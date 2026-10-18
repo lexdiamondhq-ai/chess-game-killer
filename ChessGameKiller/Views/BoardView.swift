@@ -5,7 +5,7 @@ import SwiftUI
 /// Shows the two best moves as arrows and blows up captured pieces.
 struct BoardView: View {
     let match: MatchController
-    var theme: BoardTheme = .walnut
+    var theme: BoardTheme = .malachite
 
     @AppStorage("haptics") private var hapticsOn = true
 
@@ -49,7 +49,7 @@ struct BoardView: View {
             // Explosions sit outside the clip so shards can fly past the edge.
             .overlay(alignment: .topLeading) { explosions(size: sq).padding(inset) }
             .background {
-                // Soft shadow (Walnut) or colored glow (Neon) around the board.
+                // Soft shadow or colored glow (Neon) around the board.
                 ForEach(Array(theme.boardShadows.enumerated()), id: \.offset) { index, color in
                     corner.fill(color)
                         .blur(radius: sq * (theme.isDark ? 0.3 + 0.35 * CGFloat(index) : 0.25))
@@ -466,7 +466,7 @@ private struct SeededRandom {
     }
 }
 
-/// One piece drawn in the theme's style: a soft shadow on Walnut, a colored glow on Neon,
+/// One piece drawn in the theme's style: a colored glow on Neon,
 /// a 3D sprite standing on its square on the pre-rendered themes.
 struct PieceImage: View {
     let piece: Piece
@@ -577,8 +577,10 @@ private struct PromotionPicker: View {
     }
 }
 
-#Preview("Walnut") {
-    BoardView(match: MatchController(engine: nil, sounds: nil)).padding()
+#Preview("Malachite") {
+    BoardView(match: MatchController(engine: nil, sounds: nil))
+        .padding()
+        .background(ThemeBackdrop(theme: .malachite))
 }
 
 #Preview("Neon") {

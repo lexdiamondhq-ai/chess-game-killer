@@ -5,7 +5,7 @@ import SwiftUI
 /// theme's style, with optional best-move arrows and square taps.
 struct PositionBoard: View {
     let draft: PositionDraft
-    var theme: BoardTheme = .walnut
+    var theme: BoardTheme = .malachite
     var flipped = false
     var hints: [MoveHint] = []
     var onTap: ((Square) -> Void)?

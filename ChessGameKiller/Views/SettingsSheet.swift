@@ -400,7 +400,7 @@ private struct SettingsGroup<Content: View>: View {
     }
 }
 
-/// Glass on Neon, a soft card on Walnut; outlined in color when selected.
+/// Glass on the dark themes; outlined in color when selected.
 private struct SettingsCard: View {
     let theme: BoardTheme
     let selected: Bool
@@ -513,7 +513,7 @@ struct LicensesView: View {
         .onAppear { UserDefaults.standard.set("neon", forKey: "boardTheme") }
 }
 
-#Preview("Walnut") {
+#Preview("Malachite") {
     SettingsSheet()
-        .onAppear { UserDefaults.standard.set("walnut", forKey: "boardTheme") }
+        .onAppear { UserDefaults.standard.set("malachite", forKey: "boardTheme") }
 }

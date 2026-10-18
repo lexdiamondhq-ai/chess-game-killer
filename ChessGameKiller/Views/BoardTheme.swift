@@ -4,7 +4,7 @@ import SwiftUI
 /// Everything that changes when the player picks a different board look.
 struct BoardTheme: Identifiable {
     enum ID: String, CaseIterable {
-        case malachite, faberge, blueprint, walnut, neon
+        case malachite, faberge, blueprint, neon
     }
 
     let id: ID
@@ -32,7 +32,7 @@ struct BoardTheme: Identifiable {
     let check: Color
 
     // Pieces
-    /// Prefix of the piece images in Assets.xcassets/Pieces ("" or "neon-").
+    /// Prefix of the piece images in Assets.xcassets/Pieces (such as "malachite-" or "neon-").
     let pieceSet: String
     let whiteGlow: Color?
     let blackGlow: Color?
@@ -93,7 +93,7 @@ struct BoardTheme: Identifiable {
         color == .white ? whiteSparks : blackSparks
     }
 
-    static let all: [BoardTheme] = [.malachite, .faberge, .blueprint, .walnut, .neon]
+    static let all: [BoardTheme] = [.malachite, .faberge, .blueprint, .neon]
 
     static func named(_ id: ID) -> BoardTheme {
         all.first { $0.id == id } ?? .malachite
@@ -214,42 +214,6 @@ struct BoardTheme: Identifiable {
         boardArt: "board-blueprint",
         spritePieces: true,
         backdrop: [Color(hex: 0x1D3C66), Color(hex: 0x050C18)]
-    )
-
-    /// Warm walnut and cream, tuned for contrast with the black and white pieces.
-    static let walnut = BoardTheme(
-        id: .walnut,
-        name: "Walnut",
-        symbol: "square.grid.3x3.fill",
-        light: Color(hex: 0xF0D9B5),
-        dark: Color(hex: 0xB58863),
-        surface: nil,
-        gridLine: nil,
-        labelOnLight: Color(hex: 0xB58863),
-        labelOnDark: Color(hex: 0xF0D9B5),
-        selected: Color(red: 0.42, green: 0.62, blue: 0.20).opacity(0.55),
-        selectedRing: nil,
-        lastMove: Color(red: 0.80, green: 0.82, blue: 0.24).opacity(0.45),
-        lastMoveRing: nil,
-        hint: Color.black.opacity(0.20),
-        hintGlow: nil,
-        check: Color(red: 0.90, green: 0.10, blue: 0.10),
-        pieceSet: "",
-        whiteGlow: nil,
-        blackGlow: nil,
-        whiteSide: .white,
-        blackSide: .black,
-        whiteName: "White",
-        blackName: "Black",
-        bestArrow: Color(hex: 0x15781B).opacity(0.85),
-        secondArrow: Color(hex: 0x15781B).opacity(0.55),
-        arrowGlow: nil,
-        whiteSparks: [Color(hex: 0xFFF4D6), Color(hex: 0xFFC24A), Color(hex: 0xFF7A1A)],
-        blackSparks: [Color(hex: 0xFFC24A), Color(hex: 0xFF7A1A), Color(hex: 0x6B3A1E)],
-        boardEdge: nil,
-        boardShadows: [Color.black.opacity(0.25)],
-        isDark: false,
-        accent: nil
     )
 
     /// Glowing glass board with gold and violet pieces, from the Neon Glass concept.

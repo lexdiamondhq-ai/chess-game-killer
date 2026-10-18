@@ -136,7 +136,7 @@ private struct StartCard: View {
     }
 }
 
-/// The rounded glass (Neon) or plain (Walnut) panel used across the analyzer.
+/// The rounded glass panel used across the analyzer.
 struct Panel: View {
     let theme: BoardTheme
     var highlight: Color?

@@ -416,6 +416,6 @@ private struct Chip: View {
     NewGameSheet(theme: .neon) { _ in }
 }
 
-#Preview("Walnut") {
-    NewGameSheet(theme: .walnut) { _ in }
+#Preview("Malachite") {
+    NewGameSheet(theme: .malachite) { _ in }
 }
