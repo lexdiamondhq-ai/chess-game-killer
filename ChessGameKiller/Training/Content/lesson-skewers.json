@@ -1,0 +1,51 @@
+{
+  "id": "skewers",
+  "title": "Skewers",
+  "subtitle": "Attack the big piece, win the one behind",
+  "skill": "skewers",
+  "steps": [
+    {
+      "fen": "8/3k3q/8/8/8/8/5PPP/R5K1 w - - 0 1",
+      "say": "A skewer is a pin in reverse. You attack the big piece, it has to move, and you win what's behind it.",
+      "task": {
+        "type": "move",
+        "prompt": "Find the skewer. Check the king and win the queen.",
+        "solution": [
+          "a1a7"
+        ],
+        "hint": "Check the king along the 7th row. The queen is hiding behind it.",
+        "success": "Skewered!"
+      }
+    },
+    {
+      "say": "The king has to move, and the queen falls.",
+      "moves": [
+        "d7e6",
+        "a7h7"
+      ]
+    },
+    {
+      "fen": "6q1/8/4k3/8/8/8/PP6/2K2B2 w - - 0 1",
+      "say": "Bishops skewer on diagonals.",
+      "task": {
+        "type": "move",
+        "prompt": "Find the bishop skewer.",
+        "solution": [
+          "f1c4"
+        ],
+        "hint": "Check the king on the long diagonal. Who's standing behind it?",
+        "success": "Another skewer!"
+      }
+    },
+    {
+      "say": "Lined-up pieces are a gift.",
+      "moves": [
+        "e6d7",
+        "c4g8"
+      ]
+    },
+    {
+      "say": "Whenever their king and queen, or king and rook, stand on the same line, look for a skewer."
+    }
+  ]
+}

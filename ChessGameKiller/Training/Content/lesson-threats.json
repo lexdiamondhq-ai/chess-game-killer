@@ -1,0 +1,96 @@
+{
+  "id": "threats",
+  "title": "Red Light: What Do They Want?",
+  "subtitle": "Find the threat behind every move",
+  "skill": "threats",
+  "steps": [
+    {
+      "fen": "r1bqk2r/ppp2ppp/2np1n2/2b1p1B1/2B1P3/2NP1N2/PPP2PPP/R2QK2R b KQkq - 1 6",
+      "say": "Every move your opponent makes wants something. Black just pushed a pawn to h6. Why?",
+      "moves": [
+        "h7h6"
+      ]
+    },
+    {
+      "task": {
+        "type": "tap",
+        "prompt": "Tap the piece the pawn is attacking.",
+        "squares": [
+          "g5"
+        ],
+        "hint": "Pawns attack one square diagonally forward. Which of your pieces is there?",
+        "success": "Right! The pawn is after your bishop. Spotting that is the red light.",
+        "wrong": "Look at the squares the h6 pawn attacks."
+      }
+    },
+    {
+      "arrows": [
+        {
+          "from": "h6",
+          "to": "g5",
+          "color": "red"
+        }
+      ],
+      "task": {
+        "type": "move",
+        "prompt": "Save your bishop. Move it, or trade it for their knight.",
+        "solution": [
+          "g5f6"
+        ],
+        "accept": [
+          [
+            "g5h4",
+            "g5e3",
+            "g5d2",
+            "g5c1"
+          ]
+        ],
+        "feedback": {
+          "g5f4": "The e5 pawn would take it there.",
+          "g5h6": "That gives your bishop for a pawn. Count it: 3 for 1."
+        },
+        "hint": "Any safe square works, and so does taking the knight on f6.",
+        "success": "Good. You saw the threat, and you didn't lose a thing.",
+        "wrong": "Your bishop can still be taken for free. Check every square it could go to."
+      }
+    },
+    {
+      "fen": "r4rk1/pb1q1ppp/1p1b4/2pp4/5B2/2N2Q2/PPP2PPP/R4RK1 b - - 0 1",
+      "say": "Now a sneakier one. Black pushes a pawn. Looks harmless, right?",
+      "moves": [
+        "d5d4"
+      ]
+    },
+    {
+      "task": {
+        "type": "tap",
+        "prompt": "That pawn move made two threats. Tap both of your pieces in danger.",
+        "squares": [
+          "c3",
+          "f3"
+        ],
+        "hint": "One threat comes from the pawn itself. The other comes from a piece the pawn was hiding.",
+        "success": "Both! The pawn attacks your knight, and it opened the bishop's path to your queen.",
+        "wrong": "Look at what the pawn attacks, and at what was standing behind it."
+      }
+    },
+    {
+      "say": "When a piece moves, ask two things: what does it attack, and what did it uncover? That's the full red light.",
+      "arrows": [
+        {
+          "from": "d4",
+          "to": "c3",
+          "color": "red"
+        },
+        {
+          "from": "b7",
+          "to": "f3",
+          "color": "red"
+        }
+      ]
+    },
+    {
+      "say": "Every move, red light first. It takes two seconds, and it saves whole games."
+    }
+  ]
+}

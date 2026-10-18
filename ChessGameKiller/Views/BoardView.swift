@@ -293,8 +293,8 @@ struct MoveArrow: View {
 }
 
 /// A captured piece bursting apart: a flash, a shockwave, the piece breaking
-/// into shards and a spray of sparks in the theme's colors.
-private struct CaptureExplosion: View {
+/// into shards and a spray of sparks in the theme's colors. Lessons and drills use it too.
+struct CaptureExplosion: View {
     let piece: Piece
     let theme: BoardTheme
     let size: CGFloat

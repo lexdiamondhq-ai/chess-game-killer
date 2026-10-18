@@ -14,6 +14,9 @@ struct ContentView: View {
     @AppStorage("showBestMoves") private var showBestMoves = true
     @AppStorage("showSecondBest") private var showSecondBest = true
     @AppStorage("coachVerdicts") private var showVerdicts = true
+    @State private var training = TrainingStore.live()
+    @State private var coach = GameCoach()
+    @State private var showingTraining = false
 
     private var theme: BoardTheme { .named(themeID) }
     /// The orb is stretched or unfolded, so nothing else fits beside it.
@@ -55,6 +58,9 @@ struct ContentView: View {
                         Label("Analyze a Position", systemImage: "camera.viewfinder")
                     }
                 }
+                ToolbarItem(placement: .topBarLeading) {
+                    TrainButton(theme: theme) { showingTraining = true }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 4) {
                         Button {
@@ -73,6 +79,20 @@ struct ContentView: View {
         }
         .tint(theme.accent)
         .preferredColorScheme(theme.isDark ? .dark : nil)
+        .environment(training)
+        .environment(coach)
+        .onChange(of: match.review) { _, review in
+            coach.observe(review, in: match, store: training)
+        }
+        .fullScreenCover(isPresented: $showingTraining) {
+            TrainingHubView(theme: theme).environment(training)
+        }
+        .fullScreenCover(item: $coach.presentedLesson) { lesson in
+            LessonScreen(lesson: lesson, theme: theme).environment(training)
+        }
+        .fullScreenCover(item: $coach.presentedSession) { plan in
+            SessionView(plan: plan, theme: theme).environment(training)
+        }
         .animation(.easeInOut(duration: 0.35), value: themeID)
         .sheet(isPresented: $showingNewGame, onDismiss: startIfNeeded) {
             NewGameSheet(theme: theme) { setup in
@@ -101,6 +121,9 @@ struct ContentView: View {
             if showing { setCoach(expanded: false) }
         }
         .onChange(of: showingAnalyze) { _, showing in
+            if showing { setCoach(expanded: false) }
+        }
+        .onChange(of: showingTraining) { _, showing in
             if showing { setCoach(expanded: false) }
         }
         .onChange(of: match.isOver) { _, over in
@@ -166,6 +189,28 @@ struct ContentView: View {
         if !match.hasStarted {
             match.start(NewGameSheet.savedSetup(), playSound: false)
         }
+    }
+}
+
+/// Opens Coach Leo's training: lessons, puzzles and your own mistakes to fix.
+/// A filled circle in the theme's accent, so it stands out from the plain toolbar icons.
+private struct TrainButton: View {
+    let theme: BoardTheme
+    let action: () -> Void
+
+    var body: some View {
+        let accent = theme.trainingAccent
+        Button(action: action) {
+            Image(systemName: "graduationcap.fill")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(theme.isDark ? Color.black : Color.white)
+                .frame(width: 32, height: 32)
+                .background(accent, in: Circle())
+                .shadow(color: theme.isDark ? accent.opacity(0.6) : .clear, radius: 8)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Train with Coach Leo")
+        .accessibilityHint("Lessons, puzzles and your own mistakes to practice")
     }
 }
 

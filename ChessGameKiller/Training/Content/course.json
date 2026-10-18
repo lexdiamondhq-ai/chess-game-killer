@@ -1,0 +1,447 @@
+{
+  "coach": {
+    "name": "Leo",
+    "title": "Grandmaster coach",
+    "tagline": "Every strong player was once a beginner who kept going. Let's go."
+  },
+  "habit": [
+    {
+      "id": "red",
+      "title": "Red light",
+      "question": "What are they threatening?",
+      "detail": "Before you think about your move, look at theirs. What does their last move attack? Is anything of yours unprotected? Is a check or a mate coming?"
+    },
+    {
+      "id": "yellow",
+      "title": "Yellow light",
+      "question": "Any checks, captures or attacks?",
+      "detail": "Now look for your chances: every check, every capture, every attack. Forcing moves first, because they leave your opponent the fewest choices."
+    },
+    {
+      "id": "green",
+      "title": "Green light",
+      "question": "Is my move safe?",
+      "detail": "Picked a move? Picture it on the board first. Can they take that piece? Does it leave something else unprotected? If it's safe, go."
+    }
+  ],
+  "units": [
+    {
+      "id": "start",
+      "title": "Start Here",
+      "subtitle": "Meet your coach and learn what pieces are worth",
+      "symbol": "sparkles",
+      "color": "teal",
+      "lessons": [
+        "welcome",
+        "piece-values"
+      ],
+      "skills": [
+        "counting"
+      ]
+    },
+    {
+      "id": "red",
+      "title": "Red Light: Their Threats",
+      "subtitle": "See what their last move is after",
+      "symbol": "eye.fill",
+      "color": "red",
+      "lessons": [
+        "threats"
+      ],
+      "skills": [
+        "threats"
+      ]
+    },
+    {
+      "id": "green",
+      "title": "Green Light: Safe Moves",
+      "subtitle": "Never give a piece away again",
+      "symbol": "checkmark.shield.fill",
+      "color": "green",
+      "lessons": [
+        "safe-squares"
+      ],
+      "skills": [
+        "safety"
+      ]
+    },
+    {
+      "id": "yellow",
+      "title": "Yellow Light: Free Pieces",
+      "subtitle": "Take what they leave unprotected",
+      "symbol": "gift.fill",
+      "color": "yellow",
+      "lessons": [
+        "free-pieces"
+      ],
+      "skills": [
+        "free-pieces"
+      ]
+    },
+    {
+      "id": "mates",
+      "title": "Checkmate Patterns",
+      "subtitle": "Finish games with style",
+      "symbol": "crown.fill",
+      "color": "pink",
+      "lessons": [
+        "mate-in-one",
+        "back-rank",
+        "mate-in-two"
+      ],
+      "skills": [
+        "mate-in-1",
+        "back-rank",
+        "mate-in-2"
+      ]
+    },
+    {
+      "id": "opening",
+      "title": "Start Strong",
+      "subtitle": "Three rules for the first ten moves",
+      "symbol": "flag.fill",
+      "color": "blue",
+      "lessons": [
+        "opening-rules"
+      ],
+      "skills": [
+        "opening"
+      ]
+    },
+    {
+      "id": "tactics",
+      "title": "Tactics",
+      "subtitle": "Forks, pins, skewers and surprises",
+      "symbol": "bolt.fill",
+      "color": "violet",
+      "lessons": [
+        "forks",
+        "pins",
+        "skewers",
+        "discovered"
+      ],
+      "skills": [
+        "forks",
+        "pins",
+        "skewers",
+        "discovered"
+      ]
+    },
+    {
+      "id": "endgame",
+      "title": "Finish the Job",
+      "subtitle": "Turn a winning position into a win",
+      "symbol": "flag.checkered",
+      "color": "orange",
+      "lessons": [
+        "queen-mate",
+        "rook-mates"
+      ],
+      "skills": [
+        "queen-mate",
+        "ladder-mate",
+        "rook-mate"
+      ]
+    }
+  ],
+  "skills": [
+    {
+      "id": "counting",
+      "title": "Good captures",
+      "symbol": "scalemass.fill",
+      "lesson": "piece-values",
+      "blurb": "Pawn 1, knight and bishop 3, rook 5, queen 9. Know when a capture wins.",
+      "prompt": "Is {move} a good capture?",
+      "yes": "Good capture",
+      "no": "Bad capture"
+    },
+    {
+      "id": "threats",
+      "title": "Their threats",
+      "symbol": "eye.fill",
+      "lesson": "threats",
+      "blurb": "Every move they make wants something. Find out what.",
+      "prompt": "Their last move attacks something of yours. Tap what's in danger."
+    },
+    {
+      "id": "safety",
+      "title": "Safe moves",
+      "symbol": "checkmark.shield.fill",
+      "lesson": "safe-squares",
+      "blurb": "Before you let go of a piece, check that they can't win it.",
+      "prompt": "Is {move} safe?",
+      "yes": "Safe",
+      "no": "Not safe"
+    },
+    {
+      "id": "free-pieces",
+      "title": "Free pieces",
+      "symbol": "gift.fill",
+      "lesson": "free-pieces",
+      "blurb": "Spot the piece nobody is guarding, and take it.",
+      "prompt": "Something of theirs isn't protected. Win it."
+    },
+    {
+      "id": "mate-in-1",
+      "title": "Mate in one",
+      "symbol": "crown.fill",
+      "lesson": "mate-in-one",
+      "blurb": "Find the one move that ends the game.",
+      "prompt": "Checkmate in one move."
+    },
+    {
+      "id": "back-rank",
+      "title": "Back-rank mate",
+      "symbol": "arrow.down.to.line",
+      "lesson": "back-rank",
+      "blurb": "A king stuck behind its own pawns can't escape a rook or queen.",
+      "prompt": "Their king is stuck on the back row. Finish it."
+    },
+    {
+      "id": "mate-in-2",
+      "title": "Mate in two",
+      "symbol": "crown",
+      "lesson": "mate-in-two",
+      "blurb": "A forcing move, their only reply, then checkmate.",
+      "prompt": "Checkmate in two moves."
+    },
+    {
+      "id": "opening",
+      "title": "Opening rules",
+      "symbol": "flag.fill",
+      "lesson": "opening-rules",
+      "blurb": "Take the center, bring out your pieces, castle. That's the recipe.",
+      "prompt": "Which move follows the opening rules?"
+    },
+    {
+      "id": "forks",
+      "title": "Forks",
+      "symbol": "arrow.triangle.branch",
+      "lesson": "forks",
+      "blurb": "One piece attacks two. They can only save one.",
+      "prompt": "Find the fork."
+    },
+    {
+      "id": "pins",
+      "title": "Pins",
+      "symbol": "pin.fill",
+      "lesson": "pins",
+      "blurb": "Freeze a piece in front of a bigger one.",
+      "prompt": "Find the pin."
+    },
+    {
+      "id": "skewers",
+      "title": "Skewers",
+      "symbol": "line.diagonal.arrow",
+      "lesson": "skewers",
+      "blurb": "Attack the big piece and win the one behind it.",
+      "prompt": "Find the skewer."
+    },
+    {
+      "id": "discovered",
+      "title": "Discovered attacks",
+      "symbol": "rays",
+      "lesson": "discovered",
+      "blurb": "Move one piece and uncover an attack from another.",
+      "prompt": "Find the discovered attack."
+    },
+    {
+      "id": "queen-mate",
+      "title": "Queen checkmate",
+      "symbol": "crown.fill",
+      "lesson": "queen-mate",
+      "blurb": "King and queen against a lone king. Box it in, then finish.",
+      "prompt": "Checkmate with your queen in {limit} moves or fewer. Watch out for stalemate!"
+    },
+    {
+      "id": "ladder-mate",
+      "title": "Ladder mate",
+      "symbol": "stairs",
+      "lesson": "rook-mates",
+      "blurb": "Two rooks walk the king to the edge, one step at a time.",
+      "prompt": "Checkmate with your two rooks in {limit} moves or fewer."
+    },
+    {
+      "id": "rook-mate",
+      "title": "Rook checkmate",
+      "symbol": "flag.checkered",
+      "lesson": "rook-mates",
+      "blurb": "King and rook working as a team.",
+      "prompt": "Checkmate with king and rook in {limit} moves or fewer."
+    }
+  ],
+  "ranks": [
+    {
+      "id": "pawn",
+      "title": "Pawn",
+      "piece": "pawn",
+      "xp": 0
+    },
+    {
+      "id": "knight",
+      "title": "Knight",
+      "piece": "knight",
+      "xp": 250
+    },
+    {
+      "id": "bishop",
+      "title": "Bishop",
+      "piece": "bishop",
+      "xp": 700
+    },
+    {
+      "id": "rook",
+      "title": "Rook",
+      "piece": "rook",
+      "xp": 1500
+    },
+    {
+      "id": "queen",
+      "title": "Queen",
+      "piece": "queen",
+      "xp": 3000
+    },
+    {
+      "id": "king",
+      "title": "King",
+      "piece": "king",
+      "xp": 5000
+    }
+  ],
+  "lines": {
+    "greeting": [
+      "Good to see you. Let's find some patterns.",
+      "Welcome back. A few minutes a day is how strong players are made.",
+      "Ready when you are. I picked something good for today.",
+      "Hello again! You remember more than you think. Let's prove it.",
+      "Every game you play shows me what to teach you next.",
+      "Small steps, every day. That's the whole secret."
+    ],
+    "correct": [
+      "Yes! That's it.",
+      "Exactly right.",
+      "Beautiful.",
+      "You saw it. Great eyes.",
+      "That's the move.",
+      "Spot on.",
+      "Perfect.",
+      "Now you're thinking like a master."
+    ],
+    "correctAfterHint": [
+      "There it is. Hints are how we learn.",
+      "Got it. Next time you'll see it sooner.",
+      "Yes! Asking for help is a strength.",
+      "That's it. Now it's yours."
+    ],
+    "keepGoing": [
+      "Good. Keep going.",
+      "Right. What's next?",
+      "Nice. Don't stop now.",
+      "Yes. Now finish it."
+    ],
+    "wrong": [
+      "Not quite. Have another look.",
+      "Close. Try again.",
+      "Not that one. What else is there?",
+      "Almost. Check every check, capture and attack.",
+      "Not this time. Take a breath and look again."
+    ],
+    "tilt": [
+      "That was a tough one. Let's warm back up with something lighter.",
+      "Even grandmasters miss these. Here's an easier one to get the rhythm back.",
+      "No stress. A quick win, then we'll go again."
+    ],
+    "sessionDone": [
+      "That's a session. Your future self says thanks.",
+      "Nicely done. These patterns are sinking in.",
+      "Session complete. Go play a game and use what you learned.",
+      "Done for today. I'll have fresh ones for you tomorrow."
+    ],
+    "lessonDone": [
+      "Lesson done. Now let's make it stick with a few puzzles.",
+      "You've got the idea. Practice makes it automatic.",
+      "That's the lesson. Ready to try it yourself?"
+    ],
+    "restDay": [
+      "Your streak is safe. Everyone needs a rest day.",
+      "Welcome back! I used a rest day to keep your streak going."
+    ],
+    "promotion": [
+      "Promoted! The board looks different from up here.",
+      "A new rank. Well earned.",
+      "Look at you go. Promoted!"
+    ]
+  },
+  "moments": [
+    {
+      "kind": "missedMate",
+      "title": "You had checkmate!",
+      "detail": "There was mate in {n} here, starting with {best}. Look at every check first."
+    },
+    {
+      "kind": "allowedMate",
+      "title": "Checkmate threat",
+      "detail": "After {played}, {reply} starts a checkmate. Red light: what are their pieces aiming at?"
+    },
+    {
+      "kind": "hungPiece",
+      "title": "Your {piece} wasn't safe",
+      "detail": "{reply} wins your {piece} on {square}. Green light: before you let go, can they take it?"
+    },
+    {
+      "kind": "allowedFork",
+      "title": "Watch out for forks",
+      "detail": "{reply} lets their {piece} attack your {targets} at once."
+    },
+    {
+      "kind": "missedFreePiece",
+      "title": "Free {piece}!",
+      "detail": "Their {piece} on {square} wasn't protected. {best} wins it."
+    },
+    {
+      "kind": "missedFork",
+      "title": "There was a fork",
+      "detail": "{best} attacks their {targets} at the same time."
+    },
+    {
+      "kind": "missedPin",
+      "title": "There was a pin",
+      "detail": "{best} pins their {piece} to the {targets}."
+    },
+    {
+      "kind": "missedSkewer",
+      "title": "There was a skewer",
+      "detail": "{best} hits their {piece}, and the {targets} behind it falls."
+    },
+    {
+      "kind": "earlyQueen",
+      "title": "Queen out early",
+      "detail": "Out this soon, she gets chased around while their pieces develop. Knights and bishops first."
+    },
+    {
+      "kind": "foundMate",
+      "title": "Checkmate!",
+      "detail": "{played} ends it. The best feeling in chess."
+    },
+    {
+      "kind": "foundFork",
+      "title": "Beautiful fork!",
+      "detail": "{played} hits their {targets} at once."
+    },
+    {
+      "kind": "foundFreePiece",
+      "title": "Free piece, taken",
+      "detail": "You spotted the unprotected {piece}. That's the yellow light working."
+    },
+    {
+      "kind": "castled",
+      "title": "King tucked away",
+      "detail": "Castling hides your king and wakes up a rook. Great habit."
+    },
+    {
+      "kind": "fixedIt",
+      "title": "That's it!",
+      "detail": "{played} is the move. You found it."
+    }
+  ]
+}

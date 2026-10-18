@@ -15,6 +15,8 @@ struct CoachOrb: View {
 
     @State private var peekTask: Task<Void, Never>?
     @AppStorage("haptics") private var hapticsOn = true
+    /// Coach Leo, when the app has training. His tips show in the open panel.
+    @Environment(GameCoach.self) private var gameCoach: GameCoach?
 
     static let orbSize: CGFloat = 68
 
@@ -40,6 +42,16 @@ struct CoachOrb: View {
         .frame(maxWidth: isExpanded || isPeeking ? .infinity : Self.orbSize)
         .frame(height: isExpanded ? nil : Self.orbSize)
         .background { orbBackground }
+        .overlay(alignment: .topTrailing) {
+            ZStack {
+                if !isExpanded, !isPeeking, let gameCoach, let moment = gameCoach.moment {
+                    CoachOrbBadge(moment: moment, theme: theme)
+                        .transition(.scale(scale: 0.3).combined(with: .opacity))
+                }
+            }
+            .offset(x: 6, y: -6)
+            .animation(.spring(response: 0.4, dampingFraction: 0.7), value: gameCoach?.moment)
+        }
         .contentShape(RoundedRectangle(cornerRadius: Self.orbSize / 2, style: .continuous))
         .onTapGesture {
             if !isExpanded { expand() }
@@ -299,6 +311,8 @@ private struct CoachPanel: View {
     let collapse: () -> Void
 
     @AppStorage("showBestMoves") private var showBestMoves = true
+    @Environment(GameCoach.self) private var gameCoach: GameCoach?
+    @Environment(TrainingStore.self) private var training: TrainingStore?
 
     private var accent: Color { theme.accent ?? .accentColor }
 
@@ -314,6 +328,10 @@ private struct CoachPanel: View {
                 .onTapGesture(perform: collapse)
                 .accessibilityHidden(true)
             header
+            if let gameCoach, let training, GameCoachRow.hasContent(coach: gameCoach, match: match) {
+                GameCoachRow(coach: gameCoach, store: training, match: match, theme: theme)
+                    .padding(.top, 10)
+            }
             EvalBar(share: evalShare, label: evalLabel, theme: theme)
                 .padding(.top, 12)
             if match.isOver {
@@ -500,6 +518,9 @@ private struct CoachPanel: View {
             .disabled(!match.canUndo)
             ActionButton(title: "Hints", symbol: showBestMoves ? "lightbulb.fill" : "lightbulb.slash", isOn: showBestMoves, theme: theme) {
                 showBestMoves.toggle()
+            }
+            if gameCoach != nil {
+                ThinkActionButton(match: match, theme: theme)
             }
             ActionButton(title: "Flip", symbol: "arrow.triangle.2.circlepath", theme: theme) {
                 withAnimation(.snappy(duration: 0.45)) { match.flipBoard() }

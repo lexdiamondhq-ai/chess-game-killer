@@ -1,0 +1,63 @@
+{
+  "id": "back-rank",
+  "title": "The Back-Rank Mate",
+  "subtitle": "When pawns become a prison",
+  "skill": "back-rank",
+  "steps": [
+    {
+      "fen": "6k1/pb3ppp/2n5/8/8/1P6/P1P2PPP/4R1K1 w - - 0 1",
+      "say": "Look at Black's king. Its own pawns block every step forward. If a rook reaches the back row, it's over.",
+      "marks": [
+        {
+          "square": "f7",
+          "color": "red"
+        },
+        {
+          "square": "g7",
+          "color": "red"
+        },
+        {
+          "square": "h7",
+          "color": "red"
+        }
+      ],
+      "task": {
+        "type": "move",
+        "prompt": "Find the back-rank mate.",
+        "solution": [
+          "e1e8"
+        ],
+        "mate": true,
+        "hint": "Your rook can go all the way up the e-file.",
+        "success": "Back-rank mate! The pawns that protected the king became its prison."
+      }
+    },
+    {
+      "fen": "3r2k1/ppq2ppp/8/8/8/7P/3R1PP1/3R2K1 w - - 0 1",
+      "say": "Here's a trick with two rooks on the same file. Black's rook guards the back row, but one guard can't stop two attackers.",
+      "task": {
+        "type": "move",
+        "prompt": "Checkmate in two moves.",
+        "solution": [
+          "d2d8",
+          "c7d8",
+          "d1d8"
+        ],
+        "mate": true,
+        "hint": "Take their rook with check. Whatever takes back, your other rook is waiting.",
+        "success": "Two rooks, one file, checkmate. That's called doubling your rooks."
+      }
+    },
+    {
+      "fen": "6k1/pb3pp1/2n4p/8/8/1P6/P1P2PPP/4R1K1 w - - 0 1",
+      "say": "The cure is simple: give your king some air. With a pawn on h6, the king just steps out to h7.",
+      "moves": [
+        "e1e8",
+        "g8h7"
+      ]
+    },
+    {
+      "say": "So guard your own back row, and look for theirs. A king with no air is a king in danger."
+    }
+  ]
+}

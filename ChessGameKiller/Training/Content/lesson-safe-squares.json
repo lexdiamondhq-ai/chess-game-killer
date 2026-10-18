@@ -1,0 +1,121 @@
+{
+  "id": "safe-squares",
+  "title": "Green Light: Is It Safe?",
+  "subtitle": "Check before you let go",
+  "skill": "safety",
+  "steps": [
+    {
+      "fen": "r1bqkbnr/pppp1pp1/2n4p/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 4",
+      "say": "The green light is the last check before you move. You've picked a move. Now picture the piece on its new square."
+    },
+    {
+      "arrows": [
+        {
+          "from": "f3",
+          "to": "g5",
+          "color": "yellow",
+          "dashed": true
+        }
+      ],
+      "task": {
+        "type": "choice",
+        "prompt": "You'd like to play Knight g5 and attack f7. Is it safe?",
+        "options": [
+          {
+            "text": "Safe",
+            "correct": false,
+            "why": "Look at the h6 pawn. Pawns capture one square diagonally forward."
+          },
+          {
+            "text": "Not safe",
+            "correct": true,
+            "move": "h6g5",
+            "why": "The h6 pawn would take it for free."
+          }
+        ],
+        "success": "Green light working!"
+      }
+    },
+    {
+      "say": "Let's see what happens if you go anyway. Gone, for nothing. One look would have saved it.",
+      "moves": [
+        "f3g5",
+        "h6g5"
+      ]
+    },
+    {
+      "fen": "r1bqkb1r/pppp1ppp/2n2n2/4p3/4P3/2N2N2/PPPP1PPP/R1BQKB1R w KQkq - 4 4",
+      "say": "But attacked doesn't always mean unsafe. Here you'd like to play Knight d5, and Black's knight attacks that square.",
+      "arrows": [
+        {
+          "from": "c3",
+          "to": "d5",
+          "color": "yellow",
+          "dashed": true
+        },
+        {
+          "from": "f6",
+          "to": "d5",
+          "color": "red"
+        }
+      ],
+      "task": {
+        "type": "choice",
+        "prompt": "Is Knight d5 safe?",
+        "options": [
+          {
+            "text": "Safe",
+            "correct": true,
+            "why": "If their knight takes, your e4 pawn takes back. Knight for knight is a fair trade."
+          },
+          {
+            "text": "Not safe",
+            "correct": false,
+            "why": "Count it. If they take, your pawn takes back. Knight for knight, nothing lost."
+          }
+        ],
+        "success": "Exactly."
+      }
+    },
+    {
+      "say": "So the green light asks: if they take, can I take back? Is the trade fair? Count, just like before."
+    },
+    {
+      "fen": "rnbqkbnr/1p3ppp/p2p4/4p3/2PNP3/8/PP3PPP/RNBQKB1R w KQkq - 0 6",
+      "say": "Your knight is attacked by the e5 pawn. Some squares are safe, some aren't.",
+      "arrows": [
+        {
+          "from": "e5",
+          "to": "d4",
+          "color": "red"
+        }
+      ],
+      "task": {
+        "type": "move",
+        "prompt": "Move your knight to a safe square.",
+        "solution": [
+          "d4f3"
+        ],
+        "accept": [
+          [
+            "d4b3",
+            "d4c2",
+            "d4e2",
+            "d4f5"
+          ]
+        ],
+        "feedback": {
+          "d4b5": "The a6 pawn would take it.",
+          "d4c6": "The b7 pawn would take it.",
+          "d4e6": "The f7 pawn would take it."
+        },
+        "hint": "Pawns on a6, b7 and f7 guard some of the knight's squares. Stay away from those.",
+        "success": "Safe and sound. Green light!",
+        "wrong": "That square isn't safe. Check what can take your knight there."
+      }
+    },
+    {
+      "say": "Green light, every move: picture it, then check it. Can they take it? Can I take back? Is the trade fair?"
+    }
+  ]
+}
