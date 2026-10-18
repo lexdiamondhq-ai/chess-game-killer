@@ -14,10 +14,15 @@ open ChessGameKiller.xcodeproj
 ```
 Then press Run in Xcode.
 
+## Tests
+`xcodebuild test -scheme ChessGameKiller -destination 'platform=iOS Simulator,name=iPhone 16'`
+GitHub Actions runs the same build and tests on every pull request.
+
 ## Layout
 - `ChessGameKiller/App` – app entry point
-- `ChessGameKiller/Model` – board and piece logic
+- `ChessGameKiller/Model` – game state on top of [ChessKit](https://github.com/chesskit-app/chesskit-swift) (rules)
 - `ChessGameKiller/Views` – SwiftUI screens
+- `ChessGameKillerTests` – unit tests
 
 ## Credits
 Piece artwork: "cburnett" set by Colin M.L. Burnett, licensed GPLv2+ (via Lichess).
