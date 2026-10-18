@@ -1766,10 +1766,16 @@ def pick(templates, counts: dict[str, int], rng: random.Random, stats: Counter):
     return rng.choices(templates, weights=weights)[0][0]
 
 
-def puzzle_job(job: tuple[str, int, int, dict[str, int]]) -> tuple[str, list[tuple[str, dict]], Counter]:
-    """Composes and verifies candidates for one motif for a while."""
+def puzzle_job(job: tuple[str, int, int, dict[str, int], set[str], set[str]]) \
+        -> tuple[str, list[tuple[str, dict]], Counter]:
+    """Composes and verifies candidates for one motif for a while.
+
+    `seen` and `cores` hold what the run already has, so near-duplicates are
+    dropped here rather than sent back, and they count against their template:
+    some patterns (Qg7# off the long diagonal, the smothered mate) only come in
+    a couple of distinct versions, and the engine time is better spent elsewhere."""
     global ENGINE
-    motif, seed, wanted, counts = job
+    motif, seed, wanted, counts, seen, cores = job
     rng = random.Random(seed)
     counts = dict(counts)
     found: list[tuple[str, dict]] = []
@@ -1783,6 +1789,12 @@ def puzzle_job(job: tuple[str, int, int, dict[str, int]]) -> tuple[str, list[tup
         if candidate is None:
             continue
         board, key = candidate
+        # A mate in one is just the key move, so its core is known before the engine looks.
+        if placement_key(board) in seen or \
+                (motif == "mate-in-1" and core_key({"fen": board.fen(), "solution": [key[0].uci()]}) in cores):
+            stats[f"{name}:dup"] += 1
+            counts[name] = counts.get(name, 0) + 1
+            continue
         stats[f"{name}:engine"] += 1
         try:
             if not first_look(ENGINE, board, key, motif):
@@ -1796,6 +1808,13 @@ def puzzle_job(job: tuple[str, int, int, dict[str, int]]) -> tuple[str, list[tup
             continue
         if rec is None or not is_motif(motif, rec, key):
             continue
+        position, core = placement_key(chess.Board(rec["fen"])), core_key(rec)
+        if position in seen or core in cores:
+            stats[f"{name}:dup"] += 1
+            counts[name] = counts.get(name, 0) + 1
+            continue
+        seen.add(position)
+        cores.add(core)
         stats[f"{name}:ok"] += 1
         counts[name] = counts.get(name, 0) + 1
         found.append((name, rec))
@@ -1821,6 +1840,7 @@ def main() -> None:
 
     have: dict[str, list[dict]] = {m: [] for m in wanted}
     by_template: dict[str, Counter] = {m: Counter() for m in wanted}
+    dups: dict[str, Counter] = {m: Counter() for m in wanted}   # near-duplicates each template turned up
     seen: set[str] = set()
     cores: set[str] = set()
     totals: Counter = Counter()
@@ -1881,7 +1901,7 @@ def main() -> None:
             while len(pending) < args.workers + 1 and open_motifs:
                 motif = max(open_motifs, key=lambda m: needs[m] / (1 + busy[m]))
                 seed += 1
-                job = (motif, seed, min(needs[motif], 6), dict(by_template[motif]))
+                job = (motif, seed, min(needs[motif], 6), dict(by_template[motif] + dups[motif]), set(seen), set(cores))
                 pending.append((motif, pool.apply_async(puzzle_job, (job,))))
                 busy[motif] += 1
                 open_motifs = [m for m in open_motifs if busy[m] < max(1, needs[m] // 6)]
@@ -1892,6 +1912,9 @@ def main() -> None:
                 pending.remove(item)
                 motif, found, stats = item[1].get()
                 totals.update(stats)
+                for k, n in stats.items():
+                    if k.endswith(":dup"):
+                        dups[motif][k[:-len(":dup")]] += n
                 if motif in PLAYOUTS:
                     for rec in found:
                         accept(motif, motif, rec)
@@ -1904,11 +1927,11 @@ def main() -> None:
                 print(f"[{(time.time() - started) / 60:5.1f} min] {done}", flush=True)
                 write_out()
 
-    print("\ntemplate          tried  engine   deep     ok")
+    print("\ntemplate              tried  engine   deep     ok    dup")
     names = sorted({k.split(":")[0] for k in totals if ":" in k})
     for name in names:
-        print(f"{name:16} {totals[name + ':tried']:6} {totals[name + ':engine']:7} {totals[name + ':deep']:6} "
-              f"{totals[name + ':ok']:6}")
+        print(f"{name:20} {totals[name + ':tried']:6} {totals[name + ':engine']:7} {totals[name + ':deep']:6} "
+              f"{totals[name + ':ok']:6} {totals[name + ':dup']:6}")
     for m in wanted:
         ratings = [r["rating"] for r in have[m]]
         spread = f"{min(ratings)}-{max(ratings)}" if ratings else "-"
