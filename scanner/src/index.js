@@ -7,6 +7,7 @@ const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif
 const SIDES = new Set(["bottom", "top", "left", "right"]);
 const CONFIDENCE = new Set(["high", "medium", "low"]);
 const PIECES = new Set("KQRBNPkqrbnp");
+const CELLS = [..."KQRBNPkqrbnp", "."];
 
 // The answer's shape. The API's structured outputs guarantee Claude's reply
 // matches it (Sonnet 5.5 no longer allows forcing a tool call).
@@ -17,8 +18,8 @@ export const SCHEMA = {
     rows: {
       type: "array",
       description:
-        "The 8 rows of squares exactly as they appear in the picture, top row first. Each is 8 characters for the squares from left to right: K Q R B N P for White, k q r b n p for Black, . for empty.",
-      items: { type: "string", pattern: "^[KQRBNPkqrbnp.]{8}$" },
+        "The 8 rows of squares exactly as they appear in the picture, top row first. Each row lists its 8 squares from left to right, one entry per square: K Q R B N P for White, k q r b n p for Black, . for empty.",
+      items: { type: "array", items: { type: "string", enum: CELLS } },
     },
     white_side: {
       type: "string",
@@ -44,7 +45,9 @@ export const PROMPT = `Read the chess position in this picture. It may be a phot
 
 Go square by square and report the board exactly as it appears in the picture, without turning it around: the top row of squares first, each row from left to right. If the photo is taken at an angle, follow the board's own rows and columns, not the edges of the picture, and report only the 64 squares of the board. Captured pieces lying beside the board are not on it.
 
-White's pieces are the lighter ones. Tell kings from queens and bishops from pawns carefully; every legal position has exactly one king of each color. Before answering, read any coordinates and count each color's pieces, then check your rows add up to the same counts.
+White's pieces are the lighter ones. Tell kings from queens and bishops from pawns carefully; every legal position has exactly one king of each color.
+
+Think it through before answering. Find the board's edges and read any coordinates. Then go row by row and name all 8 squares of each row in order, empty ones too, so no piece slips into the next column. Finally count each color's pieces in the picture and check your rows have the same counts.
 
 For white_side, use the coordinate letters and numbers if you can see them (a1 is in the corner on White's left). Otherwise judge from where the kings, queens and pawns stand.
 
@@ -96,7 +99,7 @@ export async function readBoard(bytes, type, env) {
       "anthropic-version": "2023-06-01",
       "content-type": "application/json",
     },
-    body: JSON.stringify(buildRequest(bytes, type, env.MODEL)),
+    body: JSON.stringify(buildRequest(bytes, type, env.MODEL, env.EFFORT)),
   });
   if (!response.ok) {
     const detail = (await response.text()).slice(0, 300);
@@ -118,12 +121,15 @@ export function apiKey(env) {
   return String(env.ANTHROPIC_API_KEY || "").trim();
 }
 
-export function buildRequest(bytes, type, model) {
+/** effort ("low" to "max") sets how hard Claude thinks; left out, the API's default. */
+export function buildRequest(bytes, type, model, effort) {
+  const output_config = { format: { type: "json_schema", schema: SCHEMA } };
+  if (effort) output_config.effort = effort;
   return {
     model: model || "claude-sonnet-5-5",
     // Covers Claude's thinking too, which Sonnet 5.5 does by default.
     max_tokens: 16000,
-    output_config: { format: { type: "json_schema", schema: SCHEMA } },
+    output_config,
     messages: [
       {
         role: "user",
@@ -136,13 +142,14 @@ export function buildRequest(bytes, type, model) {
   };
 }
 
-/** Keeps only well-formed answers: 8 rows of 8 known characters. */
+/** Keeps only well-formed answers: 8 rows of 8 known characters. Rows may come
+ * as lists of squares or as strings; they go back to the app as strings. */
 export function normalize(input) {
   const answer = input || {};
   const rows = Array.isArray(answer.rows) ? answer.rows : [];
   const clean = rows.map((row) =>
-    Array.from(String(row))
-      .map((ch) => (PIECES.has(ch) ? ch : "."))
+    (Array.isArray(row) ? row.map(String) : Array.from(String(row)))
+      .map((cell) => (PIECES.has(cell) ? cell : "."))
       .join("")
   );
   const wellFormed = clean.length === 8 && clean.every((row) => row.length === 8);

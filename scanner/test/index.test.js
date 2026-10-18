@@ -32,7 +32,8 @@ function claudeAnswers(input, capture = {}) {
 test("reads a board through Claude", async () => {
   const capture = {};
   claudeAnswers(
-    { found: true, rows: ROWS, white_side: "bottom", side_to_move: "black", confidence: "high" },
+    // Claude lists each row's squares; the app gets them back as strings.
+    { found: true, rows: ROWS.map((row) => [...row]), white_side: "bottom", side_to_move: "black", confidence: "high" },
     capture
   );
   const response = await worker.fetch(post(), env);
@@ -50,6 +51,7 @@ test("reads a board through Claude", async () => {
   const sent = JSON.parse(capture.options.body);
   assert.equal(sent.model, "claude-test");
   assert.equal(sent.output_config.format.type, "json_schema");
+  assert.equal(sent.output_config.effort, undefined);
   assert.equal(sent.tool_choice, undefined);
   assert.equal(sent.messages[0].content[0].source.data, "AQID");
 });
@@ -117,6 +119,15 @@ test("the request asks for the board's shape with the picture", () => {
   assert.equal(request.model, "claude-sonnet-5-5");
   assert.equal(request.messages[0].content[0].source.media_type, "image/png");
   assert.equal(request.output_config.format.schema, SCHEMA);
+  assert.equal(buildRequest(new Uint8Array([1]), "image/png", "m", "max").output_config.effort, "max");
+});
+
+test("rows given as lists of squares are checked square by square", () => {
+  const rows = ROWS.map((row) => [...row]);
+  rows[1][4] = "x";
+  assert.equal(normalize({ found: true, rows }).rows[1], "pppp.ppp");
+  rows[2] = rows[2].slice(0, 7);
+  assert.deepEqual(normalize({ found: true, rows }), { found: false });
 });
 
 test("a refused or cut-off answer is a failure, not a board", async () => {
