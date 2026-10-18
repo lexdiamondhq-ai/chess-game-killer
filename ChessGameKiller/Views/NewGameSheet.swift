@@ -338,7 +338,7 @@ private struct RivalCard: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            RivalSigil(rival: rival, size: 92, glows: theme.isDark)
+            RivalPortrait(rival: rival, size: 100, glows: theme.isDark)
             VStack(alignment: .leading, spacing: 4) {
                 Text(rival.name)
                     .font(.system(.title2, design: .rounded).weight(.heavy))
