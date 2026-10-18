@@ -92,7 +92,7 @@ OPENINGS = [
                   ("h5", False, "Edge pawns don't help in the opening. Develop or fight for the center.")], 520),
     ("e4 c5", [("Nf3", True, "It develops a knight and gets ready to play d4."),
                ("Qh5", False, "Out this early, the queen gets chased around while Black develops."),
-               ("a4", False, "Edge pawns don't help in the opening. Develop a piece.")], 480),
+               ("g4", False, "It loosens the pawns in front of your own king and develops nothing. Bring out a piece.")], 480),
     ("e4 e6", [("d4", True, "Two pawns side by side in the center. The ideal opening setup."),
                ("Qg4", False, "Too early for the queen. She'll be chased around."),
                ("h4", False, "Edge pawns don't fight for the center.")], 480),

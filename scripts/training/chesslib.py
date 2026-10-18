@@ -103,7 +103,8 @@ class Engine:
     """A UCI engine with the two things the scripts need: analysis and weak play."""
 
     def __init__(self, command: str, hash_mb: int = 64):
-        self.engine = chess.engine.SimpleEngine.popen_uci(shlex.split(command))
+        # The WebAssembly build can take a while to load its network on a busy machine.
+        self.engine = chess.engine.SimpleEngine.popen_uci(shlex.split(command), timeout=120)
         self.engine.configure({"Hash": hash_mb})
         self.skill = 20
 
