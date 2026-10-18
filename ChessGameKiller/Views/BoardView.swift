@@ -10,19 +10,35 @@ struct BoardView: View {
         GeometryReader { geo in
             let side = min(geo.size.width, geo.size.height)
             let sq = side / 8
+            let corner = RoundedRectangle(cornerRadius: sq * 0.12, style: .continuous)
             ZStack(alignment: .topLeading) {
+                if let surface = theme.surface {
+                    LinearGradient(colors: surface, startPoint: .topLeading, endPoint: .bottomTrailing)
+                }
                 squares(size: sq)
                 pieces(size: sq)
                 if let promotion = game.pendingPromotion {
-                    PromotionPicker(color: promotion.piece.color, squareSize: sq) { kind in
+                    PromotionPicker(color: promotion.piece.color, theme: theme, squareSize: sq) { kind in
                         withAnimation(.snappy(duration: 0.2)) { game.promote(to: kind) }
                     }
                     .transition(.opacity)
                 }
             }
             .frame(width: side, height: side)
-            .clipShape(RoundedRectangle(cornerRadius: sq * 0.12, style: .continuous))
-            .shadow(color: .black.opacity(0.25), radius: sq * 0.25, y: sq * 0.08)
+            .clipShape(corner)
+            .overlay {
+                if let edge = theme.boardEdge {
+                    corner.strokeBorder(edge, lineWidth: 1)
+                }
+            }
+            .background {
+                // Soft shadow (Walnut) or colored glow (Neon) around the board.
+                ForEach(Array(theme.boardShadows.enumerated()), id: \.offset) { index, color in
+                    corner.fill(color)
+                        .blur(radius: sq * (theme.isDark ? 0.3 + 0.35 * CGFloat(index) : 0.25))
+                        .offset(y: theme.isDark ? 0 : sq * 0.08)
+                }
+            }
         }
         .aspectRatio(1, contentMode: .fit)
         .sensoryFeedback(.impact(weight: .light), trigger: game.moveCount)
@@ -44,18 +60,29 @@ struct BoardView: View {
 
     private func square(_ square: Square, size: CGFloat) -> some View {
         let isLight = (square.fileIndex + square.rankIndex) % 2 == 1
-        let labelColor = isLight ? theme.dark : theme.light
+        let labelColor = isLight ? theme.labelOnLight : theme.labelOnDark
         let occupant = game.piece(at: square)
         let isTarget = game.targets.contains(square)
+        let ringWidth = size * 0.035
 
         return ZStack {
             Rectangle().fill(isLight ? theme.light : theme.dark)
 
+            if let gridLine = theme.gridLine {
+                Rectangle().strokeBorder(gridLine, lineWidth: 0.5)
+            }
             if let last = game.lastMove, last.from == square || last.to == square {
                 Rectangle().fill(theme.lastMove)
+                if let ring = theme.lastMoveRing {
+                    Rectangle().strokeBorder(ring, lineWidth: ringWidth)
+                }
             }
             if game.selected == square {
                 Rectangle().fill(theme.selected)
+                if let ring = theme.selectedRing {
+                    Rectangle().strokeBorder(ring, lineWidth: ringWidth)
+                        .shadow(color: ring, radius: size * 0.08)
+                }
             }
             if game.checkedKing == square {
                 RadialGradient(
@@ -74,11 +101,14 @@ struct BoardView: View {
 
             // Legal-move hints: a dot on empty squares, a ring around captures.
             if isTarget {
-                if occupant == nil {
-                    Circle().fill(theme.hint).frame(width: size * 0.32, height: size * 0.32)
-                } else {
-                    Circle().strokeBorder(theme.hint, lineWidth: size * 0.08).padding(size * 0.02)
+                Group {
+                    if occupant == nil {
+                        Circle().fill(theme.hint).frame(width: size * 0.3, height: size * 0.3)
+                    } else {
+                        Circle().strokeBorder(theme.hint, lineWidth: size * 0.08).padding(size * 0.02)
+                    }
                 }
+                .shadow(color: theme.hintGlow ?? .clear, radius: theme.hintGlow == nil ? 0 : size * 0.1)
             }
         }
         .frame(width: size, height: size)
@@ -112,14 +142,7 @@ struct BoardView: View {
     private func pieces(size: CGFloat) -> some View {
         ZStack(alignment: .topLeading) {
             ForEach(game.pieces) { placed in
-                Image(placed.piece.assetName)
-                    .resizable()
-                    .interpolation(.high)
-                    .antialiased(true)
-                    .scaledToFit()
-                    .padding(size * 0.04)
-                    .frame(width: size, height: size)
-                    .shadow(color: .black.opacity(0.18), radius: size * 0.02, y: size * 0.02)
+                PieceImage(piece: placed.piece, theme: theme, size: size)
                     .scaleEffect(game.selected == placed.square ? 1.08 : 1)
                     .position(
                         x: (CGFloat(placed.square.fileIndex) + 0.5) * size,
@@ -134,9 +157,32 @@ struct BoardView: View {
     }
 }
 
+/// One piece drawn in the theme's style: a soft shadow on Walnut, a colored glow on Neon.
+private struct PieceImage: View {
+    let piece: Piece
+    let theme: BoardTheme
+    let size: CGFloat
+
+    var body: some View {
+        let glow = piece.color == .white ? theme.whiteGlow : theme.blackGlow
+        Image(theme.imageName(for: piece))
+            .resizable()
+            .interpolation(.high)
+            .antialiased(true)
+            .scaledToFit()
+            .padding(size * 0.04)
+            .frame(width: size, height: size)
+            .shadow(color: glow?.opacity(0.95) ?? .black.opacity(0.18),
+                    radius: glow == nil ? size * 0.02 : size * 0.025,
+                    y: glow == nil ? size * 0.02 : 0)
+            .shadow(color: glow?.opacity(0.6) ?? .clear, radius: glow == nil ? 0 : size * 0.09)
+    }
+}
+
 /// Lets the player choose what a pawn becomes on the last rank.
 private struct PromotionPicker: View {
     let color: Piece.Color
+    let theme: BoardTheme
     let squareSize: CGFloat
     let choose: (Piece.Kind) -> Void
 
@@ -147,13 +193,9 @@ private struct PromotionPicker: View {
             Color.black.opacity(0.35)
             HStack(spacing: squareSize * 0.15) {
                 ForEach(kinds, id: \.self) { kind in
-                    let piece = Piece(kind, color: color, square: .a1)
                     Button { choose(kind) } label: {
-                        Image(piece.assetName)
-                            .resizable()
-                            .interpolation(.high)
-                            .scaledToFit()
-                            .padding(squareSize * 0.12)
+                        PieceImage(piece: Piece(kind, color: color, square: .a1), theme: theme, size: squareSize)
+                            .padding(squareSize * 0.08)
                             .frame(width: squareSize * 1.25, height: squareSize * 1.25)
                             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: squareSize * 0.2, style: .continuous))
                     }
@@ -166,6 +208,12 @@ private struct PromotionPicker: View {
     }
 }
 
-#Preview {
+#Preview("Walnut") {
     BoardView(game: GameModel()).padding()
+}
+
+#Preview("Neon") {
+    BoardView(game: GameModel(), theme: .neon)
+        .padding()
+        .background(NeonBackdrop())
 }
