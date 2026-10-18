@@ -25,4 +25,4 @@ GitHub Actions runs the same build and tests on every pull request.
 - `ChessGameKillerTests` – unit tests
 
 ## Credits
-Piece artwork: "cburnett" set by Colin M.L. Burnett, licensed GPLv2+ (via Lichess).
+Piece artwork: "cburnett" set by Colin M.L. Burnett, licensed GPLv2+ (via Lichess). The Neon pieces are recolored from it with `scripts/make_neon_pieces.py`.
