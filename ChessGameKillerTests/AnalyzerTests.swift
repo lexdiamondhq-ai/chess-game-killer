@@ -50,7 +50,7 @@ final class PositionDraftTests: XCTestCase {
     func testRotateTurnsTheBoardAround() {
         var draft = PositionDraft.standard
         draft.rotate()
-        XCTAssertEqual(draft[.e8], .init(.king, .white))
+        XCTAssertEqual(draft[.d8], .init(.king, .white))
         XCTAssertEqual(draft[.d1], .init(.king, .black))
         draft.rotate()
         XCTAssertEqual(draft, .standard)
