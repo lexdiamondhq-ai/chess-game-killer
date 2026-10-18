@@ -34,7 +34,7 @@ GitHub Actions runs the same build and tests on every pull request, including a 
 The sounds in `ChessGameKiller/Sounds` are made with the ElevenLabs Sound Effects API by `scripts/make_sounds.py`. To change one, edit its prompt in that script and push to the `generate-sounds` branch (or run the "Generate sounds with ElevenLabs" workflow). The workflow uses the `ELEVENLABS_API_KEY` repository secret and commits the new files back to that branch.
 
 ## Photo scanner
-Photos are read by Claude through a small server in `scanner/` (a Cloudflare Worker), so the Anthropic key never ships in the app. `.github/workflows/scanner.yml` tests it, deploys it and tries it on the boards in `scanner/test/boards`. It needs three repository secrets: `ANTHROPIC_API_KEY`, `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Each address can scan at most 10 times a minute. The app finds the server through `ScannerConfig.endpoint` in `ChessGameKiller/Engine/BoardReader.swift`.
+Photos are read by Claude through a small server in `scanner/` (a Cloudflare Worker), so the Anthropic key never ships in the app. `.github/workflows/scanner.yml` tests it, deploys it and tries it on the boards in `scanner/test/boards`. It needs two repository secrets: `ANTHROPIC_API_KEY` and `CLOUDFLARE_API_TOKEN` (made from Cloudflare's "Edit Cloudflare Workers" template); the account ID is looked up from the token. Each address can scan at most 10 times a minute. The app finds the server through `ScannerConfig.endpoint` in `ChessGameKiller/Engine/BoardReader.swift`.
 
 ## Layout
 - `ChessGameKiller/App` – app entry point
