@@ -40,6 +40,10 @@ Usage:
       --workers 2 --seed 1 --out composed.jsonl
   python3 scripts/training/compose_puzzles.py --engine stockfish --out forks.jsonl \
       --only forks --forks 20
+  # after a crash: keep what composed.jsonl already has and make the rest
+  python3 scripts/training/compose_puzzles.py --engine stockfish --out composed.jsonl --resume
+
+Jobs are time-boxed, so a seed varies the output but doesn't reproduce it exactly.
 """
 from __future__ import annotations
 
@@ -51,6 +55,7 @@ import os
 import random
 import sys
 import time
+import zlib
 from collections import Counter
 from typing import Callable
 
@@ -423,12 +428,12 @@ def mating_moves(board: chess.Board) -> list[chess.Move]:
 def mate_test(board: chess.Board, key: list[chess.Move], min_checks: int | None = None) -> bool:
     """The key mates and at most one other move mates too. Most positions also
     need a check that doesn't mate, as a distraction (decided per position by
-    a hash, so the same board always gets the same answer)."""
+    a checksum of the board, so the same board always gets the same answer)."""
     mates = mating_moves(board)
     if not 1 <= len(mates) <= 2 or not any(k in mates for k in key):
         return False
     if min_checks is None:
-        min_checks = 0 if hash(board.board_fen()) % 3 == 0 else 1
+        min_checks = 0 if zlib.crc32(board.board_fen().encode()) % 3 == 0 else 1
     return sum(1 for m in board.legal_moves if board.gives_check(m)) - len(mates) >= min_checks
 
 
@@ -1805,6 +1810,8 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=int(time.time()))
     parser.add_argument("--only", help="comma-separated motifs to make, e.g. forks,pins")
     parser.add_argument("--minutes", type=float, default=240, help="stop starting new work after this long")
+    parser.add_argument("--resume", action="store_true",
+                        help="keep the records already in --out (say, after a crash) and only make the rest")
     for name, n in {**PUZZLES, **PLAYOUTS}.items():
         parser.add_argument(f"--{name}", type=int, default=n, metavar="N", help=f"how many {name} (default {n})")
     args = parser.parse_args()
@@ -1831,6 +1838,28 @@ def main() -> None:
         by_template[motif][name] += 1
         return True
 
+    carried: list[dict] = []  # resumed records of motifs this run doesn't make; written back untouched
+    if args.resume and os.path.exists(args.out):
+        with open(args.out) as f:
+            for line in f:
+                if line.strip():
+                    rec = json.loads(line)
+                    if rec["motif"] in wanted:
+                        accept(rec["motif"], "earlier run", rec)
+                    else:
+                        carried.append(rec)
+        print("resuming with " + ", ".join(f"{m} {len(have[m])}/{wanted[m]}" for m in wanted), flush=True)
+
+    def write_out() -> None:
+        # Write a new file and swap it in, so a crash mid-write can't lose what's done.
+        with open(args.out + ".tmp", "w") as f:
+            for m in wanted:
+                for rec in sorted(have[m], key=lambda r: r["rating"]):
+                    f.write(json.dumps(rec) + "\n")
+            for rec in carried:
+                f.write(json.dumps(rec) + "\n")
+        os.replace(args.out + ".tmp", args.out)
+
     with mp.Pool(args.workers, initializer=start_engine, initargs=(args.engine,)) as pool:
         pending = []
         playout_runs: Counter = Counter()
@@ -1842,7 +1871,7 @@ def main() -> None:
             job = (motif, seed, wanted[motif] - len(have[motif]))
             pending.append((motif, pool.apply_async(playout_job, (job,))))
 
-        for motif in [m for m in wanted if m in PLAYOUTS]:
+        for motif in [m for m in wanted if m in PLAYOUTS and len(have[m]) < wanted[m]]:
             start_playouts(motif)
         while True:
             busy = Counter(m for m, _ in pending)
@@ -1873,10 +1902,7 @@ def main() -> None:
                         accept(motif, name, rec)
                 done = ", ".join(f"{m} {len(have[m])}/{wanted[m]}" for m in wanted)
                 print(f"[{(time.time() - started) / 60:5.1f} min] {done}", flush=True)
-                with open(args.out, "w") as f:
-                    for m in wanted:
-                        for rec in sorted(have[m], key=lambda r: r["rating"]):
-                            f.write(json.dumps(rec) + "\n")
+                write_out()
 
     print("\ntemplate          tried  engine   deep     ok")
     names = sorted({k.split(":")[0] for k in totals if ":" in k})
@@ -1887,7 +1913,8 @@ def main() -> None:
         ratings = [r["rating"] for r in have[m]]
         spread = f"{min(ratings)}-{max(ratings)}" if ratings else "-"
         print(f"{m:12} {len(have[m]):3}/{wanted[m]:<3} rating {spread}  {dict(by_template[m])}")
-    print(f"wrote {sum(len(v) for v in have.values())} records to {args.out}")
+    write_out()
+    print(f"wrote {sum(len(v) for v in have.values()) + len(carried)} records to {args.out}")
 
 
 if __name__ == "__main__":
