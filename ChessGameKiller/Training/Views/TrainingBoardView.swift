@@ -1,8 +1,9 @@
 import ChessKit
 import SwiftUI
 
-/// The board in lessons and drills: the game's pieces and colors, plus the
-/// coach's arrows, glowing squares and little labels.
+/// The board in lessons and drills: the game board's look (squares or the
+/// pre-rendered 3D board, and its pieces), plus the coach's arrows, glowing
+/// squares and little labels.
 struct TrainingBoardView: View {
     let game: GameModel
     let theme: BoardTheme
@@ -16,17 +17,25 @@ struct TrainingBoardView: View {
     var body: some View {
         GeometryReader { geo in
             let side = min(geo.size.width, geo.size.height)
-            let sq = side / 8
+            let inset = theme.frameInset(side: side)
+            let sq = (side - inset * 2) / 8
             let corner = RoundedRectangle(cornerRadius: sq * 0.12, style: .continuous)
             ZStack(alignment: .topLeading) {
+                if let art = theme.boardArt {
+                    BoardArt(name: art, flipped: flipped)
+                }
                 if let surface = theme.surface {
                     LinearGradient(colors: surface, startPoint: .topLeading, endPoint: .bottomTrailing)
                 }
-                squares(size: sq)
-                markLayer(size: sq)
-                pieceLayer(size: sq)
-                arrowLayer(size: sq)
-                labelLayer(size: sq)
+                ZStack(alignment: .topLeading) {
+                    squares(size: sq)
+                    markLayer(size: sq)
+                    pieceLayer(size: sq)
+                    arrowLayer(size: sq)
+                    labelLayer(size: sq)
+                }
+                .frame(width: sq * 8, height: sq * 8)
+                .padding(inset)
             }
             .frame(width: side, height: side)
             .clipShape(corner)
@@ -35,7 +44,7 @@ struct TrainingBoardView: View {
                     corner.strokeBorder(edge, lineWidth: 1)
                 }
             }
-            .overlay(alignment: .topLeading) { explosions(size: sq) }
+            .overlay(alignment: .topLeading) { explosions(size: sq).padding(inset) }
             .background {
                 ForEach(Array(theme.boardShadows.enumerated()), id: \.offset) { index, color in
                     corner.fill(color)
@@ -99,7 +108,7 @@ struct TrainingBoardView: View {
         let ringWidth = size * 0.035
 
         return ZStack {
-            Rectangle().fill(isLight ? theme.light : theme.dark)
+            Rectangle().fill(theme.squareFill(isLight: isLight))
             if let gridLine = theme.gridLine {
                 Rectangle().strokeBorder(gridLine, lineWidth: 0.5)
             }
@@ -201,9 +210,11 @@ struct TrainingBoardView: View {
     private func pieceLayer(size: CGFloat) -> some View {
         ZStack(alignment: .topLeading) {
             ForEach(game.pieces) { placed in
-                PieceImage(piece: placed.piece, theme: theme, size: size)
+                PieceImage(piece: placed.piece, theme: theme, size: size, onBoard: true)
                     .scaleEffect(game.selected == placed.square ? 1.08 : 1)
                     .position(center(of: placed.square, size: size))
+                    // Nearer rows draw last, so tall 3D pieces overlap the ones behind them.
+                    .zIndex(Double(cell(of: placed.square).row))
                     .transition(.asymmetric(
                         insertion: .opacity.combined(with: .scale(scale: 0.6)),
                         removal: .opacity.animation(.easeOut(duration: 0.12))

@@ -2,7 +2,7 @@ import ChessKit
 import SwiftUI
 
 // Shared look for the training screens, drawn in the board theme's style:
-// warm paper and soft shadows on Walnut, glass and glow on Neon.
+// paper and soft shadows on light boards, glass and glow on dark ones.
 
 extension TrainingColor {
     func color(on theme: BoardTheme) -> Color {
@@ -54,16 +54,12 @@ extension BoardTheme {
     }
 }
 
-/// The screen behind the training views.
+/// The screen behind the training views: the same backdrop as the game screen.
 struct TrainingBackdrop: View {
     let theme: BoardTheme
 
     var body: some View {
-        if theme.isDark {
-            NeonBackdrop()
-        } else {
-            Color(.systemGroupedBackground).ignoresSafeArea()
-        }
+        ThemeBackdrop(theme: theme)
     }
 }
 
@@ -108,7 +104,7 @@ extension View {
     }
 }
 
-/// A big rounded button: a glowing gradient on Neon, solid on Walnut.
+/// A big rounded button: a glowing gradient on dark boards, solid on light ones.
 struct TrainingButtonStyle: ButtonStyle {
     let theme: BoardTheme
     var prominent = true
@@ -155,18 +151,30 @@ struct CoachAvatar: View {
     /// The ring's color, to react to answers.
     var tint: Color?
 
+    /// Leo's ring when he isn't reacting: Neon's glass gradient, or the board's own
+    /// accent (rose gold on Malachite, gold on Fabergé, amber on Blueprint).
+    private var restingRing: [Color] {
+        if theme.id == .neon {
+            return [Color(hex: 0x19C6CF), Color(hex: 0x9B4BEA), Color(hex: 0xE04BC4), Color(hex: 0x19C6CF)]
+        }
+        let accent = theme.trainingAccent
+        return [accent, accent.opacity(0.55), accent]
+    }
+
+    /// Behind the knight: Neon's night blue, or the board's dark side (onyx, midnight, ink).
+    private var face: Color {
+        theme.id == .neon ? Color(hex: 0x0B0D1E) : theme.blackSide
+    }
+
     var body: some View {
-        let ring = tint.map { [$0, $0.opacity(0.6), $0] }
-            ?? (theme.isDark
-                ? [Color(hex: 0x19C6CF), Color(hex: 0x9B4BEA), Color(hex: 0xE04BC4), Color(hex: 0x19C6CF)]
-                : [Color(hex: 0xB58863), Color(hex: 0xE2C29A), Color(hex: 0xB58863)])
+        let ring = tint.map { [$0, $0.opacity(0.6), $0] } ?? restingRing
         ZStack {
-            Circle().fill(theme.isDark ? Color(hex: 0x0B0D1E) : Color(hex: 0xF0D9B5))
+            Circle().fill(face)
             PieceImage(piece: Piece(.knight, color: .white, square: .g1), theme: theme, size: size * 0.78)
             Circle().strokeBorder(AngularGradient(colors: ring, center: .center), lineWidth: max(2, size * 0.06))
         }
         .frame(width: size, height: size)
-        .shadow(color: theme.isDark ? (tint ?? Color(hex: 0x9B4BEA)).opacity(0.55) : .black.opacity(0.12),
+        .shadow(color: theme.isDark ? (tint ?? (theme.id == .neon ? Color(hex: 0x9B4BEA) : theme.trainingAccent)).opacity(0.55) : .black.opacity(0.12),
                 radius: theme.isDark ? size * 0.18 : 3, y: theme.isDark ? 0 : 1)
         .animation(.easeInOut(duration: 0.25), value: tint)
         .accessibilityHidden(true)
