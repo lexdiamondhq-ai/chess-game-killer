@@ -35,6 +35,7 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_CFBundleDisplayName: Chess Game Killer
+        INFOPLIST_KEY_NSCameraUsageDescription: Take a photo of a chess board to find the best move.
         TARGETED_DEVICE_FAMILY: "1,2"
   ChessGameKillerTests:
     type: bundle.unit-test

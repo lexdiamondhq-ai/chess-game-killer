@@ -167,7 +167,7 @@ struct GradeBadge: View {
 }
 
 /// A short line in the arrow's style, for the legend under the coach.
-private struct ArrowSample: View {
+struct ArrowSample: View {
     let color: Color
     let dashed: Bool
 

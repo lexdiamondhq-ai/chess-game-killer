@@ -11,3 +11,8 @@ build/
 .DS_Store
 # Stockfish networks (scripts/fetch_nnue.sh)
 .nnue-cache/
+# Python
+__pycache__/
+# Scanner server
+scanner/node_modules/
+scanner/.wrangler/

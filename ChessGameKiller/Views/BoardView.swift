@@ -234,7 +234,7 @@ struct BoardView: View {
 }
 
 /// An arrow from one square to another. Solid for the best move, dashed for the runner-up.
-private struct MoveArrow: View {
+struct MoveArrow: View {
     let from: CGPoint
     let to: CGPoint
     let squareSize: CGFloat

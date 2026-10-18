@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @State private var match = MatchController.live()
     @State private var showingNewGame = true
+    @State private var showingAnalyze = false
     @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .walnut
     @AppStorage("soundEffects") private var soundOn = true
     @AppStorage("showBestMoves") private var showBestMoves = true
@@ -34,6 +35,13 @@ struct ContentView: View {
             .navigationTitle("Chess Game Killer")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showingAnalyze = true
+                    } label: {
+                        Label("Analyze a Position", systemImage: "camera.viewfinder")
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     SettingsMenu(themeID: $themeID, soundOn: $soundOn, showBestMoves: $showBestMoves)
                 }
@@ -90,8 +98,26 @@ struct ContentView: View {
                 showingNewGame = false
             }
         }
+        .sheet(isPresented: $showingAnalyze) {
+            AnalyzeSheet(
+                theme: theme,
+                currentFEN: match.game.fen,
+                engine: StockfishEngine.shared,
+                reader: CloudBoardReader.live
+            ) { draft in
+                play(from: draft)
+            }
+        }
         .onAppear { match.showBestMoves = showBestMoves }
         .onChange(of: showBestMoves) { _, show in match.showBestMoves = show }
+    }
+
+    /// Starts a game from an analyzed position, with the player moving first.
+    private func play(from draft: PositionDraft) {
+        guard let position = draft.position else { return }
+        var setup = NewGameSheet.savedSetup()
+        setup.playerColor = draft.sideToMove
+        withAnimation(.snappy) { match.start(setup, from: position) }
     }
 
     /// Closing the sheet without starting still begins a game, with last time's choices.

@@ -8,6 +8,7 @@ One beautiful iOS chess game, with every feature easy to reach and easy to under
 - Coach bar at the bottom grades every move you make (best, excellent, good, inaccuracy, mistake, blunder) and names the better move
 - The two best moves drawn on the board: a solid arrow for the best, a dashed arrow for the next best
 - Captured pieces blow apart in sparks in the theme's colors
+- Analyzer: take a photo of a real board, pick a screenshot or set up any position, fix any square, and see Stockfish's two best moves with the lines that follow; then play on from there
 - Sound effects made with ElevenLabs
 - Walnut and Neon boards, undo, promotion picker, haptics
 - Training with Coach Leo, a grandmaster coach: narrated lessons, daily puzzles and your own mistakes to fix (see below)
@@ -33,6 +34,9 @@ GitHub Actions runs the same build and tests on every pull request, including a 
 ## Sounds
 The sounds in `ChessGameKiller/Sounds` are made with the ElevenLabs Sound Effects API by `scripts/make_sounds.py`. To change one, edit its prompt in that script and push to the `generate-sounds` branch (or run the "Generate sounds with ElevenLabs" workflow). The workflow uses the `ELEVENLABS_API_KEY` repository secret and commits the new files back to that branch.
 
+## Photo scanner
+Photos are read by Claude through a small server in `scanner/` (a Cloudflare Worker), so the Anthropic key never ships in the app. `.github/workflows/scanner.yml` tests it, deploys it and tries it on the boards in `scanner/test/boards`. It needs two repository secrets: `ANTHROPIC_API_KEY` and `CLOUDFLARE_API_TOKEN` (made from Cloudflare's "Edit Cloudflare Workers" template); the account ID is looked up from the token. Each address can scan at most 10 times a minute. The app finds the server through `ScannerConfig.endpoint` in `ChessGameKiller/Engine/BoardReader.swift`.
+
 ## Training with Coach Leo
 Tap **Train** at the top left to meet Coach Leo, a warm grandmaster coach for players who want a hand.
 - **Lessons that play like short videos.** The pieces move, arrows and glowing squares point things out, and Leo talks you through it in his ElevenLabs voice. Pause, go back or skip, and make the moves yourself when it's your turn. 15 lessons across 8 units, from what the pieces are worth to mating with a rook.
@@ -54,6 +58,7 @@ Everything Leo teaches is data in `ChessGameKiller/Training/Content`: `course.js
 - `ChessGameKiller/Views` – SwiftUI screens
 - `ChessGameKiller/Training` – Coach Leo: the course content, lesson player, drills, sessions and progress
 - `ChessGameKillerTests` – unit tests
+- `scanner` – the photo scanner server (JavaScript, Cloudflare Workers)
 
 ## Credits
 - Piece artwork: "cburnett" set by Colin M.L. Burnett, licensed GPLv2+ (via Lichess). The Neon pieces are recolored from it with `scripts/make_neon_pieces.py`.
