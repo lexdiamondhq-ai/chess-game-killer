@@ -6,6 +6,7 @@ Fails only if the server itself is broken; reading mistakes are reported, not fa
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.request
 
@@ -34,8 +35,25 @@ def to_white_view(rows, side):
     return ["".join(row) for row in board]
 
 
+def wait_until_up(url, minutes=5):
+    """A brand-new workers.dev address can take a few minutes to start answering."""
+    deadline = time.time() + minutes * 60
+    while True:
+        try:
+            with urllib.request.urlopen(url + "/", timeout=15) as response:
+                if json.load(response).get("ok"):
+                    return True
+        except (urllib.error.URLError, OSError, ValueError) as error:
+            if time.time() > deadline:
+                print(f"Scanner never answered at {url}: {error}")
+                return False
+        time.sleep(10)
+
+
 def main():
     url, folder = sys.argv[1].rstrip("/"), sys.argv[2]
+    if not wait_until_up(url):
+        sys.exit(1)
     with open(os.path.join(folder, "expected.json")) as f:
         expected = json.load(f)
     broken = False

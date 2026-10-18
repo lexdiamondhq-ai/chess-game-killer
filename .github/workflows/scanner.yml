@@ -46,6 +46,29 @@ jobs:
           else
             echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
+      - name: Make sure the account has a workers.dev address
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain"
+          auth="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          current=$(curl -s -H "$auth" "$api" | jq -r '.result.subdomain // empty')
+          if [ -z "$current" ]; then
+            # A new account has none yet; pick a free name.
+            for name in chess-game-killer "chessgamekiller-$RANDOM" "chessgamekiller-$(date +%s)"; do
+              ok=$(curl -s -X PUT -H "$auth" -H "Content-Type: application/json" \
+                --data "{\"subdomain\":\"$name\"}" "$api" | jq -r '.success')
+              if [ "$ok" = "true" ]; then current="$name"; break; fi
+            done
+          fi
+          if [ -z "$current" ]; then
+            echo "::error::Couldn't set up a workers.dev address. Open Workers & Pages in the Cloudflare dashboard once, then re-run."
+            exit 1
+          fi
+          echo "workers.dev address: $current.workers.dev"
       - name: Deploy to Cloudflare
         id: deploy
         if: steps.secrets.outputs.ready == 'true'
