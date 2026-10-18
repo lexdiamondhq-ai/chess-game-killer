@@ -185,9 +185,10 @@ final class GameModel {
         syncPieces()
     }
 
-    func newGame() {
+    /// Starts again from the standard position, or any other (like one set up from a photo).
+    func newGame(from position: Position = .standard) {
         history.removeAll()
-        board = Board()
+        board = Board(position: position)
         lastMove = nil
         lastPlayed = nil
         pendingPromotion = nil

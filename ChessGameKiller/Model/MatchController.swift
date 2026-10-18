@@ -110,11 +110,11 @@ final class MatchController {
 
     // MARK: Actions
 
-    func start(_ setup: Setup, playSound: Bool = true) {
+    func start(_ setup: Setup, from position: Position = .standard, playSound: Bool = true) {
         self.setup = setup
         hasStarted = true
         resetWork()
-        game.newGame()
+        game.newGame(from: position)
         game.humanColors = setup.opponent == .computer ? [setup.playerColor] : [.white, .black]
         if playSound { sounds?.play(.gameStart) }
         scheduleWork(after: nil)
