@@ -1,0 +1,28 @@
+name: Generate sounds with ElevenLabs
+
+# Push to the generate-sounds branch to (re)generate every sound in
+# scripts/make_sounds.py. The new files are committed back to that branch.
+on:
+  push:
+    branches: [generate-sounds]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate sound effects
+        env:
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+        run: python3 scripts/make_sounds.py ChessGameKiller/Sounds
+      - name: Commit the sounds
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ChessGameKiller/Sounds
+          git commit -m "Generate sound effects with ElevenLabs" || echo "No changes"
+          git push origin HEAD:generate-sounds
