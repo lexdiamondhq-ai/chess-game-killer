@@ -5,7 +5,7 @@ import SwiftUI
 /// Settings: the board's look with a live preview, how much the coach says,
 /// sound and haptics, and the credits. Every choice is remembered.
 struct SettingsSheet: View {
-    @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .walnut
+    @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .malachite
     @AppStorage("showBestMoves") private var showBestMoves = true
     @AppStorage("showSecondBest") private var showSecondBest = true
     @AppStorage("coachVerdicts") private var showVerdicts = true
@@ -165,27 +165,38 @@ struct BoardPreview: View {
     private static let second = (from: Square.c1, to: Square.g5)
 
     var body: some View {
-        let sq = size / 8
+        let inset = theme.frameInset(side: size)
+        let sq = (size - inset * 2) / 8
         let corner = RoundedRectangle(cornerRadius: sq * 0.12, style: .continuous)
         ZStack(alignment: .topLeading) {
+            if let art = theme.boardArt {
+                BoardArt(name: art, flipped: false)
+            }
             if let surface = theme.surface {
                 LinearGradient(colors: surface, startPoint: .topLeading, endPoint: .bottomTrailing)
             }
-            squares(size: sq)
-            ForEach(Self.position?.pieces ?? [], id: \.square) { piece in
-                PieceImage(piece: piece, theme: theme, size: sq)
-                    .position(center(of: piece.square, size: sq))
+            ZStack(alignment: .topLeading) {
+                squares(size: sq)
+                ForEach(Self.position?.pieces ?? [], id: \.square) { piece in
+                    PieceImage(piece: piece, theme: theme, size: sq, onBoard: true)
+                        .position(center(of: piece.square, size: sq))
+                        .zIndex(Double(7 - piece.square.rankIndex))
+                }
+                if showBest, showSecond {
+                    MoveArrow(from: center(of: Self.second.from, size: sq), to: center(of: Self.second.to, size: sq),
+                              squareSize: sq, isBest: false, color: theme.secondArrow, glow: theme.arrowGlow)
+                        .transition(.opacity)
+                        .zIndex(10)
+                }
+                if showBest {
+                    MoveArrow(from: center(of: Self.best.from, size: sq), to: center(of: Self.best.to, size: sq),
+                              squareSize: sq, isBest: true, color: theme.bestArrow, glow: theme.arrowGlow)
+                        .transition(.opacity)
+                        .zIndex(11)
+                }
             }
-            if showBest, showSecond {
-                MoveArrow(from: center(of: Self.second.from, size: sq), to: center(of: Self.second.to, size: sq),
-                          squareSize: sq, isBest: false, color: theme.secondArrow, glow: theme.arrowGlow)
-                    .transition(.opacity)
-            }
-            if showBest {
-                MoveArrow(from: center(of: Self.best.from, size: sq), to: center(of: Self.best.to, size: sq),
-                          squareSize: sq, isBest: true, color: theme.bestArrow, glow: theme.arrowGlow)
-                    .transition(.opacity)
-            }
+            .frame(width: sq * 8, height: sq * 8)
+            .padding(inset)
         }
         .frame(width: size, height: size)
         .clipShape(corner)
@@ -214,7 +225,7 @@ struct BoardPreview: View {
                     ForEach(0..<8, id: \.self) { column in
                         let isLight = (column + 7 - row) % 2 == 1
                         Rectangle()
-                            .fill(isLight ? theme.light : theme.dark)
+                            .fill(theme.squareFill(isLight: isLight))
                             .overlay {
                                 if let gridLine = theme.gridLine {
                                     Rectangle().strokeBorder(gridLine, lineWidth: 0.5)
@@ -271,18 +282,13 @@ private struct ThemeCard: View {
 
     private var swatch: some View {
         ZStack {
-            if let surface = option.surface {
-                LinearGradient(colors: surface, startPoint: .topLeading, endPoint: .bottomTrailing)
-            }
-            VStack(spacing: 0) {
-                HStack(spacing: 0) {
-                    Rectangle().fill(option.light)
-                    Rectangle().fill(option.dark)
+            if let art = option.boardArt {
+                Image(art).resizable().interpolation(.high).scaledToFill()
+            } else {
+                if let surface = option.surface {
+                    LinearGradient(colors: surface, startPoint: .topLeading, endPoint: .bottomTrailing)
                 }
-                HStack(spacing: 0) {
-                    Rectangle().fill(option.dark)
-                    Rectangle().fill(option.light)
-                }
+                checker
             }
         }
         .frame(width: 44, height: 44)
@@ -291,8 +297,22 @@ private struct ThemeCard: View {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .strokeBorder(option.boardEdge ?? Color.black.opacity(0.08), lineWidth: 1)
         }
-        .shadow(color: option.isDark ? Color(hex: 0x3CDCE6).opacity(0.35) : .black.opacity(0.1), radius: 6)
+        .shadow(color: option.backdrop != nil ? .black.opacity(0.35)
+                    : option.isDark ? Color(hex: 0x3CDCE6).opacity(0.35) : .black.opacity(0.1), radius: 6)
         .accessibilityHidden(true)
+    }
+
+    private var checker: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                Rectangle().fill(option.light)
+                Rectangle().fill(option.dark)
+            }
+            HStack(spacing: 0) {
+                Rectangle().fill(option.dark)
+                Rectangle().fill(option.light)
+            }
+        }
     }
 }
 
@@ -380,7 +400,7 @@ private struct SettingsGroup<Content: View>: View {
     }
 }
 
-/// Glass on Neon, a soft card on Walnut; outlined in color when selected.
+/// Glass on the dark themes; outlined in color when selected.
 private struct SettingsCard: View {
     let theme: BoardTheme
     let selected: Bool
@@ -399,16 +419,12 @@ private struct SettingsCard: View {
     }
 }
 
-/// The backdrop for a sheet: the Neon glow or the grouped gray.
+/// The backdrop for a sheet, in the theme's colors.
 struct SheetBackdrop: View {
     let theme: BoardTheme
 
     var body: some View {
-        if theme.isDark {
-            NeonBackdrop()
-        } else {
-            Color(.systemGroupedBackground).ignoresSafeArea()
-        }
+        ThemeBackdrop(theme: theme)
     }
 }
 
@@ -497,7 +513,7 @@ struct LicensesView: View {
         .onAppear { UserDefaults.standard.set("neon", forKey: "boardTheme") }
 }
 
-#Preview("Walnut") {
+#Preview("Malachite") {
     SettingsSheet()
-        .onAppear { UserDefaults.standard.set("walnut", forKey: "boardTheme") }
+        .onAppear { UserDefaults.standard.set("malachite", forKey: "boardTheme") }
 }

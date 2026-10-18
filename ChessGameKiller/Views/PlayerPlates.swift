@@ -150,7 +150,7 @@ private struct PlayerName: View {
     }
 }
 
-/// Glass on Neon, a soft card on Walnut; glowing in the side's color when it is that side's turn.
+/// Glass on the dark themes; glowing in the side's color when it is that side's turn.
 private struct PlateBackground: View {
     let theme: BoardTheme
     let glow: Color?
