@@ -101,11 +101,7 @@ struct AnalyzeSheet: View {
         }
         .tint(accent)
         .presentationBackground {
-            if theme.isDark {
-                NeonBackdrop()
-            } else {
-                Color(.systemGroupedBackground)
-            }
+            ThemeBackdrop(theme: theme)
         }
         .preferredColorScheme(theme.isDark ? .dark : nil)
     }

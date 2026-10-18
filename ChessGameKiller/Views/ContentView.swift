@@ -10,7 +10,7 @@ struct ContentView: View {
     @State private var showingAnalyze = false
     @State private var coachExpanded = false
     @State private var coachPeeking = false
-    @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .walnut
+    @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .malachite
     @AppStorage("showBestMoves") private var showBestMoves = true
     @AppStorage("showSecondBest") private var showSecondBest = true
     @AppStorage("coachVerdicts") private var showVerdicts = true

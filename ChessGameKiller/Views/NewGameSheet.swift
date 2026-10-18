@@ -171,11 +171,7 @@ struct NewGameSheet: View {
         }
         .presentationDetents([.large])
         .presentationBackground {
-            if theme.isDark {
-                NeonBackdrop()
-            } else {
-                Color(.systemGroupedBackground)
-            }
+            ThemeBackdrop(theme: theme)
         }
         .tint(accent)
         .preferredColorScheme(theme.isDark ? .dark : nil)

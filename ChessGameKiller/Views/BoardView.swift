@@ -15,21 +15,29 @@ struct BoardView: View {
     var body: some View {
         GeometryReader { geo in
             let side = min(geo.size.width, geo.size.height)
-            let sq = side / 8
+            let inset = theme.frameInset(side: side)
+            let sq = (side - inset * 2) / 8
             let corner = RoundedRectangle(cornerRadius: sq * 0.12, style: .continuous)
             ZStack(alignment: .topLeading) {
+                if let art = theme.boardArt {
+                    BoardArt(name: art, flipped: flipped)
+                }
                 if let surface = theme.surface {
                     LinearGradient(colors: surface, startPoint: .topLeading, endPoint: .bottomTrailing)
                 }
-                squares(size: sq)
-                pieces(size: sq)
-                arrows(size: sq)
-                if let promotion = game.pendingPromotion {
-                    PromotionPicker(color: promotion.piece.color, theme: theme, squareSize: sq) { kind in
-                        withAnimation(.snappy(duration: 0.2)) { match.promote(to: kind) }
+                ZStack(alignment: .topLeading) {
+                    squares(size: sq)
+                    pieces(size: sq)
+                    arrows(size: sq)
+                    if let promotion = game.pendingPromotion {
+                        PromotionPicker(color: promotion.piece.color, theme: theme, squareSize: sq) { kind in
+                            withAnimation(.snappy(duration: 0.2)) { match.promote(to: kind) }
+                        }
+                        .transition(.opacity)
                     }
-                    .transition(.opacity)
                 }
+                .frame(width: sq * 8, height: sq * 8)
+                .padding(inset)
             }
             .frame(width: side, height: side)
             .clipShape(corner)
@@ -39,7 +47,7 @@ struct BoardView: View {
                 }
             }
             // Explosions sit outside the clip so shards can fly past the edge.
-            .overlay(alignment: .topLeading) { explosions(size: sq) }
+            .overlay(alignment: .topLeading) { explosions(size: sq).padding(inset) }
             .background {
                 // Soft shadow (Walnut) or colored glow (Neon) around the board.
                 ForEach(Array(theme.boardShadows.enumerated()), id: \.offset) { index, color in
@@ -96,7 +104,7 @@ struct BoardView: View {
         let ringWidth = size * 0.035
 
         return ZStack {
-            Rectangle().fill(isLight ? theme.light : theme.dark)
+            Rectangle().fill(theme.squareFill(isLight: isLight))
 
             if let gridLine = theme.gridLine {
                 Rectangle().strokeBorder(gridLine, lineWidth: 0.5)
@@ -175,9 +183,11 @@ struct BoardView: View {
     private func pieces(size: CGFloat) -> some View {
         ZStack(alignment: .topLeading) {
             ForEach(game.pieces) { placed in
-                PieceImage(piece: placed.piece, theme: theme, size: size)
+                PieceImage(piece: placed.piece, theme: theme, size: size, onBoard: true)
                     .scaleEffect(game.selected == placed.square ? 1.08 : 1)
                     .position(center(of: placed.square, size: size))
+                    // Nearer rows draw last, so tall 3D pieces overlap the ones behind them.
+                    .zIndex(Double(cell(of: placed.square).row))
                     .transition(.asymmetric(
                         insertion: .opacity.combined(with: .scale(scale: 0.6)),
                         removal: .opacity.animation(.easeOut(duration: 0.12))
@@ -456,13 +466,57 @@ private struct SeededRandom {
     }
 }
 
-/// One piece drawn in the theme's style: a soft shadow on Walnut, a colored glow on Neon.
+/// One piece drawn in the theme's style: a soft shadow on Walnut, a colored glow on Neon,
+/// a 3D sprite standing on its square on the pre-rendered themes.
 struct PieceImage: View {
     let piece: Piece
     let theme: BoardTheme
     let size: CGFloat
+    /// On a board, a 3D sprite rises above its square; elsewhere it is fitted into `size`.
+    var onBoard = false
+
+    /// How much larger than the square a sprite is drawn on the board.
+    private static let spriteScale: CGFloat = 1.12
 
     var body: some View {
+        if theme.spritePieces {
+            sprite
+        } else {
+            flat
+        }
+    }
+
+    /// The renders are 1.3 squares wide and 1.42 tall, with the piece's foot
+    /// 1.0 square below the top edge, so they are lifted to stand on the square's center.
+    @ViewBuilder
+    private var sprite: some View {
+        let image = Image(theme.imageName(for: piece))
+            .resizable()
+            .interpolation(.high)
+            .antialiased(true)
+        if onBoard {
+            let k = Self.spriteScale
+            Color.clear
+                .frame(width: size, height: size)
+                .overlay {
+                    image
+                        .frame(width: size * 1.3 * k, height: size * 1.42 * k)
+                        .offset(y: size * (0.15 - 0.29 * k))
+                }
+        } else {
+            // Fitted so a king, the tallest piece, fills the frame.
+            Color.clear
+                .frame(width: size, height: size)
+                .overlay {
+                    image
+                        .frame(width: size * 1.08, height: size * 1.18)
+                        .offset(y: size * 0.06)
+                }
+        }
+    }
+
+    @ViewBuilder
+    private var flat: some View {
         let glow = piece.color == .white ? theme.whiteGlow : theme.blackGlow
         Image(theme.imageName(for: piece))
             .resizable()
@@ -475,6 +529,22 @@ struct PieceImage: View {
                     radius: glow == nil ? size * 0.02 : size * 0.025,
                     y: glow == nil ? size * 0.02 : 0)
             .shadow(color: glow?.opacity(0.6) ?? .clear, radius: glow == nil ? 0 : size * 0.09)
+    }
+}
+
+/// The pre-rendered board picture. Turned around when the board is flipped,
+/// which keeps the light and dark squares where they belong.
+struct BoardArt: View {
+    let name: String
+    let flipped: Bool
+
+    var body: some View {
+        Image(name)
+            .resizable()
+            .interpolation(.high)
+            .antialiased(true)
+            .rotationEffect(.degrees(flipped ? 180 : 0))
+            .accessibilityHidden(true)
     }
 }
 
