@@ -26,9 +26,9 @@ export const SCHEMA = {
       description: "Which edge of the picture White's side of the board is on.",
     },
     side_to_move: {
-      type: ["string", "null"],
-      enum: ["white", "black", null],
-      description: "Only if the picture shows whose turn it is; otherwise null.",
+      type: "string",
+      enum: ["white", "black", "unknown"],
+      description: "white or black only if the picture shows whose turn it is; otherwise unknown.",
     },
     confidence: {
       type: "string",
@@ -48,7 +48,7 @@ White's pieces are the lighter ones. Tell kings from queens and bishops from paw
 
 For white_side, use the coordinate letters and numbers if you can see them (a1 is in the corner on White's left). Otherwise judge from where the kings, queens and pawns stand.
 
-Give side_to_move only if the picture shows it, for example a highlighted last move, a "to move" label or a running clock.
+Set side_to_move to white or black only if the picture shows whose turn it is, for example a highlighted last move, a "to move" label or a running clock; otherwise set it to unknown.
 
 If there is no chess board in the picture, set found to false.`;
 

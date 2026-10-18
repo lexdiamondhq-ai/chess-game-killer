@@ -133,4 +133,11 @@ test("the answer's shape follows the structured outputs rules", () => {
   assert.deepEqual(SCHEMA.required, Object.keys(SCHEMA.properties));
   assert.equal(SCHEMA.properties.rows.minItems, undefined);
   assert.equal(SCHEMA.properties.rows.maxItems, undefined);
+  // The API rejects an enum next to a list of types, so each field has one type.
+  for (const field of Object.values(SCHEMA.properties)) assert.equal(typeof field.type, "string");
+});
+
+test("an unknown turn comes back as null", () => {
+  const answer = normalize({ found: true, rows: ROWS, white_side: "top", side_to_move: "unknown", confidence: "low" });
+  assert.equal(answer.side_to_move, null);
 });
