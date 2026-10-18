@@ -8,51 +8,43 @@ const SIDES = new Set(["bottom", "top", "left", "right"]);
 const CONFIDENCE = new Set(["high", "medium", "low"]);
 const PIECES = new Set("KQRBNPkqrbnp");
 
-export const TOOL = {
-  name: "report_board",
-  description: "Report the chess position seen in the picture.",
-  input_schema: {
-    type: "object",
-    properties: {
-      observations: {
-        type: "string",
-        description:
-          "A few short notes first: board style, which side each color is on, any coordinates or labels you can read, and how many pieces of each color you count.",
-      },
-      found: { type: "boolean", description: "False if there is no chess board in the picture." },
-      rows: {
-        type: "array",
-        description:
-          "The 8 rows of squares exactly as they appear in the picture, top row first. Each is 8 characters for the squares from left to right: K Q R B N P for White, k q r b n p for Black, . for empty.",
-        items: { type: "string", pattern: "^[KQRBNPkqrbnp.]{8}$" },
-        minItems: 8,
-        maxItems: 8,
-      },
-      white_side: {
-        type: "string",
-        enum: ["bottom", "top", "left", "right"],
-        description: "Which edge of the picture White's side of the board is on.",
-      },
-      side_to_move: {
-        type: ["string", "null"],
-        enum: ["white", "black", null],
-        description: "Only if the picture shows whose turn it is; otherwise null.",
-      },
-      confidence: {
-        type: "string",
-        enum: ["high", "medium", "low"],
-        description: "How sure you are that every square is right.",
-      },
+// The answer's shape. The API's structured outputs guarantee Claude's reply
+// matches it (Sonnet 5.5 no longer allows forcing a tool call).
+export const SCHEMA = {
+  type: "object",
+  properties: {
+    found: { type: "boolean", description: "False if there is no chess board in the picture." },
+    rows: {
+      type: "array",
+      description:
+        "The 8 rows of squares exactly as they appear in the picture, top row first. Each is 8 characters for the squares from left to right: K Q R B N P for White, k q r b n p for Black, . for empty.",
+      items: { type: "string", pattern: "^[KQRBNPkqrbnp.]{8}$" },
     },
-    required: ["observations", "found", "rows", "white_side", "side_to_move", "confidence"],
+    white_side: {
+      type: "string",
+      enum: ["bottom", "top", "left", "right"],
+      description: "Which edge of the picture White's side of the board is on.",
+    },
+    side_to_move: {
+      type: ["string", "null"],
+      enum: ["white", "black", null],
+      description: "Only if the picture shows whose turn it is; otherwise null.",
+    },
+    confidence: {
+      type: "string",
+      enum: ["high", "medium", "low"],
+      description: "How sure you are that every square is right.",
+    },
   },
+  required: ["found", "rows", "white_side", "side_to_move", "confidence"],
+  additionalProperties: false,
 };
 
 export const PROMPT = `Read the chess position in this picture. It may be a photo of a real board or a screenshot of a chess app or website.
 
 Go square by square and report the board exactly as it appears in the picture, without turning it around: the top row of squares first, each row from left to right. If the photo is taken at an angle, follow the board's own rows and columns, not the edges of the picture, and report only the 64 squares of the board. Captured pieces lying beside the board are not on it.
 
-White's pieces are the lighter ones. Tell kings from queens and bishops from pawns carefully; every legal position has exactly one king of each color.
+White's pieces are the lighter ones. Tell kings from queens and bishops from pawns carefully; every legal position has exactly one king of each color. Before answering, read any coordinates and count each color's pieces, then check your rows add up to the same counts.
 
 For white_side, use the coordinate letters and numbers if you can see them (a1 is in the corner on White's left). Otherwise judge from where the kings, queens and pawns stand.
 
@@ -113,9 +105,12 @@ export async function readBoard(bytes, type, env) {
     throw error;
   }
   const message = await response.json();
-  const call = (message.content || []).find((block) => block.type === "tool_use" && block.name === TOOL.name);
-  if (!call) throw new Error("Claude did not report a board");
-  return normalize(call.input);
+  if (message.stop_reason === "refusal" || message.stop_reason === "max_tokens") {
+    throw new Error(`Claude stopped early: ${message.stop_reason}`);
+  }
+  const text = (message.content || []).find((block) => block.type === "text");
+  if (!text) throw new Error("Claude did not report a board");
+  return normalize(JSON.parse(text.text));
 }
 
 /** The key without stray spaces or line breaks from pasting it into a secret. */
@@ -126,9 +121,9 @@ export function apiKey(env) {
 export function buildRequest(bytes, type, model) {
   return {
     model: model || "claude-sonnet-5-5",
-    max_tokens: 1024,
-    tools: [TOOL],
-    tool_choice: { type: "tool", name: TOOL.name },
+    // Covers Claude's thinking too, which Sonnet 5.5 does by default.
+    max_tokens: 16000,
+    output_config: { format: { type: "json_schema", schema: SCHEMA } },
     messages: [
       {
         role: "user",

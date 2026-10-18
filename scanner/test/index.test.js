@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
-import worker, { buildRequest, normalize, toBase64 } from "../src/index.js";
+import worker, { SCHEMA, buildRequest, normalize, toBase64 } from "../src/index.js";
 
 const realFetch = globalThis.fetch;
 afterEach(() => {
@@ -23,7 +23,7 @@ function claudeAnswers(input, capture = {}) {
     capture.url = url;
     capture.options = options;
     return new Response(
-      JSON.stringify({ content: [{ type: "tool_use", name: "report_board", input }] }),
+      JSON.stringify({ content: [{ type: "text", text: JSON.stringify(input) }], stop_reason: "end_turn" }),
       { status: 200, headers: { "content-type": "application/json" } }
     );
   };
@@ -32,7 +32,7 @@ function claudeAnswers(input, capture = {}) {
 test("reads a board through Claude", async () => {
   const capture = {};
   claudeAnswers(
-    { observations: "", found: true, rows: ROWS, white_side: "bottom", side_to_move: "black", confidence: "high" },
+    { found: true, rows: ROWS, white_side: "bottom", side_to_move: "black", confidence: "high" },
     capture
   );
   const response = await worker.fetch(post(), env);
@@ -49,7 +49,8 @@ test("reads a board through Claude", async () => {
   assert.equal(capture.options.headers["x-api-key"], "test-key");
   const sent = JSON.parse(capture.options.body);
   assert.equal(sent.model, "claude-test");
-  assert.equal(sent.tool_choice.name, "report_board");
+  assert.equal(sent.output_config.format.type, "json_schema");
+  assert.equal(sent.tool_choice, undefined);
   assert.equal(sent.messages[0].content[0].source.data, "AQID");
 });
 
@@ -111,9 +112,25 @@ test("base64 matches Node's for big inputs", () => {
   assert.equal(toBase64(bytes), Buffer.from(bytes).toString("base64"));
 });
 
-test("the request asks for the board tool with the picture", () => {
+test("the request asks for the board's shape with the picture", () => {
   const request = buildRequest(new Uint8Array([255]), "image/png");
   assert.equal(request.model, "claude-sonnet-5-5");
   assert.equal(request.messages[0].content[0].source.media_type, "image/png");
-  assert.equal(request.tools[0].name, "report_board");
+  assert.equal(request.output_config.format.schema, SCHEMA);
+});
+
+test("a refused or cut-off answer is a failure, not a board", async () => {
+  for (const stop_reason of ["refusal", "max_tokens"]) {
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ content: [{ type: "text", text: "{" }], stop_reason }), { status: 200 });
+    assert.equal((await worker.fetch(post(), env)).status, 502);
+  }
+});
+
+test("the answer's shape follows the structured outputs rules", () => {
+  // Every object closes off extra keys, and arrays have no size limits.
+  assert.equal(SCHEMA.additionalProperties, false);
+  assert.deepEqual(SCHEMA.required, Object.keys(SCHEMA.properties));
+  assert.equal(SCHEMA.properties.rows.minItems, undefined);
+  assert.equal(SCHEMA.properties.rows.maxItems, undefined);
 });

@@ -70,8 +70,9 @@ def main():
             image = f.read()
         request = urllib.request.Request(f"{url}/read", data=image, method="POST",
                                          headers={**HEADERS, "Content-Type": "image/png"})
+        started = time.time()
         try:
-            with urllib.request.urlopen(request, timeout=90) as response:
+            with urllib.request.urlopen(request, timeout=150) as response:
                 answer = json.load(response)
         except urllib.error.HTTPError as error:
             print(f"{name}: server error {error.code}: {error.read()[:200]!r}")
@@ -87,7 +88,8 @@ def main():
                  for r in range(8) for c in range(8) if got[r][c] != truth[r][c]]
         side_ok = answer.get("white_side") == want["white_side"]
         print(f"{name}: {right}/64 squares right, white side {answer.get('white_side')}"
-              f"{'' if side_ok else ' (wrong)'}, confidence {answer.get('confidence')}")
+              f"{'' if side_ok else ' (wrong)'}, confidence {answer.get('confidence')},"
+              f" {time.time() - started:.0f} s")
         for line in wrong:
             print(f"    {line}")
     sys.exit(1 if broken else 0)

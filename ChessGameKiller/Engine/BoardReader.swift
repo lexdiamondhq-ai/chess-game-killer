@@ -70,7 +70,7 @@ struct CloudBoardReader: BoardReader {
         var request = URLRequest(url: endpoint.appendingPathComponent("read"))
         request.httpMethod = "POST"
         request.setValue("image/jpeg", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 60
+        request.timeoutInterval = 120
 
         let result: (Data, URLResponse)
         do {
