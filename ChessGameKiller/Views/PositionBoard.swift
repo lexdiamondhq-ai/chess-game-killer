@@ -5,7 +5,7 @@ import SwiftUI
 /// theme's style, with optional best-move arrows and square taps.
 struct PositionBoard: View {
     let draft: PositionDraft
-    var theme: BoardTheme = .walnut
+    var theme: BoardTheme = .malachite
     var flipped = false
     var hints: [MoveHint] = []
     var onTap: ((Square) -> Void)?
@@ -13,38 +13,46 @@ struct PositionBoard: View {
     var body: some View {
         GeometryReader { geo in
             let side = min(geo.size.width, geo.size.height)
-            let sq = side / 8
+            let inset = theme.frameInset(side: side)
+            let sq = (side - inset * 2) / 8
             let corner = RoundedRectangle(cornerRadius: sq * 0.12, style: .continuous)
             ZStack(alignment: .topLeading) {
+                if let art = theme.boardArt {
+                    BoardArt(name: art, flipped: flipped)
+                }
                 if let surface = theme.surface {
                     LinearGradient(colors: surface, startPoint: .topLeading, endPoint: .bottomTrailing)
                 }
-                VStack(spacing: 0) {
-                    ForEach(0..<8, id: \.self) { row in
-                        HStack(spacing: 0) {
-                            ForEach(0..<8, id: \.self) { column in
-                                squareView(column: column, row: row, size: sq)
+                ZStack(alignment: .topLeading) {
+                    VStack(spacing: 0) {
+                        ForEach(0..<8, id: \.self) { row in
+                            HStack(spacing: 0) {
+                                ForEach(0..<8, id: \.self) { column in
+                                    squareView(column: column, row: row, size: sq)
+                                }
                             }
                         }
                     }
+                    ZStack {
+                        ForEach(Array(hints.reversed())) { hint in
+                            MoveArrow(
+                                from: center(of: hint.from, size: sq),
+                                to: center(of: hint.to, size: sq),
+                                squareSize: sq,
+                                isBest: hint.rank == 0,
+                                color: hint.rank == 0 ? theme.bestArrow : theme.secondArrow,
+                                glow: theme.arrowGlow
+                            )
+                            .transition(.opacity)
+                        }
                 }
-                ZStack {
-                    ForEach(Array(hints.reversed())) { hint in
-                        MoveArrow(
-                            from: center(of: hint.from, size: sq),
-                            to: center(of: hint.to, size: sq),
-                            squareSize: sq,
-                            isBest: hint.rank == 0,
-                            color: hint.rank == 0 ? theme.bestArrow : theme.secondArrow,
-                            glow: theme.arrowGlow
-                        )
-                        .transition(.opacity)
-                    }
-                }
-                .frame(width: side, height: side)
+                .frame(width: sq * 8, height: sq * 8)
                 .animation(.easeInOut(duration: 0.25), value: hints)
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
+                }
+                .frame(width: sq * 8, height: sq * 8)
+                .padding(inset)
             }
             .frame(width: side, height: side)
             .clipShape(corner)
@@ -81,7 +89,7 @@ struct PositionBoard: View {
         let token = draft[square]
 
         return ZStack {
-            Rectangle().fill(isLight ? theme.light : theme.dark)
+            Rectangle().fill(theme.squareFill(isLight: isLight))
             if let gridLine = theme.gridLine {
                 Rectangle().strokeBorder(gridLine, lineWidth: 0.5)
             }
@@ -92,7 +100,7 @@ struct PositionBoard: View {
                 label(square.file.rawValue, size: size, color: labelColor, alignment: .bottomTrailing)
             }
             if let token {
-                PieceImage(piece: token.piece(at: square), theme: theme, size: size)
+                PieceImage(piece: token.piece(at: square), theme: theme, size: size, onBoard: true)
                     .transition(.scale(scale: 0.6).combined(with: .opacity))
             }
         }

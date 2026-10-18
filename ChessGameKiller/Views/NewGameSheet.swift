@@ -171,11 +171,7 @@ struct NewGameSheet: View {
         }
         .presentationDetents([.large])
         .presentationBackground {
-            if theme.isDark {
-                NeonBackdrop()
-            } else {
-                Color(.systemGroupedBackground)
-            }
+            ThemeBackdrop(theme: theme)
         }
         .tint(accent)
         .preferredColorScheme(theme.isDark ? .dark : nil)
@@ -420,6 +416,6 @@ private struct Chip: View {
     NewGameSheet(theme: .neon) { _ in }
 }
 
-#Preview("Walnut") {
-    NewGameSheet(theme: .walnut) { _ in }
+#Preview("Malachite") {
+    NewGameSheet(theme: .malachite) { _ in }
 }

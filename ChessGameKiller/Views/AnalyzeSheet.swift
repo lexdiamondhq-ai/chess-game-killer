@@ -101,11 +101,7 @@ struct AnalyzeSheet: View {
         }
         .tint(accent)
         .presentationBackground {
-            if theme.isDark {
-                NeonBackdrop()
-            } else {
-                Color(.systemGroupedBackground)
-            }
+            ThemeBackdrop(theme: theme)
         }
         .preferredColorScheme(theme.isDark ? .dark : nil)
     }
@@ -140,7 +136,7 @@ private struct StartCard: View {
     }
 }
 
-/// The rounded glass (Neon) or plain (Walnut) panel used across the analyzer.
+/// The rounded glass panel used across the analyzer.
 struct Panel: View {
     let theme: BoardTheme
     var highlight: Color?
