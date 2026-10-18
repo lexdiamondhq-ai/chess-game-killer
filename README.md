@@ -3,13 +3,17 @@
 One beautiful iOS chess game, with every feature easy to reach and easy to understand.
 
 ## Features
-- Play the computer (Stockfish 17, five levels from Beginner to Grandmaster) or a friend on the same phone
+- Play the computer or a friend on the same phone. The computer comes as five rivals, Spark to Singularity (Stockfish 17 from Beginner to Grandmaster), each with its own sigil and a line about how it plays
 - Pick your side: White or Black (Gold or Violet on the Neon board), or random
-- Coach bar at the bottom grades every move you make (best, excellent, good, inaccuracy, mistake, blunder) and names the better move
-- The two best moves drawn on the board: a solid arrow for the best, a dashed arrow for the next best
+- Chess clocks: 3+2, 5+0, 10+0 or 15+10, or no clock. The last ten seconds count down in tenths, and a fallen flag ends the game
+- The coach is one orb at the bottom of the screen. Its ring is the live evaluation. After a move it stretches out for a moment with the verdict (best, excellent, good, inaccuracy, mistake, blunder) and the better move, then shrinks back. Tap it and it unfolds into the full coach: eval bar, the two best moves (tap one to play it), Undo, Hints, Flip and New game
+- When the game ends the orb opens on its own with the result, your accuracy and how many best moves, mistakes and blunders you made, plus Rematch
+- The two best moves drawn on the board: a solid arrow for the best, a dashed arrow for the next best. The coach can be set to full, arrows only, verdicts only or silent
+- Player plates above the board: who is to move, the clocks, captured pieces and the material lead. The moves so far run in a line under the board
 - Captured pieces blow apart in sparks in the theme's colors
 - Sound effects made with ElevenLabs
-- Walnut and Neon boards, undo, promotion picker, haptics
+- Settings with a live board preview: Walnut and Neon boards, arrows, verdicts, sound, haptics, and the open-source licenses
+- Undo, flip the board, promotion picker, haptics
 
 ## Stack
 - SwiftUI, iOS 17+
@@ -34,9 +38,9 @@ The sounds in `ChessGameKiller/Sounds` are made with the ElevenLabs Sound Effect
 
 ## Layout
 - `ChessGameKiller/App` – app entry point
-- `ChessGameKiller/Model` – the game, the match against the computer, sounds
+- `ChessGameKiller/Model` – the game, the match against the computer, the clock, sounds
 - `ChessGameKiller/Engine` – Stockfish, move grading and notation
-- `ChessGameKiller/Views` – SwiftUI screens
+- `ChessGameKiller/Views` – SwiftUI screens: the game screen (`ContentView`), the board, the coach orb, player plates, rivals, the new-game sheet and settings
 - `ChessGameKillerTests` – unit tests
 
 ## Credits

@@ -3,7 +3,7 @@ import Foundation
 import Observation
 
 /// Runs a match: who plays which side, the computer's replies, the coach's
-/// verdict on each move and the two best-move arrows.
+/// verdict on each move, the two best-move arrows and the clock.
 @MainActor
 @Observable
 final class MatchController {
@@ -66,6 +66,18 @@ final class MatchController {
         var opponent: Opponent = .computer
         var playerColor: Piece.Color = .white
         var level: Level = .club
+        var timeControl: TimeControl = .unlimited
+    }
+
+    /// How the game ended when the board itself doesn't say (the clock did).
+    enum Outcome: Equatable {
+        case timeout(loser: Piece.Color)
+
+        var winner: Piece.Color {
+            switch self {
+            case .timeout(let loser): return loser.opposite
+            }
+        }
     }
 
     let game: GameModel
@@ -74,18 +86,46 @@ final class MatchController {
     private(set) var hints: [MoveHint] = []
     /// The coach's verdict on the last move a person played.
     private(set) var review: MoveReview?
+    /// How the position stands, from Gold's (White's) point of view. Drives the eval ring.
+    private(set) var evaluation: Evaluation?
     private(set) var isComputerThinking = false
     /// Set once the first game has been set up from the new-game sheet.
     private(set) var hasStarted = false
     /// Set when the engine couldn't answer, so the screen can say so.
     private(set) var engineFailed = false
+    /// The clock, when the game is timed.
+    private(set) var clock: ChessClock?
+    /// Set when the game ended on the clock rather than on the board.
+    private(set) var outcome: Outcome?
+    /// How many of the person's moves got each grade this game, for the summary at the end.
+    private(set) var gradeCounts: [MoveReview.Grade: Int] = [:]
+    /// Flipped by the Flip button, on top of the usual "your side at the bottom".
+    private(set) var isFlippedByHand = false
 
     var showBestMoves = true {
-        didSet { hints = showBestMoves ? cachedHints : [] }
+        didSet { refreshHints() }
+    }
+
+    /// Whether the runner-up arrow is drawn too.
+    var showSecondBest = true {
+        didSet { refreshHints() }
+    }
+
+    /// Whether moves are graded. Checkmate is always announced.
+    var showVerdicts = true {
+        didSet { if !showVerdicts, review?.grade != .checkmate { review = nil } }
     }
 
     /// Black at the bottom when the player chose black against the computer.
-    var isBoardFlipped: Bool { setup.opponent == .computer && setup.playerColor == .black }
+    var isBoardFlipped: Bool {
+        (setup.opponent == .computer && setup.playerColor == .black) != isFlippedByHand
+    }
+
+    /// Over on the board (mate, draw) or on the clock.
+    var isOver: Bool { game.isGameOver || outcome != nil }
+
+    /// Who won, on the board or on the clock. Nil for a draw or a game still going.
+    var winner: Piece.Color? { outcome?.winner ?? game.winner }
 
     private let engine: ChessEngine?
     private let sounds: SoundPlaying?
@@ -116,11 +156,22 @@ final class MatchController {
         resetWork()
         game.newGame()
         game.humanColors = setup.opponent == .computer ? [setup.playerColor] : [.white, .black]
+        outcome = nil
+        gradeCounts = [:]
+        isFlippedByHand = false
+        evaluation = nil
+        startClock()
         if playSound { sounds?.play(.gameStart) }
         scheduleWork(after: nil)
     }
 
+    /// The same game again: same rival, same side, same clock.
+    func rematch() {
+        start(setup)
+    }
+
     func tap(_ square: Square) {
+        guard outcome == nil else { return }
         let movesBefore = game.moveCount
         let selectedBefore = game.selected
         game.tap(square)
@@ -132,6 +183,7 @@ final class MatchController {
     }
 
     func promote(to kind: Piece.Kind) {
+        guard outcome == nil else { return }
         let movesBefore = game.moveCount
         game.promote(to: kind)
         if game.moveCount != movesBefore {
@@ -139,18 +191,72 @@ final class MatchController {
         }
     }
 
-    var canUndo: Bool { game.canUndo }
+    /// Plays one of the suggested moves for the person, as if they had tapped it out.
+    func play(_ hint: MoveHint) {
+        guard outcome == nil, game.isHumanTurn, game.pendingPromotion == nil else { return }
+        let movesBefore = game.moveCount
+        game.playEngineMove(hint.uci)
+        if game.moveCount != movesBefore {
+            didPlayMove(byPerson: true)
+        }
+    }
+
+    var canUndo: Bool { game.canUndo && outcome == nil }
 
     /// Takes back the last move. Against the computer, its reply is taken back too,
     /// so it is the player's turn again.
     func undo() {
-        guard game.canUndo else { return }
+        guard canUndo else { return }
         resetWork()
         game.undo()
         if setup.opponent == .computer, !game.isHumanTurn, game.canUndo {
             game.undo()
         }
+        clock?.start(game.sideToMove)
         scheduleWork(after: nil)
+    }
+
+    /// Turns the board around.
+    func flipBoard() {
+        isFlippedByHand.toggle()
+    }
+
+    /// A rough quality score for the person's moves this game, 0 to 100.
+    var accuracy: Int? {
+        let weights: [MoveReview.Grade: Int] = [
+            .checkmate: 100, .best: 100, .excellent: 95, .good: 85, .inaccuracy: 60, .mistake: 35, .blunder: 10,
+        ]
+        let graded = gradeCounts.reduce(into: (sum: 0, count: 0)) { acc, entry in
+            acc.sum += (weights[entry.key] ?? 0) * entry.value
+            acc.count += entry.value
+        }
+        guard graded.count > 0 else { return nil }
+        return graded.sum / graded.count
+    }
+
+    // MARK: The clock
+
+    private func startClock() {
+        clock?.pause()
+        guard setup.timeControl.isTimed else {
+            clock = nil
+            return
+        }
+        let clock = ChessClock(control: setup.timeControl)
+        clock.onFlag = { [weak self] loser in self?.flagFell(loser) }
+        self.clock = clock
+        clock.start(game.sideToMove)
+    }
+
+    private func flagFell(_ loser: Piece.Color) {
+        guard outcome == nil, !game.isGameOver else { return }
+        resetWork()
+        outcome = .timeout(loser: loser)
+        if setup.opponent == .friend || game.humanColors.contains(loser.opposite) {
+            sounds?.play(.win)
+        } else {
+            sounds?.play(.gameOver)
+        }
     }
 
     // MARK: Running the match
@@ -168,11 +274,20 @@ final class MatchController {
     private func didPlayMove(byPerson: Bool) {
         guard let played = game.lastPlayed else { return }
         playSound(for: played)
+        if game.isGameOver {
+            clock?.pause()
+        } else {
+            clock?.moved(by: played.color)
+        }
         work?.cancel()
         generation += 1
         hints = []
         cachedHints = []
         scheduleWork(after: byPerson ? played : nil)
+    }
+
+    private func refreshHints() {
+        hints = showBestMoves ? Array(cachedHints.prefix(showSecondBest ? 2 : 1)) : []
     }
 
     private func scheduleWork(after personMove: PlayedMove?) {
@@ -216,9 +331,12 @@ final class MatchController {
         let grade = MoveReview.grade(before: bestLine.evaluation, after: after, playedBest: playedBest)
         let bestSAN = playedBest ? nil : Notation.san(of: bestMove, fen: move.fenBefore)
         publishReview(grade, move: move, best: bestSAN, evaluation: after)
+        evaluation = move.color == .white ? after : after.flipped
     }
 
     private func publishReview(_ grade: MoveReview.Grade, move: PlayedMove, best: String?, evaluation: Evaluation?) {
+        gradeCounts[grade, default: 0] += 1
+        guard showVerdicts || grade == .checkmate else { return }
         review = MoveReview(id: nextReviewID, grade: grade, played: move.san, best: best, evaluation: evaluation)
         nextReviewID += 1
     }
@@ -226,7 +344,7 @@ final class MatchController {
     private func computerMoveIfNeeded(generation gen: Int) async {
         guard
             let engine, setup.opponent == .computer,
-            !game.isGameOver, !game.isHumanTurn, game.pendingPromotion == nil
+            !isOver, !game.isHumanTurn, game.pendingPromotion == nil
         else { return }
 
         isComputerThinking = true
@@ -249,25 +367,33 @@ final class MatchController {
         }
         engineFailed = false
         playSound(for: played)
+        if game.isGameOver {
+            self.clock?.pause()
+        } else {
+            self.clock?.moved(by: played.color)
+        }
     }
 
     private func prepareHints(generation gen: Int) async {
-        guard let engine, !game.isGameOver, game.isHumanTurn, game.pendingPromotion == nil else { return }
+        guard let engine, !isOver, game.isHumanTurn, game.pendingPromotion == nil else { return }
         let fen = game.fen
         let lines = await engine.analyze(fen: fen, depth: 14, lines: 2)
         guard gen == generation, game.fen == fen else { return }
         engineFailed = lines.isEmpty
 
         analysis = (fen, lines)
+        if let best = lines.first {
+            evaluation = game.sideToMove == .white ? best.evaluation : best.evaluation.flipped
+        }
         cachedHints = lines.prefix(2).enumerated().compactMap { index, line in
             guard
                 let uci = line.firstMove,
                 let squares = Notation.squares(of: uci),
                 let san = Notation.san(of: uci, fen: fen)
             else { return nil }
-            return MoveHint(rank: index, from: squares.from, to: squares.to, san: san)
+            return MoveHint(rank: index, from: squares.from, to: squares.to, san: san, uci: uci, evaluation: line.evaluation)
         }
-        if showBestMoves { hints = cachedHints }
+        refreshHints()
     }
 
     private func playSound(for move: PlayedMove) {

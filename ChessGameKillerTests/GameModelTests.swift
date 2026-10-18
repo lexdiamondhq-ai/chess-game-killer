@@ -71,6 +71,16 @@ final class GameModelTests: XCTestCase {
         XCTAssertEqual(game.piece(at: .d5)?.color, .white)
     }
 
+    func testMovesAreKeptInStandardNotation() {
+        let game = GameModel()
+        play(game, "e2e4", "d7d5", "e4d5")
+        XCTAssertEqual(game.moves, ["e4", "d5", "exd5"])
+        game.undo()
+        XCTAssertEqual(game.moves, ["e4", "d5"])
+        game.newGame()
+        XCTAssertTrue(game.moves.isEmpty)
+    }
+
     func testFoolsMateEndsGame() {
         let game = GameModel()
         play(game, "f2f3", "e7e5", "g2g4", "d8h4")
