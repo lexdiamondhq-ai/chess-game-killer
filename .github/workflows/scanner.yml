@@ -1,0 +1,70 @@
+name: Scanner server
+
+# Tests the photo scanner server (scanner/) and deploys it to Cloudflare.
+# Deploying needs three repository secrets: ANTHROPIC_API_KEY,
+# CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID. Without them it only tests.
+on:
+  pull_request:
+    paths: ["scanner/**", ".github/workflows/scanner.yml"]
+  push:
+    branches: [main, photo-analyzer]
+    paths: ["scanner/**", ".github/workflows/scanner.yml"]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Unit tests
+        working-directory: scanner
+        run: npm test
+
+  deploy:
+    needs: test
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the secrets are set
+        id: secrets
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          missing=""
+          [ -n "$ANTHROPIC_API_KEY" ] || missing="$missing ANTHROPIC_API_KEY"
+          [ -n "$CLOUDFLARE_API_TOKEN" ] || missing="$missing CLOUDFLARE_API_TOKEN"
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] || missing="$missing CLOUDFLARE_ACCOUNT_ID"
+          if [ -n "$missing" ]; then
+            echo "::notice::Not deploying the scanner yet. Missing secrets:$missing"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Deploy to Cloudflare
+        id: deploy
+        if: steps.secrets.outputs.ready == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: scanner
+          wranglerVersion: "4"
+          secrets: |
+            ANTHROPIC_API_KEY
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      - name: Read the test boards
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          SCANNER_URL: ${{ steps.deploy.outputs.deployment-url }}
+        shell: bash
+        run: |
+          echo "Scanner is live at $SCANNER_URL"
+          echo "### Scanner: $SCANNER_URL" >> "$GITHUB_STEP_SUMMARY"
+          python3 scanner/test/smoke.py "$SCANNER_URL" scanner/test/boards | tee -a "$GITHUB_STEP_SUMMARY"
