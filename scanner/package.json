@@ -1,0 +1,9 @@
+{
+  "name": "chess-game-killer-scanner",
+  "private": true,
+  "type": "module",
+  "description": "Reads a chess position from a photo with Claude. Runs on Cloudflare Workers.",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}

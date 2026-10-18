@@ -7,6 +7,7 @@ struct ContentView: View {
     @State private var match = MatchController.live()
     @State private var showingNewGame = true
     @State private var showingSettings = false
+    @State private var showingAnalyze = false
     @State private var coachExpanded = false
     @State private var coachPeeking = false
     @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .walnut
@@ -47,6 +48,13 @@ struct ContentView: View {
             .navigationTitle("Chess Game Killer")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showingAnalyze = true
+                    } label: {
+                        Label("Analyze a Position", systemImage: "camera.viewfinder")
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 4) {
                         Button {
@@ -75,11 +83,24 @@ struct ContentView: View {
         .sheet(isPresented: $showingSettings) {
             SettingsSheet()
         }
+        .sheet(isPresented: $showingAnalyze) {
+            AnalyzeSheet(
+                theme: theme,
+                currentFEN: match.game.fen,
+                engine: StockfishEngine.shared,
+                reader: CloudBoardReader.live
+            ) { draft in
+                play(from: draft)
+            }
+        }
         .onAppear { syncCoachSettings() }
         .onChange(of: showBestMoves) { _, _ in syncCoachSettings() }
         .onChange(of: showSecondBest) { _, _ in syncCoachSettings() }
         .onChange(of: showVerdicts) { _, _ in syncCoachSettings() }
         .onChange(of: showingNewGame) { _, showing in
+            if showing { setCoach(expanded: false) }
+        }
+        .onChange(of: showingAnalyze) { _, showing in
             if showing { setCoach(expanded: false) }
         }
         .onChange(of: match.isOver) { _, over in
@@ -130,6 +151,14 @@ struct ContentView: View {
         match.showBestMoves = showBestMoves
         match.showSecondBest = showSecondBest
         match.showVerdicts = showVerdicts
+    }
+
+    /// Starts a game from an analyzed position, with the player moving first.
+    private func play(from draft: PositionDraft) {
+        guard let position = draft.position else { return }
+        var setup = NewGameSheet.savedSetup()
+        setup.playerColor = draft.sideToMove
+        withAnimation(.snappy) { match.start(setup, from: position) }
     }
 
     /// Closing the sheet without starting still begins a game, with last time's choices.

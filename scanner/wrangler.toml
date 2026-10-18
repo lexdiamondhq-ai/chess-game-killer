@@ -1,0 +1,17 @@
+# Deployed by .github/workflows/scanner.yml. The Anthropic key is a Worker
+# secret (ANTHROPIC_API_KEY), copied from the GitHub secret of the same name.
+name = "chess-game-killer-scanner"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+workers_dev = true
+
+[vars]
+# The Claude model that reads the board, and how hard it thinks (low to max).
+MODEL = "claude-sonnet-5-5"
+EFFORT = "high"
+
+# At most 10 scans a minute from one address, so a leaked URL can't run up the bill.
+[[ratelimits]]
+name = "SCAN_LIMITER"
+namespace_id = "1001"
+simple = { limit = 10, period = 60 }

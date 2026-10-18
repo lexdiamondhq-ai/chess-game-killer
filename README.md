@@ -11,6 +11,7 @@ One beautiful iOS chess game, with every feature easy to reach and easy to under
 - The two best moves drawn on the board: a solid arrow for the best, a dashed arrow for the next best. The coach can be set to full, arrows only, verdicts only or silent
 - Player plates above the board: who is to move, the clocks, captured pieces and the material lead. The moves so far run in a line under the board
 - Captured pieces blow apart in sparks in the theme's colors
+- Analyzer: take a photo of a real board, pick a screenshot or set up any position, fix any square, and see Stockfish's two best moves with the lines that follow; then play on from there
 - Sound effects made with ElevenLabs
 - Settings with a live board preview: Walnut and Neon boards, arrows, verdicts, sound, haptics, and the open-source licenses
 - Undo, flip the board, promotion picker, haptics
@@ -36,12 +37,16 @@ GitHub Actions runs the same build and tests on every pull request, including a 
 ## Sounds
 The sounds in `ChessGameKiller/Sounds` are made with the ElevenLabs Sound Effects API by `scripts/make_sounds.py`. To change one, edit its prompt in that script and push to the `generate-sounds` branch (or run the "Generate sounds with ElevenLabs" workflow). The workflow uses the `ELEVENLABS_API_KEY` repository secret and commits the new files back to that branch.
 
+## Photo scanner
+Photos are read by Claude through a small server in `scanner/` (a Cloudflare Worker), so the Anthropic key never ships in the app. `.github/workflows/scanner.yml` tests it, deploys it and tries it on the boards in `scanner/test/boards`. It needs two repository secrets: `ANTHROPIC_API_KEY` and `CLOUDFLARE_API_TOKEN` (made from Cloudflare's "Edit Cloudflare Workers" template); the account ID is looked up from the token. Each address can scan at most 10 times a minute. The app finds the server through `ScannerConfig.endpoint` in `ChessGameKiller/Engine/BoardReader.swift`.
+
 ## Layout
 - `ChessGameKiller/App` – app entry point
 - `ChessGameKiller/Model` – the game, the match against the computer, the clock, sounds
 - `ChessGameKiller/Engine` – Stockfish, move grading and notation
 - `ChessGameKiller/Views` – SwiftUI screens: the game screen (`ContentView`), the board, the coach orb, player plates, rivals, the new-game sheet and settings
 - `ChessGameKillerTests` – unit tests
+- `scanner` – the photo scanner server (JavaScript, Cloudflare Workers)
 
 ## Credits
 - Piece artwork: "cburnett" set by Colin M.L. Burnett, licensed GPLv2+ (via Lichess). The Neon pieces are recolored from it with `scripts/make_neon_pieces.py`.

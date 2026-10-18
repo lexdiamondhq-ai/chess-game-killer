@@ -86,13 +86,51 @@ enum Notation {
         var board = Board(position: position)
         guard let move = board.move(pieceAt: squares.from, to: squares.to) else { return nil }
         if case .promotion(let pawnMove) = board.state {
-            var kind: Piece.Kind = .queen
-            if uci.count == 5, let letter = uci.last, let k = Piece.Kind(rawValue: letter.uppercased()) {
-                kind = k
-            }
-            return board.completePromotion(of: pawnMove, to: kind).san
+            return board.completePromotion(of: pawnMove, to: promotionKind(uci)).san
         }
         return move.san
+    }
+
+    /// An engine line in standard notation, like ["Nf3", "Nc6", "d4"], stopping at the first move that doesn't fit.
+    static func sanLine(of moves: [String], fen: String, limit: Int = 6) -> [String] {
+        guard let position = Position(fen: fen) else { return [] }
+        var board = Board(position: position)
+        var line: [String] = []
+        for uci in moves.prefix(limit) {
+            guard let squares = squares(of: uci), let move = board.move(pieceAt: squares.from, to: squares.to) else { break }
+            if case .promotion(let pawnMove) = board.state {
+                line.append(board.completePromotion(of: pawnMove, to: promotionKind(uci)).san)
+            } else {
+                line.append(move.san)
+            }
+        }
+        return line
+    }
+
+    /// Numbers a line for reading: "1. Nf3 Nc6 2. d4", or "1... Nc6 2. d4" when black moves first.
+    static func numbered(_ line: [String], blackFirst: Bool) -> String {
+        var parts: [String] = []
+        var number = 1
+        var whiteToMove = !blackFirst
+        for (index, san) in line.enumerated() {
+            if whiteToMove {
+                parts.append("\(number). \(san)")
+            } else if index == 0 {
+                parts.append("\(number)... \(san)")
+            } else {
+                parts.append(san)
+            }
+            if !whiteToMove { number += 1 }
+            whiteToMove.toggle()
+        }
+        return parts.joined(separator: " ")
+    }
+
+    private static func promotionKind(_ uci: String) -> Piece.Kind {
+        if uci.count == 5, let letter = uci.last, let kind = Piece.Kind(rawValue: letter.uppercased()) {
+            return kind
+        }
+        return .queen
     }
 
     private static func isSquare(_ text: String) -> Bool {
