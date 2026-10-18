@@ -136,7 +136,7 @@ final class AnalysisModel {
                     let squares = Notation.squares(of: uci),
                     let san = Notation.san(of: uci, fen: fen)
                 else { return nil }
-                return MoveHint(rank: index, from: squares.from, to: squares.to, san: san)
+                return MoveHint(rank: index, from: squares.from, to: squares.to, san: san, uci: uci, evaluation: line.evaluation)
             }
         }
         isThinking = false

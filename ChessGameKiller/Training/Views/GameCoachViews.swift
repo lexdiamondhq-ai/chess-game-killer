@@ -9,6 +9,12 @@ struct GameCoachRow: View {
     let match: MatchController
     let theme: BoardTheme
 
+    /// True when the row has something to show: a tip, a second try, or saved mistakes after the game.
+    static func hasContent(coach: GameCoach, match: MatchController) -> Bool {
+        guard match.setup.opponent == .computer else { return false }
+        return coach.retrying != nil || coach.moment != nil || (match.isOver && coach.savedThisGame > 0)
+    }
+
     var body: some View {
         Group {
             if let retry = coach.retrying {
@@ -16,7 +22,7 @@ struct GameCoachRow: View {
                      tint: TrainingColor.yellow.color(on: theme)) { EmptyView() }
             } else if let moment = coach.moment {
                 momentView(moment)
-            } else if match.game.isGameOver, coach.savedThisGame > 0 {
+            } else if match.isOver, coach.savedThisGame > 0 {
                 line(title: "Your mistakes become your puzzles",
                      detail: coach.savedThisGame == 1
                         ? "I saved 1 position from this game to practice."
@@ -115,32 +121,52 @@ struct GameCoachRow: View {
     }
 }
 
-/// The small "Think with me" button: the Traffic Light, for the position on the board.
-struct ThinkWithMeButton: View {
+/// "Think" in the coach orb's row of round buttons: the Traffic Light, for the
+/// position on the board. Drawn like the orb's other buttons, with the three lights as its icon.
+struct ThinkActionButton: View {
     let match: MatchController
     let theme: BoardTheme
     @State private var showing = false
+    @Environment(\.isEnabled) private var isEnabled
+
+    private var canThink: Bool { !match.isOver && match.game.isHumanTurn }
 
     var body: some View {
         Button {
             showing = true
         } label: {
-            HStack(spacing: 5) {
-                TrafficLightDots(theme: theme, size: 6)
+            VStack(spacing: 5) {
+                TrafficLightDots(theme: theme, size: 7)
+                    .frame(width: 44, height: 44)
+                    .background(Color.primary.opacity(theme.isDark ? 0.07 : 0.05), in: Circle())
+                    .overlay(Circle().strokeBorder(Color.primary.opacity(0.11), lineWidth: 1))
                 Text("Think")
-                    .font(.caption.weight(.bold))
+                    .font(.caption2.weight(.semibold))
             }
-            .padding(.horizontal, 9)
-            .padding(.vertical, 6)
-            .background(Color.secondary.opacity(theme.isDark ? 0.18 : 0.12), in: Capsule())
+            .foregroundStyle(Color.primary.opacity(0.85))
+            .frame(maxWidth: .infinity)
+            .opacity(isEnabled && canThink ? 1 : 0.35)
         }
         .buttonStyle(.plain)
+        .disabled(!canThink)
         .accessibilityLabel("Think with me")
-        .disabled(match.game.isGameOver || !match.game.isHumanTurn)
+        .accessibilityHint("Walks through the three questions to ask before you move.")
         .sheet(isPresented: $showing) {
             ThinkWithMeSheet(fen: match.game.fen, lastMove: match.game.lastMove, theme: theme)
         }
-        .accessibilityHint("Walks through the three questions to ask before you move.")
+    }
+}
+
+/// Little Leo on the closed coach orb: he has a tip about the last move. Open the orb to read it.
+struct CoachOrbBadge: View {
+    let moment: CoachMoment
+    let theme: BoardTheme
+
+    var body: some View {
+        let tint = moment.isPraise ? TrainingColor.green.color(on: theme) : TrainingColor.orange.color(on: theme)
+        CoachAvatar(theme: theme, size: 26, tint: tint)
+            .accessibilityElement()
+            .accessibilityLabel(moment.isPraise ? "Coach Leo liked that move" : "Coach Leo has a tip")
     }
 }
 

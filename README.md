@@ -3,14 +3,18 @@
 One beautiful iOS chess game, with every feature easy to reach and easy to understand.
 
 ## Features
-- Play the computer (Stockfish 17, five levels from Beginner to Grandmaster) or a friend on the same phone
+- Play the computer or a friend on the same phone. The computer comes as five rivals, Spark to Singularity (Stockfish 17 from Beginner to Grandmaster), each with its own sigil and a line about how it plays
 - Pick your side: White or Black (Gold or Violet on the Neon board), or random
-- Coach bar at the bottom grades every move you make (best, excellent, good, inaccuracy, mistake, blunder) and names the better move
-- The two best moves drawn on the board: a solid arrow for the best, a dashed arrow for the next best
+- Chess clocks: 3+2, 5+0, 10+0 or 15+10, or no clock. The last ten seconds count down in tenths, and a fallen flag ends the game
+- The coach is one orb at the bottom of the screen. Its ring is the live evaluation. After a move it stretches out for a moment with the verdict (best, excellent, good, inaccuracy, mistake, blunder) and the better move, then shrinks back. Tap it and it unfolds into the full coach: eval bar, the two best moves (tap one to play it), Undo, Hints, Flip and New game
+- When the game ends the orb opens on its own with the result, your accuracy and how many best moves, mistakes and blunders you made, plus Rematch
+- The two best moves drawn on the board: a solid arrow for the best, a dashed arrow for the next best. The coach can be set to full, arrows only, verdicts only or silent
+- Player plates above the board: who is to move, the clocks, captured pieces and the material lead. The moves so far run in a line under the board
 - Captured pieces blow apart in sparks in the theme's colors
 - Analyzer: take a photo of a real board, pick a screenshot or set up any position, fix any square, and see Stockfish's two best moves with the lines that follow; then play on from there
 - Sound effects made with ElevenLabs
-- Walnut and Neon boards, undo, promotion picker, haptics
+- Settings with a live board preview: Walnut and Neon boards, arrows, verdicts, sound, haptics, and the open-source licenses
+- Undo, flip the board, promotion picker, haptics
 - Training with Coach Leo, a grandmaster coach: narrated lessons, daily puzzles and your own mistakes to fix (see below)
 
 ## Stack
@@ -38,12 +42,12 @@ The sounds in `ChessGameKiller/Sounds` are made with the ElevenLabs Sound Effect
 Photos are read by Claude through a small server in `scanner/` (a Cloudflare Worker), so the Anthropic key never ships in the app. `.github/workflows/scanner.yml` tests it, deploys it and tries it on the boards in `scanner/test/boards`. It needs two repository secrets: `ANTHROPIC_API_KEY` and `CLOUDFLARE_API_TOKEN` (made from Cloudflare's "Edit Cloudflare Workers" template); the account ID is looked up from the token. Each address can scan at most 10 times a minute. The app finds the server through `ScannerConfig.endpoint` in `ChessGameKiller/Engine/BoardReader.swift`.
 
 ## Training with Coach Leo
-Tap **Train** at the top left to meet Coach Leo, a warm grandmaster coach for players who want a hand.
+Tap the graduation cap at the top left to meet Coach Leo, a warm grandmaster coach for players who want a hand.
 - **Lessons that play like short videos.** The pieces move, arrows and glowing squares point things out, and Leo talks you through it in his ElevenLabs voice. Pause, go back or skip, and make the moves yourself when it's your turn. 15 lessons across 8 units, from what the pieces are worth to mating with a rook.
 - **A daily session of about six minutes.** A warm-up, four puzzles on today's skill pitched so you solve about four in five, a review of anything missed (your own game mistakes first), one mixed puzzle with no clue, and a finisher so it ends on a win.
 - **One habit before every move, the Traffic Light.** Red: what are they threatening? Yellow: any checks, captures or attacks? Green: is my move safe?
 - **Progress you can feel.** XP and ranks named after the pieces (Pawn up to King), a daily streak that forgives one missed day a week, and rings that fill as you master each skill.
-- **Help during games.** Against the computer, Leo names the pattern behind your move in the coach bar (a missed mate, a piece left hanging, a fork you found), lets you try the move again, and opens the lesson that teaches it. Mistakes are saved and come back as puzzles. **Think** works through the Traffic Light for the position on the board.
+- **Help during games.** Against the computer, Leo names the pattern behind your move (a missed mate, a piece left hanging, a fork you found): a small badge on the coach orb shows he has something to say, and opening the orb shows his tip with buttons to try the move again or watch the lesson that teaches it. Mistakes are saved and come back as puzzles. **Think** works through the Traffic Light for the position on the board.
 
 Everything Leo teaches is data in `ChessGameKiller/Training/Content`: `course.json` (units, skills, ranks and what Leo says), `lesson-*.json` and `drills.json` (the puzzles). The scripts in `scripts/training` make and check it (they need `pip install chess` and any UCI Stockfish):
 - `build_lessons.py` writes the lessons; `--engine` checks every answer with Stockfish.
@@ -53,9 +57,9 @@ Everything Leo teaches is data in `ChessGameKiller/Training/Content`: `course.js
 
 ## Layout
 - `ChessGameKiller/App` – app entry point
-- `ChessGameKiller/Model` – the game, the match against the computer, sounds
+- `ChessGameKiller/Model` – the game, the match against the computer, the clock, sounds
 - `ChessGameKiller/Engine` – Stockfish, move grading and notation
-- `ChessGameKiller/Views` – SwiftUI screens
+- `ChessGameKiller/Views` – SwiftUI screens: the game screen (`ContentView`), the board, the coach orb, player plates, rivals, the new-game sheet and settings
 - `ChessGameKiller/Training` – Coach Leo: the course content, lesson player, drills, sessions and progress
 - `ChessGameKillerTests` – unit tests
 - `scanner` – the photo scanner server (JavaScript, Cloudflare Workers)

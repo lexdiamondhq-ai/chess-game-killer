@@ -203,12 +203,61 @@ final class MatchControllerTests: XCTestCase {
         let defaults = UserDefaults(suiteName: "MatchControllerTests")!
         defaults.removePersistentDomain(forName: "MatchControllerTests")
         XCTAssertEqual(NewGameSheet.savedSetup(defaults).opponent, .computer)
+        XCTAssertEqual(NewGameSheet.savedSetup(defaults).timeControl, .unlimited)
         defaults.set("friend", forKey: "setup.opponent")
         defaults.set("black", forKey: "setup.side")
         defaults.set(MatchController.Level.expert.rawValue, forKey: "setup.level")
+        defaults.set("5+0", forKey: "setup.clock")
         let setup = NewGameSheet.savedSetup(defaults)
         XCTAssertEqual(setup.opponent, .friend)
         XCTAssertEqual(setup.playerColor, .black)
         XCTAssertEqual(setup.level, .expert)
+        XCTAssertEqual(setup.timeControl, .blitz5)
+    }
+
+    func testOnlyTheBestArrowWhenTheSecondIsOff() async {
+        let match = MatchController(engine: FakeEngine(), sounds: nil)
+        match.showSecondBest = false
+        match.start(.init(opponent: .friend), playSound: false)
+        await waitUntil("the hint appears") { match.hints.count == 1 }
+        XCTAssertEqual(match.hints.map(\.rank), [0])
+        match.showSecondBest = true
+        XCTAssertEqual(match.hints.count, 2)
+    }
+
+    func testPlayingAHintMakesTheMove() async {
+        let match = MatchController(engine: FakeEngine(), sounds: nil)
+        match.start(.init(opponent: .friend), playSound: false)
+        await waitUntil("hints appear") { match.hints.count == 2 }
+        let hint = match.hints[0]
+        match.play(hint)
+        XCTAssertEqual(match.game.plyCount, 1)
+        XCTAssertEqual(match.game.moves, [hint.san])
+        XCTAssertEqual(match.game.sideToMove, .black)
+    }
+
+    func testTimedGameRunsTheClockForTheSideToMove() {
+        let match = MatchController(engine: nil, sounds: nil)
+        match.start(.init(opponent: .friend, timeControl: .blitz5), playSound: false)
+        XCTAssertEqual(match.clock?.running, .white)
+        XCTAssertEqual(match.clock?.remaining(for: .black), .seconds(300))
+
+        tapMove(match, "e2e4")
+        XCTAssertEqual(match.clock?.running, .black)
+        match.undo()
+        XCTAssertEqual(match.clock?.running, .white)
+
+        match.start(.init(opponent: .friend), playSound: false)
+        XCTAssertNil(match.clock)
+    }
+
+    func testFlipTurnsTheBoardAround() {
+        let match = MatchController(engine: nil, sounds: nil)
+        match.start(.init(opponent: .computer, playerColor: .black), playSound: false)
+        XCTAssertTrue(match.isBoardFlipped)
+        match.flipBoard()
+        XCTAssertFalse(match.isBoardFlipped)
+        match.start(.init(opponent: .computer, playerColor: .black), playSound: false)
+        XCTAssertTrue(match.isBoardFlipped, "a new game puts the player's side back at the bottom")
     }
 }

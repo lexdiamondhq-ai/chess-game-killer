@@ -52,6 +52,8 @@ final class GameModel {
     private(set) var lastPlayed: PlayedMove?
     /// Recent captures, newest last. Old ones are dropped.
     private(set) var captureEvents: [CaptureEvent] = []
+    /// Every move played so far in standard notation, like ["e4", "e5", "Nf3"].
+    private(set) var moves: [String] = []
     /// Colors a person moves by tapping. The computer's color is left out.
     var humanColors: Set<Piece.Color> = [.white, .black]
 
@@ -180,6 +182,7 @@ final class GameModel {
         board = snapshot.board
         lastMove = snapshot.lastMove
         lastPlayed = nil
+        if pendingPromotion == nil { _ = moves.popLast() }
         pendingPromotion = nil
         clearSelection()
         syncPieces()
@@ -193,6 +196,7 @@ final class GameModel {
         lastPlayed = nil
         pendingPromotion = nil
         captureEvents = []
+        moves = []
         clearSelection()
         syncPieces()
     }
@@ -252,6 +256,7 @@ final class GameModel {
             givesCheck: move.checkState == .check || move.checkState == .checkmate
         )
         fenBeforePendingMove = nil
+        moves.append(move.san)
         moveCount += 1
         syncPieces()
     }

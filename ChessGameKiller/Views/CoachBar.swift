@@ -5,17 +5,11 @@ import SwiftUI
 struct CoachBar: View {
     let match: MatchController
     let theme: BoardTheme
-    /// Coach Leo's training coach, when the app provides one.
-    @Environment(GameCoach.self) private var coach: GameCoach?
-    @Environment(TrainingStore.self) private var training: TrainingStore?
 
     var body: some View {
         let tint = match.review?.grade.color ?? theme.accent ?? .accentColor
         VStack(alignment: .leading, spacing: 12) {
             verdict
-            if let coach, let training, match.setup.opponent == .computer {
-                GameCoachRow(coach: coach, store: training, match: match, theme: theme)
-            }
             footer
         }
         .padding(14)
@@ -104,15 +98,6 @@ struct CoachBar: View {
                     .accessibilityElement(children: .combine)
                 }
                 Spacer(minLength: 0)
-                if coach != nil {
-                    ThinkWithMeButton(match: match, theme: theme)
-                }
-            }
-            .transition(.opacity)
-        } else if coach != nil, match.game.isHumanTurn, !match.game.isGameOver {
-            HStack {
-                Spacer(minLength: 0)
-                ThinkWithMeButton(match: match, theme: theme)
             }
             .transition(.opacity)
         }

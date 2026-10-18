@@ -1,37 +1,53 @@
 import SwiftUI
 
+/// The game screen: the two players, the board, the moves so far, and the
+/// coach orb at the bottom with Undo and Hints either side of it. When the orb
+/// unfolds, the player plates fold into one line and the board makes room.
 struct ContentView: View {
     @State private var match = MatchController.live()
     @State private var showingNewGame = true
+    @State private var showingSettings = false
     @State private var showingAnalyze = false
+    @State private var coachExpanded = false
+    @State private var coachPeeking = false
     @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .walnut
-    @AppStorage("soundEffects") private var soundOn = true
     @AppStorage("showBestMoves") private var showBestMoves = true
+    @AppStorage("showSecondBest") private var showSecondBest = true
+    @AppStorage("coachVerdicts") private var showVerdicts = true
     @State private var training = TrainingStore.live()
     @State private var coach = GameCoach()
     @State private var showingTraining = false
 
     private var theme: BoardTheme { .named(themeID) }
+    /// The orb is stretched or unfolded, so nothing else fits beside it.
+    private var coachIsWide: Bool { coachExpanded || coachPeeking }
+
+    private static let spacing: CGFloat = 12
+    private static let platesHeight: CGFloat = 64
+    private static let stripHeight: CGFloat = 30
+    private static let ribbonHeight: CGFloat = 24
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 16) {
-                StatusBar(match: match, theme: theme)
-                BoardView(match: match, theme: theme)
-                Spacer(minLength: 0)
-                CoachBar(match: match, theme: theme)
+            GeometryReader { geo in
+                let platesHeight = coachExpanded ? Self.stripHeight : Self.platesHeight
+                let spare = geo.size.height - platesHeight - Self.ribbonHeight - Self.spacing * 2
+                let side = max(0, min(geo.size.width, spare))
+                VStack(spacing: Self.spacing) {
+                    PlayerPlates(match: match, theme: theme, compact: coachExpanded)
+                        .frame(height: platesHeight)
+                    BoardView(match: match, theme: theme)
+                        .frame(width: side, height: side)
+                    MoveRibbon(moves: match.game.moves, theme: theme)
+                        .frame(height: Self.ribbonHeight)
+                    Spacer(minLength: 0)
+                }
+                .frame(maxWidth: .infinity)
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
-            .padding(.bottom, 12)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background {
-                if theme.isDark {
-                    NeonBackdrop()
-                } else {
-                    Color(.systemGroupedBackground).ignoresSafeArea()
-                }
-            }
+            .safeAreaInset(edge: .bottom, spacing: 0) { dock }
+            .background { SheetBackdrop(theme: theme) }
             .navigationTitle("Chess Game Killer")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -42,38 +58,24 @@ struct ContentView: View {
                         Label("Analyze a Position", systemImage: "camera.viewfinder")
                     }
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    SettingsMenu(themeID: $themeID, soundOn: $soundOn, showBestMoves: $showBestMoves)
-                }
                 ToolbarItem(placement: .topBarLeading) {
                     TrainButton(theme: theme) { showingTraining = true }
                 }
-                ToolbarItemGroup(placement: .bottomBar) {
-                    Button {
-                        showingNewGame = true
-                    } label: {
-                        Label("New Game", systemImage: "plus.circle")
+                ToolbarItem(placement: .topBarTrailing) {
+                    HStack(spacing: 4) {
+                        Button {
+                            showingNewGame = true
+                        } label: {
+                            Label("New Game", systemImage: "plus")
+                        }
+                        Button {
+                            showingSettings = true
+                        } label: {
+                            Label("Settings", systemImage: "gearshape")
+                        }
                     }
-                    .labelStyle(.titleAndIcon)
-                    Spacer()
-                    Button {
-                        showBestMoves.toggle()
-                    } label: {
-                        Label("Best Moves", systemImage: showBestMoves ? "lightbulb.fill" : "lightbulb.slash")
-                    }
-                    .labelStyle(.titleAndIcon)
-                    .accessibilityValue(showBestMoves ? "On" : "Off")
-                    Spacer()
-                    Button {
-                        withAnimation(.snappy(duration: 0.22)) { match.undo() }
-                    } label: {
-                        Label("Undo", systemImage: "arrow.uturn.backward")
-                    }
-                    .labelStyle(.titleAndIcon)
-                    .disabled(!match.canUndo)
                 }
             }
-            .toolbarBackground(theme.isDark ? .visible : .automatic, for: .bottomBar)
         }
         .tint(theme.accent)
         .preferredColorScheme(theme.isDark ? .dark : nil)
@@ -98,6 +100,9 @@ struct ContentView: View {
                 showingNewGame = false
             }
         }
+        .sheet(isPresented: $showingSettings) {
+            SettingsSheet()
+        }
         .sheet(isPresented: $showingAnalyze) {
             AnalyzeSheet(
                 theme: theme,
@@ -108,8 +113,67 @@ struct ContentView: View {
                 play(from: draft)
             }
         }
-        .onAppear { match.showBestMoves = showBestMoves }
-        .onChange(of: showBestMoves) { _, show in match.showBestMoves = show }
+        .onAppear { syncCoachSettings() }
+        .onChange(of: showBestMoves) { _, _ in syncCoachSettings() }
+        .onChange(of: showSecondBest) { _, _ in syncCoachSettings() }
+        .onChange(of: showVerdicts) { _, _ in syncCoachSettings() }
+        .onChange(of: showingNewGame) { _, showing in
+            if showing { setCoach(expanded: false) }
+        }
+        .onChange(of: showingAnalyze) { _, showing in
+            if showing { setCoach(expanded: false) }
+        }
+        .onChange(of: showingTraining) { _, showing in
+            if showing { setCoach(expanded: false) }
+        }
+        .onChange(of: match.isOver) { _, over in
+            guard over else { return }
+            // Let the last move land and the sound play, then open the summary.
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1.4))
+                guard match.isOver, !showingNewGame else { return }
+                setCoach(expanded: true)
+            }
+        }
+    }
+
+    /// Undo and Hints either side of the orb. They step aside while the orb is wide.
+    private var dock: some View {
+        ZStack {
+            HStack {
+                RoundButton(title: "Undo", symbol: "arrow.uturn.backward", theme: theme) {
+                    withAnimation(.snappy(duration: 0.22)) { match.undo() }
+                }
+                .disabled(!match.canUndo)
+                Spacer()
+                RoundButton(title: "Hints", symbol: showBestMoves ? "lightbulb.fill" : "lightbulb.slash",
+                            isOn: showBestMoves, theme: theme) {
+                    showBestMoves.toggle()
+                }
+            }
+            .opacity(coachIsWide ? 0 : 1)
+            .scaleEffect(coachIsWide ? 0.85 : 1)
+            .allowsHitTesting(!coachIsWide)
+            CoachOrb(match: match, theme: theme, isExpanded: $coachExpanded, isPeeking: $coachPeeking) {
+                showingNewGame = true
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 10)
+        .padding(.bottom, 8)
+        .animation(.spring(response: 0.45, dampingFraction: 0.85), value: coachIsWide)
+    }
+
+    private func setCoach(expanded: Bool) {
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.82)) {
+            coachExpanded = expanded
+        }
+    }
+
+    private func syncCoachSettings() {
+        match.showBestMoves = showBestMoves
+        match.showSecondBest = showSecondBest
+        match.showVerdicts = showVerdicts
     }
 
     /// Starts a game from an analyzed position, with the player moving first.
@@ -129,6 +193,7 @@ struct ContentView: View {
 }
 
 /// Opens Coach Leo's training: lessons, puzzles and your own mistakes to fix.
+/// A filled circle in the theme's accent, so it stands out from the plain toolbar icons.
 private struct TrainButton: View {
     let theme: BoardTheme
     let action: () -> Void
@@ -136,86 +201,56 @@ private struct TrainButton: View {
     var body: some View {
         let accent = theme.trainingAccent
         Button(action: action) {
-            Label("Train", systemImage: "graduationcap.fill")
-                .labelStyle(.titleAndIcon)
-                .font(.subheadline.weight(.bold))
+            Image(systemName: "graduationcap.fill")
+                .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(theme.isDark ? Color.black : Color.white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(accent, in: Capsule())
+                .frame(width: 32, height: 32)
+                .background(accent, in: Circle())
                 .shadow(color: theme.isDark ? accent.opacity(0.6) : .clear, radius: 8)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Train with Coach Leo")
         .accessibilityHint("Lessons, puzzles and your own mistakes to practice")
     }
 }
 
-/// Top-right menu: board look, sound and best-move arrows. Choices are remembered.
-private struct SettingsMenu: View {
-    @Binding var themeID: BoardTheme.ID
-    @Binding var soundOn: Bool
-    @Binding var showBestMoves: Bool
-
-    var body: some View {
-        Menu {
-            Picker("Board", selection: $themeID) {
-                ForEach(BoardTheme.all) { theme in
-                    Label(theme.name, systemImage: theme.symbol).tag(theme.id)
-                }
-            }
-            Section {
-                Toggle(isOn: $soundOn) {
-                    Label("Sound Effects", systemImage: "speaker.wave.2.fill")
-                }
-                Toggle(isOn: $showBestMoves) {
-                    Label("Best-Move Arrows", systemImage: "arrow.up.right")
-                }
-            }
-        } label: {
-            Label("Settings", systemImage: "slider.horizontal.3")
-        }
-    }
-}
-
-/// Whose turn it is or how the game ended, and who the opponent is.
-private struct StatusBar: View {
-    let match: MatchController
+/// A round button with a caption under it, for either side of the orb.
+private struct RoundButton: View {
+    let title: String
+    let symbol: String
+    var isOn = false
     let theme: BoardTheme
+    let action: () -> Void
 
-    private var game: GameModel { match.game }
+    @Environment(\.isEnabled) private var isEnabled
+
+    private var accent: Color { theme.accent ?? .accentColor }
 
     var body: some View {
-        let sideColor = theme.sideColor(game.sideToMove)
-        let status = game.status(white: theme.whiteName, black: theme.blackName)
-        HStack(spacing: 10) {
-            Circle()
-                .fill(sideColor)
-                .overlay(Circle().strokeBorder(Color.secondary.opacity(0.5), lineWidth: theme.isDark ? 0 : 1))
-                .frame(width: 14, height: 14)
-                .shadow(color: theme.isDark ? sideColor : .clear, radius: 5)
-            Text(status)
-                .font(.headline)
-                .foregroundStyle(game.isGameOver ? (theme.accent ?? .accentColor) : Color.primary)
-                .contentTransition(.opacity)
-            Spacer()
-            Text(opponentText)
-                .font(.footnote.weight(.medium))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(Color.secondary.opacity(theme.isDark ? 0.18 : 0.12), in: Capsule())
+        Button(action: action) {
+            VStack(spacing: 4) {
+                Image(systemName: symbol)
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(width: 48, height: 48)
+                    .background(
+                        theme.isDark ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)),
+                        in: Circle()
+                    )
+                    .overlay {
+                        Circle().strokeBorder(isOn ? accent.opacity(0.6) : Color.primary.opacity(theme.isDark ? 0.12 : 0.08), lineWidth: 1)
+                    }
+                    .shadow(color: theme.isDark ? (isOn ? accent.opacity(0.3) : .clear) : .black.opacity(0.1),
+                            radius: theme.isDark ? 10 : 6, y: theme.isDark ? 0 : 2)
+                    .contentTransition(.symbolEffect(.replace))
+                Text(title)
+                    .font(.caption2.weight(.semibold))
+            }
+            .foregroundStyle(isOn ? accent : Color.primary.opacity(0.85))
+            .opacity(isEnabled ? 1 : 0.35)
         }
-        .padding(.horizontal, 4)
-        .animation(.snappy, value: status)
-        .accessibilityElement(children: .combine)
-    }
-
-    private var opponentText: String {
-        let setup = match.setup
-        switch setup.opponent {
-        case .computer: return "vs Computer · \(setup.level.name)"
-        case .friend: return "vs Friend"
-        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityValue(isOn ? "On" : "")
     }
 }
 
