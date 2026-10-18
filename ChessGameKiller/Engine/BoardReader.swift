@@ -36,10 +36,10 @@ enum BoardReaderError: LocalizedError, Equatable {
     }
 }
 
-/// Where the scanner server lives (scanner/ in this repo, on Cloudflare).
-/// Empty until the server is deployed.
+/// Where the scanner server lives (scanner/ in this repo, deployed to
+/// Cloudflare by .github/workflows/scanner.yml).
 enum ScannerConfig {
-    static let endpoint = URL(string: "")
+    static let endpoint = URL(string: "https://chess-game-killer-scanner.chess-game-killer.workers.dev")
 }
 
 /// Sends the picture to the scanner server, which asks Claude to read the board.

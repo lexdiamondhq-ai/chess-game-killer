@@ -10,6 +10,9 @@ import time
 import urllib.error
 import urllib.request
 
+# Cloudflare turns away Python's default "Python-urllib" signature with a 403.
+HEADERS = {"User-Agent": "ChessGameKiller-smoke/1.0"}
+
 
 def grid(placement):
     rows = []
@@ -40,9 +43,14 @@ def wait_until_up(url, minutes=5):
     deadline = time.time() + minutes * 60
     while True:
         try:
-            with urllib.request.urlopen(url + "/", timeout=15) as response:
+            request = urllib.request.Request(url + "/", headers=HEADERS)
+            with urllib.request.urlopen(request, timeout=15) as response:
                 if json.load(response).get("ok"):
                     return True
+        except urllib.error.HTTPError as error:
+            if time.time() > deadline:
+                print(f"Scanner never answered at {url}: {error} {error.read()[:300]!r}")
+                return False
         except (urllib.error.URLError, OSError, ValueError) as error:
             if time.time() > deadline:
                 print(f"Scanner never answered at {url}: {error}")
@@ -61,7 +69,7 @@ def main():
         with open(os.path.join(folder, name), "rb") as f:
             image = f.read()
         request = urllib.request.Request(f"{url}/read", data=image, method="POST",
-                                         headers={"Content-Type": "image/png"})
+                                         headers={**HEADERS, "Content-Type": "image/png"})
         try:
             with urllib.request.urlopen(request, timeout=90) as response:
                 answer = json.load(response)
