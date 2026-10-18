@@ -1,0 +1,19 @@
+name: ChessGameKiller
+options:
+  bundleIdPrefix: com.chessgamekiller
+  deploymentTarget:
+    iOS: "17.0"
+targets:
+  ChessGameKiller:
+    type: application
+    platform: iOS
+    sources: [ChessGameKiller]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.chessgamekiller.app
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Chess Game Killer
+        TARGETED_DEVICE_FAMILY: "1,2"
