@@ -1,0 +1,50 @@
+{
+  "id": "forks",
+  "title": "Forks",
+  "subtitle": "One piece, two targets",
+  "skill": "forks",
+  "steps": [
+    {
+      "fen": "r1b1k2r/pp3ppp/5n2/1N6/5B2/8/PPP2PPP/R4RK1 w - - 0 1",
+      "say": "A fork is one piece attacking two things at once. They can only save one. Knights are the sneakiest forkers.",
+      "task": {
+        "type": "move",
+        "prompt": "Find the knight fork.",
+        "solution": [
+          "b5c7"
+        ],
+        "hint": "Find a square where your knight checks the king and hits a rook. Your bishop guards it.",
+        "success": "Fork! Check and attack at the same time."
+      }
+    },
+    {
+      "say": "The king has to step away, and the knight takes the rook.",
+      "moves": [
+        "e8d7",
+        "c7a8"
+      ]
+    },
+    {
+      "fen": "r1bqk2r/pppp1ppp/2n2n2/1Bb1p3/4P3/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 6 5",
+      "say": "Pawns can fork too. Watch: White gives a knight for a pawn, on purpose.",
+      "moves": [
+        "f3e5",
+        "c6e5"
+      ]
+    },
+    {
+      "task": {
+        "type": "move",
+        "prompt": "Now find the pawn fork.",
+        "solution": [
+          "d2d4"
+        ],
+        "hint": "Which pawn can attack the bishop and the knight in one step?",
+        "success": "Pawn d4 hits the bishop and the knight. You'll win your piece back."
+      }
+    },
+    {
+      "say": "Forks work best against the king and against pieces nobody is guarding. When you see two loose targets, look for a fork."
+    }
+  ]
+}

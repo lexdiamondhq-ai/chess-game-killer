@@ -6,6 +6,9 @@ struct ContentView: View {
     @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .walnut
     @AppStorage("soundEffects") private var soundOn = true
     @AppStorage("showBestMoves") private var showBestMoves = true
+    @State private var training = TrainingStore.live()
+    @State private var coach = GameCoach()
+    @State private var showingTraining = false
 
     private var theme: BoardTheme { .named(themeID) }
 
@@ -33,6 +36,9 @@ struct ContentView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     SettingsMenu(themeID: $themeID, soundOn: $soundOn, showBestMoves: $showBestMoves)
+                }
+                ToolbarItem(placement: .topBarLeading) {
+                    TrainButton(theme: theme) { showingTraining = true }
                 }
                 ToolbarItemGroup(placement: .bottomBar) {
                     Button {
@@ -63,6 +69,20 @@ struct ContentView: View {
         }
         .tint(theme.accent)
         .preferredColorScheme(theme.isDark ? .dark : nil)
+        .environment(training)
+        .environment(coach)
+        .onChange(of: match.review) { _, review in
+            coach.observe(review, in: match, store: training)
+        }
+        .fullScreenCover(isPresented: $showingTraining) {
+            TrainingHubView().environment(training)
+        }
+        .fullScreenCover(item: $coach.presentedLesson) { lesson in
+            LessonScreen(lesson: lesson, theme: theme).environment(training)
+        }
+        .fullScreenCover(item: $coach.presentedSession) { plan in
+            SessionView(plan: plan, theme: theme).environment(training)
+        }
         .animation(.easeInOut(duration: 0.35), value: themeID)
         .sheet(isPresented: $showingNewGame, onDismiss: startIfNeeded) {
             NewGameSheet(theme: theme) { setup in
@@ -79,6 +99,28 @@ struct ContentView: View {
         if !match.hasStarted {
             match.start(NewGameSheet.savedSetup(), playSound: false)
         }
+    }
+}
+
+/// Opens Coach Leo's training: lessons, puzzles and your own mistakes to fix.
+private struct TrainButton: View {
+    let theme: BoardTheme
+    let action: () -> Void
+
+    var body: some View {
+        let accent = theme.trainingAccent
+        Button(action: action) {
+            Label("Train", systemImage: "graduationcap.fill")
+                .labelStyle(.titleAndIcon)
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(theme.isDark ? Color.black : Color.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(accent, in: Capsule())
+                .shadow(color: theme.isDark ? accent.opacity(0.6) : .clear, radius: 8)
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Lessons, puzzles and your own mistakes to practice")
     }
 }
 

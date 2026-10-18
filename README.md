@@ -10,6 +10,7 @@ One beautiful iOS chess game, with every feature easy to reach and easy to under
 - Captured pieces blow apart in sparks in the theme's colors
 - Sound effects made with ElevenLabs
 - Walnut and Neon boards, undo, promotion picker, haptics
+- Training with Coach Leo, a grandmaster coach: narrated lessons, daily puzzles and your own mistakes to fix (see below)
 
 ## Stack
 - SwiftUI, iOS 17+
@@ -32,11 +33,26 @@ GitHub Actions runs the same build and tests on every pull request, including a 
 ## Sounds
 The sounds in `ChessGameKiller/Sounds` are made with the ElevenLabs Sound Effects API by `scripts/make_sounds.py`. To change one, edit its prompt in that script and push to the `generate-sounds` branch (or run the "Generate sounds with ElevenLabs" workflow). The workflow uses the `ELEVENLABS_API_KEY` repository secret and commits the new files back to that branch.
 
+## Training with Coach Leo
+Tap **Train** at the top left to meet Coach Leo, a warm grandmaster coach for players who want a hand.
+- **Lessons that play like short videos.** The pieces move, arrows and glowing squares point things out, and Leo talks you through it in his ElevenLabs voice. Pause, go back or skip, and make the moves yourself when it's your turn. 15 lessons across 8 units, from what the pieces are worth to mating with a rook.
+- **A daily session of about six minutes.** A warm-up, four puzzles on today's skill pitched so you solve about four in five, a review of anything missed (your own game mistakes first), one mixed puzzle with no clue, and a finisher so it ends on a win.
+- **One habit before every move, the Traffic Light.** Red: what are they threatening? Yellow: any checks, captures or attacks? Green: is my move safe?
+- **Progress you can feel.** XP and ranks named after the pieces (Pawn up to King), a daily streak that forgives one missed day a week, and rings that fill as you master each skill.
+- **Help during games.** Against the computer, Leo names the pattern behind your move in the coach bar (a missed mate, a piece left hanging, a fork you found), lets you try the move again, and opens the lesson that teaches it. Mistakes are saved and come back as puzzles. **Think** works through the Traffic Light for the position on the board.
+
+Everything Leo teaches is data in `ChessGameKiller/Training/Content`: `course.json` (units, skills, ranks and what Leo says), `lesson-*.json` and `drills.json` (the puzzles). The scripts in `scripts/training` make and check it (they need `pip install chess` and any UCI Stockfish):
+- `build_lessons.py` writes the lessons; `--engine` checks every answer with Stockfish.
+- `mine_puzzles.py` mines puzzles from beginner-style engine games, `compose_puzzles.py` composes pattern puzzles and endgames, and `build_drills.py` picks the final set.
+- `verify_training.py` checks every move, square and checkmate in the content.
+- `make_narration.py` records Leo's lines. The "Record lesson narration with ElevenLabs" workflow runs it when a branch changes a lesson, using the `ELEVENLABS_API_KEY` secret, and commits the recordings to `ChessGameKiller/Training/Narration`. A line is only ever recorded once; until it is, the phone's own voice reads it.
+
 ## Layout
 - `ChessGameKiller/App` – app entry point
 - `ChessGameKiller/Model` – the game, the match against the computer, sounds
 - `ChessGameKiller/Engine` – Stockfish, move grading and notation
 - `ChessGameKiller/Views` – SwiftUI screens
+- `ChessGameKiller/Training` – Coach Leo: the course content, lesson player, drills, sessions and progress
 - `ChessGameKillerTests` – unit tests
 
 ## Credits

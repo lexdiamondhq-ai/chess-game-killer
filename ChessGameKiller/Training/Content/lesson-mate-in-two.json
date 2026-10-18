@@ -1,0 +1,54 @@
+{
+  "id": "mate-in-two",
+  "title": "Mate in Two",
+  "subtitle": "Force it, then finish it",
+  "skill": "mate-in-2",
+  "steps": [
+    {
+      "fen": "5r1k/pp4pp/1q5N/8/2Q5/8/PP3PPP/6K1 w - - 0 1",
+      "say": "In a mate in two, your first move forces their reply, and your second move is checkmate. Here's the most beautiful one in chess: the smothered mate."
+    },
+    {
+      "say": "Black's king is boxed in by its own rook and pawns. Your knight would love to check from f7, but the rook guards it. For now.",
+      "arrows": [
+        {
+          "from": "h6",
+          "to": "f7",
+          "color": "yellow",
+          "dashed": true
+        }
+      ],
+      "marks": [
+        {
+          "square": "f8",
+          "color": "red"
+        },
+        {
+          "square": "g7",
+          "color": "red"
+        },
+        {
+          "square": "h7",
+          "color": "red"
+        }
+      ]
+    },
+    {
+      "task": {
+        "type": "move",
+        "prompt": "Checkmate in two. Start by giving up your queen!",
+        "solution": [
+          "c4g8",
+          "f8g8",
+          "h6f7"
+        ],
+        "mate": true,
+        "hint": "Check on g8. The king can't take, because your knight guards g8. So the rook has to.",
+        "success": "Smothered mate! The king was trapped by its own pieces."
+      }
+    },
+    {
+      "say": "The secret of mates in two: look for checks that leave them only one reply. Then look for mate after it."
+    }
+  ]
+}

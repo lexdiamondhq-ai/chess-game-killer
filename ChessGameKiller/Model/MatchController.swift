@@ -201,25 +201,38 @@ final class MatchController {
 
         let playedBest = bestMove == move.uci
         let after: Evaluation
+        // The opponent's best answer, so the coach can say what the move allows.
+        var reply: String?
         if playedBest {
             after = bestLine.evaluation
+            reply = bestLine.moves.dropFirst().first
         } else if before.count > 1, before[1].firstMove == move.uci {
             after = before[1].evaluation
+            reply = before[1].moves.dropFirst().first
         } else if game.isGameOver {
             after = .centipawns(0)
         } else {
-            let reply = await engine.analyze(fen: game.fen, depth: 12, lines: 1)
-            guard gen == generation, let line = reply.first else { return }
+            let answer = await engine.analyze(fen: game.fen, depth: 12, lines: 1)
+            guard gen == generation, let line = answer.first else { return }
             after = line.evaluation.flipped
+            reply = line.firstMove
         }
 
         let grade = MoveReview.grade(before: bestLine.evaluation, after: after, playedBest: playedBest)
         let bestSAN = playedBest ? nil : Notation.san(of: bestMove, fen: move.fenBefore)
-        publishReview(grade, move: move, best: bestSAN, evaluation: after)
+        publishReview(grade, move: move, best: bestSAN, evaluation: after,
+                      bestUCI: bestMove, before: bestLine.evaluation, reply: reply)
     }
 
-    private func publishReview(_ grade: MoveReview.Grade, move: PlayedMove, best: String?, evaluation: Evaluation?) {
-        review = MoveReview(id: nextReviewID, grade: grade, played: move.san, best: best, evaluation: evaluation)
+    private func publishReview(
+        _ grade: MoveReview.Grade, move: PlayedMove, best: String?, evaluation: Evaluation?,
+        bestUCI: String? = nil, before: Evaluation? = nil, reply: String? = nil
+    ) {
+        review = MoveReview(
+            id: nextReviewID, grade: grade, played: move.san, best: best, evaluation: evaluation,
+            fenBefore: move.fenBefore, fenAfter: game.fen, playedUCI: move.uci, bestUCI: bestUCI,
+            before: before, reply: reply
+        )
         nextReviewID += 1
     }
 

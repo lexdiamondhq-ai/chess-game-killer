@@ -1,0 +1,48 @@
+{
+  "id": "free-pieces",
+  "title": "Yellow Light: Free Pieces",
+  "subtitle": "Take what they leave unprotected",
+  "skill": "free-pieces",
+  "steps": [
+    {
+      "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2",
+      "say": "Yellow light: look for captures. Black's queen just came out to h4. Who is guarding her?",
+      "moves": [
+        "d8h4"
+      ]
+    },
+    {
+      "task": {
+        "type": "move",
+        "prompt": "Take the free piece.",
+        "solution": [
+          "f3h4"
+        ],
+        "hint": "Your knight on f3 can jump to h4.",
+        "success": "Free queen! Nothing guarded h4. That's 9 points for nothing."
+      }
+    },
+    {
+      "say": "A piece nobody guards is called hanging. Real games are full of them. Your job is to notice."
+    },
+    {
+      "fen": "4r1k1/ppp2ppp/8/3n4/8/1P5P/PBP2PP1/3R2K1 w - - 0 1",
+      "say": "Two captures here. One wins a piece for free. The other is a trap.",
+      "task": {
+        "type": "move",
+        "prompt": "Find the capture that wins a piece for free.",
+        "solution": [
+          "d1d5"
+        ],
+        "feedback": {
+          "b2g7": "The king guards g7. You'd give a bishop for a pawn."
+        },
+        "hint": "Check what guards each piece. Count the defenders.",
+        "success": "Free knight! Nothing was guarding d5."
+      }
+    },
+    {
+      "say": "Before you grab, use the green light too: after you take, is your piece safe? Free pieces are only free if you get to keep them."
+    }
+  ]
+}

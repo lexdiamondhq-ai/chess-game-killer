@@ -1,0 +1,45 @@
+name: Record lesson narration with ElevenLabs
+
+# Records Coach Leo's voice for any lesson line that doesn't have a recording
+# yet (scripts/training/make_narration.py) and commits the new files to the
+# branch that changed the lessons. Lines already recorded are skipped, so a
+# run with nothing new costs nothing.
+on:
+  push:
+    branches-ignore: [main]
+    paths:
+      - "ChessGameKiller/Training/Content/lesson-*.json"
+      - "ChessGameKiller/Training/Content/course.json"
+      - "scripts/training/make_narration.py"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: narration-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Record missing lines
+        env:
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+        run: python3 scripts/training/make_narration.py --prune
+      - name: Commit the recordings
+        # Also after a failed run, so the lines that did get recorded are kept.
+        if: ${{ !cancelled() }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ChessGameKiller/Training/Narration
+          if git diff --cached --quiet; then
+            echo "Nothing new to record."
+            exit 0
+          fi
+          git commit -m "Record lesson narration with ElevenLabs"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

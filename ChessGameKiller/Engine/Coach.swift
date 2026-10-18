@@ -16,6 +16,17 @@ struct MoveReview: Equatable, Identifiable {
     /// The position after the move, from the mover's point of view.
     let evaluation: Evaluation?
 
+    // What the training coach needs to name the pattern behind the move.
+    var fenBefore: String? = nil
+    var fenAfter: String? = nil
+    /// The move played and the engine's choice, in engine notation.
+    var playedUCI: String? = nil
+    var bestUCI: String? = nil
+    /// The position before the move, from the mover's point of view.
+    var before: Evaluation? = nil
+    /// The opponent's best answer to the move played, in engine notation.
+    var reply: String? = nil
+
     var title: String {
         switch grade {
         case .checkmate: return "Checkmate!"
