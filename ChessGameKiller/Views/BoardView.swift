@@ -7,6 +7,8 @@ struct BoardView: View {
     let match: MatchController
     var theme: BoardTheme = .walnut
 
+    @AppStorage("haptics") private var hapticsOn = true
+
     private var game: GameModel { match.game }
     private var flipped: Bool { match.isBoardFlipped }
 
@@ -48,8 +50,8 @@ struct BoardView: View {
             }
         }
         .aspectRatio(1, contentMode: .fit)
-        .sensoryFeedback(.impact(weight: .light), trigger: game.moveCount)
-        .sensoryFeedback(.impact(weight: .heavy, intensity: 0.9), trigger: game.captureEvents.last?.id)
+        .sensoryFeedback(.impact(weight: .light), trigger: game.moveCount) { _, _ in hapticsOn }
+        .sensoryFeedback(.impact(weight: .heavy, intensity: 0.9), trigger: game.captureEvents.last?.id) { _, _ in hapticsOn }
     }
 
     // MARK: Layout

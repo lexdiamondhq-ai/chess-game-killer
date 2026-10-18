@@ -62,6 +62,10 @@ struct MoveHint: Equatable, Identifiable {
     let from: Square
     let to: Square
     let san: String
+    /// Engine notation, like "e1g1", so the move can be played on request.
+    let uci: String
+    /// The position after this move, from the mover's point of view.
+    let evaluation: Evaluation
 
     var id: Int { rank }
 }
