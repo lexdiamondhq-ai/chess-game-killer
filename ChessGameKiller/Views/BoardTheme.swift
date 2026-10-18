@@ -39,6 +39,18 @@ struct BoardTheme: Identifiable {
     /// The dot next to "White to move" / "Black to move".
     let whiteSide: Color
     let blackSide: Color
+    /// What the sides are called on screen ("White", or "Gold" on Neon).
+    let whiteName: String
+    let blackName: String
+
+    // Coach
+    /// The best-move arrow (solid) and the second-best arrow (dashed).
+    let bestArrow: Color
+    let secondArrow: Color
+    let arrowGlow: Color?
+    /// Spark colors when a piece of that color is captured.
+    let whiteSparks: [Color]
+    let blackSparks: [Color]
 
     // Screen
     let boardEdge: Color?
@@ -48,6 +60,18 @@ struct BoardTheme: Identifiable {
 
     func imageName(for piece: Piece) -> String {
         pieceSet + piece.assetName
+    }
+
+    func name(of color: Piece.Color) -> String {
+        color == .white ? whiteName : blackName
+    }
+
+    func sideColor(_ color: Piece.Color) -> Color {
+        color == .white ? whiteSide : blackSide
+    }
+
+    func sparks(for color: Piece.Color) -> [Color] {
+        color == .white ? whiteSparks : blackSparks
     }
 
     static let all: [BoardTheme] = [.walnut, .neon]
@@ -79,6 +103,13 @@ struct BoardTheme: Identifiable {
         blackGlow: nil,
         whiteSide: .white,
         blackSide: .black,
+        whiteName: "White",
+        blackName: "Black",
+        bestArrow: Color(hex: 0x15781B).opacity(0.85),
+        secondArrow: Color(hex: 0x15781B).opacity(0.55),
+        arrowGlow: nil,
+        whiteSparks: [Color(hex: 0xFFF4D6), Color(hex: 0xFFC24A), Color(hex: 0xFF7A1A)],
+        blackSparks: [Color(hex: 0xFFC24A), Color(hex: 0xFF7A1A), Color(hex: 0x6B3A1E)],
         boardEdge: nil,
         boardShadows: [Color.black.opacity(0.25)],
         isDark: false,
@@ -108,6 +139,13 @@ struct BoardTheme: Identifiable {
         blackGlow: Color(hex: 0xAA6EFF),
         whiteSide: Color(hex: 0xFFD08A),
         blackSide: Color(hex: 0xA66BFF),
+        whiteName: "Gold",
+        blackName: "Violet",
+        bestArrow: Color(hex: 0x3DFF9A),
+        secondArrow: Color(hex: 0x3DFF9A).opacity(0.7),
+        arrowGlow: Color(hex: 0x3DFF9A),
+        whiteSparks: [Color(hex: 0xFFF6DC), Color(hex: 0xFFD08A), Color(hex: 0xFF9E3D), Color(hex: 0xFF5AC8)],
+        blackSparks: [Color(hex: 0xF0E2FF), Color(hex: 0xB98CFF), Color(hex: 0x7C4DFF), Color(hex: 0x50F0E6)],
         boardEdge: Color.white.opacity(0.35),
         boardShadows: [Color(hex: 0x3CDCE6).opacity(0.35), Color(hex: 0xC846DC).opacity(0.35)],
         isDark: true,

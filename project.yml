@@ -10,6 +10,9 @@ packages:
   ChessKit:
     url: https://github.com/chesskit-app/chesskit-swift
     exactVersion: 0.17.0
+  ChessKitEngine:
+    url: https://github.com/chesskit-app/chesskit-engine
+    exactVersion: 0.6.0
 targets:
   ChessGameKiller:
     type: application
@@ -17,8 +20,15 @@ targets:
     sources: [ChessGameKiller]
     dependencies:
       - package: ChessKit
+      - package: ChessKitEngine
+    postBuildScripts:
+      # Stockfish's neural networks are too big for git; this downloads them once and bundles them.
+      - name: Bundle Stockfish networks
+        script: '"${SRCROOT}/scripts/fetch_nnue.sh" "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"'
+        basedOnDependencyAnalysis: false
     settings:
       base:
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
         PRODUCT_BUNDLE_IDENTIFIER: com.chessgamekiller.app
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"
