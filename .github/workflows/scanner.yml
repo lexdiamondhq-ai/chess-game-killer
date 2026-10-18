@@ -8,7 +8,7 @@ on:
   pull_request:
     paths: ["scanner/**", ".github/workflows/scanner.yml"]
   push:
-    branches: [main, photo-analyzer]
+    branches: [main]
     paths: ["scanner/**", ".github/workflows/scanner.yml"]
   workflow_dispatch:
     inputs:
