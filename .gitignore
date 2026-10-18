@@ -9,3 +9,5 @@ build/
 .swiftpm/
 # macOS
 .DS_Store
+# Stockfish networks (scripts/fetch_nnue.sh)
+.nnue-cache/

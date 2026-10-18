@@ -16,6 +16,26 @@ struct LastMove: Equatable {
     let to: Square
 }
 
+/// A captured piece, so the board can blow it up where it stood.
+struct CaptureEvent: Identifiable, Equatable {
+    let id: Int
+    let piece: Piece
+}
+
+/// The move that was just completed, with what the coach and sounds need.
+struct PlayedMove: Equatable {
+    /// Engine notation, like "e2e4".
+    let uci: String
+    /// Standard notation, like "Nf3" or "exd5+".
+    let san: String
+    let color: Piece.Color
+    /// The position before the move, as FEN.
+    let fenBefore: String
+    let isCapture: Bool
+    let isCastle: Bool
+    let givesCheck: Bool
+}
+
 /// One game of chess. The rules come from ChessKit; this adds selection,
 /// move hints, promotion, undo and the text shown above the board.
 @Observable
@@ -29,10 +49,17 @@ final class GameModel {
     private(set) var pendingPromotion: Move?
     /// Bumps on every completed move. Drives haptics.
     private(set) var moveCount = 0
+    private(set) var lastPlayed: PlayedMove?
+    /// Recent captures, newest last. Old ones are dropped.
+    private(set) var captureEvents: [CaptureEvent] = []
+    /// Colors a person moves by tapping. The computer's color is left out.
+    var humanColors: Set<Piece.Color> = [.white, .black]
 
     /// Snapshots taken before each move, for undo.
     private var history: [Snapshot] = []
     private var nextPieceID = 0
+    private var nextEventID = 0
+    private var fenBeforePendingMove: String?
 
     private struct Snapshot {
         let board: Board
@@ -49,6 +76,8 @@ final class GameModel {
 
     var sideToMove: Piece.Color { board.position.sideToMove }
 
+    var fen: String { board.position.fen }
+
     func piece(at square: Square) -> Piece? {
         board.position.piece(at: square)
     }
@@ -60,7 +89,19 @@ final class GameModel {
         }
     }
 
+    /// The winner, if the game ended in checkmate.
+    var winner: Piece.Color? {
+        if case .checkmate(let loser) = board.state { return loser.opposite }
+        return nil
+    }
+
     var canUndo: Bool { !history.isEmpty }
+
+    /// Number of moves played (by both sides) that can be taken back.
+    var plyCount: Int { history.count }
+
+    /// Whether a person is the one to move now.
+    var isHumanTurn: Bool { humanColors.contains(sideToMove) }
 
     /// The square of the king that is in check, if any.
     var checkedKing: Square? {
@@ -72,18 +113,22 @@ final class GameModel {
         return board.position.pieces.first { $0.kind == .king && $0.color == color }?.square
     }
 
-    var status: String {
+    var status: String { status(white: "White", black: "Black") }
+
+    /// Whose turn it is or how the game ended, using the theme's names for the sides.
+    func status(white: String, black: String) -> String {
+        func name(_ color: Piece.Color) -> String { color == .white ? white : black }
         switch board.state {
         case .checkmate(let loser):
-            return "Checkmate. \(loser.opposite.displayName) wins"
+            return "Checkmate. \(name(loser.opposite)) wins"
         case .draw(let reason):
             return "Draw by \(reason.displayName)"
         case .check(let color):
-            return "\(color.displayName) is in check"
+            return "\(name(color)) is in check"
         case .promotion:
             return "Choose a piece"
         case .active:
-            return "\(sideToMove.displayName) to move"
+            return "\(name(sideToMove)) to move"
         }
     }
 
@@ -91,10 +136,10 @@ final class GameModel {
 
     /// Handles a tap on a square: select a piece, move it, or clear the selection.
     func tap(_ square: Square) {
-        guard pendingPromotion == nil, !isGameOver else { return }
+        guard pendingPromotion == nil, !isGameOver, isHumanTurn else { return }
 
         if let from = selected, targets.contains(square) {
-            play(from: from, to: square)
+            play(from: from, to: square, promotion: nil)
             return
         }
 
@@ -109,9 +154,24 @@ final class GameModel {
     /// Finishes a pawn promotion started by `tap`.
     func promote(to kind: Piece.Kind) {
         guard let move = pendingPromotion else { return }
-        board.completePromotion(of: move, to: kind)
+        let completed = board.completePromotion(of: move, to: kind)
         pendingPromotion = nil
-        finishMove()
+        finishMove(completed)
+    }
+
+    /// Plays a move given in engine notation ("e2e4", "e7e8q"). Returns false if it isn't legal.
+    @discardableResult
+    func playEngineMove(_ uci: String) -> Bool {
+        guard uci.count >= 4, pendingPromotion == nil, !isGameOver else { return false }
+        let from = Square(String(uci.prefix(2)))
+        let to = Square(String(uci.dropFirst(2).prefix(2)))
+        guard piece(at: from)?.color == sideToMove, board.canMove(pieceAt: from, to: to) else { return false }
+
+        var promotion: Piece.Kind = .queen
+        if uci.count == 5, let letter = uci.last, let kind = Piece.Kind(rawValue: letter.uppercased()) {
+            promotion = kind
+        }
+        return play(from: from, to: to, promotion: promotion)
     }
 
     /// Takes back the last move, or cancels a promotion in progress.
@@ -119,6 +179,7 @@ final class GameModel {
         guard let snapshot = history.popLast() else { return }
         board = snapshot.board
         lastMove = snapshot.lastMove
+        lastPlayed = nil
         pendingPromotion = nil
         clearSelection()
         syncPieces()
@@ -128,32 +189,68 @@ final class GameModel {
         history.removeAll()
         board = Board()
         lastMove = nil
+        lastPlayed = nil
         pendingPromotion = nil
+        captureEvents = []
         clearSelection()
         syncPieces()
     }
 
     // MARK: Private
 
-    private func play(from: Square, to: Square) {
+    /// Plays a move. `promotion` is used right away when given; otherwise the
+    /// player is asked to choose.
+    @discardableResult
+    private func play(from: Square, to: Square, promotion: Piece.Kind?) -> Bool {
         let before = Snapshot(board: board, lastMove: lastMove)
-        guard board.move(pieceAt: from, to: to) != nil else {
+        let fenBefore = fen
+        guard let move = board.move(pieceAt: from, to: to) else {
             clearSelection()
-            return
+            return false
         }
         history.append(before)
         lastMove = LastMove(from: from, to: to)
+        fenBeforePendingMove = fenBefore
         clearSelection()
 
-        if case .promotion(let move) = board.state {
-            pendingPromotion = move
-            syncPieces()
+        if case .promotion(let pawnMove) = board.state {
+            if let promotion {
+                finishMove(board.completePromotion(of: pawnMove, to: promotion))
+            } else {
+                pendingPromotion = pawnMove
+                syncPieces()
+            }
         } else {
-            finishMove()
+            finishMove(move)
         }
+        return true
     }
 
-    private func finishMove() {
+    private func finishMove(_ move: Move) {
+        var isCapture = false
+        var isCastle = false
+        switch move.result {
+        case .capture(let captured):
+            isCapture = true
+            captureEvents.append(CaptureEvent(id: nextEventID, piece: captured))
+            nextEventID += 1
+            if captureEvents.count > 6 { captureEvents.removeFirst(captureEvents.count - 6) }
+        case .castle:
+            isCastle = true
+        case .move:
+            break
+        }
+
+        lastPlayed = PlayedMove(
+            uci: move.lan,
+            san: move.san,
+            color: move.piece.color,
+            fenBefore: fenBeforePendingMove ?? fen,
+            isCapture: isCapture,
+            isCastle: isCastle,
+            givesCheck: move.checkState == .check || move.checkState == .checkmate
+        )
+        fenBeforePendingMove = nil
         moveCount += 1
         syncPieces()
     }

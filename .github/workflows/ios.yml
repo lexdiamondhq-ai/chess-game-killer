@@ -8,8 +8,14 @@ on:
 jobs:
   build-and-test:
     runs-on: macos-15
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - name: Cache Stockfish networks
+        uses: actions/cache@v4
+        with:
+          path: .nnue-cache
+          key: nnue-1111cefa1111-37f18f62d772
       - name: Generate Xcode project
         run: |
           brew install xcodegen
