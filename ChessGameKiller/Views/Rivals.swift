@@ -15,6 +15,9 @@ struct Rival: Identifiable {
     /// 1 to 5, for the strength bars.
     var strength: Int { level.rawValue + 1 }
 
+    /// The rival's portrait in Assets.xcassets/Rivals.
+    var portraitName: String { "rival-" + name.lowercased() }
+
     static let all: [Rival] = MatchController.Level.allCases.map(\.rival)
 }
 
@@ -167,6 +170,26 @@ struct RivalSigil: View {
                 .rotationEffect(.degrees(-28))
                 .opacity(0.25)
         }
+    }
+}
+
+/// A rival's portrait: a rounded square photo with a glowing edge in the rival's color.
+struct RivalPortrait: View {
+    let rival: Rival
+    var size: CGFloat = 92
+    var glows = true
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: size * 0.22, style: .continuous)
+        Image(rival.portraitName)
+            .resizable()
+            .interpolation(.high)
+            .scaledToFill()
+            .frame(width: size, height: size)
+            .clipShape(shape)
+            .overlay { shape.strokeBorder(rival.hue.opacity(0.7), lineWidth: 1) }
+            .shadow(color: glows ? rival.hue.opacity(0.55) : .black.opacity(0.2), radius: size * 0.12)
+            .accessibilityHidden(true)
     }
 }
 
