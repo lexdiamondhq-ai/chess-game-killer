@@ -3,11 +3,13 @@ import SwiftUI
 struct ContentView: View {
     var body: some View {
         NavigationStack {
-            VStack(spacing: 24) {
+            ZStack {
+                Color(.systemGroupedBackground).ignoresSafeArea()
                 BoardView(board: .starting)
-                    .padding()
+                    .padding(16)
             }
             .navigationTitle("Chess Game Killer")
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 }
