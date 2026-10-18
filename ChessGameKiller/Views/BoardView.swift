@@ -310,7 +310,7 @@ private struct CaptureExplosion: View {
     private var colors: [Color] { theme.sparks(for: piece.color) }
 
     var body: some View {
-        let canvas = size * 3.2
+        let canvas = size * 4.2
         ZStack {
             // Flash
             Circle()
@@ -327,7 +327,7 @@ private struct CaptureExplosion: View {
             Circle()
                 .strokeBorder(colors[0], lineWidth: size * (burst ? 0.02 : 0.12))
                 .frame(width: size, height: size)
-                .scaleEffect(burst ? 2.6 : 0.4)
+                .scaleEffect(burst ? 2.8 : 0.4)
                 .opacity(burst ? 0 : 0.9)
                 .shadow(color: colors[1 % colors.count], radius: size * 0.1)
                 .animation(.easeOut(duration: 0.6), value: burst)
@@ -336,11 +336,13 @@ private struct CaptureExplosion: View {
             ForEach(shards) { shard in
                 PieceShardImage(piece: piece, theme: theme, size: size)
                     .clipShape(Wedge(start: shard.start, end: shard.end))
+                    .shadow(color: colors[1 % colors.count], radius: size * 0.06)
+                    .shadow(color: colors[0], radius: size * 0.02)
                     .rotationEffect(.degrees(burst ? shard.spin : 0))
                     .offset(flight(of: shard))
-                    .scaleEffect(burst ? 0.75 : 1)
+                    .scaleEffect(burst ? 0.7 : 1)
                     .opacity(burst ? 0 : 1)
-                    .animation(.easeOut(duration: 0.75), value: burst)
+                    .animation(.easeOut(duration: 0.8), value: burst)
             }
 
             // Sparks
@@ -354,7 +356,7 @@ private struct CaptureExplosion: View {
                             y: burst ? CGFloat(sin(spark.angle)) * spark.distance : 0)
                     .scaleEffect(burst ? 0.2 : 1)
                     .opacity(burst ? 0 : 1)
-                    .animation(.easeOut(duration: 0.8).delay(spark.delay), value: burst)
+                    .animation(.easeOut(duration: 0.85).delay(spark.delay), value: burst)
             }
         }
         .frame(width: canvas, height: canvas)
@@ -384,20 +386,20 @@ private struct CaptureExplosion: View {
                 id: i,
                 start: .degrees(start),
                 end: .degrees(start + turn),
-                distance: size * CGFloat(0.55 + random.next() * 0.5),
-                spin: (random.next() - 0.5) * 160
+                distance: size * CGFloat(0.7 + random.next() * 0.6),
+                spin: (random.next() - 0.5) * 400
             )
         }
     }
 
     private var sparks: [Spark] {
         var random = SeededRandom(seed: seed &* 31 &+ 7)
-        return (0..<22).map { i in
+        return (0..<26).map { i in
             Spark(
                 id: i,
                 angle: random.next() * 2 * .pi,
-                distance: size * CGFloat(0.6 + random.next() * 0.95),
-                radius: size * CGFloat(0.025 + random.next() * 0.035),
+                distance: size * CGFloat(0.7 + random.next() * 1.2),
+                radius: size * CGFloat(0.04 + random.next() * 0.05),
                 colorIndex: Int(random.next() * 4),
                 delay: random.next() * 0.06
             )
