@@ -7,15 +7,19 @@ struct Piece: Hashable {
     let kind: PieceKind
     let color: PieceColor
 
-    var symbol: String {
-        switch (color, kind) {
-        case (.white, .king): "♔"; case (.white, .queen): "♕"
-        case (.white, .rook): "♖"; case (.white, .bishop): "♗"
-        case (.white, .knight): "♘"; case (.white, .pawn): "♙"
-        case (.black, .king): "♚"; case (.black, .queen): "♛"
-        case (.black, .rook): "♜"; case (.black, .bishop): "♝"
-        case (.black, .knight): "♞"; case (.black, .pawn): "♟"
+    /// Name of the vector image in Assets.xcassets/Pieces, e.g. "wK".
+    var assetName: String {
+        let c = color == .white ? "w" : "b"
+        let k: String
+        switch kind {
+        case .king: k = "K"
+        case .queen: k = "Q"
+        case .rook: k = "R"
+        case .bishop: k = "B"
+        case .knight: k = "N"
+        case .pawn: k = "P"
         }
+        return c + k
     }
 }
 

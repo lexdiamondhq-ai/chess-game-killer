@@ -18,3 +18,6 @@ Then press Run in Xcode.
 - `ChessGameKiller/App` – app entry point
 - `ChessGameKiller/Model` – board and piece logic
 - `ChessGameKiller/Views` – SwiftUI screens
+
+## Credits
+Piece artwork: "cburnett" set by Colin M.L. Burnett, licensed GPLv2+ (via Lichess).
