@@ -85,7 +85,7 @@ struct ContentView: View {
             coach.observe(review, in: match, store: training)
         }
         .fullScreenCover(isPresented: $showingTraining) {
-            TrainingHubView().environment(training)
+            TrainingHubView(theme: theme).environment(training)
         }
         .fullScreenCover(item: $coach.presentedLesson) { lesson in
             LessonScreen(lesson: lesson, theme: theme).environment(training)

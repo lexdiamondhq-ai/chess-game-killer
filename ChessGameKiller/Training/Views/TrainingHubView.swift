@@ -4,16 +4,15 @@ import SwiftUI
 /// The Training screen: Coach Leo, today's session, the learner's own
 /// mistakes to fix, the Traffic Light habit, and the whole journey.
 struct TrainingHubView: View {
+    /// The game screen's board look, so training looks like the game.
+    let theme: BoardTheme
     @Environment(TrainingStore.self) private var store
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .walnut
     @AppStorage("coachVoiceMuted") private var voiceMuted = false
     @State private var lesson: Lesson?
     @State private var session: SessionPlan?
     @State private var greeting = ""
     @State private var confirmingReset = false
-
-    private var theme: BoardTheme { .named(themeID) }
 
     var body: some View {
         NavigationStack {
