@@ -84,13 +84,13 @@ export default {
     if (bytes.length === 0) return json({ error: "empty" }, 400);
     if (bytes.length > MAX_BYTES) return json({ error: "too_large" }, 413);
 
-    if (!env.ANTHROPIC_API_KEY) return json({ error: "not_configured" }, 503);
+    if (!apiKey(env)) return json({ error: "not_configured" }, 503);
 
     try {
       return json(await readBoard(bytes, type, env));
     } catch (error) {
       console.error("reading failed:", error && error.message);
-      return json({ error: "upstream" }, 502);
+      return json({ error: "upstream", status: (error && error.status) || null }, 502);
     }
   },
 };
@@ -100,7 +100,7 @@ export async function readBoard(bytes, type, env) {
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
-      "x-api-key": env.ANTHROPIC_API_KEY,
+      "x-api-key": apiKey(env),
       "anthropic-version": "2023-06-01",
       "content-type": "application/json",
     },
@@ -108,12 +108,19 @@ export async function readBoard(bytes, type, env) {
   });
   if (!response.ok) {
     const detail = (await response.text()).slice(0, 300);
-    throw new Error(`Anthropic API ${response.status}: ${detail}`);
+    const error = new Error(`Anthropic API ${response.status}: ${detail}`);
+    error.status = response.status;
+    throw error;
   }
   const message = await response.json();
   const call = (message.content || []).find((block) => block.type === "tool_use" && block.name === TOOL.name);
   if (!call) throw new Error("Claude did not report a board");
   return normalize(call.input);
+}
+
+/** The key without stray spaces or line breaks from pasting it into a secret. */
+export function apiKey(env) {
+  return String(env.ANTHROPIC_API_KEY || "").trim();
 }
 
 export function buildRequest(bytes, type, model) {

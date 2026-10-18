@@ -100,3 +100,11 @@ jobs:
           echo "Scanner is live at $SCANNER_URL"
           echo "### Scanner: $SCANNER_URL" >> "$GITHUB_STEP_SUMMARY"
           python3 scanner/test/smoke.py "$SCANNER_URL" scanner/test/boards | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: If reading failed, ask the Claude API directly why
+        if: failure() && steps.secrets.outputs.ready == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        shell: bash
+        run: |
+          model=$(sed -n 's/^MODEL *= *"\(.*\)"/\1/p' scanner/wrangler.toml)
+          node scanner/test/check_api.mjs scanner/test/boards/neon-app.png "$model" | tee -a "$GITHUB_STEP_SUMMARY"

@@ -74,8 +74,18 @@ test("too many scans are turned away", async () => {
 
 test("a missing key or a failing API is reported, not crashed on", async () => {
   assert.equal((await worker.fetch(post(), { MODEL: "x" })).status, 503);
+  assert.equal((await worker.fetch(post(), { ANTHROPIC_API_KEY: "  \n" })).status, 503);
   globalThis.fetch = async () => new Response("overloaded", { status: 529 });
-  assert.equal((await worker.fetch(post(), env)).status, 502);
+  const failed = await worker.fetch(post(), env);
+  assert.equal(failed.status, 502);
+  assert.deepEqual(await failed.json(), { error: "upstream", status: 529 });
+});
+
+test("spaces around a pasted key are dropped", async () => {
+  const capture = {};
+  claudeAnswers({ found: false }, capture);
+  await worker.fetch(post(), { ...env, ANTHROPIC_API_KEY: " test-key\n" });
+  assert.equal(capture.options.headers["x-api-key"], "test-key");
 });
 
 test("cleans up what Claude sends back", () => {
