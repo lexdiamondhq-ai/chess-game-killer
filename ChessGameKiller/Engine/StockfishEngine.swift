@@ -4,10 +4,18 @@ import Foundation
 
 /// What the game needs from a chess engine. A protocol so tests can use a fake.
 protocol ChessEngine: AnyObject, Sendable {
-    /// The best `lines` continuations from `fen`, best first.
-    func analyze(fen: String, depth: Int, lines: Int) async -> [EngineLine]
+    /// The best `lines` continuations from `fen`, best first. The search stops at
+    /// `depth` or after `maxTimeMs`, whichever comes first; nil means no time cap.
+    func analyze(fen: String, depth: Int, lines: Int, maxTimeMs: Int?) async -> [EngineLine]
     /// A move to play from `fen` at the given strength (0 = weakest, 20 = full strength).
     func chooseMove(fen: String, skill: Int, thinkTimeMs: Int) async -> String?
+}
+
+extension ChessEngine {
+    /// An analysis with no time cap: it runs until `depth`.
+    func analyze(fen: String, depth: Int, lines: Int) async -> [EngineLine] {
+        await analyze(fen: fen, depth: depth, lines: lines, maxTimeMs: nil)
+    }
 }
 
 /// Stockfish 17 running on the device, through ChessKitEngine.
@@ -40,14 +48,20 @@ actor StockfishEngine: ChessEngine {
 
     // MARK: ChessEngine
 
-    func analyze(fen: String, depth: Int, lines: Int) async -> [EngineLine] {
+    func analyze(fen: String, depth: Int, lines: Int, maxTimeMs: Int?) async -> [EngineLine] {
         let result = await search(
             fen: fen,
             options: [("Skill Level", "20"), ("MultiPV", "\(max(1, lines))")],
-            go: .go(depth: depth),
-            timeout: .seconds(20)
+            go: .go(depth: depth, movetime: maxTimeMs),
+            timeout: maxTimeMs.map { .milliseconds($0 + 10_000) } ?? .seconds(20)
         )
         return Array(result.lines.prefix(lines))
+    }
+
+    /// Starts Stockfish and loads its networks ahead of the first search, so the
+    /// first computer move of the session doesn't pay for it.
+    func warmUp() async {
+        _ = await startIfNeeded()
     }
 
     func chooseMove(fen: String, skill: Int, thinkTimeMs: Int) async -> String? {
@@ -103,6 +117,11 @@ actor StockfishEngine: ChessEngine {
         return SearchResult(bestMove: nil, lines: [])
     }
 
+    /// Two search threads where the device has cores to spare; one otherwise.
+    static var searchThreads: Int {
+        ProcessInfo.processInfo.activeProcessorCount >= 4 ? 2 : 1
+    }
+
     /// Stockfish's neural network files, copied into the app by scripts/fetch_nnue.sh.
     static let networkFiles = ["nn-1111cefa1111", "nn-37f18f62d772"]
 
@@ -149,6 +168,7 @@ actor StockfishEngine: ChessEngine {
         // Then ask again: this "readyok" comes once the networks are loaded.
         let seen = readyCount
         await engine.send(command: .setoption(id: "Hash", value: "64"))
+        await engine.send(command: .setoption(id: "Threads", value: "\(Self.searchThreads)"))
         await engine.send(command: .isready)
         attempts = 0
         while readyCount == seen, attempts < 400 {

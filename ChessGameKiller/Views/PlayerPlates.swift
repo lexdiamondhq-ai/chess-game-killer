@@ -70,14 +70,10 @@ private struct PlayerPlate: View {
                         ClockLabel(clock: clock, color: color, theme: theme, size: 14)
                     }
                 }
-                HStack(spacing: 6) {
-                    Text(status)
-                        .font(.caption2.weight(isActive ? .semibold : .regular))
-                        .foregroundStyle(isActive ? sideColor : Color.secondary)
-                        .lineLimit(1)
-                    Spacer(minLength: 0)
-                    CapturedPieces(match: match, theme: theme, by: color)
-                }
+                Text(status)
+                    .font(.caption2.weight(isActive ? .semibold : .regular))
+                    .foregroundStyle(isActive ? sideColor : Color.secondary)
+                    .lineLimit(1)
             }
         }
         .padding(.leading, 8)
@@ -200,51 +196,67 @@ struct ClockLabel: View {
     }
 }
 
-/// What a side has taken, as tiny pieces, with the material lead when it has one.
-private struct CapturedPieces: View {
+/// What one side has taken, down the edge of the board: each kind of the
+/// opponent's pieces with how many are gone, biggest first, and the material
+/// lead at the bottom when there is one.
+struct CaptureRail: View {
     let match: MatchController
     let theme: BoardTheme
+    /// The side that did the capturing.
     let by: Piece.Color
-
-    private static let values: [Piece.Kind: Int] = [.pawn: 1, .knight: 3, .bishop: 3, .rook: 5, .queen: 9]
-    private static let order: [Piece.Kind] = [.queen, .rook, .bishop, .knight, .pawn]
+    var width: CGFloat = 26
 
     var body: some View {
-        let taken = captured(by: by)
-        let lead = material(taken) - material(captured(by: by.opposite))
+        let taken = match.game.captured(by: by)
+        let lead = match.game.materialLead(for: by)
         let glow = theme.isDark ? (by.opposite == .white ? theme.whiteGlow : theme.blackGlow) : nil
-        HStack(spacing: 4) {
-            HStack(spacing: -3) {
-                ForEach(Array(taken.prefix(8).enumerated()), id: \.offset) { _, kind in
-                    Image(theme.imageName(for: Piece(kind, color: by.opposite, square: .a1)))
+        VStack(spacing: 6) {
+            ForEach(taken) { entry in
+                VStack(spacing: 0) {
+                    Image(theme.imageName(for: Piece(entry.kind, color: by.opposite, square: .a1)))
                         .resizable()
                         .interpolation(.high)
                         .scaledToFit()
-                        .frame(width: 13, height: 13)
-                        .shadow(color: glow?.opacity(0.8) ?? .clear, radius: 2)
+                        .frame(width: width - 2, height: width - 2)
+                        .shadow(color: glow?.opacity(0.8) ?? .black.opacity(0.15), radius: 2)
+                    Text("\(entry.count)")
+                        .font(.system(size: 10.5, weight: .bold, design: .rounded).monospacedDigit())
+                        .foregroundStyle(Color.primary.opacity(0.75))
                 }
+                .transition(.scale.combined(with: .opacity))
             }
             if lead > 0 {
                 Text("+\(lead)")
-                    .font(.system(size: 10.5, weight: .bold, design: .rounded))
+                    .font(.system(size: 11, weight: .heavy, design: .rounded))
                     .foregroundStyle(theme.bestArrow)
+                    .padding(.top, 2)
+                    .transition(.opacity)
             }
         }
-        .frame(height: 14)
-        .accessibilityLabel(taken.isEmpty ? "" : "Captured \(taken.count) pieces" + (lead > 0 ? ", up \(lead)" : ""))
+        .frame(width: width)
+        .frame(maxHeight: .infinity, alignment: .center)
+        .animation(.snappy(duration: 0.3), value: taken)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label(taken: taken, lead: lead))
     }
 
-    /// Pieces of the other color missing from the board, biggest first.
-    private func captured(by color: Piece.Color) -> [Piece.Kind] {
-        var counts: [Piece.Kind: Int] = [.pawn: 8, .knight: 2, .bishop: 2, .rook: 2, .queen: 1]
-        for placed in match.game.pieces where placed.piece.color == color.opposite {
-            counts[placed.piece.kind, default: 0] -= 1
+    private func label(taken: [CapturedCount], lead: Int) -> String {
+        guard !taken.isEmpty else { return "\(theme.name(of: by)) has captured nothing" }
+        let pieces = taken.map { "\($0.count) \(name(of: $0.kind))\($0.count == 1 ? "" : "s")" }
+        var text = "\(theme.name(of: by)) has captured " + pieces.joined(separator: ", ")
+        if lead > 0 { text += ", up \(lead)" }
+        return text
+    }
+
+    private func name(of kind: Piece.Kind) -> String {
+        switch kind {
+        case .pawn: return "pawn"
+        case .knight: return "knight"
+        case .bishop: return "bishop"
+        case .rook: return "rook"
+        case .queen: return "queen"
+        case .king: return "king"
         }
-        return Self.order.flatMap { kind in Array(repeating: kind, count: max(0, counts[kind] ?? 0)) }
-    }
-
-    private func material(_ kinds: [Piece.Kind]) -> Int {
-        kinds.reduce(0) { $0 + (Self.values[$1] ?? 0) }
     }
 }
 

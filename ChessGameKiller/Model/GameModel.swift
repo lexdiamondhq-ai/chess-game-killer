@@ -4,6 +4,14 @@ import Observation
 
 /// A piece with a stable identity, so the board can animate it sliding
 /// from square to square instead of popping in and out.
+/// How many of one kind of piece a side has captured.
+struct CapturedCount: Identifiable, Equatable {
+    let kind: Piece.Kind
+    let count: Int
+
+    var id: Piece.Kind { kind }
+}
+
 struct PlacedPiece: Identifiable, Equatable {
     let id: Int
     let piece: Piece
@@ -95,6 +103,33 @@ final class GameModel {
     var winner: Piece.Color? {
         if case .checkmate(let loser) = board.state { return loser.opposite }
         return nil
+    }
+
+    /// How many of each piece are in a full set, pawns included.
+    private static let fullSet: [Piece.Kind: Int] = [.pawn: 8, .knight: 2, .bishop: 2, .rook: 2, .queen: 1]
+    private static let pieceValues: [Piece.Kind: Int] = [.pawn: 1, .knight: 3, .bishop: 3, .rook: 5, .queen: 9]
+
+    /// What `color` has taken: each kind of the opponent's pieces missing from the
+    /// board with how many are gone, biggest first. Kinds with none taken are left out.
+    func captured(by color: Piece.Color) -> [CapturedCount] {
+        var counts = Self.fullSet
+        for placed in pieces where placed.piece.color == color.opposite {
+            counts[placed.piece.kind, default: 0] -= 1
+        }
+        let order: [Piece.Kind] = [.queen, .rook, .bishop, .knight, .pawn]
+        return order.compactMap { kind in
+            let count = counts[kind] ?? 0
+            return count > 0 ? CapturedCount(kind: kind, count: count) : nil
+        }
+    }
+
+    /// How far ahead `color` is in material, in pawns. Negative when behind.
+    func materialLead(for color: Piece.Color) -> Int {
+        material(captured(by: color)) - material(captured(by: color.opposite))
+    }
+
+    private func material(_ taken: [CapturedCount]) -> Int {
+        taken.reduce(0) { $0 + (Self.pieceValues[$1.kind] ?? 0) * $1.count }
     }
 
     var canUndo: Bool { !history.isEmpty }
