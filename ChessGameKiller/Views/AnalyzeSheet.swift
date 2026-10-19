@@ -149,8 +149,8 @@ struct Panel: View {
                 shape.strokeBorder(highlight ?? Color.secondary.opacity(theme.isDark ? 0.25 : 0.12),
                                    lineWidth: highlight == nil ? 1 : 2)
             }
-            .shadow(color: theme.isDark ? (highlight ?? .clear).opacity(0.45) : .black.opacity(0.06),
-                    radius: theme.isDark ? 10 : 6, y: theme.isDark ? 0 : 2)
+            .shadow(color: theme.glows ? (highlight ?? .clear).opacity(0.45) : .black.opacity(0.06),
+                    radius: theme.glows ? 10 : 6, y: theme.glows ? 0 : 2)
     }
 }
 
@@ -412,7 +412,7 @@ struct AnalysisView: View {
                     Spacer()
                     if let evaluation = model.evaluationForWhite {
                         Text(evaluation.label)
-                            .font(.system(.headline, design: .rounded).monospacedDigit())
+                            .font(.system(.headline, design: .themed).monospacedDigit())
                     }
                 }
                 EvaluationBar(winningChances: model.evaluationForWhite?.winningChances ?? 0, theme: theme)
@@ -435,11 +435,11 @@ struct AnalysisView: View {
                                 .foregroundStyle(.secondary)
                             if index < model.hints.count {
                                 Text(model.hints[index].san)
-                                    .font(.system(.headline, design: .rounded))
+                                    .font(.system(.headline, design: .themed))
                             }
                             Spacer()
                             Text(scoreLabel(line))
-                                .font(.system(.subheadline, design: .rounded).weight(.semibold).monospacedDigit())
+                                .font(.system(.subheadline, design: .themed).weight(.semibold).monospacedDigit())
                                 .foregroundStyle(.secondary)
                         }
                         Text(model.readable(line))
@@ -488,7 +488,7 @@ struct EvaluationBar: View {
                 Capsule()
                     .fill(theme.whiteSide)
                     .frame(width: max(8, geo.size.width * share))
-                    .shadow(color: theme.isDark ? theme.whiteSide.opacity(0.7) : .clear, radius: 6)
+                    .shadow(color: theme.glows ? theme.whiteSide.opacity(0.7) : .clear, radius: 6)
             }
             .overlay(Capsule().strokeBorder(Color.secondary.opacity(0.3), lineWidth: 0.5))
         }

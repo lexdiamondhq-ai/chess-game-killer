@@ -113,7 +113,7 @@ struct TrainingButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         let color = tint ?? theme.trainingAccent
         configuration.label
-            .font(.system(.headline, design: .rounded))
+            .font(.system(.headline, design: .themed))
             .lineLimit(1)
             .minimumScaleFactor(0.8)
             .frame(maxWidth: .infinity)
@@ -123,7 +123,7 @@ struct TrainingButtonStyle: ButtonStyle {
             .background {
                 Capsule()
                     .fill(prominent ? AnyShapeStyle(fill(color)) : AnyShapeStyle(color.opacity(theme.isDark ? 0.16 : 0.12)))
-                    .shadow(color: prominent && theme.isDark ? color.opacity(0.55) : .clear, radius: 12)
+                    .shadow(color: prominent && theme.glows ? color.opacity(0.55) : .clear, radius: 12)
             }
             .overlay {
                 if !prominent, theme.isDark {
@@ -174,8 +174,8 @@ struct CoachAvatar: View {
             Circle().strokeBorder(AngularGradient(colors: ring, center: .center), lineWidth: max(2, size * 0.06))
         }
         .frame(width: size, height: size)
-        .shadow(color: theme.isDark ? (tint ?? (theme.id == .neon ? Color(hex: 0x9B4BEA) : theme.trainingAccent)).opacity(0.55) : .black.opacity(0.12),
-                radius: theme.isDark ? size * 0.18 : 3, y: theme.isDark ? 0 : 1)
+        .shadow(color: theme.glows ? (tint ?? (theme.id == .neon ? Color(hex: 0x9B4BEA) : theme.trainingAccent)).opacity(0.55) : .black.opacity(0.12),
+                radius: theme.glows ? size * 0.18 : 3, y: theme.glows ? 0 : 1)
         .animation(.easeInOut(duration: 0.25), value: tint)
         .accessibilityHidden(true)
     }
@@ -214,7 +214,7 @@ struct TrafficLightDots: View {
                 Circle()
                     .fill(color.opacity(on ? 1 : 0.25))
                     .frame(width: size, height: size)
-                    .shadow(color: on && theme.isDark ? color : .clear, radius: size * 0.5)
+                    .shadow(color: on && theme.glows ? color : .clear, radius: size * 0.5)
             }
         }
         .accessibilityHidden(true)

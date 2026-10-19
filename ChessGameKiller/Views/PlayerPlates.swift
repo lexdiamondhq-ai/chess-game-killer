@@ -89,7 +89,7 @@ private struct PlayerPlate: View {
     @ViewBuilder
     private var avatar: some View {
         if isComputer {
-            RivalSigil(rival: match.setup.level.rival, size: 40, glows: theme.isDark)
+            RivalSigil(rival: match.setup.level.rival, size: 40, glows: theme.glows)
         } else {
             PieceImage(piece: Piece(.king, color: color, square: .e1), theme: theme, size: 36)
         }
@@ -157,11 +157,11 @@ private struct PlateBackground: View {
         shape
             .fill(theme.isDark ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)))
             .overlay {
-                shape.strokeBorder(glow?.opacity(theme.isDark ? 0.7 : 0.6) ?? Color.primary.opacity(theme.isDark ? 0.1 : 0.06),
+                shape.strokeBorder(glow?.opacity(theme.glows ? 0.7 : 0.6) ?? Color.primary.opacity(theme.glows ? 0.1 : 0.06),
                                    lineWidth: glow == nil ? 1 : 1.5)
             }
-            .shadow(color: glow.map { $0.opacity(theme.isDark ? 0.35 : 0.25) } ?? .black.opacity(theme.isDark ? 0 : 0.06),
-                    radius: glow == nil ? 6 : 14, y: theme.isDark ? 0 : 2)
+            .shadow(color: glow.map { $0.opacity(theme.glows ? 0.35 : 0.25) } ?? .black.opacity(theme.glows ? 0 : 0.06),
+                    radius: glow == nil ? 6 : 14, y: theme.glows ? 0 : 2)
     }
 }
 
@@ -179,7 +179,7 @@ struct ClockLabel: View {
             let remaining = clock.remaining(for: color)
             let urgent = isRunning && remaining < .seconds(10)
             Text(remaining.clockLabel)
-                .font(.system(size: size, weight: .semibold, design: .rounded).monospacedDigit())
+                .font(.system(size: size, weight: .semibold, design: .themed).monospacedDigit())
                 .foregroundStyle(urgent ? Color(hex: 0xFF4D6D) : (isRunning ? Color.primary : Color.secondary))
                 .padding(.horizontal, 6)
                 .padding(.vertical, 1)
@@ -209,7 +209,7 @@ struct CaptureRail: View {
     var body: some View {
         let taken = match.game.captured(by: by)
         let lead = match.game.materialLead(for: by)
-        let glow = theme.isDark ? (by.opposite == .white ? theme.whiteGlow : theme.blackGlow) : nil
+        let glow = theme.glows ? (by.opposite == .white ? theme.whiteGlow : theme.blackGlow) : nil
         VStack(spacing: 6) {
             ForEach(taken) { entry in
                 VStack(spacing: 0) {
@@ -220,14 +220,14 @@ struct CaptureRail: View {
                         .frame(width: width - 2, height: width - 2)
                         .shadow(color: glow?.opacity(0.8) ?? .black.opacity(0.15), radius: 2)
                     Text("\(entry.count)")
-                        .font(.system(size: 10.5, weight: .bold, design: .rounded).monospacedDigit())
+                        .font(.system(size: 10.5, weight: .bold, design: .themed).monospacedDigit())
                         .foregroundStyle(Color.primary.opacity(0.75))
                 }
                 .transition(.scale.combined(with: .opacity))
             }
             if lead > 0 {
                 Text("+\(lead)")
-                    .font(.system(size: 11, weight: .heavy, design: .rounded))
+                    .font(.system(size: 11, weight: .heavy, design: .themed))
                     .foregroundStyle(theme.bestArrow)
                     .padding(.top, 2)
                     .transition(.opacity)
@@ -279,13 +279,22 @@ struct MoveRibbon: View {
                             Text(san)
                                 .fontWeight(.semibold)
                                 .foregroundStyle(isLast ? Color.primary : Color.secondary)
-                                .padding(.horizontal, isLast ? 7 : 0)
+                                .padding(.horizontal, isLast && theme.glows ? 7 : 0)
                                 .padding(.vertical, 2)
                                 .background {
-                                    if isLast {
+                                    if isLast && theme.glows {
                                         Capsule()
                                             .fill(Color.primary.opacity(theme.isDark ? 0.1 : 0.07))
                                             .overlay(Capsule().strokeBorder(Color.primary.opacity(0.12), lineWidth: 1))
+                                    }
+                                }
+                                .overlay(alignment: .bottom) {
+                                    // The executive look marks the newest move with a fine accent line.
+                                    if isLast && !theme.glows {
+                                        Rectangle()
+                                            .fill(theme.accent ?? .accentColor)
+                                            .frame(height: 1.5)
+                                            .offset(y: 2)
                                     }
                                 }
                         }
@@ -302,7 +311,7 @@ struct MoveRibbon: View {
                 }
             }
         }
-        .font(.system(.caption, design: .rounded))
+        .font(theme.glows ? Font.system(.caption, design: .themed) : Font.system(.footnote).monospacedDigit())
         .frame(height: 24)
         .mask {
             LinearGradient(colors: [.clear, .black, .black, .black], startPoint: .leading, endPoint: .trailing)

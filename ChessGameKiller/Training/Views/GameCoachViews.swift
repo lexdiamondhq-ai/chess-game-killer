@@ -187,7 +187,7 @@ struct ThinkWithMeSheet: View {
                     HStack(spacing: 12) {
                         CoachAvatar(theme: theme, size: 48)
                         Text("Before you move, ask three questions. Here's what I see.")
-                            .font(.system(.subheadline, design: .rounded).weight(.medium))
+                            .font(.system(.subheadline, design: .themed).weight(.medium))
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     if let scan {
@@ -221,9 +221,9 @@ struct ThinkWithMeSheet: View {
                 Circle()
                     .fill(tint)
                     .frame(width: 14, height: 14)
-                    .shadow(color: theme.isDark ? tint : .clear, radius: 6)
+                    .shadow(color: theme.glows ? tint : .clear, radius: 6)
                 Text(title)
-                    .font(.system(.headline, design: .rounded))
+                    .font(.system(.headline, design: .themed))
             }
             ForEach(lines, id: \.self) { line in
                 Text(line)

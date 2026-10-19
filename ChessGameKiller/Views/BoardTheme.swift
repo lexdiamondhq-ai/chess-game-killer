@@ -70,6 +70,10 @@ struct BoardTheme: Identifiable {
     var backdrop: [Color]? = nil
 
     /// The width of the frame around the 8x8 squares, for a board `side` points wide.
+    /// Neon is the only theme with colored halos. Every other theme is the
+    /// quiet "executive" look: no glows, plain type, fine lines, one accent.
+    var glows: Bool { id == .neon }
+
     func frameInset(side: CGFloat) -> CGFloat {
         boardArt == nil ? 0 : side / 18
     }
@@ -120,7 +124,7 @@ struct BoardTheme: Identifiable {
         lastMove: Color(hex: 0xFFF6E4).opacity(0.28),
         lastMoveRing: Color(hex: 0xE8BE64).opacity(0.55),
         hint: Color(hex: 0xE8BE64).opacity(0.9),
-        hintGlow: Color(hex: 0xF6D27A),
+        hintGlow: nil,
         check: Color(hex: 0xFF3B4E),
         pieceSet: "faberge-",
         whiteGlow: nil,
@@ -131,7 +135,7 @@ struct BoardTheme: Identifiable {
         blackName: "Midnight",
         bestArrow: Color(hex: 0xE8BE64).opacity(0.95),
         secondArrow: Color(hex: 0xE8BE64).opacity(0.7),
-        arrowGlow: Color(hex: 0xF6D27A),
+        arrowGlow: nil,
         whiteSparks: [Color(hex: 0xFFF6E4), Color(hex: 0xFFF0C2), Color(hex: 0xE8BE64), Color(hex: 0xB8862E)],
         blackSparks: [Color(hex: 0xFFFFFF), Color(hex: 0x8FB0FF), Color(hex: 0x1236E0), Color(hex: 0xE8BE64)],
         boardEdge: nil,
@@ -159,7 +163,7 @@ struct BoardTheme: Identifiable {
         lastMove: Color.white.opacity(0.14),
         lastMoveRing: Color.white.opacity(0.5),
         hint: Color(hex: 0xFFC24D).opacity(0.9),
-        hintGlow: Color(hex: 0xFFC24D),
+        hintGlow: nil,
         check: Color(hex: 0xFF4D5E),
         pieceSet: "blueprint-",
         whiteGlow: nil,
@@ -170,7 +174,7 @@ struct BoardTheme: Identifiable {
         blackName: "Ink",
         bestArrow: Color(hex: 0xFFC24D).opacity(0.95),
         secondArrow: Color(hex: 0xFFC24D).opacity(0.7),
-        arrowGlow: Color(hex: 0xFFC24D),
+        arrowGlow: nil,
         whiteSparks: [Color.white, Color(hex: 0xDCE8F7), Color(hex: 0xFFC24D), Color(hex: 0x7FB2FF)],
         blackSparks: [Color.white, Color(hex: 0x7FB2FF), Color(hex: 0x1E4275), Color(hex: 0xFFC24D)],
         boardEdge: nil,
@@ -280,7 +284,7 @@ struct BoardTheme: Identifiable {
         backdrop: [Color(hex: 0x2A2438), Color(hex: 0x07060B)]
     )
 
-    /// The shared shape of a rival's board: a pre-rendered picture, 3D sprites, glowing seams in the accent.
+    /// The shared shape of a rival's board: a pre-rendered picture, 3D sprites, marks in the accent.
     private static func rivalTheme(
         id: ID, name: String, symbol: String, light: Color, dark: Color,
         labelOnLight: Color, labelOnDark: Color, accent: Color, selected: Color,
@@ -302,7 +306,7 @@ struct BoardTheme: Identifiable {
             lastMove: Color.white.opacity(0.16),
             lastMoveRing: accent.opacity(0.55),
             hint: accent.opacity(0.9),
-            hintGlow: selected,
+            hintGlow: nil,
             check: Color(hex: 0xFF3B4E),
             pieceSet: id.rawValue + "-",
             whiteGlow: nil,
@@ -313,11 +317,11 @@ struct BoardTheme: Identifiable {
             blackName: blackName,
             bestArrow: accent.opacity(0.95),
             secondArrow: accent.opacity(0.7),
-            arrowGlow: selected,
+            arrowGlow: nil,
             whiteSparks: whiteSparks,
             blackSparks: blackSparks,
             boardEdge: nil,
-            boardShadows: [Color.black.opacity(0.6), accent.opacity(0.25)],
+            boardShadows: [Color.black.opacity(0.6)],
             isDark: true,
             accent: accent,
             boardArt: "board-" + id.rawValue,
@@ -345,8 +349,15 @@ struct ThemeBackdrop: View {
     var body: some View {
         if let colors = theme.backdrop {
             GeometryReader { geo in
-                RadialGradient(colors: colors, center: UnitPoint(x: 0.5, y: 0.4),
-                               startRadius: 0, endRadius: max(geo.size.width, geo.size.height) * 0.75)
+                ZStack {
+                    RadialGradient(colors: colors, center: UnitPoint(x: 0.5, y: 0.4),
+                                   startRadius: 0, endRadius: max(geo.size.width, geo.size.height) * 0.75)
+                    // The executive look keeps the theme's color but deepens it toward black.
+                    if !theme.glows {
+                        LinearGradient(colors: [.black.opacity(0.2), .black.opacity(0.5)],
+                                       startPoint: .top, endPoint: .bottom)
+                    }
+                }
             }
             .ignoresSafeArea()
             .accessibilityHidden(true)
@@ -387,4 +398,19 @@ struct NeonBackdrop: View {
             .blur(radius: 5)
             .position(x: x, y: y)
     }
+}
+
+/// The type design for the current look: rounded on Neon, plain SF Pro everywhere else.
+/// `ContentView` sets it for the theme on screen before anything draws.
+enum ThemeFont {
+    static var design: Font.Design = .rounded
+
+    static func use(_ theme: BoardTheme) {
+        design = theme.glows ? .rounded : .default
+    }
+}
+
+extension Font.Design {
+    /// Rounded on Neon, the default SF Pro on the executive themes.
+    static var themed: Font.Design { ThemeFont.design }
 }

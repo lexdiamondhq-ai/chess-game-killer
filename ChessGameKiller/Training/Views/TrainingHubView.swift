@@ -97,13 +97,13 @@ struct TrainingHubView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text(library.coach.name)
-                        .font(.system(.title3, design: .rounded).weight(.bold))
+                        .font(.system(.title3, design: .themed).weight(.bold))
                     Text(library.coach.title)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                 }
                 Text(greeting)
-                    .font(.system(.subheadline, design: .rounded))
+                    .font(.system(.subheadline, design: .themed))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -120,10 +120,10 @@ struct TrainingHubView: View {
             Image(systemName: "flame.fill")
                 .font(.title2)
                 .foregroundStyle(streak > 0 ? color : Color.secondary.opacity(0.5))
-                .shadow(color: theme.isDark && streak > 0 ? color : .clear, radius: 8)
+                .shadow(color: theme.glows && streak > 0 ? color : .clear, radius: 8)
                 .symbolEffect(.bounce, value: streak)
             Text("\(streak)")
-                .font(.system(.headline, design: .rounded).monospacedDigit())
+                .font(.system(.headline, design: .themed).monospacedDigit())
             Text(streak == 1 ? "day" : "days")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
@@ -141,7 +141,7 @@ struct TrainingHubView: View {
                 VStack(alignment: .leading, spacing: 7) {
                     HStack(alignment: .firstTextBaseline) {
                         Text(rank.title)
-                            .font(.system(.headline, design: .rounded))
+                            .font(.system(.headline, design: .themed))
                         Text("\(store.progress.xp) XP")
                             .font(.caption.weight(.semibold).monospacedDigit())
                             .foregroundStyle(.secondary)
@@ -186,7 +186,7 @@ struct TrainingHubView: View {
                         .background(theme.trainingAccent.opacity(0.14), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     VStack(alignment: .leading, spacing: 3) {
                         Text(focus.title)
-                            .font(.system(.title3, design: .rounded).weight(.bold))
+                            .font(.system(.title3, design: .themed).weight(.bold))
                         Text(newLesson.map { "New lesson: \($0.title), then practice" } ?? focus.blurb)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
@@ -212,10 +212,10 @@ struct TrainingHubView: View {
             Image(systemName: "arrow.uturn.backward.circle.fill")
                 .font(.system(size: 30))
                 .foregroundStyle(pink)
-                .shadow(color: theme.isDark ? pink : .clear, radius: 8)
+                .shadow(color: theme.glows ? pink : .clear, radius: 8)
             VStack(alignment: .leading, spacing: 3) {
                 Text("Your mistakes, your puzzles")
-                    .font(.system(.headline, design: .rounded))
+                    .font(.system(.headline, design: .themed))
                 Text(count == 1 ? "1 position saved from your games" : "\(count) positions saved from your games")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -224,7 +224,7 @@ struct TrainingHubView: View {
             Button("Fix") {
                 session = store.mistakesPlan()
             }
-            .font(.system(.subheadline, design: .rounded).weight(.bold))
+            .font(.system(.subheadline, design: .themed).weight(.bold))
             .buttonStyle(.borderedProminent)
             .tint(pink)
             .foregroundStyle(theme.isDark ? Color.black : Color.white)
@@ -241,7 +241,7 @@ struct TrainingHubView: View {
         return VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Text("The Traffic Light")
-                    .font(.system(.headline, design: .rounded))
+                    .font(.system(.headline, design: .themed))
                 Spacer()
                 TrafficLightDots(theme: theme, size: 9)
             }
@@ -255,11 +255,11 @@ struct TrainingHubView: View {
                     Circle()
                         .fill(color)
                         .frame(width: 14, height: 14)
-                        .shadow(color: theme.isDark ? color : .clear, radius: 5)
+                        .shadow(color: theme.glows ? color : .clear, radius: 5)
                         .padding(.top, 3)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(light.question)
-                            .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                            .font(.system(.subheadline, design: .themed).weight(.semibold))
                         Text(light.detail)
                             .font(.footnote)
                             .foregroundStyle(.secondary)
@@ -314,10 +314,10 @@ struct UnitCard: View {
                     .foregroundStyle(theme.isDark ? Color.black : Color.white)
                     .frame(width: 40, height: 40)
                     .background(color, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .shadow(color: theme.isDark ? color.opacity(0.7) : .clear, radius: 8)
+                    .shadow(color: theme.glows ? color.opacity(0.7) : .clear, radius: 8)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(unit.title)
-                        .font(.system(.headline, design: .rounded))
+                        .font(.system(.headline, design: .themed))
                     Text(unit.subtitle)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -356,7 +356,7 @@ struct UnitCard: View {
                 .frame(width: 34)
             VStack(alignment: .leading, spacing: 1) {
                 Text(lesson.title)
-                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                    .font(.system(.subheadline, design: .themed).weight(.semibold))
                 Text(lesson.subtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -386,7 +386,7 @@ struct UnitCard: View {
             .frame(width: 34, height: 34)
             VStack(alignment: .leading, spacing: 1) {
                 Text(skill.title)
-                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                    .font(.system(.subheadline, design: .themed).weight(.semibold))
                 Text(TrainingStore.levelName(level))
                     .font(.caption)
                     .foregroundStyle(level >= 2 ? color : Color.secondary)
@@ -394,7 +394,7 @@ struct UnitCard: View {
             Spacer(minLength: 4)
             if hasDrills {
                 Button("Practice") { practice(skill) }
-                    .font(.system(.caption, design: .rounded).weight(.bold))
+                    .font(.system(.caption, design: .themed).weight(.bold))
                     .buttonStyle(.bordered)
                     .buttonBorderShape(.capsule)
                     .tint(color)

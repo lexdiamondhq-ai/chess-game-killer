@@ -419,8 +419,8 @@ private struct SettingsCard: View {
                 shape.strokeBorder(selected ? color : Color.primary.opacity(theme.isDark ? 0.12 : 0.08),
                                    lineWidth: selected ? 1.5 : 1)
             }
-            .shadow(color: selected ? color.opacity(theme.isDark ? 0.45 : 0.25) : .black.opacity(theme.isDark ? 0 : 0.05),
-                    radius: selected ? 12 : 6, y: theme.isDark ? 0 : 2)
+            .shadow(color: selected ? color.opacity(theme.glows ? 0.45 : 0.25) : .black.opacity(theme.glows ? 0 : 0.05),
+                    radius: selected ? 12 : 6, y: theme.glows ? 0 : 2)
     }
 }
 
