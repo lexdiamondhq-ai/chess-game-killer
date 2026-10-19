@@ -62,6 +62,9 @@ final class GameModel {
     private(set) var captureEvents: [CaptureEvent] = []
     /// Every move played so far in standard notation, like ["e4", "e5", "Nf3"].
     private(set) var moves: [String] = []
+    /// Where each piece started and what it did this game, for the player's army.
+    /// Nil when the game began from a set-up position.
+    private(set) var ledger: PieceLedger?
     /// Colors a person moves by tapping. The computer's color is left out.
     var humanColors: Set<Piece.Color> = [.white, .black]
 
@@ -74,11 +77,13 @@ final class GameModel {
     private struct Snapshot {
         let board: Board
         let lastMove: LastMove?
+        let ledger: PieceLedger?
     }
 
     /// Starts from the standard position, or any other (useful for lessons and tests).
     init(position: Position = .standard) {
         board = Board(position: position)
+        ledger = PieceLedger(startingFrom: position)
         syncPieces()
     }
 
@@ -216,6 +221,7 @@ final class GameModel {
         guard let snapshot = history.popLast() else { return }
         board = snapshot.board
         lastMove = snapshot.lastMove
+        ledger = snapshot.ledger
         lastPlayed = nil
         if pendingPromotion == nil { _ = moves.popLast() }
         pendingPromotion = nil
@@ -227,6 +233,7 @@ final class GameModel {
     func newGame(from position: Position = .standard) {
         history.removeAll()
         board = Board(position: position)
+        ledger = PieceLedger(startingFrom: position)
         lastMove = nil
         lastPlayed = nil
         pendingPromotion = nil
@@ -242,7 +249,7 @@ final class GameModel {
     /// player is asked to choose.
     @discardableResult
     private func play(from: Square, to: Square, promotion: Piece.Kind?) -> Bool {
-        let before = Snapshot(board: board, lastMove: lastMove)
+        let before = Snapshot(board: board, lastMove: lastMove, ledger: ledger)
         let fenBefore = fen
         guard let move = board.move(pieceAt: from, to: to) else {
             clearSelection()
@@ -291,6 +298,11 @@ final class GameModel {
             givesCheck: move.checkState == .check || move.checkState == .checkmate
         )
         fenBeforePendingMove = nil
+        if let before = history.last?.board.position {
+            var mate = false
+            if case .checkmate = board.state { mate = true }
+            ledger?.record(from: before, to: board.position, endedInMate: mate)
+        }
         moves.append(move.san)
         moveCount += 1
         syncPieces()
