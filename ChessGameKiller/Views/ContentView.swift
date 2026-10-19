@@ -11,6 +11,7 @@ struct ContentView: View {
     @State private var coachExpanded = false
     @State private var coachPeeking = false
     @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .neon
+    @AppStorage("matchRival") private var matchRival = true
     @AppStorage("showBestMoves") private var showBestMoves = true
     @AppStorage("showSecondBest") private var showSecondBest = true
     @AppStorage("coachVerdicts") private var showVerdicts = true
@@ -18,7 +19,13 @@ struct ContentView: View {
     @State private var coach = GameCoach()
     @State private var showingTraining = false
 
-    private var theme: BoardTheme { .named(themeID) }
+    /// Against the computer, the board matches the rival's portrait unless the player turned that off.
+    private var theme: BoardTheme {
+        if matchRival, match.setup.opponent == .computer {
+            return .named(match.setup.level.rival.boardTheme)
+        }
+        return .named(themeID)
+    }
     /// The orb is stretched or unfolded, so nothing else fits beside it.
     private var coachIsWide: Bool { coachExpanded || coachPeeking }
 
@@ -93,7 +100,7 @@ struct ContentView: View {
         .fullScreenCover(item: $coach.presentedSession) { plan in
             SessionView(plan: plan, theme: theme).environment(training)
         }
-        .animation(.easeInOut(duration: 0.35), value: themeID)
+        .animation(.easeInOut(duration: 0.35), value: theme.id)
         .sheet(isPresented: $showingNewGame, onDismiss: startIfNeeded) {
             NewGameSheet(theme: theme) { setup in
                 withAnimation(.snappy) { match.start(setup) }

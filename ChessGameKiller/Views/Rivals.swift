@@ -9,6 +9,8 @@ struct Rival: Identifiable {
     let blurb: String
     let hue: Color
     let hue2: Color
+    /// The board that matches the portrait, used in games when "Match rival" is on.
+    let boardTheme: BoardTheme.ID
 
     var id: MatchController.Level { level }
 
@@ -27,23 +29,28 @@ extension MatchController.Level {
         case .beginner:
             return Rival(level: self, name: "Spark", elo: "~800",
                          blurb: "Misses a lot. Perfect for learning the moves.",
-                         hue: Color(hex: 0xFFD54A), hue2: Color(hex: 0xFF9E3D))
+                         hue: Color(hex: 0xFFD54A), hue2: Color(hex: 0xFF9E3D),
+                         boardTheme: .spark)
         case .casual:
             return Rival(level: self, name: "Drift", elo: "~1100",
                          blurb: "Plays for fun and takes chances.",
-                         hue: Color(hex: 0x5BE0B0), hue2: Color(hex: 0x3DD6C8))
+                         hue: Color(hex: 0x5BE0B0), hue2: Color(hex: 0x3DD6C8),
+                         boardTheme: .drift)
         case .club:
             return Rival(level: self, name: "Pulse", elo: "~1500",
                          blurb: "Solid and patient. Punishes loose pawns.",
-                         hue: Color(hex: 0x7CF7FF), hue2: Color(hex: 0x4C7BE8))
+                         hue: Color(hex: 0x7CF7FF), hue2: Color(hex: 0x4C7BE8),
+                         boardTheme: .pulse)
         case .expert:
             return Rival(level: self, name: "Vector", elo: "~2000",
                          blurb: "Sharp and precise. Attacks the moment you slip.",
-                         hue: Color(hex: 0xA66BFF), hue2: Color(hex: 0x7C4DFF))
+                         hue: Color(hex: 0xA66BFF), hue2: Color(hex: 0x7C4DFF),
+                         boardTheme: .vector)
         case .grandmaster:
             return Rival(level: self, name: "Singularity", elo: "3000+",
                          blurb: "Full-strength Stockfish. Nobody wins. Try anyway.",
-                         hue: Color(hex: 0xFF5AC8), hue2: Color(hex: 0xFF3B6B))
+                         hue: Color(hex: 0xFF5AC8), hue2: Color(hex: 0xFF3B6B),
+                         boardTheme: .singularity)
         }
     }
 }

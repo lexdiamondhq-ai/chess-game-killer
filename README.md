@@ -13,7 +13,7 @@ One beautiful iOS chess game, with every feature easy to reach and easy to under
 - Captured pieces blow apart in sparks in the theme's colors
 - Analyzer: take a photo of a real board, pick a screenshot or set up any position, fix any square, and see Stockfish's two best moves with the lines that follow; then play on from there
 - Sound effects made with ElevenLabs
-- Settings with a live board preview: Neon (default), Fabergé and Blueprint boards, arrows, verdicts, sound, haptics, and the open-source licenses
+- Settings with a live board preview: Neon (default), Fabergé and Blueprint boards plus one board per rival (on by default in games), arrows, verdicts, sound, haptics, and the open-source licenses
 - Undo, flip the board, promotion picker, haptics
 - Training with Coach Leo, a grandmaster coach: narrated lessons, daily puzzles and your own mistakes to fix (see below)
 
