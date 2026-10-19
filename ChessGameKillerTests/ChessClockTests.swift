@@ -5,6 +5,12 @@ import XCTest
 @MainActor
 final class ChessClockTests: XCTestCase {
 
+    func testTimeControlsNameTheirKind() {
+        XCTAssertNil(TimeControl.unlimited.kind)
+        XCTAssertEqual(TimeControl.blitz5.kind, "Blitz")
+        XCTAssertEqual(TimeControl.rapid15Plus10.kind, "Rapid")
+    }
+
     func testTimeControlsDescribeThemselves() {
         XCTAssertEqual(TimeControl.blitz3Plus2.initial, .seconds(180))
         XCTAssertEqual(TimeControl.blitz3Plus2.increment, .seconds(2))
