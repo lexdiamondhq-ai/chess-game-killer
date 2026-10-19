@@ -4,7 +4,7 @@ import SwiftUI
 /// Everything that changes when the player picks a different board look.
 struct BoardTheme: Identifiable {
     enum ID: String, CaseIterable {
-        case malachite, faberge, blueprint, neon
+        case neon, faberge, blueprint
     }
 
     let id: ID
@@ -32,7 +32,7 @@ struct BoardTheme: Identifiable {
     let check: Color
 
     // Pieces
-    /// Prefix of the piece images in Assets.xcassets/Pieces (such as "malachite-" or "neon-").
+    /// Prefix of the piece images in Assets.xcassets/Pieces (such as "neon-" or "faberge-").
     let pieceSet: String
     let whiteGlow: Color?
     let blackGlow: Color?
@@ -93,50 +93,11 @@ struct BoardTheme: Identifiable {
         color == .white ? whiteSparks : blackSparks
     }
 
-    static let all: [BoardTheme] = [.malachite, .faberge, .blueprint, .neon]
+    static let all: [BoardTheme] = [.neon, .faberge, .blueprint]
 
     static func named(_ id: ID) -> BoardTheme {
-        all.first { $0.id == id } ?? .malachite
+        all.first { $0.id == id } ?? .neon
     }
-
-    /// Mother-of-pearl and banded malachite inlaid with rose gold, on black onyx.
-    static let malachite = BoardTheme(
-        id: .malachite,
-        name: "Malachite",
-        symbol: "diamond.fill",
-        light: Color(hex: 0xF2F0EB),
-        dark: Color(hex: 0x0D7340),
-        surface: nil,
-        gridLine: nil,
-        labelOnLight: Color(hex: 0xB86A50),
-        labelOnDark: Color(hex: 0xFFE3D6),
-        selected: Color(hex: 0xFFC2AC).opacity(0.22),
-        selectedRing: Color(hex: 0xFFC2AC).opacity(0.95),
-        lastMove: Color(hex: 0xFFFDF8).opacity(0.30),
-        lastMoveRing: Color(hex: 0xF2A98F).opacity(0.55),
-        hint: Color(hex: 0xF2A98F).opacity(0.85),
-        hintGlow: Color(hex: 0xFFC2AC),
-        check: Color(hex: 0xFF3B4E),
-        pieceSet: "malachite-",
-        whiteGlow: nil,
-        blackGlow: nil,
-        whiteSide: Color(hex: 0xF4EFEA),
-        blackSide: Color(hex: 0x0A0C0B),
-        whiteName: "Pearl",
-        blackName: "Onyx",
-        bestArrow: Color(hex: 0xF2A98F).opacity(0.95),
-        secondArrow: Color(hex: 0xF2A98F).opacity(0.7),
-        arrowGlow: Color(hex: 0xFFC2AC),
-        whiteSparks: [Color(hex: 0xFFFDF8), Color(hex: 0xFFE3D6), Color(hex: 0xF2A98F), Color(hex: 0x9FE6D0)],
-        blackSparks: [Color(hex: 0xFFE3D6), Color(hex: 0x44B377), Color(hex: 0x0D7340), Color(hex: 0xF2A98F)],
-        boardEdge: nil,
-        boardShadows: [Color.black.opacity(0.6)],
-        isDark: true,
-        accent: Color(hex: 0xF2A98F),
-        boardArt: "board-malachite",
-        spritePieces: true,
-        backdrop: [Color(hex: 0x0F3B29), Color(hex: 0x030C08)]
-    )
 
     /// Sapphire guilloché enamel and pearl, ruled in gold, after the imperial eggs.
     static let faberge = BoardTheme(

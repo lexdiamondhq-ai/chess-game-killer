@@ -5,7 +5,7 @@ import SwiftUI
 /// Settings: the board's look with a live preview, how much the coach says,
 /// sound and haptics, and the credits. Every choice is remembered.
 struct SettingsSheet: View {
-    @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .malachite
+    @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .neon
     @AppStorage("showBestMoves") private var showBestMoves = true
     @AppStorage("showSecondBest") private var showSecondBest = true
     @AppStorage("coachVerdicts") private var showVerdicts = true
@@ -513,7 +513,7 @@ struct LicensesView: View {
         .onAppear { UserDefaults.standard.set("neon", forKey: "boardTheme") }
 }
 
-#Preview("Malachite") {
+#Preview("Fabergé") {
     SettingsSheet()
-        .onAppear { UserDefaults.standard.set("malachite", forKey: "boardTheme") }
+        .onAppear { UserDefaults.standard.set("faberge", forKey: "boardTheme") }
 }

@@ -5,7 +5,7 @@ import SwiftUI
 /// Shows the two best moves as arrows and blows up captured pieces.
 struct BoardView: View {
     let match: MatchController
-    var theme: BoardTheme = .malachite
+    var theme: BoardTheme = .neon
 
     @AppStorage("haptics") private var hapticsOn = true
 
@@ -575,12 +575,6 @@ private struct PromotionPicker: View {
         }
         .frame(width: squareSize * 8, height: squareSize * 8)
     }
-}
-
-#Preview("Malachite") {
-    BoardView(match: MatchController(engine: nil, sounds: nil))
-        .padding()
-        .background(ThemeBackdrop(theme: .malachite))
 }
 
 #Preview("Neon") {
