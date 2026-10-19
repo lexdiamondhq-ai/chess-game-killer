@@ -152,7 +152,7 @@ struct CoachAvatar: View {
     var tint: Color?
 
     /// Leo's ring when he isn't reacting: Neon's glass gradient, or the board's own
-    /// accent (rose gold on Malachite, gold on Fabergé, amber on Blueprint).
+    /// accent (gold on Fabergé, amber on Blueprint).
     private var restingRing: [Color] {
         if theme.id == .neon {
             return [Color(hex: 0x19C6CF), Color(hex: 0x9B4BEA), Color(hex: 0xE04BC4), Color(hex: 0x19C6CF)]
@@ -161,7 +161,7 @@ struct CoachAvatar: View {
         return [accent, accent.opacity(0.55), accent]
     }
 
-    /// Behind the knight: Neon's night blue, or the board's dark side (onyx, midnight, ink).
+    /// Behind the knight: Neon's night blue, or the board's dark side (midnight, ink).
     private var face: Color {
         theme.id == .neon ? Color(hex: 0x0B0D1E) : theme.blackSide
     }
