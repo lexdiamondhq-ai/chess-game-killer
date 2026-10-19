@@ -24,19 +24,30 @@ final class BoardThemeTests: XCTestCase {
         }
     }
 
-    func testMalachiteIsTheDefaultLook() {
-        XCTAssertEqual(BoardTheme.all.first?.id, .malachite)
-        XCTAssertEqual(BoardTheme.named(.malachite).boardArt, "board-malachite")
+    func testNeonIsTheDefaultLook() {
+        XCTAssertEqual(BoardTheme.all.first?.id, .neon)
     }
 
-    func testASavedWalnutSettingOpensMalachite() {
-        // Walnut was removed; @AppStorage falls back to its default when the saved value no longer parses.
-        XCTAssertNil(BoardTheme.ID(rawValue: "walnut"))
+    func testSavedSettingsForRemovedThemesOpenNeon() {
+        // Walnut and Malachite were removed; @AppStorage falls back to its default when the saved value no longer parses.
         let defaults = UserDefaults(suiteName: "BoardThemeTests")!
-        defaults.set("walnut", forKey: "boardTheme")
-        let saved = defaults.string(forKey: "boardTheme").flatMap(BoardTheme.ID.init(rawValue:)) ?? .malachite
-        XCTAssertEqual(saved, .malachite)
+        for removed in ["walnut", "malachite"] {
+            XCTAssertNil(BoardTheme.ID(rawValue: removed))
+            defaults.set(removed, forKey: "boardTheme")
+            let saved = defaults.string(forKey: "boardTheme").flatMap(BoardTheme.ID.init(rawValue:)) ?? .neon
+            XCTAssertEqual(saved, .neon)
+        }
         defaults.removePersistentDomain(forName: "BoardThemeTests")
+    }
+
+    func testEveryRivalHasItsOwnBoard() {
+        for rival in Rival.all {
+            let theme = BoardTheme.named(rival.boardTheme)
+            XCTAssertEqual(theme.id, rival.boardTheme, "\(rival.name) points at a theme that does not exist")
+            XCTAssertEqual(theme.name, rival.name)
+            XCTAssertNotNil(theme.boardArt)
+        }
+        XCTAssertEqual(Set(Rival.all.map(\.boardTheme)).count, Rival.all.count, "two rivals share a board")
     }
 
     func testThemesAreFoundByID() {
