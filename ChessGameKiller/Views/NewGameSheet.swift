@@ -40,6 +40,16 @@ enum CoachMode: CaseIterable, Identifiable {
         }
     }
 
+    /// A couple of words for the match card, next to the name.
+    var short: String {
+        switch self {
+        case .full: return "arrows + verdicts"
+        case .arrows: return "no grades"
+        case .verdicts: return "no arrows"
+        case .silent: return "just chess"
+        }
+    }
+
     var showsArrows: Bool { self == .full || self == .arrows }
     var showsVerdicts: Bool { self == .full || self == .verdicts }
 
@@ -54,7 +64,16 @@ enum CoachMode: CaseIterable, Identifiable {
 }
 
 /// Picks the opponent, the rival, the side, the clock and the coach, then starts the game.
+///
+/// Side, clock and coach live in one card of three rows. A row shows its
+/// current choice; tapping it unfolds the options in place, and picking one
+/// folds it back up.
 struct NewGameSheet: View {
+    /// The rows of the match card.
+    private enum MatchRow {
+        case side, clock, coach
+    }
+
     let theme: BoardTheme
     let start: (MatchController.Setup) -> Void
 
@@ -65,7 +84,10 @@ struct NewGameSheet: View {
     @AppStorage("showBestMoves") private var showBestMoves = true
     @AppStorage("coachVerdicts") private var showVerdicts = true
 
+    @AppStorage("haptics") private var hapticsOn = true
+
     @State private var scrolledLevel: MatchController.Level?
+    @State private var openRow: MatchRow?
     @Environment(\.dismiss) private var dismiss
 
     /// The choices from last time, for when the sheet is closed without starting.
@@ -98,13 +120,6 @@ struct NewGameSheet: View {
                             rivalCarousel
                             dots
                         }
-                        section("Play as") {
-                            HStack(spacing: 10) {
-                                ForEach(SideChoice.allCases) { choice in
-                                    sideCard(choice)
-                                }
-                            }
-                        }
                     } else {
                         Label("Pass the phone back and forth. The coach grades both of you.",
                               systemImage: "person.2.fill")
@@ -112,36 +127,24 @@ struct NewGameSheet: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    section("Clock") {
-                        chipRow {
-                            ForEach(TimeControl.allCases) { control in
-                                Chip(title: control.name, isOn: timeControl == control, theme: theme) {
-                                    withAnimation(.snappy) { timeControl = control }
-                                }
-                            }
+                    section("The match") {
+                        matchCard
+                        if openRow == nil {
+                            Text("Tap a row to change it")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                                .frame(maxWidth: .infinity)
+                                .transition(.opacity)
                         }
-                        note(timeControl.detail)
-                    }
-
-                    section("Coach") {
-                        chipRow {
-                            ForEach(CoachMode.allCases) { mode in
-                                Chip(title: mode.name, isOn: coachMode == mode, theme: theme) {
-                                    withAnimation(.snappy) {
-                                        showBestMoves = mode.showsArrows
-                                        showVerdicts = mode.showsVerdicts
-                                    }
-                                }
-                            }
-                        }
-                        note(coachMode.detail)
                     }
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 12)
                 .padding(.bottom, 24)
                 .animation(.snappy, value: opponent)
+                .animation(.spring(response: 0.42, dampingFraction: 0.86), value: openRow)
             }
+            .sensoryFeedback(.selection, trigger: openRow) { _, _ in hapticsOn }
             .safeAreaInset(edge: .bottom) {
                 Button {
                     start(MatchController.Setup(opponent: opponent, playerColor: side.color, level: level, timeControl: timeControl))
@@ -188,20 +191,119 @@ struct NewGameSheet: View {
         }
     }
 
-    private func note(_ text: String) -> some View {
-        Text(text)
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-            .contentTransition(.opacity)
+    // MARK: The match card
+
+    private var matchCard: some View {
+        VStack(spacing: 0) {
+            if opponent == .computer {
+                MatchRowButton(label: "Play as", value: sideName(side), detail: nil, isOpen: openRow == .side,
+                               theme: theme, icon: { sideIcon }) {
+                    toggle(.side)
+                }
+                if openRow == .side {
+                    HStack(spacing: 8) {
+                        ForEach(SideChoice.allCases) { choice in
+                            sideCard(choice)
+                        }
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.top, 4)
+                    .padding(.bottom, 12)
+                    .transition(unfold)
+                }
+                rowDivider
+            }
+
+            MatchRowButton(label: "Clock", value: timeControl.name, detail: timeControl.kind, isOpen: openRow == .clock,
+                           theme: theme, icon: { Image(systemName: "stopwatch") }) {
+                toggle(.clock)
+            }
+            if openRow == .clock {
+                optionList {
+                    ForEach(TimeControl.allCases) { control in
+                        OptionRow(title: control.name, detail: control.detail, isOn: timeControl == control, theme: theme) {
+                            choose { timeControl = control }
+                        }
+                    }
+                }
+            }
+            rowDivider
+
+            MatchRowButton(label: "Coach", value: coachMode.name, detail: coachMode.short, isOpen: openRow == .coach,
+                           theme: theme, icon: { Image(systemName: "graduationcap.fill") }) {
+                toggle(.coach)
+            }
+            if openRow == .coach {
+                optionList {
+                    ForEach(CoachMode.allCases) { mode in
+                        OptionRow(title: mode.name, detail: mode.detail, isOn: coachMode == mode, theme: theme) {
+                            choose {
+                                showBestMoves = mode.showsArrows
+                                showVerdicts = mode.showsVerdicts
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .background {
+            let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+            shape
+                .fill(theme.isDark ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)))
+                .overlay { shape.strokeBorder(Color.primary.opacity(theme.isDark ? 0.12 : 0.08), lineWidth: 1) }
+                .shadow(color: .black.opacity(theme.isDark ? 0.3 : 0.08), radius: 16, y: 6)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
-    private func chipRow<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) { content() }
-                .padding(.horizontal, 20)
+    /// The king of the chosen side, for the Play as row.
+    @ViewBuilder
+    private var sideIcon: some View {
+        switch side {
+        case .white:
+            PieceImage(piece: Piece(.king, color: .white, square: .e1), theme: theme, size: 24)
+        case .black:
+            PieceImage(piece: Piece(.king, color: .black, square: .e8), theme: theme, size: 24)
+        case .random:
+            ZStack {
+                PieceImage(piece: Piece(.king, color: .black, square: .e8), theme: theme, size: 19)
+                    .offset(x: 5, y: -2)
+                PieceImage(piece: Piece(.king, color: .white, square: .e1), theme: theme, size: 19)
+                    .offset(x: -5, y: 2)
+            }
         }
-        .padding(.horizontal, -20)
-        .scrollClipDisabled()
+    }
+
+    private var rowDivider: some View {
+        Rectangle()
+            .fill(Color.primary.opacity(theme.isDark ? 0.08 : 0.06))
+            .frame(height: 1)
+            .padding(.leading, 58)
+    }
+
+    private var unfold: AnyTransition {
+        .opacity.combined(with: .move(edge: .top))
+    }
+
+    private func optionList<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        VStack(spacing: 2) { content() }
+            .padding(.horizontal, 10)
+            .padding(.top, 4)
+            .padding(.bottom, 10)
+            .transition(unfold)
+    }
+
+    private func toggle(_ row: MatchRow) {
+        openRow = openRow == row ? nil : row
+    }
+
+    /// Applies a choice, then folds the row back up a beat later so the check is seen.
+    private func choose(_ change: @escaping () -> Void) {
+        withAnimation(.snappy) { change() }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(260))
+            openRow = nil
+        }
     }
 
     // MARK: Rivals
@@ -271,17 +373,17 @@ struct NewGameSheet: View {
             glow = theme.isDark ? accent : nil
         }
         return Button {
-            withAnimation(.snappy) { side = choice }
+            choose { side = choice }
         } label: {
-            VStack(spacing: 6) {
+            VStack(spacing: 4) {
                 sideArt(choice)
-                    .frame(height: 52)
+                    .frame(height: 46)
                 Text(sideName(choice))
-                    .font(.footnote.weight(.bold))
+                    .font(.caption.weight(.bold))
                     .foregroundStyle(isSelected ? color : Color.secondary)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 92)
+            .frame(height: 84)
             .background(card(selected: isSelected, color: color, glow: glow))
         }
         .buttonStyle(.plain)
@@ -293,15 +395,15 @@ struct NewGameSheet: View {
     private func sideArt(_ choice: SideChoice) -> some View {
         switch choice {
         case .white:
-            PieceImage(piece: Piece(.king, color: .white, square: .e1), theme: theme, size: 52)
+            PieceImage(piece: Piece(.king, color: .white, square: .e1), theme: theme, size: 44)
         case .black:
-            PieceImage(piece: Piece(.king, color: .black, square: .e8), theme: theme, size: 52)
+            PieceImage(piece: Piece(.king, color: .black, square: .e8), theme: theme, size: 44)
         case .random:
             ZStack {
-                PieceImage(piece: Piece(.king, color: .black, square: .e8), theme: theme, size: 40)
-                    .offset(x: 9, y: -4)
-                PieceImage(piece: Piece(.king, color: .white, square: .e1), theme: theme, size: 40)
-                    .offset(x: -9, y: 4)
+                PieceImage(piece: Piece(.king, color: .black, square: .e8), theme: theme, size: 34)
+                    .offset(x: 8, y: -4)
+                PieceImage(piece: Piece(.king, color: .white, square: .e1), theme: theme, size: 34)
+                    .offset(x: -8, y: 4)
             }
         }
     }
@@ -315,9 +417,9 @@ struct NewGameSheet: View {
     }
 
     private func card(selected: Bool, color: Color, glow: Color?) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
         return shape
-            .fill(theme.isDark ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)))
+            .fill(selected ? color.opacity(0.1) : Color.primary.opacity(theme.isDark ? 0.05 : 0.03))
             .overlay {
                 shape.strokeBorder(selected ? color : Color.primary.opacity(theme.isDark ? 0.12 : 0.08),
                                    lineWidth: selected ? 1.5 : 1)
@@ -383,9 +485,72 @@ private struct RivalCard: View {
     }
 }
 
-/// A pill that is filled in when chosen.
-private struct Chip: View {
+/// One row of the match card: an icon, what it sets, and the current choice.
+private struct MatchRowButton<Icon: View>: View {
+    let label: String
+    let value: String
+    let detail: String?
+    let isOpen: Bool
+    let theme: BoardTheme
+    @ViewBuilder let icon: () -> Icon
+    let action: () -> Void
+
+    private var accent: Color { theme.accent ?? .accentColor }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                icon()
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(accent)
+                    .frame(width: 34, height: 34)
+                    .background(accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 11, style: .continuous)
+                            .strokeBorder(accent.opacity(0.18), lineWidth: 1)
+                    }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(label.uppercased())
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .tracking(1)
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(value)
+                            .font(.system(.callout, design: .rounded).weight(.bold))
+                            .foregroundStyle(.primary)
+                            .contentTransition(.numericText())
+                        if let detail {
+                            Text(detail)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                                .contentTransition(.opacity)
+                        }
+                    }
+                    .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(isOpen ? accent : Color.secondary.opacity(0.7))
+                    .rotationEffect(.degrees(isOpen ? 180 : 0))
+            }
+            .padding(.leading, 12)
+            .padding(.trailing, 14)
+            .frame(height: 60)
+            .background(isOpen ? Color.primary.opacity(theme.isDark ? 0.04 : 0.03) : .clear)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(label): \(value)")
+        .accessibilityHint(isOpen ? "Closes the choices" : "Shows the choices")
+        .accessibilityAddTraits(isOpen ? .isSelected : [])
+    }
+}
+
+/// One choice inside an unfolded row, with a line about it and a check when chosen.
+private struct OptionRow: View {
     let title: String
+    let detail: String
     let isOn: Bool
     let theme: BoardTheme
     let action: () -> Void
@@ -394,20 +559,49 @@ private struct Chip: View {
 
     var body: some View {
         Button(action: action) {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .padding(.horizontal, 14)
-                .frame(height: 36)
-                .foregroundStyle(isOn ? (theme.isDark ? Color.black : Color.white) : Color.primary.opacity(0.75))
-                .background {
-                    Capsule().fill(isOn ? AnyShapeStyle(accent) : AnyShapeStyle(Color.primary.opacity(theme.isDark ? 0.07 : 0.05)))
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(isOn ? Color.primary : Color.primary.opacity(0.85))
+                    Text(detail)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
-                .overlay {
-                    Capsule().strokeBorder(isOn ? Color.clear : Color.primary.opacity(0.1), lineWidth: 1)
+                Spacer(minLength: 0)
+                ZStack {
+                    Circle()
+                        .strokeBorder(Color.primary.opacity(0.18), lineWidth: 1.5)
+                        .opacity(isOn ? 0 : 1)
+                    Circle()
+                        .fill(accent)
+                        .shadow(color: theme.isDark ? accent.opacity(0.6) : .clear, radius: 6)
+                        .overlay {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 11, weight: .heavy))
+                                .foregroundStyle(theme.isDark ? Color.black : Color.white)
+                        }
+                        .scaleEffect(isOn ? 1 : 0.4)
+                        .opacity(isOn ? 1 : 0)
                 }
-                .shadow(color: isOn && theme.isDark ? accent.opacity(0.45) : .clear, radius: 10)
+                .frame(width: 22, height: 22)
+            }
+            .padding(.leading, 12)
+            .padding(.trailing, 10)
+            .frame(height: 50)
+            .background {
+                let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+                shape
+                    .fill(isOn ? accent.opacity(0.1) : .clear)
+                    .overlay { shape.strokeBorder(isOn ? accent.opacity(0.35) : .clear, lineWidth: 1) }
+                    .shadow(color: isOn && theme.isDark ? accent.opacity(0.12) : .clear, radius: 10)
+            }
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .animation(.snappy(duration: 0.25), value: isOn)
+        .accessibilityLabel("\(title). \(detail)")
         .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 }

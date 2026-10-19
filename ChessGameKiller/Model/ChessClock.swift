@@ -39,6 +39,15 @@ enum TimeControl: String, CaseIterable, Identifiable {
         self == .unlimited ? "No clock" : rawValue
     }
 
+    /// The family of the time control, "Blitz" or "Rapid". Nil for no clock.
+    var kind: String? {
+        switch self {
+        case .unlimited: return nil
+        case .blitz3Plus2, .blitz5: return "Blitz"
+        case .rapid10, .rapid15Plus10: return "Rapid"
+        }
+    }
+
     /// One line explaining the choice.
     var detail: String {
         switch self {
