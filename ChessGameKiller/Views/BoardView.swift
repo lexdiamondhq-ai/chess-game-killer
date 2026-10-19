@@ -8,6 +8,8 @@ struct BoardView: View {
     var theme: BoardTheme = .malachite
 
     @AppStorage("haptics") private var hapticsOn = true
+    /// The player's army, so veteran pieces show their glow, scar and name.
+    @Environment(ArmyStore.self) private var army: ArmyStore?
 
     private var game: GameModel { match.game }
     private var flipped: Bool { match.isBoardFlipped }
@@ -29,6 +31,7 @@ struct BoardView: View {
                     squares(size: sq)
                     pieces(size: sq)
                     arrows(size: sq)
+                    nameTag(size: sq)
                     if let promotion = game.pendingPromotion {
                         PromotionPicker(color: promotion.piece.color, theme: theme, squareSize: sq) { kind in
                             withAnimation(.snappy(duration: 0.2)) { match.promote(to: kind) }
@@ -184,6 +187,7 @@ struct BoardView: View {
         ZStack(alignment: .topLeading) {
             ForEach(game.pieces) { placed in
                 PieceImage(piece: placed.piece, theme: theme, size: size, onBoard: true)
+                    .modifier(VeteranAura(rank: armyRank(of: placed), piece: placed.piece, theme: theme, size: size))
                     .scaleEffect(game.selected == placed.square ? 1.08 : 1)
                     .position(center(of: placed.square, size: size))
                     // Nearer rows draw last, so tall 3D pieces overlap the ones behind them.
@@ -200,6 +204,32 @@ struct BoardView: View {
         .animation(.snappy(duration: 0.45), value: flipped)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+
+    // MARK: Army
+
+    private func armyRank(of placed: PlacedPiece) -> ArmyRank {
+        guard let army, let slot = army.slot(of: placed, in: match) else { return .recruit }
+        return army.record(for: slot).rank
+    }
+
+    /// The selected piece's name, floating above it (below it on the top row).
+    @ViewBuilder
+    private func nameTag(size: CGFloat) -> some View {
+        if let army, let square = game.selected,
+           let placed = game.pieces.first(where: { $0.square == square }),
+           let slot = army.slot(of: placed, in: match),
+           let name = army.record(for: slot).name {
+            let rank = army.record(for: slot).rank
+            let center = center(of: square, size: size)
+            let onTop = cell(of: square).row == 0
+            ArmyNameTag(name: name, rank: rank, color: rank.color(for: placed.piece, theme: theme))
+                .position(x: min(max(center.x, size * 1.2), size * 6.8),
+                          y: center.y + size * (onTop ? 0.8 : (theme.spritePieces ? -1.0 : -0.75)))
+                .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
     }
 
     // MARK: Best-move arrows

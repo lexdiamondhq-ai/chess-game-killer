@@ -19,6 +19,9 @@ struct ContentView: View {
     @State private var training = TrainingStore.live()
     @State private var coach = GameCoach()
     @State private var showingTraining = false
+    @State private var army = ArmyStore.live()
+    @State private var showingArmy = false
+    @State private var armyNews: ArmyNews?
 
     private var theme: BoardTheme { .named(themeID) }
     /// The orb is stretched or unfolded, so nothing else fits beside it.
@@ -60,6 +63,17 @@ struct ContentView: View {
             .padding(.top, 8)
             .safeAreaInset(edge: .bottom, spacing: 0) { dock }
             .background { SheetBackdrop(theme: theme) }
+            .overlay(alignment: .top) {
+                if let news = armyNews {
+                    ArmyNewsBanner(news: news, color: match.setup.playerColor, theme: theme) {
+                        armyNews = nil
+                        showingArmy = true
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.top, 4)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
             .navigationTitle("Chess Game Killer")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -72,6 +86,13 @@ struct ContentView: View {
                 }
                 ToolbarItem(placement: .topBarLeading) {
                     TrainButton(theme: theme) { showingTraining = true }
+                }
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showingArmy = true
+                    } label: {
+                        Label("Your Army", systemImage: "shield.lefthalf.filled")
+                    }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 4) {
@@ -93,11 +114,15 @@ struct ContentView: View {
         .preferredColorScheme(theme.isDark ? .dark : nil)
         .environment(training)
         .environment(coach)
+        .environment(army)
         .onChange(of: match.review) { _, review in
             coach.observe(review, in: match, store: training)
         }
         .fullScreenCover(isPresented: $showingTraining) {
             TrainingHubView(theme: theme).environment(training)
+        }
+        .fullScreenCover(isPresented: $showingArmy) {
+            ArmyView(theme: theme, color: match.setup.playerColor).environment(army)
         }
         .fullScreenCover(item: $coach.presentedLesson) { lesson in
             LessonScreen(lesson: lesson, theme: theme).environment(training)
@@ -141,6 +166,7 @@ struct ContentView: View {
         }
         .onChange(of: match.isOver) { _, over in
             guard over else { return }
+            recordArmy()
             // Let the last move land and the sound play, then open the summary.
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds(1.4))
@@ -187,6 +213,22 @@ struct ContentView: View {
         match.showBestMoves = showBestMoves
         match.showSecondBest = showSecondBest
         match.showVerdicts = showVerdicts
+    }
+
+    /// Adds a finished game against the computer to the army, and announces
+    /// the best thing a piece earned.
+    private func recordArmy() {
+        guard match.setup.opponent == .computer, let ledger = match.game.ledger else { return }
+        let won = match.winner.map { $0 == match.setup.playerColor }
+        guard let news = army.record(ledger, playerColor: match.setup.playerColor, won: won).first else { return }
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.2))
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) { armyNews = news }
+            try? await Task.sleep(for: .seconds(6))
+            if armyNews == news {
+                withAnimation(.easeOut(duration: 0.3)) { armyNews = nil }
+            }
+        }
     }
 
     /// Starts a game from an analyzed position, with the player moving first.
