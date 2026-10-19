@@ -163,4 +163,19 @@ final class GameModelTests: XCTestCase {
         XCTAssertFalse(game.canUndo)
         XCTAssertNil(game.lastMove)
     }
+
+    func testCapturedPiecesAreCountedByKind() {
+        let game = GameModel()
+        XCTAssertTrue(game.captured(by: .white).isEmpty)
+        XCTAssertEqual(game.materialLead(for: .white), 0)
+
+        // 1. e4 d5 2. exd5 Qxd5 3. Nc3 Qxg2?? 4. Bxg2
+        play(game, "e2e4", "d7d5", "e4d5", "d8d5", "b1c3", "d5g2", "f1g2")
+        XCTAssertEqual(game.captured(by: .white), [
+            CapturedCount(kind: .queen, count: 1), CapturedCount(kind: .pawn, count: 1),
+        ])
+        XCTAssertEqual(game.captured(by: .black), [CapturedCount(kind: .pawn, count: 2)])
+        XCTAssertEqual(game.materialLead(for: .white), 8)
+        XCTAssertEqual(game.materialLead(for: .black), -8)
+    }
 }

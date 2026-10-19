@@ -5,6 +5,8 @@ import SwiftUI
 struct BoardTheme: Identifiable {
     enum ID: String, CaseIterable {
         case neon, faberge, blueprint
+        // One board per rival, matching its portrait.
+        case spark, drift, pulse, vector, singularity
     }
 
     let id: ID
@@ -93,7 +95,10 @@ struct BoardTheme: Identifiable {
         color == .white ? whiteSparks : blackSparks
     }
 
-    static let all: [BoardTheme] = [.neon, .faberge, .blueprint]
+    static let all: [BoardTheme] = [.neon, .faberge, .blueprint, .spark, .drift, .pulse, .vector, .singularity]
+
+    /// The boards that belong to a rival, in rival order.
+    static let rivals: [BoardTheme] = [.spark, .drift, .pulse, .vector, .singularity]
 
     static func named(_ id: ID) -> BoardTheme {
         all.first { $0.id == id } ?? .neon
@@ -212,6 +217,114 @@ struct BoardTheme: Identifiable {
         isDark: true,
         accent: Color(hex: 0x7CF7FF)
     )
+
+    // MARK: Rival boards
+
+    /// A glowing ember: golden sparkles in warm amber glass, for Spark.
+    static let spark = rivalTheme(
+        id: .spark, name: "Spark", symbol: "flame.fill",
+        light: Color(hex: 0xB86B26), dark: Color(hex: 0x170D08),
+        labelOnLight: Color(hex: 0xFFE2B0), labelOnDark: Color(hex: 0xFFB24A),
+        accent: Color(hex: 0xFFB24A), selected: Color(hex: 0xFFD27A),
+        whiteSide: Color(hex: 0xFFC46A), blackSide: Color(hex: 0x1A120C), whiteName: "Ember", blackName: "Obsidian",
+        whiteSparks: [Color(hex: 0xFFF4D6), Color(hex: 0xFFC24A), Color(hex: 0xFF7A1A), Color(hex: 0xFF4D1A)],
+        blackSparks: [Color(hex: 0xFFC24A), Color(hex: 0xFF7A1A), Color(hex: 0x6B3A1E), Color(hex: 0xFFE2B0)],
+        backdrop: [Color(hex: 0x3A2210), Color(hex: 0x0A0604)]
+    )
+
+    /// A tilted orbit of light around aqua glass, for Drift.
+    static let drift = rivalTheme(
+        id: .drift, name: "Drift", symbol: "circle.dotted.and.circle",
+        light: Color(hex: 0x54A8A8), dark: Color(hex: 0x08161F),
+        labelOnLight: Color(hex: 0x08161F), labelOnDark: Color(hex: 0x9FE6DC),
+        accent: Color(hex: 0xC89CFF), selected: Color(hex: 0xE0C8FF),
+        whiteSide: Color(hex: 0x9FFAEE), blackSide: Color(hex: 0x0A0C2E), whiteName: "Aqua", blackName: "Indigo",
+        whiteSparks: [Color(hex: 0xEAFFFB), Color(hex: 0x9FFAEE), Color(hex: 0x5BE0B0), Color(hex: 0xFF8CF0)],
+        blackSparks: [Color(hex: 0xE0C8FF), Color(hex: 0xC89CFF), Color(hex: 0x4C4CFF), Color(hex: 0x5BE0B0)],
+        backdrop: [Color(hex: 0x17303A), Color(hex: 0x06100F)]
+    )
+
+    /// Shockwave rings of cyan light, for Pulse.
+    static let pulse = rivalTheme(
+        id: .pulse, name: "Pulse", symbol: "dot.radiowaves.left.and.right",
+        light: Color(hex: 0x2B6EA3), dark: Color(hex: 0x050D1C),
+        labelOnLight: Color(hex: 0xD6F4FF), labelOnDark: Color(hex: 0x7FE6FF),
+        accent: Color(hex: 0x4DE0FF), selected: Color(hex: 0x96F0FF),
+        whiteSide: Color(hex: 0xDBF7FF), blackSide: Color(hex: 0x030813), whiteName: "Ice", blackName: "Night",
+        whiteSparks: [Color(hex: 0xFFFFFF), Color(hex: 0xDBF7FF), Color(hex: 0x7FE6FF), Color(hex: 0x4C7BE8)],
+        blackSparks: [Color(hex: 0x7FE6FF), Color(hex: 0x4DE0FF), Color(hex: 0x1C4FA0), Color(hex: 0xFFFFFF)],
+        backdrop: [Color(hex: 0x0B2A45), Color(hex: 0x03080F)]
+    )
+
+    /// Every square cut into violet crystal facets, for Vector.
+    static let vector = rivalTheme(
+        id: .vector, name: "Vector", symbol: "diamond.fill",
+        light: Color(hex: 0x7349BF), dark: Color(hex: 0x160A2B),
+        labelOnLight: Color(hex: 0xEBDCFF), labelOnDark: Color(hex: 0xB98CFF),
+        accent: Color(hex: 0xCF8CFF), selected: Color(hex: 0xE6C2FF),
+        whiteSide: Color(hex: 0xE2D4FF), blackSide: Color(hex: 0x12062A), whiteName: "Crystal", blackName: "Deep",
+        whiteSparks: [Color(hex: 0xF7F0FF), Color(hex: 0xE2D4FF), Color(hex: 0xCF8CFF), Color(hex: 0xFF5AC8)],
+        blackSparks: [Color(hex: 0xCF8CFF), Color(hex: 0xA66BFF), Color(hex: 0x7C4DFF), Color(hex: 0xFFFFFF)],
+        backdrop: [Color(hex: 0x2C1850), Color(hex: 0x0A0515)]
+    )
+
+    /// A black hole with a bright photon ring and a magenta halo, for Singularity.
+    static let singularity = rivalTheme(
+        id: .singularity, name: "Singularity", symbol: "circle.circle",
+        light: Color(hex: 0x54506B), dark: Color(hex: 0x080712),
+        labelOnLight: Color(hex: 0xE8E4FF), labelOnDark: Color(hex: 0xB9B3D6),
+        accent: Color(hex: 0xFF5AC8), selected: Color(hex: 0xFF9ADF),
+        whiteSide: Color(hex: 0xF2EEFF), blackSide: Color(hex: 0x030205), whiteName: "Pearl", blackName: "Void",
+        whiteSparks: [Color(hex: 0xFFFFFF), Color(hex: 0xF2EEFF), Color(hex: 0xFF9ADF), Color(hex: 0x8FB0FF)],
+        blackSparks: [Color(hex: 0xFF5AC8), Color(hex: 0xFF3B6B), Color(hex: 0x8FB0FF), Color(hex: 0xFFFFFF)],
+        backdrop: [Color(hex: 0x2A2438), Color(hex: 0x07060B)]
+    )
+
+    /// The shared shape of a rival's board: a pre-rendered picture, 3D sprites, glowing seams in the accent.
+    private static func rivalTheme(
+        id: ID, name: String, symbol: String, light: Color, dark: Color,
+        labelOnLight: Color, labelOnDark: Color, accent: Color, selected: Color,
+        whiteSide: Color, blackSide: Color, whiteName: String, blackName: String,
+        whiteSparks: [Color], blackSparks: [Color], backdrop: [Color]
+    ) -> BoardTheme {
+        BoardTheme(
+            id: id,
+            name: name,
+            symbol: symbol,
+            light: light,
+            dark: dark,
+            surface: nil,
+            gridLine: nil,
+            labelOnLight: labelOnLight,
+            labelOnDark: labelOnDark,
+            selected: selected.opacity(0.22),
+            selectedRing: selected.opacity(0.95),
+            lastMove: Color.white.opacity(0.16),
+            lastMoveRing: accent.opacity(0.55),
+            hint: accent.opacity(0.9),
+            hintGlow: selected,
+            check: Color(hex: 0xFF3B4E),
+            pieceSet: id.rawValue + "-",
+            whiteGlow: nil,
+            blackGlow: nil,
+            whiteSide: whiteSide,
+            blackSide: blackSide,
+            whiteName: whiteName,
+            blackName: blackName,
+            bestArrow: accent.opacity(0.95),
+            secondArrow: accent.opacity(0.7),
+            arrowGlow: selected,
+            whiteSparks: whiteSparks,
+            blackSparks: blackSparks,
+            boardEdge: nil,
+            boardShadows: [Color.black.opacity(0.6), accent.opacity(0.25)],
+            isDark: true,
+            accent: accent,
+            boardArt: "board-" + id.rawValue,
+            spritePieces: true,
+            backdrop: backdrop
+        )
+    }
 }
 
 extension Color {

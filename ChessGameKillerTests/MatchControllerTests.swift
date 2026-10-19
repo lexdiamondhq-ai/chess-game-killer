@@ -12,7 +12,7 @@ actor FakeEngine: ChessEngine {
         self.scripted = scripted
     }
 
-    func analyze(fen: String, depth: Int, lines: Int) async -> [EngineLine] {
+    func analyze(fen: String, depth: Int, lines: Int, maxTimeMs: Int?) async -> [EngineLine] {
         analyzed.append(fen)
         if let lines = scripted[fen] { return lines }
         return Self.legalMoves(fen: fen).prefix(lines).map { EngineLine(moves: [$0], evaluation: .centipawns(0)) }
@@ -259,5 +259,26 @@ final class MatchControllerTests: XCTestCase {
         XCTAssertFalse(match.isBoardFlipped)
         match.start(.init(opponent: .computer, playerColor: .black), playSound: false)
         XCTAssertTrue(match.isBoardFlipped, "a new game puts the player's side back at the bottom")
+    }
+
+    func testTheComputerAnswersBeforeTheMoveIsGraded() async {
+        let start = GameModel().fen
+        let engine = FakeEngine(scripted: [
+            start: [
+                EngineLine(moves: ["e2e4"], evaluation: .centipawns(30)),
+                EngineLine(moves: ["d2d4"], evaluation: .centipawns(25)),
+            ],
+        ])
+        let match = MatchController(engine: engine, sounds: nil)
+        match.start(.init(opponent: .computer, playerColor: .white), playSound: false)
+        await waitUntil("hints appear") { match.hints.count == 2 }
+
+        tapMove(match, "e2e4")
+        await waitUntil("the computer replies") { match.game.moveCount == 2 }
+        await waitUntil("the move is reviewed") { match.review != nil }
+        XCTAssertEqual(match.review?.played, "e4")
+        // The verdict describes the position the person's move made, not the reply.
+        XCTAssertEqual(match.review?.fenAfter, fen(after: "e2e4"))
+        XCTAssertEqual(match.game.sideToMove, .white)
     }
 }

@@ -9,11 +9,11 @@ One beautiful iOS chess game, with every feature easy to reach and easy to under
 - The coach is one orb at the bottom of the screen. Its ring is the live evaluation. After a move it stretches out for a moment with the verdict (best, excellent, good, inaccuracy, mistake, blunder) and the better move, then shrinks back. Tap it and it unfolds into the full coach: eval bar, the two best moves (tap one to play it), Undo, Hints, Flip and New game
 - When the game ends the orb opens on its own with the result, your accuracy and how many best moves, mistakes and blunders you made, plus Rematch
 - The two best moves drawn on the board: a solid arrow for the best, a dashed arrow for the next best. The coach can be set to full, arrows only, verdicts only or silent
-- Player plates above the board: who is to move, the clocks, captured pieces and the material lead. The moves so far run in a line under the board
+- Player plates above the board: who is to move and the clocks. Down each edge of the board, a rail counts what that side has captured (each piece with how many) and shows the material lead. The moves so far run in a line under the board
 - Captured pieces blow apart in sparks in the theme's colors
 - Analyzer: take a photo of a real board, pick a screenshot or set up any position, fix any square, and see Stockfish's two best moves with the lines that follow; then play on from there
 - Sound effects made with ElevenLabs
-- Settings with a live board preview: Neon (default), Fabergé and Blueprint boards, arrows, verdicts, sound, haptics, and the open-source licenses
+- Settings with a live board preview: Neon (default), Fabergé and Blueprint boards plus one board per rival (on by default in games), arrows, verdicts, sound, haptics, and the open-source licenses
 - Undo, flip the board, promotion picker, haptics
 - Training with Coach Leo, a grandmaster coach: narrated lessons, daily puzzles and your own mistakes to fix (see below)
 

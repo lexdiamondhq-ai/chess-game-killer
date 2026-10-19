@@ -286,22 +286,34 @@ final class MatchController {
         scheduleWork(after: byPerson ? played : nil)
     }
 
+    /// The position a person's move led to, kept so it can be graded after the
+    /// computer has already answered it.
+    private struct PersonMove {
+        let move: PlayedMove
+        let fenAfter: String
+        let endedGame: Bool
+    }
+
     private func refreshHints() {
         hints = showBestMoves ? Array(cachedHints.prefix(showSecondBest ? 2 : 1)) : []
     }
 
+    /// The computer answers first, so its reply never waits on the coach; the
+    /// person's move is graded next, then the hints for their next move.
     private func scheduleWork(after personMove: PlayedMove?) {
         let gen = generation
+        let played = personMove.map { PersonMove(move: $0, fenAfter: game.fen, endedGame: game.isGameOver) }
         work = Task { [weak self] in
-            if let personMove { await self?.review(personMove, generation: gen) }
             await self?.computerMoveIfNeeded(generation: gen)
+            if let played { await self?.review(played, generation: gen) }
             await self?.prepareHints(generation: gen)
         }
     }
 
-    private func review(_ move: PlayedMove, generation gen: Int) async {
-        if game.winner == move.color {
-            publishReview(.checkmate, move: move, best: nil, evaluation: nil)
+    private func review(_ played: PersonMove, generation gen: Int) async {
+        let move = played.move
+        if played.endedGame, game.winner == move.color {
+            publishReview(.checkmate, move: move, fenAfter: played.fenAfter, best: nil, evaluation: nil)
             return
         }
         guard let engine else { return }
@@ -310,7 +322,7 @@ final class MatchController {
         if let analysis, analysis.fen == move.fenBefore {
             before = analysis.lines
         } else {
-            before = await engine.analyze(fen: move.fenBefore, depth: 12, lines: 2)
+            before = await engine.analyze(fen: move.fenBefore, depth: 12, lines: 2, maxTimeMs: 900)
         }
         guard gen == generation, let bestLine = before.first, let bestMove = bestLine.firstMove else { return }
 
@@ -324,10 +336,10 @@ final class MatchController {
         } else if before.count > 1, before[1].firstMove == move.uci {
             after = before[1].evaluation
             reply = before[1].moves.dropFirst().first
-        } else if game.isGameOver {
+        } else if played.endedGame {
             after = .centipawns(0)
         } else {
-            let answer = await engine.analyze(fen: game.fen, depth: 12, lines: 1)
+            let answer = await engine.analyze(fen: played.fenAfter, depth: 12, lines: 1, maxTimeMs: 700)
             guard gen == generation, let line = answer.first else { return }
             after = line.evaluation.flipped
             reply = line.firstMove
@@ -335,20 +347,23 @@ final class MatchController {
 
         let grade = MoveReview.grade(before: bestLine.evaluation, after: after, playedBest: playedBest)
         let bestSAN = playedBest ? nil : Notation.san(of: bestMove, fen: move.fenBefore)
-        publishReview(grade, move: move, best: bestSAN, evaluation: after,
+        publishReview(grade, move: move, fenAfter: played.fenAfter, best: bestSAN, evaluation: after,
                       bestUCI: bestMove, before: bestLine.evaluation, reply: reply)
-        evaluation = move.color == .white ? after : after.flipped
+        // Only until the next hint search reports on the position as it stands now.
+        if analysis?.fen != game.fen {
+            evaluation = move.color == .white ? after : after.flipped
+        }
     }
 
     private func publishReview(
-        _ grade: MoveReview.Grade, move: PlayedMove, best: String?, evaluation: Evaluation?,
+        _ grade: MoveReview.Grade, move: PlayedMove, fenAfter: String, best: String?, evaluation: Evaluation?,
         bestUCI: String? = nil, before: Evaluation? = nil, reply: String? = nil
     ) {
         gradeCounts[grade, default: 0] += 1
         guard showVerdicts || grade == .checkmate else { return }
         review = MoveReview(
             id: nextReviewID, grade: grade, played: move.san, best: best, evaluation: evaluation,
-            fenBefore: move.fenBefore, fenAfter: game.fen, playedUCI: move.uci, bestUCI: bestUCI,
+            fenBefore: move.fenBefore, fenAfter: fenAfter, playedUCI: move.uci, bestUCI: bestUCI,
             before: before, reply: reply
         )
         nextReviewID += 1
@@ -390,7 +405,7 @@ final class MatchController {
     private func prepareHints(generation gen: Int) async {
         guard let engine, !isOver, game.isHumanTurn, game.pendingPromotion == nil else { return }
         let fen = game.fen
-        let lines = await engine.analyze(fen: fen, depth: 14, lines: 2)
+        let lines = await engine.analyze(fen: fen, depth: 14, lines: 2, maxTimeMs: 2000)
         guard gen == generation, game.fen == fen else { return }
         engineFailed = lines.isEmpty
 

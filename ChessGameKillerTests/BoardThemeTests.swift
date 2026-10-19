@@ -40,6 +40,16 @@ final class BoardThemeTests: XCTestCase {
         defaults.removePersistentDomain(forName: "BoardThemeTests")
     }
 
+    func testEveryRivalHasItsOwnBoard() {
+        for rival in Rival.all {
+            let theme = BoardTheme.named(rival.boardTheme)
+            XCTAssertEqual(theme.id, rival.boardTheme, "\(rival.name) points at a theme that does not exist")
+            XCTAssertEqual(theme.name, rival.name)
+            XCTAssertNotNil(theme.boardArt)
+        }
+        XCTAssertEqual(Set(Rival.all.map(\.boardTheme)).count, Rival.all.count, "two rivals share a board")
+    }
+
     func testThemesAreFoundByID() {
         for id in BoardTheme.ID.allCases {
             XCTAssertEqual(BoardTheme.named(id).id, id)

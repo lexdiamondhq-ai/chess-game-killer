@@ -1,8 +1,10 @@
+import ChessKit
 import SwiftUI
 
-/// The game screen: the two players, the board, the moves so far, and the
-/// coach orb at the bottom with Undo and Hints either side of it. When the orb
-/// unfolds, the player plates fold into one line and the board makes room.
+/// The game screen: the two players, the board with each side's captures
+/// counted down its edge, the moves so far, and the coach orb at the bottom
+/// with Undo and Hints either side of it. When the orb unfolds, the player
+/// plates fold into one line and the board makes room.
 struct ContentView: View {
     @State private var match = MatchController.live()
     @State private var showingNewGame = true
@@ -11,6 +13,7 @@ struct ContentView: View {
     @State private var coachExpanded = false
     @State private var coachPeeking = false
     @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .neon
+    @AppStorage("matchRival") private var matchRival = true
     @AppStorage("showBestMoves") private var showBestMoves = true
     @AppStorage("showSecondBest") private var showSecondBest = true
     @AppStorage("coachVerdicts") private var showVerdicts = true
@@ -18,7 +21,13 @@ struct ContentView: View {
     @State private var coach = GameCoach()
     @State private var showingTraining = false
 
-    private var theme: BoardTheme { .named(themeID) }
+    /// Against the computer, the board matches the rival's portrait unless the player turned that off.
+    private var theme: BoardTheme {
+        if matchRival, match.setup.opponent == .computer {
+            return .named(match.setup.level.rival.boardTheme)
+        }
+        return .named(themeID)
+    }
     /// The orb is stretched or unfolded, so nothing else fits beside it.
     private var coachIsWide: Bool { coachExpanded || coachPeeking }
 
@@ -26,25 +35,35 @@ struct ContentView: View {
     private static let platesHeight: CGFloat = 64
     private static let stripHeight: CGFloat = 30
     private static let ribbonHeight: CGFloat = 24
+    /// The captured-piece rails either side of the board.
+    private static let railWidth: CGFloat = 26
+    private static let railSpacing: CGFloat = 6
 
     var body: some View {
         NavigationStack {
             GeometryReader { geo in
                 let platesHeight = coachExpanded ? Self.stripHeight : Self.platesHeight
                 let spare = geo.size.height - platesHeight - Self.ribbonHeight - Self.spacing * 2
-                let side = max(0, min(geo.size.width, spare))
+                let railsWidth = (Self.railWidth + Self.railSpacing) * 2
+                let side = max(0, min(geo.size.width - railsWidth, spare))
+                let topColor: Piece.Color = match.isBoardFlipped ? .white : .black
                 VStack(spacing: Self.spacing) {
                     PlayerPlates(match: match, theme: theme, compact: coachExpanded)
                         .frame(height: platesHeight)
-                    BoardView(match: match, theme: theme)
-                        .frame(width: side, height: side)
+                    HStack(spacing: Self.railSpacing) {
+                        CaptureRail(match: match, theme: theme, by: topColor, width: Self.railWidth)
+                        BoardView(match: match, theme: theme)
+                            .frame(width: side, height: side)
+                        CaptureRail(match: match, theme: theme, by: topColor.opposite, width: Self.railWidth)
+                    }
+                    .frame(height: side)
                     MoveRibbon(moves: match.game.moves, theme: theme)
                         .frame(height: Self.ribbonHeight)
                     Spacer(minLength: 0)
                 }
                 .frame(maxWidth: .infinity)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 8)
             .padding(.top, 8)
             .safeAreaInset(edge: .bottom, spacing: 0) { dock }
             .background { SheetBackdrop(theme: theme) }
@@ -93,7 +112,7 @@ struct ContentView: View {
         .fullScreenCover(item: $coach.presentedSession) { plan in
             SessionView(plan: plan, theme: theme).environment(training)
         }
-        .animation(.easeInOut(duration: 0.35), value: themeID)
+        .animation(.easeInOut(duration: 0.35), value: theme.id)
         .sheet(isPresented: $showingNewGame, onDismiss: startIfNeeded) {
             NewGameSheet(theme: theme) { setup in
                 withAnimation(.snappy) { match.start(setup) }
@@ -114,6 +133,7 @@ struct ContentView: View {
             }
         }
         .onAppear { syncCoachSettings() }
+        .task { await StockfishEngine.shared.warmUp() }
         .onChange(of: showBestMoves) { _, _ in syncCoachSettings() }
         .onChange(of: showSecondBest) { _, _ in syncCoachSettings() }
         .onChange(of: showVerdicts) { _, _ in syncCoachSettings() }
