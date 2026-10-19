@@ -159,7 +159,7 @@ struct TrainingBoardView: View {
 
     private func coordinate(_ text: String, size: CGFloat, color: Color, alignment: Alignment) -> some View {
         Text(text)
-            .font(.system(size: size * 0.2, weight: .semibold, design: .rounded))
+            .font(.system(size: size * 0.2, weight: .semibold, design: .themed))
             .foregroundStyle(color)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignment)
             .padding(size * 0.05)
@@ -186,7 +186,7 @@ struct TrainingBoardView: View {
                         Rectangle().fill(color.opacity(theme.isDark ? 0.26 : 0.34))
                         Rectangle()
                             .strokeBorder(color, lineWidth: size * 0.055)
-                            .shadow(color: theme.isDark ? color : .clear, radius: size * 0.12)
+                            .shadow(color: theme.glows ? color : .clear, radius: size * 0.12)
                     }
                     .frame(width: size, height: size)
                     .offset(x: CGFloat(cell.column) * size, y: CGFloat(cell.row) * size)
@@ -239,7 +239,7 @@ struct TrainingBoardView: View {
                         squareSize: size,
                         dashed: arrow.dashed ?? false,
                         color: (arrow.color ?? .green).color(on: theme),
-                        glows: theme.isDark
+                        glows: theme.glows
                     )
                     .transition(.opacity)
                 }
@@ -263,15 +263,15 @@ struct TrainingBoardView: View {
                     let color = (label.color ?? .blue).color(on: theme)
                     let cell = cell(of: square)
                     Text(label.text)
-                        .font(.system(size: size * 0.24, weight: .heavy, design: .rounded))
+                        .font(.system(size: size * 0.24, weight: .heavy, design: .themed))
                         .monospacedDigit()
                         .lineLimit(1)
                         .foregroundStyle(theme.isDark ? Color.black : Color.white)
                         .padding(.horizontal, size * 0.07)
                         .frame(minWidth: size * 0.38, minHeight: size * 0.34)
                         .background(color, in: Capsule())
-                        .shadow(color: theme.isDark ? color.opacity(0.9) : .black.opacity(0.25),
-                                radius: theme.isDark ? size * 0.1 : 2, y: theme.isDark ? 0 : 1)
+                        .shadow(color: theme.glows ? color.opacity(0.9) : .black.opacity(0.25),
+                                radius: theme.glows ? size * 0.1 : 2, y: theme.glows ? 0 : 1)
                         .position(x: (CGFloat(cell.column) + 0.76) * size, y: (CGFloat(cell.row) + 0.24) * size)
                         .transition(.scale(scale: 0.5).combined(with: .opacity))
                 }

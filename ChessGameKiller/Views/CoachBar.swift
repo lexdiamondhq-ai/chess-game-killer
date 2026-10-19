@@ -26,7 +26,7 @@ struct CoachBar: View {
     private var verdict: some View {
         if let review = match.review {
             HStack(alignment: .center, spacing: 12) {
-                GradeBadge(grade: review.grade, glows: theme.isDark)
+                GradeBadge(grade: review.grade, glows: theme.glows)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(review.title)
                         .font(.headline)
@@ -39,7 +39,7 @@ struct CoachBar: View {
                 Spacer(minLength: 4)
                 if let evaluation = review.evaluation {
                     Text(evaluation.label)
-                        .font(.system(.subheadline, design: .rounded).weight(.bold).monospacedDigit())
+                        .font(.system(.subheadline, design: .themed).weight(.bold).monospacedDigit())
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(review.grade.color.opacity(0.18), in: Capsule())
@@ -93,7 +93,7 @@ struct CoachBar: View {
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                         Text(hint.san)
-                            .font(.system(.footnote, design: .rounded).weight(.bold))
+                            .font(.system(.footnote, design: .themed).weight(.bold))
                     }
                     .accessibilityElement(children: .combine)
                 }
@@ -141,7 +141,7 @@ struct GradeBadge: View {
                     .font(.system(size: 17, weight: .bold))
             case .text(let text):
                 Text(text)
-                    .font(.system(size: 16, weight: .heavy, design: .rounded))
+                    .font(.system(size: 16, weight: .heavy, design: .themed))
             }
         }
         .foregroundStyle(.black.opacity(0.8))

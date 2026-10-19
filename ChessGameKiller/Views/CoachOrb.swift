@@ -126,13 +126,13 @@ struct CoachOrb: View {
             .fill(theme.isDark ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)))
             .overlay {
                 shape.strokeBorder(
-                    LinearGradient(colors: [tint.opacity(theme.isDark ? 0.9 : 0.45), tint.opacity(0.15)],
+                    LinearGradient(colors: [tint.opacity(theme.glows ? 0.9 : 0.45), tint.opacity(0.15)],
                                    startPoint: .topLeading, endPoint: .bottomTrailing),
                     lineWidth: 1
                 )
             }
-            .shadow(color: theme.isDark ? tint.opacity(0.35) : .black.opacity(0.12),
-                    radius: theme.isDark ? 16 : 10, y: theme.isDark ? 0 : 3)
+            .shadow(color: theme.glows ? tint.opacity(0.35) : .black.opacity(0.12),
+                    radius: theme.glows ? 16 : 10, y: theme.glows ? 0 : 3)
     }
 }
 
@@ -168,16 +168,16 @@ private struct OrbFace: View {
     @ViewBuilder
     private var mark: some View {
         if match.isComputerThinking {
-            RivalSigil(rival: match.setup.level.rival, size: 36, glows: theme.isDark)
+            RivalSigil(rival: match.setup.level.rival, size: 36, glows: theme.glows)
         } else if match.isOver {
             if let winner = match.winner {
                 Image(systemName: "crown.fill")
                     .font(.system(size: 22, weight: .bold))
                     .foregroundStyle(theme.sideColor(winner))
-                    .shadow(color: theme.isDark ? theme.sideColor(winner).opacity(0.9) : .clear, radius: 8)
+                    .shadow(color: theme.glows ? theme.sideColor(winner).opacity(0.9) : .clear, radius: 8)
             } else {
                 Text("½")
-                    .font(.system(size: 24, weight: .heavy, design: .rounded))
+                    .font(.system(size: 24, weight: .heavy, design: .themed))
                     .foregroundStyle(.secondary)
             }
         } else if let review = match.review {
@@ -186,17 +186,17 @@ private struct OrbFace: View {
                 case .symbol(let name):
                     Image(systemName: name).font(.system(size: 22, weight: .bold))
                 case .text(let text):
-                    Text(text).font(.system(size: 22, weight: .heavy, design: .rounded))
+                    Text(text).font(.system(size: 22, weight: .heavy, design: .themed))
                 }
             }
             .foregroundStyle(review.grade.color)
-            .shadow(color: theme.isDark ? review.grade.color.opacity(0.9) : .clear, radius: 8)
+            .shadow(color: theme.glows ? review.grade.color.opacity(0.9) : .clear, radius: 8)
             .contentTransition(.symbolEffect(.replace))
         } else {
             Image(systemName: "sparkles")
                 .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(theme.accent ?? .accentColor)
-                .shadow(color: theme.isDark ? (theme.accent ?? .accentColor).opacity(0.9) : .clear, radius: 8)
+                .shadow(color: theme.glows ? (theme.accent ?? .accentColor).opacity(0.9) : .clear, radius: 8)
         }
     }
 
@@ -218,13 +218,13 @@ struct EvalRing: View {
         ZStack {
             Circle()
                 .stroke(theme.blackSide.opacity(theme.isDark ? 0.9 : 0.85), lineWidth: lineWidth)
-                .shadow(color: theme.isDark ? theme.blackSide.opacity(0.8) : .clear, radius: 4)
+                .shadow(color: theme.glows ? theme.blackSide.opacity(0.8) : .clear, radius: 4)
             Circle()
                 .trim(from: 0, to: max(0, min(1, share)))
                 .stroke(theme.whiteSide, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-                .shadow(color: theme.isDark ? (theme.whiteGlow ?? theme.whiteSide).opacity(0.9) : .black.opacity(0.35),
-                        radius: theme.isDark ? 4 : 1)
+                .shadow(color: theme.glows ? (theme.whiteGlow ?? theme.whiteSide).opacity(0.9) : .black.opacity(0.35),
+                        radius: theme.glows ? 4 : 1)
         }
         .padding(lineWidth / 2)
         .animation(.spring(response: 0.6, dampingFraction: 0.9), value: share)
@@ -263,7 +263,7 @@ private struct PeekRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            GradeBadge(grade: review.grade, glows: theme.isDark)
+            GradeBadge(grade: review.grade, glows: theme.glows)
             VStack(alignment: .leading, spacing: 1) {
                 Text(review.title)
                     .font(.subheadline.weight(.bold))
@@ -292,7 +292,7 @@ struct EvalChip: View {
 
     var body: some View {
         Text(text)
-            .font(.system(large ? .subheadline : .footnote, design: .rounded).weight(.bold).monospacedDigit())
+            .font(.system(large ? .subheadline : .footnote, design: .themed).weight(.bold).monospacedDigit())
             .foregroundStyle(color)
             .padding(.horizontal, large ? 10 : 8)
             .padding(.vertical, large ? 5 : 4)
@@ -372,7 +372,7 @@ private struct CoachPanel: View {
                 }
                 Spacer(minLength: 4)
             } else if let review = match.review {
-                GradeBadge(grade: review.grade, glows: theme.isDark)
+                GradeBadge(grade: review.grade, glows: theme.glows)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(review.title).font(.headline).foregroundStyle(review.grade.color)
                     Text(review.detail).font(.subheadline).foregroundStyle(.secondary)
@@ -420,7 +420,7 @@ private struct CoachPanel: View {
                 .foregroundStyle(.black.opacity(0.8))
         }
         .frame(width: 38, height: 38)
-        .shadow(color: theme.isDark ? resultColor.opacity(0.8) : .clear, radius: 8)
+        .shadow(color: theme.glows ? resultColor.opacity(0.8) : .clear, radius: 8)
     }
 
     private var resultTitle: String {
@@ -560,7 +560,7 @@ private struct CoachPanel: View {
             .buttonBorderShape(.roundedRectangle(radius: 16))
             .tint(accent)
             .foregroundStyle(theme.isDark ? Color.black : Color.white)
-            .shadow(color: theme.isDark ? accent.opacity(0.5) : .clear, radius: 12)
+            .shadow(color: theme.glows ? accent.opacity(0.5) : .clear, radius: 12)
 
             Button {
                 collapse()
@@ -591,15 +591,15 @@ struct EvalBar: View {
             ZStack(alignment: .leading) {
                 Capsule()
                     .fill(theme.blackSide.opacity(theme.isDark ? 0.55 : 0.8))
-                    .shadow(color: theme.isDark ? theme.blackSide.opacity(0.25) : .clear, radius: 12)
+                    .shadow(color: theme.glows ? theme.blackSide.opacity(0.25) : .clear, radius: 12)
                 Capsule()
                     .fill(LinearGradient(colors: [theme.whiteSide.opacity(0.75), theme.whiteSide],
                                          startPoint: .leading, endPoint: .trailing))
                     .frame(width: max(12, width * clamped))
-                    .shadow(color: theme.isDark ? (theme.whiteGlow ?? theme.whiteSide).opacity(0.6) : .black.opacity(0.2),
-                            radius: theme.isDark ? 12 : 2)
+                    .shadow(color: theme.glows ? (theme.whiteGlow ?? theme.whiteSide).opacity(0.6) : .black.opacity(0.2),
+                            radius: theme.glows ? 12 : 2)
                 Text(label)
-                    .font(.system(size: 11, weight: .bold, design: .rounded).monospacedDigit())
+                    .font(.system(size: 11, weight: .bold, design: .themed).monospacedDigit())
                     .foregroundStyle(Color.black)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
@@ -626,16 +626,16 @@ private struct HintRow: View {
     var body: some View {
         Button(action: play) {
             HStack(spacing: 10) {
-                HintSwatch(color: isBest ? theme.bestArrow : theme.secondArrow, dashed: !isBest, glow: theme.isDark ? theme.arrowGlow : nil)
+                HintSwatch(color: isBest ? theme.bestArrow : theme.secondArrow, dashed: !isBest, glow: theme.glows ? theme.arrowGlow : nil)
                 Text(hint.san)
-                    .font(.system(.body, design: .rounded).weight(.bold))
+                    .font(.system(.body, design: .themed).weight(.bold))
                     .frame(minWidth: 46, alignment: .leading)
                 Text(isBest ? "Best" : "Next best")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 4)
                 Text(hint.evaluation.label)
-                    .font(.system(.footnote, design: .rounded).weight(.bold).monospacedDigit())
+                    .font(.system(.footnote, design: .themed).weight(.bold).monospacedDigit())
                     .foregroundStyle(isBest ? theme.bestArrow : Color.secondary)
                 Image(systemName: "play.fill")
                     .font(.system(size: 12, weight: .bold))
@@ -699,7 +699,7 @@ private struct ActionButton: View {
                     .frame(width: 44, height: 44)
                     .background(Color.primary.opacity(theme.isDark ? 0.07 : 0.05), in: Circle())
                     .overlay(Circle().strokeBorder(isOn ? accent.opacity(0.5) : Color.primary.opacity(0.11), lineWidth: 1))
-                    .shadow(color: isOn && theme.isDark ? accent.opacity(0.25) : .clear, radius: 10)
+                    .shadow(color: isOn && theme.glows ? accent.opacity(0.25) : .clear, radius: 10)
                 Text(title)
                     .font(.caption2.weight(.semibold))
             }
@@ -726,7 +726,7 @@ private struct StatTile: View {
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.secondary)
             Text(value)
-                .font(.system(.title3, design: .rounded).weight(.heavy).monospacedDigit())
+                .font(.system(.title3, design: .themed).weight(.heavy).monospacedDigit())
                 .foregroundStyle(color)
         }
         .frame(maxWidth: .infinity)

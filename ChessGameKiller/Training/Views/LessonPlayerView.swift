@@ -120,7 +120,7 @@ struct LessonPlayerView: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(lesson.title)
-                    .font(.system(.headline, design: .rounded))
+                    .font(.system(.headline, design: .themed))
                     .lineLimit(1)
                 Text(lesson.subtitle)
                     .font(.caption)
@@ -154,7 +154,7 @@ struct LessonPlayerView: View {
                           ? accent
                           : (index == player.stepIndex ? accent.opacity(0.55) : Color.secondary.opacity(0.22)))
                     .frame(height: 4)
-                    .shadow(color: theme.isDark && index <= player.stepIndex ? accent.opacity(0.7) : .clear, radius: 3)
+                    .shadow(color: theme.glows && index <= player.stepIndex ? accent.opacity(0.7) : .clear, radius: 3)
             }
         }
         .padding(.horizontal, 16)
@@ -175,7 +175,7 @@ struct LessonPlayerView: View {
                         TrainingChip(text: "Your turn", symbol: "hand.tap.fill", color: theme.trainingAccent)
                     }
                     Text(player.caption)
-                        .font(.system(.body, design: .rounded).weight(.medium))
+                        .font(.system(.body, design: .themed).weight(.medium))
                         .foregroundStyle(Color.primary)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -208,7 +208,7 @@ struct LessonPlayerView: View {
         } label: {
             HStack(spacing: 10) {
                 Text(option.text)
-                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                    .font(.system(.subheadline, design: .themed).weight(.semibold))
                     .multilineTextAlignment(.leading)
                     .strikethrough(tried && !option.correct, color: color)
                 Spacer(minLength: 4)
@@ -283,7 +283,7 @@ struct LessonPlayerView: View {
                 .background {
                     Circle()
                         .fill(prominent ? AnyShapeStyle(accent) : AnyShapeStyle(accent.opacity(theme.isDark ? 0.16 : 0.12)))
-                        .shadow(color: prominent && theme.isDark ? accent.opacity(0.6) : .clear, radius: 12)
+                        .shadow(color: prominent && theme.glows ? accent.opacity(0.6) : .clear, radius: 12)
                 }
                 .contentTransition(.symbolEffect(.replace))
         }
@@ -330,12 +330,12 @@ struct LessonDoneCard: View {
                     Image(systemName: "checkmark.seal.fill")
                         .font(.system(size: 54, weight: .bold))
                         .foregroundStyle(green)
-                        .shadow(color: theme.isDark ? green : .clear, radius: 14)
+                        .shadow(color: theme.glows ? green : .clear, radius: 14)
                         .symbolEffect(.bounce, value: appeared)
                 }
                 VStack(spacing: 6) {
                     Text("Lesson complete")
-                        .font(.system(.title2, design: .rounded).weight(.bold))
+                        .font(.system(.title2, design: .themed).weight(.bold))
                     Text(lesson.title)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -349,14 +349,14 @@ struct LessonDoneCard: View {
                 }
                 if let promotion = reward.promotion {
                     Text("Promoted to \(promotion.title)!")
-                        .font(.system(.headline, design: .rounded))
+                        .font(.system(.headline, design: .themed))
                         .foregroundStyle(TrainingColor.yellow.color(on: theme))
                 }
                 if let line {
                     HStack(alignment: .top, spacing: 10) {
                         CoachAvatar(theme: theme, size: 32)
                         Text(line)
-                            .font(.system(.subheadline, design: .rounded))
+                            .font(.system(.subheadline, design: .themed))
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }

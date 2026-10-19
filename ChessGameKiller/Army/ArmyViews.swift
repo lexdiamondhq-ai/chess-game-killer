@@ -130,9 +130,9 @@ struct ArmyNameTag: View {
                 .font(.system(size: 9, weight: .bold))
                 .foregroundStyle(color)
             Text(name)
-                .font(.system(.caption, design: .rounded).weight(.bold))
+                .font(.system(.caption, design: .themed).weight(.bold))
             Text(rank.title.uppercased())
-                .font(.system(size: 8, weight: .heavy, design: .rounded))
+                .font(.system(size: 8, weight: .heavy, design: .themed))
                 .tracking(0.6)
                 .foregroundStyle(color)
         }
@@ -163,11 +163,11 @@ struct ArmyNewsBanner: View {
                     .modifier(VeteranAura(rank: news.rank, piece: piece, theme: theme, size: 38, onBoard: false))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(news.rank.title.uppercased())
-                        .font(.system(size: 10, weight: .heavy, design: .rounded))
+                        .font(.system(size: 10, weight: .heavy, design: .themed))
                         .tracking(0.8)
                         .foregroundStyle(tint)
                     Text(news.headline)
-                        .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                        .font(.system(.subheadline, design: .themed).weight(.semibold))
                         .foregroundStyle(.primary)
                         .multilineTextAlignment(.leading)
                 }
@@ -255,9 +255,9 @@ struct ArmyView: View {
     private var header: some View {
         VStack(spacing: 6) {
             Text("Every piece remembers.")
-                .font(.system(.title3, design: .rounded).weight(.bold))
+                .font(.system(.title3, design: .themed).weight(.bold))
             Text("Win with them and they earn a name, then a battle scar, then a golden glow.")
-                .font(.system(.subheadline, design: .rounded))
+                .font(.system(.subheadline, design: .themed))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
@@ -292,7 +292,7 @@ struct ArmyView: View {
             PieceImage(piece: piece, theme: theme, size: 36)
                 .modifier(VeteranAura(rank: record.rank, piece: piece, theme: theme, size: 36, onBoard: false))
             Text(record.name ?? " ")
-                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .font(.system(size: 9, weight: .bold, design: .themed))
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
                 .foregroundStyle(record.rank.color(for: piece, theme: theme))
@@ -314,7 +314,7 @@ struct ArmyView: View {
     private var honorRoll: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Most Decorated")
-                .font(.system(.headline, design: .rounded))
+                .font(.system(.headline, design: .themed))
             ForEach(decorated) { slot in
                 Button { selected = slot } label: { honorRow(slot) }
                     .buttonStyle(.plain)
@@ -334,7 +334,7 @@ struct ArmyView: View {
                 .modifier(VeteranAura(rank: record.rank, piece: piece, theme: theme, size: 34, onBoard: false))
             VStack(alignment: .leading, spacing: 1) {
                 Text(record.name ?? slot.title)
-                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                    .font(.system(.subheadline, design: .themed).weight(.semibold))
                 Text("\(record.rank.title) · \(slot.title)")
                     .font(.caption)
                     .foregroundStyle(tint)
@@ -342,7 +342,7 @@ struct ArmyView: View {
             Spacer(minLength: 0)
             VStack(alignment: .trailing, spacing: 1) {
                 Text("\(record.wins) wins")
-                    .font(.system(.subheadline, design: .rounded).weight(.semibold).monospacedDigit())
+                    .font(.system(.subheadline, design: .themed).weight(.semibold).monospacedDigit())
                 Text("\(record.captures) taken")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
@@ -354,7 +354,7 @@ struct ArmyView: View {
     private var ranksCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Ranks")
-                .font(.system(.headline, design: .rounded))
+                .font(.system(.headline, design: .themed))
             ForEach(ArmyRank.allCases, id: \.self) { rank in
                 let piece = Piece(.knight, color: color, square: .a1)
                 HStack(spacing: 12) {
@@ -362,7 +362,7 @@ struct ArmyView: View {
                         .modifier(VeteranAura(rank: rank, piece: piece, theme: theme, size: 30, onBoard: false))
                     VStack(alignment: .leading, spacing: 1) {
                         Text(rank.title)
-                            .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                            .font(.system(.subheadline, design: .themed).weight(.semibold))
                         Text(rank.reward)
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -421,7 +421,7 @@ struct PieceDetailView: View {
                 VStack(spacing: 4) {
                     HStack(spacing: 6) {
                         Text(record.name ?? slot.title)
-                            .font(.system(.title2, design: .rounded).weight(.bold))
+                            .font(.system(.title2, design: .themed).weight(.bold))
                         if record.name != nil {
                             Button {
                                 draftName = record.name ?? ""
@@ -435,7 +435,7 @@ struct PieceDetailView: View {
                         }
                     }
                     Text("\(record.rank.title) · \(slot.title)")
-                        .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                        .font(.system(.subheadline, design: .themed).weight(.semibold))
                         .foregroundStyle(tint)
                 }
                 progress(record, tint: tint)
@@ -477,7 +477,7 @@ struct PieceDetailView: View {
             .trainingCard(theme, tint: tint, cornerRadius: 16)
         } else {
             Text("\(record.xp) XP. A Legend of your army.")
-                .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                .font(.system(.subheadline, design: .themed).weight(.semibold))
                 .foregroundStyle(tint)
         }
     }
@@ -492,7 +492,7 @@ struct PieceDetailView: View {
             ForEach(items, id: \.0) { item in
                 VStack(spacing: 2) {
                     Text("\(item.1)")
-                        .font(.system(.title3, design: .rounded).weight(.bold).monospacedDigit())
+                        .font(.system(.title3, design: .themed).weight(.bold).monospacedDigit())
                     Text(item.0)
                         .font(.caption)
                         .foregroundStyle(.secondary)

@@ -122,7 +122,7 @@ struct BoardView: View {
                 Rectangle().fill(theme.selected)
                 if let ring = theme.selectedRing {
                     Rectangle().strokeBorder(ring, lineWidth: ringWidth)
-                        .shadow(color: ring, radius: size * 0.08)
+                        .shadow(color: theme.glows ? ring : .clear, radius: size * 0.08)
                 }
             }
             if game.checkedKing == square {
@@ -164,7 +164,7 @@ struct BoardView: View {
 
     private func coordinate(_ text: String, size: CGFloat, color: Color, alignment: Alignment) -> some View {
         Text(text)
-            .font(.system(size: size * 0.2, weight: .semibold, design: .rounded))
+            .font(.system(size: size * 0.2, weight: .semibold, design: .themed))
             .foregroundStyle(color)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignment)
             .padding(size * 0.05)

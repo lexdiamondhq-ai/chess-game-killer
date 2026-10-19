@@ -161,7 +161,7 @@ struct NewGameSheet: View {
                 .foregroundStyle(theme.isDark ? Color.black : Color.white)
                 .padding(.horizontal, 20)
                 .padding(.bottom, 8)
-                .shadow(color: theme.isDark ? accent.opacity(0.6) : .clear, radius: 14)
+                .shadow(color: theme.glows ? accent.opacity(0.6) : .clear, radius: 14)
                 .animation(.snappy, value: level)
             }
             .navigationTitle("New Game")
@@ -347,7 +347,7 @@ struct NewGameSheet: View {
                 Capsule()
                     .fill(isOn ? rival.hue : Color.secondary.opacity(0.3))
                     .frame(width: isOn ? 18 : 6, height: 6)
-                    .shadow(color: isOn && theme.isDark ? rival.hue.opacity(0.8) : .clear, radius: 6)
+                    .shadow(color: isOn && theme.glows ? rival.hue.opacity(0.8) : .clear, radius: 6)
             }
         }
         .frame(maxWidth: .infinity)
@@ -370,7 +370,7 @@ struct NewGameSheet: View {
             glow = theme.blackGlow
         case .random:
             color = accent
-            glow = theme.isDark ? accent : nil
+            glow = theme.glows ? accent : nil
         }
         return Button {
             choose { side = choice }
@@ -424,7 +424,7 @@ struct NewGameSheet: View {
                 shape.strokeBorder(selected ? color : Color.primary.opacity(theme.isDark ? 0.12 : 0.08),
                                    lineWidth: selected ? 1.5 : 1)
             }
-            .shadow(color: selected ? (glow ?? color).opacity(theme.isDark ? 0.45 : 0.25) : .clear, radius: 12)
+            .shadow(color: selected ? (glow ?? color).opacity(theme.glows ? 0.45 : 0.25) : .clear, radius: 12)
     }
 }
 
@@ -436,10 +436,10 @@ private struct RivalCard: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            RivalPortrait(rival: rival, size: 100, glows: theme.isDark)
+            RivalPortrait(rival: rival, size: 100, glows: theme.glows)
             VStack(alignment: .leading, spacing: 4) {
                 Text(rival.name)
-                    .font(.system(.title2, design: .rounded).weight(.heavy))
+                    .font(.system(.title2, design: .themed).weight(.heavy))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 (Text(rival.level.name).foregroundStyle(rival.hue) + Text(" · Elo \(rival.elo)"))
@@ -456,7 +456,7 @@ private struct RivalCard: View {
                         Capsule()
                             .fill(lit ? rival.hue : Color.primary.opacity(0.14))
                             .frame(width: 22, height: 5)
-                            .shadow(color: lit && theme.isDark ? rival.hue.opacity(0.8) : .clear, radius: 4)
+                            .shadow(color: lit && theme.glows ? rival.hue.opacity(0.8) : .clear, radius: 4)
                     }
                 }
                 .padding(.top, 6)
@@ -475,7 +475,7 @@ private struct RivalCard: View {
                     shape.strokeBorder(isSelected ? rival.hue : Color.primary.opacity(theme.isDark ? 0.12 : 0.08),
                                        lineWidth: isSelected ? 1.5 : 1)
                 }
-                .shadow(color: isSelected ? rival.hue.opacity(theme.isDark ? 0.4 : 0.25) : .clear, radius: 16)
+                .shadow(color: isSelected ? rival.hue.opacity(theme.glows ? 0.4 : 0.25) : .clear, radius: 16)
         }
         .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .animation(.snappy, value: isSelected)
@@ -516,7 +516,7 @@ private struct MatchRowButton<Icon: View>: View {
                         .tracking(1)
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(value)
-                            .font(.system(.callout, design: .rounded).weight(.bold))
+                            .font(.system(.callout, design: .themed).weight(.bold))
                             .foregroundStyle(.primary)
                             .contentTransition(.numericText())
                         if let detail {
@@ -576,7 +576,7 @@ private struct OptionRow: View {
                         .opacity(isOn ? 0 : 1)
                     Circle()
                         .fill(accent)
-                        .shadow(color: theme.isDark ? accent.opacity(0.6) : .clear, radius: 6)
+                        .shadow(color: theme.glows ? accent.opacity(0.6) : .clear, radius: 6)
                         .overlay {
                             Image(systemName: "checkmark")
                                 .font(.system(size: 11, weight: .heavy))
@@ -595,7 +595,7 @@ private struct OptionRow: View {
                 shape
                     .fill(isOn ? accent.opacity(0.1) : .clear)
                     .overlay { shape.strokeBorder(isOn ? accent.opacity(0.35) : .clear, lineWidth: 1) }
-                    .shadow(color: isOn && theme.isDark ? accent.opacity(0.12) : .clear, radius: 10)
+                    .shadow(color: isOn && theme.glows ? accent.opacity(0.12) : .clear, radius: 10)
             }
             .contentShape(Rectangle())
         }
