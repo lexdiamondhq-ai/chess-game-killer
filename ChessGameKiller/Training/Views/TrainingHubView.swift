@@ -38,7 +38,7 @@ struct TrainingHubView: View {
                                 session = store.practicePlan(for: skill)
                             }
                         }
-                        Text("Every puzzle here was checked by Stockfish.")
+                        Text("Every lesson drill was checked by Stockfish. Puzzles come from real games on Lichess.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                             .padding(.top, 4)
