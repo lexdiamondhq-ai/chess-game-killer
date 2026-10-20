@@ -9,6 +9,7 @@ struct TrainingHubView: View {
     @Environment(TrainingStore.self) private var store
     @Environment(PuzzleStore.self) private var puzzles
     @State private var showingPuzzles = false
+    @State private var showingRoom = false
     @Environment(\.dismiss) private var dismiss
     @AppStorage("coachVoiceMuted") private var voiceMuted = false
     @State private var lesson: Lesson?
@@ -25,6 +26,7 @@ struct TrainingHubView: View {
                         rankCard
                         todayCard
                         puzzlesCard
+                        roomCard
                         if !store.openMistakes.isEmpty {
                             mistakesCard
                         }
@@ -85,6 +87,10 @@ struct TrainingHubView: View {
         .fullScreenCover(item: $lesson) { lesson in
             LessonScreen(lesson: lesson, theme: theme)
                 .environment(store)
+        }
+        .fullScreenCover(isPresented: $showingRoom) {
+            GrandmasterRoomView(theme: theme)
+                .environment(puzzles)
         }
         .fullScreenCover(isPresented: $showingPuzzles) {
             PuzzlesView(theme: theme)
@@ -199,6 +205,36 @@ struct TrainingHubView: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
+            }
+            .padding(18)
+            .trainingCard(theme)
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Training for strong players.
+    private var roomCard: some View {
+        Button {
+            showingRoom = true
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "crown.fill")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(theme.trainingAccent)
+                    .frame(width: 52, height: 52)
+                    .background(theme.trainingAccent.opacity(0.14), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Grandmaster Room")
+                        .font(.system(.title3, design: .themed).weight(.bold))
+                    Text("Guess the Move, blindfold calculation, perfect endgames, your opening repertoire.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.tertiary)
             }
             .padding(18)
             .trainingCard(theme)
