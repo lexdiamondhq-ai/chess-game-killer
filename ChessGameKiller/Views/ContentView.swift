@@ -27,6 +27,11 @@ struct ContentView: View {
     @State private var armyNews: ArmyNews?
     @Environment(\.scenePhase) private var scenePhase
 
+    /// The app opens on the New Game sheet; tests that picture the game screen skip it.
+    init(startsWithNewGame: Bool = true) {
+        _showingNewGame = State(initialValue: startsWithNewGame)
+    }
+
     /// Against the computer, the board matches the rival's portrait unless the player turned that off.
     private var theme: BoardTheme {
         if matchRival, match.setup.opponent == .computer {

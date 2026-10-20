@@ -39,13 +39,24 @@ final class ScreenSnapshotTests: XCTestCase {
         try snapshot("faberge")
     }
 
-    private func snapshot(_ name: String) throws {
+    /// The way the app really opens: the New Game sheet first, then the game once it closes.
+    func testRivalBoardAfterTheNewGameSheet() throws {
+        defaults.removeObject(forKey: "boardTheme")
+        defaults.set(true, forKey: "matchRival")
+        try snapshot("rival-after-sheet", startsWithNewGame: true)
+    }
+
+    private func snapshot(_ name: String, startsWithNewGame: Bool = false) throws {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let window = UIWindow(windowScene: scene)
         window.frame = scene.coordinateSpace.bounds
-        window.rootViewController = UIHostingController(rootView: ContentView())
+        window.rootViewController = UIHostingController(rootView: ContentView(startsWithNewGame: startsWithNewGame))
         window.makeKeyAndVisible()
         RunLoop.main.run(until: Date().addingTimeInterval(3))
+        if startsWithNewGame {
+            window.rootViewController?.presentedViewController?.dismiss(animated: true)
+            RunLoop.main.run(until: Date().addingTimeInterval(3))
+        }
         window.layoutIfNeeded()
 
         let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
