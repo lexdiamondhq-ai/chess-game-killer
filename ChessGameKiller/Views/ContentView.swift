@@ -63,6 +63,103 @@ struct ContentView: View {
     var body: some View {
         // Fonts read the look from here: rounded on Neon, plain SF Pro on the rest.
         let _ = ThemeFont.use(theme)
+        presented
+            .onAppear { syncCoachSettings() }
+            .task { await StockfishEngine.shared.warmUp() }
+            .onChange(of: showBestMoves) { _, _ in syncCoachSettings() }
+            .onChange(of: showSecondBest) { _, _ in syncCoachSettings() }
+            .onChange(of: showVerdicts) { _, _ in syncCoachSettings() }
+            .onChange(of: showingNewGame) { _, showing in
+                if showing { setCoach(expanded: false) }
+            }
+            .onChange(of: showingAnalyze) { _, showing in
+                if showing { setCoach(expanded: false) }
+            }
+            .onChange(of: showingTraining) { _, showing in
+                if showing { setCoach(expanded: false) }
+            }
+            .onChange(of: match.isOver) { _, over in
+                guard over else { return }
+                recordArmy()
+                // Let the last move land and the sound play, then open the summary.
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(1.4))
+                    guard match.isOver, !showingNewGame else { return }
+                    setCoach(expanded: true)
+                }
+            }
+    }
+
+    /// The game screen with its sheets and full-screen covers.
+    private var presented: some View {
+        observed
+            .fullScreenCover(isPresented: $showingTraining) {
+                TrainingHubView(theme: theme).environment(training)
+            }
+            .fullScreenCover(isPresented: $showingArmy) {
+                ArmyView(theme: theme, color: match.setup.playerColor).environment(army)
+            }
+            .fullScreenCover(item: $coach.presentedLesson) { lesson in
+                LessonScreen(lesson: lesson, theme: theme).environment(training)
+            }
+            .fullScreenCover(item: $coach.presentedSession) { plan in
+                SessionView(plan: plan, theme: theme).environment(training)
+            }
+            .animation(.easeInOut(duration: 0.35), value: theme.id)
+            .sheet(isPresented: $showingNewGame, onDismiss: startIfNeeded) {
+                NewGameSheet(theme: theme) { setup in
+                    withAnimation(.snappy) { match.start(setup) }
+                    showingNewGame = false
+                }
+            }
+            .sheet(isPresented: $showingSettings) {
+                SettingsSheet()
+            }
+            .sheet(isPresented: $showingAnalyze) {
+                AnalyzeSheet(
+                    theme: theme,
+                    currentFEN: match.game.fen,
+                    engine: StockfishEngine.shared,
+                    reader: CloudBoardReader.live
+                ) { draft in
+                    play(from: draft)
+                }
+            }
+    }
+
+    /// The game screen, watching the match for the coach and the clock.
+    private var observed: some View {
+        gameScreen
+            // Switching between Neon and the executive look redraws everything in the new type.
+            .id(theme.glows)
+            .tint(theme.accent)
+            .preferredColorScheme(theme.isDark ? .dark : nil)
+            .environment(training)
+            .environment(coach)
+            .environment(army)
+            .onChange(of: match.review) { _, review in
+                coach.observe(review, in: match, store: training)
+            }
+            .onChange(of: match.gameNumber) { _, _ in
+                coach.gameStarted()
+            }
+            .onChange(of: match.game.moveCount) { _, _ in
+                // Once the learner moves on, the tip about the move before is over.
+                if let played = match.game.lastPlayed, match.game.humanColors.contains(played.color) {
+                    coach.dismiss()
+                }
+            }
+            .onChange(of: boardHidden) { _, hidden in
+                if hidden { match.suspendClock() } else { match.resumeClock() }
+            }
+            .onChange(of: match.clock?.running, initial: true) { _, running in
+                // The screen stays awake while a clock runs.
+                UIApplication.shared.isIdleTimerDisabled = running != nil
+            }
+    }
+
+    /// The board, plates and dock inside the navigation bar, sized to the screen.
+    private var gameScreen: some View {
         GeometryReader { screen in
             NavigationStack {
                 GeometryReader { geo in
@@ -93,88 +190,6 @@ struct ContentView: View {
                 .navigationTitle("Chess Game Killer")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar { toolbarContent }
-            }
-        }
-        // Switching between Neon and the executive look redraws everything in the new type.
-        .id(theme.glows)
-        .tint(theme.accent)
-        .preferredColorScheme(theme.isDark ? .dark : nil)
-        .environment(training)
-        .environment(coach)
-        .environment(army)
-        .onChange(of: match.review) { _, review in
-            coach.observe(review, in: match, store: training)
-        }
-        .onChange(of: match.gameNumber) { _, _ in
-            coach.gameStarted()
-        }
-        .onChange(of: match.game.moveCount) { _, _ in
-            // Once the learner moves on, the tip about the move before is over.
-            if let played = match.game.lastPlayed, match.game.humanColors.contains(played.color) {
-                coach.dismiss()
-            }
-        }
-        .onChange(of: boardHidden) { _, hidden in
-            if hidden { match.suspendClock() } else { match.resumeClock() }
-        }
-        .onChange(of: match.clock?.running, initial: true) { _, running in
-            // The screen stays awake while a clock runs.
-            UIApplication.shared.isIdleTimerDisabled = running != nil
-        }
-        .fullScreenCover(isPresented: $showingTraining) {
-            TrainingHubView(theme: theme).environment(training)
-        }
-        .fullScreenCover(isPresented: $showingArmy) {
-            ArmyView(theme: theme, color: match.setup.playerColor).environment(army)
-        }
-        .fullScreenCover(item: $coach.presentedLesson) { lesson in
-            LessonScreen(lesson: lesson, theme: theme).environment(training)
-        }
-        .fullScreenCover(item: $coach.presentedSession) { plan in
-            SessionView(plan: plan, theme: theme).environment(training)
-        }
-        .animation(.easeInOut(duration: 0.35), value: theme.id)
-        .sheet(isPresented: $showingNewGame, onDismiss: startIfNeeded) {
-            NewGameSheet(theme: theme) { setup in
-                withAnimation(.snappy) { match.start(setup) }
-                showingNewGame = false
-            }
-        }
-        .sheet(isPresented: $showingSettings) {
-            SettingsSheet()
-        }
-        .sheet(isPresented: $showingAnalyze) {
-            AnalyzeSheet(
-                theme: theme,
-                currentFEN: match.game.fen,
-                engine: StockfishEngine.shared,
-                reader: CloudBoardReader.live
-            ) { draft in
-                play(from: draft)
-            }
-        }
-        .onAppear { syncCoachSettings() }
-        .task { await StockfishEngine.shared.warmUp() }
-        .onChange(of: showBestMoves) { _, _ in syncCoachSettings() }
-        .onChange(of: showSecondBest) { _, _ in syncCoachSettings() }
-        .onChange(of: showVerdicts) { _, _ in syncCoachSettings() }
-        .onChange(of: showingNewGame) { _, showing in
-            if showing { setCoach(expanded: false) }
-        }
-        .onChange(of: showingAnalyze) { _, showing in
-            if showing { setCoach(expanded: false) }
-        }
-        .onChange(of: showingTraining) { _, showing in
-            if showing { setCoach(expanded: false) }
-        }
-        .onChange(of: match.isOver) { _, over in
-            guard over else { return }
-            recordArmy()
-            // Let the last move land and the sound play, then open the summary.
-            Task { @MainActor in
-                try? await Task.sleep(for: .seconds(1.4))
-                guard match.isOver, !showingNewGame else { return }
-                setCoach(expanded: true)
             }
         }
     }
