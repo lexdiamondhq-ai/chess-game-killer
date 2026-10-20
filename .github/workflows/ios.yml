@@ -23,14 +23,21 @@ jobs:
       - name: Pick an iPhone simulator
         id: sim
         run: |
-          UDID=$(xcrun simctl list devices available -j \
-            | jq -r '[.devices | to_entries[] | select(.key | contains("iOS")) | .value[] | select(.name | startswith("iPhone"))][0].udid')
+          xcrun simctl list runtimes
+          # The newest iOS, on an iPhone 17 Pro when the runner has one.
+          DEVICES=$(xcrun simctl list devices available -j \
+            | jq -c '[.devices | to_entries[] | select(.key | contains("iOS")) | .key as $rt | .value[] | select(.name | startswith("iPhone")) | {udid, name, rt: $rt}] | sort_by(.rt) | reverse')
+          UDID=$(echo "$DEVICES" | jq -r '([.[] | select(.name == "iPhone 17 Pro")] + .)[0].udid')
+          echo "$DEVICES" | jq -r '.[] | select(.udid == "'"$UDID"'") | "\(.name) \(.rt)"'
           echo "Using simulator $UDID"
+          mkdir -p snapshots
+          echo "$DEVICES" | jq -r '.[] | select(.udid == "'"$UDID"'") | "\(.name) \(.rt)"' > snapshots/device.txt
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
       - name: Build and test
         run: |
           status=0
-          xcodebuild test \
+          # Test runner variables reach the tests without the prefix, as SNAPSHOT_DIR.
+          TEST_RUNNER_SNAPSHOT_DIR="$PWD/snapshots" xcodebuild test \
             -project ChessGameKiller.xcodeproj \
             -scheme ChessGameKiller \
             -destination "id=${{ steps.sim.outputs.udid }}" \
@@ -43,3 +50,23 @@ jobs:
         with:
           name: build-log
           path: build.log
+      - name: Upload screen pictures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screens
+          path: snapshots
+          if-no-files-found: ignore
+      - name: Print small screen pictures
+        if: always()
+        # Small JPEGs in the log, base64, between markers, so the screen can be checked without downloading.
+        run: |
+          [ -d snapshots ] || exit 0
+          cat snapshots/device.txt || true
+          for f in snapshots/*.png; do
+            [ -e "$f" ] || continue
+            sips -s format jpeg -s formatOptions 60 -Z 700 "$f" --out /tmp/small.jpg >/dev/null
+            echo "BEGIN-SCREEN $(basename "$f")"
+            base64 -i /tmp/small.jpg | fold -w 3000
+            echo "END-SCREEN"
+          done
