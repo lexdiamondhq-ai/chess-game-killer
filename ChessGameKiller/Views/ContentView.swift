@@ -336,7 +336,9 @@ struct ContentView: View {
                         .disabled(!match.canUndo)
                     }
                     .frame(maxWidth: .infinity)
-                    Color.clear.frame(width: CoachOrb.orbSize + 12)
+                    // The orb's place. Only a width: a bare Color.clear takes every bit of
+                    // height it is offered, which pushed the dock up and squeezed the board to nothing.
+                    Color.clear.frame(width: CoachOrb.orbSize + 12, height: 1)
                     HStack(spacing: 0) {
                         DockButton(title: "Hint", symbol: showBestMoves ? "lightbulb.fill" : "lightbulb",
                                    isOn: showBestMoves, theme: theme) {
