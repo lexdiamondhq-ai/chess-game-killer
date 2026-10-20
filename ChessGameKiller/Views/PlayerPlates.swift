@@ -13,16 +13,21 @@ struct PlayerPlates: View {
     private var topColor: Piece.Color { match.isBoardFlipped ? .white : .black }
 
     var body: some View {
-        if compact {
-            strip
+        Group {
+            if compact {
+                strip
+                    .transition(.opacity)
+            } else {
+                HStack(spacing: 10) {
+                    PlayerPlate(match: match, theme: theme, color: topColor)
+                    PlayerPlate(match: match, theme: theme, color: topColor.opposite)
+                }
                 .transition(.opacity)
-        } else {
-            HStack(spacing: 10) {
-                PlayerPlate(match: match, theme: theme, color: topColor)
-                PlayerPlate(match: match, theme: theme, color: topColor.opposite)
             }
-            .transition(.opacity)
         }
+        // The plates and the strip sit in rows of fixed height, so the type stops
+        // growing at the largest regular size instead of spilling onto the board.
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 
     private var strip: some View {
@@ -52,7 +57,7 @@ private struct PlayerPlate: View {
     let color: Piece.Color
 
     private var isComputer: Bool { match.setup.opponent == .computer && !match.game.humanColors.contains(color) }
-    private var isActive: Bool { !match.isOver && match.game.sideToMove == color }
+    private var isActive: Bool { !match.isOver && match.game.activeColor == color }
     private var sideColor: Color { theme.sideColor(color) }
 
     var body: some View {
@@ -65,15 +70,19 @@ private struct PlayerPlate: View {
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(isActive ? sideColor : Color.primary)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                        .allowsTightening(true)
                     Spacer(minLength: 0)
                     if let clock = match.clock {
                         ClockLabel(clock: clock, color: color, theme: theme, size: 14)
+                            .layoutPriority(1)
                     }
                 }
                 Text(status)
                     .font(.caption2.weight(isActive ? .semibold : .regular))
                     .foregroundStyle(isActive ? sideColor : Color.secondary)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.75)
             }
         }
         .padding(.leading, 8)
@@ -83,7 +92,17 @@ private struct PlayerPlate: View {
         .background(PlateBackground(theme: theme, glow: isActive ? sideColor : nil, radius: 18))
         .animation(.snappy(duration: 0.3), value: isActive)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(name), \(status)")
+        .accessibilityLabel(spokenLabel)
+    }
+
+    /// Name, status and time left. The label stands in for the children's own,
+    /// so the clock has to be spelled out here.
+    private var spokenLabel: String {
+        var text = "\(name), \(status)"
+        if let clock = match.clock {
+            text += ", \(clock.remaining(for: color).clockLabel) left"
+        }
+        return text
     }
 
     @ViewBuilder
@@ -104,16 +123,20 @@ private struct PlayerPlate: View {
     private var status: String {
         if match.isOver {
             if match.winner == color { return "Winner" }
-            return match.winner == nil ? "Draw" : ""
+            return match.winner == nil ? "Draw" : "Lost"
         }
         if isActive {
-            if isComputer { return match.isComputerThinking ? "thinking" : "to move" }
+            if isComputer {
+                if match.isComputerThinking { return "thinking" }
+                if match.engineFailed, !match.game.isHumanTurn { return "Engine unavailable" }
+                return "to move"
+            }
             if match.game.checkedKing != nil { return "\(theme.name(of: color)) is in check" }
             return "\(theme.name(of: color)) to move"
         }
         if isComputer {
             let rival = match.setup.level.rival
-            return "\(rival.level.name) · Elo \(rival.elo)"
+            return "\(rival.level.name) · \(rival.elo)"
         }
         return theme.name(of: color)
     }
@@ -181,6 +204,7 @@ struct ClockLabel: View {
             Text(remaining.clockLabel)
                 .font(.system(size: size, weight: .semibold, design: .themed).monospacedDigit())
                 .foregroundStyle(urgent ? Color(hex: 0xFF4D6D) : (isRunning ? Color.primary : Color.secondary))
+                .lineLimit(1)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 1)
                 .background {
@@ -191,8 +215,9 @@ struct ClockLabel: View {
                                 .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1))
                     }
                 }
+                // Inside the timeline, so VoiceOver reads the time as it stands now.
+                .accessibilityLabel("\(theme.name(of: color)) has \(remaining.clockLabel) left")
         }
-        .accessibilityLabel("\(theme.name(of: color)) has \(clock.remaining(for: color).clockLabel) left")
     }
 }
 
@@ -237,18 +262,20 @@ struct CaptureRail: View {
         .frame(maxHeight: .infinity, alignment: .center)
         .animation(.snappy(duration: 0.3), value: taken)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(label(taken: taken, lead: lead))
+        .accessibilityLabel(Self.spokenCaptures(taken, lead: lead, name: theme.name(of: by)))
     }
 
-    private func label(taken: [CapturedCount], lead: Int) -> String {
-        guard !taken.isEmpty else { return "\(theme.name(of: by)) has captured nothing" }
-        let pieces = taken.map { "\($0.count) \(name(of: $0.kind))\($0.count == 1 ? "" : "s")" }
-        var text = "\(theme.name(of: by)) has captured " + pieces.joined(separator: ", ")
+    /// What a side has taken, in words, for VoiceOver: "Gold has captured 1 knight, 2 pawns, up 3".
+    /// The executive plate reads the same sentence, since its strip of pieces is hidden from VoiceOver.
+    static func spokenCaptures(_ taken: [CapturedCount], lead: Int, name: String) -> String {
+        guard !taken.isEmpty else { return "\(name) has captured nothing" }
+        let pieces = taken.map { "\($0.count) \(spokenName(of: $0.kind))\($0.count == 1 ? "" : "s")" }
+        var text = "\(name) has captured " + pieces.joined(separator: ", ")
         if lead > 0 { text += ", up \(lead)" }
         return text
     }
 
-    private func name(of kind: Piece.Kind) -> String {
+    private static func spokenName(of kind: Piece.Kind) -> String {
         switch kind {
         case .pawn: return "pawn"
         case .knight: return "knight"
@@ -304,6 +331,9 @@ struct MoveRibbon: View {
                 .padding(.horizontal, 4)
                 .frame(minWidth: 0, maxWidth: .infinity, alignment: .trailing)
             }
+            // Short lists sit against the trailing edge and the ribbon opens at the
+            // newest move, even when the screen is rebuilt mid-game.
+            .defaultScrollAnchor(.trailing)
             .onChange(of: moves.count) { _, count in
                 guard count > 0 else { return }
                 withAnimation(.snappy(duration: 0.3)) {
@@ -312,6 +342,7 @@ struct MoveRibbon: View {
             }
         }
         .font(theme.glows ? Font.system(.caption, design: .themed) : Font.system(.footnote).monospacedDigit())
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .frame(height: 24)
         .mask {
             LinearGradient(colors: [.clear, .black, .black, .black], startPoint: .leading, endPoint: .trailing)

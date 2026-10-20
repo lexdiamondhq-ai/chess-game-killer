@@ -57,7 +57,11 @@ struct TrainingBoardView: View {
         }
         .aspectRatio(1, contentMode: .fit)
         .sensoryFeedback(.impact(weight: .light), trigger: game.moveCount) { _, _ in hapticsOn }
-        .sensoryFeedback(.impact(weight: .heavy, intensity: 0.9), trigger: game.captureEvents.last?.id) { _, _ in hapticsOn }
+        // Capture events are dropped once the explosion is over, which changes the
+        // trigger a second time; only a new capture should thump.
+        .sensoryFeedback(.impact(weight: .heavy, intensity: 0.9), trigger: game.captureEvents.last?.id) { _, new in
+            hapticsOn && new != nil
+        }
     }
 
     // MARK: Layout
