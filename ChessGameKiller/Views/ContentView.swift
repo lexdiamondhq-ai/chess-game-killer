@@ -22,6 +22,8 @@ struct ContentView: View {
     @State private var training = TrainingStore.live()
     @State private var coach = GameCoach()
     @State private var showingTraining = false
+    @State private var puzzles = PuzzleStore.live()
+    @State private var showingPuzzles = false
     @State private var army = ArmyStore.live()
     @State private var showingArmy = false
     @State private var armyNews: ArmyNews?
@@ -51,7 +53,7 @@ struct ContentView: View {
     /// The board is out of sight: the app is in the background, or training covers the game.
     /// The clock waits while it is.
     private var boardHidden: Bool {
-        scenePhase != .active || showingTraining || showingArmy
+        scenePhase != .active || showingTraining || showingArmy || showingPuzzles
             || coach.presentedLesson != nil || coach.presentedSession != nil
     }
 
@@ -90,6 +92,9 @@ struct ContentView: View {
             .onChange(of: showingTraining) { _, showing in
                 if showing { setCoach(expanded: false) }
             }
+            .onChange(of: showingPuzzles) { _, showing in
+                if showing { setCoach(expanded: false) }
+            }
             .onChange(of: match.isOver) { _, over in
                 guard over else { return }
                 recordArmy()
@@ -107,7 +112,10 @@ struct ContentView: View {
     private var presented: some View {
         observed
             .fullScreenCover(isPresented: $showingTraining) {
-                TrainingHubView(theme: theme).environment(training)
+                TrainingHubView(theme: theme).environment(training).environment(puzzles)
+            }
+            .fullScreenCover(isPresented: $showingPuzzles) {
+                PuzzlesView(theme: theme).environment(puzzles).environment(training)
             }
             .fullScreenCover(isPresented: $showingArmy) {
                 ArmyView(theme: theme, color: match.setup.playerColor).environment(army)
@@ -373,7 +381,8 @@ struct ContentView: View {
         BigBoardTray(match: match, theme: theme, isOpen: $trayOpen,
                      onNewGame: { showingNewGame = true },
                      onSettings: { showingSettings = true },
-                     onExit: { withAnimation(.snappy) { bigBoard = false } }) {
+                     onExit: { withAnimation(.snappy) { bigBoard = false } },
+                     onArmy: theme.glows ? nil : { showingArmy = true }) {
             if theme.glows {
                 VStack(spacing: 6) {
                     neonToolRow
@@ -393,6 +402,7 @@ struct ContentView: View {
         HStack(spacing: 0) {
             DockButton(title: "Analyze", symbol: "camera.viewfinder", theme: theme) { showingAnalyze = true }
             DockButton(title: "Train", symbol: "graduationcap", theme: theme) { showingTraining = true }
+            DockButton(title: "Puzzles", symbol: "puzzlepiece.extension", theme: theme) { showingPuzzles = true }
             DockButton(title: "Army", symbol: "shield.lefthalf.filled", theme: theme) { showingArmy = true }
             DockButton(title: "Flip", symbol: "arrow.up.arrow.down", theme: theme) {
                 withAnimation(.snappy) { match.flipBoard() }
@@ -430,6 +440,13 @@ struct ContentView: View {
             }
             ToolbarItem(placement: .topBarLeading) {
                 Button {
+                    showingPuzzles = true
+                } label: {
+                    Label("Puzzles", systemImage: "puzzlepiece.extension")
+                }
+            }
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
                     showingArmy = true
                 } label: {
                     Label("Your Army", systemImage: "shield.lefthalf.filled")
@@ -452,10 +469,17 @@ struct ContentView: View {
             }
         } else {
             ToolbarItem(placement: .topBarLeading) {
-                Button {
-                    showingNewGame = true
-                } label: {
-                    Label("New Game", systemImage: "plus")
+                HStack(spacing: 4) {
+                    Button {
+                        showingNewGame = true
+                    } label: {
+                        Label("New Game", systemImage: "plus")
+                    }
+                    Button {
+                        showingArmy = true
+                    } label: {
+                        Label("Your Army", systemImage: "shield.lefthalf.filled")
+                    }
                 }
                 .tint(.primary)
             }
@@ -493,22 +517,22 @@ struct ContentView: View {
                         DockButton(title: "Train", symbol: "graduationcap", theme: theme) {
                             showingTraining = true
                         }
-                        DockButton(title: "Undo", symbol: "arrow.uturn.backward", theme: theme) {
-                            withAnimation(.snappy(duration: 0.22)) { match.undo() }
+                        DockButton(title: "Puzzles", symbol: "puzzlepiece.extension", theme: theme) {
+                            showingPuzzles = true
                         }
-                        .disabled(!match.canUndo)
                     }
                     .frame(maxWidth: .infinity)
                     // The orb's place. Only a width: a bare Color.clear takes every bit of
                     // height it is offered, which pushed the dock up and squeezed the board to nothing.
                     Color.clear.frame(width: CoachOrb.orbSize + 12, height: 1)
                     HStack(spacing: 0) {
+                        DockButton(title: "Undo", symbol: "arrow.uturn.backward", theme: theme) {
+                            withAnimation(.snappy(duration: 0.22)) { match.undo() }
+                        }
+                        .disabled(!match.canUndo)
                         DockButton(title: "Hint", symbol: showBestMoves ? "lightbulb.fill" : "lightbulb",
                                    isOn: showBestMoves, theme: theme) {
                             showBestMoves.toggle()
-                        }
-                        DockButton(title: "Army", symbol: "shield.lefthalf.filled", theme: theme) {
-                            showingArmy = true
                         }
                         DockButton(title: "Flip", symbol: "arrow.up.arrow.down", theme: theme) {
                             withAnimation(.snappy) { match.flipBoard() }

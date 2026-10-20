@@ -45,6 +45,8 @@ final class DrillRunner {
     /// The two answers of a yes-or-no drill, like "Safe" and "Not safe".
     let answerLabels: (yes: String, no: String)
     let moveLimit: Int
+    /// One wrong move ends it and shows the answer, as in Puzzle Rush.
+    @ObservationIgnored var strict = false
 
     private let startFEN: String
     private let setup: String?
@@ -431,7 +433,7 @@ final class DrillRunner {
             try? await Task.sleep(for: .milliseconds(900))
             guard let self, !Task.isCancelled else { return }
             self.game.undo()
-            if self.mistakes >= 3 {
+            if self.strict || self.mistakes >= 3 {
                 self.showLine()
                 return
             }
