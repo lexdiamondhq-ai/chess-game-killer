@@ -12,13 +12,28 @@ final class ScreenSnapshotTests: XCTestCase {
     private var saved: [String: Any?] = [:]
 
     override func setUp() async throws {
-        for key in ["boardTheme", "matchRival"] { saved[key] = defaults.object(forKey: key) }
+        for key in ["boardTheme", "matchRival", "bigBoard"] { saved[key] = defaults.object(forKey: key) }
+        defaults.set(false, forKey: "bigBoard")
     }
 
     override func tearDown() async throws {
         for (key, value) in saved {
             if let value { defaults.set(value, forKey: key) } else { defaults.removeObject(forKey: key) }
         }
+    }
+
+    func testBigBoardNeon() throws {
+        defaults.set("neon", forKey: "boardTheme")
+        defaults.set(false, forKey: "matchRival")
+        defaults.set(true, forKey: "bigBoard")
+        try snapshot("bigboard-neon")
+    }
+
+    func testBigBoardFabergeTrayOpen() throws {
+        defaults.set("faberge", forKey: "boardTheme")
+        defaults.set(false, forKey: "matchRival")
+        defaults.set(true, forKey: "bigBoard")
+        try snapshot("bigboard-faberge-tray", trayOpen: true)
     }
 
     func testRivalBoardScreen() throws {
@@ -46,11 +61,11 @@ final class ScreenSnapshotTests: XCTestCase {
         try snapshot("rival-after-sheet", startsWithNewGame: true)
     }
 
-    private func snapshot(_ name: String, startsWithNewGame: Bool = false) throws {
+    private func snapshot(_ name: String, startsWithNewGame: Bool = false, trayOpen: Bool = false) throws {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let window = UIWindow(windowScene: scene)
         window.frame = scene.coordinateSpace.bounds
-        window.rootViewController = UIHostingController(rootView: ContentView(startsWithNewGame: startsWithNewGame))
+        window.rootViewController = UIHostingController(rootView: ContentView(startsWithNewGame: startsWithNewGame, trayOpen: trayOpen))
         window.makeKeyAndVisible()
         RunLoop.main.run(until: Date().addingTimeInterval(3))
         if startsWithNewGame {

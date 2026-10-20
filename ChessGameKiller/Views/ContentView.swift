@@ -26,10 +26,17 @@ struct ContentView: View {
     @State private var showingArmy = false
     @State private var armyNews: ArmyNews?
     @Environment(\.scenePhase) private var scenePhase
+    /// Big Board: the board edge to edge with everything else tucked into a pull-up tray.
+    @AppStorage("bigBoard") private var bigBoard = false
+    @State private var trayOpen = false
+    /// The position being looked at while the player swipes back through the game; nil is live.
+    @State private var browsePly: Int?
+    @State private var scrubStart: Int?
 
     /// The app opens on the New Game sheet; tests that picture the game screen skip it.
-    init(startsWithNewGame: Bool = true) {
+    init(startsWithNewGame: Bool = true, trayOpen: Bool = false) {
         _showingNewGame = State(initialValue: startsWithNewGame)
+        _trayOpen = State(initialValue: trayOpen)
     }
 
     /// Against the computer, the board matches the rival's portrait unless the player turned that off.
@@ -86,6 +93,7 @@ struct ContentView: View {
             .onChange(of: match.isOver) { _, over in
                 guard over else { return }
                 recordArmy()
+                if bigBoard { trayOpen = true }
                 // Let the last move land and the sound play, then open the summary.
                 Task { @MainActor in
                     try? await Task.sleep(for: .seconds(1.4))
@@ -149,6 +157,9 @@ struct ContentView: View {
                 coach.gameStarted()
             }
             .onChange(of: match.game.moveCount) { _, _ in
+                // A new move brings the board back to the live position.
+                browsePly = nil
+                scrubStart = nil
                 // Once the learner moves on, the tip about the move before is over.
                 if let played = match.game.lastPlayed, match.game.humanColors.contains(played.color) {
                     coach.dismiss()
@@ -168,17 +179,25 @@ struct ContentView: View {
         GeometryReader { screen in
             NavigationStack {
                 GeometryReader { geo in
-                    if theme.glows {
+                    if bigBoard {
+                        bigLayout(in: geo.size)
+                    } else if theme.glows {
                         neonLayout(in: geo.size)
                     } else {
                         executiveLayout(in: geo.size)
                     }
                 }
-                .padding(.horizontal, theme.glows ? 8 : 12)
-                .padding(.top, 8)
+                .padding(.horizontal, bigBoard ? 0 : (theme.glows ? 8 : 12))
+                .padding(.top, bigBoard ? 0 : 8)
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     let coachHeight = screen.size.height * Self.coachShare
-                    if theme.glows { dock(coachHeight: coachHeight) } else { executiveDock(coachHeight: coachHeight) }
+                    if bigBoard {
+                        bigTray(coachHeight: coachHeight)
+                    } else if theme.glows {
+                        dock(coachHeight: coachHeight)
+                    } else {
+                        executiveDock(coachHeight: coachHeight)
+                    }
                 }
                 .background { SheetBackdrop(theme: theme) }
                 .overlay(alignment: .top) {
@@ -195,6 +214,7 @@ struct ContentView: View {
                 .navigationTitle("Chess Game Killer")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar { toolbarContent }
+                .toolbar(bigBoard ? .hidden : .visible, for: .navigationBar)
             }
         }
     }
@@ -256,6 +276,145 @@ struct ContentView: View {
         .frame(maxWidth: .infinity)
     }
 
+    /// Big Board: no top bar, the board as wide as the screen (and as tall as it may be on iPad),
+    /// the players hugging it above and below. Swipe sideways on the board to look back through the game.
+    private func bigLayout(in size: CGSize) -> some View {
+        let compact = coachExpanded
+        let platesHeight = compact ? Self.stripHeight : Self.plateHeight * 2
+        let gaps: CGFloat = compact ? 3 : 4
+        let spare = size.height - platesHeight - Self.ribbonHeight - Self.spacing * gaps
+        let side = max(0, min(size.width, spare))
+        let topColor: Piece.Color = match.isBoardFlipped ? .white : .black
+        return VStack(spacing: Self.spacing) {
+            Spacer(minLength: 0)
+            Group {
+                if compact {
+                    PlayerPlates(match: match, theme: theme, compact: true)
+                        .frame(height: Self.stripHeight)
+                } else {
+                    ExecutivePlate(match: match, theme: theme, color: topColor)
+                        .frame(height: Self.plateHeight)
+                }
+            }
+            .padding(.horizontal, 12)
+            .frame(maxWidth: max(side, Self.maxBoardSide))
+            browsableBoard
+                .frame(width: side, height: side)
+            if !compact {
+                ExecutivePlate(match: match, theme: theme, color: topColor.opposite)
+                    .frame(height: Self.plateHeight)
+                    .padding(.horizontal, 12)
+                    .frame(maxWidth: max(side, Self.maxBoardSide))
+            }
+            Group {
+                if let ply = browsePly {
+                    let fens = match.game.positionFENs
+                    BrowsePill(ply: ply, total: fens.count - 1,
+                               san: ply > 0 && ply <= match.game.moves.count ? match.game.moves[ply - 1] : nil,
+                               theme: theme) {
+                        withAnimation(.snappy) { browsePly = nil }
+                    }
+                } else {
+                    MoveRibbon(moves: match.game.moves, theme: theme)
+                        .padding(.horizontal, 12)
+                }
+            }
+            .frame(height: Self.ribbonHeight)
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    /// The live board, with an earlier position laid over it while the player looks back.
+    /// Dragging sideways scrubs through the game: right goes back, left comes forward.
+    private var browsableBoard: some View {
+        ZStack {
+            BoardView(match: match, theme: theme)
+            if let ply = browsePly, let fen = match.game.positionFENs[safe: ply],
+               let draft = PositionDraft(fen: fen) {
+                PositionBoard(draft: draft, theme: theme, flipped: match.isBoardFlipped) { _ in
+                    withAnimation(.snappy) { browsePly = nil }
+                }
+                .transition(.opacity)
+                .accessibilityLabel("An earlier position. Tap to go back to the game.")
+            }
+        }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 24)
+                .onChanged(scrub)
+                .onEnded { _ in scrubStart = nil }
+        )
+        .sensoryFeedback(.selection, trigger: browsePly) { _, _ in true }
+        .accessibilityAction(named: "Previous move") { step(by: -1) }
+        .accessibilityAction(named: "Next move") { step(by: 1) }
+    }
+
+    /// One position for every ~34 points of sideways drag.
+    private func scrub(_ value: DragGesture.Value) {
+        guard abs(value.translation.width) > abs(value.translation.height) * 1.5,
+              match.game.pendingPromotion == nil else { return }
+        let live = match.game.positionFENs.count - 1
+        let start = scrubStart ?? (browsePly ?? live)
+        scrubStart = start
+        let steps = Int((value.translation.width / 34).rounded(.towardZero))
+        let ply = min(live, max(0, start - steps))
+        let next: Int? = ply == live ? nil : ply
+        if next != browsePly { browsePly = next }
+    }
+
+    private func step(by delta: Int) {
+        let live = match.game.positionFENs.count - 1
+        let ply = min(live, max(0, (browsePly ?? live) + delta))
+        browsePly = ply == live ? nil : ply
+    }
+
+    /// The tray at the bottom of Big Board, holding the same controls as the normal screen.
+    private func bigTray(coachHeight: CGFloat) -> some View {
+        BigBoardTray(match: match, theme: theme, isOpen: $trayOpen,
+                     onNewGame: { showingNewGame = true },
+                     onSettings: { showingSettings = true },
+                     onExit: { withAnimation(.snappy) { bigBoard = false } }) {
+            if theme.glows {
+                VStack(spacing: 6) {
+                    neonToolRow
+                    dock(coachHeight: coachHeight)
+                }
+            } else {
+                executiveDock(coachHeight: coachHeight)
+            }
+        }
+        .onChange(of: trayOpen) { _, open in
+            if !open { setCoach(expanded: false) }
+        }
+    }
+
+    /// Neon keeps Analyze, Train and Army in its top bar; Big Board has none, so they come into the tray.
+    private var neonToolRow: some View {
+        HStack(spacing: 0) {
+            DockButton(title: "Analyze", symbol: "camera.viewfinder", theme: theme) { showingAnalyze = true }
+            DockButton(title: "Train", symbol: "graduationcap", theme: theme) { showingTraining = true }
+            DockButton(title: "Army", symbol: "shield.lefthalf.filled", theme: theme) { showingArmy = true }
+            DockButton(title: "Flip", symbol: "arrow.up.arrow.down", theme: theme) {
+                withAnimation(.snappy) { match.flipBoard() }
+            }
+        }
+        .padding(.horizontal, 8)
+        .opacity(coachIsWide ? 0 : 1)
+        .allowsHitTesting(!coachIsWide)
+    }
+
+    /// Switches Big Board on.
+    private var bigBoardButton: some View {
+        Button {
+            withAnimation(.snappy) {
+                trayOpen = false
+                bigBoard = true
+            }
+        } label: {
+            Label("Big Board", systemImage: "arrow.up.left.and.arrow.down.right")
+        }
+    }
+
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         if theme.glows {
@@ -283,6 +442,7 @@ struct ContentView: View {
                     } label: {
                         Label("New Game", systemImage: "plus")
                     }
+                    bigBoardButton
                     Button {
                         showingSettings = true
                     } label: {
@@ -303,10 +463,13 @@ struct ContentView: View {
                 ExecutiveMatchTitle(match: match)
             }
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    showingSettings = true
-                } label: {
-                    Label("Settings", systemImage: "gearshape")
+                HStack(spacing: 4) {
+                    bigBoardButton
+                    Button {
+                        showingSettings = true
+                    } label: {
+                        Label("Settings", systemImage: "gearshape")
+                    }
                 }
                 .tint(.primary)
             }
@@ -507,6 +670,10 @@ private struct RoundButton: View {
         .accessibilityValue(spokenState)
         .accessibilityAddTraits(isOn == nil ? [] : .isToggle)
     }
+}
+
+private extension Array {
+    subscript(safe index: Int) -> Element? { indices.contains(index) ? self[index] : nil }
 }
 
 #Preview { ContentView() }

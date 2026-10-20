@@ -12,6 +12,7 @@ struct SettingsSheet: View {
     @AppStorage("coachVerdicts") private var showVerdicts = true
     @AppStorage("soundEffects") private var soundOn = true
     @AppStorage("haptics") private var hapticsOn = true
+    @AppStorage("bigBoard") private var bigBoard = false
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.requestReview) private var requestReview
@@ -36,6 +37,9 @@ struct SettingsSheet: View {
                         SettingsGroup(theme: theme) {
                             ToggleRow(title: "Match rival", subtitle: "Computer games use the rival's own board, not the one picked above",
                                       symbol: "person.crop.circle.badge.checkmark", isOn: $matchRival, theme: theme)
+                            rule
+                            ToggleRow(title: "Big Board", subtitle: "The board fills the screen. Swipe up from the bottom for the tools, sideways on the board to replay moves.",
+                                      symbol: "arrow.up.left.and.arrow.down.right", isOn: $bigBoard, theme: theme)
                         }
                     }
 
