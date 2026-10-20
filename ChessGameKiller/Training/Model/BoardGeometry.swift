@@ -117,12 +117,13 @@ struct BoardGeometry {
 
     /// What the piece on `square` hits that's worth hitting: the king, anything
     /// worth more than it, or anything undefended (pawns only if undefended).
+    /// A king is priceless, so it only counts undefended pieces.
     func forkTargets(from square: Square) -> [Square] {
         guard let attacker = pieces[square] else { return [] }
         return attacks(from: square).filter { target in
             guard let piece = pieces[target], piece.color != attacker.color else { return false }
             if piece.kind == .king { return true }
-            if Self.value(piece.kind) > Self.value(attacker.kind) { return true }
+            if Self.value(piece.kind) > Self.exchangeValue(attacker.kind) { return true }
             return Self.value(piece.kind) >= 3 && !isDefended(target, by: piece.color)
         }
     }

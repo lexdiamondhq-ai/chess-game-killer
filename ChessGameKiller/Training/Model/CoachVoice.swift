@@ -19,6 +19,21 @@ final class CoachVoice: NSObject {
     private let synthesizer = AVSpeechSynthesizer()
     private var utterance: AVSpeechUtterance?
     private var waiting: CheckedContinuation<Void, Never>?
+    private var interruptionObserver: NSObjectProtocol?
+
+    override init() {
+        super.init()
+        // A call, Siri or an alarm pauses the player and the synthesizer without a
+        // finish callback. Stop instead, so a pending `say` returns and the lesson
+        // carries on with captions rather than sitting on the same step.
+        interruptionObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification, object: nil, queue: .main
+        ) { [weak self] notification in
+            let type = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+            guard type == AVAudioSession.InterruptionType.began.rawValue else { return }
+            Task { @MainActor in self?.stop() }
+        }
+    }
 
     /// The recorded file for a line: "nar-" and the first 12 hex digits of its SHA-1.
     static func fileName(for text: String) -> String {

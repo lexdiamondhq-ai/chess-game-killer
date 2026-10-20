@@ -42,6 +42,7 @@ struct LessonPlayerView: View {
     let theme: BoardTheme
     var onFinish: () -> Void = {}
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @State private var player: LessonPlayer?
     /// Shared with CoachVoice.isMuted.
     @AppStorage("coachVoiceMuted") private var muted = false
@@ -68,6 +69,13 @@ struct LessonPlayerView: View {
             guard phase == .finished, !finished else { return }
             finished = true
             onFinish()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // Locking the phone or switching apps pauses the lesson cleanly, with
+            // the play button showing, instead of leaving it mid-line.
+            if phase != .active, let player, player.phase == .playing {
+                player.togglePause()
+            }
         }
     }
 
@@ -122,10 +130,12 @@ struct LessonPlayerView: View {
                 Text(lesson.title)
                     .font(.system(.headline, design: .themed))
                     .lineLimit(1)
+                    .minimumScaleFactor(0.85)
                 Text(lesson.subtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)
             Button {

@@ -24,14 +24,16 @@ final class SessionRunner {
     private(set) var coachNote: String?
 
     private let engine: ChessEngine?
+    private let playsSounds: Bool
     @ObservationIgnored private var missesInARow = 0
     @ObservationIgnored private var used: Set<String>
     @ObservationIgnored private var recorded = false
 
-    init(plan: SessionPlan, store: TrainingStore, engine: ChessEngine?) {
+    init(plan: SessionPlan, store: TrainingStore, engine: ChessEngine?, playsSounds: Bool = true) {
         self.plan = plan
         self.store = store
         self.engine = engine
+        self.playsSounds = playsSounds
         items = plan.items
         used = Set(plan.items.compactMap { item in
             if case .drill(let drill) = item.content { return drill.id }
@@ -85,9 +87,11 @@ final class SessionRunner {
         missesInARow = outcome == .missed ? missesInARow + 1 : 0
         if missesInARow >= 2 {
             missesInARow = 0
-            coachNote = store.library?.course.lines.tilt.randomElement()
-                ?? "Deep breath. Even grandmasters miss these. Here's a friendlier one."
-            insertEasierDrill()
+            // The note promises something lighter, so only say it when there is one.
+            if insertEasierDrill() {
+                coachNote = store.library?.course.lines.tilt.randomElement()
+                    ?? "Deep breath. Even grandmasters miss these. Here's a friendlier one."
+            }
         }
     }
 
@@ -124,7 +128,7 @@ final class SessionRunner {
     private func makeDrill() {
         recorded = false
         guard let item = current else { return finish() }
-        if let runner = DrillRunner(item: item, library: store.library, engine: engine) {
+        if let runner = DrillRunner(item: item, library: store.library, engine: engine, playsSounds: playsSounds) {
             drill = runner
             runner.begin()
         } else {
@@ -139,11 +143,18 @@ final class SessionRunner {
     }
 
     /// After two misses, the next drill is an easy one of the same skill.
-    private func insertEasierDrill() {
-        guard let item = current, case .drill(let missed) = item.content,
-              let easier = store.easierDrill(for: missed.skill, excluding: used) else { return }
+    /// False when there's none to add, like a game mistake with no pattern behind it.
+    private func insertEasierDrill() -> Bool {
+        guard let item = current else { return false }
+        let skill: String
+        switch item.content {
+        case .drill(let missed): skill = missed.skill
+        case .mistake(let mistake): skill = mistake.skill
+        }
+        guard !skill.isEmpty, let easier = store.easierDrill(for: skill, excluding: used) else { return false }
         used.insert(easier.id)
         items.insert(SessionItem(content: .drill(easier), role: .warmUp), at: index + 1)
+        return true
     }
 
     private func finish() {

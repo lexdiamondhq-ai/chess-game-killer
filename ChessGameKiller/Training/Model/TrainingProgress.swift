@@ -156,6 +156,8 @@ enum Trainer {
         if let last = s.lastDay, let lastDate = Self.date(from: last, calendar: calendar) {
             let gap = calendar.dateComponents([.day], from: calendar.startOfDay(for: lastDate),
                                               to: calendar.startOfDay(for: date)).day ?? 99
+            // The clock went backwards (a time zone change, say): still the same day.
+            guard gap > 0 else { return (s, false) }
             if gap == 1 {
                 s.current += 1
             } else if gap == 2, canRest(s, on: date, calendar: calendar) {

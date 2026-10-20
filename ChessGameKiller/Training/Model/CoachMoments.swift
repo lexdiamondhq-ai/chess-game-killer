@@ -140,9 +140,10 @@ enum MomentFinder {
         }
 
         // Something better was there: a free piece, a fork, a pin or a skewer.
+        // The words say "wasn't protected", so only a truly undefended piece counts.
         if let bestUCI = review.bestUCI, bestUCI != review.playedUCI, values["best"] != nil,
            let best = Notation.squares(of: bestUCI) {
-            if let target = before.piece(at: best.to), target.color != me, before.isHanging(best.to) {
+            if let target = before.piece(at: best.to), target.color != me, !before.isDefended(best.to, by: target.color) {
                 values["piece"] = BoardGeometry.name(target.kind)
                 values["square"] = best.to.notation
                 return Found(kind: .missedFreePiece, skill: "free-pieces", values: values)
@@ -192,7 +193,7 @@ enum MomentFinder {
         let me = mover.color
 
         if let target = before.piece(at: played.to), target.color != me,
-           BoardGeometry.value(target.kind) >= 3, before.isHanging(played.to) {
+           BoardGeometry.value(target.kind) >= 3, !before.isDefended(played.to, by: target.color) {
             values["piece"] = BoardGeometry.name(target.kind)
             values["square"] = played.to.notation
             return Found(kind: .foundFreePiece, skill: "free-pieces", values: values)

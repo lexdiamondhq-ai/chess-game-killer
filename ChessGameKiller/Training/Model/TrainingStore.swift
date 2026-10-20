@@ -92,6 +92,16 @@ final class TrainingStore {
         return TrainingPlanner(library: library, progress: progress).todaysFocus()
     }
 
+    /// The lesson today's session opens with, if any: the same rule the plan uses.
+    var todaysLesson: Lesson? {
+        guard let library else { return nil }
+        let planner = TrainingPlanner(library: library, progress: progress)
+        return planner.todaysLesson(focus: planner.todaysFocus())
+    }
+
+    /// About how long today's session takes, matching what its intro says.
+    var todaysMinutes: Int { dailyPlan()?.minutes ?? 6 }
+
     static func levelName(_ level: Int) -> String {
         switch level {
         case 3: return "Mastered"

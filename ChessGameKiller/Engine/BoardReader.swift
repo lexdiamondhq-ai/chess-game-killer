@@ -24,6 +24,7 @@ enum BoardReaderError: LocalizedError, Equatable {
     case notSetUp
     case noBoard
     case busy
+    case offline
     case failed
 
     var errorDescription: String? {
@@ -31,7 +32,8 @@ enum BoardReaderError: LocalizedError, Equatable {
         case .notSetUp: return "Photo reading isn't switched on yet. Set up the pieces to match your photo."
         case .noBoard: return "I couldn't find a chess board in that picture. Try a straighter, closer shot."
         case .busy: return "Too many scans in a row. Wait a minute and try again."
-        case .failed: return "I couldn't read that picture. Check your connection, or set up the pieces by hand."
+        case .offline: return "I couldn't reach the photo reader. Check your connection, or set up the pieces by hand."
+        case .failed: return "I couldn't read that picture. Try again in a moment, or set up the pieces by hand."
         }
     }
 }
@@ -76,13 +78,28 @@ struct CloudBoardReader: BoardReader {
         do {
             result = try await session.upload(for: request, from: jpeg)
         } catch {
-            throw BoardReaderError.failed
+            throw Self.readerError(for: error)
         }
         let (data, response) = result
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         if status == 429 { throw BoardReaderError.busy }
         guard status == 200 else { throw BoardReaderError.failed }
         return try Self.reading(from: data)
+    }
+
+    /// Failures that really are about the phone's connection.
+    static let connectionProblems: [URLError.Code] = [
+        .notConnectedToInternet, .networkConnectionLost, .timedOut, .cannotFindHost,
+        .cannotConnectToHost, .dnsLookupFailed, .dataNotAllowed, .internationalRoamingOff,
+    ]
+
+    /// What to tell the player when the picture never got an answer. Only a
+    /// network problem blames the connection; anything else is on our side.
+    static func readerError(for error: Error) -> BoardReaderError {
+        if let urlError = error as? URLError, connectionProblems.contains(urlError.code) {
+            return .offline
+        }
+        return .failed
     }
 
     /// Builds the reading from the server's JSON.

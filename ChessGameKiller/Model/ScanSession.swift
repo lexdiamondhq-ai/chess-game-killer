@@ -23,6 +23,8 @@ final class ScanSession {
 
     private let reader: BoardReader
     private var readTask: Task<Void, Never>?
+    /// Which read is current, so one that was replaced can't report into the next.
+    private var readID = 0
 
     init(reader: BoardReader) {
         self.reader = reader
@@ -49,20 +51,31 @@ final class ScanSession {
         draft = .empty
         isReading = true
         path = [.editor]
+        readID += 1
+        let id = readID
         readTask = Task { [weak self, reader] in
             do {
                 let reading = try await reader.read(image)
-                self?.finishReading(reading)
+                self?.finishReading(reading, id: id)
             } catch {
-                self?.failReading(error)
+                self?.failReading(error, id: id)
             }
         }
     }
 
+    /// For a picture that couldn't even be opened: the editor, with the failure explained.
+    func failToLoadPhoto() {
+        reset()
+        draft = .empty
+        readingFailed = true
+        readingNote = "I couldn't open that photo. Try another one, or set up the pieces by hand."
+        path = [.editor]
+    }
+
     // MARK: Reading
 
-    private func finishReading(_ reading: BoardReading) {
-        guard isReading else { return }
+    private func finishReading(_ reading: BoardReading, id: Int) {
+        guard isReading, id == readID else { return }
         isReading = false
         draft = reading.draft
         readingFailed = false
@@ -72,8 +85,8 @@ final class ScanSession {
         readingNote = notes.joined(separator: " ")
     }
 
-    private func failReading(_ error: Error) {
-        guard isReading else { return }
+    private func failReading(_ error: Error, id: Int) {
+        guard isReading, id == readID else { return }
         isReading = false
         readingFailed = true
         readingNote = (error as? LocalizedError)?.errorDescription ?? BoardReaderError.failed.errorDescription
@@ -121,11 +134,17 @@ final class AnalysisModel {
 
     /// Looks quickly, then deeper, updating as each pass finishes.
     func run() async {
-        guard let engine, draft.isValid, ending == nil, lines.isEmpty, !isThinking else { return }
+        guard ending == nil, lines.isEmpty, !isThinking else { return }
+        // Nothing Stockfish can look at: say so instead of thinking forever.
+        guard let engine, draft.isValid else {
+            failed = true
+            return
+        }
         let fen = draft.fen
         isThinking = true
         for depth in [10, 18] {
-            let found = await engine.analyze(fen: fen, depth: depth, lines: 2)
+            // Capped so the deep pass can't run away on a slow phone.
+            let found = await engine.analyze(fen: fen, depth: depth, lines: 2, maxTimeMs: depth == 10 ? 1500 : 8000)
             if Task.isCancelled { break }
             guard !found.isEmpty else { continue }
             lines = found

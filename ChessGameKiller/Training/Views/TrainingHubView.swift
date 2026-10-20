@@ -21,7 +21,7 @@ struct TrainingHubView: View {
                     VStack(spacing: 18) {
                         coachHeader(library)
                         rankCard
-                        todayCard(library)
+                        todayCard
                         if !store.openMistakes.isEmpty {
                             mistakesCard
                         }
@@ -164,16 +164,16 @@ struct TrainingHubView: View {
 
     // MARK: Today
 
-    private func todayCard(_ library: TrainingLibrary) -> some View {
+    private var todayCard: some View {
         let focus = store.todaysFocus
-        let newLesson = focus.flatMap { store.isDone($0.lesson) ? nil : library.lesson($0.lesson) }
+        let newLesson = store.todaysLesson
         return VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 8) {
                 TrainingChip(text: store.trainedToday ? "Done today. More?" : "Today's training",
                              symbol: store.trainedToday ? "checkmark" : "sun.max.fill",
                              color: theme.trainingAccent)
                 Spacer()
-                Text(newLesson == nil ? "About 6 min" : "About 8 min")
+                Text("About \(store.todaysMinutes) min")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

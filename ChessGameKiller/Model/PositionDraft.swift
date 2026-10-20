@@ -53,7 +53,7 @@ struct PositionDraft: Equatable {
         func message(white: String, black: String) -> String {
             func name(_ color: Piece.Color) -> String { color == .white ? white : black }
             switch self {
-            case .missingKing(let color): return "Add a \(name(color)) king."
+            case .missingKing(let color): return "Add the \(name(color)) king."
             case .extraKing(let color): return "\(name(color)) can only have one king."
             case .tooManyPieces(let color): return "\(name(color)) has more than 16 pieces."
             case .tooManyPawns(let color): return "\(name(color)) has more than 8 pawns."
@@ -64,8 +64,22 @@ struct PositionDraft: Equatable {
         }
     }
 
-    private(set) var placement: [Square: Token] = [:]
-    var sideToMove: Piece.Color = .white
+    private(set) var placement: [Square: Token] = [:] {
+        // Once the pieces are touched, the position's history is unknown again.
+        didSet {
+            castling = nil
+            enPassant = nil
+        }
+    }
+    var sideToMove: Piece.Color = .white {
+        // An en passant capture is only there for the side whose turn it is.
+        didSet { if sideToMove != oldValue { enPassant = nil } }
+    }
+    /// From a FEN: castling rights as the game has them, when they are fewer than
+    /// the squares allow (like "-" or "Kq"). Nil when `castlingFEN` has it right.
+    private(set) var castling: String?
+    /// From a FEN: the en passant square, like "e3".
+    private(set) var enPassant: String?
 
     init(placement: [Square: Token] = [:], sideToMove: Piece.Color = .white) {
         self.placement = placement
@@ -75,7 +89,8 @@ struct PositionDraft: Equatable {
     static let empty = PositionDraft()
     static let standard = PositionDraft(fen: Position.standard.fen)!
 
-    /// Reads the piece placement and side to move of a FEN. The rest is worked out again.
+    /// Reads a FEN. Castling rights and the en passant square are kept until the
+    /// pieces are edited; the clocks are worked out again.
     init?(fen: String) {
         let fields = fen.split(separator: " ")
         guard let first = fields.first, let draft = PositionDraft(placement: String(first)) else { return nil }
@@ -83,6 +98,21 @@ struct PositionDraft: Equatable {
         if fields.count > 1 {
             sideToMove = fields[1] == "b" ? .black : .white
         }
+        if fields.count > 2 {
+            // Only rights the squares still allow, so a king that moved and came back can't castle.
+            var kept: String = castlingFEN.filter { $0 != "-" && fields[2].contains($0) }
+            if kept.isEmpty { kept = "-" }
+            if kept != castlingFEN { castling = kept }
+        }
+        if fields.count > 3, Self.isEnPassantSquare(fields[3]) {
+            enPassant = String(fields[3])
+        }
+    }
+
+    /// Whether a FEN en passant field names a square, like "e3" or "d6".
+    private static func isEnPassantSquare(_ field: Substring) -> Bool {
+        guard field.count == 2, let file = field.first, let rank = field.last else { return false }
+        return "abcdefgh".contains(file) && "36".contains(rank)
     }
 
     /// Reads just a FEN placement field, like "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR".
@@ -275,7 +305,7 @@ struct PositionDraft: Equatable {
     }
 
     var fen: String {
-        "\(placementFEN) \(sideToMove == .white ? "w" : "b") \(castlingFEN) - 0 1"
+        "\(placementFEN) \(sideToMove == .white ? "w" : "b") \(castling ?? castlingFEN) \(enPassant ?? "-") 0 1"
     }
 
     /// The position as a game can use it, when it is valid.
