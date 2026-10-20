@@ -30,6 +30,8 @@ jobs:
           UDID=$(echo "$DEVICES" | jq -r '([.[] | select(.name == "iPhone 17 Pro")] + .)[0].udid')
           echo "$DEVICES" | jq -r '.[] | select(.udid == "'"$UDID"'") | "\(.name) \(.rt)"'
           echo "Using simulator $UDID"
+          mkdir -p snapshots
+          echo "$DEVICES" | jq -r '.[] | select(.udid == "'"$UDID"'") | "\(.name) \(.rt)"' > snapshots/device.txt
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
       - name: Build and test
         run: |
@@ -55,3 +57,16 @@ jobs:
           name: screens
           path: snapshots
           if-no-files-found: ignore
+      - name: Print small screen pictures
+        if: always()
+        # Small JPEGs in the log, base64, between markers, so the screen can be checked without downloading.
+        run: |
+          [ -d snapshots ] || exit 0
+          cat snapshots/device.txt || true
+          for f in snapshots/*.png; do
+            [ -e "$f" ] || continue
+            sips -s format jpeg -s formatOptions 60 -Z 700 "$f" --out /tmp/small.jpg >/dev/null
+            echo "BEGIN-SCREEN $(basename "$f")"
+            base64 -i /tmp/small.jpg | fold -w 3000
+            echo "END-SCREEN"
+          done
