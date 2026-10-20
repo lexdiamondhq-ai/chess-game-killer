@@ -109,10 +109,7 @@ struct TrainingPlanner {
             items.append(SessionItem(content: .drill(finisher), role: .finisher))
         }
 
-        let lesson = openingLesson ?? focus.flatMap { skill in
-            progress.lessonsDone[skill.lesson] == nil ? library.lesson(skill.lesson) : nil
-        }
-        return SessionPlan(title: "Today's training", focus: focus, lesson: lesson, items: items)
+        return SessionPlan(title: "Today's training", focus: focus, lesson: todaysLesson(focus: focus), items: items)
     }
 
     /// Practice one skill: easy start, then drills at the learner's level, easy finish.
@@ -153,6 +150,14 @@ struct TrainingPlanner {
             return nil
         }
         return first
+    }
+
+    /// The lesson today's session opens with: the course's first for a brand-new
+    /// learner, otherwise the focus skill's when it hasn't been watched yet.
+    func todaysLesson(focus: Skill?) -> Lesson? {
+        openingLesson ?? focus.flatMap { skill in
+            progress.lessonsDone[skill.lesson] == nil ? library.lesson(skill.lesson) : nil
+        }
     }
 
     /// Today's skill: the first lesson's on day one, then the next one on the journey.

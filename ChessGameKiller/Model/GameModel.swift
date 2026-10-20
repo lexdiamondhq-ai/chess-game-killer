@@ -73,17 +73,31 @@ final class GameModel {
     private var nextPieceID = 0
     private var nextEventID = 0
     private var fenBeforePendingMove: String?
+    /// What the starting position really is. ChessKit only judges check and mate as a
+    /// move is made; handed a position whole, it looks at the side that isn't moving,
+    /// so a start in check would read as quiet.
+    private var startState: Board.State = .active
+    /// How many of each piece each side began with, so the rails show only what was taken.
+    private var startCounts: [Piece.Color: [Piece.Kind: Int]] = [:]
+    /// Castling rights ChessKit keeps after the rook was captured on its home square,
+    /// as FEN letters. Rights never come back, so a home square without its own rook
+    /// settles it for good.
+    private var lostCastling: Set<Character> = []
 
     private struct Snapshot {
         let board: Board
         let lastMove: LastMove?
         let ledger: PieceLedger?
+        let lostCastling: Set<Character>
     }
 
     /// Starts from the standard position, or any other (useful for lessons and tests).
     init(position: Position = .standard) {
         board = Board(position: position)
         ledger = PieceLedger(startingFrom: position)
+        startState = Self.stateAtStart(of: board)
+        startCounts = Self.counts(in: position)
+        noteLostCastling()
         syncPieces()
     }
 
@@ -91,14 +105,30 @@ final class GameModel {
 
     var sideToMove: Piece.Color { board.position.sideToMove }
 
-    var fen: String { board.position.fen }
+    /// Whose turn it is as a player sees it: the promoting side until it has chosen a piece.
+    var activeColor: Piece.Color { pendingPromotion?.piece.color ?? sideToMove }
+
+    /// The position as FEN, without the castling rights ChessKit keeps for a rook
+    /// that was captured on its home square.
+    var fen: String {
+        let raw = board.position.fen
+        guard !lostCastling.isEmpty else { return raw }
+        var fields = raw.split(separator: " ").map(String.init)
+        guard fields.count == 6 else { return raw }
+        fields[2].removeAll { lostCastling.contains($0) }
+        if fields[2].isEmpty { fields[2] = "-" }
+        return fields.joined(separator: " ")
+    }
 
     func piece(at square: Square) -> Piece? {
         board.position.piece(at: square)
     }
 
+    /// The board's state, with the starting position judged for the side to move.
+    var state: Board.State { history.isEmpty ? startState : board.state }
+
     var isGameOver: Bool {
-        switch board.state {
+        switch state {
         case .checkmate, .draw: return true
         default: return false
         }
@@ -106,35 +136,34 @@ final class GameModel {
 
     /// The winner, if the game ended in checkmate.
     var winner: Piece.Color? {
-        if case .checkmate(let loser) = board.state { return loser.opposite }
+        if case .checkmate(let loser) = state { return loser.opposite }
         return nil
     }
 
-    /// How many of each piece are in a full set, pawns included.
-    private static let fullSet: [Piece.Kind: Int] = [.pawn: 8, .knight: 2, .bishop: 2, .rook: 2, .queen: 1]
     private static let pieceValues: [Piece.Kind: Int] = [.pawn: 1, .knight: 3, .bishop: 3, .rook: 5, .queen: 9]
 
     /// What `color` has taken: each kind of the opponent's pieces missing from the
     /// board with how many are gone, biggest first. Kinds with none taken are left out.
+    /// A side with more of a kind than it started with has promoted pawns, and those
+    /// pawns were not taken.
     func captured(by color: Piece.Color) -> [CapturedCount] {
-        var counts = Self.fullSet
+        let start = startCounts[color.opposite] ?? [:]
+        var onBoard: [Piece.Kind: Int] = [:]
         for placed in pieces where placed.piece.color == color.opposite {
-            counts[placed.piece.kind, default: 0] -= 1
+            onBoard[placed.piece.kind, default: 0] += 1
         }
+        let promoted = onBoard.reduce(0) { $0 + max(0, $1.value - (start[$1.key] ?? 0)) }
         let order: [Piece.Kind] = [.queen, .rook, .bishop, .knight, .pawn]
         return order.compactMap { kind in
-            let count = counts[kind] ?? 0
+            var count = (start[kind] ?? 0) - (onBoard[kind] ?? 0)
+            if kind == .pawn { count -= promoted }
             return count > 0 ? CapturedCount(kind: kind, count: count) : nil
         }
     }
 
     /// How far ahead `color` is in material, in pawns. Negative when behind.
     func materialLead(for color: Piece.Color) -> Int {
-        material(captured(by: color)) - material(captured(by: color.opposite))
-    }
-
-    private func material(_ taken: [CapturedCount]) -> Int {
-        taken.reduce(0) { $0 + (Self.pieceValues[$1.kind] ?? 0) * $1.count }
+        pieces.reduce(0) { $0 + (Self.pieceValues[$1.piece.kind] ?? 0) * ($1.piece.color == color ? 1 : -1) }
     }
 
     var canUndo: Bool { !history.isEmpty }
@@ -148,7 +177,7 @@ final class GameModel {
     /// The square of the king that is in check, if any.
     var checkedKing: Square? {
         let color: Piece.Color
-        switch board.state {
+        switch state {
         case .check(let c), .checkmate(let c): color = c
         default: return nil
         }
@@ -160,7 +189,7 @@ final class GameModel {
     /// Whose turn it is or how the game ended, using the theme's names for the sides.
     func status(white: String, black: String) -> String {
         func name(_ color: Piece.Color) -> String { color == .white ? white : black }
-        switch board.state {
+        switch state {
         case .checkmate(let loser):
             return "Checkmate. \(name(loser.opposite)) wins"
         case .draw(let reason):
@@ -187,7 +216,7 @@ final class GameModel {
 
         if let piece = piece(at: square), piece.color == sideToMove, selected != square {
             selected = square
-            targets = Set(board.legalMoves(forPieceAt: square))
+            targets = Set(board.legalMoves(forPieceAt: square).filter { !isLostCastling(from: square, to: $0) })
         } else {
             clearSelection()
         }
@@ -207,7 +236,10 @@ final class GameModel {
         guard uci.count >= 4, pendingPromotion == nil, !isGameOver else { return false }
         let from = Square(String(uci.prefix(2)))
         let to = Square(String(uci.dropFirst(2).prefix(2)))
-        guard piece(at: from)?.color == sideToMove, board.canMove(pieceAt: from, to: to) else { return false }
+        guard
+            piece(at: from)?.color == sideToMove, board.canMove(pieceAt: from, to: to),
+            !isLostCastling(from: from, to: to)
+        else { return false }
 
         var promotion: Piece.Kind = .queen
         if uci.count == 5, let letter = uci.last, let kind = Piece.Kind(rawValue: letter.uppercased()) {
@@ -222,6 +254,7 @@ final class GameModel {
         board = snapshot.board
         lastMove = snapshot.lastMove
         ledger = snapshot.ledger
+        lostCastling = snapshot.lostCastling
         lastPlayed = nil
         if pendingPromotion == nil { _ = moves.popLast() }
         pendingPromotion = nil
@@ -234,6 +267,10 @@ final class GameModel {
         history.removeAll()
         board = Board(position: position)
         ledger = PieceLedger(startingFrom: position)
+        startState = Self.stateAtStart(of: board)
+        startCounts = Self.counts(in: position)
+        lostCastling = []
+        noteLostCastling()
         lastMove = nil
         lastPlayed = nil
         pendingPromotion = nil
@@ -249,7 +286,7 @@ final class GameModel {
     /// player is asked to choose.
     @discardableResult
     private func play(from: Square, to: Square, promotion: Piece.Kind?) -> Bool {
-        let before = Snapshot(board: board, lastMove: lastMove, ledger: ledger)
+        let before = Snapshot(board: board, lastMove: lastMove, ledger: ledger, lostCastling: lostCastling)
         let fenBefore = fen
         guard let move = board.move(pieceAt: from, to: to) else {
             clearSelection()
@@ -279,9 +316,17 @@ final class GameModel {
         switch move.result {
         case .capture(let captured):
             isCapture = true
-            captureEvents.append(CaptureEvent(id: nextEventID, piece: captured))
+            let id = nextEventID
             nextEventID += 1
+            captureEvents.append(CaptureEvent(id: id, piece: captured))
             if captureEvents.count > 6 { captureEvents.removeFirst(captureEvents.count - 6) }
+            // The explosion is over in under a second. After that the event only costs
+            // drawing time, and would burst again if the board were rebuilt. Ids never
+            // repeat, so a removal that lands after a new game finds nothing.
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .seconds(1.2))
+                self?.captureEvents.removeAll { $0.id == id }
+            }
         case .castle:
             isCastle = true
         case .move:
@@ -305,12 +350,66 @@ final class GameModel {
         }
         moves.append(move.san)
         moveCount += 1
+        noteLostCastling()
         syncPieces()
     }
 
     private func clearSelection() {
         selected = nil
         targets = []
+    }
+
+    /// The home square of each castling right's rook, by FEN letter.
+    private static let rookHomes: [(letter: Character, square: Square, color: Piece.Color)] = [
+        ("K", .h1, .white), ("Q", .a1, .white), ("k", .h8, .black), ("q", .a8, .black),
+    ]
+
+    /// Marks the castling rights whose rook is no longer on its home square. ChessKit
+    /// only drops a right when the king or that rook moves, not when the rook is taken.
+    private func noteLostCastling() {
+        for home in Self.rookHomes
+        where board.position.piece(at: home.square) != Piece(.rook, color: home.color, square: home.square) {
+            lostCastling.insert(home.letter)
+        }
+    }
+
+    /// Whether a king move is a castling ChessKit still offers although that rook was taken.
+    private func isLostCastling(from: Square, to: Square) -> Bool {
+        guard piece(at: from)?.kind == .king else { return false }
+        switch (from, to) {
+        case (.e1, .g1): return lostCastling.contains("K")
+        case (.e1, .c1): return lostCastling.contains("Q")
+        case (.e8, .g8): return lostCastling.contains("k")
+        case (.e8, .c8): return lostCastling.contains("q")
+        default: return false
+        }
+    }
+
+    /// How many of each piece each side has in `position`.
+    private static func counts(in position: Position) -> [Piece.Color: [Piece.Kind: Int]] {
+        var counts: [Piece.Color: [Piece.Kind: Int]] = [:]
+        for piece in position.pieces {
+            counts[piece.color, default: [:]][piece.kind, default: 0] += 1
+        }
+        return counts
+    }
+
+    /// The state of a position handed to the board whole. ChessKit judges the side that
+    /// just moved, which at the start is the side that is waiting, so check, mate and
+    /// stalemate are worked out here for the side to move. (A waiting side with no
+    /// moves is reported as stalemate by ChessKit for the same reason, so that is
+    /// judged again too.)
+    private static func stateAtStart(of board: Board) -> Board.State {
+        guard board.state == .active || board.state == .draw(reason: .stalemate) else { return board.state }
+        let position = board.position
+        let side = position.sideToMove
+        let hasMoves = position.pieces.contains { piece in
+            piece.color == side && !board.legalMoves(forPieceAt: piece.square).isEmpty
+        }
+        let inCheck = PositionDraft(fen: position.fen)?.isInCheck(side) ?? false
+        if !hasMoves { return inCheck ? .checkmate(color: side) : .draw(reason: .stalemate) }
+        if position.hasInsufficientMaterial { return .draw(reason: .insufficientMaterial) }
+        return inCheck ? .check(color: side) : .active
     }
 
     /// Matches the board's pieces to the ones already on screen so each

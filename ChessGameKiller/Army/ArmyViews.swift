@@ -450,6 +450,13 @@ struct PieceDetailView: View {
             TextField("Name", text: $draftName)
             Button("Save") { store.rename(slot, to: draftName) }
             Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Up to 20 characters.")
+        }
+        .onChange(of: draftName) { _, name in
+            // The store keeps 20 characters, so stop the typing there instead of
+            // cutting the name on Save.
+            if name.count > 20 { draftName = String(name.prefix(20)) }
         }
     }
 

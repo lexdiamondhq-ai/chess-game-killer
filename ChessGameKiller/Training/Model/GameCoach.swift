@@ -30,9 +30,6 @@ final class GameCoach {
             return
         }
         guard let review else {
-            if match.game.plyCount == 0 {
-                startGame()
-            }
             moment = nil
             return
         }
@@ -88,6 +85,10 @@ final class GameCoach {
         retrying = moment
         self.moment = nil
         match.undo()
+        // The tip was about an earlier move if the board isn't back where that move was played.
+        if match.game.fen != moment.fen {
+            retrying = nil
+        }
     }
 
     func dismiss() {
@@ -113,15 +114,18 @@ final class GameCoach {
         presentedSession = store.mistakesPlan()
     }
 
-    // MARK: Private
-
-    private func startGame() {
+    /// A new game began: nothing said about the last one carries over.
+    /// Call whenever `match.gameNumber` changes.
+    func gameStarted() {
+        moment = nil
+        retrying = nil
         savedThisGame = 0
         movesSincePraise = 99
         praisedCastling = false
-        retrying = nil
         lastReviewID = nil
     }
+
+    // MARK: Private
 
     private func show(_ found: MomentFinder.Found, review: MoveReview, library: TrainingLibrary?) {
         let defaults = MomentFinder.defaultText(for: found.kind)

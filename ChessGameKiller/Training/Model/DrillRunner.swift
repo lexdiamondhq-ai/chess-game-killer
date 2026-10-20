@@ -81,7 +81,15 @@ final class DrillRunner {
             options = drill.options ?? []
             answerLabels = (skill?.yes ?? "Safe", skill?.no ?? "Not safe")
             moveLimit = drill.limit ?? max(1, (drill.mate ?? 6) + 6)
-            prompt = Self.prompt(for: drill, skill: skill, role: item.role)
+            var text = Self.prompt(for: drill, skill: skill, role: item.role)
+            if drill.type == .safe {
+                // Name the move now, from the position it's played in, so the
+                // question never shows its placeholder while the setup move animates.
+                let after = drill.setup.flatMap { TrainingChess.fen(after: [$0], from: drill.fen) } ?? drill.fen
+                let san = drill.move.flatMap { Notation.san(of: $0, fen: after) } ?? drill.move ?? "this move"
+                text = text.replacingOccurrences(of: "{move}", with: san)
+            }
+            prompt = text
         case .mistake(let mistake):
             let played = Notation.san(of: mistake.played, fen: mistake.fen) ?? mistake.played
             fen = mistake.fen
@@ -173,8 +181,6 @@ final class DrillRunner {
         case .safe:
             if let candidate, let squares = Notation.squares(of: candidate) {
                 arrows = [BoardArrow(from: squares.from.notation, to: squares.to.notation, color: .blue, dashed: true)]
-                let san = Notation.san(of: candidate, fen: game.fen) ?? candidate
-                message = prompt.replacingOccurrences(of: "{move}", with: san)
             }
         case .tap, .choice:
             break
@@ -253,9 +259,15 @@ final class DrillRunner {
             marks = [SquareMark(square: squares.from.notation, color: .yellow)]
             message = "Try your \(BoardGeometry.name(piece.kind)) on \(squares.from.notation)."
         case .tap:
-            if let setup, let squares = Notation.squares(of: setup) {
-                marks = [SquareMark(square: squares.to.notation, color: .yellow)]
-                message = "Look at every square the piece on \(squares.to.notation) can reach."
+            var attackers: [Square] = []
+            for attacker in squares.flatMap({ threats(to: $0) }) where !attackers.contains(attacker) {
+                attackers.append(attacker)
+            }
+            marks = marks.filter { $0.color != .yellow } + attackers.map { SquareMark(square: $0.notation, color: .yellow) }
+            if attackers.count == 1, let piece = game.piece(at: attackers[0]) {
+                message = "Look at every square their \(BoardGeometry.name(piece.kind)) on \(attackers[0].notation) can reach."
+            } else {
+                message = "Look at what their pieces can reach now."
             }
         case .safe:
             if let candidate, let squares = Notation.squares(of: candidate) {
@@ -277,9 +289,7 @@ final class DrillRunner {
             showLine()
         case .tap:
             marks = squares.map { SquareMark(square: $0, color: .green) }
-            if let setup, let from = Notation.squares(of: setup)?.to {
-                arrows = squares.map { BoardArrow(from: from.notation, to: $0, color: .red, dashed: nil) }
-            }
+            arrows = threatArrows()
             tone = .hint
             message = explain ?? "These were the pieces under attack."
             phase = .done(.missed)
@@ -294,6 +304,12 @@ final class DrillRunner {
             }
             phase = .done(.missed)
         case .safe, .playout:
+            if phase == .solving {
+                // Given up mid-playout: say so, rather than leaving the question up.
+                tone = .hint
+                message = "No problem. We'll come back to this one."
+            }
+            game.humanColors = []
             phase = .done(.missed)
         }
     }
@@ -309,6 +325,9 @@ final class DrillRunner {
         marks = []
         tone = .coach
         message = prompt
+        // Back to the intro right away, so the stuck buttons go and "Move on" can't
+        // record the drill while the board resets.
+        phase = .intro
         begin()
     }
 
@@ -367,6 +386,8 @@ final class DrillRunner {
             // Games have more than one good move. Ask the engine before saying no.
             phase = .waiting
             game.humanColors = []
+            tone = .coach
+            message = "Hmm, let me check that one with Stockfish…"
             let fen = played.fenBefore
             pending = Task { [weak self] in
                 guard let self else { return }
@@ -385,7 +406,7 @@ final class DrillRunner {
 
     private func isAlmostAsGood(_ uci: String, fen: String) async -> Bool {
         guard let engine else { return false }
-        let lines = await engine.analyze(fen: fen, depth: 12, lines: 4)
+        let lines = await engine.analyze(fen: fen, depth: 12, lines: 4, maxTimeMs: 1500)
         guard let top = lines.first, let line = lines.first(where: { $0.firstMove == uci }) else { return false }
         return top.evaluation.winningChances - line.evaluation.winningChances < 0.06
     }
@@ -393,7 +414,8 @@ final class DrillRunner {
     private func solved(note: String? = nil) {
         game.humanColors = []
         tone = .success
-        let outcome: Outcome = usedHint ? .withHint : (mistakes == 0 ? .firstTry : .afterMistake)
+        // A miss counts for more than a hint: the second miss hands out a hint on its own.
+        let outcome: Outcome = mistakes > 0 ? .afterMistake : (usedHint ? .withHint : .firstTry)
         let praise = outcome == .firstTry ? pick(lines?.correct, or: "Yes!") : pick(lines?.correctAfterHint, or: "There it is.")
         message = [note, praise].compactMap { $0 }.joined(separator: " ")
         phase = .done(outcome)
@@ -455,16 +477,14 @@ final class DrillRunner {
                 tone = .success
                 let opener = mistakes == 0 ? pick(lines?.correct, or: "Yes!") : pick(lines?.correctAfterHint, or: "There it is.")
                 message = [opener, explain].compactMap { $0 }.joined(separator: " ")
-                if let setup, let from = Notation.squares(of: setup)?.to {
-                    arrows = squares.map { BoardArrow(from: from.notation, to: $0, color: .red, dashed: nil) }
-                }
-                phase = .done(usedHint ? .withHint : (mistakes == 0 ? .firstTry : .afterMistake))
+                arrows = threatArrows()
+                phase = .done(mistakes > 0 ? .afterMistake : (usedHint ? .withHint : .firstTry))
             }
         } else {
             mistakes += 1
             tone = .wrong
             message = game.piece(at: square)?.color == learner
-                ? "That one's safe. Look at what their last move can reach."
+                ? "That one's safe. Look at what their pieces can reach now."
                 : "Tap your piece that's in danger."
             let flash = SquareMark(square: name, color: .red)
             marks.append(flash)
@@ -476,6 +496,25 @@ final class DrillRunner {
                     self.reveal()
                 }
             }
+        }
+    }
+
+    /// Their pieces that attack an answer square: the piece that just moved when
+    /// it does, otherwise everything of theirs that reaches it (a discovered
+    /// attack), or the moved piece anyway when nothing does.
+    private func threats(to square: String) -> [Square] {
+        let geometry = BoardGeometry(position: game.board.position)
+        let attackers = geometry.attackers(of: Square(square), by: learner.opposite)
+        let moved = setup.flatMap { Notation.squares(of: $0)?.to }
+        if let moved, attackers.contains(moved) { return [moved] }
+        if !attackers.isEmpty { return attackers.sorted { $0.rawValue < $1.rawValue } }
+        return moved.map { [$0] } ?? []
+    }
+
+    /// A red arrow from each attacker to the piece of ours it hits.
+    private func threatArrows() -> [BoardArrow] {
+        squares.flatMap { square in
+            threats(to: square).map { BoardArrow(from: $0.notation, to: square, color: .red, dashed: nil) }
         }
     }
 

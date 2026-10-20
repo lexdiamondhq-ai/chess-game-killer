@@ -32,7 +32,9 @@ struct BoardView: View {
                     pieces(size: sq)
                     arrows(size: sq)
                     nameTag(size: sq)
-                    if let promotion = game.pendingPromotion {
+                    // A flag that falls mid-promotion puts the pawn back; this just makes sure
+                    // the picker never outlives the game.
+                    if let promotion = game.pendingPromotion, !match.isOver {
                         PromotionPicker(color: promotion.piece.color, theme: theme, squareSize: sq) { kind in
                             withAnimation(.snappy(duration: 0.2)) { match.promote(to: kind) }
                         }
@@ -62,7 +64,11 @@ struct BoardView: View {
         }
         .aspectRatio(1, contentMode: .fit)
         .sensoryFeedback(.impact(weight: .light), trigger: game.moveCount) { _, _ in hapticsOn }
-        .sensoryFeedback(.impact(weight: .heavy, intensity: 0.9), trigger: game.captureEvents.last?.id) { _, _ in hapticsOn }
+        // Capture events are dropped once the explosion is over, which changes the
+        // trigger a second time; only a new capture should thump.
+        .sensoryFeedback(.impact(weight: .heavy, intensity: 0.9), trigger: game.captureEvents.last?.id) { _, new in
+            hapticsOn && new != nil
+        }
     }
 
     // MARK: Layout
@@ -223,12 +229,15 @@ struct BoardView: View {
             let rank = army.record(for: slot).rank
             let center = center(of: square, size: size)
             let onTop = cell(of: square).row == 0
-            ArmyNameTag(name: name, rank: rank, color: rank.color(for: placed.piece, theme: theme))
-                .position(x: min(max(center.x, size * 1.2), size * 6.8),
-                          y: center.y + size * (onTop ? 0.8 : (theme.spritePieces ? -1.0 : -0.75)))
-                .transition(.opacity.combined(with: .scale(scale: 0.9)))
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
+            // The board is clipped at its edge, so the capsule is kept inside it by
+            // its measured width rather than a fixed number of squares.
+            NameTagPlacement(x: center.x, y: center.y + size * (onTop ? 0.8 : (theme.spritePieces ? -1.0 : -0.75))) {
+                ArmyNameTag(name: name, rank: rank, color: rank.color(for: placed.piece, theme: theme))
+                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
+            }
+            .frame(width: size * 8, height: size * 8)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
         }
     }
 
@@ -272,6 +281,34 @@ struct BoardView: View {
         .frame(width: size * 8, height: size * 8)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+}
+
+/// Centers its one child over a point, shifted inward as far as needed to keep
+/// the whole child within the bounds. A child wider than the bounds is centered.
+private struct NameTagPlacement: Layout {
+    var x: CGFloat
+    var y: CGFloat
+
+    private static let margin: CGFloat = 2
+
+    /// The point animates, so the tag slides when the selection moves to another piece.
+    var animatableData: AnimatablePair<CGFloat, CGFloat> {
+        get { AnimatablePair(x, y) }
+        set { x = newValue.first; y = newValue.second }
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        proposal.replacingUnspecifiedDimensions()
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard let tag = subviews.first else { return }
+        let half = tag.sizeThatFits(.unspecified).width / 2
+        let lowest = bounds.minX + half + Self.margin
+        let highest = bounds.maxX - half - Self.margin
+        let centerX = lowest <= highest ? min(max(bounds.minX + x, lowest), highest) : bounds.midX
+        tag.place(at: CGPoint(x: centerX, y: bounds.minY + y), anchor: .center, proposal: .unspecified)
     }
 }
 
@@ -331,6 +368,8 @@ struct CaptureExplosion: View {
     let seed: Int
 
     @State private var burst = false
+    /// With Reduce Motion on, nothing flies or grows: the flash and shockwave only fade.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private struct Shard: Identifiable {
         let id: Int
@@ -361,7 +400,7 @@ struct CaptureExplosion: View {
                     center: .center, startRadius: 0, endRadius: size * 0.6
                 ))
                 .frame(width: size * 1.2, height: size * 1.2)
-                .scaleEffect(burst ? 1.9 : 0.3)
+                .scaleEffect(flashScale)
                 .opacity(burst ? 0 : 0.95)
                 .animation(.easeOut(duration: 0.45), value: burst)
 
@@ -369,36 +408,38 @@ struct CaptureExplosion: View {
             Circle()
                 .strokeBorder(colors[0], lineWidth: size * (burst ? 0.02 : 0.12))
                 .frame(width: size, height: size)
-                .scaleEffect(burst ? 2.8 : 0.4)
+                .scaleEffect(waveScale)
                 .opacity(burst ? 0 : 0.9)
                 .shadow(color: colors[1 % colors.count], radius: size * 0.1)
                 .animation(.easeOut(duration: 0.6), value: burst)
 
-            // The piece, broken into wedges that fly apart.
-            ForEach(shards) { shard in
-                PieceShardImage(piece: piece, theme: theme, size: size)
-                    .clipShape(Wedge(start: shard.start, end: shard.end))
-                    .shadow(color: colors[1 % colors.count], radius: size * 0.06)
-                    .shadow(color: colors[0], radius: size * 0.02)
-                    .rotationEffect(.degrees(burst ? shard.spin : 0))
-                    .offset(flight(of: shard))
-                    .scaleEffect(burst ? 0.7 : 1)
-                    .opacity(burst ? 0 : 1)
-                    .animation(.easeOut(duration: 0.8), value: burst)
-            }
+            if !reduceMotion {
+                // The piece, broken into wedges that fly apart.
+                ForEach(shards) { shard in
+                    PieceShardImage(piece: piece, theme: theme, size: size)
+                        .clipShape(Wedge(start: shard.start, end: shard.end))
+                        .shadow(color: colors[1 % colors.count], radius: size * 0.06)
+                        .shadow(color: colors[0], radius: size * 0.02)
+                        .rotationEffect(.degrees(burst ? shard.spin : 0))
+                        .offset(flight(of: shard))
+                        .scaleEffect(burst ? 0.7 : 1)
+                        .opacity(burst ? 0 : 1)
+                        .animation(.easeOut(duration: 0.8), value: burst)
+                }
 
-            // Sparks
-            ForEach(sparks) { spark in
-                let color = colors[spark.colorIndex % colors.count]
-                Circle()
-                    .fill(color)
-                    .frame(width: spark.radius * 2, height: spark.radius * 2)
-                    .shadow(color: color, radius: spark.radius * 1.5)
-                    .offset(x: burst ? CGFloat(cos(spark.angle)) * spark.distance : 0,
-                            y: burst ? CGFloat(sin(spark.angle)) * spark.distance : 0)
-                    .scaleEffect(burst ? 0.2 : 1)
-                    .opacity(burst ? 0 : 1)
-                    .animation(.easeOut(duration: 0.85).delay(spark.delay), value: burst)
+                // Sparks
+                ForEach(sparks) { spark in
+                    let color = colors[spark.colorIndex % colors.count]
+                    Circle()
+                        .fill(color)
+                        .frame(width: spark.radius * 2, height: spark.radius * 2)
+                        .shadow(color: color, radius: spark.radius * 1.5)
+                        .offset(x: burst ? CGFloat(cos(spark.angle)) * spark.distance : 0,
+                                y: burst ? CGFloat(sin(spark.angle)) * spark.distance : 0)
+                        .scaleEffect(burst ? 0.2 : 1)
+                        .opacity(burst ? 0 : 1)
+                        .animation(.easeOut(duration: 0.85).delay(spark.delay), value: burst)
+                }
             }
         }
         .frame(width: canvas, height: canvas)
@@ -407,6 +448,16 @@ struct CaptureExplosion: View {
             // On the next frame, so the burst animates from its starting state.
             Task { @MainActor in burst = true }
         }
+    }
+
+    private var flashScale: CGFloat {
+        if reduceMotion { return 1.2 }
+        return burst ? 1.9 : 0.3
+    }
+
+    private var waveScale: CGFloat {
+        if reduceMotion { return 1.6 }
+        return burst ? 2.8 : 0.4
     }
 
     /// How far a shard has flown: outward through the middle of its wedge.

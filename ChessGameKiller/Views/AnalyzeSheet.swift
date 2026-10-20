@@ -12,6 +12,7 @@ struct AnalyzeSheet: View {
 
     @State private var session: ScanSession
     @State private var photoItem: PhotosPickerItem?
+    @State private var isLoadingPhoto = false
     @State private var showingCamera = false
     @Environment(\.dismiss) private var dismiss
 
@@ -51,12 +52,14 @@ struct AnalyzeSheet: View {
                     }
                     PhotosPicker(selection: $photoItem, matching: .images) {
                         StartCard(symbol: "photo.on.rectangle.angled", title: "Choose a Photo",
-                                  detail: "A picture or a screenshot of a board", theme: theme)
+                                  detail: "A picture or a screenshot of a board", theme: theme,
+                                  isLoading: isLoadingPhoto)
                     }
                     .buttonStyle(.plain)
+                    .disabled(isLoadingPhoto)
                     Button { session.setUpByHand() } label: {
                         StartCard(symbol: "square.grid.3x3.fill", title: "Set Up a Board",
-                                  detail: "Place the pieces yourself", theme: theme)
+                                  detail: "Start from the opening position and change it", theme: theme)
                     }
                     .buttonStyle(.plain)
                     Button { session.analyze(fen: currentFEN) } label: {
@@ -89,9 +92,14 @@ struct AnalyzeSheet: View {
         .onChange(of: photoItem) { _, item in
             guard let item else { return }
             Task {
+                // Loading can mean an iCloud download, so show that something is happening.
+                isLoadingPhoto = true
                 if let data = try? await item.loadTransferable(type: Data.self), let image = UIImage(data: data) {
                     session.read(image)
+                } else {
+                    session.failToLoadPhoto()
                 }
+                isLoadingPhoto = false
                 photoItem = nil
             }
         }
@@ -113,6 +121,7 @@ private struct StartCard: View {
     let title: String
     let detail: String
     let theme: BoardTheme
+    var isLoading = false
 
     var body: some View {
         HStack(spacing: 14) {
@@ -126,9 +135,13 @@ private struct StartCard: View {
                 Text(detail).font(.subheadline).foregroundStyle(.secondary)
             }
             Spacer()
-            Image(systemName: "chevron.right")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(.tertiary)
+            if isLoading {
+                ProgressView().controlSize(.small)
+            } else {
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
         }
         .padding(14)
         .background(Panel(theme: theme))
@@ -177,7 +190,7 @@ struct BoardEditorView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                if session.photo != nil || session.isReading {
+                if session.photo != nil || session.isReading || session.readingFailed {
                     readingBanner
                 }
 
@@ -195,14 +208,16 @@ struct BoardEditorView: View {
 
                 palette
 
+                // What the reader finds replaces the whole draft, so hold edits until it's done.
                 Picker("Turn", selection: $session.draft.sideToMove) {
                     Text("\(theme.whiteName) to move").tag(Piece.Color.white)
                     Text("\(theme.blackName) to move").tag(Piece.Color.black)
                 }
                 .pickerStyle(.segmented)
+                .disabled(session.isReading)
 
                 HStack(spacing: 10) {
-                    editButton("Turn Board", symbol: "arrow.triangle.2.circlepath") { session.draft.rotate() }
+                    editButton("Swap Sides", symbol: "arrow.left.arrow.right") { session.draft.rotate() }
                     editButton("Clear", symbol: "trash") { session.draft.clear() }
                     editButton("Start", symbol: "arrow.counterclockwise") {
                         let turn = session.draft.sideToMove
@@ -210,6 +225,7 @@ struct BoardEditorView: View {
                         session.draft.sideToMove = turn
                     }
                 }
+                .disabled(session.isReading)
 
                 if let problem, !session.isReading {
                     Label(problem, systemImage: "exclamationmark.triangle.fill")
@@ -258,7 +274,7 @@ struct BoardEditorView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(session.isReading ? "Reading your photo" : session.readingFailed ? "Couldn't read it" : "Board read")
                     .font(.headline)
-                Text(session.isReading ? "This takes a few seconds." : session.readingNote ?? "")
+                Text(session.isReading ? "I'm checking every square. This can take up to a minute." : session.readingNote ?? "")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -272,11 +288,11 @@ struct BoardEditorView: View {
     private var palette: some View {
         VStack(spacing: 8) {
             ForEach([Piece.Color.white, .black], id: \.self) { color in
-                HStack(spacing: 6) {
+                HStack(spacing: 4) {
                     ForEach([Piece.Kind.king, .queen, .rook, .bishop, .knight, .pawn], id: \.self) { kind in
                         let token = PositionDraft.Token(kind, color)
                         toolButton(.piece(token)) {
-                            PieceImage(piece: token.piece(at: .a1), theme: theme, size: 40)
+                            PieceImage(piece: token.piece(at: .a1), theme: theme, size: 36)
                         }
                         .accessibilityLabel("\(color == .white ? theme.whiteName : theme.blackName) \(String(describing: kind))")
                     }
@@ -285,11 +301,11 @@ struct BoardEditorView: View {
                             Image(systemName: "eraser.fill")
                                 .font(.title3)
                                 .foregroundStyle(.secondary)
-                                .frame(width: 40, height: 40)
+                                .frame(width: 36, height: 36)
                         }
                         .accessibilityLabel("Eraser")
                     } else {
-                        Color.clear.frame(width: 48, height: 48)
+                        Color.clear.frame(width: 44, height: 44)
                     }
                 }
             }
@@ -303,7 +319,7 @@ struct BoardEditorView: View {
             tool = option
         } label: {
             label()
-                .frame(width: 48, height: 48)
+                .frame(width: 44, height: 44)
                 .background {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .fill(isSelected ? accent.opacity(0.22) : Color.secondary.opacity(0.08))
@@ -378,7 +394,7 @@ struct AnalysisView: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .foregroundStyle(theme.isDark ? Color.black : Color.white)
-                .disabled(model.ending != nil)
+                .disabled(model.ending != nil || model.draft.position == nil)
             }
             .padding(16)
             .animation(.snappy, value: model.lines)
@@ -407,7 +423,7 @@ struct AnalysisView: View {
         } else {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Text(model.evaluationForWhite == nil ? "Thinking" : model.verdict(white: theme.whiteName, black: theme.blackName))
+                    Text(headline)
                         .font(.headline)
                     Spacer()
                     if let evaluation = model.evaluationForWhite {
@@ -418,6 +434,17 @@ struct AnalysisView: View {
                 EvaluationBar(winningChances: model.evaluationForWhite?.winningChances ?? 0, theme: theme)
             }
         }
+    }
+
+    /// The verdict, or why there isn't one.
+    private var headline: String {
+        if model.evaluationForWhite != nil {
+            return model.verdict(white: theme.whiteName, black: theme.blackName)
+        }
+        if model.failed {
+            return model.draft.problems.first?.message(white: theme.whiteName, black: theme.blackName) ?? "No verdict"
+        }
+        return "Thinking"
     }
 
     // MARK: The two lines
@@ -458,7 +485,7 @@ struct AnalysisView: View {
                         Text("Stockfish couldn't look at this position.")
                     } else if model.depth > 0 {
                         Image(systemName: "checkmark.seal.fill").foregroundStyle(accent)
-                        Text("Stockfish 17, depth \(model.depth)")
+                        Text("Checked by Stockfish 17")
                     }
                 }
                 .font(.footnote)

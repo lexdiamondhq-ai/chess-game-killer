@@ -51,7 +51,7 @@ struct CoachBar: View {
             .accessibilityElement(children: .combine)
         } else if match.engineFailed {
             message(symbol: "exclamationmark.triangle.fill", title: "Coach offline",
-                    detail: "Stockfish couldn't start. You can still play a friend.")
+                    detail: "Stockfish didn't answer. Undo and try again, or play a friend.")
         } else {
             message(symbol: "sparkles", title: "Your coach",
                     detail: "Make a move and I'll tell you how good it was.")

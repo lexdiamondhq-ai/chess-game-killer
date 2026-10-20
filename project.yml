@@ -36,6 +36,8 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_CFBundleDisplayName: Chess Game Killer
         INFOPLIST_KEY_NSCameraUsageDescription: Take a photo of a chess board to find the best move.
+        # The game and lesson screens are laid out for portrait; iPad keeps every orientation.
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
         TARGETED_DEVICE_FAMILY: "1,2"
   ChessGameKillerTests:
     type: bundle.unit-test

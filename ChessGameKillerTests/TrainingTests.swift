@@ -151,6 +151,38 @@ final class TrainerTests: XCTestCase {
         XCTAssertEqual(streak.current, 1)
         XCTAssertFalse(Trainer.isAlive(streak, on: noon(6), calendar: utc))
     }
+
+    func testADayThatGoesBackwardsIsTheSameDay() {
+        var streak = Streak()
+        streak = Trainer.streak(streak, trainingOn: noon(0), calendar: utc).streak
+        streak = Trainer.streak(streak, trainingOn: noon(1), calendar: utc).streak
+        // Flying west can make the local date yesterday again. That's no break.
+        let back = Trainer.streak(streak, trainingOn: noon(0), calendar: utc)
+        XCTAssertEqual(back.streak.current, 2)
+        XCTAssertEqual(back.streak.lastDay, streak.lastDay)
+        XCTAssertFalse(back.usedRestDay)
+        // And the next day still counts once the clock catches up.
+        XCTAssertEqual(Trainer.streak(back.streak, trainingOn: noon(2), calendar: utc).streak.current, 3)
+    }
+}
+
+// MARK: Board geometry
+
+final class BoardGeometryTests: XCTestCase {
+
+    func testAKingOnlyForksUndefendedPieces() throws {
+        // The rook is guarded by the c6 pawn and the knight by the g6 pawn: no fork.
+        let guarded = try XCTUnwrap(BoardGeometry(fen: "8/8/2p3p1/3r1n2/4K3/8/8/7k b - - 1 1"))
+        XCTAssertTrue(guarded.forkTargets(from: .e4).isEmpty)
+        // Loose pieces next to the king really are forked.
+        let loose = try XCTUnwrap(BoardGeometry(fen: "8/8/8/3r4/4K3/5n2/8/7k b - - 1 1"))
+        XCTAssertEqual(Set(loose.forkTargets(from: .e4)), [.d5, .f3])
+    }
+
+    func testAKnightForksTheKingAndARook() throws {
+        let board = try XCTUnwrap(BoardGeometry(fen: "r3k3/2N5/8/8/8/8/8/4K3 b - - 0 1"))
+        XCTAssertEqual(Set(board.forkTargets(from: .c7)), [.a8, .e8])
+    }
 }
 
 // MARK: Planning
@@ -320,6 +352,18 @@ final class TrainingStoreTests: XCTestCase {
         XCTAssertEqual(store.progress.mistakes.first?.fixed, true)
     }
 
+    func testTheTodayCardNamesTheLessonTheSessionOpensWith() throws {
+        let store = try store()
+        // A brand-new learner starts with the welcome lesson, whatever skill is in focus.
+        XCTAssertEqual(store.todaysLesson?.id, "welcome")
+        XCTAssertEqual(store.todaysLesson?.id, store.dailyPlan()?.lesson?.id)
+        XCTAssertEqual(store.todaysMinutes, store.dailyPlan()?.minutes ?? 0)
+        store.completeLesson("welcome", at: noon())
+        store.finishSession(accuracy: 1, at: noon())
+        XCTAssertEqual(store.todaysLesson?.id, store.todaysFocus?.lesson)
+        XCTAssertEqual(store.todaysLesson?.id, store.dailyPlan()?.lesson?.id)
+    }
+
     func testProgressIsSavedAndReadBack() throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("training-\(UUID().uuidString).json")
         defer { try? FileManager.default.removeItem(at: url) }
@@ -359,6 +403,15 @@ final class CoachMomentTests: XCTestCase {
         XCTAssertEqual(found?.kind, .hungPiece)
         XCTAssertEqual(found?.values["piece"], "knight")
         XCTAssertEqual(found?.values["square"], "g5")
+    }
+
+    func testADefendedPieceIsNotCalledFree() {
+        // The a8 rook is covered by the queen along the back rank, so the knight
+        // could take it but it wasn't unprotected.
+        let fen = "r2qkbnr/pppppppp/1N6/8/8/8/PPPPPPPP/R1BQKBNR w KQkq - 0 1"
+        let found = MomentFinder.find(in: review(.mistake, played: "a2a3", fen: fen, best: "b6a8",
+                                                 before: .centipawns(200), after: .centipawns(-100)))
+        XCTAssertNotEqual(found?.kind, .missedFreePiece)
     }
 
     func testAFreePieceTakenIsPraised() {
@@ -461,6 +514,22 @@ final class DrillRunnerTests: XCTestCase {
         XCTAssertEqual(runner.outcome, .afterMistake)
     }
 
+    func testTwoMissesScoreBelowOneEvenWithTheFreeHint() async throws {
+        let runner = try runner(backRank)
+        try await started(runner)
+        for wrong in ["h2h3", "g2g3"] {
+            move(runner, wrong)
+            for _ in 0..<40 where runner.phase != .solving {
+                try await Task.sleep(for: .milliseconds(50))
+            }
+        }
+        XCTAssertEqual(runner.mistakes, 2)
+        // The second miss hands out a hint, which mustn't make the result look better.
+        XCTAssertTrue(runner.usedHint)
+        move(runner, "a1a8")
+        XCTAssertEqual(runner.outcome, .afterMistake)
+    }
+
     func testTheOpponentsMoveComesFirst() async throws {
         // Black blunders the queen with ...Qh4, then it's White's turn.
         let runner = try runner("""
@@ -501,6 +570,45 @@ final class DrillRunnerTests: XCTestCase {
         XCTAssertEqual(runner.outcome, .afterMistake)
     }
 
+    func testTapDrillsPointAtTheRealAttacker() async throws {
+        // The knight steps aside and the bishop behind it hits the rook.
+        let runner = try runner("""
+        {"id": "t-6", "skill": "threats", "type": "tap", "rating": 500,
+         "fen": "7k/8/5r2/8/3N4/8/1B6/6K1 w - - 0 1", "setup": "d4c6", "squares": ["f6"]}
+        """)
+        XCTAssertEqual(runner.learner, .black)
+        try await started(runner)
+        runner.hint()
+        XCTAssertEqual(runner.marks.map(\.square), ["b2"])
+        XCTAssertTrue(runner.message.contains("bishop on b2"), runner.message)
+        runner.tap(.f6)
+        XCTAssertEqual(runner.outcome, .withHint)
+        XCTAssertEqual(runner.arrows.map(\.from), ["b2"])
+        XCTAssertEqual(runner.arrows.map(\.to), ["f6"])
+    }
+
+    func testYesOrNoDrillsNameTheMoveFromTheStart() throws {
+        // The question is ready before the setup move has even been played.
+        let runner = try runner("""
+        {"id": "t-7", "skill": "safety", "type": "safe", "rating": 500, "prompt": "Is {move} safe?",
+         "fen": "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3",
+         "setup": "h7h6", "move": "f3g5", "answer": false}
+        """)
+        XCTAssertEqual(runner.message, "Is Ng5 safe?")
+    }
+
+    func testAPlayoutCanBeGivenUp() async throws {
+        let runner = try runner("""
+        {"id": "t-8", "skill": "queen-mate", "type": "playout", "rating": 500,
+         "fen": "8/8/8/4k3/8/8/8/4K2Q w - - 0 1", "limit": 10}
+        """)
+        try await started(runner)
+        runner.reveal()
+        XCTAssertEqual(runner.outcome, .missed)
+        XCTAssertEqual(runner.tone, .hint)
+        XCTAssertFalse(runner.acceptsTaps)
+    }
+
     func testChoices() async throws {
         let runner = try runner("""
         {"id": "t-5", "skill": "opening", "type": "choice", "rating": 400,
@@ -514,5 +622,50 @@ final class DrillRunnerTests: XCTestCase {
         XCTAssertFalse(runner.isDone)
         runner.choose(1)
         XCTAssertEqual(runner.outcome, .afterMistake)
+    }
+}
+
+// MARK: Sessions
+
+@MainActor
+final class SessionRunnerTests: XCTestCase {
+
+    private func runner(_ items: [SessionItem]) throws -> SessionRunner {
+        let store = TrainingStore(library: try loadLibrary(), calendar: utc)
+        let plan = SessionPlan(title: "Test", focus: nil, lesson: nil, items: items)
+        return SessionRunner(plan: plan, store: store, engine: nil, playsSounds: false)
+    }
+
+    func testTwoMissesInARowBringAnEasierDrillAndANote() throws {
+        let library = try loadLibrary()
+        let skill = try XCTUnwrap(library.orderedSkills.first)
+        let items = library.drills(for: skill.id).prefix(2).map { SessionItem(content: .drill($0), role: .focus) }
+        let runner = try runner(items)
+        runner.begin()
+        runner.record(.missed)
+        XCTAssertNil(runner.coachNote)
+        runner.next()
+        runner.record(.missed)
+        XCTAssertEqual(runner.items.count, 3)
+        XCTAssertEqual(runner.items[2].role, .warmUp)
+        XCTAssertNotNil(runner.coachNote)
+        runner.end()
+    }
+
+    func testNoNotePromisesAnEasierDrillWhenThereIsNone() throws {
+        // Game mistakes with no pattern behind them have nothing lighter to offer.
+        let items = ["m1", "m2"].map { id in
+            SessionItem(content: .mistake(GameMistake(id: id, fen: "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1", best: "a1a8",
+                                                      played: "h2h3", skill: "", title: "Find the better move",
+                                                      created: noon(), due: noon())), role: .review)
+        }
+        let runner = try runner(items)
+        runner.begin()
+        runner.record(.missed)
+        runner.next()
+        runner.record(.missed)
+        XCTAssertEqual(runner.items.count, 2)
+        XCTAssertNil(runner.coachNote)
+        runner.end()
     }
 }

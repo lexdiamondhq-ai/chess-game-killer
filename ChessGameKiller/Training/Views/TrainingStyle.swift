@@ -78,12 +78,15 @@ struct TrainingCard: ViewModifier {
                     .fill(.ultraThinMaterial)
                     .overlay {
                         shape.strokeBorder(
-                            LinearGradient(colors: [edge.opacity(0.85), edge.opacity(0.12)],
+                            LinearGradient(colors: [edge.opacity(theme.glows ? 0.85 : 0.45), edge.opacity(0.12)],
                                            startPoint: .topLeading, endPoint: .bottomTrailing),
                             lineWidth: 1
                         )
                     }
-                    .shadow(color: edge.opacity(0.28), radius: 14)
+                    // Only Neon gets the colored halo; the other boards keep the
+                    // same quiet shadow as the coach's orb.
+                    .shadow(color: theme.glows ? edge.opacity(0.28) : .black.opacity(0.12),
+                            radius: theme.glows ? 14 : 10, y: theme.glows ? 0 : 3)
             } else {
                 shape
                     .fill(Color(.secondarySystemGroupedBackground))

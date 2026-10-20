@@ -141,15 +141,23 @@ struct DrillView: View {
                     Text("Moves: \(runner.movesMade) of \(runner.moveLimit)")
                         .font(.system(.subheadline, design: .themed).weight(.semibold).monospacedDigit())
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .layoutPriority(1)
                         .contentTransition(.numericText())
-                    Spacer()
                     Button {
                         runner.hint()
                     } label: {
                         Label("Hint", systemImage: "lightbulb.fill")
                     }
                     .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false, tint: TrainingColor.yellow.color(on: theme)))
-                    .frame(maxWidth: 140)
+                    .frame(maxWidth: 130)
+                    Button {
+                        withAnimation(.snappy) { runner.reveal() }
+                    } label: {
+                        Text("Move on")
+                    }
+                    .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false))
+                    .frame(maxWidth: 130)
                 }
             }
         }

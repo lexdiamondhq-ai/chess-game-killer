@@ -179,7 +179,7 @@
       "symbol": "gift.fill",
       "lesson": "free-pieces",
       "blurb": "Spot the piece nobody is guarding, and take it.",
-      "prompt": "Something of theirs isn't protected. Win it."
+      "prompt": "Something of theirs isn't protected, or is worth more than the piece you can take it with. Win it."
     },
     {
       "id": "mate-in-1",

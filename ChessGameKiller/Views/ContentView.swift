@@ -1,5 +1,6 @@
 import ChessKit
 import SwiftUI
+import UIKit
 
 /// The game screen. On Neon: the two players above the board, each side's
 /// captures down its edge, and Undo and Hints beside the coach orb. On every
@@ -24,6 +25,7 @@ struct ContentView: View {
     @State private var army = ArmyStore.live()
     @State private var showingArmy = false
     @State private var armyNews: ArmyNews?
+    @Environment(\.scenePhase) private var scenePhase
 
     /// Against the computer, the board matches the rival's portrait unless the player turned that off.
     private var theme: BoardTheme {
@@ -34,6 +36,12 @@ struct ContentView: View {
     }
     /// The orb is stretched or unfolded, so nothing else fits beside it.
     private var coachIsWide: Bool { coachExpanded || coachPeeking }
+    /// The board is out of sight: the app is in the background, or training covers the game.
+    /// The clock waits while it is.
+    private var boardHidden: Bool {
+        scenePhase != .active || showingTraining || showingArmy
+            || coach.presentedLesson != nil || coach.presentedSession != nil
+    }
 
     private static let spacing: CGFloat = 12
     private static let platesHeight: CGFloat = 64
@@ -44,103 +52,144 @@ struct ContentView: View {
     /// The captured-piece rails either side of the board.
     private static let railWidth: CGFloat = 26
     private static let railSpacing: CGFloat = 6
+    /// The board stops growing here. On iPad the plates, ribbon and controls keep to
+    /// the same column instead of stretching across the screen; no phone is this wide.
+    private static let maxBoardSide: CGFloat = 680
+    /// The board and its two rails, at their widest.
+    private static let neonColumnWidth: CGFloat = maxBoardSide + (railWidth + railSpacing) * 2
+    /// How much of the screen the unfolded coach may take, so the board stays usable under it.
+    private static let coachShare: CGFloat = 0.45
 
     var body: some View {
         // Fonts read the look from here: rounded on Neon, plain SF Pro on the rest.
         let _ = ThemeFont.use(theme)
-        NavigationStack {
-            GeometryReader { geo in
-                if theme.glows {
-                    neonLayout(in: geo.size)
-                } else {
-                    executiveLayout(in: geo.size)
+        presented
+            .onAppear { syncCoachSettings() }
+            .task { await StockfishEngine.shared.warmUp() }
+            .onChange(of: showBestMoves) { _, _ in syncCoachSettings() }
+            .onChange(of: showSecondBest) { _, _ in syncCoachSettings() }
+            .onChange(of: showVerdicts) { _, _ in syncCoachSettings() }
+            .onChange(of: showingNewGame) { _, showing in
+                if showing { setCoach(expanded: false) }
+            }
+            .onChange(of: showingAnalyze) { _, showing in
+                if showing { setCoach(expanded: false) }
+            }
+            .onChange(of: showingTraining) { _, showing in
+                if showing { setCoach(expanded: false) }
+            }
+            .onChange(of: match.isOver) { _, over in
+                guard over else { return }
+                recordArmy()
+                // Let the last move land and the sound play, then open the summary.
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(1.4))
+                    guard match.isOver, !showingNewGame else { return }
+                    setCoach(expanded: true)
                 }
             }
-            .padding(.horizontal, theme.glows ? 8 : 12)
-            .padding(.top, 8)
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                if theme.glows { dock } else { executiveDock }
+    }
+
+    /// The game screen with its sheets and full-screen covers.
+    private var presented: some View {
+        observed
+            .fullScreenCover(isPresented: $showingTraining) {
+                TrainingHubView(theme: theme).environment(training)
             }
-            .background { SheetBackdrop(theme: theme) }
-            .overlay(alignment: .top) {
-                if let news = armyNews {
-                    ArmyNewsBanner(news: news, color: match.setup.playerColor, theme: theme) {
-                        armyNews = nil
-                        showingArmy = true
+            .fullScreenCover(isPresented: $showingArmy) {
+                ArmyView(theme: theme, color: match.setup.playerColor).environment(army)
+            }
+            .fullScreenCover(item: $coach.presentedLesson) { lesson in
+                LessonScreen(lesson: lesson, theme: theme).environment(training)
+            }
+            .fullScreenCover(item: $coach.presentedSession) { plan in
+                SessionView(plan: plan, theme: theme).environment(training)
+            }
+            .animation(.easeInOut(duration: 0.35), value: theme.id)
+            .sheet(isPresented: $showingNewGame, onDismiss: startIfNeeded) {
+                NewGameSheet(theme: theme) { setup in
+                    withAnimation(.snappy) { match.start(setup) }
+                    showingNewGame = false
+                }
+            }
+            .sheet(isPresented: $showingSettings) {
+                SettingsSheet()
+            }
+            .sheet(isPresented: $showingAnalyze) {
+                AnalyzeSheet(
+                    theme: theme,
+                    currentFEN: match.game.fen,
+                    engine: StockfishEngine.shared,
+                    reader: CloudBoardReader.live
+                ) { draft in
+                    play(from: draft)
+                }
+            }
+    }
+
+    /// The game screen, watching the match for the coach and the clock.
+    private var observed: some View {
+        gameScreen
+            // Switching between Neon and the executive look redraws everything in the new type.
+            .id(theme.glows)
+            .tint(theme.accent)
+            .preferredColorScheme(theme.isDark ? .dark : nil)
+            .environment(training)
+            .environment(coach)
+            .environment(army)
+            .onChange(of: match.review) { _, review in
+                coach.observe(review, in: match, store: training)
+            }
+            .onChange(of: match.gameNumber) { _, _ in
+                coach.gameStarted()
+            }
+            .onChange(of: match.game.moveCount) { _, _ in
+                // Once the learner moves on, the tip about the move before is over.
+                if let played = match.game.lastPlayed, match.game.humanColors.contains(played.color) {
+                    coach.dismiss()
+                }
+            }
+            .onChange(of: boardHidden) { _, hidden in
+                if hidden { match.suspendClock() } else { match.resumeClock() }
+            }
+            .onChange(of: match.clock?.running, initial: true) { _, running in
+                // The screen stays awake while a clock runs.
+                UIApplication.shared.isIdleTimerDisabled = running != nil
+            }
+    }
+
+    /// The board, plates and dock inside the navigation bar, sized to the screen.
+    private var gameScreen: some View {
+        GeometryReader { screen in
+            NavigationStack {
+                GeometryReader { geo in
+                    if theme.glows {
+                        neonLayout(in: geo.size)
+                    } else {
+                        executiveLayout(in: geo.size)
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.top, 4)
-                    .transition(.move(edge: .top).combined(with: .opacity))
                 }
-            }
-            .navigationTitle("Chess Game Killer")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { toolbarContent }
-        }
-        // Switching between Neon and the executive look redraws everything in the new type.
-        .id(theme.glows)
-        .tint(theme.accent)
-        .preferredColorScheme(theme.isDark ? .dark : nil)
-        .environment(training)
-        .environment(coach)
-        .environment(army)
-        .onChange(of: match.review) { _, review in
-            coach.observe(review, in: match, store: training)
-        }
-        .fullScreenCover(isPresented: $showingTraining) {
-            TrainingHubView(theme: theme).environment(training)
-        }
-        .fullScreenCover(isPresented: $showingArmy) {
-            ArmyView(theme: theme, color: match.setup.playerColor).environment(army)
-        }
-        .fullScreenCover(item: $coach.presentedLesson) { lesson in
-            LessonScreen(lesson: lesson, theme: theme).environment(training)
-        }
-        .fullScreenCover(item: $coach.presentedSession) { plan in
-            SessionView(plan: plan, theme: theme).environment(training)
-        }
-        .animation(.easeInOut(duration: 0.35), value: theme.id)
-        .sheet(isPresented: $showingNewGame, onDismiss: startIfNeeded) {
-            NewGameSheet(theme: theme) { setup in
-                withAnimation(.snappy) { match.start(setup) }
-                showingNewGame = false
-            }
-        }
-        .sheet(isPresented: $showingSettings) {
-            SettingsSheet()
-        }
-        .sheet(isPresented: $showingAnalyze) {
-            AnalyzeSheet(
-                theme: theme,
-                currentFEN: match.game.fen,
-                engine: StockfishEngine.shared,
-                reader: CloudBoardReader.live
-            ) { draft in
-                play(from: draft)
-            }
-        }
-        .onAppear { syncCoachSettings() }
-        .task { await StockfishEngine.shared.warmUp() }
-        .onChange(of: showBestMoves) { _, _ in syncCoachSettings() }
-        .onChange(of: showSecondBest) { _, _ in syncCoachSettings() }
-        .onChange(of: showVerdicts) { _, _ in syncCoachSettings() }
-        .onChange(of: showingNewGame) { _, showing in
-            if showing { setCoach(expanded: false) }
-        }
-        .onChange(of: showingAnalyze) { _, showing in
-            if showing { setCoach(expanded: false) }
-        }
-        .onChange(of: showingTraining) { _, showing in
-            if showing { setCoach(expanded: false) }
-        }
-        .onChange(of: match.isOver) { _, over in
-            guard over else { return }
-            recordArmy()
-            // Let the last move land and the sound play, then open the summary.
-            Task { @MainActor in
-                try? await Task.sleep(for: .seconds(1.4))
-                guard match.isOver, !showingNewGame else { return }
-                setCoach(expanded: true)
+                .padding(.horizontal, theme.glows ? 8 : 12)
+                .padding(.top, 8)
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    let coachHeight = screen.size.height * Self.coachShare
+                    if theme.glows { dock(coachHeight: coachHeight) } else { executiveDock(coachHeight: coachHeight) }
+                }
+                .background { SheetBackdrop(theme: theme) }
+                .overlay(alignment: .top) {
+                    if let news = armyNews {
+                        ArmyNewsBanner(news: news, color: match.setup.playerColor, theme: theme) {
+                            armyNews = nil
+                            showingArmy = true
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.top, 4)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+                }
+                .navigationTitle("Chess Game Killer")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { toolbarContent }
             }
         }
     }
@@ -150,7 +199,7 @@ struct ContentView: View {
         let platesHeight = coachExpanded ? Self.stripHeight : Self.platesHeight
         let spare = size.height - platesHeight - Self.ribbonHeight - Self.spacing * 2
         let railsWidth = (Self.railWidth + Self.railSpacing) * 2
-        let side = max(0, min(size.width - railsWidth, spare))
+        let side = max(0, min(size.width - railsWidth, spare, Self.maxBoardSide))
         let topColor: Piece.Color = match.isBoardFlipped ? .white : .black
         return VStack(spacing: Self.spacing) {
             PlayerPlates(match: match, theme: theme, compact: coachExpanded)
@@ -166,6 +215,7 @@ struct ContentView: View {
                 .frame(height: Self.ribbonHeight)
             Spacer(minLength: 0)
         }
+        .frame(maxWidth: Self.neonColumnWidth)
         .frame(maxWidth: .infinity)
     }
 
@@ -176,7 +226,7 @@ struct ContentView: View {
         let platesHeight = compact ? Self.stripHeight : Self.plateHeight * 2
         let gaps: CGFloat = compact ? 4 : 5
         let spare = size.height - platesHeight - Self.ribbonHeight - Self.spacing * gaps
-        let side = max(0, min(size.width, spare))
+        let side = max(0, min(size.width, spare, Self.maxBoardSide))
         let topColor: Piece.Color = match.isBoardFlipped ? .white : .black
         return VStack(spacing: Self.spacing) {
             Spacer(minLength: 0)
@@ -197,6 +247,7 @@ struct ContentView: View {
                 .frame(height: Self.ribbonHeight)
             Spacer(minLength: 0)
         }
+        .frame(maxWidth: Self.maxBoardSide)
         .frame(maxWidth: .infinity)
     }
 
@@ -258,7 +309,7 @@ struct ContentView: View {
     }
 
     /// Executive: every control named, three either side of the orb. They step aside while the orb is wide.
-    private var executiveDock: some View {
+    private func executiveDock(coachHeight: CGFloat) -> some View {
         VStack(spacing: 0) {
             Rectangle()
                 .fill(Color.primary.opacity(0.08))
@@ -298,7 +349,8 @@ struct ContentView: View {
                 .opacity(coachIsWide ? 0 : 1)
                 .scaleEffect(coachIsWide ? 0.92 : 1)
                 .allowsHitTesting(!coachIsWide)
-                CoachOrb(match: match, theme: theme, isExpanded: $coachExpanded, isPeeking: $coachPeeking) {
+                CoachOrb(match: match, theme: theme, isExpanded: $coachExpanded, isPeeking: $coachPeeking,
+                         expandedMaxHeight: coachHeight) {
                     showingNewGame = true
                 }
             }
@@ -306,11 +358,12 @@ struct ContentView: View {
         }
         .padding(.horizontal, 8)
         .padding(.bottom, 8)
+        .frame(maxWidth: Self.maxBoardSide + 8)
         .animation(.spring(response: 0.45, dampingFraction: 0.85), value: coachIsWide)
     }
 
     /// Undo and Hints either side of the orb. They step aside while the orb is wide.
-    private var dock: some View {
+    private func dock(coachHeight: CGFloat) -> some View {
         ZStack {
             HStack {
                 RoundButton(title: "Undo", symbol: "arrow.uturn.backward", theme: theme) {
@@ -326,13 +379,15 @@ struct ContentView: View {
             .opacity(coachIsWide ? 0 : 1)
             .scaleEffect(coachIsWide ? 0.85 : 1)
             .allowsHitTesting(!coachIsWide)
-            CoachOrb(match: match, theme: theme, isExpanded: $coachExpanded, isPeeking: $coachPeeking) {
+            CoachOrb(match: match, theme: theme, isExpanded: $coachExpanded, isPeeking: $coachPeeking,
+                     expandedMaxHeight: coachHeight) {
                 showingNewGame = true
             }
         }
         .padding(.horizontal, 16)
         .padding(.top, 10)
         .padding(.bottom, 8)
+        .frame(maxWidth: Self.neonColumnWidth + 16)
         .animation(.spring(response: 0.45, dampingFraction: 0.85), value: coachIsWide)
     }
 
@@ -406,13 +461,17 @@ private struct TrainButton: View {
 private struct RoundButton: View {
     let title: String
     let symbol: String
-    var isOn = false
+    /// Set for a toggle, so VoiceOver can say which way it is.
+    var isOn: Bool? = nil
     let theme: BoardTheme
     let action: () -> Void
 
     @Environment(\.isEnabled) private var isEnabled
 
     private var accent: Color { theme.accent ?? .accentColor }
+    private var lit: Bool { isOn == true }
+    /// What VoiceOver says after the name: the state of a toggle, nothing for a plain button.
+    private var spokenState: String { isOn.map { $0 ? "On" : "Off" } ?? "" }
 
     var body: some View {
         Button(action: action) {
@@ -425,20 +484,21 @@ private struct RoundButton: View {
                         in: Circle()
                     )
                     .overlay {
-                        Circle().strokeBorder(isOn ? accent.opacity(0.6) : Color.primary.opacity(theme.isDark ? 0.12 : 0.08), lineWidth: 1)
+                        Circle().strokeBorder(lit ? accent.opacity(0.6) : Color.primary.opacity(theme.isDark ? 0.12 : 0.08), lineWidth: 1)
                     }
-                    .shadow(color: theme.glows ? (isOn ? accent.opacity(0.3) : .clear) : .black.opacity(0.1),
+                    .shadow(color: theme.glows ? (lit ? accent.opacity(0.3) : .clear) : .black.opacity(0.1),
                             radius: theme.glows ? 10 : 6, y: theme.glows ? 0 : 2)
                     .contentTransition(.symbolEffect(.replace))
                 Text(title)
                     .font(.caption2.weight(.semibold))
             }
-            .foregroundStyle(isOn ? accent : Color.primary.opacity(0.85))
+            .foregroundStyle(lit ? accent : Color.primary.opacity(0.85))
             .opacity(isEnabled ? 1 : 0.35)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title)
-        .accessibilityValue(isOn ? "On" : "")
+        .accessibilityValue(spokenState)
+        .accessibilityAddTraits(isOn == nil ? [] : .isToggle)
     }
 }
 

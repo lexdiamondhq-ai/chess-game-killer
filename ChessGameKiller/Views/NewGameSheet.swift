@@ -31,10 +31,12 @@ enum CoachMode: CaseIterable, Identifiable {
         }
     }
 
-    var detail: String {
+    /// One line about the mode. How many arrows it promises follows the
+    /// second-best setting, so the text matches what the game draws.
+    func detail(twoArrows: Bool) -> String {
         switch self {
-        case .full: return "Grades every move and shows the two best moves"
-        case .arrows: return "Shows the two best moves, no grades"
+        case .full: return twoArrows ? "Grades every move and shows the two best moves" : "Grades every move and shows the best move"
+        case .arrows: return twoArrows ? "Shows the two best moves, no grades" : "Shows the best move, no grades"
         case .verdicts: return "Grades your moves, no arrows. A fair test."
         case .silent: return "Just chess. The coach keeps quiet."
         }
@@ -83,11 +85,14 @@ struct NewGameSheet: View {
     @AppStorage("setup.clock") private var timeControl: TimeControl = .unlimited
     @AppStorage("showBestMoves") private var showBestMoves = true
     @AppStorage("coachVerdicts") private var showVerdicts = true
+    @AppStorage("showSecondBest") private var showSecondBest = true
 
     @AppStorage("haptics") private var hapticsOn = true
 
     @State private var scrolledLevel: MatchController.Level?
     @State private var openRow: MatchRow?
+    /// The coach as it was when the sheet opened, so Cancel can put it back.
+    @State private var coachOnOpen: CoachMode?
     @Environment(\.dismiss) private var dismiss
 
     /// The choices from last time, for when the sheet is closed without starting.
@@ -168,7 +173,15 @@ struct NewGameSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") {
+                        // The coach keys reach the running game at once, so a
+                        // choice that was only tried out goes back on Cancel.
+                        if let coachOnOpen, coachOnOpen != coachMode {
+                            showBestMoves = coachOnOpen.showsArrows
+                            showVerdicts = coachOnOpen.showsVerdicts
+                        }
+                        dismiss()
+                    }
                 }
             }
         }
@@ -178,7 +191,10 @@ struct NewGameSheet: View {
         }
         .tint(accent)
         .preferredColorScheme(theme.isDark ? .dark : nil)
-        .onAppear { scrolledLevel = level }
+        .onAppear {
+            scrolledLevel = level
+            coachOnOpen = coachMode
+        }
     }
 
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
@@ -236,7 +252,7 @@ struct NewGameSheet: View {
             if openRow == .coach {
                 optionList {
                     ForEach(CoachMode.allCases) { mode in
-                        OptionRow(title: mode.name, detail: mode.detail, isOn: coachMode == mode, theme: theme) {
+                        OptionRow(title: mode.name, detail: mode.detail(twoArrows: showSecondBest), isOn: coachMode == mode, theme: theme) {
                             choose {
                                 showBestMoves = mode.showsArrows
                                 showVerdicts = mode.showsVerdicts
@@ -383,7 +399,7 @@ struct NewGameSheet: View {
                     .foregroundStyle(isSelected ? color : Color.secondary)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 84)
+            .frame(minHeight: 84)
             .background(card(selected: isSelected, color: color, glow: glow))
         }
         .buttonStyle(.plain)
@@ -466,7 +482,7 @@ private struct RivalCard: View {
         }
         .padding(.leading, 8)
         .padding(.trailing, 14)
-        .frame(height: 150)
+        .frame(minHeight: 150)
         .background {
             let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
             shape
@@ -536,7 +552,7 @@ private struct MatchRowButton<Icon: View>: View {
             }
             .padding(.leading, 12)
             .padding(.trailing, 14)
-            .frame(height: 60)
+            .frame(minHeight: 60)
             .background(isOpen ? Color.primary.opacity(theme.isDark ? 0.04 : 0.03) : .clear)
             .contentShape(Rectangle())
         }
@@ -567,7 +583,8 @@ private struct OptionRow: View {
                     Text(detail)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
                 ZStack {
@@ -589,7 +606,8 @@ private struct OptionRow: View {
             }
             .padding(.leading, 12)
             .padding(.trailing, 10)
-            .frame(height: 50)
+            .padding(.vertical, 6)
+            .frame(minHeight: 50)
             .background {
                 let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
                 shape

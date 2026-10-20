@@ -176,6 +176,13 @@ final class LessonPlayer {
             game.humanColors = []
             tone = .hint
             run?.cancel()
+            // Cancelling may have stopped a wrong move being taken back, or their
+            // reply being played. Put the board where the answer starts from.
+            if let expected = TrainingChess.fen(after: (step.moves ?? []) + Array(solution.prefix(solutionIndex)), from: starts[stepIndex]),
+               TrainingChess.key(game.fen) != TrainingChess.key(expected), let position = Position(fen: expected) {
+                game = GameModel(position: position)
+                game.humanColors = []
+            }
             run = Task { [weak self] in
                 guard let self else { return }
                 for (offset, uci) in remaining.enumerated() {

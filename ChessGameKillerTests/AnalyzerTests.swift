@@ -58,6 +58,9 @@ final class PositionDraftTests: XCTestCase {
 
     func testProblemsAreFound() {
         XCTAssertEqual(PositionDraft.empty.problems, [.missingKing(.white), .missingKing(.black)])
+        // Side names can start with a vowel, so the message mustn't say "a Ice king".
+        XCTAssertEqual(PositionDraft.Problem.missingKing(.white).message(white: "Ice", black: "Night"), "Add the Ice king.")
+        XCTAssertEqual(PositionDraft.Problem.missingKing(.black).message(white: "Ice", black: "Night"), "Add the Night king.")
 
         var draft = PositionDraft(fen: "4k3/8/8/8/8/8/8/4K3 w - - 0 1")!
         XCTAssertTrue(draft.isValid)
@@ -92,6 +95,35 @@ final class PositionDraftTests: XCTestCase {
         XCTAssertEqual(PositionDraft(fen: "r3k3/8/8/8/8/8/8/4K2R w - - 0 1")?.castlingFEN, "Kq")
         XCTAssertEqual(PositionDraft(fen: "r3k3/8/8/8/8/8/8/3K3R w - - 0 1")?.castlingFEN, "q")
         XCTAssertEqual(PositionDraft(fen: "4k3/8/8/8/8/8/8/4K3 w - - 0 1")?.castlingFEN, "-")
+    }
+
+    func testAGamesFENKeepsItsCastlingRightsAndEnPassantSquare() {
+        let afterE4 = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"
+        var draft = PositionDraft(fen: afterE4)!
+        XCTAssertEqual(draft.fen, afterE4)
+        XCTAssertEqual(draft.position?.fen, afterE4)
+
+        // Rights the game has lost stay lost, even with king and rooks at home...
+        let shuffled = PositionDraft(fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1")!
+        XCTAssertEqual(shuffled.castlingFEN, "KQkq")
+        XCTAssertEqual(shuffled.fen, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1")
+        // ...but a right the squares don't allow is never granted.
+        XCTAssertEqual(PositionDraft(fen: "r3k3/8/8/8/8/8/8/4K2R w KQkq - 0 1")?.fen, "r3k3/8/8/8/8/8/8/4K2R w Kq - 0 1")
+        // Odd en passant fields are dropped rather than passed on.
+        XCTAssertEqual(PositionDraft(fen: "4k3/8/8/8/8/8/8/4K3 w - e4 0 1")?.fen, "4k3/8/8/8/8/8/8/4K3 w - - 0 1")
+
+        // A FEN that says nothing new compares equal to the same position set up by hand.
+        XCTAssertEqual(PositionDraft(fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"), .standard)
+
+        // Changing the turn or the pieces goes back to what the squares say.
+        draft.sideToMove = .white
+        XCTAssertEqual(draft.fen, "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 1")
+        var edited = shuffled
+        edited[.e4] = .init(.pawn, .white)
+        XCTAssertEqual(edited.fen, "rnbqkbnr/pppppppp/8/8/4P3/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+        var turned = shuffled
+        turned.rotate()
+        XCTAssertNil(turned.castling)
     }
 
     func testFinishedPositions() {
@@ -151,6 +183,16 @@ final class BoardReaderTests: XCTestCase {
         XCTAssertEqual(reading.draft[.d1], .init(.king, .black))
     }
 
+    func testOnlyNetworkTroubleBlamesTheConnection() {
+        XCTAssertEqual(CloudBoardReader.readerError(for: URLError(.notConnectedToInternet)), .offline)
+        XCTAssertEqual(CloudBoardReader.readerError(for: URLError(.timedOut)), .offline)
+        XCTAssertEqual(CloudBoardReader.readerError(for: URLError(.badServerResponse)), .failed)
+        XCTAssertEqual(CloudBoardReader.readerError(for: URLError(.cancelled)), .failed)
+        XCTAssertEqual(CloudBoardReader.readerError(for: BoardReaderError.noBoard), .failed)
+        XCTAssertTrue(BoardReaderError.offline.errorDescription?.contains("connection") == true)
+        XCTAssertFalse(BoardReaderError.failed.errorDescription?.contains("connection") == true)
+    }
+
     func testNoBoardInThePicture() {
         XCTAssertThrowsError(try CloudBoardReader.reading(from: json(#"{"found": false}"#))) { error in
             XCTAssertEqual(error as? BoardReaderError, .noBoard)
@@ -179,6 +221,17 @@ struct FakeBoardReader: BoardReader {
 
     func read(_ image: UIImage) async throws -> BoardReading {
         try result.get()
+    }
+}
+
+/// A reader that takes a while to answer, like the real one.
+struct SlowFakeBoardReader: BoardReader {
+    var reading: BoardReading
+    var delay: Duration = .milliseconds(200)
+
+    func read(_ image: UIImage) async throws -> BoardReading {
+        try await Task.sleep(for: delay)
+        return reading
     }
 }
 
@@ -217,12 +270,39 @@ final class ScanSessionTests: XCTestCase {
         XCTAssertEqual(session.readingNote, BoardReaderError.noBoard.errorDescription)
     }
 
+    func testANewerReadIsNotSpoiledByTheOneItReplaced() async {
+        let draft = PositionDraft(fen: "6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1")!
+        let reader = SlowFakeBoardReader(reading: BoardReading(draft: draft, whiteSide: .bottom, sureOfTurn: true, confidence: .high))
+        let session = ScanSession(reader: reader)
+        session.read(UIImage())
+        // Back out and pick another picture before the first one has been read.
+        session.read(UIImage())
+        XCTAssertTrue(session.isReading)
+
+        await waitUntil { !session.isReading }
+        XCTAssertFalse(session.readingFailed)
+        XCTAssertEqual(session.draft, draft)
+    }
+
+    func testAPhotoThatWontOpenExplainsItself() {
+        let session = ScanSession(reader: UnavailableBoardReader())
+        session.failToLoadPhoto()
+        XCTAssertEqual(session.path, [.editor])
+        XCTAssertFalse(session.isReading)
+        XCTAssertTrue(session.readingFailed)
+        XCTAssertTrue(session.draft.isEmpty)
+        XCTAssertTrue(session.readingNote?.contains("open that photo") == true)
+    }
+
     func testAnalyzingTheCurrentGameSkipsTheEditor() {
         let session = ScanSession(reader: UnavailableBoardReader())
-        session.analyze(fen: "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1")
+        let fen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"
+        session.analyze(fen: fen)
         XCTAssertEqual(session.path, [.analysis])
         XCTAssertEqual(session.draft.sideToMove, .black)
         XCTAssertEqual(session.draft[.e4], .init(.pawn, .white))
+        // The game's castling rights and en passant square go to Stockfish as they are.
+        XCTAssertEqual(session.draft.fen, fen)
     }
 }
 
@@ -257,6 +337,20 @@ final class AnalysisModelTests: XCTestCase {
         XCTAssertEqual(model.ending, "Checkmate")
         await model.run()
         XCTAssertTrue(model.lines.isEmpty)
+    }
+
+    func testAnInvalidPositionFailsInsteadOfThinkingForever() async {
+        let pawnOnEdge = PositionDraft(fen: "4k3/8/8/8/8/8/8/P3K3 w - - 0 1")!
+        let model = AnalysisModel(draft: pawnOnEdge, engine: FakeEngine())
+        XCTAssertNil(model.ending)
+        await model.run()
+        XCTAssertTrue(model.failed)
+        XCTAssertFalse(model.isThinking)
+        XCTAssertTrue(model.lines.isEmpty)
+
+        let noEngine = AnalysisModel(draft: .standard, engine: nil)
+        await noEngine.run()
+        XCTAssertTrue(noEngine.failed)
     }
 
     func testVerdicts() {

@@ -13,7 +13,7 @@ struct ExecutivePlate: View {
     let color: Piece.Color
 
     private var isComputer: Bool { match.setup.opponent == .computer && !match.game.humanColors.contains(color) }
-    private var isActive: Bool { !match.isOver && match.game.sideToMove == color }
+    private var isActive: Bool { !match.isOver && match.game.activeColor == color }
     private var accent: Color { theme.accent ?? .accentColor }
 
     var body: some View {
@@ -36,6 +36,9 @@ struct ExecutivePlate: View {
                         .font(.system(size: 12.5, weight: isActive ? .medium : .regular))
                         .foregroundStyle(isActive ? Color.primary.opacity(0.8) : Color.secondary)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                        // The words come first; the strip of captured pieces condenses to make room.
+                        .layoutPriority(1)
                     CapturedPieces(match: match, theme: theme, by: color)
                 }
             }
@@ -47,7 +50,21 @@ struct ExecutivePlate: View {
         .padding(.horizontal, 4)
         .animation(.snappy(duration: 0.3), value: isActive)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(name), \(status)")
+        .accessibilityLabel(spokenLabel)
+    }
+
+    /// Name, status, time left and captures. The label stands in for the children's
+    /// own, and the strip of pieces is hidden from VoiceOver, so both are spelled out here.
+    private var spokenLabel: String {
+        var text = "\(name), \(status)"
+        if let clock = match.clock {
+            text += ", \(clock.remaining(for: color).clockLabel) left"
+        }
+        let taken = match.game.captured(by: color)
+        if !taken.isEmpty {
+            text += ", " + CaptureRail.spokenCaptures(taken, lead: match.game.materialLead(for: color), name: theme.name(of: color))
+        }
+        return text
     }
 
     @ViewBuilder
@@ -75,7 +92,11 @@ struct ExecutivePlate: View {
             return match.winner == nil ? "Draw" : "Lost"
         }
         if isActive {
-            if isComputer { return match.isComputerThinking ? "Thinking" : "To move" }
+            if isComputer {
+                if match.isComputerThinking { return "Thinking" }
+                if match.engineFailed, !match.game.isHumanTurn { return "Engine unavailable" }
+                return "To move"
+            }
             if match.game.checkedKing != nil { return "\(theme.name(of: color)) in check" }
             return "\(theme.name(of: color)) to move"
         }
@@ -88,6 +109,7 @@ struct ExecutivePlate: View {
 }
 
 /// The pieces a side has taken, small and overlapping, with the material lead.
+/// When the line runs short of room, one piece of each kind with its count instead.
 private struct CapturedPieces: View {
     let match: MatchController
     let theme: BoardTheme
@@ -99,15 +121,32 @@ private struct CapturedPieces: View {
     var body: some View {
         let taken = match.game.captured(by: by)
         let lead = match.game.materialLead(for: by)
-        HStack(spacing: 4) {
+        ViewThatFits(in: .horizontal) {
+            strip(taken, lead: lead, stacked: true)
+            strip(taken, lead: lead, stacked: false)
+        }
+        .animation(.snappy(duration: 0.3), value: taken)
+        .accessibilityHidden(true)
+    }
+
+    /// Every piece taken, overlapping within its kind; or, condensed, one of each kind with a count.
+    private func strip(_ taken: [CapturedCount], lead: Int, stacked: Bool) -> some View {
+        HStack(spacing: stacked ? 4 : 3) {
             ForEach(taken) { entry in
-                HStack(spacing: -Self.size * 0.55) {
-                    ForEach(0..<entry.count, id: \.self) { _ in
-                        Image(theme.imageName(for: Piece(entry.kind, color: by.opposite, square: .a1)))
-                            .resizable()
-                            .interpolation(.high)
-                            .scaledToFit()
-                            .frame(width: Self.size, height: Self.size)
+                if stacked {
+                    HStack(spacing: -Self.size * 0.55) {
+                        ForEach(0..<entry.count, id: \.self) { _ in
+                            image(of: entry.kind)
+                        }
+                    }
+                } else {
+                    HStack(spacing: 0) {
+                        image(of: entry.kind)
+                        if entry.count > 1 {
+                            Text("\(entry.count)")
+                                .font(.system(size: 9.5, weight: .semibold).monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
@@ -117,8 +156,14 @@ private struct CapturedPieces: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .animation(.snappy(duration: 0.3), value: taken)
-        .accessibilityHidden(true)
+    }
+
+    private func image(of kind: Piece.Kind) -> some View {
+        Image(theme.imageName(for: Piece(kind, color: by.opposite, square: .a1)))
+            .resizable()
+            .interpolation(.high)
+            .scaledToFit()
+            .frame(width: Self.size, height: Self.size)
     }
 }
 
@@ -138,6 +183,7 @@ private struct ExecutiveClock: View {
             Text(remaining.clockLabel)
                 .font(.system(size: 21, weight: .medium).monospacedDigit())
                 .foregroundStyle(isRunning ? Color.black.opacity(0.88) : Color.secondary)
+                .lineLimit(1)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 5)
                 .background {
@@ -148,9 +194,10 @@ private struct ExecutiveClock: View {
                             .overlay(shape.strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
                     }
                 }
+                // Inside the timeline, so VoiceOver reads the time as it stands now.
+                .accessibilityLabel("\(theme.name(of: color)) has \(remaining.clockLabel) left")
         }
         .animation(.snappy(duration: 0.25), value: isRunning)
-        .accessibilityLabel("\(theme.name(of: color)) has \(clock.remaining(for: color).clockLabel) left")
     }
 }
 

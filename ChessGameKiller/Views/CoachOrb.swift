@@ -11,6 +11,8 @@ struct CoachOrb: View {
     @Binding var isExpanded: Bool
     /// True while the orb is stretched to show a verdict; the parent hides what sits beside it.
     @Binding var isPeeking: Bool
+    /// How tall the unfolded panel may get before its contents scroll, so the board keeps its room.
+    var expandedMaxHeight: CGFloat? = nil
     let newGame: () -> Void
 
     @State private var peekTask: Task<Void, Never>?
@@ -40,7 +42,7 @@ struct CoachOrb: View {
             }
         }
         .frame(maxWidth: isExpanded || isPeeking ? .infinity : Self.orbSize)
-        .frame(height: isExpanded ? nil : Self.orbSize)
+        .frame(minHeight: isExpanded ? nil : Self.orbSize, maxHeight: isExpanded ? expandedMaxHeight : Self.orbSize)
         .background { orbBackground }
         .overlay(alignment: .topTrailing) {
             ZStack {
@@ -202,8 +204,14 @@ private struct OrbFace: View {
 
     private var accessibilityText: String {
         if match.isComputerThinking { return "\(match.setup.level.rival.name) is thinking" }
-        if let review = match.review { return "\(review.title). \(review.detail)" }
-        return "Your coach"
+        if match.isOver {
+            return match.winner.map { "\(theme.name(of: $0)) wins" } ?? "Draw"
+        }
+        var text = match.review.map { "\($0.title). \($0.detail)" } ?? "Your coach"
+        if let evaluation = match.evaluation {
+            text += " Evaluation \(evaluation.label) for \(theme.whiteName)."
+        }
+        return text
     }
 }
 
@@ -232,25 +240,40 @@ struct EvalRing: View {
     }
 }
 
-/// A sweeping arc in the rival's color while the computer thinks.
+/// A sweeping arc in the rival's color while the computer thinks. With Reduce
+/// Motion on it steps round once every four seconds instead of sweeping.
 private struct ThinkingRing: View {
     let color: Color
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        TimelineView(.animation) { context in
-            let seconds = context.date.timeIntervalSinceReferenceDate
-            let turn = seconds.truncatingRemainder(dividingBy: 1.1) / 1.1
-            ZStack {
-                Circle().stroke(Color.primary.opacity(0.12), lineWidth: 3.5)
-                Circle()
-                    .trim(from: 0, to: 0.28)
-                    .stroke(color, style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
-                    .rotationEffect(.degrees(turn * 360 - 90))
-                    .shadow(color: color.opacity(0.9), radius: 5)
+        Group {
+            if reduceMotion {
+                TimelineView(.periodic(from: .now, by: 0.5)) { context in
+                    let steps = (context.date.timeIntervalSinceReferenceDate / 0.5).rounded(.down)
+                    arc(turn: steps.truncatingRemainder(dividingBy: 8) / 8)
+                }
+            } else {
+                TimelineView(.animation) { context in
+                    let seconds = context.date.timeIntervalSinceReferenceDate
+                    arc(turn: seconds.truncatingRemainder(dividingBy: 1.1) / 1.1)
+                }
             }
-            .padding(1.75)
         }
         .accessibilityHidden(true)
+    }
+
+    /// The ring with the arc `turn` of the way round, 0 to 1.
+    private func arc(turn: Double) -> some View {
+        ZStack {
+            Circle().stroke(Color.primary.opacity(0.12), lineWidth: 3.5)
+            Circle()
+                .trim(from: 0, to: 0.28)
+                .stroke(color, style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
+                .rotationEffect(.degrees(turn * 360 - 90))
+                .shadow(color: color.opacity(0.9), radius: 5)
+        }
+        .padding(1.75)
     }
 }
 
@@ -274,12 +297,15 @@ private struct PeekRow: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 4)
-            if let evaluation = review.evaluation {
+            if let evaluation = review.evaluationForWhite {
                 EvalChip(text: evaluation.label, color: review.grade.color)
             }
         }
         .padding(.horizontal, 14)
         .frame(height: CoachOrb.orbSize)
+        // The stretched orb is as tall as the orb, so the type stops growing at the
+        // largest regular size instead of spilling past the pill.
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .accessibilityElement(children: .combine)
     }
 }
@@ -327,6 +353,24 @@ private struct CoachPanel: View {
                 .contentShape(Rectangle())
                 .onTapGesture(perform: collapse)
                 .accessibilityHidden(true)
+            // Where it all fits the panel is its natural height; on a short screen
+            // the rest scrolls under the handle instead of squeezing the board.
+            ViewThatFits(in: .vertical) {
+                content
+                ScrollView {
+                    content
+                }
+                .scrollBounceBehavior(.basedOnSize)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 12)
+        .animation(.snappy(duration: 0.3), value: match.hints)
+        .animation(.snappy(duration: 0.3), value: match.isComputerThinking)
+    }
+
+    private var content: some View {
+        VStack(spacing: 0) {
             header
             if let gameCoach, let training, GameCoachRow.hasContent(coach: gameCoach, match: match) {
                 GameCoachRow(coach: gameCoach, store: training, match: match, theme: theme)
@@ -342,10 +386,6 @@ private struct CoachPanel: View {
                 actions.padding(.top, 8)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 12)
-        .animation(.snappy(duration: 0.3), value: match.hints)
-        .animation(.snappy(duration: 0.3), value: match.isComputerThinking)
     }
 
     // MARK: Header
@@ -366,7 +406,18 @@ private struct CoachPanel: View {
                 ThinkingRing(color: match.setup.level.rival.hue).frame(width: 40, height: 40)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(match.setup.level.rival.name) is thinking").font(.headline)
-                    Text("Your move is graded below as soon as it answers.")
+                    Text("Your move is graded here as soon as it answers.")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 4)
+            } else if match.engineFailed {
+                // Ahead of the last verdict, which is about a move that is no longer the news.
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.title3).foregroundStyle(accent).frame(width: 40, height: 40)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Coach offline").font(.headline)
+                    Text("Stockfish didn't answer. Undo and try again, or play a friend.")
                         .font(.subheadline).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -379,19 +430,9 @@ private struct CoachPanel: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 4)
-                if let evaluation = review.evaluation {
+                if let evaluation = review.evaluationForWhite {
                     EvalChip(text: evaluation.label, color: review.grade.color, large: true)
                 }
-            } else if match.engineFailed {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.title3).foregroundStyle(accent).frame(width: 40, height: 40)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Coach offline").font(.headline)
-                    Text("Stockfish couldn't start. You can still play a friend.")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 4)
             } else {
                 Image(systemName: "sparkles")
                     .font(.title3).foregroundStyle(accent).frame(width: 40, height: 40)
@@ -424,16 +465,24 @@ private struct CoachPanel: View {
     }
 
     private var resultTitle: String {
-        if let outcome = match.outcome, case .timeout = outcome {
-            return "\(theme.name(of: outcome.winner)) wins on time"
+        if let outcome = match.outcome {
+            switch outcome {
+            case .timeout(let loser): return "\(theme.name(of: loser.opposite)) wins on time"
+            case .timeoutDraw: return "Draw"
+            }
         }
         if match.game.winner != nil { return "Checkmate!" }
         return "Draw"
     }
 
     private var resultDetail: String {
-        if let outcome = match.outcome, case .timeout(let loser) = outcome {
-            return "\(theme.name(of: loser)) ran out of time."
+        if let outcome = match.outcome {
+            switch outcome {
+            case .timeout(let loser):
+                return "\(theme.name(of: loser)) ran out of time."
+            case .timeoutDraw(let flagged):
+                return "\(theme.name(of: flagged)) ran out of time, but \(theme.name(of: flagged.opposite)) cannot checkmate."
+            }
         }
         if let winner = match.game.winner {
             let last = match.game.moves.last ?? "The last move"
@@ -476,18 +525,25 @@ private struct CoachPanel: View {
                 .tracking(1)
                 .textCase(.uppercase)
             if showBestMoves {
-                if match.hints.isEmpty {
+                if match.engineFailed {
+                    Text("Stockfish is offline, so there are no best moves to show.")
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(minHeight: 36)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else if match.hints.isEmpty {
                     HStack(spacing: 8) {
                         ProgressView().controlSize(.small)
                         Text(match.isComputerThinking ? "Waiting for \(match.setup.level.rival.name)" : "Looking at the position")
                             .font(.footnote.weight(.medium))
                             .foregroundStyle(.secondary)
                     }
-                    .frame(height: 36)
+                    .frame(minHeight: 36)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
                     ForEach(match.hints) { hint in
-                        HintRow(hint: hint, theme: theme) {
+                        HintRow(hint: hint, mover: match.game.sideToMove, theme: theme) {
                             match.play(hint)
                             collapse()
                         }
@@ -502,7 +558,7 @@ private struct CoachPanel: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(accent)
-                .frame(height: 36)
+                .frame(minHeight: 36)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -538,7 +594,7 @@ private struct CoachPanel: View {
                      color: MoveReview.Grade.best.color, theme: theme)
             StatTile(title: "Best", value: "\(match.gradeCounts[.best, default: 0] + match.gradeCounts[.checkmate, default: 0])",
                      color: .primary, theme: theme)
-            StatTile(title: "Mistakes", value: "\(match.gradeCounts[.mistake, default: 0] + match.gradeCounts[.inaccuracy, default: 0])",
+            StatTile(title: "Mistakes", value: "\(match.gradeCounts[.mistake, default: 0])",
                      color: MoveReview.Grade.mistake.color, theme: theme)
             StatTile(title: "Blunders", value: "\(match.gradeCounts[.blunder, default: 0])",
                      color: MoveReview.Grade.blunder.color, theme: theme)
@@ -554,7 +610,7 @@ private struct CoachPanel: View {
                 Label("Rematch", systemImage: "play.fill")
                     .font(.headline)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 50)
+                    .frame(minHeight: 50)
             }
             .buttonStyle(.borderedProminent)
             .buttonBorderShape(.roundedRectangle(radius: 16))
@@ -569,7 +625,7 @@ private struct CoachPanel: View {
                 Label("New game", systemImage: "plus")
                     .font(.headline)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 50)
+                    .frame(minHeight: 50)
             }
             .buttonStyle(.bordered)
             .buttonBorderShape(.roundedRectangle(radius: 16))
@@ -618,10 +674,13 @@ struct EvalBar: View {
 /// One of the best moves: how it is drawn, what it is, how good it is, and a button to play it.
 private struct HintRow: View {
     let hint: MoveHint
+    /// Whose move it is. The hint's score is from their side; the row shows White's, like the eval bar.
+    let mover: Piece.Color
     let theme: BoardTheme
     let play: () -> Void
 
     private var isBest: Bool { hint.rank == 0 }
+    private var score: String { (mover == .white ? hint.evaluation : hint.evaluation.flipped).label }
 
     var body: some View {
         Button(action: play) {
@@ -634,7 +693,7 @@ private struct HintRow: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 4)
-                Text(hint.evaluation.label)
+                Text(score)
                     .font(.system(.footnote, design: .themed).weight(.bold).monospacedDigit())
                     .foregroundStyle(isBest ? theme.bestArrow : Color.secondary)
                 Image(systemName: "play.fill")
@@ -645,7 +704,7 @@ private struct HintRow: View {
             }
             .padding(.leading, 12)
             .padding(.trailing, 6)
-            .frame(height: 38)
+            .frame(minHeight: 38)
             .background(
                 RoundedRectangle(cornerRadius: 13, style: .continuous)
                     .fill(Color.primary.opacity(theme.isDark ? 0.05 : 0.04))
@@ -655,7 +714,7 @@ private struct HintRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(isBest ? "Best" : "Next best") move \(hint.san), score \(hint.evaluation.label)")
+        .accessibilityLabel("\(isBest ? "Best" : "Next best") move \(hint.san), score \(score)")
         .accessibilityHint("Plays it for you")
     }
 }
@@ -683,13 +742,17 @@ private struct HintSwatch: View {
 private struct ActionButton: View {
     let title: String
     let symbol: String
-    var isOn = false
+    /// Set for a toggle, so VoiceOver can say which way it is.
+    var isOn: Bool? = nil
     let theme: BoardTheme
     let action: () -> Void
 
     @Environment(\.isEnabled) private var isEnabled
 
     private var accent: Color { theme.accent ?? .accentColor }
+    private var lit: Bool { isOn == true }
+    /// What VoiceOver says after the name: the state of a toggle, nothing for a plain button.
+    private var spokenState: String { isOn.map { $0 ? "On" : "Off" } ?? "" }
 
     var body: some View {
         Button(action: action) {
@@ -698,18 +761,19 @@ private struct ActionButton: View {
                     .font(.system(size: 18, weight: .semibold))
                     .frame(width: 44, height: 44)
                     .background(Color.primary.opacity(theme.isDark ? 0.07 : 0.05), in: Circle())
-                    .overlay(Circle().strokeBorder(isOn ? accent.opacity(0.5) : Color.primary.opacity(0.11), lineWidth: 1))
-                    .shadow(color: isOn && theme.glows ? accent.opacity(0.25) : .clear, radius: 10)
+                    .overlay(Circle().strokeBorder(lit ? accent.opacity(0.5) : Color.primary.opacity(0.11), lineWidth: 1))
+                    .shadow(color: lit && theme.glows ? accent.opacity(0.25) : .clear, radius: 10)
                 Text(title)
                     .font(.caption2.weight(.semibold))
             }
-            .foregroundStyle(isOn ? accent : Color.primary.opacity(0.85))
+            .foregroundStyle(lit ? accent : Color.primary.opacity(0.85))
             .frame(maxWidth: .infinity)
             .opacity(isEnabled ? 1 : 0.35)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title)
-        .accessibilityValue(isOn ? "On" : "")
+        .accessibilityValue(spokenState)
+        .accessibilityAddTraits(isOn == nil ? [] : .isToggle)
     }
 }
 
@@ -730,7 +794,7 @@ private struct StatTile: View {
                 .foregroundStyle(color)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 54)
+        .frame(minHeight: 54)
         .background(
             RoundedRectangle(cornerRadius: 13, style: .continuous)
                 .fill(Color.primary.opacity(theme.isDark ? 0.05 : 0.04))
@@ -742,6 +806,14 @@ private struct StatTile: View {
 }
 
 extension MoveReview {
+    /// The score after the move from White's point of view, the way the eval bar
+    /// and ring show it. `evaluation` itself is from the mover's side.
+    var evaluationForWhite: Evaluation? {
+        guard let evaluation else { return nil }
+        let moverWasBlack = fenBefore?.split(separator: " ").dropFirst().first == "b"
+        return moverWasBlack ? evaluation.flipped : evaluation
+    }
+
     /// One short line for the stretched orb.
     var shortDetail: String {
         let better = best ?? "another move"

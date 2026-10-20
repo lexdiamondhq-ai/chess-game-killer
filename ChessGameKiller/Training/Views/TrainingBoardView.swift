@@ -14,6 +14,8 @@ struct TrainingBoardView: View {
     /// Taps on squares. Nil makes the board look-only.
     var onTap: ((Square) -> Void)?
 
+    @AppStorage("haptics") private var hapticsOn = true
+
     var body: some View {
         GeometryReader { geo in
             let side = min(geo.size.width, geo.size.height)
@@ -54,8 +56,12 @@ struct TrainingBoardView: View {
             }
         }
         .aspectRatio(1, contentMode: .fit)
-        .sensoryFeedback(.impact(weight: .light), trigger: game.moveCount)
-        .sensoryFeedback(.impact(weight: .heavy, intensity: 0.9), trigger: game.captureEvents.last?.id)
+        .sensoryFeedback(.impact(weight: .light), trigger: game.moveCount) { _, _ in hapticsOn }
+        // Capture events are dropped once the explosion is over, which changes the
+        // trigger a second time; only a new capture should thump.
+        .sensoryFeedback(.impact(weight: .heavy, intensity: 0.9), trigger: game.captureEvents.last?.id) { _, new in
+            hapticsOn && new != nil
+        }
     }
 
     // MARK: Layout
@@ -223,6 +229,13 @@ struct TrainingBoardView: View {
         }
         .frame(width: size * 8, height: size * 8)
         .animation(.snappy(duration: 0.35), value: game.pieces)
+        // A lesson or drill that jumps to another position hands the board a fresh
+        // model, whose piece ids start over. Tie the layer to the model so the old
+        // pieces fade out and the new ones fade in, instead of each id sliding to
+        // whatever piece now holds its number.
+        .transition(.opacity)
+        .id(ObjectIdentifier(game))
+        .animation(.easeInOut(duration: 0.25), value: ObjectIdentifier(game))
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
