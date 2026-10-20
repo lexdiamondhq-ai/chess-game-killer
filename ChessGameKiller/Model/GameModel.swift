@@ -168,6 +168,10 @@ final class GameModel {
 
     var canUndo: Bool { !history.isEmpty }
 
+    /// Every position of the game as FEN, the start first and the current one last,
+    /// so the player can look back through the game.
+    var positionFENs: [String] { history.map(\.board.position.fen) + [fen] }
+
     /// Number of moves played (by both sides) that can be taken back.
     var plyCount: Int { history.count }
 
