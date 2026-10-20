@@ -27,7 +27,11 @@ for NAME in nn-1111cefa1111 nn-37f18f62d772; do
     echo "Downloading $NAME.nnue"
     TMP="$FILE.download"
     curl -fsSL --retry 3 -o "$TMP" "https://raw.githubusercontent.com/official-stockfish/networks/master/$NAME.nnue" ||
-      curl -fsSL --retry 3 -o "$TMP" "https://tests.stockfishchess.org/api/nn/$NAME.nnue"
+      curl -fsSL --retry 3 -o "$TMP" "https://tests.stockfishchess.org/api/nn/$NAME.nnue" || {
+        rm -f "$TMP"
+        echo "error: could not download $NAME.nnue (a Stockfish network). Check your network connection, or copy the file into $CACHE." >&2
+        exit 1
+      }
     # The name is the start of the file's SHA-256, so a bad download is caught here.
     EXPECTED="${NAME#nn-}"
     ACTUAL="$(sha256 "$TMP")"

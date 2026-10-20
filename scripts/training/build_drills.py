@@ -73,7 +73,7 @@ OPENINGS = [
                    ("f6", False, "It guards e5, but it weakens your king and takes your knight's best square."),
                    ("Qe7", False, "The queen guards e5, but she blocks your bishop. Use a knight.")], 480),
     ("e4 e5 Nf3 Nc6", [("Bb5", True, "It develops a bishop and puts pressure on the knight that guards e5."),
-                       ("Ng5", False, "Same piece twice, and it attacks nothing guarded. Bring out a new piece."),
+                       ("Ng5", False, "Same piece twice, and the queen on d8 simply takes it. Bring out a new piece."),
                        ("Qe2", False, "Too early for the queen, and she blocks your bishop.")], 520),
     ("e4 e5 Nf3 Nc6 Bc4", [("Nf6", True, "It develops a knight and attacks the e4 pawn."),
                            ("Qf6", False, "Too early for the queen, and she takes your knight's best square."),
@@ -257,6 +257,9 @@ def puzzle_skill(rec: dict) -> str | None:
     for tag, skill in TAG_SKILLS:
         if tag in tags:
             if skill == "back-rank" and (mate or 0) > 2:
+                continue
+            # A one-move smothered mate is a mate in one, whatever its pattern.
+            if skill == "mate-in-2" and mate == 1:
                 continue
             return skill
     if mate == 1:

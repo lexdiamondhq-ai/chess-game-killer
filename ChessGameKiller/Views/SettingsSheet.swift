@@ -34,7 +34,7 @@ struct SettingsSheet: View {
                             }
                         }
                         SettingsGroup(theme: theme) {
-                            ToggleRow(title: "Match rival", subtitle: "Games against the computer use the rival's own board",
+                            ToggleRow(title: "Match rival", subtitle: "Computer games use the rival's own board, not the one picked above",
                                       symbol: "person.crop.circle.badge.checkmark", isOn: $matchRival, theme: theme)
                         }
                     }
@@ -265,7 +265,9 @@ private struct ThemeCard: View {
                 Text(option.name)
                     .font(.headline)
                     .foregroundStyle(Color.primary)
-                Spacer(minLength: 0)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.title3)
