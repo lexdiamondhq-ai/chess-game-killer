@@ -339,6 +339,7 @@ private struct CoachPanel: View {
     @AppStorage("showBestMoves") private var showBestMoves = true
     @Environment(GameCoach.self) private var gameCoach: GameCoach?
     @Environment(TrainingStore.self) private var training: TrainingStore?
+    @State private var reel: GameReel?
 
     private var accent: Color { theme.accent ?? .accentColor }
 
@@ -381,6 +382,7 @@ private struct CoachPanel: View {
             if match.isOver {
                 summary.padding(.top, 12)
                 endButtons.padding(.top, 10)
+                reelButton.padding(.top, 8)
             } else {
                 bestMoves.padding(.top, 12)
                 actions.padding(.top, 8)
@@ -598,6 +600,24 @@ private struct CoachPanel: View {
                      color: MoveReview.Grade.mistake.color, theme: theme)
             StatTile(title: "Blunders", value: "\(match.gradeCounts[.blunder, default: 0])",
                      color: MoveReview.Grade.blunder.color, theme: theme)
+        }
+    }
+
+    /// Leo's 30-second story of the game, to watch and share.
+    private var reelButton: some View {
+        Button {
+            reel = match.highlightReel()
+        } label: {
+            Label("Watch your highlight reel", systemImage: "film.stack")
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 40)
+        }
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.capsule)
+        .tint(accent)
+        .fullScreenCover(item: $reel) { reel in
+            HighlightReelView(reel: reel, theme: theme)
         }
     }
 

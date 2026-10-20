@@ -1,0 +1,74 @@
+{
+ "endgames": [
+  {
+   "id": "kq-k",
+   "title": "Queen mate",
+   "level": 1,
+   "fen": "8/8/8/4k3/8/8/8/4K2Q w - - 0 1",
+   "idea": "Box the king in with your queen a knight's jump away, bring your king up, then mate on the edge."
+  },
+  {
+   "id": "kr-k",
+   "title": "Rook mate",
+   "level": 1,
+   "fen": "8/8/8/4k3/8/8/8/R3K3 w - - 0 1",
+   "idea": "Cut the king off with the rook, walk your king opposite theirs, and push them back one rank at a time."
+  },
+  {
+   "id": "kp-k-6th",
+   "title": "King in front of the pawn",
+   "level": 1,
+   "fen": "4k3/8/4K3/4P3/8/8/8/8 w - - 0 1",
+   "idea": "Your king leads, the pawn follows. Take the opposition so their king has to step aside."
+  },
+  {
+   "id": "kbb-k",
+   "title": "Two bishops mate",
+   "level": 2,
+   "fen": "8/8/8/4k3/8/8/8/2B1KB2 w - - 0 1",
+   "idea": "Side by side, the bishops make a wall. Shrink the box toward a corner and bring the king."
+  },
+  {
+   "id": "kp-k-opposition",
+   "title": "The opposition",
+   "level": 2,
+   "fen": "8/8/8/2k5/8/8/2KP4/8 w - - 0 1",
+   "idea": "Get your king in front of the pawn first. Then win the opposition before pushing."
+  },
+  {
+   "id": "lucena",
+   "title": "Lucena position",
+   "level": 2,
+   "fen": "1K1k4/1P6/8/8/8/8/r7/2R5 w - - 0 1",
+   "idea": "Build a bridge: bring your rook to the fourth rank so it can block checks later."
+  },
+  {
+   "id": "philidor",
+   "title": "Philidor defence",
+   "level": 2,
+   "fen": "4k3/8/r7/3KP3/8/8/8/7R b - - 0 1",
+   "idea": "Keep your rook on the sixth rank. When the pawn steps up, check from behind."
+  },
+  {
+   "id": "kq-kr",
+   "title": "Queen against rook",
+   "level": 3,
+   "fen": "8/8/3k4/8/2r5/8/8/4K2Q w - - 0 1",
+   "idea": "Drive the king and rook to the edge together, then win the rook with a fork or a skewer."
+  },
+  {
+   "id": "kbn-k",
+   "title": "Bishop and knight mate",
+   "level": 3,
+   "fen": "8/8/8/4k3/8/8/8/2B1KN2 w - - 0 1",
+   "idea": "Mate only comes in a corner your bishop covers. Use the W-manoeuvre with the knight."
+  },
+  {
+   "id": "kr-kb",
+   "title": "Rook against bishop",
+   "level": 3,
+   "fen": "8/8/8/2k5/8/8/1b6/3RK3 b - - 0 1",
+   "idea": "Defend: keep your king in the corner that's the opposite colour of your bishop."
+  }
+ ]
+}

@@ -117,6 +117,8 @@ final class MatchController {
     /// The grade of each of the person's moves this game, by the ply count once the
     /// move was on the board, so a move that is taken back leaves the summary too.
     private var gradeLog: [Int: MoveReview.Grade] = [:]
+    /// Every graded move of the person's, by ply, for the highlight reel.
+    private(set) var reelLog: [Int: ReelMoment] = [:]
     /// Flipped by the Flip button, on top of the usual "your side at the bottom".
     private(set) var isFlippedByHand = false
 
@@ -189,6 +191,7 @@ final class MatchController {
         game.humanColors = setup.opponent == .computer ? [setup.playerColor] : [.white, .black]
         outcome = nil
         gradeLog = [:]
+        reelLog = [:]
         isFlippedByHand = false
         evaluation = nil
         startClock()
@@ -246,6 +249,7 @@ final class MatchController {
         }
         // Grades of moves that are no longer on the board go with them.
         gradeLog = gradeLog.filter { $0.key <= game.plyCount }
+        reelLog = reelLog.filter { $0.key <= game.plyCount }
         clock?.start(game.sideToMove)
         scheduleWork(after: nil)
     }
@@ -276,6 +280,14 @@ final class MatchController {
     /// Turns the board around.
     func flipBoard() {
         isFlippedByHand.toggle()
+    }
+
+    /// The game's story for the highlight reel.
+    func highlightReel() -> GameReel {
+        let opponent = setup.opponent == .computer ? setup.level.rival.name : "Friend"
+        return GameReel.make(log: reelLog, player: "You", opponent: opponent, playerColor: setup.playerColor,
+                             winner: winner, isOver: isOver, accuracy: accuracy,
+                             moveCount: (game.plyCount + 1) / 2, finalFEN: game.fen)
     }
 
     /// A rough quality score for the person's moves this game, 0 to 100.
@@ -446,6 +458,12 @@ final class MatchController {
         bestUCI: String? = nil, before: Evaluation? = nil, reply: String? = nil
     ) {
         gradeLog[ply] = grade
+        reelLog[ply] = ReelMoment(
+            ply: ply, grade: grade, san: move.san, uci: move.uci, color: move.color,
+            fenBefore: move.fenBefore, fenAfter: fenAfter, best: best,
+            before: before?.winningChances ?? evaluation?.winningChances ?? 0,
+            after: grade == .checkmate ? 1 : (evaluation?.winningChances ?? 0)
+        )
         guard showVerdicts || grade == .checkmate else { return }
         review = MoveReview(
             id: nextReviewID, grade: grade, played: move.san, best: best, evaluation: evaluation,

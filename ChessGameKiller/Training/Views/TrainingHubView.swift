@@ -7,6 +7,9 @@ struct TrainingHubView: View {
     /// The game screen's board look, so training looks like the game.
     let theme: BoardTheme
     @Environment(TrainingStore.self) private var store
+    @Environment(PuzzleStore.self) private var puzzles
+    @State private var showingPuzzles = false
+    @State private var showingRoom = false
     @Environment(\.dismiss) private var dismiss
     @AppStorage("coachVoiceMuted") private var voiceMuted = false
     @State private var lesson: Lesson?
@@ -22,6 +25,8 @@ struct TrainingHubView: View {
                         coachHeader(library)
                         rankCard
                         todayCard
+                        puzzlesCard
+                        roomCard
                         if !store.openMistakes.isEmpty {
                             mistakesCard
                         }
@@ -33,7 +38,7 @@ struct TrainingHubView: View {
                                 session = store.practicePlan(for: skill)
                             }
                         }
-                        Text("Every puzzle here was checked by Stockfish.")
+                        Text("Every lesson drill was checked by Stockfish. Puzzles come from real games on Lichess.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                             .padding(.top, 4)
@@ -81,6 +86,15 @@ struct TrainingHubView: View {
         }
         .fullScreenCover(item: $lesson) { lesson in
             LessonScreen(lesson: lesson, theme: theme)
+                .environment(store)
+        }
+        .fullScreenCover(isPresented: $showingRoom) {
+            GrandmasterRoomView(theme: theme)
+                .environment(puzzles)
+        }
+        .fullScreenCover(isPresented: $showingPuzzles) {
+            PuzzlesView(theme: theme)
+                .environment(puzzles)
                 .environment(store)
         }
         .fullScreenCover(item: $session) { plan in
@@ -163,6 +177,70 @@ struct TrainingHubView: View {
     }
 
     // MARK: Today
+
+    /// Real-game puzzles from Lichess, at the learner's level.
+    private var puzzlesCard: some View {
+        Button {
+            showingPuzzles = true
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "puzzlepiece.extension.fill")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(theme.trainingAccent)
+                    .frame(width: 52, height: 52)
+                    .background(theme.trainingAccent.opacity(0.14), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Puzzles")
+                        .font(.system(.title3, design: .themed).weight(.bold))
+                    Text("Real games, every theme, rated to your level. Plus Puzzle Rush.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                VStack(spacing: 0) {
+                    Text("\(puzzles.progress.rating)")
+                        .font(.system(.headline, design: .themed).monospacedDigit())
+                    Text("rating")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(18)
+            .trainingCard(theme)
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Training for strong players.
+    private var roomCard: some View {
+        Button {
+            showingRoom = true
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "crown.fill")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(theme.trainingAccent)
+                    .frame(width: 52, height: 52)
+                    .background(theme.trainingAccent.opacity(0.14), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Grandmaster Room")
+                        .font(.system(.title3, design: .themed).weight(.bold))
+                    Text("Guess the Move, blindfold calculation, perfect endgames, your opening repertoire.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(18)
+            .trainingCard(theme)
+        }
+        .buttonStyle(.plain)
+    }
 
     private var todayCard: some View {
         let focus = store.todaysFocus

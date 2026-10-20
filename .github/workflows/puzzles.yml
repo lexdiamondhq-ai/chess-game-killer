@@ -1,0 +1,32 @@
+name: Build the Lichess puzzle pack
+
+# Runs on pushes to work branches that change the pack builder, and by hand.
+# Downloads the Lichess puzzle database (CC0) and commits the app's slice of it.
+on:
+  push:
+    branches-ignore: [main]
+    paths: [scripts/puzzles/build_puzzle_pack.py]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the pack
+        run: |
+          mkdir -p ChessGameKiller/Puzzles
+          curl -sSfL https://database.lichess.org/lichess_db_puzzle.csv.zst | zstd -dc \
+            | python3 scripts/puzzles/build_puzzle_pack.py - ChessGameKiller/Puzzles/lichess-puzzles.csv
+          ls -la ChessGameKiller/Puzzles
+          head -3 ChessGameKiller/Puzzles/lichess-puzzles.csv
+      - name: Commit the pack
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ChessGameKiller/Puzzles/lichess-puzzles.csv
+          git commit -m "Build the Lichess puzzle pack" || echo "No changes"
+          git push origin HEAD:${GITHUB_REF_NAME}

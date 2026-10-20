@@ -467,6 +467,9 @@ struct LicensesView: View {
         Credit(name: "cburnett pieces", license: "GPL v2 or later",
                detail: "Piece artwork by Colin M.L. Burnett, via Lichess. The Neon set is recolored from it.",
                url: URL(string: "https://github.com/lichess-org/lila/tree/master/public/piece/cburnett")!),
+        Credit(name: "Lichess puzzle database", license: "CC0",
+               detail: "The puzzles and Puzzle Rush: positions from real games, rated by Lichess players.",
+               url: URL(string: "https://database.lichess.org/#puzzles")!),
     ]
 
     var body: some View {

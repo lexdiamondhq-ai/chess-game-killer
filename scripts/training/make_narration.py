@@ -75,6 +75,20 @@ def spoken_lines(lesson: dict) -> list[str]:
     return lines
 
 
+# What Leo says over a game's highlight reel. Keep in step with GameReel in
+# ChessGameKiller/Reel/HighlightReel.swift (introLine, lines, endLines).
+REEL_LINES = [
+    "Here's how it went.",
+    "What a move. This is the one I'd frame.",
+    "And right here, the whole game turned.",
+    "Ouch. This is the one to learn from.",
+    "And that's how you finish a game.",
+    "A win. Well played.",
+    "Not this time. We'll get them next game.",
+    "Honours even. A fair result.",
+]
+
+
 def all_lines() -> list[str]:
     course = json.loads((CONTENT / "course.json").read_text())
     order = [lesson for unit in course["units"] for lesson in unit["lessons"]]
@@ -84,6 +98,9 @@ def all_lines() -> list[str]:
         for line in spoken_lines(lesson):
             if line not in lines:
                 lines.append(line)
+    for line in REEL_LINES:
+        if line not in lines:
+            lines.append(line)
     return lines
 
 
