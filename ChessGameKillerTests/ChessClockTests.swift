@@ -103,4 +103,58 @@ final class ChessClockTests: XCTestCase {
         XCTAssertEqual(Duration.milliseconds(9400).clockLabel, "0:09.4")
         XCTAssertEqual(Duration.zero.clockLabel, "0:00.0")
     }
+
+    func testClockLabelsRoundUpOnBothSidesOfTenSeconds() {
+        XCTAssertEqual(Duration.milliseconds(10400).clockLabel, "0:11")
+        XCTAssertEqual(Duration.milliseconds(9960).clockLabel, "0:10.0")
+        XCTAssertEqual(Duration.milliseconds(9900).clockLabel, "0:09.9")
+        XCTAssertEqual(Duration.milliseconds(40).clockLabel, "0:00.1")
+    }
+
+    func testTakingBackAMoveRemovesItsIncrement() {
+        let clock = ChessClock(initial: .seconds(60), increment: .seconds(2))
+        let t0 = ContinuousClock.now
+        clock.start(.white, at: t0)
+        clock.moved(by: .white, at: t0 + .seconds(10))
+        XCTAssertEqual(clock.remaining(for: .white, at: t0 + .seconds(15)), .seconds(52))
+
+        clock.tookBack(moveBy: .white, at: t0 + .seconds(15))
+        XCTAssertNil(clock.running)
+        XCTAssertEqual(clock.remaining(for: .white, at: t0 + .seconds(20)), .seconds(50))
+        XCTAssertEqual(clock.remaining(for: .black, at: t0 + .seconds(20)), .seconds(55))
+
+        // Never below zero, even when more than the increment has gone since the move.
+        let short = ChessClock(initial: .seconds(1), increment: .seconds(5))
+        short.start(.black, at: t0)
+        short.moved(by: .black, at: t0 + .milliseconds(500))
+        short.moved(by: .white, at: t0 + .milliseconds(600))
+        short.tookBack(moveBy: .white, at: t0 + .seconds(6))
+        short.tookBack(moveBy: .black, at: t0 + .seconds(6))
+        XCTAssertEqual(short.remaining(for: .black, at: t0 + .seconds(6)), .zero)
+        XCTAssertEqual(short.remaining(for: .white, at: t0 + .seconds(6)), .milliseconds(900))
+        clock.pause(at: t0 + .seconds(20))
+        short.pause(at: t0 + .seconds(6))
+    }
+
+    func testAHeldClockIgnoresStartsUntilReleased() {
+        let clock = ChessClock(initial: .seconds(60), increment: .seconds(2))
+        let t0 = ContinuousClock.now
+        clock.start(.white, at: t0)
+        clock.hold(at: t0 + .seconds(5))
+        XCTAssertTrue(clock.held)
+        XCTAssertNil(clock.running)
+
+        // A move landing while held still earns its increment, but starts nobody.
+        clock.moved(by: .white, at: t0 + .seconds(6))
+        XCTAssertNil(clock.running)
+        XCTAssertEqual(clock.remaining(for: .white, at: t0 + .seconds(30)), .seconds(57))
+        clock.start(.black, at: t0 + .seconds(7))
+        XCTAssertNil(clock.running)
+
+        clock.release(.black, at: t0 + .seconds(10))
+        XCTAssertFalse(clock.held)
+        XCTAssertEqual(clock.running, .black)
+        XCTAssertEqual(clock.remaining(for: .black, at: t0 + .seconds(11)), .seconds(59))
+        clock.pause(at: t0 + .seconds(11))
+    }
 }

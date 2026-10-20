@@ -60,6 +60,17 @@ final class MatchController {
             case .grandmaster: return 1200
             }
         }
+
+        /// How often the rival plays any legal move instead of the engine's.
+        /// Stockfish's lowest skill level is still about 1300 Elo, so the weakest
+        /// rivals have to miss things on purpose to be the beginners they say they are.
+        var slipRate: Double {
+            switch self {
+            case .beginner: return 0.3
+            case .casual: return 0.1
+            default: return 0
+            }
+        }
     }
 
     struct Setup: Equatable {
@@ -72,10 +83,14 @@ final class MatchController {
     /// How the game ended when the board itself doesn't say (the clock did).
     enum Outcome: Equatable {
         case timeout(loser: Piece.Color)
+        /// The flag fell, but the other side has nothing that could ever give mate.
+        case timeoutDraw(flagged: Piece.Color)
 
-        var winner: Piece.Color {
+        /// Nil for a draw.
+        var winner: Piece.Color? {
             switch self {
             case .timeout(let loser): return loser.opposite
+            case .timeoutDraw: return nil
             }
         }
     }
@@ -91,14 +106,17 @@ final class MatchController {
     private(set) var isComputerThinking = false
     /// Set once the first game has been set up from the new-game sheet.
     private(set) var hasStarted = false
+    /// Counts up with every game started, so the screen can tell one game from the next.
+    private(set) var gameNumber = 0
     /// Set when the engine couldn't answer, so the screen can say so.
     private(set) var engineFailed = false
     /// The clock, when the game is timed.
     private(set) var clock: ChessClock?
     /// Set when the game ended on the clock rather than on the board.
     private(set) var outcome: Outcome?
-    /// How many of the person's moves got each grade this game, for the summary at the end.
-    private(set) var gradeCounts: [MoveReview.Grade: Int] = [:]
+    /// The grade of each of the person's moves this game, by the ply count once the
+    /// move was on the board, so a move that is taken back leaves the summary too.
+    private var gradeLog: [Int: MoveReview.Grade] = [:]
     /// Flipped by the Flip button, on top of the usual "your side at the bottom".
     private(set) var isFlippedByHand = false
 
@@ -125,7 +143,19 @@ final class MatchController {
     var isOver: Bool { game.isGameOver || outcome != nil }
 
     /// Who won, on the board or on the clock. Nil for a draw or a game still going.
-    var winner: Piece.Color? { outcome?.winner ?? game.winner }
+    var winner: Piece.Color? {
+        if let outcome { return outcome.winner }
+        return game.winner
+    }
+
+    /// How many of the person's moves got each grade this game, for the summary at the end.
+    var gradeCounts: [MoveReview.Grade: Int] {
+        gradeLog.values.reduce(into: [MoveReview.Grade: Int]()) { $0[$1, default: 0] += 1 }
+    }
+
+    /// A number in 0..<1 drawn for each of the rival's slips: whether it slips, and
+    /// which move it plays instead. Tests swap in a fixed value.
+    @ObservationIgnored var chance: () -> Double = { Double.random(in: 0..<1) }
 
     private let engine: ChessEngine?
     private let sounds: SoundPlaying?
@@ -153,11 +183,12 @@ final class MatchController {
     func start(_ setup: Setup, from position: Position = .standard, playSound: Bool = true) {
         self.setup = setup
         hasStarted = true
+        gameNumber += 1
         resetWork()
         game.newGame(from: position)
         game.humanColors = setup.opponent == .computer ? [setup.playerColor] : [.white, .black]
         outcome = nil
-        gradeCounts = [:]
+        gradeLog = [:]
         isFlippedByHand = false
         evaluation = nil
         startClock()
@@ -201,19 +232,45 @@ final class MatchController {
         }
     }
 
-    var canUndo: Bool { game.canUndo && outcome == nil }
+    /// A finished game stays finished, on the board as on the clock.
+    var canUndo: Bool { game.canUndo && !isOver }
 
     /// Takes back the last move. Against the computer, its reply is taken back too,
     /// so it is the player's turn again.
     func undo() {
         guard canUndo else { return }
         resetWork()
-        game.undo()
+        takeBack()
         if setup.opponent == .computer, !game.isHumanTurn, game.canUndo {
-            game.undo()
+            takeBack()
         }
+        // Grades of moves that are no longer on the board go with them.
+        gradeLog = gradeLog.filter { $0.key <= game.plyCount }
         clock?.start(game.sideToMove)
         scheduleWork(after: nil)
+    }
+
+    /// Takes one move off the board and its increment off the clock. A pawn still
+    /// waiting to be promoted never finished its move, so it earned no increment
+    /// (and ChessKit already counts that as the other side's turn).
+    private func takeBack() {
+        if game.pendingPromotion == nil {
+            clock?.tookBack(moveBy: game.sideToMove.opposite)
+        }
+        game.undo()
+    }
+
+    /// Freezes the clock while the board is out of sight: the app in the background,
+    /// or a lesson over the game. A computer reply landing meanwhile can't restart it.
+    func suspendClock() {
+        clock?.hold()
+    }
+
+    /// Lets the clock run again once the board is back, unless the game is over.
+    /// The side still choosing what its pawn becomes is the one on the clock.
+    func resumeClock() {
+        guard !isOver else { return }
+        clock?.release(game.pendingPromotion?.piece.color ?? game.sideToMove)
     }
 
     /// Turns the board around.
@@ -248,15 +305,36 @@ final class MatchController {
         clock.start(game.sideToMove)
     }
 
-    private func flagFell(_ loser: Piece.Color) {
+    /// The clock ran out for `loser`: a win for the other side if it has anything
+    /// that could ever give mate, a draw otherwise, as on Lichess and Chess.com.
+    func flagFell(_ loser: Piece.Color) {
         guard outcome == nil, !game.isGameOver else { return }
         resetWork()
-        outcome = .timeout(loser: loser)
-        if setup.opponent == .friend || game.humanColors.contains(loser.opposite) {
-            sounds?.play(.win)
+        // A pawn still waiting to be promoted never finished its move. Put it back,
+        // so the picker goes away and the final position is the real one.
+        if game.pendingPromotion != nil { game.undo() }
+        if Self.hasMatingMaterial(game.board.position.pieces, for: loser.opposite) {
+            outcome = .timeout(loser: loser)
+            if setup.opponent == .friend || game.humanColors.contains(loser.opposite) {
+                sounds?.play(.win)
+            } else {
+                sounds?.play(.gameOver)
+            }
         } else {
+            outcome = .timeoutDraw(flagged: loser)
             sounds?.play(.gameOver)
         }
+    }
+
+    /// Whether `color` has pieces that could ever deliver mate: any pawn, rook or
+    /// queen can, and so can two or more minor pieces unless they are all bishops
+    /// on one square colour. A lone king, or a king with one knight or one bishop, cannot.
+    static func hasMatingMaterial(_ pieces: [Piece], for color: Piece.Color) -> Bool {
+        let own = pieces.filter { $0.color == color && $0.kind != .king }
+        if own.contains(where: { $0.kind == .pawn || $0.kind == .rook || $0.kind == .queen }) { return true }
+        guard own.count >= 2 else { return false }
+        if own.contains(where: { $0.kind == .knight }) { return true }
+        return own.contains(where: { $0.square.color == .light }) && own.contains(where: { $0.square.color == .dark })
     }
 
     // MARK: Running the match
@@ -292,6 +370,8 @@ final class MatchController {
         let move: PlayedMove
         let fenAfter: String
         let endedGame: Bool
+        /// The game's ply count once the move was on the board, for the grade log.
+        let ply: Int
     }
 
     private func refreshHints() {
@@ -302,18 +382,24 @@ final class MatchController {
     /// person's move is graded next, then the hints for their next move.
     private func scheduleWork(after personMove: PlayedMove?) {
         let gen = generation
-        let played = personMove.map { PersonMove(move: $0, fenAfter: game.fen, endedGame: game.isGameOver) }
+        let played = personMove.map {
+            PersonMove(move: $0, fenAfter: game.fen, endedGame: game.isGameOver, ply: game.plyCount)
+        }
         work = Task { [weak self] in
             await self?.computerMoveIfNeeded(generation: gen)
+            // The game may have moved on (an undo, a new game) while the computer thought.
+            guard !Task.isCancelled, self?.generation == gen else { return }
             if let played { await self?.review(played, generation: gen) }
+            guard !Task.isCancelled, self?.generation == gen else { return }
             await self?.prepareHints(generation: gen)
         }
     }
 
     private func review(_ played: PersonMove, generation gen: Int) async {
+        guard gen == generation, !Task.isCancelled else { return }
         let move = played.move
         if played.endedGame, game.winner == move.color {
-            publishReview(.checkmate, move: move, fenAfter: played.fenAfter, best: nil, evaluation: nil)
+            publishReview(.checkmate, move: move, ply: played.ply, fenAfter: played.fenAfter, best: nil, evaluation: nil)
             return
         }
         guard let engine else { return }
@@ -347,7 +433,7 @@ final class MatchController {
 
         let grade = MoveReview.grade(before: bestLine.evaluation, after: after, playedBest: playedBest)
         let bestSAN = playedBest ? nil : Notation.san(of: bestMove, fen: move.fenBefore)
-        publishReview(grade, move: move, fenAfter: played.fenAfter, best: bestSAN, evaluation: after,
+        publishReview(grade, move: move, ply: played.ply, fenAfter: played.fenAfter, best: bestSAN, evaluation: after,
                       bestUCI: bestMove, before: bestLine.evaluation, reply: reply)
         // Only until the next hint search reports on the position as it stands now.
         if analysis?.fen != game.fen {
@@ -356,10 +442,10 @@ final class MatchController {
     }
 
     private func publishReview(
-        _ grade: MoveReview.Grade, move: PlayedMove, fenAfter: String, best: String?, evaluation: Evaluation?,
+        _ grade: MoveReview.Grade, move: PlayedMove, ply: Int, fenAfter: String, best: String?, evaluation: Evaluation?,
         bestUCI: String? = nil, before: Evaluation? = nil, reply: String? = nil
     ) {
-        gradeCounts[grade, default: 0] += 1
+        gradeLog[ply] = grade
         guard showVerdicts || grade == .checkmate else { return }
         review = MoveReview(
             id: nextReviewID, grade: grade, played: move.san, best: best, evaluation: evaluation,
@@ -378,7 +464,7 @@ final class MatchController {
         isComputerThinking = true
         let clock = ContinuousClock()
         let started = clock.now
-        let move = await engine.chooseMove(fen: game.fen, skill: setup.level.skill, thinkTimeMs: setup.level.thinkTimeMs)
+        let chosen = await engine.chooseMove(fen: game.fen, skill: setup.level.skill, thinkTimeMs: setup.level.thinkTimeMs)
 
         // A short pause so the reply never feels instant.
         let minimum = Duration.milliseconds(450)
@@ -389,7 +475,16 @@ final class MatchController {
         guard gen == generation else { return }
         isComputerThinking = false
 
-        guard let move, game.playEngineMove(move), let played = game.lastPlayed else {
+        // The weakest rivals miss things on purpose: now and then they play any
+        // legal move instead of the engine's. An engine that gave no move stays a failure.
+        let slips = chosen != nil && setup.level.slipRate > 0 && chance() < setup.level.slipRate
+        let slip = slips ? randomLegalMove() : nil
+        // A slip the game refuses (a castling ChessKit still offers after the rook was
+        // taken) falls back to the engine's move.
+        var moved = false
+        if let slip { moved = game.playEngineMove(slip) }
+        if !moved, let chosen { moved = game.playEngineMove(chosen) }
+        guard moved, let played = game.lastPlayed else {
             engineFailed = true
             return
         }
@@ -402,11 +497,27 @@ final class MatchController {
         }
     }
 
+    /// Any legal move for the side to move, in engine notation; `chance` picks which.
+    /// A pawn reaching the last rank becomes a queen (the four-letter form does that).
+    private func randomLegalMove() -> String? {
+        let board = game.board
+        let moves = board.position.pieces
+            .filter { $0.color == game.sideToMove }
+            .flatMap { piece in board.legalMoves(forPieceAt: piece.square).map { piece.square.notation + $0.notation } }
+            .sorted()
+        guard !moves.isEmpty else { return nil }
+        let index = max(0, min(moves.count - 1, Int(chance() * Double(moves.count))))
+        return moves[index]
+    }
+
     private func prepareHints(generation gen: Int) async {
+        guard gen == generation, !Task.isCancelled else { return }
         guard let engine, !isOver, game.isHumanTurn, game.pendingPromotion == nil else { return }
         let fen = game.fen
         let lines = await engine.analyze(fen: fen, depth: 14, lines: 2, maxTimeMs: 2000)
-        guard gen == generation, game.fen == fen else { return }
+        // Only a search that ran its course says anything about the engine; one cut
+        // short by an undo or a new game doesn't.
+        guard gen == generation, game.fen == fen, !Task.isCancelled else { return }
         engineFailed = lines.isEmpty
 
         analysis = (fen, lines)

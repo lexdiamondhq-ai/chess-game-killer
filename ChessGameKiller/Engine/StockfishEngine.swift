@@ -86,11 +86,16 @@ actor StockfishEngine: ChessEngine {
             return SearchResult(bestMove: nil, lines: [])
         }
 
+        // A caller whose task was cancelled no longer wants an answer, and must
+        // not stop a search someone else is waiting for.
+        if Task.isCancelled { return SearchResult(bestMove: nil, lines: []) }
+
         // One search at a time: stop the current one and wait for it to report.
         if pending != nil {
             await engine.send(command: .stop)
         }
         while pending != nil {
+            if Task.isCancelled { return SearchResult(bestMove: nil, lines: []) }
             try? await Task.sleep(for: .milliseconds(10))
         }
 
@@ -105,9 +110,14 @@ actor StockfishEngine: ChessEngine {
         await engine.send(command: .position(.fen(fen)))
         await engine.send(command: go)
 
-        // Safety net in case the engine never answers.
+        // Safety net in case the engine never answers: ask it to stop, so its
+        // bestmove still lands on this search rather than on the next one, and
+        // give up on it a little after that.
         Task { [weak self] in
             try? await Task.sleep(for: timeout)
+            let stopped = await self?.stopIfPending(searchID: id) ?? false
+            guard stopped else { return }
+            try? await Task.sleep(for: .seconds(2))
             await self?.finish(searchID: id, bestMove: nil)
         }
 
@@ -221,6 +231,14 @@ actor StockfishEngine: ChessEngine {
         }
     }
 
+    /// Tells the engine to stop if `searchID` is still the search in progress,
+    /// and says whether it was.
+    private func stopIfPending(searchID: Int) async -> Bool {
+        guard let search = pending, search.id == searchID else { return false }
+        await engine.send(command: .stop)
+        return true
+    }
+
     private func finish(searchID: Int, bestMove: String?) {
         guard let search = pending, search.id == searchID else { return }
         let lines = search.lines.sorted { $0.key < $1.key }.map { $0.value.line }
@@ -229,7 +247,10 @@ actor StockfishEngine: ChessEngine {
         pending = nil
     }
 
+    /// Whether `move` is legal in `position` for the side to move. ChessKit's parser
+    /// checks the move itself but not whose turn it is.
     private func isLegal(_ move: String, in position: Position) -> Bool {
-        EngineLANParser.parse(move: move, for: position.sideToMove, in: position) != nil
+        guard let parsed = EngineLANParser.parse(move: move, for: position.sideToMove, in: position) else { return false }
+        return parsed.piece.color == position.sideToMove
     }
 }

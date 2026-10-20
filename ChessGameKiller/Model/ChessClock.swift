@@ -75,6 +75,10 @@ final class ChessClock {
     private(set) var running: Piece.Color?
     /// Set once a side has run out of time. The clock stops for good.
     private(set) var flagged: Piece.Color?
+    /// Set while the clock is held for something outside the game, like the app
+    /// going to the background or a lesson over the board. `start` does nothing
+    /// until `release`, so a move landing meanwhile can't restart the clock.
+    private(set) var held = false
     /// Called on the main actor when a side runs out of time.
     var onFlag: ((Piece.Color) -> Void)?
 
@@ -101,7 +105,7 @@ final class ChessClock {
 
     /// Starts (or switches to) a side's clock without giving anyone an increment.
     func start(_ color: Piece.Color, at now: ContinuousClock.Instant = .now) {
-        guard flagged == nil else { return }
+        guard flagged == nil, !held else { return }
         if running == color { return }
         stop(at: now)
         running = color
@@ -121,9 +125,31 @@ final class ChessClock {
         start(color.opposite, at: now)
     }
 
+    /// A move was taken back: the increment it earned comes off again, never below
+    /// zero. Both clocks stop; the caller starts the right side afterwards. (A side
+    /// left at zero flags the moment it is started, which is only fair: it had
+    /// already spent more than the increment it is giving back.)
+    func tookBack(moveBy color: Piece.Color, at now: ContinuousClock.Instant = .now) {
+        guard flagged == nil else { return }
+        stop(at: now)
+        stored[color] = max((stored[color] ?? .zero) - increment, .zero)
+    }
+
     /// Freezes both clocks, for example when the game ends.
     func pause(at now: ContinuousClock.Instant = .now) {
         stop(at: now)
+    }
+
+    /// Freezes both clocks until `release(_:)`; `start` is ignored in between.
+    func hold(at now: ContinuousClock.Instant = .now) {
+        stop(at: now)
+        held = true
+    }
+
+    /// Lets the clock run again, for `color`.
+    func release(_ color: Piece.Color, at now: ContinuousClock.Instant = .now) {
+        held = false
+        start(color, at: now)
     }
 
     private func stop(at now: ContinuousClock.Instant) {
@@ -156,13 +182,16 @@ final class ChessClock {
 
 extension Duration {
     /// "4:51", or "0:09.4" under ten seconds so the last moments are readable.
+    /// Rounded up on both sides of ten seconds, so the running clock never skips
+    /// a second there and "0:00.0" only shows once the time is really gone.
     var clockLabel: String {
         let total = max(self, .zero)
-        let seconds = Double(total.components.seconds) + Double(total.components.attoseconds) / 1e18
-        if seconds < 10 {
-            return String(format: "0:%04.1f", seconds)
+        let attosecondsPerTenth: Int64 = 100_000_000_000_000_000
+        let tenths = Int(total.components.seconds * 10 + (total.components.attoseconds + attosecondsPerTenth - 1) / attosecondsPerTenth)
+        if tenths <= 100 {
+            return String(format: "0:%02d.%d", tenths / 10, tenths % 10)
         }
-        let whole = Int(seconds.rounded(.up))
+        let whole = (tenths + 9) / 10
         return String(format: "%d:%02d", whole / 60, whole % 60)
     }
 }
