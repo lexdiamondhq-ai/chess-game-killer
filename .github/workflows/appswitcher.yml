@@ -1,0 +1,24 @@
+name: Switcher (macOS app switcher)
+
+# Builds AppSwitcher/ on a Mac and attaches Switcher.app as a download.
+on:
+  push:
+    paths: ["AppSwitcher/**", ".github/workflows/appswitcher.yml"]
+  pull_request:
+    paths: ["AppSwitcher/**", ".github/workflows/appswitcher.yml"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: ./AppSwitcher/build.sh
+      - name: Zip the app
+        run: cd AppSwitcher/build && ditto -c -k --keepParent Switcher.app Switcher.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Switcher
+          path: AppSwitcher/build/Switcher.zip
