@@ -469,9 +469,6 @@ struct ContentView: View {
                     Label("Your Army", systemImage: "shield.lefthalf.filled")
                 }
             }
-            ToolbarItem(placement: .topBarLeading) {
-                gamesButton
-            }
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 4) {
                     Button {

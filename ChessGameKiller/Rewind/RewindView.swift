@@ -138,7 +138,8 @@ struct RewindView: View {
 
     private var positionTitle: String {
         if ply == 0 { return "The start" }
-        return "Move \((ply + 1) / 2) of \(game.moveCount)"
+        // The move being decided: before White's sixth move is "Move 6".
+        return "Move \(min(game.moveCount, ply / 2 + 1)) of \(game.moveCount)"
     }
 
     // MARK: Board

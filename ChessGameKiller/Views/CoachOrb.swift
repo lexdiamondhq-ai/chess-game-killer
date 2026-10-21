@@ -341,6 +341,7 @@ private struct CoachPanel: View {
     @Environment(TrainingStore.self) private var training: TrainingStore?
     @State private var reel: GameReel?
     @State private var rewind: SavedGame?
+    @State private var showingGames = false
     @Environment(GameVault.self) private var vault: GameVault?
 
     private var accent: Color { theme.accent ?? .accentColor }
@@ -589,9 +590,29 @@ private struct CoachPanel: View {
             ActionButton(title: "Flip", symbol: "arrow.triangle.2.circlepath", theme: theme) {
                 withAnimation(.snappy(duration: 0.45)) { match.flipBoard() }
             }
+            if vault != nil {
+                ActionButton(title: "Games", symbol: "backward.circle", theme: theme) {
+                    showingGames = true
+                }
+            }
             ActionButton(title: "New game", symbol: "plus", theme: theme) {
                 collapse()
                 newGame()
+            }
+        }
+        .fullScreenCover(isPresented: $showingGames) {
+            if let vault {
+                RewindGamesView(theme: theme) { game in
+                    collapse()
+                    var setup = match.setup
+                    if let raw = game.level, let level = MatchController.Level(rawValue: raw) {
+                        setup.opponent = .computer
+                        setup.level = level
+                        setup.playerColor = game.playerColor
+                    }
+                    withAnimation(.snappy) { match.start(setup) }
+                }
+                .environment(vault)
             }
         }
     }
