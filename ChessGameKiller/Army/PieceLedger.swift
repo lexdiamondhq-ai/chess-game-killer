@@ -7,6 +7,8 @@ struct PieceGameStats: Equatable {
     var captures = 0
     /// Pawns' worth of material it took (pawn 1, knight 3, ... queen 9).
     var captureValue = 0
+    /// What it took, in the order it took them.
+    var taken: [Piece.Kind] = []
     var fell = false
     var gaveMate = false
     var promoted = false
@@ -75,6 +77,7 @@ struct PieceLedger: Equatable {
             if let capturer = moved.first(where: { $0.to == piece.square }) ?? main {
                 stats[capturer.start, default: PieceGameStats()].captures += 1
                 stats[capturer.start, default: PieceGameStats()].captureValue += Self.values[piece.kind] ?? 0
+                stats[capturer.start, default: PieceGameStats()].taken.append(piece.kind)
             }
         }
 

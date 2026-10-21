@@ -75,6 +75,12 @@ struct ReelFrame: View {
                     .background(highlight.moment.grade.color.opacity(0.22), in: Capsule())
                     .foregroundStyle(highlight.moment.grade.color)
                 Spacer()
+                if let piece = highlight.piece {
+                    Label(piece, systemImage: "shield.lefthalf.filled")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundStyle(theme.sideColor(reel.playerColor))
+                        .lineLimit(1)
+                }
                 Text("Move \((moment.ply + 1) / 2)")
                     .font(.system(size: 15, weight: .semibold, design: .rounded).monospacedDigit())
                     .foregroundStyle(.secondary)
@@ -114,6 +120,17 @@ struct ReelFrame: View {
             Text(reel.endLine)
                 .font(.system(size: 20, weight: .semibold, design: .rounded))
                 .multilineTextAlignment(.center)
+            if let hero = reel.hero {
+                VStack(spacing: 4) {
+                    Text("PIECE OF THE MATCH")
+                        .font(.system(size: 12, weight: .heavy, design: .rounded))
+                        .tracking(1.5)
+                        .foregroundStyle(ArmyRank.gold)
+                    Text(hero)
+                        .font(.system(size: 17, weight: .semibold, design: .rounded))
+                        .multilineTextAlignment(.center)
+                }
+            }
             Text("Coached by Leo · Chess Game Killer")
                 .font(.system(size: 14, weight: .medium, design: .rounded))
                 .foregroundStyle(.secondary)

@@ -78,7 +78,14 @@ struct ContentView: View {
         // Fonts read the look from here: rounded on Neon, plain SF Pro on the rest.
         let _ = ThemeFont.use(theme)
         presented
-            .onAppear { syncCoachSettings() }
+            .onAppear {
+                syncCoachSettings()
+                match.onAbandon = { [army] ledger, setup, assisted in
+                    // Walking away from a game counts as a loss.
+                    army.record(ledger, playerColor: setup.playerColor, won: false,
+                                stakes: GameStakes(level: setup.level, assisted: assisted))
+                }
+            }
             .task { await StockfishEngine.shared.warmUp() }
             .onChange(of: showBestMoves) { _, _ in syncCoachSettings() }
             .onChange(of: showSecondBest) { _, _ in syncCoachSettings() }
@@ -163,6 +170,7 @@ struct ContentView: View {
             }
             .onChange(of: match.gameNumber) { _, _ in
                 coach.gameStarted()
+                announceGrudge()
             }
             .onChange(of: match.game.moveCount) { _, _ in
                 // A new move brings the board back to the live position.
@@ -602,9 +610,22 @@ struct ContentView: View {
     private func recordArmy() {
         guard match.setup.opponent == .computer, let ledger = match.game.ledger else { return }
         let won = match.winner.map { $0 == match.setup.playerColor }
-        guard let news = army.record(ledger, playerColor: match.setup.playerColor, won: won).first else { return }
+        guard let news = army.record(ledger, playerColor: match.setup.playerColor, won: won,
+                                       stakes: match.armyStakes).first else { return }
+        show(news, after: 1.2)
+    }
+
+    /// As a game against a rival starts: the piece that rival keeps taking.
+    private func announceGrudge() {
+        guard match.setup.opponent == .computer, match.game.ledger != nil,
+              let news = army.grudge(against: match.setup.level) else { return }
+        show(news, after: 0.6)
+    }
+
+    /// Slides the army banner in, then away again unless something newer replaced it.
+    private func show(_ news: ArmyNews, after delay: Double) {
         Task { @MainActor in
-            try? await Task.sleep(for: .seconds(1.2))
+            try? await Task.sleep(for: .seconds(delay))
             withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) { armyNews = news }
             try? await Task.sleep(for: .seconds(6))
             if armyNews == news {

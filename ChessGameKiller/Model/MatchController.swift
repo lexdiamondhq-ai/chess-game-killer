@@ -121,6 +121,17 @@ final class MatchController {
     private(set) var reelLog: [Int: ReelMoment] = [:]
     /// Flipped by the Flip button, on top of the usual "your side at the bottom".
     private(set) var isFlippedByHand = false
+    /// Set once the person takes a move back or lets the coach play one for them,
+    /// so the army knows the game had help.
+    private(set) var wasAssisted = false
+    /// Called when a game against the computer is left unfinished for a new one,
+    /// so it can count as a loss. Short games (fewer than two moves each) don't count.
+    @ObservationIgnored var onAbandon: ((_ ledger: PieceLedger, _ setup: Setup, _ assisted: Bool) -> Void)?
+
+    /// What this game is worth to the army.
+    var armyStakes: GameStakes {
+        GameStakes(level: setup.level, assisted: wasAssisted)
+    }
 
     var showBestMoves = true {
         didSet { refreshHints() }
@@ -183,7 +194,12 @@ final class MatchController {
     // MARK: Actions
 
     func start(_ setup: Setup, from position: Position = .standard, playSound: Bool = true) {
+        if hasStarted, self.setup.opponent == .computer, !isOver, game.plyCount >= 4,
+           let ledger = game.ledger {
+            onAbandon?(ledger, self.setup, wasAssisted)
+        }
         self.setup = setup
+        wasAssisted = false
         hasStarted = true
         gameNumber += 1
         resetWork()
@@ -231,6 +247,7 @@ final class MatchController {
         let movesBefore = game.moveCount
         game.playEngineMove(hint.uci)
         if game.moveCount != movesBefore {
+            wasAssisted = true
             didPlayMove(byPerson: true)
         }
     }
@@ -243,6 +260,7 @@ final class MatchController {
     func undo() {
         guard canUndo else { return }
         resetWork()
+        wasAssisted = true
         takeBack()
         if setup.opponent == .computer, !game.isHumanTurn, game.canUndo {
             takeBack()
@@ -282,12 +300,14 @@ final class MatchController {
         isFlippedByHand.toggle()
     }
 
-    /// The game's story for the highlight reel.
-    func highlightReel() -> GameReel {
+    /// The game's story for the highlight reel. `pieceName` names the player's
+    /// piece that started on a square, and `hero` is the Piece of the Match line.
+    func highlightReel(pieceName: (Square) -> String? = { _ in nil }, hero: String? = nil) -> GameReel {
         let opponent = setup.opponent == .computer ? setup.level.rival.name : "Friend"
         return GameReel.make(log: reelLog, player: "You", opponent: opponent, playerColor: setup.playerColor,
                              winner: winner, isOver: isOver, accuracy: accuracy,
-                             moveCount: (game.plyCount + 1) / 2, finalFEN: game.fen)
+                             moveCount: (game.plyCount + 1) / 2, finalFEN: game.fen,
+                             pieceName: pieceName, hero: hero)
     }
 
     /// A rough quality score for the person's moves this game, 0 to 100.
@@ -384,6 +404,8 @@ final class MatchController {
         let endedGame: Bool
         /// The game's ply count once the move was on the board, for the grade log.
         let ply: Int
+        /// Where the moving piece started the game, so the army can name it.
+        let origin: Square?
     }
 
     private func refreshHints() {
@@ -395,7 +417,8 @@ final class MatchController {
     private func scheduleWork(after personMove: PlayedMove?) {
         let gen = generation
         let played = personMove.map {
-            PersonMove(move: $0, fenAfter: game.fen, endedGame: game.isGameOver, ply: game.plyCount)
+            PersonMove(move: $0, fenAfter: game.fen, endedGame: game.isGameOver, ply: game.plyCount,
+                       origin: game.ledger?.origin(of: Square(String($0.uci.dropFirst(2).prefix(2)))))
         }
         work = Task { [weak self] in
             await self?.computerMoveIfNeeded(generation: gen)
@@ -411,7 +434,8 @@ final class MatchController {
         guard gen == generation, !Task.isCancelled else { return }
         let move = played.move
         if played.endedGame, game.winner == move.color {
-            publishReview(.checkmate, move: move, ply: played.ply, fenAfter: played.fenAfter, best: nil, evaluation: nil)
+            publishReview(.checkmate, move: move, ply: played.ply, fenAfter: played.fenAfter, best: nil, evaluation: nil,
+                          origin: played.origin)
             return
         }
         guard let engine else { return }
@@ -446,7 +470,7 @@ final class MatchController {
         let grade = MoveReview.grade(before: bestLine.evaluation, after: after, playedBest: playedBest)
         let bestSAN = playedBest ? nil : Notation.san(of: bestMove, fen: move.fenBefore)
         publishReview(grade, move: move, ply: played.ply, fenAfter: played.fenAfter, best: bestSAN, evaluation: after,
-                      bestUCI: bestMove, before: bestLine.evaluation, reply: reply)
+                      bestUCI: bestMove, before: bestLine.evaluation, reply: reply, origin: played.origin)
         // Only until the next hint search reports on the position as it stands now.
         if analysis?.fen != game.fen {
             evaluation = move.color == .white ? after : after.flipped
@@ -455,20 +479,21 @@ final class MatchController {
 
     private func publishReview(
         _ grade: MoveReview.Grade, move: PlayedMove, ply: Int, fenAfter: String, best: String?, evaluation: Evaluation?,
-        bestUCI: String? = nil, before: Evaluation? = nil, reply: String? = nil
+        bestUCI: String? = nil, before: Evaluation? = nil, reply: String? = nil, origin: Square? = nil
     ) {
         gradeLog[ply] = grade
         reelLog[ply] = ReelMoment(
             ply: ply, grade: grade, san: move.san, uci: move.uci, color: move.color,
             fenBefore: move.fenBefore, fenAfter: fenAfter, best: best,
             before: before?.winningChances ?? evaluation?.winningChances ?? 0,
-            after: grade == .checkmate ? 1 : (evaluation?.winningChances ?? 0)
+            after: grade == .checkmate ? 1 : (evaluation?.winningChances ?? 0),
+            origin: origin
         )
         guard showVerdicts || grade == .checkmate else { return }
         review = MoveReview(
             id: nextReviewID, grade: grade, played: move.san, best: best, evaluation: evaluation,
             fenBefore: move.fenBefore, fenAfter: fenAfter, playedUCI: move.uci, bestUCI: bestUCI,
-            before: before, reply: reply
+            before: before, reply: reply, origin: origin
         )
         nextReviewID += 1
     }

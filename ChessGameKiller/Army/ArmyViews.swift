@@ -12,6 +12,12 @@ extension ArmyStore {
         else { return nil }
         return ArmySlot(start: start, color: placed.piece.color)
     }
+
+    /// The army name of the piece a verdict is about, in a game that counts.
+    func pieceName(for review: MoveReview, in match: MatchController) -> String? {
+        guard match.setup.opponent == .computer, match.game.ledger != nil else { return nil }
+        return name(ofPieceFrom: review.origin, color: match.setup.playerColor)
+    }
 }
 
 extension ArmyRank {
@@ -162,7 +168,7 @@ struct ArmyNewsBanner: View {
                 PieceImage(piece: piece, theme: theme, size: 38)
                     .modifier(VeteranAura(rank: news.rank, piece: piece, theme: theme, size: 38, onBoard: false))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(news.rank.title.uppercased())
+                    Text(news.label)
                         .font(.system(size: 10, weight: .heavy, design: .themed))
                         .tracking(0.8)
                         .foregroundStyle(tint)
@@ -182,6 +188,45 @@ struct ArmyNewsBanner: View {
         }
         .buttonStyle(.plain)
         .accessibilityHint("Opens your army")
+    }
+}
+
+/// After a game: the piece that did the most, in the coach's end-of-game panel.
+struct PieceOfTheMatchCard: View {
+    let hero: MatchHero
+    let color: Piece.Color
+    let theme: BoardTheme
+    @Environment(ArmyStore.self) private var store
+
+    var body: some View {
+        let record = store.record(for: hero.slot)
+        let piece = Piece(hero.slot.kind, color: color, square: .a1)
+        let tint = record.rank == .recruit ? ArmyRank.gold : record.rank.color(for: piece, theme: theme)
+        HStack(spacing: 12) {
+            PieceImage(piece: piece, theme: theme, size: 40)
+                .modifier(VeteranAura(rank: max(record.rank, .veteran), piece: piece, theme: theme,
+                                      size: 40, onBoard: false))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("PIECE OF THE MATCH")
+                    .font(.system(size: 10, weight: .heavy, design: .themed))
+                    .tracking(0.8)
+                    .foregroundStyle(tint)
+                Text(hero.line)
+                    .font(.system(.subheadline, design: .themed).weight(.semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("+\(ArmyStore.heroXP) XP · \(record.honors) \(record.honors == 1 ? "honor" : "honors")")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "star.fill")
+                .font(.title3)
+                .foregroundStyle(tint)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .trainingCard(theme, tint: tint, cornerRadius: 16)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -373,7 +418,7 @@ struct ArmyView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            Text("XP: 1 per game, 3 per win, 2 more if the piece is still standing, 2 per pawn's worth taken, 10 per promotion, 20 per checkmate.")
+            Text("XP: 1 per game, 3 per win, 2 more if the piece is still standing, 2 per pawn's worth taken, 10 per promotion, 20 per checkmate. Stronger rivals are worth more, up to 3× against Singularity. Games with Undo or a played hint earn half. Leaving a game unfinished counts as a loss. Piece of the Match earns +5, revenge on a rival that keeps taking a piece earns +15.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -439,6 +484,9 @@ struct PieceDetailView: View {
                         .foregroundStyle(tint)
                 }
                 progress(record, tint: tint)
+                if record.nemesis != nil || !record.revenge.isEmpty {
+                    rivals(record, tint: tint)
+                }
                 stats(record)
             }
             .padding(.horizontal, 20)
@@ -489,11 +537,55 @@ struct PieceDetailView: View {
         }
     }
 
+    /// Which rival keeps taking this piece, and the rivals it has beaten back.
+    private func rivals(_ record: PieceRecord, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let nemesis = record.nemesis {
+                let rival = nemesis.level.rival
+                let avenged = record.revenge.contains(nemesis.level.rawValue)
+                HStack(spacing: 10) {
+                    RivalSigil(rival: rival, size: 30, glows: theme.glows)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(avenged ? "Old rival: \(rival.name)" : "Nemesis: \(rival.name)")
+                            .font(.system(.subheadline, design: .themed).weight(.semibold))
+                        Text(avenged
+                             ? "Took it \(nemesis.times) times. Revenge taken."
+                             : "Has taken it \(nemesis.times) times. Win against \(rival.name) and take something back for revenge.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            if !record.revenge.isEmpty {
+                HStack(spacing: 6) {
+                    Text("Revenge on")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    ForEach(record.revenge.sorted(), id: \.self) { raw in
+                        if let level = MatchController.Level(rawValue: raw) {
+                            Text(level.rival.name)
+                                .font(.caption.weight(.bold))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(level.rival.hue.opacity(0.2), in: Capsule())
+                                .foregroundStyle(level.rival.hue)
+                        }
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .trainingCard(theme, tint: tint, cornerRadius: 16)
+    }
+
     private func stats(_ record: PieceRecord) -> some View {
         let items: [(String, Int)] = [
             ("Games", record.games), ("Wins", record.wins), ("Captures", record.captures),
             ("Material Taken", record.captureValue), ("Checkmates", record.mates),
             ("Promotions", record.promotions), ("Times Fallen", record.falls),
+            ("Piece of the Match", record.honors),
         ]
         return LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
             ForEach(items, id: \.0) { item in

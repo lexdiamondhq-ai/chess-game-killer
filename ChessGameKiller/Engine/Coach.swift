@@ -26,6 +26,8 @@ struct MoveReview: Equatable, Identifiable {
     var before: Evaluation? = nil
     /// The opponent's best answer to the move played, in engine notation.
     var reply: String? = nil
+    /// Where the moving piece started the game, so the army can name it.
+    var origin: Square? = nil
 
     var title: String {
         switch grade {
