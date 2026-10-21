@@ -158,6 +158,96 @@ final class RewindTests: XCTestCase {
     }
 }
 
+@MainActor
+final class LineExplorerTests: XCTestCase {
+
+    private func explorer(level: ReviewLevel = .club, engine: ChessEngine? = nil) -> LineExplorer {
+        let moment = RewindSample.game().moments.first { $0.ply == 11 }!
+        return LineExplorer(root: moment.fenBefore, line: moment.bestLine, player: .white, level: level, engine: engine)
+    }
+
+    func testTheLineStepsMoveByMove() {
+        let line = explorer()
+        XCTAssertEqual(line.steps.map(\.san), ["Nxf7", "Kxf7", "Qf3+", "Ke6"])
+        XCTAssertEqual(line.cursor, 0)
+        line.go(to: 1)
+        XCTAssertEqual(line.current?.numbered, "6. Nxf7")
+        XCTAssertEqual(line.ghostSquares, [Square("f7")])
+        line.go(to: 2)
+        // The king took the knight: the king is now the ghost on f7.
+        XCTAssertEqual(line.ghostSquares, [Square("f7")])
+        line.go(to: 3)
+        XCTAssertEqual(line.ghostSquares, [Square("f7"), Square("f3")])
+        line.go(to: 99)
+        XCTAssertTrue(line.atEnd)
+        line.stepBack()
+        XCTAssertEqual(line.cursor, 3)
+    }
+
+    func testLeoSaysWhatEachMoveDoes() {
+        let line = explorer()
+        line.go(to: 1)
+        XCTAssertTrue(line.sentence.contains("takes their pawn"), line.sentence)
+        XCTAssertTrue(line.sentence.contains("queen and rook"), line.sentence)
+        line.go(to: 2)
+        XCTAssertTrue(line.sentence.hasPrefix("Kxf7: Their king takes your knight"), line.sentence)
+        line.go(to: 3)
+        XCTAssertTrue(line.sentence.contains("with check"), line.sentence)
+    }
+
+    func testCoachIsShorterThanGrandmaster() {
+        let line = explorer(level: .grandmaster)
+        XCTAssertEqual(line.steps.count, 4)
+        line.go(to: 4)
+        line.setLevel(.coach)
+        XCTAssertEqual(line.steps.count, 4)
+        XCTAssertEqual(ReviewLevel.coach.depth, 4)
+        XCTAssertLessThan(ReviewLevel.club.depth, ReviewLevel.grandmaster.depth)
+        XCTAssertFalse(ReviewLevel.club.showsBranches(playerToMove: true))
+        XCTAssertTrue(ReviewLevel.club.showsBranches(playerToMove: false))
+        XCTAssertFalse(ReviewLevel.coach.showsBranches(playerToMove: false))
+    }
+
+    func testYourOwnMoveStartsYourOwnLine() {
+        let line = explorer()
+        line.tap(Square("d2"))
+        XCTAssertEqual(line.selected, Square("d2"))
+        line.tap(Square("d4"))
+        XCTAssertNil(line.selected)
+        XCTAssertEqual(line.ownMoveAt, 0)
+        XCTAssertEqual(line.steps.map(\.san), ["d4"])
+        XCTAssertEqual(line.cursor, 1)
+        // A move that isn't legal changes nothing.
+        line.play("a1a8")
+        XCTAssertEqual(line.steps.count, 1)
+    }
+
+    func testTheEngineRunsTheLineOnAndOffersBranches() async throws {
+        let line = explorer(level: .club, engine: FakeEngine())
+        line.go(to: 1)
+        // Black to move after Nxf7: on Club the opponent's tries show.
+        for _ in 0..<40 where line.isThinking || line.branches.isEmpty {
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        XCTAssertNotNil(line.evaluation)
+        XCTAssertFalse(line.branches.isEmpty)
+        XCTAssertLessThanOrEqual(line.branches.count, ReviewLevel.club.branches)
+        XCTAssertFalse(line.branches.contains { $0.moves.first == "e8f7" }, "The line's own move isn't a branch")
+
+        let branch = line.branches[0]
+        line.follow(branch)
+        XCTAssertEqual(line.cursor, 2)
+        XCTAssertEqual(line.current?.uci, branch.moves.first)
+
+        // At the end of a short line the engine carries it on to the level's depth.
+        line.go(to: line.steps.count)
+        for _ in 0..<40 where line.steps.count < ReviewLevel.club.depth {
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        XCTAssertEqual(line.steps.count, ReviewLevel.club.depth)
+    }
+}
+
 /// Pictures of Rewind at iPhone size, saved for CI like the game screen's.
 @MainActor
 final class RewindSnapshotTests: XCTestCase {
@@ -176,6 +266,16 @@ final class RewindSnapshotTests: XCTestCase {
         try snapshot("rewind-blueprint", RewindView(game: game, theme: .named(.blueprint), startAt: 14).environment(vault))
     }
 
+    func testDeepLine() throws {
+        let vault = GameVault()
+        let game = RewindSample.game()
+        vault.record(game)
+        UserDefaults.standard.set(ReviewLevel.grandmaster.rawValue, forKey: ReviewLevel.storageKey)
+        defer { UserDefaults.standard.removeObject(forKey: ReviewLevel.storageKey) }
+        try snapshot("rewind-line", RewindView(game: game, theme: .named(.pulse), startAt: 10, opensLine: true,
+                                               engine: FakeEngine()).environment(vault), wait: 3)
+    }
+
     func testYourGames() throws {
         let vault = GameVault()
         vault.record(RewindSample.game(date: .now.addingTimeInterval(-86_400)))
@@ -186,13 +286,13 @@ final class RewindSnapshotTests: XCTestCase {
         try snapshot("rewind-games", RewindGamesView(theme: .named(.neon)).environment(vault))
     }
 
-    private func snapshot(_ name: String, _ view: some View) throws {
+    private func snapshot(_ name: String, _ view: some View, wait: TimeInterval = 1.5) throws {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let window = UIWindow(windowScene: scene)
         window.frame = scene.coordinateSpace.bounds
         window.rootViewController = UIHostingController(rootView: view)
         window.makeKeyAndVisible()
-        RunLoop.main.run(until: Date().addingTimeInterval(1.5))
+        RunLoop.main.run(until: Date().addingTimeInterval(wait))
         window.layoutIfNeeded()
         let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
             window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
