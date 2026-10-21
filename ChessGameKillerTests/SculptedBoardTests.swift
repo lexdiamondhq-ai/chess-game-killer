@@ -126,12 +126,25 @@ final class SculptedBoardTests: XCTestCase {
         defaults.set("faberge", forKey: "boardTheme")
         defaults.set(true, forKey: "matchRival")
         LookIntroduction.applyOnce(defaults: defaults)
-        XCTAssertEqual(defaults.string(forKey: "boardTheme"), "sculpted")
+        XCTAssertEqual(defaults.string(forKey: "boardTheme"), "noir")
         XCTAssertEqual(defaults.bool(forKey: "matchRival"), false)
         // A look picked afterwards stays.
         defaults.set("neon", forKey: "boardTheme")
         LookIntroduction.applyOnce(defaults: defaults)
         XCTAssertEqual(defaults.string(forKey: "boardTheme"), "neon")
+        defaults.removePersistentDomain(forName: "SculptedBoardTests")
+    }
+
+    /// Someone who already met Sculpted and turned "Match rival" back on keeps it on.
+    func testNoirKeepsAMatchRivalChoiceMadeAfterSculpted() {
+        let defaults = UserDefaults(suiteName: "SculptedBoardTests")!
+        defaults.removePersistentDomain(forName: "SculptedBoardTests")
+        defaults.set(true, forKey: LookIntroduction.sculptedKey)
+        defaults.set("sculpted", forKey: "boardTheme")
+        defaults.set(true, forKey: "matchRival")
+        LookIntroduction.applyOnce(defaults: defaults)
+        XCTAssertEqual(defaults.string(forKey: "boardTheme"), "noir")
+        XCTAssertEqual(defaults.bool(forKey: "matchRival"), true)
         defaults.removePersistentDomain(forName: "SculptedBoardTests")
     }
 

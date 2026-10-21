@@ -24,9 +24,21 @@ final class BoardThemeTests: XCTestCase {
         }
     }
 
-    func testSculptedIsTheDefaultLook() {
-        XCTAssertEqual(BoardTheme.all.first?.id, .sculpted)
-        XCTAssertEqual(BoardTheme.named(.sculpted).pieceSet, "sculpted-")
+    func testNoirIsTheDefaultLook() {
+        XCTAssertEqual(BoardTheme.all.first?.id, .noir)
+        XCTAssertEqual(BoardTheme.named(.noir).pieceSet, "sculpted-")
+        XCTAssertEqual(BoardTheme.named(.noir).sculptedLook?.name, "Noir")
+    }
+
+    func testTheCarvedLooksPlayIn3DAndTheRestStayFlat() {
+        for id in [BoardTheme.ID.noir, .sculpted, .bordeaux, .midnight] {
+            let theme = BoardTheme.named(id)
+            XCTAssertNotNil(theme.sculptedLook, "\(theme.name) lost its 3D look")
+            XCTAssertEqual(theme.sculptedLook?.name, theme.name)
+        }
+        for theme in BoardTheme.all where ![.noir, .sculpted, .bordeaux, .midnight].contains(theme.id) {
+            XCTAssertNil(theme.sculptedLook, "\(theme.name) should stay flat")
+        }
     }
 
     func testSavedSettingsForRemovedThemesOpenTheDefault() {
@@ -35,8 +47,8 @@ final class BoardThemeTests: XCTestCase {
         for removed in ["walnut", "malachite"] {
             XCTAssertNil(BoardTheme.ID(rawValue: removed))
             defaults.set(removed, forKey: "boardTheme")
-            let saved = defaults.string(forKey: "boardTheme").flatMap(BoardTheme.ID.init(rawValue:)) ?? .sculpted
-            XCTAssertEqual(saved, .sculpted)
+            let saved = defaults.string(forKey: "boardTheme").flatMap(BoardTheme.ID.init(rawValue:)) ?? .noir
+            XCTAssertEqual(saved, .noir)
         }
         defaults.removePersistentDomain(forName: "BoardThemeTests")
     }

@@ -45,6 +45,11 @@ jobs:
           # Failures first, so they are never cut off by a long list of passes.
           grep -E "error:|Test Case .* failed|\*\* " build.log | head -80 || true
           grep -E "Executed" build.log | tail -3 || true
+          # On a crash: which test was running, and the lines around the error.
+          if [ "$status" != 0 ]; then
+            grep -E "Restarting after|Test Case '.*' started" build.log | tail -4 || true
+            grep -B4 -A24 "Fatal error" build.log | head -60 || true
+          fi
           exit $status
       - name: Upload build log
         if: always()
@@ -67,7 +72,11 @@ jobs:
           cat snapshots/device.txt || true
           for f in snapshots/*.png; do
             [ -e "$f" ] || continue
-            sips -s format jpeg -s formatOptions 60 -Z 700 "$f" --out /tmp/small.jpg >/dev/null
+            # Look studies are printed near full size, so they can be judged as on the phone.
+            case "$(basename "$f")" in
+              study-*) sips -s format jpeg -s formatOptions 80 -Z 1300 "$f" --out /tmp/small.jpg >/dev/null ;;
+              *) sips -s format jpeg -s formatOptions 60 -Z 700 "$f" --out /tmp/small.jpg >/dev/null ;;
+            esac
             echo "BEGIN-SCREEN $(basename "$f")"
             base64 -i /tmp/small.jpg | fold -w 3000
             echo "END-SCREEN"

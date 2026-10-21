@@ -2,23 +2,34 @@ import ChessKit
 import SceneKit
 import SwiftUI
 
-/// Holds one board's 3D scene, made the first time the board is drawn.
+/// Holds one board's 3D scene, made the first time the board is drawn, and made again
+/// in the new look when the player picks another.
 final class SculptedStage {
-    lazy var scene = SculptedBoardScene()
+    private var made: SculptedBoardScene?
+
+    func scene(for look: SculptedLook) -> SculptedBoardScene {
+        if let made, made.look.name == look.name { return made }
+        let scene = SculptedBoardScene(look: look)
+        made = scene
+        return scene
+    }
 }
 
 /// The SceneKit view inside SwiftUI. Taps are read by the SwiftUI layer laid over it.
+/// Callers give it `.id(look.name)`, so a new look brings a new view.
 struct SculptedSceneView: UIViewRepresentable {
     let stage: SculptedStage
+    let look: SculptedLook
     let state: SculptedBoardState
 
     func makeUIView(context: Context) -> SculptedSceneKitView {
-        stage.scene.apply(state, animated: false)
-        return stage.scene.view
+        let scene = stage.scene(for: look)
+        scene.apply(state, animated: false)
+        return scene.view
     }
 
     func updateUIView(_ view: SculptedSceneKitView, context: Context) {
-        stage.scene.apply(state, animated: !context.transaction.disablesAnimations)
+        stage.scene(for: look).apply(state, animated: !context.transaction.disablesAnimations)
     }
 }
 
@@ -42,13 +53,15 @@ struct SculptedBoardView: View {
 
     private var game: GameModel { match.game }
     private var flipped: Bool { match.isBoardFlipped }
+    private var look: SculptedLook { theme.sculptedLook ?? .noir }
 
     var body: some View {
         GeometryReader { geo in
             let size = geo.size
             let camera = SculptedCamera.fitted(aspect: Float(size.width / max(size.height, 1)), flipped: flipped)
             ZStack(alignment: .topLeading) {
-                SculptedSceneView(stage: stage, state: boardState)
+                SculptedSceneView(stage: stage, look: look, state: boardState)
+                    .id(look.name)
                     .frame(width: size.width, height: size.height)
                     .accessibilityHidden(true)
                 Color.clear
@@ -121,7 +134,7 @@ struct SculptedBoardView: View {
             endBrowsing?()
             return
         }
-        guard let square = stage.scene.square(at: point) else { return }
+        guard let square = stage.scene(for: look).square(at: point) else { return }
         withAnimation(.snappy(duration: 0.22)) { match.tap(square) }
     }
 
@@ -183,12 +196,14 @@ struct SculptedBoardView: View {
 /// A 3D board that is not for playing, such as the Settings preview: a position and arrows.
 struct SculptedStillBoard: View {
     let position: Position
+    var look: SculptedLook = .noir
     var hints: [SculptedHint] = []
 
     @State private var stage = SculptedStage()
 
     var body: some View {
-        SculptedSceneView(stage: stage, state: state)
+        SculptedSceneView(stage: stage, look: look, state: state)
+            .id(look.name)
             .aspectRatio(SculptedBoardView.aspect, contentMode: .fit)
             .allowsHitTesting(false)
     }

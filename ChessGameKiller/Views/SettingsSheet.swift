@@ -5,7 +5,7 @@ import SwiftUI
 /// Settings: the board's look with a live preview, how much the coach says,
 /// sound and haptics, and the credits. Every choice is remembered.
 struct SettingsSheet: View {
-    @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .sculpted
+    @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .noir
     @AppStorage("matchRival") private var matchRival = false
     @AppStorage("showBestMoves") private var showBestMoves = true
     @AppStorage("showSecondBest") private var showSecondBest = true
@@ -36,7 +36,7 @@ struct SettingsSheet: View {
                             }
                         }
                         SettingsGroup(theme: theme) {
-                            if themeID == .sculpted {
+                            if theme.sculptedLook != nil {
                                 ToggleRow(title: "3D pieces", subtitle: "Carved pieces that lift, glide and fall. Off draws the same set flat.",
                                           symbol: "cube", isOn: $sculpted3D, theme: theme)
                                 rule
@@ -130,7 +130,7 @@ struct SettingsSheet: View {
     private var preview: some View {
         VStack(spacing: 14) {
             BoardPreview(theme: theme, showBest: showBestMoves, showSecond: showBestMoves && showSecondBest, size: 172,
-                         threeD: themeID == .sculpted && sculpted3D)
+                         threeD: theme.sculptedLook != nil && sculpted3D)
                 .padding(.top, 6)
             Text("Live preview")
                 .font(.caption.weight(.semibold))
@@ -175,7 +175,7 @@ struct BoardPreview: View {
     let showBest: Bool
     let showSecond: Bool
     var size: CGFloat = 160
-    /// The Sculpted look's real 3D board, with the same position and arrows.
+    /// The look's real 3D board, with the same position and arrows.
     var threeD = false
 
     private static let position = Position(fen: "r1bqk2r/ppp2ppp/2np1n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQK2R w KQkq - 0 6")
@@ -185,7 +185,7 @@ struct BoardPreview: View {
     var body: some View {
         if threeD, SculptedAssets.shared.isLoaded, let position = Self.position {
             // As tall as the flat preview, and as wide as the angled board needs.
-            SculptedStillBoard(position: position, hints: stillHints)
+            SculptedStillBoard(position: position, look: theme.sculptedLook ?? .noir, hints: stillHints)
                 .frame(width: size * SculptedBoardView.aspect, height: size)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Preview of the \(theme.name) board")

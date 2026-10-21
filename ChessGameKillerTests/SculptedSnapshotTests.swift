@@ -55,13 +55,32 @@ final class SculptedSnapshotTests: XCTestCase {
         window.isHidden = true
     }
 
+    /// Each 3D look at the size it has on an iPhone 17 Pro, a game in progress.
+    func testEveryLook() throws {
+        for look in SculptedLook.all {
+            let (scene, window) = try stage(Self.midgame, look: look, side: 402)
+            try save(scene.snapshot(), "study-\(look.name.lowercased())")
+            window.isHidden = true
+        }
+    }
+
+    /// Every look has its own stone, studio and cache key.
+    func testLooksAreDistinct() {
+        let looks = SculptedLook.all
+        XCTAssertEqual(Set(looks.map(\.name)).count, looks.count, "two looks share a cache key")
+        XCTAssertEqual(Set(looks.map(\.squares)).count, looks.count, "two looks share their stone")
+        for look in looks {
+            XCTAssertNotNil(UIImage(named: look.squares), "\(look.name) is missing \(look.squares)")
+            XCTAssertNotNil(UIImage(named: look.studio), "\(look.name) is missing \(look.studio)")
+        }
+    }
+
     func testLightLevels() throws {
-        let saved = SculptedLook.current
-        defer { SculptedLook.current = saved }
         for (name, environment, key) in [("low", 1.5, 900.0), ("high", 2.5, 1350.0)] as [(String, CGFloat, CGFloat)] {
-            SculptedLook.current.environment = environment
-            SculptedLook.current.key = key
-            let (scene, window) = try stage(SculptedBoardState(pieces: Self.pieces))
+            var look = SculptedLook.classic
+            look.environment = environment
+            look.key = key
+            let (scene, window) = try stage(SculptedBoardState(pieces: Self.pieces), look: look)
             try save(scene.snapshot(), "sculpted-light-\(name)")
             window.isHidden = true
         }
@@ -92,8 +111,10 @@ final class SculptedSnapshotTests: XCTestCase {
 
     // MARK: Helpers
 
-    private func stage(_ state: SculptedBoardState, side: CGFloat = 390) throws -> (SculptedBoardScene, UIWindow) {
-        let scene = SculptedBoardScene(assets: SculptedAssets())
+    private func stage(
+        _ state: SculptedBoardState, look: SculptedLook = .noir, side: CGFloat = 390
+    ) throws -> (SculptedBoardScene, UIWindow) {
+        let scene = SculptedBoardScene(look: look, assets: SculptedAssets())
         let windowScene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let window = UIWindow(windowScene: windowScene)
         window.frame = CGRect(x: 0, y: 0, width: side, height: (side / SculptedBoardView.aspect).rounded())

@@ -23,27 +23,39 @@ final class ScreenSnapshotTests: XCTestCase {
         }
     }
 
-    func testSculptedScreen() throws {
-        defaults.set("sculpted", forKey: "boardTheme")
+    func testNoirScreen() throws {
+        defaults.set("noir", forKey: "boardTheme")
         defaults.set(false, forKey: "matchRival")
         defaults.set(true, forKey: "sculpted3D")
-        try snapshot("sculpted")
+        try snapshot("noir")
     }
 
-    func testBigBoardSculpted() throws {
-        defaults.set("sculpted", forKey: "boardTheme")
+    func testBigBoardNoir() throws {
+        defaults.set("noir", forKey: "boardTheme")
         defaults.set(false, forKey: "matchRival")
         defaults.set(true, forKey: "sculpted3D")
         defaults.set(true, forKey: "bigBoard")
-        try snapshot("bigboard-sculpted")
+        try snapshot("bigboard-noir")
     }
 
     /// The same set drawn flat, as small boards and the "3D pieces" switch show it.
-    func testSculptedFlatScreen() throws {
-        defaults.set("sculpted", forKey: "boardTheme")
+    func testFlatScreens() throws {
         defaults.set(false, forKey: "matchRival")
         defaults.set(false, forKey: "sculpted3D")
-        try snapshot("sculpted-flat")
+        for id in ["noir", "sculpted", "bordeaux", "midnight"] {
+            defaults.set(id, forKey: "boardTheme")
+            try snapshot("\(id)-flat")
+        }
+    }
+
+    /// Every 3D look on the whole game screen.
+    func testLookScreens() throws {
+        defaults.set(false, forKey: "matchRival")
+        defaults.set(true, forKey: "sculpted3D")
+        for id in ["noir", "sculpted", "bordeaux", "midnight"] {
+            defaults.set(id, forKey: "boardTheme")
+            try snapshot("study-screen-\(id)")
+        }
     }
 
     func testBigBoardNeon() throws {
