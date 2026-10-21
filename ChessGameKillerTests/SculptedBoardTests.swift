@@ -36,7 +36,10 @@ final class SculptedBoardTests: XCTestCase {
         for aspect: Float in [1, 0.8, 1.35, 1.6] {
             for flipped in [false, true] {
                 let camera = SculptedCamera.fitted(aspect: aspect, flipped: flipped)
-                let points = SculptedCamera.keyPoints.map(camera.normalized)
+                // From Black's side the far rank, whose kings must fit, is White's first rank.
+                let points = SculptedCamera.keyPoints
+                    .map { flipped ? SIMD3($0.x * -1, $0.y, $0.z * -1) : $0 }
+                    .map(camera.normalized)
                 XCTAssertTrue(points.allSatisfy { abs($0.x) <= 1 && abs($0.y) <= 1 }, "\(aspect) \(flipped)")
                 // Up to the game's own shape, the board's near corners reach the side margins.
                 if aspect <= Float(SculptedBoardView.aspect) {
