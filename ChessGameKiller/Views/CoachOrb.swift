@@ -340,6 +340,8 @@ private struct CoachPanel: View {
     @Environment(GameCoach.self) private var gameCoach: GameCoach?
     @Environment(TrainingStore.self) private var training: TrainingStore?
     @State private var reel: GameReel?
+    @State private var rewind: SavedGame?
+    @Environment(GameVault.self) private var vault: GameVault?
 
     private var accent: Color { theme.accent ?? .accentColor }
 
@@ -382,7 +384,11 @@ private struct CoachPanel: View {
             if match.isOver {
                 summary.padding(.top, 12)
                 endButtons.padding(.top, 10)
-                reelButton.padding(.top, 8)
+                HStack(spacing: 8) {
+                    rewindButton
+                    reelButton
+                }
+                .padding(.top, 8)
             } else {
                 bestMoves.padding(.top, 12)
                 actions.padding(.top, 8)
@@ -603,12 +609,38 @@ private struct CoachPanel: View {
         }
     }
 
+    /// Rewind: the game's line, Leo on each moment, and a second chance at the mistakes.
+    private var rewindButton: some View {
+        Button {
+            guard let game = match.savedGame() else { return }
+            vault?.record(game)
+            rewind = vault?.game(game.id) ?? game
+        } label: {
+            Label("Rewind", systemImage: "backward.circle.fill")
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 40)
+        }
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.capsule)
+        .tint(accent)
+        .fullScreenCover(item: $rewind) { game in
+            if let vault {
+                RewindView(game: game, theme: theme) { _ in
+                    collapse()
+                    withAnimation(.snappy) { match.rematch() }
+                }
+                .environment(vault)
+            }
+        }
+    }
+
     /// Leo's 30-second story of the game, to watch and share.
     private var reelButton: some View {
         Button {
             reel = match.highlightReel()
         } label: {
-            Label("Watch your highlight reel", systemImage: "film.stack")
+            Label("Highlight reel", systemImage: "film.stack")
                 .font(.subheadline.weight(.semibold))
                 .frame(maxWidth: .infinity)
                 .frame(minHeight: 40)

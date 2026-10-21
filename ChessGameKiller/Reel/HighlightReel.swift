@@ -15,6 +15,14 @@ struct ReelMoment: Equatable {
     /// Winning chances for the mover, -1 to 1, before and after the move.
     let before: Double
     let after: Double
+    /// For Rewind: the engine's move in engine notation, its whole line, and the
+    /// opponent's best answer to the move played.
+    var bestUCI: String? = nil
+    var bestLine: [String] = []
+    var reply: String? = nil
+    /// The engine's scores for the mover, before and after the move.
+    var beforeEval: Evaluation? = nil
+    var afterEval: Evaluation? = nil
 }
 
 /// A finished game cut down to its story: up to three moments and how it ended.

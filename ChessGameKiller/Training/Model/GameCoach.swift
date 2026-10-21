@@ -127,16 +127,21 @@ final class GameCoach {
 
     // MARK: Private
 
-    private func show(_ found: MomentFinder.Found, review: MoveReview, library: TrainingLibrary?) {
+    /// What the coach says about a moment: the course's words when it has them, the built-in ones otherwise.
+    nonisolated static func words(for found: MomentFinder.Found, library: TrainingLibrary?) -> (title: String, detail: String) {
         let defaults = MomentFinder.defaultText(for: found.kind)
         let text = library?.moment(found.kind.rawValue)
-        var title = MomentFinder.fill(text?.title ?? defaults.title, with: found.values)
-        var detail = MomentFinder.fill(text?.detail ?? defaults.detail, with: found.values)
+        let title = MomentFinder.fill(text?.title ?? defaults.title, with: found.values)
+        let detail = MomentFinder.fill(text?.detail ?? defaults.detail, with: found.values)
         // A placeholder left over means the course text asked for something this moment lacks.
         if title.contains("{") || detail.contains("{") {
-            title = MomentFinder.fill(defaults.title, with: found.values)
-            detail = MomentFinder.fill(defaults.detail, with: found.values)
+            return (MomentFinder.fill(defaults.title, with: found.values), MomentFinder.fill(defaults.detail, with: found.values))
         }
+        return (title, detail)
+    }
+
+    private func show(_ found: MomentFinder.Found, review: MoveReview, library: TrainingLibrary?) {
+        let (title, detail) = Self.words(for: found, library: library)
         moment = CoachMoment(
             id: nextID, kind: found.kind, title: title, detail: detail, skill: found.skill,
             fen: review.fenBefore ?? "", best: review.bestUCI, played: review.playedUCI ?? ""

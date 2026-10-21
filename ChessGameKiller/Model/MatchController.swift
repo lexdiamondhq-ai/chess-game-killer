@@ -119,6 +119,13 @@ final class MatchController {
     private var gradeLog: [Int: MoveReview.Grade] = [:]
     /// Every graded move of the person's, by ply, for the highlight reel.
     private(set) var reelLog: [Int: ReelMoment] = [:]
+    /// Names this game in the player's saved games. A new one for every game.
+    private(set) var gameID = UUID()
+    /// When this game began.
+    private(set) var startedAt = Date()
+    /// Handed the game as it stood whenever a new one starts, so games left
+    /// unfinished can still be rewound.
+    @ObservationIgnored var onArchive: (@MainActor (SavedGame) -> Void)?
     /// Flipped by the Flip button, on top of the usual "your side at the bottom".
     private(set) var isFlippedByHand = false
 
@@ -183,6 +190,11 @@ final class MatchController {
     // MARK: Actions
 
     func start(_ setup: Setup, from position: Position = .standard, playSound: Bool = true) {
+        if hasStarted, isOver || game.plyCount >= Self.pliesWorthKeeping, let saved = savedGame() {
+            onArchive?(saved)
+        }
+        gameID = UUID()
+        startedAt = Date()
         self.setup = setup
         hasStarted = true
         gameNumber += 1
@@ -288,6 +300,31 @@ final class MatchController {
         return GameReel.make(log: reelLog, player: "You", opponent: opponent, playerColor: setup.playerColor,
                              winner: winner, isOver: isOver, accuracy: accuracy,
                              moveCount: (game.plyCount + 1) / 2, finalFEN: game.fen)
+    }
+
+    /// An unfinished game this long is kept when a new one starts.
+    static let pliesWorthKeeping = 10
+
+    /// The game so far, for the player's saved games. Nil before the first move.
+    func savedGame() -> SavedGame? {
+        guard hasStarted, game.plyCount > 0 else { return nil }
+        let isComputer = setup.opponent == .computer
+        let moments = reelLog.values.sorted { $0.ply < $1.ply }.map { moment in
+            SavedMoment(
+                ply: moment.ply, grade: moment.grade.rawValue, san: moment.san, uci: moment.uci,
+                byWhite: moment.color == .white, fenBefore: moment.fenBefore, fenAfter: moment.fenAfter,
+                best: moment.best, bestUCI: moment.bestUCI, bestLine: moment.bestLine, reply: moment.reply,
+                before: moment.before, after: moment.after,
+                beforeEval: moment.beforeEval, afterEval: moment.afterEval
+            )
+        }
+        return SavedGame.make(
+            id: gameID, date: startedAt, opponent: isComputer ? setup.level.rival.name : "Friend",
+            level: isComputer ? setup.level.rawValue : nil,
+            playerColor: isComputer ? setup.playerColor : .white,
+            winner: winner, isOver: isOver, accuracy: accuracy,
+            positions: game.positionFENs, moves: game.moves, moments: moments
+        )
     }
 
     /// A rough quality score for the person's moves this game, 0 to 100.
@@ -446,7 +483,8 @@ final class MatchController {
         let grade = MoveReview.grade(before: bestLine.evaluation, after: after, playedBest: playedBest)
         let bestSAN = playedBest ? nil : Notation.san(of: bestMove, fen: move.fenBefore)
         publishReview(grade, move: move, ply: played.ply, fenAfter: played.fenAfter, best: bestSAN, evaluation: after,
-                      bestUCI: bestMove, before: bestLine.evaluation, reply: reply)
+                      bestUCI: bestMove, before: bestLine.evaluation, reply: reply,
+                      line: playedBest ? [] : bestLine.moves)
         // Only until the next hint search reports on the position as it stands now.
         if analysis?.fen != game.fen {
             evaluation = move.color == .white ? after : after.flipped
@@ -455,14 +493,16 @@ final class MatchController {
 
     private func publishReview(
         _ grade: MoveReview.Grade, move: PlayedMove, ply: Int, fenAfter: String, best: String?, evaluation: Evaluation?,
-        bestUCI: String? = nil, before: Evaluation? = nil, reply: String? = nil
+        bestUCI: String? = nil, before: Evaluation? = nil, reply: String? = nil, line: [String] = []
     ) {
         gradeLog[ply] = grade
         reelLog[ply] = ReelMoment(
             ply: ply, grade: grade, san: move.san, uci: move.uci, color: move.color,
             fenBefore: move.fenBefore, fenAfter: fenAfter, best: best,
             before: before?.winningChances ?? evaluation?.winningChances ?? 0,
-            after: grade == .checkmate ? 1 : (evaluation?.winningChances ?? 0)
+            after: grade == .checkmate ? 1 : (evaluation?.winningChances ?? 0),
+            bestUCI: best == nil ? nil : bestUCI, bestLine: line, reply: reply,
+            beforeEval: before, afterEval: evaluation
         )
         guard showVerdicts || grade == .checkmate else { return }
         review = MoveReview(

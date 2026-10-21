@@ -13,6 +13,8 @@ struct BigBoardTray<Dock: View>: View {
     let onExit: () -> Void
     /// Set when the army isn't in the dock already.
     var onArmy: (() -> Void)?
+    /// Your saved games, to rewind.
+    var onGames: (() -> Void)?
     @ViewBuilder let dock: () -> Dock
 
     @GestureState private var drag: CGFloat = 0
@@ -81,6 +83,9 @@ struct BigBoardTray<Dock: View>: View {
             DockButton(title: "New game", symbol: "plus", theme: theme, action: onNewGame)
             if let onArmy {
                 DockButton(title: "Army", symbol: "shield.lefthalf.filled", theme: theme, action: onArmy)
+            }
+            if let onGames {
+                DockButton(title: "Games", symbol: "backward.circle", theme: theme, action: onGames)
             }
             DockButton(title: "Settings", symbol: "gearshape", theme: theme, action: onSettings)
             DockButton(title: "Normal view", symbol: "arrow.down.right.and.arrow.up.left", theme: theme, action: onExit)

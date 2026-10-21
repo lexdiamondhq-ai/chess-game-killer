@@ -27,6 +27,8 @@ struct ContentView: View {
     @State private var army = ArmyStore.live()
     @State private var showingArmy = false
     @State private var armyNews: ArmyNews?
+    @State private var vault = GameVault.live()
+    @State private var showingGames = false
     @Environment(\.scenePhase) private var scenePhase
     /// Big Board: the board edge to edge with everything else tucked into a pull-up tray.
     @AppStorage("bigBoard") private var bigBoard = false
@@ -53,7 +55,7 @@ struct ContentView: View {
     /// The board is out of sight: the app is in the background, or training covers the game.
     /// The clock waits while it is.
     private var boardHidden: Bool {
-        scenePhase != .active || showingTraining || showingArmy || showingPuzzles
+        scenePhase != .active || showingTraining || showingArmy || showingPuzzles || showingGames
             || coach.presentedLesson != nil || coach.presentedSession != nil
     }
 
@@ -78,7 +80,11 @@ struct ContentView: View {
         // Fonts read the look from here: rounded on Neon, plain SF Pro on the rest.
         let _ = ThemeFont.use(theme)
         presented
-            .onAppear { syncCoachSettings() }
+            .onAppear {
+                syncCoachSettings()
+                // A game left unfinished when a new one starts is still kept.
+                match.onArchive = { [vault] game in vault.record(game) }
+            }
             .task { await StockfishEngine.shared.warmUp() }
             .onChange(of: showBestMoves) { _, _ in syncCoachSettings() }
             .onChange(of: showSecondBest) { _, _ in syncCoachSettings() }
@@ -98,6 +104,7 @@ struct ContentView: View {
             .onChange(of: match.isOver) { _, over in
                 guard over else { return }
                 recordArmy()
+                recordGame()
                 if bigBoard { trayOpen = true }
                 // Let the last move land and the sound play, then open the summary.
                 Task { @MainActor in
@@ -116,6 +123,10 @@ struct ContentView: View {
             }
             .fullScreenCover(isPresented: $showingPuzzles) {
                 PuzzlesView(theme: theme).environment(puzzles).environment(training)
+            }
+            .fullScreenCover(isPresented: $showingGames) {
+                RewindGamesView(theme: theme) { game in playAgain(game) }
+                    .environment(vault).environment(training)
             }
             .fullScreenCover(isPresented: $showingArmy) {
                 ArmyView(theme: theme, color: match.setup.playerColor).environment(army)
@@ -158,6 +169,11 @@ struct ContentView: View {
             .environment(training)
             .environment(coach)
             .environment(army)
+            .environment(vault)
+            .onChange(of: match.reelLog.count) { _, _ in
+                // The last grades can land just after the game ends.
+                if match.isOver { recordGame() }
+            }
             .onChange(of: match.review) { _, review in
                 coach.observe(review, in: match, store: training)
             }
@@ -382,7 +398,8 @@ struct ContentView: View {
                      onNewGame: { showingNewGame = true },
                      onSettings: { showingSettings = true },
                      onExit: { withAnimation(.snappy) { bigBoard = false } },
-                     onArmy: theme.glows ? nil : { showingArmy = true }) {
+                     onArmy: theme.glows ? nil : { showingArmy = true },
+                     onGames: { showingGames = true }) {
             if theme.glows {
                 VStack(spacing: 6) {
                     neonToolRow
@@ -452,6 +469,9 @@ struct ContentView: View {
                     Label("Your Army", systemImage: "shield.lefthalf.filled")
                 }
             }
+            ToolbarItem(placement: .topBarLeading) {
+                gamesButton
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 4) {
                     Button {
@@ -480,6 +500,7 @@ struct ContentView: View {
                     } label: {
                         Label("Your Army", systemImage: "shield.lefthalf.filled")
                     }
+                    gamesButton
                 }
                 .tint(.primary)
             }
@@ -497,6 +518,15 @@ struct ContentView: View {
                 }
                 .tint(.primary)
             }
+        }
+    }
+
+    /// Your saved games, to rewind.
+    private var gamesButton: some View {
+        Button {
+            showingGames = true
+        } label: {
+            Label("Your Games", systemImage: "backward.circle")
         }
     }
 
@@ -611,6 +641,24 @@ struct ContentView: View {
                 withAnimation(.easeOut(duration: 0.3)) { armyNews = nil }
             }
         }
+    }
+
+    /// Keeps the game for Rewind. Called again as late grades arrive; the vault updates it in place.
+    private func recordGame() {
+        guard let game = match.savedGame() else { return }
+        vault.record(game)
+    }
+
+    /// The same rival again, from a rewound game.
+    private func playAgain(_ game: SavedGame) {
+        var setup = NewGameSheet.savedSetup()
+        if let raw = game.level, let level = MatchController.Level(rawValue: raw) {
+            setup.opponent = .computer
+            setup.level = level
+            setup.playerColor = game.playerColor
+        }
+        withAnimation(.snappy) { match.start(setup) }
+        showingNewGame = false
     }
 
     /// Starts a game from an analyzed position, with the player moving first.

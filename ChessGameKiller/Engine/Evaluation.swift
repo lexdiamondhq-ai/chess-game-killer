@@ -1,7 +1,7 @@
 import Foundation
 
 /// How good a position is, from the point of view of the side to move.
-enum Evaluation: Equatable, Sendable {
+enum Evaluation: Equatable, Sendable, Codable {
     /// Hundredths of a pawn. +100 means the side to move is a pawn ahead.
     case centipawns(Int)
     /// Forced mate. Positive: the side to move mates in n. Zero or negative: it gets mated.
