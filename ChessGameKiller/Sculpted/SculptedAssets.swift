@@ -109,8 +109,8 @@ final class SculptedAssets {
         return Self.pbr(inlay, roughness: 0.2, metalness: 1)
     }
 
-    /// The studio light the pieces reflect: a soft light tent, the same from every side.
-    var environment: UIImage? { UIImage(named: "sculpted-env") }
+    /// The studio light the pieces reflect, the same from every side.
+    var environment: UIImage? { UIImage(named: SculptedLook.current.studio) }
 
     static func pbr(
         _ color: UIColor, roughness: CGFloat, metalness: CGFloat = 0, coat: CGFloat = 0, coatRoughness: CGFloat = 0.05
@@ -244,7 +244,9 @@ struct SculptedLook {
     /// The line around the squares; nil is platinum.
     var inlay: UIColor?
 
-    /// How bright the studio tent is, and the key light that casts the shadows.
+    /// The studio the pieces reflect: a soft light tent, or a dark room with a few soft boxes.
+    var studio = "sculpted-env"
+    /// How bright the studio is, and the key light that casts the shadows.
     var environment: CGFloat = 2.0
     var key: CGFloat = 1100
     var rim: CGFloat = 300
@@ -266,21 +268,24 @@ extension SculptedLook {
     /// The looks being compared for the next board, the current one first.
     static let studies: [SculptedLook] = [SculptedLook(), .noir, .bordeaux, .midnight]
 
-    /// A warm key falling as a pool of light, a cool rim, a dim tent: depth without glare.
+    /// A dark studio, a warm key falling as a pool of light and a cool rim: deep color and crisp
+    /// highlights. Spot lights come out about pi times brighter than directional ones in SceneKit,
+    /// so the key is set to light the middle of the board about 1.3 times its stone color.
     private static func lit(_ look: SculptedLook) -> SculptedLook {
         var look = look
-        look.environment = 1.1
-        look.key = 2600
-        look.rim = 520
-        look.keyColor = UIColor(red: 1, green: 0.9, blue: 0.76, alpha: 1)
+        look.studio = "sculpted-env-studio"
+        look.environment = 1.0
+        look.key = 340
+        look.rim = 450
+        look.keyColor = UIColor(red: 1, green: 0.92, blue: 0.8, alpha: 1)
         look.rimColor = UIColor(red: 0.8, green: 0.87, blue: 1, alpha: 1)
-        look.spot = (inner: 24, outer: 86)
-        look.ivory = UIColor(red: 0.94, green: 0.9, blue: 0.83, alpha: 1)
-        look.ebony = UIColor(red: 0.11, green: 0.105, blue: 0.1, alpha: 1)
-        look.stoneRoughness = 0.26
-        look.stoneCoat = 0.35
-        look.lacquerRoughness = 0.3
-        look.lacquerCoat = 0.6
+        look.spot = (inner: 36, outer: 110)
+        look.ivory = UIColor(red: 0.92, green: 0.885, blue: 0.82, alpha: 1)
+        look.ebony = UIColor(red: 0.1, green: 0.095, blue: 0.09, alpha: 1)
+        look.stoneRoughness = 0.22
+        look.stoneCoat = 0.5
+        look.lacquerRoughness = 0.28
+        look.lacquerCoat = 0.7
         return look
     }
 
@@ -292,6 +297,8 @@ extension SculptedLook {
         look.lacquer = UIColor(red: 0.04, green: 0.04, blue: 0.045, alpha: 1)
         look.inlay = UIColor(red: 0.8, green: 0.72, blue: 0.56, alpha: 1)
         look.platinumMark = UIColor(red: 0.86, green: 0.79, blue: 0.64, alpha: 1)
+        look.lastMove = UIColor(red: 0.86, green: 0.79, blue: 0.64, alpha: 1)
+        look.lastMoveAlpha = 0.16
         return look
     }()
 
@@ -302,6 +309,8 @@ extension SculptedLook {
         look.squares = "sculpted-squares-bordeaux"
         look.lacquer = UIColor(red: 0.05, green: 0.04, blue: 0.04, alpha: 1)
         look.accent = UIColor(red: 0.95, green: 0.82, blue: 0.56, alpha: 1)
+        look.lastMove = look.accent
+        look.lastMoveAlpha = 0.18
         return look
     }()
 
@@ -311,8 +320,9 @@ extension SculptedLook {
         look.name = "Midnight"
         look.squares = "sculpted-squares-midnight"
         look.lacquer = UIColor(red: 0.04, green: 0.045, blue: 0.06, alpha: 1)
-        look.keyColor = UIColor(red: 1, green: 0.92, blue: 0.8, alpha: 1)
         look.accent = UIColor(red: 0.98, green: 0.86, blue: 0.62, alpha: 1)
+        look.lastMove = look.accent
+        look.lastMoveAlpha = 0.18
         return look
     }()
 }

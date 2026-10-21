@@ -60,10 +60,18 @@ final class SculptedSnapshotTests: XCTestCase {
         let saved = SculptedLook.current
         defer { SculptedLook.current = saved }
         for look in SculptedLook.studies {
-            SculptedLook.current = look
-            let (scene, window) = try stage(Self.midgame, side: 402)
-            try save(scene.snapshot(), "study-\(look.name.lowercased())")
-            window.isHidden = true
+            // The new looks also at 1.3 times the light, to settle how bright they should be.
+            var brighter = look
+            brighter.environment *= 1.3
+            brighter.key *= 1.3
+            brighter.rim *= 1.3
+            let variants = look.spot == nil ? [("", look)] : [("", look), ("-bright", brighter)]
+            for (suffix, variant) in variants {
+                SculptedLook.current = variant
+                let (scene, window) = try stage(Self.midgame, side: 402)
+                try save(scene.snapshot(), "study-\(look.name.lowercased())\(suffix)")
+                window.isHidden = true
+            }
         }
     }
 
