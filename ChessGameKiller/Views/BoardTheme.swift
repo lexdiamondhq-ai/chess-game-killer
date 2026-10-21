@@ -4,7 +4,7 @@ import SwiftUI
 /// Everything that changes when the player picks a different board look.
 struct BoardTheme: Identifiable {
     enum ID: String, CaseIterable {
-        case sculpted, neon, faberge, blueprint
+        case noir, sculpted, bordeaux, midnight, neon, faberge, blueprint
         // One board per rival, matching its portrait.
         case spark, drift, pulse, vector, singularity
     }
@@ -60,6 +60,9 @@ struct BoardTheme: Identifiable {
     let isDark: Bool
     let accent: Color?
 
+    /// The real 3D board's stone, finishes and light. Looks without one are drawn flat.
+    var sculptedLook: SculptedLook? = nil
+
     // Pre-rendered 3D themes
     /// A full board picture in Assets.xcassets/Boards: 9 squares wide, so the
     /// frame around the playing area is half a square on each side. Squares are not drawn when set.
@@ -100,17 +103,140 @@ struct BoardTheme: Identifiable {
     }
 
     /// The first is the default look.
-    static let all: [BoardTheme] = [.sculpted, .neon, .faberge, .blueprint, .spark, .drift, .pulse, .vector, .singularity]
+    static let all: [BoardTheme] = [
+        .noir, .sculpted, .bordeaux, .midnight, .neon, .faberge, .blueprint, .spark, .drift, .pulse, .vector, .singularity,
+    ]
 
     /// The boards that belong to a rival, in rival order.
     static let rivals: [BoardTheme] = [.spark, .drift, .pulse, .vector, .singularity]
 
     static func named(_ id: ID) -> BoardTheme {
-        all.first { $0.id == id } ?? .sculpted
+        all.first { $0.id == id } ?? .noir
     }
 
-    /// Carved ivory and ebony on grey and black marble, with platinum rings and sapphires.
-    /// In a game it is a real 3D board; small boards draw renders of the same set.
+    /// The default: the carved set on ivory and black marble, ruled in champagne, under a warm
+    /// studio light. In a game it is a real 3D board; small boards draw a picture of it.
+    static let noir = BoardTheme(
+        id: .noir,
+        name: "Noir",
+        symbol: "circle.lefthalf.filled",
+        light: Color(hex: 0xE3D9C6),
+        dark: Color(hex: 0x1E1E21),
+        surface: nil,
+        gridLine: nil,
+        labelOnLight: Color(hex: 0x2A2722).opacity(0.8),
+        labelOnDark: Color(hex: 0xE8DFCC).opacity(0.8),
+        selected: Color(hex: 0x5E8FFF).opacity(0.28),
+        selectedRing: nil,
+        lastMove: Color.white.opacity(0.15),
+        lastMoveRing: nil,
+        hint: Color(hex: 0x5E8FFF).opacity(0.92),
+        hintGlow: nil,
+        check: Color(hex: 0xFF3B4D),
+        pieceSet: "sculpted-",
+        whiteGlow: nil,
+        blackGlow: nil,
+        whiteSide: Color(hex: 0xEDE6D8),
+        blackSide: Color(hex: 0x26242A),
+        whiteName: "Ivory",
+        blackName: "Ebony",
+        bestArrow: Color(hex: 0x5E8FFF).opacity(0.95),
+        secondArrow: Color(hex: 0x5E8FFF).opacity(0.72),
+        arrowGlow: nil,
+        whiteSparks: [Color.white, Color(hex: 0xF4ECDD), Color(hex: 0xE0CFA8), Color(hex: 0x8FB0FF)],
+        blackSparks: [Color.white, Color(hex: 0xE0CFA8), Color(hex: 0x8FB0FF), Color(hex: 0x5E8FFF)],
+        boardEdge: nil,
+        boardShadows: [Color.black.opacity(0.6)],
+        isDark: true,
+        accent: Color(hex: 0x7EA6FF),
+        sculptedLook: .noir,
+        boardArt: "board-noir",
+        spritePieces: true,
+        backdrop: [Color(hex: 0x2B2A2C), Color(hex: 0x070708)]
+    )
+
+    /// The carved set on cream and deep wine-red marble, with gold marks.
+    static let bordeaux = BoardTheme(
+        id: .bordeaux,
+        name: "Bordeaux",
+        symbol: "wineglass.fill",
+        light: Color(hex: 0xE8D9BE),
+        dark: Color(hex: 0x7A2530),
+        surface: nil,
+        gridLine: nil,
+        labelOnLight: Color(hex: 0x4A1A22).opacity(0.8),
+        labelOnDark: Color(hex: 0xF2E6CF).opacity(0.8),
+        selected: Color(hex: 0xEBB357).opacity(0.3),
+        selectedRing: nil,
+        lastMove: Color.white.opacity(0.15),
+        lastMoveRing: nil,
+        hint: Color(hex: 0xEBB357).opacity(0.92),
+        hintGlow: nil,
+        check: Color(hex: 0xFF3B4D),
+        pieceSet: "sculpted-",
+        whiteGlow: nil,
+        blackGlow: nil,
+        whiteSide: Color(hex: 0xEDE6D8),
+        blackSide: Color(hex: 0x26242A),
+        whiteName: "Ivory",
+        blackName: "Ebony",
+        bestArrow: Color(hex: 0xEBB357).opacity(0.95),
+        secondArrow: Color(hex: 0xEBB357).opacity(0.72),
+        arrowGlow: nil,
+        whiteSparks: [Color.white, Color(hex: 0xF4ECDD), Color(hex: 0xF2D49A), Color(hex: 0xEBB357)],
+        blackSparks: [Color.white, Color(hex: 0xF2D49A), Color(hex: 0xC0505E), Color(hex: 0xEBB357)],
+        boardEdge: nil,
+        boardShadows: [Color.black.opacity(0.6)],
+        isDark: true,
+        accent: Color(hex: 0xEBB357),
+        sculptedLook: .bordeaux,
+        boardArt: "board-bordeaux",
+        spritePieces: true,
+        backdrop: [Color(hex: 0x2E2426), Color(hex: 0x0A0607)]
+    )
+
+    /// The carved set on cream and ink-blue stone, with gold marks.
+    static let midnight = BoardTheme(
+        id: .midnight,
+        name: "Midnight",
+        symbol: "moon.stars.fill",
+        light: Color(hex: 0xE4E0D4),
+        dark: Color(hex: 0x2C3D6C),
+        surface: nil,
+        gridLine: nil,
+        labelOnLight: Color(hex: 0x1E2A4A).opacity(0.8),
+        labelOnDark: Color(hex: 0xE8E4D8).opacity(0.8),
+        selected: Color(hex: 0xF2BD5C).opacity(0.3),
+        selectedRing: nil,
+        lastMove: Color.white.opacity(0.15),
+        lastMoveRing: nil,
+        hint: Color(hex: 0xF2BD5C).opacity(0.92),
+        hintGlow: nil,
+        check: Color(hex: 0xFF3B4D),
+        pieceSet: "sculpted-",
+        whiteGlow: nil,
+        blackGlow: nil,
+        whiteSide: Color(hex: 0xEDE6D8),
+        blackSide: Color(hex: 0x26242A),
+        whiteName: "Ivory",
+        blackName: "Ebony",
+        bestArrow: Color(hex: 0xF2BD5C).opacity(0.95),
+        secondArrow: Color(hex: 0xF2BD5C).opacity(0.72),
+        arrowGlow: nil,
+        whiteSparks: [Color.white, Color(hex: 0xF4ECDD), Color(hex: 0xF6D592), Color(hex: 0xF2BD5C)],
+        blackSparks: [Color.white, Color(hex: 0xF6D592), Color(hex: 0x6F8BD0), Color(hex: 0xF2BD5C)],
+        boardEdge: nil,
+        boardShadows: [Color.black.opacity(0.6)],
+        isDark: true,
+        accent: Color(hex: 0xF2BD5C),
+        sculptedLook: .midnight,
+        boardArt: "board-midnight",
+        spritePieces: true,
+        backdrop: [Color(hex: 0x232836), Color(hex: 0x06070B)]
+    )
+
+    /// Carved ivory and ebony on grey and black marble, with platinum rings and sapphires,
+    /// under an even light. In a game it is a real 3D board; small boards draw renders of the same set.
     static let sculpted = BoardTheme(
         id: .sculpted,
         name: "Sculpted",
@@ -144,6 +270,7 @@ struct BoardTheme: Identifiable {
         boardShadows: [Color.black.opacity(0.55)],
         isDark: true,
         accent: Color(hex: 0x7EA6FF),
+        sculptedLook: .classic,
         boardArt: "board-sculpted",
         spritePieces: true,
         backdrop: [Color(hex: 0x2E3034), Color(hex: 0x08080A)]

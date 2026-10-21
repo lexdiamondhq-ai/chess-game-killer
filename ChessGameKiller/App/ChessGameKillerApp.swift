@@ -13,16 +13,21 @@ struct ChessGameKillerApp: App {
     }
 }
 
-/// The sculpted 3D set replaced the old default look. The first launch with it switches to it
-/// once, and lets computer games keep it rather than the rival's board. The older looks and
-/// the "Match rival" switch stay in Settings, and anything picked after this is kept.
+/// Noir replaced Sculpted as the default look. The first launch with it switches to it once;
+/// the other looks stay in Settings, and anything picked after this is kept. (An install that
+/// never had Sculpted also turns "Match rival" off, as Sculpted's introduction did.)
 enum LookIntroduction {
-    static let key = "sculptedIntroduced"
+    static let key = "noirIntroduced"
+    /// Set by the Sculpted introduction, which also turned "Match rival" off.
+    static let sculptedKey = "sculptedIntroduced"
 
     static func applyOnce(defaults: UserDefaults = .standard) {
         guard !defaults.bool(forKey: key) else { return }
         defaults.set(true, forKey: key)
-        defaults.set(BoardTheme.ID.sculpted.rawValue, forKey: "boardTheme")
-        defaults.set(false, forKey: "matchRival")
+        defaults.set(BoardTheme.ID.noir.rawValue, forKey: "boardTheme")
+        if !defaults.bool(forKey: sculptedKey) {
+            defaults.set(true, forKey: sculptedKey)
+            defaults.set(false, forKey: "matchRival")
+        }
     }
 }

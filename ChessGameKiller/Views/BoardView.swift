@@ -15,7 +15,7 @@ struct BoardView: View {
     /// The player's army, so veteran pieces show their glow, scar and name.
     @Environment(ArmyStore.self) private var army: ArmyStore?
 
-    /// The Sculpted look plays on a real 3D board unless the player asked for it flat.
+    /// The sculpted looks play on a real 3D board unless the player asked for them flat.
     @AppStorage("sculpted3D") private var sculpted3D = true
 
     private var game: GameModel { match.game }
@@ -31,7 +31,7 @@ struct BoardView: View {
 
     /// Whether this look plays on the real 3D board, given the "3D pieces" setting.
     static func playsIn3D(_ theme: BoardTheme, setting: Bool) -> Bool {
-        theme.id == .sculpted && setting && SculptedAssets.shared.isLoaded
+        theme.sculptedLook != nil && setting && SculptedAssets.shared.isLoaded
     }
 
     /// Width over height of the board: the 3D board, seen at an angle, is wider than tall.

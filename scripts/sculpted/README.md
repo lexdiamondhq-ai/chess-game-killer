@@ -14,7 +14,8 @@ files the app loads. Run from the repository root with Blender's Python module
    (add a name such as `sculpted-wN` to render just one).
 5. `python scripts/sculpted/env.py` draws the studio light tent the pieces reflect, and `env_studio.py` the dark
    studio (a few soft boxes in a near-black room) used by the richer looks. `marble.py looks/m-<name>.json out.png`
-   draws a look's stone squares.
+   draws a look's stone squares, and `flat_art.py <squares.jpg> <board.jpg> [line hex]` its flat board picture
+   (Noir uses the champagne line CCB88F; copy to `Assets.xcassets/Boards/board-<look>.imageset`).
 6. Finishing for the asset catalog: `python scripts/sculpted/fade.py build/sculpted/sprites build/sculpted/final`
    fades each sprite's shadow out before its edge (copy to `Assets.xcassets/Pieces/sculpted-*.imageset`), and
    `python scripts/sculpted/frame.py build/sculpted/out/board-art.png build/sculpted/out/board-sculpted.jpg`

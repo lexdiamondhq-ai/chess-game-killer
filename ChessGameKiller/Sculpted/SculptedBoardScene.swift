@@ -79,7 +79,7 @@ final class SculptedBoardScene {
     let view: SculptedSceneKitView
     private let scene = SCNScene()
     private let assets: SculptedAssets
-    private let look = SculptedLook.current
+    let look: SculptedLook
 
     /// The camera as it will be once any walk around the board is over.
     private(set) var camera = SculptedCamera()
@@ -95,7 +95,8 @@ final class SculptedBoardScene {
     private var state: SculptedBoardState?
     private var size: CGSize = .zero
 
-    init(assets: SculptedAssets = .shared) {
+    init(look: SculptedLook = .noir, assets: SculptedAssets = .shared) {
+        self.look = look
         self.assets = assets
         view = SculptedSceneKitView(frame: CGRect(x: 0, y: 0, width: 320, height: 320), options: nil)
         view.scene = scene
@@ -109,7 +110,7 @@ final class SculptedBoardScene {
         view.autoenablesDefaultLighting = false
 
         scene.background.contents = UIColor.clear
-        scene.lightingEnvironment.contents = assets.environment
+        scene.lightingEnvironment.contents = assets.environment(look)
         scene.lightingEnvironment.intensity = look.environment
 
         buildCamera()
@@ -272,7 +273,7 @@ final class SculptedBoardScene {
     private static let travelLift: Float = 0.16
 
     private func makeNode(for placed: PlacedPiece) -> PieceNode {
-        let model = assets.makePiece(placed.piece.kind, color: placed.piece.color)
+        let model = assets.makePiece(placed.piece.kind, color: placed.piece.color, look: look)
         let contact = SCNNode(geometry: Self.contactGeometry)
         contact.simdPosition = SIMD3(0, 0.0012, 0)
         contact.simdOrientation = Self.flat
@@ -874,12 +875,12 @@ final class SculptedBoardScene {
     private func buildBoard() {
         let board = SCNNode()
         let squares = SCNNode(geometry: SCNPlane(width: 8, height: 8))
-        squares.geometry?.materials = [assets.squaresMaterial()]
+        squares.geometry?.materials = [assets.squaresMaterial(look)]
         squares.simdOrientation = Self.flat
         board.addChildNode(squares)
 
         // Four lacquered rails with softened edges, standing a hair above the stone.
-        let frame = assets.frameMaterial()
+        let frame = assets.frameMaterial(look)
         let width: Float = 0.55
         let height: Float = 0.14
         let rails: [(x: Float, z: Float, width: Float, length: Float)] = [
@@ -897,7 +898,7 @@ final class SculptedBoardScene {
         }
 
         // A fine metal line around the squares.
-        let metal = assets.inlayMaterial()
+        let metal = assets.inlayMaterial(look)
         let gap: Float = 0.09
         let line: Float = 0.012
         let span = 8 + 2 * gap + line
