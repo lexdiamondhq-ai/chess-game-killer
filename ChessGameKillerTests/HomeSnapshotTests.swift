@@ -6,13 +6,13 @@ import XCTest
 
 /// The home screen at iPhone size: at rest, part way down (the board fading and lifting
 /// away) and near the foot, with a week of games and an army, and on a first launch.
-/// When SNAPSHOT_DIR is set the pictures are saved there.
+/// When SNAPSHOT_DIR is set the pictures are saved there, named to sort last so CI prints them at the log's end.
 @MainActor
 final class HomeSnapshotTests: XCTestCase {
 
     func testHomeScrolling() throws {
         let window = try show(HomeSample.home())
-        for (name, offset) in [("home-0-top", 0.0), ("home-1-fading", 230.0), ("home-2-cards", 520.0), ("home-3-foot", 2000.0)] {
+        for (name, offset) in [("zz-home-0-top", 0.0), ("zz-home-1-fading", 230.0), ("zz-home-2-cards", 520.0), ("zz-home-3-foot", 2000.0)] {
             scroll(window, to: offset)
             try save(window, name)
         }
@@ -21,14 +21,14 @@ final class HomeSnapshotTests: XCTestCase {
 
     func testFirstLaunch() throws {
         let window = try show(HomeSample.home(empty: true))
-        try save(window, "home-first-launch")
+        try save(window, "zz-home-first-launch")
         window.isHidden = true
     }
 
     /// The real app opening on the home screen.
     func testAppOpensHome() throws {
         let window = try show(ContentView(startsAtHome: true))
-        try save(window, "home-app")
+        try save(window, "zz-home-app")
         window.isHidden = true
     }
 
