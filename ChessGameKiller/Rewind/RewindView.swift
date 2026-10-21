@@ -678,13 +678,13 @@ private struct ExplorerCard: View {
 
     private var controls: some View {
         HStack(spacing: 8) {
-            round("backward.end.fill", label: "Previous move", disabled: explorer.cursor == 0) {
+            roundButton("backward.end.fill", label: "Previous move", disabled: explorer.cursor == 0) {
                 explorer.stepBack()
             }
-            round(isPlaying ? "pause.fill" : "play.fill", label: isPlaying ? "Pause" : "Play the line", disabled: false) {
+            roundButton(isPlaying ? "pause.fill" : "play.fill", label: isPlaying ? "Pause" : "Play the line", disabled: false) {
                 if isPlaying { onTouch() } else { onPlay() }
             }
-            round("forward.end.fill", label: "Next move", disabled: explorer.atEnd) {
+            roundButton("forward.end.fill", label: "Next move", disabled: explorer.atEnd) {
                 explorer.stepForward()
             }
             Spacer(minLength: 4)
@@ -706,7 +706,7 @@ private struct ExplorerCard: View {
         }
     }
 
-    private func round(_ symbol: String, label: String, disabled: Bool, action: @escaping () -> Void) -> some View {
+    private func roundButton(_ symbol: String, label: String, disabled: Bool, action: @escaping () -> Void) -> some View {
         Button {
             if symbol != "play.fill" && symbol != "pause.fill" { onTouch() }
             withAnimation(.easeInOut(duration: 0.3)) { action() }
