@@ -29,6 +29,11 @@ struct ContentView: View {
     @State private var armyNews: ArmyNews?
     @State private var vault = GameVault.live()
     @State private var showingGames = false
+    /// A game picked on the home screen, opened straight away in Rewind.
+    @State private var rewindOpening: UUID?
+    /// The home screen covers the game until a game is started or resumed.
+    @State private var showingHome: Bool
+    @AppStorage(HomeScreen.key) private var homeScreenOn = HomeScreen.defaultOn
     @Environment(\.scenePhase) private var scenePhase
     /// Big Board: the board edge to edge with everything else tucked into a pull-up tray.
     @AppStorage("bigBoard") private var bigBoard = false
@@ -38,9 +43,12 @@ struct ContentView: View {
     @State private var browsePly: Int?
     @State private var scrubStart: Int?
 
-    /// The app opens on the New Game sheet; tests that picture the game screen skip it.
-    init(startsWithNewGame: Bool = true, trayOpen: Bool = false) {
-        _showingNewGame = State(initialValue: startsWithNewGame)
+    /// The app opens on the home screen when it is on, otherwise on the New Game sheet;
+    /// tests that picture the game screen skip both.
+    init(startsWithNewGame: Bool = true, trayOpen: Bool = false, startsAtHome: Bool? = nil) {
+        let home = startsAtHome ?? (startsWithNewGame && HomeScreen.isOn())
+        _showingHome = State(initialValue: home)
+        _showingNewGame = State(initialValue: startsWithNewGame && !home)
         _trayOpen = State(initialValue: trayOpen)
     }
 
@@ -56,7 +64,7 @@ struct ContentView: View {
     /// The board is out of sight: the app is in the background, or training covers the game.
     /// The clock waits while it is.
     private var boardHidden: Bool {
-        scenePhase != .active || showingTraining || showingArmy || showingPuzzles || showingGames
+        scenePhase != .active || showingHome || showingTraining || showingArmy || showingPuzzles || showingGames
             || coach.presentedLesson != nil || coach.presentedSession != nil
     }
 
@@ -130,8 +138,11 @@ struct ContentView: View {
             .fullScreenCover(isPresented: $showingPuzzles) {
                 PuzzlesView(theme: theme).environment(puzzles).environment(training)
             }
+            .onChange(of: showingGames) { _, showing in
+                if !showing { rewindOpening = nil }
+            }
             .fullScreenCover(isPresented: $showingGames) {
-                RewindGamesView(theme: theme) { game in playAgain(game) }
+                RewindGamesView(theme: theme, opening: rewindOpening) { game in playAgain(game) }
                     .environment(vault).environment(training)
             }
             .fullScreenCover(isPresented: $showingArmy) {
@@ -148,6 +159,7 @@ struct ContentView: View {
                 NewGameSheet(theme: theme) { setup in
                     withAnimation(.snappy) { match.start(setup) }
                     showingNewGame = false
+                    leaveHome()
                 }
             }
             .sheet(isPresented: $showingSettings) {
@@ -167,7 +179,7 @@ struct ContentView: View {
 
     /// The game screen, watching the match for the coach and the clock.
     private var observed: some View {
-        gameScreen
+        screens
             // Switching between Neon and the executive look redraws everything in the new type.
             .id(theme.glows)
             .tint(theme.accent)
@@ -176,6 +188,7 @@ struct ContentView: View {
             .environment(coach)
             .environment(army)
             .environment(vault)
+            .environment(puzzles)
             .onChange(of: match.reelLog.count) { _, _ in
                 // The last grades can land just after the game ends.
                 if match.isOver { recordGame() }
@@ -203,6 +216,54 @@ struct ContentView: View {
                 // The screen stays awake while a clock runs.
                 UIApplication.shared.isIdleTimerDisabled = running != nil
             }
+    }
+
+    /// The home screen, or the game once one is under way.
+    @ViewBuilder
+    private var screens: some View {
+        if showingHome {
+            HomeView(match: match, theme: theme, actions: homeActions)
+                .transition(.opacity)
+        } else {
+            gameScreen
+                .transition(.opacity)
+        }
+    }
+
+    private var homeActions: HomeActions {
+        HomeActions(
+            play: { showingNewGame = true },
+            resume: { leaveHome() },
+            analyze: { showingAnalyze = true },
+            train: { showingTraining = true },
+            puzzles: { showingPuzzles = true },
+            rewind: { showingGames = true },
+            openGame: { game in
+                rewindOpening = game.id
+                showingGames = true
+            },
+            army: { showingArmy = true },
+            settings: { showingSettings = true }
+        )
+    }
+
+    private func leaveHome() {
+        guard showingHome else { return }
+        withAnimation(.easeInOut(duration: 0.35)) { showingHome = false }
+    }
+
+    private func goHome() {
+        setCoach(expanded: false)
+        withAnimation(.easeInOut(duration: 0.35)) { showingHome = true }
+    }
+
+    /// Back to the home screen, in the top bar while the home screen is on.
+    private var homeButton: some View {
+        Button {
+            goHome()
+        } label: {
+            Label("Home", systemImage: "house")
+        }
     }
 
     /// The board, plates and dock inside the navigation bar, sized to the screen.
@@ -422,7 +483,8 @@ struct ContentView: View {
                      onSettings: { showingSettings = true },
                      onExit: { withAnimation(.snappy) { bigBoard = false } },
                      onArmy: theme.glows ? nil : { showingArmy = true },
-                     onGames: { showingGames = true }) {
+                     onGames: { showingGames = true },
+                     onHome: homeScreenOn ? { goHome() } : nil) {
             if theme.glows {
                 VStack(spacing: 6) {
                     neonToolRow
@@ -468,6 +530,9 @@ struct ContentView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         if theme.glows {
+            if homeScreenOn {
+                ToolbarItem(placement: .topBarLeading) { homeButton }
+            }
             ToolbarItem(placement: .topBarLeading) {
                 Button {
                     showingAnalyze = true
@@ -510,6 +575,7 @@ struct ContentView: View {
         } else {
             ToolbarItem(placement: .topBarLeading) {
                 HStack(spacing: 4) {
+                    if homeScreenOn { homeButton }
                     Button {
                         showingNewGame = true
                     } label: {
@@ -692,6 +758,7 @@ struct ContentView: View {
         }
         withAnimation(.snappy) { match.start(setup) }
         showingNewGame = false
+        leaveHome()
     }
 
     /// Starts a game from an analyzed position, with the player moving first.
@@ -700,11 +767,13 @@ struct ContentView: View {
         var setup = NewGameSheet.savedSetup()
         setup.playerColor = draft.sideToMove
         withAnimation(.snappy) { match.start(setup, from: position) }
+        leaveHome()
     }
 
     /// Closing the sheet without starting still begins a game, with last time's choices.
     private func startIfNeeded() {
-        if !match.hasStarted {
+        // From the home screen, closing the sheet just goes back home.
+        if !match.hasStarted, !showingHome {
             match.start(NewGameSheet.savedSetup(), playSound: false)
         }
     }

@@ -14,6 +14,7 @@ struct SettingsSheet: View {
     @AppStorage("haptics") private var hapticsOn = true
     @AppStorage("bigBoard") private var bigBoard = false
     @AppStorage("sculpted3D") private var sculpted3D = true
+    @AppStorage(HomeScreen.key) private var homeScreen = HomeScreen.defaultOn
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.requestReview) private var requestReview
@@ -46,6 +47,9 @@ struct SettingsSheet: View {
                             rule
                             ToggleRow(title: "Big Board", subtitle: "The board fills the screen. Swipe up from the bottom for the tools, sideways on the board to replay moves.",
                                       symbol: "arrow.up.left.and.arrow.down.right", isOn: $bigBoard, theme: theme)
+                            rule
+                            ToggleRow(title: "Home screen", subtitle: "Open on a home page: the board up top, your week, and every mode one tap away.",
+                                      symbol: "house", isOn: $homeScreen, theme: theme)
                         }
                     }
 

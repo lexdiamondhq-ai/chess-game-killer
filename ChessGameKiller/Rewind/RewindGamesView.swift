@@ -9,7 +9,14 @@ struct RewindGamesView: View {
 
     @Environment(GameVault.self) private var vault
     @Environment(\.dismiss) private var dismiss
-    @State private var path: [UUID] = []
+    @State private var path: [UUID]
+
+    /// `opening` is a game to show straight away, as when one is picked on the home screen.
+    init(theme: BoardTheme, opening: UUID? = nil, onPlayAgain: ((SavedGame) -> Void)? = nil) {
+        self.theme = theme
+        self.onPlayAgain = onPlayAgain
+        _path = State(initialValue: opening.map { [$0] } ?? [])
+    }
 
     var body: some View {
         NavigationStack(path: $path) {
