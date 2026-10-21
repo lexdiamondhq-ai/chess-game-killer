@@ -63,14 +63,15 @@ struct RewindView: View {
                     Lifeline(game: game, ply: $ply, ghost: ghostBranch, dotFill: theme.isDark ? Color(hex: 0x101114) : .white) { moment in
                         jump(to: moment)
                     }
-                    .frame(height: explorer == nil ? 96 : 56)
+                    .frame(height: explorer == nil ? 78 : 56)
                     .frame(maxWidth: 640)
-                    .padding(.top, 14)
+                    .padding(.top, 10)
                     .padding(.horizontal, 8)
+                    // The card runs to the bottom, so its buttons always sit in the same place.
                     card
-                        .frame(maxWidth: 640)
-                        .padding(.top, 12)
-                    Spacer(minLength: 0)
+                        .frame(maxWidth: 640, maxHeight: 440)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                        .padding(.top, 10)
                 }
                 .frame(width: geo.size.width)
             }
@@ -106,24 +107,29 @@ struct RewindView: View {
     private var header: some View {
         HStack {
             Button {
-                dismiss()
+                // Out of a line first, then out of Rewind.
+                if explorer != nil { stopGhost() } else { dismiss() }
             } label: {
                 Image(systemName: "chevron.left")
                     .font(.title3.weight(.semibold))
                     .frame(width: 44, height: 44)
             }
             .tint(.primary)
-            .accessibilityLabel("Back")
+            .accessibilityLabel(explorer == nil ? "Back" : "Back to the game")
             Spacer()
-            VStack(spacing: 2) {
-                Text(explorer == nil ? "Rewind · vs \(game.opponent)" : "\(level.title) review · vs \(game.opponent)")
-                    .font(.caption2.weight(.semibold))
-                    .tracking(2.5)
-                    .textCase(.uppercase)
-                    .foregroundStyle(.secondary)
-                Text(explorer == nil ? positionTitle : "What could have been")
-                    .font(.system(.headline, design: .themed))
-                    .contentTransition(.numericText())
+            if let explorer {
+                levelMenu(explorer)
+            } else {
+                VStack(spacing: 2) {
+                    Text("Rewind · vs \(game.opponent)")
+                        .font(.caption2.weight(.semibold))
+                        .tracking(2.5)
+                        .textCase(.uppercase)
+                        .foregroundStyle(.secondary)
+                    Text(positionTitle)
+                        .font(.system(.headline, design: .themed))
+                        .contentTransition(.numericText())
+                }
             }
             Spacer()
             if let onPlayAgain, game.level != nil {
@@ -148,6 +154,34 @@ struct RewindView: View {
         if ply == 0 { return "The start" }
         // The move being decided: before White's sixth move is "Move 6".
         return "Move \(min(game.moveCount, ply / 2 + 1)) of \(game.moveCount)"
+    }
+
+    /// While a line is open the title picks how deep the review goes.
+    private func levelMenu(_ explorer: LineExplorer) -> some View {
+        Menu {
+            Picker("Review level", selection: $levelID) {
+                ForEach(ReviewLevel.allCases) { option in
+                    Text("\(option.title): \(option.blurb)").tag(option.rawValue)
+                }
+            }
+        } label: {
+            VStack(spacing: 2) {
+                HStack(spacing: 4) {
+                    Text("\(level.title) review").tracking(2.5)
+                    Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
+                }
+                .font(.caption2.weight(.semibold))
+                .textCase(.uppercase)
+                .foregroundStyle(.secondary)
+                Text(explorer.ownMoveAt == nil ? "What could have been" : "Your line")
+                    .font(.system(.headline, design: .themed))
+                    .foregroundStyle(.primary)
+            }
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .tint(.primary)
+        .accessibilityLabel("Review level, \(level.title)")
     }
 
     // MARK: Board
@@ -215,37 +249,45 @@ struct RewindView: View {
 
     // MARK: The card
 
+    /// Words on top, which scroll when a small screen runs out of room;
+    /// the buttons pinned at the bottom.
     private var card: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-            if let explorer, let focused {
+        let note = focused.map { RewindNote.make(for: $0, library: training?.library) }
+        return VStack(alignment: .leading, spacing: 0) {
+            if let explorer, let focused, let note {
                 ExplorerCard(
-                    explorer: explorer, moment: focused, theme: theme, levelID: $levelID,
+                    explorer: explorer,
                     canTryIt: !game.rewritten.contains(focused.ply),
                     isPlaying: autoplay != nil,
                     onTouch: stopAutoplay,
                     onPlay: { startAutoplay() },
                     onTryIt: {
                         stopGhost()
-                        takeBack(focused, note: RewindNote.make(for: focused, library: training?.library))
-                    },
-                    onClose: stopGhost
+                        takeBack(focused, note: note)
+                    }
                 )
-            } else if let focused {
-                momentCard(focused)
             } else {
-                plainCard
+                ScrollView {
+                    Group {
+                        if let focused, let note {
+                            momentText(focused, note: note)
+                        } else {
+                            plainCard
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.bottom, 12)
+                }
+                .scrollBounceBehavior(.basedOnSize)
+                .mask { FadingBottom() }
+                if let focused, let note {
+                    momentActions(focused, note: note)
+                }
+                momentNav.padding(.top, 12)
             }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .scrollBounceBehavior(.basedOnSize)
-            Spacer(minLength: 12)
-            if explorer == nil { momentNav }
         }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .fill(theme.isDark ? Color.white.opacity(0.06) : Color.white)
@@ -259,12 +301,9 @@ struct RewindView: View {
         .animation(.snappy(duration: 0.25), value: explorer == nil)
     }
 
-    private func momentCard(_ moment: SavedMoment) -> some View {
-        let note = RewindNote.make(for: moment, library: training?.library)
+    private func momentText(_ moment: SavedMoment, note: RewindNote) -> some View {
         let rewritten = game.rewritten.contains(moment.ply)
         let color = RewindPalette.color(for: moment, rewritten: rewritten)
-        let canFix = note.isLesson && moment.bestUCI != nil
-        let skill = note.skill.flatMap { training?.library?.skill($0) }
         return VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Tag(text: rewritten ? "Rewritten" : note.tag, symbol: rewritten ? "checkmark" : nil, color: color)
@@ -276,30 +315,37 @@ struct RewindView: View {
             Text(rewritten ? "You found it." : note.title)
                 .font(.system(.title2, design: .themed).weight(.semibold))
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 12)
+                .padding(.top, 10)
             Text(rewritten ? "This moment is rewritten. \(game.leftToRewrite == 0 ? "Every moment in this game is fixed." : "\(game.leftToRewrite) left in this game.")" : note.detail)
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 6)
-            if canFix || skill != nil {
-                HStack(spacing: 10) {
-                    if canFix {
-                        CardButton(title: "Show me", symbol: "circle.dashed") { startGhost() }
-                        if !rewritten {
-                            CardButton(title: "Take it back", symbol: "arrow.counterclockwise", prominent: true, accent: accent) {
-                                takeBack(moment, note: note)
-                            }
-                        }
-                    }
-                    if let skill {
-                        CardButton(title: "Practice", symbol: "graduationcap") {
-                            session = training?.practicePlan(for: skill)
+        }
+    }
+
+    @ViewBuilder
+    private func momentActions(_ moment: SavedMoment, note: RewindNote) -> some View {
+        let rewritten = game.rewritten.contains(moment.ply)
+        let canFix = note.isLesson && moment.bestUCI != nil
+        let skill = note.skill.flatMap { training?.library?.skill($0) }
+        if canFix || skill != nil {
+            HStack(spacing: 10) {
+                if canFix {
+                    CardButton(title: "Show me", symbol: "circle.dashed") { startGhost() }
+                    if !rewritten {
+                        CardButton(title: "Take it back", symbol: "arrow.counterclockwise", prominent: true, accent: accent) {
+                            takeBack(moment, note: note)
                         }
                     }
                 }
-                .padding(.top, 16)
+                if let skill {
+                    CardButton(title: "Practice", symbol: "graduationcap") {
+                        session = training?.practicePlan(for: skill)
+                    }
+                }
             }
+            .padding(.top, 4)
         }
     }
 
@@ -504,67 +550,43 @@ private struct SecondChanceSheet: View {
 /// the board, where it leads, and the other side's best tries to follow instead.
 private struct ExplorerCard: View {
     let explorer: LineExplorer
-    let moment: SavedMoment
-    let theme: BoardTheme
-    @Binding var levelID: String
     let canTryIt: Bool
     let isPlaying: Bool
     let onTouch: () -> Void
     let onPlay: () -> Void
     let onTryIt: () -> Void
-    let onClose: () -> Void
 
     private var level: ReviewLevel { explorer.level }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 8) {
-                Tag(text: explorer.ownMoveAt == nil ? "Ghost line" : "Your line", symbol: "circle.dashed",
-                    color: RewindPalette.gold)
-                Spacer()
-                levelMenu
-                Button(action: onClose) {
-                    Image(systemName: "xmark")
-                        .font(.footnote.weight(.bold))
-                        .frame(width: 30, height: 30)
-                        .background(Circle().fill(Color.primary.opacity(0.08)))
+            moves
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(explorer.sentence)
+                        .font(.system(.headline, design: .themed))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .contentTransition(.opacity)
+                    outlook.padding(.top, 4)
+                    if !explorer.branches.isEmpty {
+                        branches.padding(.top, 14)
+                    }
+                    if explorer.ownMoveAt == nil {
+                        Text("Tap a piece on the board to try a move of your own.")
+                            .font(.footnote)
+                            .foregroundStyle(.tertiary)
+                            .padding(.top, 12)
+                    }
                 }
-                .tint(.primary)
-                .accessibilityLabel("Back to the game")
-            }
-            moves.padding(.top, 12)
-            Text(explorer.sentence)
-                .font(.system(.headline, design: .themed))
-                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 12)
-                .contentTransition(.opacity)
-            outlook.padding(.top, 4)
-            if !explorer.branches.isEmpty {
-                branches.padding(.top, 12)
+                .padding(.bottom, 12)
             }
-            controls.padding(.top, 14)
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollIndicatorsFlash(trigger: explorer.branches.count)
+            .mask { FadingBottom() }
+            controls.padding(.top, 4)
         }
-    }
-
-    private var levelMenu: some View {
-        Menu {
-            Picker("Review", selection: $levelID) {
-                ForEach(ReviewLevel.allCases) { level in
-                    Text("\(level.title): \(level.blurb)").tag(level.rawValue)
-                }
-            }
-        } label: {
-            HStack(spacing: 4) {
-                Text(level.title)
-                Image(systemName: "chevron.up.chevron.down").font(.caption2.weight(.bold))
-            }
-            .font(.subheadline.weight(.semibold))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(Capsule().fill(Color.primary.opacity(0.08)))
-        }
-        .tint(.primary)
-        .accessibilityLabel("Review level, \(level.title)")
     }
 
     /// Every move of the line; the one on the board is lit.
@@ -678,13 +700,13 @@ private struct ExplorerCard: View {
 
     private var controls: some View {
         HStack(spacing: 8) {
-            roundButton("backward.end.fill", label: "Previous move", disabled: explorer.cursor == 0) {
+            roundButton("chevron.left", label: "Previous move", disabled: explorer.cursor == 0) {
                 explorer.stepBack()
             }
             roundButton(isPlaying ? "pause.fill" : "play.fill", label: isPlaying ? "Pause" : "Play the line", disabled: false) {
                 if isPlaying { onTouch() } else { onPlay() }
             }
-            roundButton("forward.end.fill", label: "Next move", disabled: explorer.atEnd) {
+            roundButton("chevron.right", label: "Next move", disabled: explorer.atEnd) {
                 explorer.stepForward()
             }
             Spacer(minLength: 4)
@@ -699,9 +721,9 @@ private struct ExplorerCard: View {
                 }
                 .buttonStyle(.plain)
             } else {
-                Text("Tap a piece to try a move")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                Label("Rewritten", systemImage: "checkmark.seal.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(RewindPalette.gold)
             }
         }
     }
@@ -723,6 +745,17 @@ private struct ExplorerCard: View {
 }
 
 // MARK: Small parts
+
+/// Fades the last few points of a scrolling area, so words that run on show they do.
+private struct FadingBottom: View {
+    var body: some View {
+        VStack(spacing: 0) {
+            Color.black
+            LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom)
+                .frame(height: 12)
+        }
+    }
+}
 
 private struct Tag: View {
     let text: String
@@ -758,7 +791,7 @@ private struct CardButton: View {
                 Image(systemName: symbol).font(.body.weight(.semibold))
                 Text(title).font(.footnote.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.8)
             }
-            .frame(maxWidth: .infinity, minHeight: 56)
+            .frame(maxWidth: .infinity, minHeight: 52)
             .foregroundStyle(prominent ? AnyShapeStyle(.background) : AnyShapeStyle(.primary))
             .background {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
