@@ -42,6 +42,9 @@ struct SculptedBoardState: Equatable {
     var lastCapture: CaptureEvent?
     /// Veteran glows by piece id.
     var halos: [Int: SculptedHalo] = [:]
+    /// The pieces come without lasting ids (an earlier position of the game, a preview):
+    /// the scene matches them to the pieces on the board so each one moves rather than fades.
+    var matchesPieces = false
 
     /// The parts that decide the marks on the stone.
     fileprivate var marks: [String] {
@@ -154,7 +157,11 @@ final class SculptedBoardScene {
 
     // MARK: Updating
 
-    func apply(_ new: SculptedBoardState, animated: Bool) {
+    func apply(_ incoming: SculptedBoardState, animated: Bool) {
+        var new = incoming
+        if new.matchesPieces {
+            new.pieces = Self.carryIdentity(new.pieces.map(\.piece), from: state?.pieces ?? [], nextID: &nextLooseID)
+        }
         let animate = animated && state != nil
         let old = state ?? SculptedBoardState()
         guard state != new else { return }
@@ -173,6 +180,46 @@ final class SculptedBoardScene {
         if old.halos != new.halos || old.pieces != new.pieces {
             updateHalos(new)
         }
+    }
+
+    /// Stretches every move, so a test can photograph one in flight. 1 in the app.
+    static var motionScale: Double = 1
+
+    private var nextLooseID = 1_000_000
+
+    /// Gives each piece the id of the piece it most likely is: the same piece on the same
+    /// square first, then the nearest one of its kind and color, else a new id.
+    static func carryIdentity(_ pieces: [Piece], from current: [PlacedPiece], nextID: inout Int) -> [PlacedPiece] {
+        var unmatched = current
+        var result: [PlacedPiece] = []
+        var moved: [Piece] = []
+        for piece in pieces {
+            if let i = unmatched.firstIndex(where: { $0.piece == piece }) {
+                result.append(PlacedPiece(id: unmatched[i].id, piece: piece))
+                unmatched.remove(at: i)
+            } else {
+                moved.append(piece)
+            }
+        }
+        for piece in moved {
+            let candidates = unmatched.indices.filter {
+                unmatched[$0].piece.kind == piece.kind && unmatched[$0].piece.color == piece.color
+            }
+            let distance = { (i: Int) -> Int in
+                let other = unmatched[i].square
+                let dx = other.fileIndex - piece.square.fileIndex
+                let dz = other.rankIndex - piece.square.rankIndex
+                return dx * dx + dz * dz
+            }
+            if let i = candidates.min(by: { distance($0) < distance($1) }) {
+                result.append(PlacedPiece(id: unmatched[i].id, piece: piece))
+                unmatched.remove(at: i)
+            } else {
+                result.append(PlacedPiece(id: nextID, piece: piece))
+                nextID += 1
+            }
+        }
+        return result.sorted { $0.id < $1.id }
     }
 
     private func layout(_ newSize: CGSize) {
@@ -207,7 +254,8 @@ final class SculptedBoardScene {
             self.model = model
             self.contact = contact
             switch piece.kind {
-            case .knight: yaw = 25 * .pi / 180
+            // Nearly side-on, so the head reads as a horse at a glance.
+            case .knight: yaw = 6 * .pi / 180
             case .bishop: yaw = -112 * .pi / 180
             default: yaw = 0
             }
@@ -370,6 +418,11 @@ final class SculptedBoardScene {
                 lean = 0
                 wobble = 0
             }
+            let stretch = SculptedBoardScene.motionScale
+            lift *= stretch
+            travel *= stretch
+            land *= stretch
+            wobble *= stretch
         }
 
         var total: Double { lift + travel + land + wobble }

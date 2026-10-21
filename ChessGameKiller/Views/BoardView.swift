@@ -6,6 +6,10 @@ import SwiftUI
 struct BoardView: View {
     let match: MatchController
     var theme: BoardTheme = .neon
+    /// An earlier position the player is looking back at. Only the 3D board shows it
+    /// itself; the flat board has it laid over the top instead.
+    var browsing: Position?
+    var endBrowsing: (() -> Void)?
 
     @AppStorage("haptics") private var hapticsOn = true
     /// The player's army, so veteran pieces show their glow, scar and name.
@@ -18,11 +22,21 @@ struct BoardView: View {
     private var flipped: Bool { match.isBoardFlipped }
 
     var body: some View {
-        if theme.id == .sculpted, sculpted3D, SculptedAssets.shared.isLoaded {
-            SculptedBoardView(match: match, theme: theme)
+        if Self.playsIn3D(theme, setting: sculpted3D) {
+            SculptedBoardView(match: match, theme: theme, browsing: browsing, endBrowsing: endBrowsing)
         } else {
             flatBoard
         }
+    }
+
+    /// Whether this look plays on the real 3D board, given the "3D pieces" setting.
+    static func playsIn3D(_ theme: BoardTheme, setting: Bool) -> Bool {
+        theme.id == .sculpted && setting && SculptedAssets.shared.isLoaded
+    }
+
+    /// Width over height of the board: the 3D board, seen at an angle, is wider than tall.
+    static func aspect(_ theme: BoardTheme, setting: Bool) -> CGFloat {
+        playsIn3D(theme, setting: setting) ? SculptedBoardView.aspect : 1
     }
 
     private var flatBoard: some View {

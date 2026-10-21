@@ -226,9 +226,9 @@ struct SculptedLook {
     var lacquer = UIColor(red: 0.07, green: 0.07, blue: 0.08, alpha: 1)
 
     /// How bright the studio tent is, and the key light that casts the shadows.
-    var environment: CGFloat = 1.5
-    var key: CGFloat = 900
-    var rim: CGFloat = 250
+    var environment: CGFloat = 2.0
+    var key: CGFloat = 1100
+    var rim: CGFloat = 300
 
     /// The marks drawn on the stone: legal moves, best-move arrows.
     var accent = UIColor(red: 0.37, green: 0.56, blue: 1.0, alpha: 1)

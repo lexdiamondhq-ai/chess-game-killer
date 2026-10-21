@@ -38,8 +38,8 @@ final class SculptedBoardTests: XCTestCase {
                 let camera = SculptedCamera.fitted(aspect: aspect, flipped: flipped)
                 let points = SculptedCamera.keyPoints.map(camera.normalized)
                 XCTAssertTrue(points.allSatisfy { abs($0.x) <= 1 && abs($0.y) <= 1 }, "\(aspect) \(flipped)")
-                // On a square or tall view the board's near corners reach the side margins.
-                if aspect <= 1 {
+                // Up to the game's own shape, the board's near corners reach the side margins.
+                if aspect <= Float(SculptedBoardView.aspect) {
                     XCTAssertGreaterThan(points.map { abs($0.x) }.max() ?? 0, 0.95)
                 }
                 let ys = points.map(\.y)
@@ -49,9 +49,9 @@ final class SculptedBoardTests: XCTestCase {
     }
 
     func testEverySquareIsFoundUnderItsOwnCenter() {
-        let size = CGSize(width: 390, height: 390)
+        let size = CGSize(width: 390, height: 390 / SculptedBoardView.aspect)
         for flipped in [false, true] {
-            let camera = SculptedCamera.fitted(aspect: 1, flipped: flipped)
+            let camera = SculptedCamera.fitted(aspect: Float(size.width / size.height), flipped: flipped)
             for index in 0..<64 {
                 let square = Square(file: index % 8, rank: index / 8)
                 let point = camera.screenPoint(SculptedCamera.position(of: square), in: size)
@@ -92,6 +92,29 @@ final class SculptedBoardTests: XCTestCase {
         let e4 = scene.camera.screenPoint(SculptedCamera.position(of: .e4), in: size)
         XCTAssertEqual(scene.square(at: e4), .e4)
         window.isHidden = true
+    }
+
+    /// Looking back through a game: each piece keeps its id, so it walks back rather than fading.
+    func testPiecesKeepTheirIdentityWhenLookingBack() {
+        var next = 1000
+        let live = Self.startPieces
+        // 1. e4 e5 2. Nf3, then a step back to before Nf3, then the start again.
+        let afterNf3 = Position(fen: "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2")!.pieces
+        let shown = SculptedBoardScene.carryIdentity(afterNf3, from: live, nextID: &next)
+        let id = { (pieces: [PlacedPiece], square: Square) in pieces.first { $0.square == square }?.id }
+        XCTAssertEqual(id(shown, .f3), id(live, .g1), "the knight is the one from g1")
+        XCTAssertEqual(id(shown, .e4), id(live, .e2))
+        XCTAssertEqual(id(shown, .e5), id(live, .e7))
+        XCTAssertEqual(id(shown, .a1), id(live, .a1))
+        XCTAssertEqual(Set(shown.map(\.id)).count, 32, "no id is used twice")
+        XCTAssertEqual(next, 1000, "nobody new came on")
+        // After a capture the taken piece is gone; stepping back brings a new one.
+        let taken = Position(fen: "rnbqkbnr/pppp1ppp/8/4N3/4P3/8/PPPP1PPP/RNBQKB1R b KQkq - 0 3")!.pieces
+        let afterCapture = SculptedBoardScene.carryIdentity(taken, from: shown, nextID: &next)
+        XCTAssertEqual(id(afterCapture, .e5), id(shown, .f3), "the knight took on e5")
+        let back = SculptedBoardScene.carryIdentity(afterNf3, from: afterCapture, nextID: &next)
+        XCTAssertEqual(id(back, .f3), id(shown, .f3))
+        XCTAssertEqual(id(back, .e5), 1000, "the pawn comes back as a new piece")
     }
 
     func testTheNewLookIsSwitchedOnOnce() {

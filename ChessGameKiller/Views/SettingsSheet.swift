@@ -184,8 +184,9 @@ struct BoardPreview: View {
 
     var body: some View {
         if threeD, SculptedAssets.shared.isLoaded, let position = Self.position {
+            // As tall as the flat preview, and as wide as the angled board needs.
             SculptedStillBoard(position: position, hints: stillHints)
-                .frame(width: size, height: size)
+                .frame(width: size * SculptedBoardView.aspect, height: size)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Preview of the \(theme.name) board")
         } else {

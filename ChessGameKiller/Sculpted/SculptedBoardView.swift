@@ -28,6 +28,13 @@ struct SculptedSceneView: UIViewRepresentable {
 struct SculptedBoardView: View {
     let match: MatchController
     let theme: BoardTheme
+    /// An earlier position the player is looking back at; the pieces walk back to it.
+    var browsing: Position?
+    /// Called when the player taps the board while looking back.
+    var endBrowsing: (() -> Void)?
+
+    /// Width over height: the board seen at an angle is wider than it is tall.
+    static let aspect: CGFloat = 1.3
 
     @AppStorage("haptics") private var hapticsOn = true
     @Environment(ArmyStore.self) private var army: ArmyStore?
@@ -48,10 +55,19 @@ struct SculptedBoardView: View {
                     .contentShape(Rectangle())
                     .gesture(SpatialTapGesture().onEnded { value in tap(at: value.location) })
                     .accessibilityHidden(true)
-                squareElements(camera: camera, size: size)
-                nameTag(camera: camera, size: size)
+                if browsing == nil {
+                    squareElements(camera: camera, size: size)
+                    nameTag(camera: camera, size: size)
+                } else {
+                    Color.clear
+                        .allowsHitTesting(false)
+                        .accessibilityElement()
+                        .accessibilityLabel("An earlier position. Tap to go back to the game.")
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityAction { endBrowsing?() }
+                }
                 // A flag that falls mid-promotion puts the pawn back; the picker never outlives the game.
-                if let promotion = game.pendingPromotion, !match.isOver {
+                if browsing == nil, let promotion = game.pendingPromotion, !match.isOver {
                     PromotionPicker(color: promotion.piece.color, theme: theme, squareSize: size.width / 8) { kind in
                         withAnimation(.snappy(duration: 0.2)) { match.promote(to: kind) }
                     }
@@ -60,7 +76,7 @@ struct SculptedBoardView: View {
                 }
             }
         }
-        .aspectRatio(1, contentMode: .fit)
+        .aspectRatio(Self.aspect, contentMode: .fit)
         .sensoryFeedback(.impact(weight: .light), trigger: game.moveCount) { _, _ in hapticsOn }
         .sensoryFeedback(.impact(weight: .heavy, intensity: 0.7), trigger: game.captureEvents.last?.id) { _, new in
             hapticsOn && new != nil
@@ -69,7 +85,11 @@ struct SculptedBoardView: View {
 
     /// The game, copied for the scene.
     private var boardState: SculptedBoardState {
-        SculptedBoardState(
+        if let browsing {
+            return SculptedBoardState(pieces: browsing.pieces.map { PlacedPiece(id: 0, piece: $0) },
+                                      flipped: flipped, matchesPieces: true)
+        }
+        return SculptedBoardState(
             pieces: game.pieces,
             selected: game.selected,
             targets: game.targets,
@@ -97,6 +117,10 @@ struct SculptedBoardView: View {
     }
 
     private func tap(at point: CGPoint) {
+        if browsing != nil {
+            endBrowsing?()
+            return
+        }
         guard let square = stage.scene.square(at: point) else { return }
         withAnimation(.snappy(duration: 0.22)) { match.tap(square) }
     }
@@ -165,14 +189,15 @@ struct SculptedStillBoard: View {
 
     var body: some View {
         SculptedSceneView(stage: stage, state: state)
-            .aspectRatio(1, contentMode: .fit)
+            .aspectRatio(SculptedBoardView.aspect, contentMode: .fit)
             .allowsHitTesting(false)
     }
 
     private var state: SculptedBoardState {
         SculptedBoardState(
-            pieces: position.pieces.map { PlacedPiece(id: $0.square.rawValue, piece: $0) },
-            hints: hints
+            pieces: position.pieces.map { PlacedPiece(id: 0, piece: $0) },
+            hints: hints,
+            matchesPieces: true
         )
     }
 }

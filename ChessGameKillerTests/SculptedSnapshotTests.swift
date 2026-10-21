@@ -30,7 +30,7 @@ final class SculptedSnapshotTests: XCTestCase {
         let (scene, window) = try stage(Self.midgame)
         let image = scene.snapshot()
         try save(image, "sculpted-board")
-        try save(crop(image, x: 0, y: 0.45, side: 0.55), "sculpted-board-crop")
+        try save(crop(image, x: 0, y: 0.35, side: 0.5), "sculpted-board-crop")
         window.isHidden = true
     }
 
@@ -58,7 +58,7 @@ final class SculptedSnapshotTests: XCTestCase {
     func testLightLevels() throws {
         let saved = SculptedLook.current
         defer { SculptedLook.current = saved }
-        for (name, environment, key) in [("low", 1.0, 650.0), ("high", 2.1, 1150.0)] as [(String, CGFloat, CGFloat)] {
+        for (name, environment, key) in [("low", 1.5, 900.0), ("high", 2.5, 1350.0)] as [(String, CGFloat, CGFloat)] {
             SculptedLook.current.environment = environment
             SculptedLook.current.key = key
             let (scene, window) = try stage(SculptedBoardState(pieces: Self.pieces))
@@ -78,9 +78,12 @@ final class SculptedSnapshotTests: XCTestCase {
             return placed
         }
         after.lastCapture = CaptureEvent(id: 1, piece: pawn)
+        // Five times slower than in play, so each picture lands where it should.
+        SculptedBoardScene.motionScale = 5
+        defer { SculptedBoardScene.motionScale = 1 }
         let start = Date()
         scene.apply(after, animated: true)
-        for (index, time) in [0.12, 0.24, 0.36, 0.7].enumerated() {
+        for (index, time) in [0.35, 0.9, 1.4, 1.9, 4.8].enumerated() {
             RunLoop.main.run(until: start.addingTimeInterval(time))
             try save(scene.snapshot(), "sculpted-motion-\(index + 1)")
         }
@@ -93,7 +96,7 @@ final class SculptedSnapshotTests: XCTestCase {
         let scene = SculptedBoardScene(assets: SculptedAssets())
         let windowScene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let window = UIWindow(windowScene: windowScene)
-        window.frame = CGRect(x: 0, y: 0, width: side, height: side)
+        window.frame = CGRect(x: 0, y: 0, width: side, height: (side / SculptedBoardView.aspect).rounded())
         let host = UIViewController()
         host.view.backgroundColor = UIColor(red: 0.11, green: 0.115, blue: 0.125, alpha: 1)
         scene.view.frame = host.view.bounds
