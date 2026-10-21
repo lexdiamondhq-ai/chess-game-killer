@@ -1,3 +1,4 @@
+import SceneKit
 import SwiftUI
 import UIKit
 import XCTest
@@ -12,7 +13,7 @@ final class ScreenSnapshotTests: XCTestCase {
     private var saved: [String: Any?] = [:]
 
     override func setUp() async throws {
-        for key in ["boardTheme", "matchRival", "bigBoard"] { saved[key] = defaults.object(forKey: key) }
+        for key in ["boardTheme", "matchRival", "bigBoard", "sculpted3D"] { saved[key] = defaults.object(forKey: key) }
         defaults.set(false, forKey: "bigBoard")
     }
 
@@ -20,6 +21,29 @@ final class ScreenSnapshotTests: XCTestCase {
         for (key, value) in saved {
             if let value { defaults.set(value, forKey: key) } else { defaults.removeObject(forKey: key) }
         }
+    }
+
+    func testSculptedScreen() throws {
+        defaults.set("sculpted", forKey: "boardTheme")
+        defaults.set(false, forKey: "matchRival")
+        defaults.set(true, forKey: "sculpted3D")
+        try snapshot("sculpted")
+    }
+
+    func testBigBoardSculpted() throws {
+        defaults.set("sculpted", forKey: "boardTheme")
+        defaults.set(false, forKey: "matchRival")
+        defaults.set(true, forKey: "sculpted3D")
+        defaults.set(true, forKey: "bigBoard")
+        try snapshot("bigboard-sculpted")
+    }
+
+    /// The same set drawn flat, as small boards and the "3D pieces" switch show it.
+    func testSculptedFlatScreen() throws {
+        defaults.set("sculpted", forKey: "boardTheme")
+        defaults.set(false, forKey: "matchRival")
+        defaults.set(false, forKey: "sculpted3D")
+        try snapshot("sculpted-flat")
     }
 
     func testBigBoardNeon() throws {
@@ -76,11 +100,19 @@ final class ScreenSnapshotTests: XCTestCase {
 
         let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
             window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+            // Metal content is drawn by SceneKit itself, so 3D boards are pictured separately.
+            for view in Self.sceneViews(in: window) {
+                view.snapshot().draw(in: view.convert(view.bounds, to: window))
+            }
         }
         if let dir = ProcessInfo.processInfo.environment["SNAPSHOT_DIR"], let data = image.pngData() {
             try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
             try data.write(to: URL(fileURLWithPath: dir).appendingPathComponent("\(name).png"))
         }
         window.isHidden = true
+    }
+
+    private static func sceneViews(in view: UIView) -> [SCNView] {
+        ((view as? SCNView).map { [$0] } ?? []) + view.subviews.flatMap { sceneViews(in: $0) }
     }
 }

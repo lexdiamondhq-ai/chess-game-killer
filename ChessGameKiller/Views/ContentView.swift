@@ -14,8 +14,8 @@ struct ContentView: View {
     @State private var showingAnalyze = false
     @State private var coachExpanded = false
     @State private var coachPeeking = false
-    @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .neon
-    @AppStorage("matchRival") private var matchRival = true
+    @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .sculpted
+    @AppStorage("matchRival") private var matchRival = false
     @AppStorage("showBestMoves") private var showBestMoves = true
     @AppStorage("showSecondBest") private var showSecondBest = true
     @AppStorage("coachVerdicts") private var showVerdicts = true
@@ -32,6 +32,7 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     /// Big Board: the board edge to edge with everything else tucked into a pull-up tray.
     @AppStorage("bigBoard") private var bigBoard = false
+    @AppStorage("sculpted3D") private var sculpted3D = true
     @State private var trayOpen = false
     /// The position being looked at while the player swipes back through the game; nil is live.
     @State private var browsePly: Int?
@@ -281,7 +282,8 @@ struct ContentView: View {
         let platesHeight = compact ? Self.stripHeight : Self.plateHeight * 2
         let gaps: CGFloat = compact ? 4 : 5
         let spare = size.height - platesHeight - Self.ribbonHeight - Self.spacing * gaps
-        let side = max(0, min(size.width, spare, Self.maxBoardSide))
+        let aspect = boardAspect
+        let width = max(0, min(size.width, spare * aspect, Self.maxBoardSide))
         let topColor: Piece.Color = match.isBoardFlipped ? .white : .black
         return VStack(spacing: Self.spacing) {
             Spacer(minLength: 0)
@@ -293,7 +295,7 @@ struct ContentView: View {
                     .frame(height: Self.plateHeight)
             }
             BoardView(match: match, theme: theme)
-                .frame(width: side, height: side)
+                .frame(width: width, height: width / aspect)
             if !compact {
                 ExecutivePlate(match: match, theme: theme, color: topColor.opposite)
                     .frame(height: Self.plateHeight)
@@ -313,7 +315,8 @@ struct ContentView: View {
         let platesHeight = compact ? Self.stripHeight : Self.plateHeight * 2
         let gaps: CGFloat = compact ? 3 : 4
         let spare = size.height - platesHeight - Self.ribbonHeight - Self.spacing * gaps
-        let side = max(0, min(size.width, spare))
+        let aspect = boardAspect
+        let side = max(0, min(size.width, spare * aspect))
         let topColor: Piece.Color = match.isBoardFlipped ? .white : .black
         return VStack(spacing: Self.spacing) {
             Spacer(minLength: 0)
@@ -329,7 +332,7 @@ struct ContentView: View {
             .padding(.horizontal, 12)
             .frame(maxWidth: max(side, Self.maxBoardSide))
             browsableBoard
-                .frame(width: side, height: side)
+                .frame(width: side, height: side / aspect)
             if !compact {
                 ExecutivePlate(match: match, theme: theme, color: topColor.opposite)
                     .frame(height: Self.plateHeight)
@@ -355,13 +358,17 @@ struct ContentView: View {
         .frame(maxWidth: .infinity)
     }
 
-    /// The live board, with an earlier position laid over it while the player looks back.
+    /// The live board, showing an earlier position while the player looks back.
     /// Dragging sideways scrubs through the game: right goes back, left comes forward.
     private var browsableBoard: some View {
         ZStack {
-            BoardView(match: match, theme: theme)
-            if let ply = browsePly, let fen = match.game.positionFENs[safe: ply],
-               let draft = PositionDraft(fen: fen) {
+            // The 3D board walks its own pieces back through the game; the flat board has
+            // the earlier position laid over it.
+            BoardView(match: match, theme: theme, browsing: browsedPosition) {
+                withAnimation(.snappy) { browsePly = nil }
+            }
+            if !BoardView.playsIn3D(theme, setting: sculpted3D), let ply = browsePly,
+               let fen = match.game.positionFENs[safe: ply], let draft = PositionDraft(fen: fen) {
                 PositionBoard(draft: draft, theme: theme, flipped: match.isBoardFlipped) { _ in
                     withAnimation(.snappy) { browsePly = nil }
                 }
@@ -377,6 +384,16 @@ struct ContentView: View {
         .sensoryFeedback(.selection, trigger: browsePly) { _, _ in true }
         .accessibilityAction(named: "Previous move") { step(by: -1) }
         .accessibilityAction(named: "Next move") { step(by: 1) }
+    }
+
+    /// The position the player is looking back at, if any.
+    private var browsedPosition: Position? {
+        browsePly.flatMap { match.game.positionFENs[safe: $0] }.flatMap { Position(fen: $0) }
+    }
+
+    /// Width over height of the board in play: 1 for the flat looks, wider for the 3D board.
+    private var boardAspect: CGFloat {
+        BoardView.aspect(theme, setting: sculpted3D)
     }
 
     /// One position for every ~34 points of sideways drag.

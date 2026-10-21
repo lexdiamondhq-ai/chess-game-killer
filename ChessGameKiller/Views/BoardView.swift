@@ -6,15 +6,40 @@ import SwiftUI
 struct BoardView: View {
     let match: MatchController
     var theme: BoardTheme = .neon
+    /// An earlier position the player is looking back at. Only the 3D board shows it
+    /// itself; the flat board has it laid over the top instead.
+    var browsing: Position?
+    var endBrowsing: (() -> Void)?
 
     @AppStorage("haptics") private var hapticsOn = true
     /// The player's army, so veteran pieces show their glow, scar and name.
     @Environment(ArmyStore.self) private var army: ArmyStore?
 
+    /// The Sculpted look plays on a real 3D board unless the player asked for it flat.
+    @AppStorage("sculpted3D") private var sculpted3D = true
+
     private var game: GameModel { match.game }
     private var flipped: Bool { match.isBoardFlipped }
 
     var body: some View {
+        if Self.playsIn3D(theme, setting: sculpted3D) {
+            SculptedBoardView(match: match, theme: theme, browsing: browsing, endBrowsing: endBrowsing)
+        } else {
+            flatBoard
+        }
+    }
+
+    /// Whether this look plays on the real 3D board, given the "3D pieces" setting.
+    static func playsIn3D(_ theme: BoardTheme, setting: Bool) -> Bool {
+        theme.id == .sculpted && setting && SculptedAssets.shared.isLoaded
+    }
+
+    /// Width over height of the board: the 3D board, seen at an angle, is wider than tall.
+    static func aspect(_ theme: BoardTheme, setting: Bool) -> CGFloat {
+        playsIn3D(theme, setting: setting) ? SculptedBoardView.aspect : 1
+    }
+
+    private var flatBoard: some View {
         GeometryReader { geo in
             let side = min(geo.size.width, geo.size.height)
             let inset = theme.frameInset(side: side)
@@ -286,7 +311,7 @@ struct BoardView: View {
 
 /// Centers its one child over a point, shifted inward as far as needed to keep
 /// the whole child within the bounds. A child wider than the bounds is centered.
-private struct NameTagPlacement: Layout {
+struct NameTagPlacement: Layout {
     var x: CGFloat
     var y: CGFloat
 
@@ -630,7 +655,7 @@ struct BoardArt: View {
 }
 
 /// Lets the player choose what a pawn becomes on the last rank.
-private struct PromotionPicker: View {
+struct PromotionPicker: View {
     let color: Piece.Color
     let theme: BoardTheme
     let squareSize: CGFloat

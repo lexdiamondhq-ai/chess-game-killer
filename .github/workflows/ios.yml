@@ -42,7 +42,9 @@ jobs:
             -scheme ChessGameKiller \
             -destination "id=${{ steps.sim.outputs.udid }}" \
             CODE_SIGNING_ALLOWED=NO > build.log 2>&1 || status=$?
-          grep -E "error:|Test Case .* (passed|failed)|Executed|\*\* " build.log | head -150 || true
+          # Failures first, so they are never cut off by a long list of passes.
+          grep -E "error:|Test Case .* failed|\*\* " build.log | head -80 || true
+          grep -E "Executed" build.log | tail -3 || true
           exit $status
       - name: Upload build log
         if: always()

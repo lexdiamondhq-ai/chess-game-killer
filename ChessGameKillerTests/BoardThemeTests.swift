@@ -24,18 +24,19 @@ final class BoardThemeTests: XCTestCase {
         }
     }
 
-    func testNeonIsTheDefaultLook() {
-        XCTAssertEqual(BoardTheme.all.first?.id, .neon)
+    func testSculptedIsTheDefaultLook() {
+        XCTAssertEqual(BoardTheme.all.first?.id, .sculpted)
+        XCTAssertEqual(BoardTheme.named(.sculpted).pieceSet, "sculpted-")
     }
 
-    func testSavedSettingsForRemovedThemesOpenNeon() {
+    func testSavedSettingsForRemovedThemesOpenTheDefault() {
         // Walnut and Malachite were removed; @AppStorage falls back to its default when the saved value no longer parses.
         let defaults = UserDefaults(suiteName: "BoardThemeTests")!
         for removed in ["walnut", "malachite"] {
             XCTAssertNil(BoardTheme.ID(rawValue: removed))
             defaults.set(removed, forKey: "boardTheme")
-            let saved = defaults.string(forKey: "boardTheme").flatMap(BoardTheme.ID.init(rawValue:)) ?? .neon
-            XCTAssertEqual(saved, .neon)
+            let saved = defaults.string(forKey: "boardTheme").flatMap(BoardTheme.ID.init(rawValue:)) ?? .sculpted
+            XCTAssertEqual(saved, .sculpted)
         }
         defaults.removePersistentDomain(forName: "BoardThemeTests")
     }

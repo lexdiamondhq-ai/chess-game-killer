@@ -5,14 +5,15 @@ import SwiftUI
 /// Settings: the board's look with a live preview, how much the coach says,
 /// sound and haptics, and the credits. Every choice is remembered.
 struct SettingsSheet: View {
-    @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .neon
-    @AppStorage("matchRival") private var matchRival = true
+    @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .sculpted
+    @AppStorage("matchRival") private var matchRival = false
     @AppStorage("showBestMoves") private var showBestMoves = true
     @AppStorage("showSecondBest") private var showSecondBest = true
     @AppStorage("coachVerdicts") private var showVerdicts = true
     @AppStorage("soundEffects") private var soundOn = true
     @AppStorage("haptics") private var hapticsOn = true
     @AppStorage("bigBoard") private var bigBoard = false
+    @AppStorage("sculpted3D") private var sculpted3D = true
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.requestReview) private var requestReview
@@ -35,6 +36,11 @@ struct SettingsSheet: View {
                             }
                         }
                         SettingsGroup(theme: theme) {
+                            if themeID == .sculpted {
+                                ToggleRow(title: "3D pieces", subtitle: "Carved pieces that lift, glide and fall. Off draws the same set flat.",
+                                          symbol: "cube", isOn: $sculpted3D, theme: theme)
+                                rule
+                            }
                             ToggleRow(title: "Match rival", subtitle: "Computer games use the rival's own board, not the one picked above",
                                       symbol: "person.crop.circle.badge.checkmark", isOn: $matchRival, theme: theme)
                             rule
@@ -123,7 +129,8 @@ struct SettingsSheet: View {
     /// The chosen board with the arrows as they will look in a game.
     private var preview: some View {
         VStack(spacing: 14) {
-            BoardPreview(theme: theme, showBest: showBestMoves, showSecond: showBestMoves && showSecondBest, size: 172)
+            BoardPreview(theme: theme, showBest: showBestMoves, showSecond: showBestMoves && showSecondBest, size: 172,
+                         threeD: themeID == .sculpted && sculpted3D)
                 .padding(.top, 6)
             Text("Live preview")
                 .font(.caption.weight(.semibold))
@@ -168,12 +175,34 @@ struct BoardPreview: View {
     let showBest: Bool
     let showSecond: Bool
     var size: CGFloat = 160
+    /// The Sculpted look's real 3D board, with the same position and arrows.
+    var threeD = false
 
     private static let position = Position(fen: "r1bqk2r/ppp2ppp/2np1n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQK2R w KQkq - 0 6")
     private static let best = (from: Square.e1, to: Square.g1)
     private static let second = (from: Square.c1, to: Square.g5)
 
     var body: some View {
+        if threeD, SculptedAssets.shared.isLoaded, let position = Self.position {
+            // As tall as the flat preview, and as wide as the angled board needs.
+            SculptedStillBoard(position: position, hints: stillHints)
+                .frame(width: size * SculptedBoardView.aspect, height: size)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Preview of the \(theme.name) board")
+        } else {
+            flatPreview
+        }
+    }
+
+    private var stillHints: [SculptedHint] {
+        var hints: [SculptedHint] = []
+        if showBest { hints.append(SculptedHint(from: Self.best.from, to: Self.best.to, isBest: true)) }
+        if showBest, showSecond { hints.append(SculptedHint(from: Self.second.from, to: Self.second.to, isBest: false)) }
+        return hints
+    }
+
+    @ViewBuilder
+    private var flatPreview: some View {
         let inset = theme.frameInset(side: size)
         let sq = (size - inset * 2) / 8
         let corner = RoundedRectangle(cornerRadius: sq * 0.12, style: .continuous)
