@@ -3,8 +3,9 @@ import SwiftUI
 
 /// Rewind: a finished game told as a story. The board above, the game's line
 /// below it to drag through, and Leo's word on each moment that mattered.
-/// At a mistake: watch the better line play out as ghosts, then take the move
-/// back and find it yourself.
+/// At a mistake: walk the better line as ghosts, as deep as the review level
+/// goes, follow the other side's best tries or play your own move against
+/// Stockfish, then take the move back and find it yourself.
 struct RewindView: View {
     let theme: BoardTheme
     /// Play the same rival again, when the screen offers it.
@@ -16,16 +17,23 @@ struct RewindView: View {
 
     @State private var game: SavedGame
     @State private var ply: Int
-    @State private var ghostStep: Int?
-    @State private var ghostTask: Task<Void, Never>?
-    /// The ply the ghost line plays from; moving anywhere else ends it.
+    /// The better line being walked through, when "Show me" is on.
+    @State private var explorer: LineExplorer?
+    @State private var autoplay: Task<Void, Never>?
+    /// The ply the line plays from; moving anywhere else on the game's line ends it.
     @State private var ghostAnchor: Int?
+    @AppStorage(ReviewLevel.storageKey) private var levelID = ReviewLevel.club.rawValue
+    private let engine: ChessEngine?
+    private let opensLine: Bool
     @State private var chance: SecondChance?
     @State private var session: SessionPlan?
 
-    init(game: SavedGame, theme: BoardTheme, startAt ply: Int? = nil, onPlayAgain: ((SavedGame) -> Void)? = nil) {
+    init(game: SavedGame, theme: BoardTheme, startAt ply: Int? = nil, opensLine: Bool = false,
+         engine: ChessEngine? = StockfishEngine.shared, onPlayAgain: ((SavedGame) -> Void)? = nil) {
         self.theme = theme
         self.onPlayAgain = onPlayAgain
+        self.engine = engine
+        self.opensLine = opensLine
         _game = State(initialValue: game)
         let first = game.toRewrite.first(where: { !game.rewritten.contains($0.ply) }) ?? game.keyMoments.first
         let start = ply ?? first.map { $0.ply - 1 } ?? game.moves.count
@@ -40,11 +48,7 @@ struct RewindView: View {
         moments.first { $0.ply == ply + 1 } ?? moments.first { $0.ply == ply }
     }
 
-    private var ghost: (positions: [String], moves: [String], uci: [String])? {
-        guard ghostStep != nil, let focused else { return nil }
-        let line = SavedGame.ghostLine(for: focused)
-        return line.positions.isEmpty ? nil : line
-    }
+    private var level: ReviewLevel { ReviewLevel(rawValue: levelID) ?? .club }
 
     var body: some View {
         ZStack {
@@ -59,7 +63,7 @@ struct RewindView: View {
                     Lifeline(game: game, ply: $ply, ghost: ghostBranch, dotFill: theme.isDark ? Color(hex: 0x101114) : .white) { moment in
                         jump(to: moment)
                     }
-                    .frame(height: 96)
+                    .frame(height: explorer == nil ? 96 : 56)
                     .frame(maxWidth: 640)
                     .padding(.top, 14)
                     .padding(.horizontal, 8)
@@ -75,6 +79,10 @@ struct RewindView: View {
         .tint(accent)
         .onChange(of: ply) { _, now in
             if now != ghostAnchor { stopGhost() }
+        }
+        .onChange(of: levelID) { _, _ in explorer?.setLevel(level) }
+        .onAppear {
+            if opensLine, explorer == nil { startGhost(autoplays: false) }
         }
         .onDisappear { stopGhost() }
         .sensoryFeedback(.selection, trigger: ply)
@@ -108,12 +116,12 @@ struct RewindView: View {
             .accessibilityLabel("Back")
             Spacer()
             VStack(spacing: 2) {
-                Text(ghost == nil ? "Rewind · vs \(game.opponent)" : "Ghost line · vs \(game.opponent)")
+                Text(explorer == nil ? "Rewind · vs \(game.opponent)" : "\(level.title) review · vs \(game.opponent)")
                     .font(.caption2.weight(.semibold))
                     .tracking(2.5)
                     .textCase(.uppercase)
                     .foregroundStyle(.secondary)
-                Text(ghost == nil ? positionTitle : "What could have been")
+                Text(explorer == nil ? positionTitle : "What could have been")
                     .font(.system(.headline, design: .themed))
                     .contentTransition(.numericText())
             }
@@ -149,16 +157,28 @@ struct RewindView: View {
         var hints: [MoveHint] = []
         var tints: [Square: Color] = [:]
         var ghosts: Set<Square> = []
-        if let ghost, let step = ghostStep {
-            let index = min(step, ghost.positions.count - 1)
-            fen = ghost.positions[index]
-            for uci in ghost.uci.prefix(index + 1) {
-                if let squares = Notation.squares(of: uci) { ghosts.insert(squares.to) }
+        var onTap: ((Square) -> Void)?
+        if let explorer {
+            fen = explorer.fen
+            ghosts = explorer.ghostSquares
+            if let current = explorer.current, let squares = Notation.squares(of: current.uci) {
+                tints[squares.from] = RewindPalette.gold.opacity(0.24)
             }
-            if let squares = Notation.squares(of: ghost.uci[index]) {
-                tints[squares.from] = RewindPalette.gold.opacity(0.28)
-                hints = [MoveHint(rank: 0, from: squares.from, to: squares.to, san: ghost.moves[index],
-                                  uci: ghost.uci[index], evaluation: .centipawns(0))]
+            // The line's next move, and the other side's best tries beside it.
+            if let next = explorer.next, let squares = Notation.squares(of: next.uci) {
+                hints.append(MoveHint(rank: 0, from: squares.from, to: squares.to, san: next.san,
+                                      uci: next.uci, evaluation: .centipawns(0)))
+            }
+            if let branch = explorer.branches.first, let first = branch.moves.first, let squares = Notation.squares(of: first) {
+                hints.append(MoveHint(rank: 1, from: squares.from, to: squares.to, san: branch.san,
+                                      uci: first, evaluation: branch.evaluation))
+            }
+            if let selected = explorer.selected {
+                tints[selected] = RewindPalette.gold.opacity(0.5)
+            }
+            onTap = { square in
+                stopAutoplay()
+                explorer.tap(square)
             }
         } else {
             fen = game.positions[min(ply, game.positions.count - 1)]
@@ -178,6 +198,7 @@ struct RewindView: View {
             theme: theme,
             flipped: !game.playerIsWhite,
             hints: hints,
+            onTap: onTap,
             tints: tints,
             ghosts: ghosts,
             ghostColor: RewindPalette.gold
@@ -186,25 +207,42 @@ struct RewindView: View {
     }
 
     private var ghostBranch: (ply: Int, value: Double)? {
-        guard ghost != nil, let focused else { return nil }
-        // The engine's score before the move is what the better line keeps.
+        guard let explorer, let focused else { return nil }
+        // Where the line stands now, or the engine's score before the move until it has looked.
         let mine = focused.byWhite == game.playerIsWhite ? focused.before : -focused.before
-        return (focused.ply - 1, mine)
+        return (focused.ply - 1, explorer.evaluation?.winningChances ?? mine)
     }
 
     // MARK: The card
 
     private var card: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if let ghost, let focused {
-                ghostCard(ghost, moment: focused)
+            ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+            if let explorer, let focused {
+                ExplorerCard(
+                    explorer: explorer, moment: focused, theme: theme, levelID: $levelID,
+                    canTryIt: !game.rewritten.contains(focused.ply),
+                    isPlaying: autoplay != nil,
+                    onTouch: stopAutoplay,
+                    onPlay: { startAutoplay() },
+                    onTryIt: {
+                        stopGhost()
+                        takeBack(focused, note: RewindNote.make(for: focused, library: training?.library))
+                    },
+                    onClose: stopGhost
+                )
             } else if let focused {
                 momentCard(focused)
             } else {
                 plainCard
             }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .scrollBounceBehavior(.basedOnSize)
             Spacer(minLength: 12)
-            momentNav
+            if explorer == nil { momentNav }
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -218,7 +256,7 @@ struct RewindView: View {
         }
         .padding(.horizontal, 12)
         .animation(.snappy(duration: 0.25), value: focused?.ply)
-        .animation(.snappy(duration: 0.25), value: ghostStep)
+        .animation(.snappy(duration: 0.25), value: explorer == nil)
     }
 
     private func momentCard(_ moment: SavedMoment) -> some View {
@@ -262,56 +300,6 @@ struct RewindView: View {
                 }
                 .padding(.top, 16)
             }
-        }
-    }
-
-    private func ghostCard(_ ghost: (positions: [String], moves: [String], uci: [String]), moment: SavedMoment) -> some View {
-        let step = min(ghostStep ?? 0, ghost.moves.count - 1)
-        let mineBest = moment.before
-        let minePlayed = moment.after
-        return VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Tag(text: "Ghost line", symbol: "circle.dashed", color: RewindPalette.gold)
-                Spacer()
-                Text("Move \(step + 1) of \(ghost.moves.count)")
-                    .font(.subheadline.weight(.semibold).monospacedDigit())
-                    .foregroundStyle(.secondary)
-            }
-            HStack(spacing: 8) {
-                ForEach(Array(ghost.moves.enumerated()), id: \.offset) { index, san in
-                    Text(san)
-                        .font(.subheadline.weight(.semibold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                        .frame(maxWidth: .infinity, minHeight: 34)
-                        .foregroundStyle(index <= step ? RewindPalette.gold : Color.secondary)
-                        .background {
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(index <= step ? RewindPalette.gold.opacity(0.14) : Color.primary.opacity(0.05))
-                        }
-                }
-            }
-            .padding(.top, 12)
-            Text("If you had played \(ghost.moves.first ?? "the engine's move")")
-                .font(.system(.title3, design: .themed).weight(.semibold))
-                .padding(.top, 12)
-            Text(GhostVerdict.sentence(best: mineBest, played: minePlayed))
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 4)
-            HStack(spacing: 10) {
-                CardButton(title: "Replay", symbol: "arrow.counterclockwise") { startGhost() }
-                if !game.rewritten.contains(moment.ply) {
-                    CardButton(title: "Try it myself", symbol: "play.fill", prominent: true, accent: accent) {
-                        stopGhost()
-                        takeBack(moment, note: RewindNote.make(for: moment, library: training?.library))
-                    }
-                } else {
-                    CardButton(title: "Back to the game", symbol: "chevron.left") { stopGhost() }
-                }
-            }
-            .padding(.top, 16)
         }
     }
 
@@ -377,29 +365,56 @@ struct RewindView: View {
         withAnimation(.snappy) { ply = max(0, moment.ply - 1) }
     }
 
-    private func startGhost() {
-        ghostTask?.cancel()
+    /// Opens the better line from the moment on the board, and plays it unless told not to.
+    private func startGhost(autoplays: Bool = true) {
+        stopGhost()
         guard let focused else { return }
-        let count = SavedGame.ghostLine(for: focused).positions.count
-        guard count > 0 else { return }
+        var line = focused.bestLine
+        if line.isEmpty, let best = focused.bestUCI { line = [best] }
+        guard !line.isEmpty else { return }
         // The board shows the moment from before it was played.
         ghostAnchor = focused.ply - 1
         if ply != focused.ply - 1 { ply = focused.ply - 1 }
-        withAnimation(.snappy) { ghostStep = 0 }
-        ghostTask = Task { @MainActor in
-            for step in 1..<max(1, count) {
-                try? await Task.sleep(for: .seconds(1.3))
-                guard !Task.isCancelled else { return }
-                withAnimation(.easeInOut(duration: 0.35)) { ghostStep = step }
-            }
+        let made = LineExplorer(root: focused.fenBefore, line: line, player: game.playerColor, level: level, engine: engine)
+        guard !made.steps.isEmpty else { return }
+        withAnimation(.snappy) { explorer = made }
+        made.refresh()
+        if autoplays {
+            startAutoplay()
+        } else if opensLine {
+            made.go(to: 1)
         }
     }
 
+    /// Plays the line one move at a time, waiting for the engine where the line runs on.
+    private func startAutoplay() {
+        stopAutoplay()
+        guard let explorer else { return }
+        if explorer.atEnd { explorer.go(to: 0) }
+        autoplay = Task { @MainActor in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1.4))
+                guard !Task.isCancelled else { return }
+                if explorer.atEnd {
+                    if explorer.isThinking, explorer.steps.count < explorer.level.depth { continue }
+                    break
+                }
+                withAnimation(.easeInOut(duration: 0.35)) { explorer.stepForward() }
+            }
+            autoplay = nil
+        }
+    }
+
+    private func stopAutoplay() {
+        autoplay?.cancel()
+        autoplay = nil
+    }
+
     private func stopGhost() {
-        ghostTask?.cancel()
-        ghostTask = nil
+        stopAutoplay()
+        explorer?.cancel()
         ghostAnchor = nil
-        if ghostStep != nil { withAnimation(.snappy) { ghostStep = nil } }
+        if explorer != nil { withAnimation(.snappy) { explorer = nil } }
     }
 
     private func takeBack(_ moment: SavedMoment, note: RewindNote) {
@@ -480,6 +495,230 @@ private struct SecondChanceSheet: View {
             reported = true
             onFinish(outcome != .missed)
         }
+    }
+}
+
+// MARK: The line, move by move
+
+/// The better line from a moment: every move tappable, Leo's word on the one on
+/// the board, where it leads, and the other side's best tries to follow instead.
+private struct ExplorerCard: View {
+    let explorer: LineExplorer
+    let moment: SavedMoment
+    let theme: BoardTheme
+    @Binding var levelID: String
+    let canTryIt: Bool
+    let isPlaying: Bool
+    let onTouch: () -> Void
+    let onPlay: () -> Void
+    let onTryIt: () -> Void
+    let onClose: () -> Void
+
+    private var level: ReviewLevel { explorer.level }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Tag(text: explorer.ownMoveAt == nil ? "Ghost line" : "Your line", symbol: "circle.dashed",
+                    color: RewindPalette.gold)
+                Spacer()
+                levelMenu
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(.footnote.weight(.bold))
+                        .frame(width: 30, height: 30)
+                        .background(Circle().fill(Color.primary.opacity(0.08)))
+                }
+                .tint(.primary)
+                .accessibilityLabel("Back to the game")
+            }
+            moves.padding(.top, 12)
+            Text(explorer.sentence)
+                .font(.system(.headline, design: .themed))
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 12)
+                .contentTransition(.opacity)
+            outlook.padding(.top, 4)
+            if !explorer.branches.isEmpty {
+                branches.padding(.top, 12)
+            }
+            controls.padding(.top, 14)
+        }
+    }
+
+    private var levelMenu: some View {
+        Menu {
+            Picker("Review", selection: $levelID) {
+                ForEach(ReviewLevel.allCases) { level in
+                    Text("\(level.title): \(level.blurb)").tag(level.rawValue)
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(level.title)
+                Image(systemName: "chevron.up.chevron.down").font(.caption2.weight(.bold))
+            }
+            .font(.subheadline.weight(.semibold))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(Color.primary.opacity(0.08)))
+        }
+        .tint(.primary)
+        .accessibilityLabel("Review level, \(level.title)")
+    }
+
+    /// Every move of the line; the one on the board is lit.
+    private var moves: some View {
+        ScrollViewReader { reader in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    pill("Start", lit: explorer.cursor == 0, own: false) { explorer.go(to: 0) }
+                        .id(0)
+                    ForEach(explorer.steps) { step in
+                        pill(step.numbered, lit: explorer.cursor == step.index + 1,
+                             own: explorer.ownMoveAt == step.index) {
+                            explorer.go(to: step.index + 1)
+                        }
+                        .id(step.index + 1)
+                    }
+                    if explorer.isThinking, explorer.atEnd {
+                        ProgressView().controlSize(.small).padding(.horizontal, 8)
+                    }
+                }
+            }
+            .onChange(of: explorer.cursor) { _, cursor in
+                withAnimation(.snappy) { reader.scrollTo(cursor, anchor: .center) }
+            }
+        }
+    }
+
+    private func pill(_ text: String, lit: Bool, own: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            onTouch()
+            action()
+        } label: {
+            HStack(spacing: 4) {
+                if own { Image(systemName: "hand.point.up.left.fill").font(.caption2) }
+                Text(text)
+            }
+            .font(.subheadline.weight(.semibold).monospacedDigit())
+            .lineLimit(1)
+            .padding(.horizontal, 10)
+            .frame(minHeight: 32)
+            .foregroundStyle(lit ? RewindPalette.gold : Color.secondary)
+            .background {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(lit ? RewindPalette.gold.opacity(0.16) : Color.primary.opacity(0.05))
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var outlook: some View {
+        if let evaluation = explorer.evaluation {
+            HStack(spacing: 6) {
+                Text("Here: \(LineNarrator.outlook(evaluation.winningChances))")
+                if level.showsNumbers {
+                    Text(evaluation.label)
+                        .monospacedDigit()
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(Color.primary.opacity(0.08)))
+                }
+            }
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+        } else if explorer.isThinking {
+            Text("Stockfish is looking…").font(.subheadline).foregroundStyle(.tertiary)
+        }
+    }
+
+    /// The other side's best tries here (both sides' on Grandmaster), to follow instead.
+    private var branches: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(explorer.playerToMove ? "Or you could play" : "If they try instead")
+                .font(.caption.weight(.semibold))
+                .tracking(1.5)
+                .textCase(.uppercase)
+                .foregroundStyle(.tertiary)
+            ForEach(explorer.branches) { branch in
+                Button {
+                    onTouch()
+                    withAnimation(.snappy) { explorer.follow(branch) }
+                } label: {
+                    HStack(spacing: 10) {
+                        Text(branch.san)
+                            .font(.subheadline.weight(.semibold))
+                            .frame(minWidth: 54, alignment: .leading)
+                        Text(branch.note)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Spacer(minLength: 4)
+                        if level.showsNumbers {
+                            Text(branch.evaluation.label)
+                                .font(.caption.weight(.semibold).monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                        Image(systemName: "arrow.turn.down.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 38)
+                    .background {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color.primary.opacity(0.05))
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var controls: some View {
+        HStack(spacing: 8) {
+            round("backward.end.fill", label: "Previous move", disabled: explorer.cursor == 0) {
+                explorer.stepBack()
+            }
+            round(isPlaying ? "pause.fill" : "play.fill", label: isPlaying ? "Pause" : "Play the line", disabled: false) {
+                if isPlaying { onTouch() } else { onPlay() }
+            }
+            round("forward.end.fill", label: "Next move", disabled: explorer.atEnd) {
+                explorer.stepForward()
+            }
+            Spacer(minLength: 4)
+            if canTryIt {
+                Button(action: onTryIt) {
+                    Label("Try it myself", systemImage: "arrow.counterclockwise")
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, 14)
+                        .frame(minHeight: 44)
+                        .foregroundStyle(.background)
+                        .background(Capsule().fill(Color.primary.opacity(0.92)))
+                }
+                .buttonStyle(.plain)
+            } else {
+                Text("Tap a piece to try a move")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    private func round(_ symbol: String, label: String, disabled: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            if symbol != "play.fill" && symbol != "pause.fill" { onTouch() }
+            withAnimation(.easeInOut(duration: 0.3)) { action() }
+        } label: {
+            Image(systemName: symbol)
+                .font(.footnote.weight(.bold))
+                .frame(width: 44, height: 44)
+                .background(Circle().fill(Color.primary.opacity(0.07)))
+        }
+        .tint(.primary)
+        .disabled(disabled)
+        .accessibilityLabel(label)
     }
 }
 
