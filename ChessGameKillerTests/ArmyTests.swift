@@ -155,16 +155,17 @@ final class ArmyTests: XCTestCase {
                     stakes: GameStakes(level: .beginner, assisted: false))
         hard.record(onePawnCaptureLedger(), playerColor: .white, won: true,
                     stakes: GameStakes(level: .grandmaster, assisted: false))
-        // e-pawn: 1 game + 3 win + 2 survived + 2 for the pawn it took = 8.
-        XCTAssertEqual(easy.record(for: .ePawn).xp, 8)
-        XCTAssertEqual(hard.record(for: .ePawn).xp, 24)
+        // e-pawn: 1 game + 3 win + 2 survived + 2 for the pawn it took + 5 as Piece of the Match = 13.
+        XCTAssertEqual(easy.record(for: .ePawn).xp, 13)
+        XCTAssertEqual(hard.record(for: .ePawn).xp, 39)
     }
 
     func testAssistedGamesEarnHalf() {
         let store = ArmyStore()
         store.record(onePawnCaptureLedger(), playerColor: .white, won: true,
                      stakes: GameStakes(level: .beginner, assisted: true))
-        XCTAssertEqual(store.record(for: .ePawn).xp, 4)
+        // 13 halved, rounded.
+        XCTAssertEqual(store.record(for: .ePawn).xp, 7)
         // a-pawn: 1 game + 3 win + 2 survived = 6, halved.
         XCTAssertEqual(store.record(for: .aPawn).xp, 3)
         let lost = ArmyStore()
@@ -228,7 +229,11 @@ final class ArmyTests: XCTestCase {
         let hero = store.lastHero!
         XCTAssertEqual(hero.slot, .kingsKnight)
         XCTAssertEqual(hero.gameID, ledger.gameID)
-        XCTAssertEqual(hero.line, "Your kingside knight took Pulse's queen.")
+        // Taking the queen made it a Veteran this game, so it is named in the line.
+        let name = store.record(for: .kingsKnight).name
+        XCTAssertNotNil(name)
+        XCTAssertEqual(hero.name, name)
+        XCTAssertEqual(hero.line, "\(name ?? "") took Pulse's queen.")
         XCTAssertEqual(store.record(for: .kingsKnight).honors, 1)
         XCTAssertEqual(store.record(for: .ePawn).honors, 0)
     }
