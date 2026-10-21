@@ -49,6 +49,8 @@ for side in ('w','b'):
         sc.render.engine='CYCLES'; sc.cycles.samples=samples; sc.cycles.use_denoising=True; sc.cycles.device='CPU'
         sc.render.film_transparent=True; sc.render.resolution_x=520; sc.render.resolution_y=568
         sc.view_settings.view_transform='AgX'; sc.view_settings.look='AgX - High Contrast' if side=='w' else 'AgX - Medium High Contrast'
+        # ebony stays deep at phone size: the body well below the dark squares, the highlights still crisp
+        if side=='b': sc.view_settings.exposure=-0.9; sc.view_settings.look='AgX - High Contrast'
         sc.render.image_settings.file_format='PNG'; sc.render.image_settings.color_mode='RGBA'
         sc.render.filepath=f'{outdir}/{name}.png'; bpy.ops.render.render(write_still=True)
         print('done',name,flush=True)
