@@ -616,17 +616,17 @@ final class SculptedBoardScene {
         let occupied = Set(new.pieces.map(\.square))
         if let last = new.lastMove {
             for square in [last.from, last.to] {
-                addMark(Self.lastMoveMark, at: square, height: 0.0015)
+                addMark(lastMoveMark, at: square, height: 0.0015)
             }
         }
         if let selected = new.selected {
-            addMark(Self.selectedMark, at: selected, height: 0.0017)
+            addMark(selectedMark, at: selected, height: 0.0017)
         }
         if let king = new.checkedKing {
-            addMark(Self.checkMark, at: king, height: 0.0019)
+            addMark(checkMark, at: king, height: 0.0019)
         }
         for target in new.targets {
-            addMark(occupied.contains(target) ? Self.captureMark : Self.dotMark, at: target, height: 0.0023, fade: true)
+            addMark(occupied.contains(target) ? captureMark : dotMark, at: target, height: 0.0023, fade: true)
         }
     }
 
@@ -659,12 +659,11 @@ final class SculptedBoardScene {
         return plane
     }
 
-    private static let palette = SculptedLook.current
-    private static let lastMoveMark = mark(size: 1, color: .white, alpha: 0.13, mask: nil)
-    private static let selectedMark = mark(size: 1, color: palette.accent, alpha: 0.3, mask: nil)
-    private static let checkMark = mark(size: 1.5, color: palette.check, alpha: 0.9, mask: MarkImages.glow)
-    private static let dotMark = mark(size: 1, color: palette.accent, alpha: 0.92, mask: MarkImages.dot)
-    private static let captureMark = mark(size: 1, color: palette.accent, alpha: 0.92, mask: MarkImages.ring)
+    private lazy var lastMoveMark = Self.mark(size: 1, color: look.lastMove, alpha: look.lastMoveAlpha, mask: nil)
+    private lazy var selectedMark = Self.mark(size: 1, color: look.accent, alpha: 0.3, mask: nil)
+    private lazy var checkMark = Self.mark(size: 1.5, color: look.check, alpha: 0.9, mask: MarkImages.glow)
+    private lazy var dotMark = Self.mark(size: 1, color: look.accent, alpha: 0.92, mask: MarkImages.dot)
+    private lazy var captureMark = Self.mark(size: 1, color: look.accent, alpha: 0.92, mask: MarkImages.ring)
     private static let contactGeometry = mark(size: 1, color: .black, alpha: 0.5, mask: MarkImages.contact)
     private static let haloMask = MarkImages.halo
 
@@ -676,7 +675,7 @@ final class SculptedBoardScene {
         }
         // The runner-up first, so the best arrow lies on top where they cross.
         for (index, hint) in hints.sorted(by: { !$0.isBest && $1.isBest }).enumerated() {
-            let node = SCNNode(geometry: Self.arrow(hint))
+            let node = SCNNode(geometry: Self.arrow(hint, color: look.accent))
             node.simdOrientation = Self.flat
             node.simdPosition = SIMD3(0, 0.003 + 0.0004 * Float(index), 0)
             node.renderingOrder = 12 + index
@@ -689,7 +688,7 @@ final class SculptedBoardScene {
 
     /// A flat arrow lying on the stone: solid with a round tail for the best move,
     /// dashed for the second best. Sizes match the flat board's arrows.
-    private static func arrow(_ hint: SculptedHint) -> SCNGeometry {
+    private static func arrow(_ hint: SculptedHint, color: UIColor) -> SCNGeometry {
         // Path coordinates are (x, -z): the shape is drawn upright, then laid flat.
         func point(_ v: SIMD3<Float>) -> CGPoint { CGPoint(x: CGFloat(v.x), y: CGFloat(-v.z)) }
         let from = point(SculptedCamera.position(of: hint.from))
@@ -747,7 +746,7 @@ final class SculptedBoardScene {
         let shape = SCNShape(path: path, extrusionDepth: 0)
         let material = SCNMaterial()
         material.lightingModel = .constant
-        material.diffuse.contents = palette.accent
+        material.diffuse.contents = color
         material.transparency = hint.isBest ? 0.95 : 0.75
         material.transparencyMode = .aOne
         material.writesToDepthBuffer = false
@@ -820,8 +819,15 @@ final class SculptedBoardScene {
         scene.rootNode.addChildNode(rig)
 
         let key = SCNLight()
-        key.type = .directional
+        if let spot = look.spot {
+            key.type = .spot
+            key.spotInnerAngle = spot.inner
+            key.spotOuterAngle = spot.outer
+        } else {
+            key.type = .directional
+        }
         key.intensity = look.key
+        key.color = look.keyColor
         key.castsShadow = true
         key.shadowMode = .forward
         key.shadowSampleCount = 16
@@ -838,7 +844,7 @@ final class SculptedBoardScene {
         let rim = SCNLight()
         rim.type = .directional
         rim.intensity = look.rim
-        rim.color = UIColor(red: 0.9, green: 0.94, blue: 1, alpha: 1)
+        rim.color = look.rimColor
         let rimNode = SCNNode()
         rimNode.light = rim
         rimNode.simdPosition = SIMD3(7, 4, -6)
@@ -890,8 +896,8 @@ final class SculptedBoardScene {
             board.addChildNode(node)
         }
 
-        // A fine platinum line around the squares.
-        let metal = assets.material(.metal, for: .white)
+        // A fine metal line around the squares.
+        let metal = assets.inlayMaterial()
         let gap: Float = 0.09
         let line: Float = 0.012
         let span = 8 + 2 * gap + line

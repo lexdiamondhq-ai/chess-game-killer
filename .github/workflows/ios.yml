@@ -67,7 +67,11 @@ jobs:
           cat snapshots/device.txt || true
           for f in snapshots/*.png; do
             [ -e "$f" ] || continue
-            sips -s format jpeg -s formatOptions 60 -Z 700 "$f" --out /tmp/small.jpg >/dev/null
+            # Look studies are printed near full size, so they can be judged as on the phone.
+            case "$(basename "$f")" in
+              study-*) sips -s format jpeg -s formatOptions 80 -Z 1300 "$f" --out /tmp/small.jpg >/dev/null ;;
+              *) sips -s format jpeg -s formatOptions 60 -Z 700 "$f" --out /tmp/small.jpg >/dev/null ;;
+            esac
             echo "BEGIN-SCREEN $(basename "$f")"
             base64 -i /tmp/small.jpg | fold -w 3000
             echo "END-SCREEN"

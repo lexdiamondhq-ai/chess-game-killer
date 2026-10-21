@@ -46,6 +46,23 @@ final class ScreenSnapshotTests: XCTestCase {
         try snapshot("sculpted-flat")
     }
 
+    /// The board looks being compared, each on the whole game screen.
+    func testLookStudyScreens() throws {
+        let saved = SculptedLook.current
+        defer {
+            SculptedLook.current = saved
+            SculptedAssets.shared = SculptedAssets()
+        }
+        defaults.set("sculpted", forKey: "boardTheme")
+        defaults.set(false, forKey: "matchRival")
+        defaults.set(true, forKey: "sculpted3D")
+        for look in SculptedLook.studies {
+            SculptedLook.current = look
+            SculptedAssets.shared = SculptedAssets()
+            try snapshot("study-screen-\(look.name.lowercased())")
+        }
+    }
+
     func testBigBoardNeon() throws {
         defaults.set("neon", forKey: "boardTheme")
         defaults.set(false, forKey: "matchRival")

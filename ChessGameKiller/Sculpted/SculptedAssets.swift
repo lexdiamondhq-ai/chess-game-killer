@@ -9,7 +9,8 @@ import UIKit
 /// script in scripts/sculpted. Sizes are in squares,
 /// with y up, the piece's foot at the origin and black's side of the board toward -z.
 final class SculptedAssets {
-    static let shared = SculptedAssets()
+    /// Replaced only by tests that compare looks.
+    static var shared = SculptedAssets()
 
     /// What a part of a piece is made of.
     enum Finish: UInt8 {
@@ -88,8 +89,9 @@ final class SculptedAssets {
 
     /// The stone squares: the baked marble with a polished coat.
     func squaresMaterial() -> SCNMaterial {
-        let material = Self.pbr(.white, roughness: 0.24, coat: 0.45, coatRoughness: 0.05)
-        material.diffuse.contents = UIImage(named: "sculpted-squares") ?? UIColor(white: 0.45, alpha: 1)
+        let look = SculptedLook.current
+        let material = Self.pbr(.white, roughness: look.stoneRoughness, coat: look.stoneCoat, coatRoughness: 0.05)
+        material.diffuse.contents = UIImage(named: look.squares) ?? UIColor(white: 0.45, alpha: 1)
         material.diffuse.mipFilter = .linear
         material.diffuse.maxAnisotropy = 8
         return material
@@ -97,7 +99,14 @@ final class SculptedAssets {
 
     /// The black lacquered frame.
     func frameMaterial() -> SCNMaterial {
-        Self.pbr(SculptedLook.current.lacquer, roughness: 0.42, coat: 0.18, coatRoughness: 0.12)
+        let look = SculptedLook.current
+        return Self.pbr(look.lacquer, roughness: look.lacquerRoughness, coat: look.lacquerCoat, coatRoughness: 0.08)
+    }
+
+    /// The fine metal line around the squares: platinum, or the look's own metal.
+    func inlayMaterial() -> SCNMaterial {
+        guard let inlay = SculptedLook.current.inlay else { return material(.metal, for: .white) }
+        return Self.pbr(inlay, roughness: 0.2, metalness: 1)
     }
 
     /// The studio light the pieces reflect: a soft light tent, the same from every side.
@@ -218,20 +227,92 @@ private struct ByteReader {
 struct SculptedLook {
     static var current = SculptedLook()
 
+    var name = "Sculpted"
+    /// The baked stone squares in the asset catalog.
+    var squares = "sculpted-squares"
+    var stoneRoughness: CGFloat = 0.24
+    var stoneCoat: CGFloat = 0.45
+
     var ivory = UIColor(red: 0.925, green: 0.9, blue: 0.85, alpha: 1)
     var ebony = UIColor(red: 0.15, green: 0.143, blue: 0.138, alpha: 1)
     var platinum = UIColor(red: 0.93, green: 0.93, blue: 0.945, alpha: 1)
     var sapphire = UIColor(red: 0.12, green: 0.26, blue: 0.8, alpha: 1)
     var pearl = UIColor(red: 0.965, green: 0.95, blue: 0.93, alpha: 1)
     var lacquer = UIColor(red: 0.07, green: 0.07, blue: 0.08, alpha: 1)
+    var lacquerRoughness: CGFloat = 0.42
+    var lacquerCoat: CGFloat = 0.18
+    /// The line around the squares; nil is platinum.
+    var inlay: UIColor?
 
     /// How bright the studio tent is, and the key light that casts the shadows.
     var environment: CGFloat = 2.0
     var key: CGFloat = 1100
     var rim: CGFloat = 300
+    var keyColor = UIColor.white
+    var rimColor = UIColor(red: 0.9, green: 0.94, blue: 1, alpha: 1)
+    /// A key that falls as a pool of light, brightest in the middle of the board, rather than
+    /// lighting it evenly. The angles are where the pool starts to fade and where it ends, in degrees.
+    var spot: (inner: CGFloat, outer: CGFloat)?
 
     /// The marks drawn on the stone: legal moves, best-move arrows.
     var accent = UIColor(red: 0.37, green: 0.56, blue: 1.0, alpha: 1)
     var check = UIColor(red: 1.0, green: 0.23, blue: 0.3, alpha: 1)
     var platinumMark = UIColor(red: 0.86, green: 0.88, blue: 0.93, alpha: 1)
+    var lastMove = UIColor.white
+    var lastMoveAlpha: CGFloat = 0.13
+}
+
+extension SculptedLook {
+    /// The looks being compared for the next board, the current one first.
+    static let studies: [SculptedLook] = [SculptedLook(), .noir, .bordeaux, .midnight]
+
+    /// A warm key falling as a pool of light, a cool rim, a dim tent: depth without glare.
+    private static func lit(_ look: SculptedLook) -> SculptedLook {
+        var look = look
+        look.environment = 1.1
+        look.key = 2600
+        look.rim = 520
+        look.keyColor = UIColor(red: 1, green: 0.9, blue: 0.76, alpha: 1)
+        look.rimColor = UIColor(red: 0.8, green: 0.87, blue: 1, alpha: 1)
+        look.spot = (inner: 24, outer: 86)
+        look.ivory = UIColor(red: 0.94, green: 0.9, blue: 0.83, alpha: 1)
+        look.ebony = UIColor(red: 0.11, green: 0.105, blue: 0.1, alpha: 1)
+        look.stoneRoughness = 0.26
+        look.stoneCoat = 0.35
+        look.lacquerRoughness = 0.3
+        look.lacquerCoat = 0.6
+        return look
+    }
+
+    /// Warm alabaster and black marble under a single warm light.
+    static let noir: SculptedLook = {
+        var look = lit(SculptedLook())
+        look.name = "Noir"
+        look.squares = "sculpted-squares-noir"
+        look.lacquer = UIColor(red: 0.04, green: 0.04, blue: 0.045, alpha: 1)
+        look.inlay = UIColor(red: 0.8, green: 0.72, blue: 0.56, alpha: 1)
+        look.platinumMark = UIColor(red: 0.86, green: 0.79, blue: 0.64, alpha: 1)
+        return look
+    }()
+
+    /// Cream and deep wine-red marble, a black frame and platinum.
+    static let bordeaux: SculptedLook = {
+        var look = lit(SculptedLook())
+        look.name = "Bordeaux"
+        look.squares = "sculpted-squares-bordeaux"
+        look.lacquer = UIColor(red: 0.05, green: 0.04, blue: 0.04, alpha: 1)
+        look.accent = UIColor(red: 0.95, green: 0.82, blue: 0.56, alpha: 1)
+        return look
+    }()
+
+    /// Cream and ink-blue stone, a black frame and platinum; the marks in warm ivory.
+    static let midnight: SculptedLook = {
+        var look = lit(SculptedLook())
+        look.name = "Midnight"
+        look.squares = "sculpted-squares-midnight"
+        look.lacquer = UIColor(red: 0.04, green: 0.045, blue: 0.06, alpha: 1)
+        look.keyColor = UIColor(red: 1, green: 0.92, blue: 0.8, alpha: 1)
+        look.accent = UIColor(red: 0.98, green: 0.86, blue: 0.62, alpha: 1)
+        return look
+    }()
 }

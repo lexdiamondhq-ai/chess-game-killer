@@ -55,6 +55,18 @@ final class SculptedSnapshotTests: XCTestCase {
         window.isHidden = true
     }
 
+    /// Each look being compared, at the size it has on an iPhone 17 Pro, a game in progress.
+    func testLookStudies() throws {
+        let saved = SculptedLook.current
+        defer { SculptedLook.current = saved }
+        for look in SculptedLook.studies {
+            SculptedLook.current = look
+            let (scene, window) = try stage(Self.midgame, side: 402)
+            try save(scene.snapshot(), "study-\(look.name.lowercased())")
+            window.isHidden = true
+        }
+    }
+
     func testLightLevels() throws {
         let saved = SculptedLook.current
         defer { SculptedLook.current = saved }
