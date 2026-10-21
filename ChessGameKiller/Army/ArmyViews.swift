@@ -373,7 +373,7 @@ struct ArmyView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            Text("XP: 1 per game, 3 per win, 2 more if the piece is still standing, 2 per pawn's worth taken, 10 per promotion, 20 per checkmate.")
+            Text("XP: 1 per game, 3 per win, 2 more if the piece is still standing, 2 per pawn's worth taken, 10 per promotion, 20 per checkmate. Stronger rivals are worth more, up to 3× against Singularity. Games with Undo or a played hint earn half. Leaving a game unfinished counts as a loss.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

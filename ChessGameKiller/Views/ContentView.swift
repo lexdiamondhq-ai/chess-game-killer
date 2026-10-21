@@ -78,7 +78,14 @@ struct ContentView: View {
         // Fonts read the look from here: rounded on Neon, plain SF Pro on the rest.
         let _ = ThemeFont.use(theme)
         presented
-            .onAppear { syncCoachSettings() }
+            .onAppear {
+                syncCoachSettings()
+                match.onAbandon = { [army] ledger, setup, assisted in
+                    // Walking away from a game counts as a loss.
+                    army.record(ledger, playerColor: setup.playerColor, won: false,
+                                stakes: GameStakes(level: setup.level, assisted: assisted))
+                }
+            }
             .task { await StockfishEngine.shared.warmUp() }
             .onChange(of: showBestMoves) { _, _ in syncCoachSettings() }
             .onChange(of: showSecondBest) { _, _ in syncCoachSettings() }
@@ -602,7 +609,8 @@ struct ContentView: View {
     private func recordArmy() {
         guard match.setup.opponent == .computer, let ledger = match.game.ledger else { return }
         let won = match.winner.map { $0 == match.setup.playerColor }
-        guard let news = army.record(ledger, playerColor: match.setup.playerColor, won: won).first else { return }
+        guard let news = army.record(ledger, playerColor: match.setup.playerColor, won: won,
+                                       stakes: match.armyStakes).first else { return }
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(1.2))
             withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) { armyNews = news }

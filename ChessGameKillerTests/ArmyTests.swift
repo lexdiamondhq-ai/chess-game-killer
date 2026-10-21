@@ -140,4 +140,78 @@ final class ArmyTests: XCTestCase {
         store.rename(.kingsKnight, to: "   ")
         XCTAssertEqual(store.record(for: .kingsKnight).name, "Vesper")
     }
+
+    // MARK: Stakes
+
+    private func onePawnCaptureLedger() -> PieceLedger {
+        let game = GameModel()
+        play(game, "e2e4", "d7d5", "e4d5")
+        return game.ledger!
+    }
+
+    func testStrongerRivalsAreWorthMore() {
+        let easy = ArmyStore(), hard = ArmyStore()
+        easy.record(onePawnCaptureLedger(), playerColor: .white, won: true,
+                    stakes: GameStakes(level: .beginner, assisted: false))
+        hard.record(onePawnCaptureLedger(), playerColor: .white, won: true,
+                    stakes: GameStakes(level: .grandmaster, assisted: false))
+        // e-pawn: 1 game + 3 win + 2 survived + 2 for the pawn it took = 8.
+        XCTAssertEqual(easy.record(for: .ePawn).xp, 8)
+        XCTAssertEqual(hard.record(for: .ePawn).xp, 24)
+    }
+
+    func testAssistedGamesEarnHalf() {
+        let store = ArmyStore()
+        store.record(onePawnCaptureLedger(), playerColor: .white, won: true,
+                     stakes: GameStakes(level: .beginner, assisted: true))
+        XCTAssertEqual(store.record(for: .ePawn).xp, 4)
+        // a-pawn: 1 game + 3 win + 2 survived = 6, halved.
+        XCTAssertEqual(store.record(for: .aPawn).xp, 3)
+        let lost = ArmyStore()
+        lost.record(onePawnCaptureLedger(), playerColor: .white, won: false,
+                    stakes: GameStakes(level: .beginner, assisted: true))
+        // Every piece still gets at least one point for playing.
+        XCTAssertEqual(lost.record(for: .aPawn).xp, 1)
+    }
+
+    func testOldSavedArmiesKeepTheirExperience() throws {
+        let json = #"{"name":"Kestrel","games":10,"wins":5,"survivedWins":4,"captures":3,"captureValue":7,"mates":1,"promotions":0,"falls":2}"#
+        let record = try JSONDecoder().decode(PieceRecord.self, from: Data(json.utf8))
+        XCTAssertEqual(record.xp, 10 + 15 + 8 + 14 + 0 + 20)
+        XCTAssertEqual(record.name, "Kestrel")
+        let again = try JSONDecoder().decode(PieceRecord.self, from: JSONEncoder().encode(record))
+        XCTAssertEqual(again, record)
+    }
+
+    func testLeavingAGameCountsAsALoss() {
+        let match = MatchController(engine: nil, sounds: nil)
+        let store = ArmyStore()
+        var abandoned = 0
+        match.onAbandon = { ledger, setup, assisted in
+            abandoned += 1
+            store.record(ledger, playerColor: setup.playerColor, won: false,
+                         stakes: GameStakes(level: setup.level, assisted: assisted))
+        }
+        match.start(.init(opponent: .computer, playerColor: .white), playSound: false)
+        for move in ["e2e4", "e7e5", "g1f3", "b8c6"] { XCTAssertTrue(match.game.playEngineMove(move)) }
+        match.start(.init(opponent: .computer, playerColor: .white), playSound: false)
+        XCTAssertEqual(abandoned, 1)
+        XCTAssertEqual(store.record(for: .king).games, 1)
+        XCTAssertEqual(store.record(for: .king).wins, 0)
+
+        // Starting again straight away, before any moves, doesn't count.
+        match.start(.init(opponent: .computer, playerColor: .white), playSound: false)
+        XCTAssertEqual(abandoned, 1)
+    }
+
+    func testUndoMarksTheGameAssisted() {
+        let match = MatchController(engine: nil, sounds: nil)
+        match.start(.init(opponent: .friend), playSound: false)
+        XCTAssertFalse(match.wasAssisted)
+        XCTAssertTrue(match.game.playEngineMove("e2e4"))
+        match.undo()
+        XCTAssertTrue(match.wasAssisted)
+        match.start(.init(opponent: .friend), playSound: false)
+        XCTAssertFalse(match.wasAssisted)
+    }
 }

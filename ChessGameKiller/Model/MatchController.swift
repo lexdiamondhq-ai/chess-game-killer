@@ -121,6 +121,17 @@ final class MatchController {
     private(set) var reelLog: [Int: ReelMoment] = [:]
     /// Flipped by the Flip button, on top of the usual "your side at the bottom".
     private(set) var isFlippedByHand = false
+    /// Set once the person takes a move back or lets the coach play one for them,
+    /// so the army knows the game had help.
+    private(set) var wasAssisted = false
+    /// Called when a game against the computer is left unfinished for a new one,
+    /// so it can count as a loss. Short games (fewer than two moves each) don't count.
+    @ObservationIgnored var onAbandon: ((_ ledger: PieceLedger, _ setup: Setup, _ assisted: Bool) -> Void)?
+
+    /// What this game is worth to the army.
+    var armyStakes: GameStakes {
+        GameStakes(level: setup.level, assisted: wasAssisted)
+    }
 
     var showBestMoves = true {
         didSet { refreshHints() }
@@ -183,7 +194,12 @@ final class MatchController {
     // MARK: Actions
 
     func start(_ setup: Setup, from position: Position = .standard, playSound: Bool = true) {
+        if hasStarted, self.setup.opponent == .computer, !isOver, game.plyCount >= 4,
+           let ledger = game.ledger {
+            onAbandon?(ledger, self.setup, wasAssisted)
+        }
         self.setup = setup
+        wasAssisted = false
         hasStarted = true
         gameNumber += 1
         resetWork()
@@ -231,6 +247,7 @@ final class MatchController {
         let movesBefore = game.moveCount
         game.playEngineMove(hint.uci)
         if game.moveCount != movesBefore {
+            wasAssisted = true
             didPlayMove(byPerson: true)
         }
     }
@@ -243,6 +260,7 @@ final class MatchController {
     func undo() {
         guard canUndo else { return }
         resetWork()
+        wasAssisted = true
         takeBack()
         if setup.opponent == .computer, !game.isHumanTurn, game.canUndo {
             takeBack()

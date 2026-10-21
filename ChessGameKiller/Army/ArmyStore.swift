@@ -122,14 +122,81 @@ struct PieceRecord: Codable, Equatable {
     var mates = 0
     var promotions = 0
     var falls = 0
-
-    /// Experience: a little for every game, more for winning, taking material,
-    /// promoting and delivering mate.
-    var xp: Int {
-        games + wins * 3 + survivedWins * 2 + captureValue * 2 + promotions * 10 + mates * 20
-    }
+    /// Experience earned so far. Each game adds its own share, scaled by how
+    /// strong the rival was and cut in half when Undo or a played hint helped.
+    var xp = 0
 
     var rank: ArmyRank { .forXP(xp) }
+
+    init() {}
+
+    /// Experience for one game: a little for playing, more for winning, taking
+    /// material, promoting and delivering mate.
+    static func baseXP(for game: PieceGameStats, won: Bool?, survived: Bool) -> Int {
+        var xp = 1
+        if won == true { xp += 3 + (survived ? 2 : 0) }
+        xp += game.captureValue * 2
+        if game.promoted { xp += 10 }
+        if game.gaveMate { xp += 20 }
+        return xp
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case name, games, wins, survivedWins, captures, captureValue, mates, promotions, falls, xp
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = try c.decodeIfPresent(String.self, forKey: .name)
+        games = try c.decodeIfPresent(Int.self, forKey: .games) ?? 0
+        wins = try c.decodeIfPresent(Int.self, forKey: .wins) ?? 0
+        survivedWins = try c.decodeIfPresent(Int.self, forKey: .survivedWins) ?? 0
+        captures = try c.decodeIfPresent(Int.self, forKey: .captures) ?? 0
+        captureValue = try c.decodeIfPresent(Int.self, forKey: .captureValue) ?? 0
+        mates = try c.decodeIfPresent(Int.self, forKey: .mates) ?? 0
+        promotions = try c.decodeIfPresent(Int.self, forKey: .promotions) ?? 0
+        falls = try c.decodeIfPresent(Int.self, forKey: .falls) ?? 0
+        // Armies saved before experience was stored keep what they had earned.
+        xp = try c.decodeIfPresent(Int.self, forKey: .xp)
+            ?? games + wins * 3 + survivedWins * 2 + captureValue * 2 + promotions * 10 + mates * 20
+    }
+}
+
+/// How much a finished game is worth to the army.
+struct GameStakes: Equatable {
+    /// Stronger rivals are worth more.
+    var multiplier: Double = 1
+    /// Undo or a played hint helped this game, so it is worth half.
+    var assisted = false
+
+    static let standard = GameStakes()
+
+    init(multiplier: Double = 1, assisted: Bool = false) {
+        self.multiplier = multiplier
+        self.assisted = assisted
+    }
+
+    init(level: MatchController.Level, assisted: Bool) {
+        self.init(multiplier: level.armyMultiplier, assisted: assisted)
+    }
+
+    func scale(_ xp: Int) -> Int {
+        let scaled = Double(xp) * multiplier * (assisted ? 0.5 : 1)
+        return max(1, Int(scaled.rounded()))
+    }
+}
+
+extension MatchController.Level {
+    /// How much a game against this rival is worth to the army.
+    var armyMultiplier: Double {
+        switch self {
+        case .beginner: return 1
+        case .casual: return 1.25
+        case .club: return 1.5
+        case .expert: return 2
+        case .grandmaster: return 3
+        }
+    }
 }
 
 /// Something worth telling the player after a game.
@@ -199,7 +266,8 @@ final class ArmyStore {
     /// Adds a finished game to every piece's record. `won` is nil for a draw.
     /// Returns what changed that is worth telling the player. A game is only counted once.
     @discardableResult
-    func record(_ ledger: PieceLedger, playerColor: Piece.Color, won: Bool?) -> [ArmyNews] {
+    func record(_ ledger: PieceLedger, playerColor: Piece.Color, won: Bool?,
+                stakes: GameStakes = .standard) -> [ArmyNews] {
         guard army.lastGameID != ledger.gameID else { return [] }
         army.lastGameID = ledger.gameID
         let standing = Set(ledger.origins.values)
@@ -211,11 +279,13 @@ final class ArmyStore {
             var record = record(for: slot)
             let rankBefore = record.rank
 
+            let survived = standing.contains(start)
             record.games += 1
             if won == true {
                 record.wins += 1
-                if standing.contains(start) { record.survivedWins += 1 }
+                if survived { record.survivedWins += 1 }
             }
+            record.xp += stakes.scale(PieceRecord.baseXP(for: game, won: won, survived: survived))
             record.captures += game.captures
             record.captureValue += game.captureValue
             if game.gaveMate { record.mates += 1 }
