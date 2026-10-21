@@ -33,7 +33,7 @@ final class SculptedBoardTests: XCTestCase {
     }
 
     func testTheFramedBoardFillsTheViewAndStaysInside() {
-        for aspect: Float in [1, 0.8, 1.3] {
+        for aspect: Float in [1, 0.8, 1.35, 1.6] {
             for flipped in [false, true] {
                 let camera = SculptedCamera.fitted(aspect: aspect, flipped: flipped)
                 let points = SculptedCamera.keyPoints.map(camera.normalized)

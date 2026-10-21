@@ -34,7 +34,7 @@ struct SculptedBoardView: View {
     var endBrowsing: (() -> Void)?
 
     /// Width over height: the board seen at an angle is wider than it is tall.
-    static let aspect: CGFloat = 1.3
+    static let aspect: CGFloat = 1.35
 
     @AppStorage("haptics") private var hapticsOn = true
     @Environment(ArmyStore.self) private var army: ArmyStore?

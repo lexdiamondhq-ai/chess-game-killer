@@ -78,12 +78,12 @@ final class SculptedSnapshotTests: XCTestCase {
             return placed
         }
         after.lastCapture = CaptureEvent(id: 1, piece: pawn)
-        // Five times slower than in play, so each picture lands where it should.
-        SculptedBoardScene.motionScale = 5
+        // Ten times slower than in play: taking a picture takes a moment of its own.
+        SculptedBoardScene.motionScale = 10
         defer { SculptedBoardScene.motionScale = 1 }
         let start = Date()
         scene.apply(after, animated: true)
-        for (index, time) in [0.35, 0.9, 1.4, 1.9, 4.8].enumerated() {
+        for (index, time) in [0.6, 2.0, 3.2, 4.4, 9.5].enumerated() {
             RunLoop.main.run(until: start.addingTimeInterval(time))
             try save(scene.snapshot(), "sculpted-motion-\(index + 1)")
         }
