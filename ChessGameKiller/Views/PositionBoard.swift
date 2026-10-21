@@ -9,6 +9,11 @@ struct PositionBoard: View {
     var flipped = false
     var hints: [MoveHint] = []
     var onTap: ((Square) -> Void)?
+    /// Squares tinted to draw the eye, like where a move came from and went.
+    var tints: [Square: Color] = [:]
+    /// Pieces drawn as ghosts: moves that could have been, not moves that were.
+    var ghosts: Set<Square> = []
+    var ghostColor: Color = .yellow
 
     var body: some View {
         GeometryReader { geo in
@@ -90,6 +95,9 @@ struct PositionBoard: View {
 
         return ZStack {
             Rectangle().fill(theme.squareFill(isLight: isLight))
+            if let tint = tints[square] {
+                Rectangle().fill(tint)
+            }
             if let gridLine = theme.gridLine {
                 Rectangle().strokeBorder(gridLine, lineWidth: 0.5)
             }
@@ -100,7 +108,10 @@ struct PositionBoard: View {
                 label(square.file.rawValue, size: size, color: labelColor, alignment: .bottomTrailing)
             }
             if let token {
+                let isGhost = ghosts.contains(square)
                 PieceImage(piece: token.piece(at: square), theme: theme, size: size, onBoard: true)
+                    .opacity(isGhost ? 0.62 : 1)
+                    .shadow(color: isGhost ? ghostColor.opacity(0.9) : .clear, radius: size * 0.12)
                     .transition(.scale(scale: 0.6).combined(with: .opacity))
             }
         }

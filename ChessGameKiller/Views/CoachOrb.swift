@@ -360,6 +360,9 @@ private struct CoachPanel: View {
     @Environment(TrainingStore.self) private var training: TrainingStore?
     @Environment(ArmyStore.self) private var army: ArmyStore?
     @State private var reel: GameReel?
+    @State private var rewind: SavedGame?
+    @State private var showingGames = false
+    @Environment(GameVault.self) private var vault: GameVault?
 
     /// This game's Piece of the Match, once the game is over and counted.
     private var hero: MatchHero? {
@@ -412,7 +415,11 @@ private struct CoachPanel: View {
                         .padding(.top, 10)
                 }
                 endButtons.padding(.top, 10)
-                reelButton.padding(.top, 8)
+                HStack(spacing: 8) {
+                    rewindButton
+                    reelButton
+                }
+                .padding(.top, 8)
             } else {
                 bestMoves.padding(.top, 12)
                 actions.padding(.top, 8)
@@ -614,9 +621,29 @@ private struct CoachPanel: View {
             ActionButton(title: "Flip", symbol: "arrow.triangle.2.circlepath", theme: theme) {
                 withAnimation(.snappy(duration: 0.45)) { match.flipBoard() }
             }
+            if vault != nil {
+                ActionButton(title: "Games", symbol: "backward.circle", theme: theme) {
+                    showingGames = true
+                }
+            }
             ActionButton(title: "New game", symbol: "plus", theme: theme) {
                 collapse()
                 newGame()
+            }
+        }
+        .fullScreenCover(isPresented: $showingGames) {
+            if let vault {
+                RewindGamesView(theme: theme) { game in
+                    collapse()
+                    var setup = match.setup
+                    if let raw = game.level, let level = MatchController.Level(rawValue: raw) {
+                        setup.opponent = .computer
+                        setup.level = level
+                        setup.playerColor = game.playerColor
+                    }
+                    withAnimation(.snappy) { match.start(setup) }
+                }
+                .environment(vault)
             }
         }
     }
@@ -634,6 +661,32 @@ private struct CoachPanel: View {
         }
     }
 
+    /// Rewind: the game's line, Leo on each moment, and a second chance at the mistakes.
+    private var rewindButton: some View {
+        Button {
+            guard let game = match.savedGame() else { return }
+            vault?.record(game)
+            rewind = vault?.game(game.id) ?? game
+        } label: {
+            Label("Rewind", systemImage: "backward.circle.fill")
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 40)
+        }
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.capsule)
+        .tint(accent)
+        .fullScreenCover(item: $rewind) { game in
+            if let vault {
+                RewindView(game: game, theme: theme) { _ in
+                    collapse()
+                    withAnimation(.snappy) { match.rematch() }
+                }
+                .environment(vault)
+            }
+        }
+    }
+
     /// Leo's 30-second story of the game, to watch and share.
     private var reelButton: some View {
         Button {
@@ -641,7 +694,7 @@ private struct CoachPanel: View {
                 ? army?.names(for: match.setup.playerColor) ?? [:] : [:]
             reel = match.highlightReel(pieceName: { names[$0] }, hero: hero?.line)
         } label: {
-            Label("Watch your highlight reel", systemImage: "film.stack")
+            Label("Highlight reel", systemImage: "film.stack")
                 .font(.subheadline.weight(.semibold))
                 .frame(maxWidth: .infinity)
                 .frame(minHeight: 40)
