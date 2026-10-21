@@ -270,14 +270,14 @@ extension SculptedLook {
 
     /// A dark studio, a warm key falling as a pool of light and a cool rim: deep color and crisp
     /// highlights. Spot lights come out about pi times brighter than directional ones in SceneKit,
-    /// so the key is set to light the middle of the board about 1.3 times its stone color.
+    /// so the key is set to light the middle of the board about 1.5 times its stone color.
     private static func lit(_ look: SculptedLook) -> SculptedLook {
         var look = look
         look.studio = "sculpted-env-studio"
-        look.environment = 1.0
-        look.key = 340
-        look.rim = 450
-        look.keyColor = UIColor(red: 1, green: 0.92, blue: 0.8, alpha: 1)
+        look.environment = 1.2
+        look.key = 410
+        look.rim = 540
+        look.keyColor = UIColor(red: 1, green: 0.95, blue: 0.88, alpha: 1)
         look.rimColor = UIColor(red: 0.8, green: 0.87, blue: 1, alpha: 1)
         look.spot = (inner: 36, outer: 110)
         look.ivory = UIColor(red: 0.92, green: 0.885, blue: 0.82, alpha: 1)
@@ -286,6 +286,7 @@ extension SculptedLook {
         look.stoneCoat = 0.5
         look.lacquerRoughness = 0.28
         look.lacquerCoat = 0.7
+        look.lastMoveAlpha = 0.15
         return look
     }
 
@@ -297,32 +298,26 @@ extension SculptedLook {
         look.lacquer = UIColor(red: 0.04, green: 0.04, blue: 0.045, alpha: 1)
         look.inlay = UIColor(red: 0.8, green: 0.72, blue: 0.56, alpha: 1)
         look.platinumMark = UIColor(red: 0.86, green: 0.79, blue: 0.64, alpha: 1)
-        look.lastMove = UIColor(red: 0.86, green: 0.79, blue: 0.64, alpha: 1)
-        look.lastMoveAlpha = 0.16
         return look
     }()
 
-    /// Cream and deep wine-red marble, a black frame and platinum.
+    /// Cream and deep wine-red marble, a black frame and platinum; the marks in warm gold.
     static let bordeaux: SculptedLook = {
         var look = lit(SculptedLook())
         look.name = "Bordeaux"
         look.squares = "sculpted-squares-bordeaux"
         look.lacquer = UIColor(red: 0.05, green: 0.04, blue: 0.04, alpha: 1)
-        look.accent = UIColor(red: 0.95, green: 0.82, blue: 0.56, alpha: 1)
-        look.lastMove = look.accent
-        look.lastMoveAlpha = 0.18
+        look.accent = UIColor(red: 0.92, green: 0.7, blue: 0.34, alpha: 1)
         return look
     }()
 
-    /// Cream and ink-blue stone, a black frame and platinum; the marks in warm ivory.
+    /// Cream and ink-blue stone, a black frame and platinum; the marks in warm gold.
     static let midnight: SculptedLook = {
         var look = lit(SculptedLook())
         look.name = "Midnight"
         look.squares = "sculpted-squares-midnight"
         look.lacquer = UIColor(red: 0.04, green: 0.045, blue: 0.06, alpha: 1)
-        look.accent = UIColor(red: 0.98, green: 0.86, blue: 0.62, alpha: 1)
-        look.lastMove = look.accent
-        look.lastMoveAlpha = 0.18
+        look.accent = UIColor(red: 0.95, green: 0.74, blue: 0.36, alpha: 1)
         return look
     }()
 }
