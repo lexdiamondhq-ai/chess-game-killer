@@ -2,6 +2,20 @@ import ChessKit
 import Foundation
 import Observation
 
+extension Piece.Kind {
+    /// The piece's name in a sentence, like "queen".
+    var word: String {
+        switch self {
+        case .pawn: return "pawn"
+        case .knight: return "knight"
+        case .bishop: return "bishop"
+        case .rook: return "rook"
+        case .queen: return "queen"
+        case .king: return "king"
+        }
+    }
+}
+
 /// One of the sixteen pieces in the player's army, named by where it starts.
 /// The same piece whether the player takes Gold/White or Violet/Black.
 enum ArmySlot: String, CaseIterable, Codable, Identifiable {
@@ -125,10 +139,24 @@ struct PieceRecord: Codable, Equatable {
     /// Experience earned so far. Each game adds its own share, scaled by how
     /// strong the rival was and cut in half when Undo or a played hint helped.
     var xp = 0
+    /// Games where this piece was named Piece of the Match.
+    var honors = 0
+    /// How many times each rival has taken this piece, by level.
+    var takenBy: [Int: Int] = [:]
+    /// Rivals this piece has had its revenge on, by level.
+    var revenge: Set<Int> = []
 
     var rank: ArmyRank { .forXP(xp) }
 
     init() {}
+
+    /// The rival that has taken this piece most often (at least twice), and how often.
+    var nemesis: (level: MatchController.Level, times: Int)? {
+        guard let top = takenBy.filter({ $0.value >= ArmyStore.grudgeAt })
+            .max(by: { ($0.value, $0.key) < ($1.value, $1.key) }),
+              let level = MatchController.Level(rawValue: top.key) else { return nil }
+        return (level, top.value)
+    }
 
     /// Experience for one game: a little for playing, more for winning, taking
     /// material, promoting and delivering mate.
@@ -143,6 +171,7 @@ struct PieceRecord: Codable, Equatable {
 
     private enum CodingKeys: String, CodingKey {
         case name, games, wins, survivedWins, captures, captureValue, mates, promotions, falls, xp
+        case honors, takenBy, revenge
     }
 
     init(from decoder: Decoder) throws {
@@ -159,15 +188,20 @@ struct PieceRecord: Codable, Equatable {
         // Armies saved before experience was stored keep what they had earned.
         xp = try c.decodeIfPresent(Int.self, forKey: .xp)
             ?? games + wins * 3 + survivedWins * 2 + captureValue * 2 + promotions * 10 + mates * 20
+        honors = try c.decodeIfPresent(Int.self, forKey: .honors) ?? 0
+        takenBy = try c.decodeIfPresent([Int: Int].self, forKey: .takenBy) ?? [:]
+        revenge = try c.decodeIfPresent(Set<Int>.self, forKey: .revenge) ?? []
     }
 }
 
-/// How much a finished game is worth to the army.
+/// How much a finished game is worth to the army, and who it was against.
 struct GameStakes: Equatable {
     /// Stronger rivals are worth more.
     var multiplier: Double = 1
     /// Undo or a played hint helped this game, so it is worth half.
     var assisted = false
+    /// The rival played, for grudges and revenge. Nil in tests that don't care.
+    var level: MatchController.Level?
 
     static let standard = GameStakes()
 
@@ -178,6 +212,7 @@ struct GameStakes: Equatable {
 
     init(level: MatchController.Level, assisted: Bool) {
         self.init(multiplier: level.armyMultiplier, assisted: assisted)
+        self.level = level
     }
 
     func scale(_ xp: Int) -> Int {
@@ -199,22 +234,68 @@ extension MatchController.Level {
     }
 }
 
-/// Something worth telling the player after a game.
+/// Something worth telling the player about a piece.
 struct ArmyNews: Identifiable, Equatable {
+    enum Kind: Equatable {
+        /// Reached a new rank.
+        case promoted
+        /// Beat a rival that kept taking it.
+        case revenge(rival: String)
+        /// Before a game: this rival has taken the piece this many times.
+        case grudge(rival: String, times: Int)
+    }
+
     let slot: ArmySlot
     let rank: ArmyRank
+    /// The piece's name, or its title when it hasn't earned one.
     let name: String
+    var kind: Kind = .promoted
 
-    var id: String { slot.rawValue }
+    var id: String { "\(slot.rawValue)-\(label)" }
 
-    var headline: String {
-        switch rank {
-        case .veteran: return "Your \(slot.title.lowercased()) earned a name: \(name)"
-        case .elite: return "\(name) earned a battle scar"
-        case .legend: return "\(name) became a Legend"
-        case .recruit: return name
+    /// The small line above the headline.
+    var label: String {
+        switch kind {
+        case .promoted: return rank.title.uppercased()
+        case .revenge: return "REVENGE"
+        case .grudge: return "GRUDGE MATCH"
         }
     }
+
+    var headline: String {
+        switch kind {
+        case .revenge(let rival):
+            return "\(name) got its revenge on \(rival)"
+        case .grudge(let rival, let times):
+            return "\(rival) has taken \(name) \(times) times. Make it pay."
+        case .promoted:
+            switch rank {
+            case .veteran: return "Your \(slot.title.lowercased()) earned a name: \(name)"
+            case .elite: return "\(name) earned a battle scar"
+            case .legend: return "\(name) became a Legend"
+            case .recruit: return name
+            }
+        }
+    }
+
+    /// Bigger news first: a Legend, then revenge, then the other ranks.
+    fileprivate var priority: Int {
+        switch kind {
+        case .revenge: return 25
+        case .grudge: return 0
+        case .promoted: return rank.rawValue * 10
+        }
+    }
+}
+
+/// The piece that did the most in one game, and what it did.
+struct MatchHero: Equatable {
+    let gameID: UUID
+    let slot: ArmySlot
+    /// Its name, or "Your kingside knight" when it hasn't earned one yet.
+    let name: String
+    /// What it did, like "Kestrel took Vector's queen."
+    let line: String
 }
 
 /// The player's army: every piece's record, saved on this device.
@@ -223,6 +304,14 @@ struct ArmyNews: Identifiable, Equatable {
 @Observable
 final class ArmyStore {
     private(set) var army: Army
+    /// The Piece of the Match of the last game recorded.
+    private(set) var lastHero: MatchHero?
+
+    /// A rival has a grudge with a piece once it has taken it this many times.
+    nonisolated static let grudgeAt = 2
+    /// Extra experience for the Piece of the Match, and for revenge.
+    static let heroXP = 5
+    static let revengeXP = 15
 
     struct Army: Codable, Equatable {
         var records: [ArmySlot: PieceRecord] = [:]
@@ -253,12 +342,45 @@ final class ArmyStore {
         army.records[slot] ?? PieceRecord()
     }
 
+    /// The piece's name, or "Your kingside knight" when it hasn't earned one.
+    func displayName(of slot: ArmySlot) -> String {
+        record(for: slot).name ?? "Your \(slot.title.lowercased())"
+    }
+
+    /// The name of the player's piece that started on `start`, if it has earned one.
+    func name(ofPieceFrom start: Square?, color: Piece.Color) -> String? {
+        guard let start, let slot = ArmySlot(start: start, color: color) else { return nil }
+        return record(for: slot).name
+    }
+
+    /// Every named piece by the square it starts on for `color`.
+    func names(for color: Piece.Color) -> [Square: String] {
+        var names: [Square: String] = [:]
+        for slot in ArmySlot.allCases {
+            if let name = record(for: slot).name { names[slot.square(for: color)] = name }
+        }
+        return names
+    }
+
     var gamesPlayed: Int {
         army.records.values.map(\.games).max() ?? 0
     }
 
     var hasVeterans: Bool {
         army.records.values.contains { $0.rank >= .veteran }
+    }
+
+    /// The piece this rival has taken most often, for a "grudge match" banner as a game starts.
+    func grudge(against level: MatchController.Level) -> ArmyNews? {
+        let rival = level.rival.name
+        let best = ArmySlot.allCases
+            .map { ($0, record(for: $0).takenBy[level.rawValue] ?? 0) }
+            .filter { $0.1 >= Self.grudgeAt && !record(for: $0.0).revenge.contains(level.rawValue) }
+            .max { $0.1 < $1.1 }
+        guard let best else { return nil }
+        let (slot, times) = best
+        return ArmyNews(slot: slot, rank: record(for: slot).rank, name: displayName(of: slot),
+                        kind: .grudge(rival: rival, times: times))
     }
 
     // MARK: Changing
@@ -271,6 +393,8 @@ final class ArmyStore {
         guard army.lastGameID != ledger.gameID else { return [] }
         army.lastGameID = ledger.gameID
         let standing = Set(ledger.origins.values)
+        let rival = stakes.level?.rival.name ?? "the computer"
+        let heroSlot = Self.heroSlot(in: ledger, playerColor: playerColor)
         var news: [ArmyNews] = []
 
         for slot in ArmySlot.allCases {
@@ -280,12 +404,32 @@ final class ArmyStore {
             let rankBefore = record.rank
 
             let survived = standing.contains(start)
+            var earned = PieceRecord.baseXP(for: game, won: won, survived: survived)
+            if slot == heroSlot {
+                record.honors += 1
+                earned += Self.heroXP
+            }
+
+            // Revenge: the piece a rival keeps taking wins a game against it and does damage.
+            var tookRevenge = false
+            if let level = stakes.level, won == true,
+               (record.takenBy[level.rawValue] ?? 0) >= Self.grudgeAt,
+               !record.revenge.contains(level.rawValue),
+               game.captures > 0 || game.gaveMate {
+                record.revenge.insert(level.rawValue)
+                earned += Self.revengeXP
+                tookRevenge = true
+            }
+            if let level = stakes.level, game.fell {
+                record.takenBy[level.rawValue, default: 0] += 1
+            }
+
             record.games += 1
             if won == true {
                 record.wins += 1
                 if survived { record.survivedWins += 1 }
             }
-            record.xp += stakes.scale(PieceRecord.baseXP(for: game, won: won, survived: survived))
+            record.xp += stakes.scale(earned)
             record.captures += game.captures
             record.captureValue += game.captureValue
             if game.gaveMate { record.mates += 1 }
@@ -299,9 +443,20 @@ final class ArmyStore {
             if record.rank > rankBefore, let name = record.name {
                 news.append(ArmyNews(slot: slot, rank: record.rank, name: name))
             }
+            if tookRevenge {
+                news.append(ArmyNews(slot: slot, rank: record.rank, name: displayName(of: slot),
+                                     kind: .revenge(rival: rival)))
+            }
+        }
+
+        lastHero = heroSlot.map { slot in
+            let stats = ledger.stats(forPieceStartingOn: slot.square(for: playerColor))
+            let name = displayName(of: slot)
+            return MatchHero(gameID: ledger.gameID, slot: slot, name: name,
+                             line: Self.heroLine(name: name, stats: stats, rival: rival))
         }
         save()
-        return news.sorted { $0.rank > $1.rank }
+        return news.sorted { $0.priority > $1.priority }
     }
 
     func rename(_ slot: ArmySlot, to name: String) {
@@ -310,12 +465,41 @@ final class ArmyStore {
         var record = record(for: slot)
         record.name = String(trimmed.prefix(20))
         army.records[slot] = record
+        if lastHero?.slot == slot, let hero = lastHero {
+            lastHero = MatchHero(gameID: hero.gameID, slot: slot, name: record.name ?? hero.name,
+                                 line: hero.line.replacingOccurrences(of: hero.name, with: record.name ?? hero.name))
+        }
         save()
     }
 
     func reset() {
         army = Army()
+        lastHero = nil
         save()
+    }
+
+    // MARK: Piece of the Match
+
+    /// The player's piece that did the most this game: mate, promotion and material
+    /// taken count, the busiest piece breaks a tie. Nil when no piece did anything.
+    nonisolated static func heroSlot(in ledger: PieceLedger, playerColor: Piece.Color) -> ArmySlot? {
+        let scored = ArmySlot.allCases.map { slot -> (ArmySlot, Int, Int) in
+            let game = ledger.stats(forPieceStartingOn: slot.square(for: playerColor))
+            let score = game.captureValue * 2 + (game.promoted ? 10 : 0) + (game.gaveMate ? 20 : 0)
+            return (slot, score, game.moves)
+        }
+        guard let best = scored.max(by: { ($0.1, $0.2) < ($1.1, $1.2) }), best.1 > 0 else { return nil }
+        return best.0
+    }
+
+    /// What the Piece of the Match did, in one short line.
+    nonisolated static func heroLine(name: String, stats: PieceGameStats, rival: String) -> String {
+        if stats.gaveMate { return "\(name) delivered checkmate." }
+        if stats.promoted { return "\(name) marched all the way and promoted." }
+        let biggest = stats.taken.max { (PieceLedger.values[$0] ?? 0) < (PieceLedger.values[$1] ?? 0) } ?? .pawn
+        let others = stats.taken.count - 1
+        let more = others > 0 ? " and \(others) more" : ""
+        return "\(name) took \(rival)'s \(biggest.word)\(more)."
     }
 
     // MARK: Private

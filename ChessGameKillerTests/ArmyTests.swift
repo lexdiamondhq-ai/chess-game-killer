@@ -214,4 +214,116 @@ final class ArmyTests: XCTestCase {
         match.start(.init(opponent: .friend), playSound: false)
         XCTAssertFalse(match.wasAssisted)
     }
+
+    // MARK: Piece of the Match
+
+    func testPieceOfTheMatchIsThePieceThatDidMost() {
+        let store = ArmyStore()
+        let game = GameModel()
+        // The e-pawn takes a pawn, the queen takes the bishop, then the knight takes the queen.
+        play(game, "e2e4", "d7d5", "e4d5", "d8d5", "b1c3", "d5e5", "f1e2", "e5e2", "g1e2")
+        let ledger = game.ledger!
+        XCTAssertEqual(ArmyStore.heroSlot(in: ledger, playerColor: .white), .kingsKnight)
+        store.record(ledger, playerColor: .white, won: true, stakes: GameStakes(level: .club, assisted: false))
+        let hero = store.lastHero!
+        XCTAssertEqual(hero.slot, .kingsKnight)
+        XCTAssertEqual(hero.gameID, ledger.gameID)
+        XCTAssertEqual(hero.line, "Your kingside knight took Pulse's queen.")
+        XCTAssertEqual(store.record(for: .kingsKnight).honors, 1)
+        XCTAssertEqual(store.record(for: .ePawn).honors, 0)
+    }
+
+    func testNoPieceOfTheMatchWhenNothingHappened() {
+        let game = GameModel()
+        play(game, "e2e4", "e7e5")
+        XCTAssertNil(ArmyStore.heroSlot(in: game.ledger!, playerColor: .white))
+    }
+
+    func testHeroLineNamesMateAndPromotionFirst() {
+        var stats = PieceGameStats()
+        stats.taken = [.pawn, .rook]
+        XCTAssertEqual(ArmyStore.heroLine(name: "Kestrel", stats: stats, rival: "Vector"),
+                       "Kestrel took Vector's rook and 1 more.")
+        stats.promoted = true
+        XCTAssertEqual(ArmyStore.heroLine(name: "Kestrel", stats: stats, rival: "Vector"),
+                       "Kestrel marched all the way and promoted.")
+        stats.gaveMate = true
+        XCTAssertEqual(ArmyStore.heroLine(name: "Kestrel", stats: stats, rival: "Vector"),
+                       "Kestrel delivered checkmate.")
+    }
+
+    // MARK: Grudges and revenge
+
+    /// White's d-pawn is taken by the black queen, then nothing else happens.
+    private func dPawnFalls() -> PieceLedger {
+        let game = GameModel()
+        play(game, "d2d4", "e7e5", "d4e5", "d8e7", "a2a3", "e7e5")
+        return game.ledger!
+    }
+
+    func testARivalThatKeepsTakingAPieceHoldsAGrudge() {
+        let store = ArmyStore()
+        let vector = GameStakes(level: .expert, assisted: false)
+        store.record(dPawnFalls(), playerColor: .white, won: false, stakes: vector)
+        XCTAssertNil(store.grudge(against: .expert))
+        store.record(dPawnFalls(), playerColor: .white, won: false, stakes: vector)
+        XCTAssertEqual(store.record(for: .dPawn).takenBy[MatchController.Level.expert.rawValue], 2)
+        XCTAssertEqual(store.record(for: .dPawn).nemesis?.level, .expert)
+        let grudge = store.grudge(against: .expert)
+        XCTAssertEqual(grudge?.slot, .dPawn)
+        XCTAssertEqual(grudge?.kind, .grudge(rival: "Vector", times: 2))
+        XCTAssertNil(store.grudge(against: .beginner))
+    }
+
+    func testWinningAndTakingSomethingIsRevenge() {
+        let store = ArmyStore()
+        let vector = GameStakes(level: .expert, assisted: false)
+        store.record(dPawnFalls(), playerColor: .white, won: false, stakes: vector)
+        store.record(dPawnFalls(), playerColor: .white, won: false, stakes: vector)
+        let xpBefore = store.record(for: .dPawn).xp
+
+        let game = GameModel()
+        play(game, "d2d4", "e7e5", "d4e5")
+        let news = store.record(game.ledger!, playerColor: .white, won: true, stakes: vector)
+        let pawn = store.record(for: .dPawn)
+        XCTAssertTrue(pawn.revenge.contains(MatchController.Level.expert.rawValue))
+        XCTAssertTrue(news.contains { $0.slot == .dPawn && $0.kind == .revenge(rival: "Vector") })
+        XCTAssertEqual(news.first { $0.slot == .dPawn }?.label, "REVENGE")
+        // 1 game + 3 win + 2 survived + 2 for the pawn + 5 hero + 15 revenge, doubled against Vector.
+        XCTAssertEqual(pawn.xp - xpBefore, (1 + 3 + 2 + 2 + 5 + 15) * 2)
+        // Once avenged, Vector no longer opens with a grudge about it.
+        XCTAssertNil(store.grudge(against: .expert))
+    }
+
+    func testOldSavedRecordsHaveNoGrudges() throws {
+        let json = #"{"games":1,"wins":0,"survivedWins":0,"captures":0,"captureValue":0,"mates":0,"promotions":0,"falls":0,"xp":1}"#
+        let record = try JSONDecoder().decode(PieceRecord.self, from: Data(json.utf8))
+        XCTAssertEqual(record.honors, 0)
+        XCTAssertTrue(record.takenBy.isEmpty)
+        XCTAssertTrue(record.revenge.isEmpty)
+    }
+
+    // MARK: Names in play
+
+    func testNamesMapToStartingSquares() {
+        let store = ArmyStore()
+        store.rename(.kingsKnight, to: "Kestrel")
+        XCTAssertEqual(store.names(for: .white)[.g1], "Kestrel")
+        XCTAssertEqual(store.names(for: .black)[.g8], "Kestrel")
+        XCTAssertEqual(store.name(ofPieceFrom: .g1, color: .white), "Kestrel")
+        XCTAssertNil(store.name(ofPieceFrom: .g8, color: .white))
+        XCTAssertEqual(store.displayName(of: .queen), "Your queen")
+    }
+
+    func testReelNamesThePieceThatMoved() {
+        let moment = ReelMoment(ply: 1, grade: .checkmate, san: "Qxf7#", uci: "h5f7", color: .white,
+                                fenBefore: Position.standard.fen, fenAfter: Position.standard.fen, best: nil,
+                                before: 0.5, after: 1, origin: .d1)
+        let reel = GameReel.make(log: [1: moment], player: "You", opponent: "Spark", playerColor: .white,
+                                 winner: .white, isOver: true, accuracy: 100, moveCount: 1,
+                                 finalFEN: Position.standard.fen,
+                                 pieceName: { $0 == .d1 ? "Nova" : nil }, hero: "Nova delivered checkmate.")
+        XCTAssertEqual(reel.highlights.first?.piece, "Nova")
+        XCTAssertEqual(reel.hero, "Nova delivered checkmate.")
+    }
 }

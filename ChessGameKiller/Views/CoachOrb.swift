@@ -19,6 +19,8 @@ struct CoachOrb: View {
     @AppStorage("haptics") private var hapticsOn = true
     /// Coach Leo, when the app has training. His tips show in the open panel.
     @Environment(GameCoach.self) private var gameCoach: GameCoach?
+    /// The player's army, so a verdict can name the piece that moved.
+    @Environment(ArmyStore.self) private var army: ArmyStore?
 
     static let orbSize: CGFloat = 68
 
@@ -34,7 +36,7 @@ struct CoachOrb: View {
                 CoachPanel(match: match, theme: theme, newGame: newGame, collapse: collapse)
                     .transition(.opacity.combined(with: .scale(scale: 0.97)))
             } else if isPeeking, let review = match.review {
-                PeekRow(review: review, theme: theme)
+                PeekRow(review: review, theme: theme, pieceName: army?.pieceName(for: review, in: match))
                     .transition(.opacity)
             } else {
                 OrbFace(match: match, theme: theme)
@@ -283,14 +285,16 @@ private struct ThinkingRing: View {
 private struct PeekRow: View {
     let review: MoveReview
     let theme: BoardTheme
+    /// The army name of the piece that moved, when it has one.
+    var pieceName: String? = nil
 
     var body: some View {
         HStack(spacing: 12) {
             GradeBadge(grade: review.grade, glows: theme.glows)
             VStack(alignment: .leading, spacing: 1) {
-                Text(review.title)
+                ReviewTitle(review: review, pieceName: pieceName)
                     .font(.subheadline.weight(.bold))
-                    .foregroundStyle(review.grade.color)
+                    .lineLimit(1)
                 Text(review.shortDetail)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -327,6 +331,21 @@ struct EvalChip: View {
     }
 }
 
+/// The verdict's title, with the army name of the piece that moved after it.
+private struct ReviewTitle: View {
+    let review: MoveReview
+    let pieceName: String?
+
+    var body: some View {
+        if let pieceName {
+            Text(review.title).foregroundColor(review.grade.color)
+                + Text(" · \(pieceName)").foregroundColor(.secondary)
+        } else {
+            Text(review.title).foregroundColor(review.grade.color)
+        }
+    }
+}
+
 // MARK: - The expanded coach
 
 /// Everything the coach knows, in the unfolded orb.
@@ -339,7 +358,14 @@ private struct CoachPanel: View {
     @AppStorage("showBestMoves") private var showBestMoves = true
     @Environment(GameCoach.self) private var gameCoach: GameCoach?
     @Environment(TrainingStore.self) private var training: TrainingStore?
+    @Environment(ArmyStore.self) private var army: ArmyStore?
     @State private var reel: GameReel?
+
+    /// This game's Piece of the Match, once the game is over and counted.
+    private var hero: MatchHero? {
+        guard match.isOver, let hero = army?.lastHero, hero.gameID == match.game.ledger?.gameID else { return nil }
+        return hero
+    }
 
     private var accent: Color { theme.accent ?? .accentColor }
 
@@ -381,6 +407,10 @@ private struct CoachPanel: View {
                 .padding(.top, 12)
             if match.isOver {
                 summary.padding(.top, 12)
+                if let hero {
+                    PieceOfTheMatchCard(hero: hero, color: match.setup.playerColor, theme: theme)
+                        .padding(.top, 10)
+                }
                 endButtons.padding(.top, 10)
                 reelButton.padding(.top, 8)
             } else {
@@ -427,7 +457,8 @@ private struct CoachPanel: View {
             } else if let review = match.review {
                 GradeBadge(grade: review.grade, glows: theme.glows)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(review.title).font(.headline).foregroundStyle(review.grade.color)
+                    ReviewTitle(review: review, pieceName: army?.pieceName(for: review, in: match))
+                        .font(.headline)
                     Text(review.detail).font(.subheadline).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -606,7 +637,9 @@ private struct CoachPanel: View {
     /// Leo's 30-second story of the game, to watch and share.
     private var reelButton: some View {
         Button {
-            reel = match.highlightReel()
+            let names = match.setup.opponent == .computer
+                ? army?.names(for: match.setup.playerColor) ?? [:] : [:]
+            reel = match.highlightReel(pieceName: { names[$0] }, hero: hero?.line)
         } label: {
             Label("Watch your highlight reel", systemImage: "film.stack")
                 .font(.subheadline.weight(.semibold))

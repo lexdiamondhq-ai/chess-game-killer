@@ -15,6 +15,8 @@ struct ReelMoment: Equatable {
     /// Winning chances for the mover, -1 to 1, before and after the move.
     let before: Double
     let after: Double
+    /// Where the moving piece started the game, so the army can name it.
+    var origin: Square? = nil
 }
 
 /// A finished game cut down to its story: up to three moments and how it ended.
@@ -42,6 +44,8 @@ struct GameReel: Equatable, Identifiable {
         let moment: ReelMoment
         /// What Leo says over it. Every line is recorded once, so it never names a move.
         let line: String
+        /// The name of the army piece that made the move, when it has one.
+        var piece: String? = nil
         var id: Int { moment.ply }
     }
 
@@ -53,6 +57,8 @@ struct GameReel: Equatable, Identifiable {
     let moveCount: Int
     let highlights: [Highlight]
     let finalFEN: String
+    /// The Piece of the Match line, shown at the end.
+    var hero: String? = nil
 
     // MARK: Leo's lines (kept short so they can be recorded ahead of time)
 
@@ -80,7 +86,8 @@ struct GameReel: Equatable, Identifiable {
     /// the move that took the game from one side to the other. Blunder: the move that
     /// gave the most away. A mate replaces the best move. In the order they were played.
     static func make(log: [Int: ReelMoment], player: String, opponent: String, playerColor: Piece.Color,
-                     winner: Piece.Color?, isOver: Bool, accuracy: Int?, moveCount: Int, finalFEN: String) -> GameReel {
+                     winner: Piece.Color?, isOver: Bool, accuracy: Int?, moveCount: Int, finalFEN: String,
+                     pieceName: (Square) -> String? = { _ in nil }, hero: String? = nil) -> GameReel {
         let moments = log.values.sorted { $0.ply < $1.ply }
         var chosen: [Kind: ReelMoment] = [:]
 
@@ -113,12 +120,13 @@ struct GameReel: Equatable, Identifiable {
         }
 
         let highlights = chosen
-            .map { Highlight(kind: $0.key, moment: $0.value, line: lines[$0.key] ?? "") }
+            .map { Highlight(kind: $0.key, moment: $0.value, line: lines[$0.key] ?? "",
+                             piece: $0.value.origin.flatMap(pieceName)) }
             .sorted { $0.moment.ply < $1.moment.ply }
         let result: Result = winner.map { $0 == playerColor ? .win : .loss } ?? .draw
         return GameReel(player: player, opponent: opponent, playerColor: playerColor,
                         result: isOver ? result : .draw, accuracy: accuracy, moveCount: moveCount,
-                        highlights: highlights, finalFEN: finalFEN)
+                        highlights: highlights, finalFEN: finalFEN, hero: hero)
     }
 
     // MARK: Timing (seconds), shared by playback and the exported video
