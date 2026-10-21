@@ -4,7 +4,7 @@ import SwiftUI
 /// Everything that changes when the player picks a different board look.
 struct BoardTheme: Identifiable {
     enum ID: String, CaseIterable {
-        case neon, faberge, blueprint
+        case sculpted, neon, faberge, blueprint
         // One board per rival, matching its portrait.
         case spark, drift, pulse, vector, singularity
     }
@@ -99,14 +99,55 @@ struct BoardTheme: Identifiable {
         color == .white ? whiteSparks : blackSparks
     }
 
-    static let all: [BoardTheme] = [.neon, .faberge, .blueprint, .spark, .drift, .pulse, .vector, .singularity]
+    /// The first is the default look.
+    static let all: [BoardTheme] = [.sculpted, .neon, .faberge, .blueprint, .spark, .drift, .pulse, .vector, .singularity]
 
     /// The boards that belong to a rival, in rival order.
     static let rivals: [BoardTheme] = [.spark, .drift, .pulse, .vector, .singularity]
 
     static func named(_ id: ID) -> BoardTheme {
-        all.first { $0.id == id } ?? .neon
+        all.first { $0.id == id } ?? .sculpted
     }
+
+    /// Carved ivory and ebony on grey and black marble, with platinum rings and sapphires.
+    /// In a game it is a real 3D board; small boards draw renders of the same set.
+    static let sculpted = BoardTheme(
+        id: .sculpted,
+        name: "Sculpted",
+        symbol: "cube.fill",
+        light: Color(hex: 0x8F8D88),
+        dark: Color(hex: 0x2A2B2F),
+        surface: nil,
+        gridLine: nil,
+        labelOnLight: Color(hex: 0x2A2B2F).opacity(0.8),
+        labelOnDark: Color(hex: 0xD6D9E0).opacity(0.8),
+        selected: Color(hex: 0x5E8FFF).opacity(0.28),
+        selectedRing: nil,
+        lastMove: Color.white.opacity(0.14),
+        lastMoveRing: nil,
+        hint: Color(hex: 0x5E8FFF).opacity(0.92),
+        hintGlow: nil,
+        check: Color(hex: 0xFF3B4D),
+        pieceSet: "sculpted-",
+        whiteGlow: nil,
+        blackGlow: nil,
+        whiteSide: Color(hex: 0xEDE6D8),
+        blackSide: Color(hex: 0x26242A),
+        whiteName: "Ivory",
+        blackName: "Ebony",
+        bestArrow: Color(hex: 0x5E8FFF).opacity(0.95),
+        secondArrow: Color(hex: 0x5E8FFF).opacity(0.72),
+        arrowGlow: nil,
+        whiteSparks: [Color.white, Color(hex: 0xF4ECDD), Color(hex: 0xD9DCE3), Color(hex: 0x8FB0FF)],
+        blackSparks: [Color.white, Color(hex: 0xD9DCE3), Color(hex: 0x8FB0FF), Color(hex: 0x5E8FFF)],
+        boardEdge: nil,
+        boardShadows: [Color.black.opacity(0.55)],
+        isDark: true,
+        accent: Color(hex: 0x7EA6FF),
+        boardArt: "board-sculpted",
+        spritePieces: true,
+        backdrop: [Color(hex: 0x2E3034), Color(hex: 0x08080A)]
+    )
 
     /// Sapphire guilloché enamel and pearl, ruled in gold, after the imperial eggs.
     static let faberge = BoardTheme(

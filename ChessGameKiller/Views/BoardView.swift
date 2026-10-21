@@ -11,10 +11,21 @@ struct BoardView: View {
     /// The player's army, so veteran pieces show their glow, scar and name.
     @Environment(ArmyStore.self) private var army: ArmyStore?
 
+    /// The Sculpted look plays on a real 3D board unless the player asked for it flat.
+    @AppStorage("sculpted3D") private var sculpted3D = true
+
     private var game: GameModel { match.game }
     private var flipped: Bool { match.isBoardFlipped }
 
     var body: some View {
+        if theme.id == .sculpted, sculpted3D, SculptedAssets.shared.isLoaded {
+            SculptedBoardView(match: match, theme: theme)
+        } else {
+            flatBoard
+        }
+    }
+
+    private var flatBoard: some View {
         GeometryReader { geo in
             let side = min(geo.size.width, geo.size.height)
             let inset = theme.frameInset(side: side)
@@ -286,7 +297,7 @@ struct BoardView: View {
 
 /// Centers its one child over a point, shifted inward as far as needed to keep
 /// the whole child within the bounds. A child wider than the bounds is centered.
-private struct NameTagPlacement: Layout {
+struct NameTagPlacement: Layout {
     var x: CGFloat
     var y: CGFloat
 
@@ -630,7 +641,7 @@ struct BoardArt: View {
 }
 
 /// Lets the player choose what a pawn becomes on the last rank.
-private struct PromotionPicker: View {
+struct PromotionPicker: View {
     let color: Piece.Color
     let theme: BoardTheme
     let squareSize: CGFloat
