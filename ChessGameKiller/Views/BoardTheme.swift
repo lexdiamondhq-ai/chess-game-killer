@@ -4,7 +4,7 @@ import SwiftUI
 /// Everything that changes when the player picks a different board look.
 struct BoardTheme: Identifiable {
     enum ID: String, CaseIterable {
-        case gilded, noir, sculpted, bordeaux, midnight, neon, faberge, blueprint
+        case gilded, portoro, noir, sculpted, bordeaux, midnight, neon, faberge, blueprint
         // One board per rival, matching its portrait.
         case spark, drift, pulse, vector, singularity
     }
@@ -104,7 +104,7 @@ struct BoardTheme: Identifiable {
 
     /// The first is the default look.
     static let all: [BoardTheme] = [
-        .gilded, .noir, .sculpted, .bordeaux, .midnight, .neon, .faberge, .blueprint, .spark, .drift, .pulse, .vector, .singularity,
+        .gilded, .portoro, .noir, .sculpted, .bordeaux, .midnight, .neon, .faberge, .blueprint, .spark, .drift, .pulse, .vector, .singularity,
     ]
 
     /// The boards that belong to a rival, in rival order.
@@ -114,15 +114,15 @@ struct BoardTheme: Identifiable {
         all.first { $0.id == id } ?? .gilded
     }
 
-    /// The default: polished onyx and cream ivory pieces with gold, on ivory and black marble
-    /// veined and ruled in gold. In a game it is a real 3D board; small boards draw
-    /// a picture of it.
+    /// The default: polished onyx and bright ivory pieces with gold, on cream marble and rich
+    /// brown marble with black veins, ruled in gold. In a game it is a real 3D board; small
+    /// boards draw a picture of it.
     static let gilded = BoardTheme(
         id: .gilded,
         name: "Gilded",
         symbol: "crown.fill",
-        light: Color(hex: 0xE3D9C6),
-        dark: Color(hex: 0x1E1E21),
+        light: Color(hex: 0xCDBC9C),
+        dark: Color(hex: 0x553420),
         surface: nil,
         gridLine: nil,
         labelOnLight: Color(hex: 0x2A2722).opacity(0.8),
@@ -152,6 +152,46 @@ struct BoardTheme: Identifiable {
         accent: Color(hex: 0x7EA6FF),
         sculptedLook: .gilded,
         boardArt: "board-gilded",
+        spritePieces: true,
+        backdrop: [Color(hex: 0x2B2A2C), Color(hex: 0x070708)]
+    )
+
+    /// The gilded set on cream marble and black Portoro marble with fine gold veins.
+    static let portoro = BoardTheme(
+        id: .portoro,
+        name: "Portoro",
+        symbol: "diamond.fill",
+        light: Color(hex: 0xCDBC9C),
+        dark: Color(hex: 0x1E1E21),
+        surface: nil,
+        gridLine: nil,
+        labelOnLight: Color(hex: 0x2A2722).opacity(0.8),
+        labelOnDark: Color(hex: 0xE8DFCC).opacity(0.8),
+        selected: Color(hex: 0x5E8FFF).opacity(0.28),
+        selectedRing: nil,
+        lastMove: Color.white.opacity(0.15),
+        lastMoveRing: nil,
+        hint: Color(hex: 0x5E8FFF).opacity(0.92),
+        hintGlow: nil,
+        check: Color(hex: 0xFF3B4D),
+        pieceSet: "gilded-",
+        whiteGlow: nil,
+        blackGlow: nil,
+        whiteSide: Color(hex: 0xE6D9BF),
+        blackSide: Color(hex: 0x141416),
+        whiteName: "Ivory",
+        blackName: "Onyx",
+        bestArrow: Color(hex: 0x5E8FFF).opacity(0.95),
+        secondArrow: Color(hex: 0x5E8FFF).opacity(0.72),
+        arrowGlow: nil,
+        whiteSparks: [Color.white, Color(hex: 0xF1E4C8), Color(hex: 0xF2C27A), Color(hex: 0xE39A45)],
+        blackSparks: [Color.white, Color(hex: 0xF2C27A), Color(hex: 0xE39A45), Color(hex: 0xFF8A2A)],
+        boardEdge: nil,
+        boardShadows: [Color.black.opacity(0.6)],
+        isDark: true,
+        accent: Color(hex: 0x7EA6FF),
+        sculptedLook: .portoro,
+        boardArt: "board-portoro",
         spritePieces: true,
         backdrop: [Color(hex: 0x2B2A2C), Color(hex: 0x070708)]
     )

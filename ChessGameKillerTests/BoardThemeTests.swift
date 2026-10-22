@@ -29,6 +29,11 @@ final class BoardThemeTests: XCTestCase {
         XCTAssertEqual(BoardTheme.named(.gilded).pieceSet, "gilded-")
         XCTAssertEqual(BoardTheme.named(.gilded).sculptedLook?.name, "Gilded")
         XCTAssertEqual(BoardTheme.named(.gilded).sculptedLook?.pieces, "gilded-pieces")
+        // Portoro, the same set on black marble with gold veins, sits next to it in Settings.
+        XCTAssertEqual(BoardTheme.all.dropFirst().first?.id, .portoro)
+        XCTAssertEqual(BoardTheme.named(.portoro).pieceSet, "gilded-")
+        XCTAssertEqual(BoardTheme.named(.portoro).sculptedLook?.pieces, "gilded-pieces")
+        XCTAssertEqual(BoardTheme.named(.portoro).boardArt, "board-portoro")
         // Noir stays in Settings with the classic set.
         XCTAssertEqual(BoardTheme.named(.noir).pieceSet, "sculpted-")
         XCTAssertEqual(BoardTheme.named(.noir).sculptedLook?.name, "Noir")
@@ -36,12 +41,12 @@ final class BoardThemeTests: XCTestCase {
     }
 
     func testTheCarvedLooksPlayIn3DAndTheRestStayFlat() {
-        for id in [BoardTheme.ID.gilded, .noir, .sculpted, .bordeaux, .midnight] {
+        for id in [BoardTheme.ID.gilded, .portoro, .noir, .sculpted, .bordeaux, .midnight] {
             let theme = BoardTheme.named(id)
             XCTAssertNotNil(theme.sculptedLook, "\(theme.name) lost its 3D look")
             XCTAssertEqual(theme.sculptedLook?.name, theme.name)
         }
-        for theme in BoardTheme.all where ![.gilded, .noir, .sculpted, .bordeaux, .midnight].contains(theme.id) {
+        for theme in BoardTheme.all where ![.gilded, .portoro, .noir, .sculpted, .bordeaux, .midnight].contains(theme.id) {
             XCTAssertNil(theme.sculptedLook, "\(theme.name) should stay flat")
         }
     }

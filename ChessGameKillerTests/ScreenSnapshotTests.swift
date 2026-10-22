@@ -42,7 +42,7 @@ final class ScreenSnapshotTests: XCTestCase {
     func testFlatScreens() throws {
         defaults.set(false, forKey: "matchRival")
         defaults.set(false, forKey: "sculpted3D")
-        for id in ["gilded", "noir", "sculpted", "bordeaux", "midnight"] {
+        for id in ["gilded", "portoro", "noir", "sculpted", "bordeaux", "midnight"] {
             defaults.set(id, forKey: "boardTheme")
             try snapshot("\(id)-flat")
         }
@@ -52,7 +52,7 @@ final class ScreenSnapshotTests: XCTestCase {
     func testLookScreens() throws {
         defaults.set(false, forKey: "matchRival")
         defaults.set(true, forKey: "sculpted3D")
-        for id in ["gilded", "noir", "sculpted", "bordeaux", "midnight"] {
+        for id in ["gilded", "portoro", "noir", "sculpted", "bordeaux", "midnight"] {
             defaults.set(id, forKey: "boardTheme")
             try snapshot("study-screen-\(id)")
         }

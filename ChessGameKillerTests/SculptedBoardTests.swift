@@ -43,8 +43,21 @@ final class SculptedBoardTests: XCTestCase {
         XCTAssertFalse(assets.parts[.knight]?.contains { $0.finish == .gem } ?? true, "the classic knight has no gems")
         // Loaded once, then shared.
         XCTAssertTrue(assets.parts(for: .gilded)[.knight]?.first?.geometry === gilded[.knight]?.first?.geometry)
-        // Looks with the classic set get the classic meshes.
+        // Looks with the classic set get the classic meshes; Portoro shares the gilded ones.
         XCTAssertTrue(assets.parts(for: .noir)[.knight]?.first?.geometry === assets.parts[.knight]?.first?.geometry)
+        XCTAssertTrue(assets.parts(for: .portoro)[.knight]?.first?.geometry === gilded[.knight]?.first?.geometry)
+    }
+
+    /// The ivory pieces once washed out on the light squares: the two were nearly the same tone.
+    /// The ivory must stay well brighter than the light squares it stands on, with a darker outline.
+    func testTheIvoryStandsOutOnTheLightSquares() throws {
+        for look in [SculptedLook.gilded, .portoro] {
+            let squares = try XCTUnwrap(UIImage(named: look.squares)?.cgImage, "\(look.name) is missing \(look.squares)")
+            let light = Self.lightSquareLuminance(squares)
+            let ivory = Self.luminance(look.ivory)
+            XCTAssertGreaterThan(ivory, light * 1.3, "\(look.name): the ivory would wash out on the light squares")
+            XCTAssertGreaterThan(look.ivoryEdge, 0, "\(look.name): the ivory lost its outline")
+        }
     }
 
     /// SceneKit draws only the front of each triangle, so a solid wound inside out shows its far
@@ -207,6 +220,43 @@ final class SculptedBoardTests: XCTestCase {
     }
 
     // MARK: Helpers
+
+    /// Relative luminance of an sRGB color, 0 for black to 1 for white.
+    static func luminance(_ color: UIColor) -> Double {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        color.getRed(&r, green: &g, blue: &b, alpha: &a)
+        return luminance(Double(r), Double(g), Double(b))
+    }
+
+    static func luminance(_ r: Double, _ g: Double, _ b: Double) -> Double {
+        func linear(_ c: Double) -> Double { c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4) }
+        return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b)
+    }
+
+    /// The average luminance of the light squares in a stone texture: the middle of each square,
+    /// away from the grooves, in whichever checker color is brighter.
+    static func lightSquareLuminance(_ image: CGImage) -> Double {
+        let side = 128, cell = side / 8
+        var pixels = [UInt8](repeating: 0, count: side * side * 4)
+        pixels.withUnsafeMutableBytes { buffer in
+            let context = CGContext(data: buffer.baseAddress, width: side, height: side, bitsPerComponent: 8,
+                                    bytesPerRow: side * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+            context?.interpolationQuality = .high
+            context?.draw(image, in: CGRect(x: 0, y: 0, width: side, height: side))
+        }
+        var sums = [0.0, 0.0], counts = [0, 0]
+        for y in 0..<side {
+            for x in 0..<side {
+                guard (3..<(cell - 3)).contains(x % cell), (3..<(cell - 3)).contains(y % cell) else { continue }
+                let parity = (x / cell + y / cell) % 2
+                let i = (y * side + x) * 4
+                sums[parity] += luminance(Double(pixels[i]) / 255, Double(pixels[i + 1]) / 255, Double(pixels[i + 2]) / 255)
+                counts[parity] += 1
+            }
+        }
+        return max(sums[0] / Double(max(counts[0], 1)), sums[1] / Double(max(counts[1], 1)))
+    }
 
     /// The signed volume of each solid in a mesh (positive when its triangles face outward),
     /// for solids of 30 triangles or more. Split vertices are welded by position first.

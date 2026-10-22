@@ -86,6 +86,7 @@ final class SculptedAssets {
         switch finish {
         case .body where color == .white:
             made = Self.pbr(look.ivory, polish: look.ivoryPolish)
+            if look.ivoryEdge > 0 { made.shaderModifiers = [.surface: Self.edgeShading(look.ivoryEdge)] }
         case .body:
             made = Self.pbr(look.ebony, polish: look.ebonyPolish)
         case .metal:
@@ -123,6 +124,15 @@ final class SculptedAssets {
 
     /// The studio light the pieces reflect, the same from every side.
     func environment(_ look: SculptedLook) -> UIImage? { UIImage(named: look.studio) }
+
+    /// Darkens a surface toward its silhouette, where it turns away from the eye, so a light piece
+    /// keeps a clear outline on light stone.
+    static func edgeShading(_ amount: CGFloat) -> String {
+        """
+        float facing = saturate(dot(normalize(_surface.normal), normalize(_surface.view)));
+        _surface.diffuse.rgb *= 1.0 - \(Float(amount)) * pow(1.0 - facing, 2.0);
+        """
+    }
 
     static func pbr(_ color: UIColor, polish: SculptedLook.Polish) -> SCNMaterial {
         pbr(color, roughness: polish.roughness, coat: polish.coat, coatRoughness: polish.coatRoughness)
@@ -260,6 +270,10 @@ struct SculptedLook {
     var ivory = UIColor(red: 0.925, green: 0.9, blue: 0.85, alpha: 1)
     var ebony = UIColor(red: 0.15, green: 0.143, blue: 0.138, alpha: 1)
     var ivoryPolish = Polish(roughness: 0.34, coat: 0.35, coatRoughness: 0.08)
+    /// How much the ivory darkens toward its silhouette; 0 for none.
+    var ivoryEdge: CGFloat = 0
+    /// How dark the pieces' shadows fall on the stone.
+    var shadowAlpha: CGFloat = 0.62
     var ebonyPolish = Polish(roughness: 0.36, coat: 0.45, coatRoughness: 0.2)
     /// The pieces' metal: platinum on most looks, gold on the gilded set.
     var platinum = UIColor(red: 0.93, green: 0.93, blue: 0.945, alpha: 1)
@@ -301,7 +315,7 @@ extension SculptedLook {
     static let classic = SculptedLook()
 
     /// Every look a theme can play in.
-    static let all: [SculptedLook] = [.gilded, .noir, .classic, .bordeaux, .midnight]
+    static let all: [SculptedLook] = [.gilded, .portoro, .noir, .classic, .bordeaux, .midnight]
 
     /// A dark studio, a warm key falling as a pool of light and a cool rim: deep color and crisp
     /// highlights. Spot lights come out about pi times brighter than directional ones in SceneKit,
@@ -326,17 +340,21 @@ extension SculptedLook {
         return look
     }
 
-    /// The default: polished onyx and cream ivory with gold bands and crowns, and a knight with
-    /// a striped gold mane and a glowing amber eye, on cream Calacatta and black Portoro marble
-    /// with fine gold veins, ruled in gold.
+    /// The default: polished onyx and bright ivory with gold bands and crowns, and a knight with
+    /// a striped gold mane and a glowing amber eye, on cream marble and rich brown marble with
+    /// black veins, ruled in gold.
     static let gilded: SculptedLook = {
         var look = lit(SculptedLook())
         look.name = "Gilded"
         look.pieces = "gilded-pieces"
         look.squares = "sculpted-squares-gilded"
         look.lacquer = UIColor(red: 0.04, green: 0.04, blue: 0.045, alpha: 1)
-        // Cream, so the white pieces stand apart from the white marble; onyx polished to a mirror.
-        look.ivory = UIColor(red: 0.74, green: 0.67, blue: 0.56, alpha: 1)
+        // Ivory a step brighter than the cream squares, darker toward its outline and casting a
+        // deeper shadow, so the white pieces stand out on the light squares from either side.
+        look.ivory = UIColor(red: 0.88, green: 0.84, blue: 0.76, alpha: 1)
+        look.ivoryEdge = 0.35
+        look.shadowAlpha = 0.75
+        // Onyx polished to a mirror.
         look.ebony = UIColor(red: 0.06, green: 0.06, blue: 0.066, alpha: 1)
         look.ivoryPolish = Polish(roughness: 0.3, coat: 0.6, coatRoughness: 0.05)
         look.ebonyPolish = Polish(roughness: 0.22, coat: 1, coatRoughness: 0.04)
@@ -350,6 +368,14 @@ extension SculptedLook {
         look.pearl = look.platinum
         look.inlay = UIColor(red: 0.95, green: 0.74, blue: 0.45, alpha: 1)
         look.platinumMark = UIColor(red: 0.95, green: 0.8, blue: 0.58, alpha: 1)
+        return look
+    }()
+
+    /// The gilded set on cream marble and black Portoro marble with fine gold veins.
+    static let portoro: SculptedLook = {
+        var look = gilded
+        look.name = "Portoro"
+        look.squares = "sculpted-squares-portoro"
         return look
     }()
 

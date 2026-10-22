@@ -73,6 +73,17 @@ final class SculptedSnapshotTests: XCTestCase {
         window.isHidden = true
     }
 
+    /// The start from Black's side, where the ivory is farthest away and smallest: Gilded and Portoro.
+    func testTheIvoryFromBlacksSide() throws {
+        var start = SculptedBoardState(pieces: SculptedBoardTests.startPieces)
+        start.flipped = true
+        for look in [SculptedLook.gilded, .portoro] {
+            let (scene, window) = try stage(start, look: look, side: 402)
+            try save(scene.snapshot(), "study-\(look.name.lowercased())-black")
+            window.isHidden = true
+        }
+    }
+
     /// Every look has its own stone, studio and cache key.
     func testLooksAreDistinct() {
         let looks = SculptedLook.all
