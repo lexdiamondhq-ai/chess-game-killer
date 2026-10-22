@@ -44,12 +44,15 @@ final class StockfishTests: XCTestCase {
     func testComputerRepliesQuicklyAtEveryLevel() async throws {
         try XCTSkipUnless(StockfishEngine.hasNetworks)
         await StockfishEngine.shared.warmUp()
+        StockfishEngine.trace = { NSLog("TIMING engine %@", $0) }
+        defer { StockfishEngine.trace = nil }
         for level in MatchController.Level.allCases {
             let match = MatchController(engine: StockfishEngine.shared, sounds: nil)
             match.start(.init(opponent: .computer, playerColor: .white, level: level), playSound: false)
             // Let the hint search get going, so the reply has to stop it first.
             try? await Task.sleep(for: .milliseconds(300))
             let started = ContinuousClock.now
+            NSLog("TIMING reply level=\(level) person moves")
             match.tap(.e2)
             match.tap(.e4)
             XCTAssertEqual(match.game.plyCount, 1)

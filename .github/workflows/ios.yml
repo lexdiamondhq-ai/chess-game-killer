@@ -45,7 +45,7 @@ jobs:
           # Failures first, so they are never cut off by a long list of passes.
           grep -E "error:|Test Case .* failed|\*\* " build.log | head -80 || true
           grep -E "Executed" build.log | tail -3 || true
-          grep -E "TIMING reply" build.log | grep -v NSLog || true
+          grep -E "\] TIMING " build.log | head -120 || true
           # On a crash: which test was running, and the lines around the error.
           if [ "$status" != 0 ]; then
             grep -E "Restarting after|Test Case '.*' started" build.log | tail -4 || true

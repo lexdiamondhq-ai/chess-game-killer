@@ -40,6 +40,9 @@ actor StockfishEngine: ChessEngine {
         /// earlier search can never leak into this one.
         let position: Position
         var lines: [Int: (depth: Int, line: EngineLine)] = [:]
+        /// Whether the engine has been told to start, and told to stop.
+        var goSent = false
+        var stopSent = false
         let continuation: AsyncStream<SearchResult>.Continuation
     }
 
@@ -98,11 +101,17 @@ actor StockfishEngine: ChessEngine {
         // searches nobody is waiting for any more.
         latestRequest += 1
         let ticket = latestRequest
-        if pending != nil {
-            await engine.send(command: .stop)
-        }
         while pending != nil {
             if Task.isCancelled || latestRequest != ticket { return SearchResult(bestMove: nil, lines: []) }
+            // Stop the search in progress, but only once its "go" is out: a stop sent
+            // while it is still being set up reaches an idle engine and is lost, and
+            // the search then runs its full time.
+            if let current = pending, current.goSent, !current.stopSent {
+                pending?.stopSent = true
+                Self.trace?("stop search \(current.id) for request \(ticket)")
+                await engine.send(command: .stop)
+                continue
+            }
             try? await Task.sleep(for: .milliseconds(5))
         }
         if latestRequest != ticket { return SearchResult(bestMove: nil, lines: []) }
@@ -111,12 +120,14 @@ actor StockfishEngine: ChessEngine {
         let id = nextSearchID
         nextSearchID += 1
         pending = PendingSearch(id: id, position: position, continuation: continuation)
+        Self.trace?("start search \(id) for request \(ticket)")
 
         for (name, value) in options {
             await engine.send(command: .setoption(id: name, value: value))
         }
         await engine.send(command: .position(.fen(fen)))
         await engine.send(command: go)
+        if pending?.id == id { pending?.goSent = true }
 
         // Safety net in case the engine never answers: ask it to stop, so its
         // bestmove still lands on this search rather than on the next one, and
@@ -134,6 +145,9 @@ actor StockfishEngine: ChessEngine {
         }
         return SearchResult(bestMove: nil, lines: [])
     }
+
+    /// Tests set this to follow the engine's searches.
+    nonisolated(unsafe) static var trace: ((String) -> Void)?
 
     /// Two search threads where the device has cores to spare; one otherwise.
     static var searchThreads: Int {
@@ -243,12 +257,15 @@ actor StockfishEngine: ChessEngine {
     /// and says whether it was.
     private func stopIfPending(searchID: Int) async -> Bool {
         guard let search = pending, search.id == searchID else { return false }
+        pending?.stopSent = true
+        Self.trace?("safety net: stop search \(searchID)")
         await engine.send(command: .stop)
         return true
     }
 
     private func finish(searchID: Int, bestMove: String?) {
         guard let search = pending, search.id == searchID else { return }
+        Self.trace?("finish search \(searchID): \(bestMove ?? "no move")")
         let lines = search.lines.sorted { $0.key < $1.key }.map { $0.value.line }
         search.continuation.yield(SearchResult(bestMove: bestMove ?? lines.first?.firstMove, lines: lines))
         search.continuation.finish()
