@@ -36,4 +36,33 @@ final class StockfishTests: XCTestCase {
         let move = try XCTUnwrap(chosen)
         XCTAssertNotNil(Notation.san(of: move, fen: fen), "\(move) should be legal")
     }
+
+    /// How long the computer takes to answer a move at every level, with the real engine,
+    /// while the coach is still busy on the player's turn (as in the app). Printed as
+    /// TIMING lines in the CI log; the bound only catches a reply that hangs.
+    @MainActor
+    func testComputerRepliesQuicklyAtEveryLevel() async throws {
+        try XCTSkipUnless(StockfishEngine.hasNetworks)
+        await StockfishEngine.shared.warmUp()
+        for level in MatchController.Level.allCases {
+            let match = MatchController(engine: StockfishEngine.shared, sounds: nil)
+            match.start(.init(opponent: .computer, playerColor: .white, level: level), playSound: false)
+            // Let the hint search get going, so the reply has to stop it first.
+            try? await Task.sleep(for: .milliseconds(300))
+            let started = ContinuousClock.now
+            match.tap(.e2)
+            match.tap(.e4)
+            XCTAssertEqual(match.game.plyCount, 1)
+            var waited = 0
+            while match.game.plyCount < 2, waited < 1000 {
+                try? await Task.sleep(for: .milliseconds(5))
+                waited += 1
+            }
+            let elapsed = ContinuousClock.now - started
+            let ms = Int(elapsed.components.seconds * 1000) + Int(elapsed.components.attoseconds / 1_000_000_000_000_000)
+            print("TIMING reply level=\(level) think=\(level.thinkTimeMs)ms total=\(ms)ms")
+            XCTAssertEqual(match.game.plyCount, 2, "\(level) never answered")
+            XCTAssertLessThan(ms, level.thinkTimeMs + 2500, "\(level) took \(ms) ms to answer")
+        }
+    }
 }

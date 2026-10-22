@@ -53,11 +53,11 @@ final class MatchController {
 
         var thinkTimeMs: Int {
             switch self {
-            case .beginner: return 150
-            case .casual: return 250
-            case .club: return 400
-            case .expert: return 700
-            case .grandmaster: return 1200
+            case .beginner: return 80
+            case .casual: return 120
+            case .club: return 200
+            case .expert: return 350
+            case .grandmaster: return 600
             }
         }
 
@@ -551,7 +551,7 @@ final class MatchController {
         let chosen = await engine.chooseMove(fen: game.fen, skill: setup.level.skill, thinkTimeMs: setup.level.thinkTimeMs)
 
         // A short pause so the reply never feels instant.
-        let minimum = Duration.milliseconds(450)
+        let minimum = Duration.milliseconds(250)
         let elapsed = clock.now - started
         if elapsed < minimum {
             try? await Task.sleep(for: minimum - elapsed)

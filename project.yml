@@ -54,5 +54,9 @@ schemes:
       targets:
         ChessGameKiller: all
         ChessGameKillerTests: [test]
+    # Running from Xcode builds Release, so Stockfish is compiled with optimizations.
+    # A Debug build runs the engine unoptimized: much weaker in the same think time.
+    run:
+      config: Release
     test:
       targets: [ChessGameKillerTests]

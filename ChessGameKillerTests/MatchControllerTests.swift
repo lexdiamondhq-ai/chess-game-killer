@@ -433,4 +433,15 @@ final class MatchControllerTests: XCTestCase {
         await waitUntil("the computer opens") { match.game.plyCount == 1 }
         XCTAssertEqual(match.game.moves, ["e4"])
     }
+
+    func testHintsAreTurnedOffOnceForEveryone() {
+        let defaults = UserDefaults(suiteName: "hints-\(UUID().uuidString)")!
+        defaults.set(true, forKey: "showBestMoves")
+        HintsIntroduction.applyOnce(defaults: defaults)
+        XCTAssertFalse(defaults.bool(forKey: "showBestMoves"))
+        // Turned back on by the player, they stay on.
+        defaults.set(true, forKey: "showBestMoves")
+        HintsIntroduction.applyOnce(defaults: defaults)
+        XCTAssertTrue(defaults.bool(forKey: "showBestMoves"))
+    }
 }
