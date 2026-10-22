@@ -43,6 +43,7 @@ actor StockfishEngine: ChessEngine {
         /// Whether the engine has been told to start, and told to stop.
         var goSent = false
         var stopSent = false
+        var stoppedAt: ContinuousClock.Instant?
         let continuation: AsyncStream<SearchResult>.Continuation
     }
 
@@ -58,7 +59,7 @@ actor StockfishEngine: ChessEngine {
             fen: fen,
             options: [("Skill Level", "20"), ("MultiPV", "\(max(1, lines))")],
             go: .go(depth: depth, movetime: maxTimeMs),
-            timeout: maxTimeMs.map { .milliseconds($0 + 10_000) } ?? .seconds(20)
+            timeout: maxTimeMs.map { .milliseconds($0 + 600) } ?? .seconds(20)
         )
         return Array(result.lines.prefix(lines))
     }
@@ -74,7 +75,7 @@ actor StockfishEngine: ChessEngine {
             fen: fen,
             options: [("Skill Level", "\(max(0, min(20, skill)))"), ("MultiPV", "1")],
             go: .go(movetime: thinkTimeMs),
-            timeout: .milliseconds(thinkTimeMs + 10_000)
+            timeout: .milliseconds(thinkTimeMs + 600)
         )
         return result.bestMove
     }
@@ -108,8 +109,17 @@ actor StockfishEngine: ChessEngine {
             // the search then runs its full time.
             if let current = pending, current.goSent, !current.stopSent {
                 pending?.stopSent = true
+                pending?.stoppedAt = .now
                 Self.trace?("stop search \(current.id) for request \(ticket)")
                 await engine.send(command: .stop)
+                continue
+            }
+            // Stockfish's "bestmove" after a stop sometimes never arrives. Don't wait
+            // for it: past a short grace the old search ends with what it found.
+            if let current = pending, let stoppedAt = current.stoppedAt,
+               ContinuousClock.now - stoppedAt > Self.stopGrace {
+                Self.trace?("no answer to stop: ending search \(current.id)")
+                finish(searchID: current.id, bestMove: nil)
                 continue
             }
             try? await Task.sleep(for: .milliseconds(5))
@@ -136,7 +146,7 @@ actor StockfishEngine: ChessEngine {
             try? await Task.sleep(for: timeout)
             let stopped = await self?.stopIfPending(searchID: id) ?? false
             guard stopped else { return }
-            try? await Task.sleep(for: .seconds(2))
+            try? await Task.sleep(for: Self.stopGrace)
             await self?.finish(searchID: id, bestMove: nil)
         }
 
@@ -145,6 +155,9 @@ actor StockfishEngine: ChessEngine {
         }
         return SearchResult(bestMove: nil, lines: [])
     }
+
+    /// How long a stopped search gets to report before it is ended without its "bestmove".
+    static let stopGrace = Duration.milliseconds(250)
 
     /// Tests set this to follow the engine's searches.
     nonisolated(unsafe) static var trace: ((String) -> Void)?
@@ -258,6 +271,7 @@ actor StockfishEngine: ChessEngine {
     private func stopIfPending(searchID: Int) async -> Bool {
         guard let search = pending, search.id == searchID else { return false }
         pending?.stopSent = true
+        pending?.stoppedAt = .now
         Self.trace?("safety net: stop search \(searchID)")
         await engine.send(command: .stop)
         return true
