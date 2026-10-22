@@ -33,10 +33,12 @@ actor StockfishEngine: ChessEngine {
     private var nextSearchID = 0
     /// Counts requests for the engine, so a waiting one can tell a newer one came.
     private var latestRequest = 0
-    /// Searches given up on before their "bestmove" came. Each one's "bestmove" can still
-    /// arrive later; it is dropped, so it can't end the next search (in the same position,
-    /// it would be legal there) before that search has found anything.
-    private var orphanedBestMoves = 0
+    /// "go"s sent whose "bestmove" hasn't come yet. A search given up on can still get its
+    /// "bestmove" later, so no new "go" is sent until it has (or is surely lost): a late
+    /// answer can then never end the next search, where in the same position it would be legal.
+    private var unansweredGos = 0
+    /// How long to wait for a given-up search's "bestmove" before counting it lost.
+    static let lostAnswer = Duration.seconds(2)
 
     private struct PendingSearch {
         let id: Int
@@ -124,8 +126,19 @@ actor StockfishEngine: ChessEngine {
             if let current = pending, let stoppedAt = current.stoppedAt,
                ContinuousClock.now - stoppedAt > Self.stopGrace {
                 Self.trace?("no answer to stop: ending search \(current.id)")
-                finish(searchID: current.id, bestMove: nil, orphaned: true)
+                finish(searchID: current.id, bestMove: nil)
                 continue
+            }
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        // The engine may still owe the answer to a search that was given up on.
+        let waitStart = ContinuousClock.now
+        while unansweredGos > 0 {
+            if Task.isCancelled || latestRequest != ticket { return SearchResult(bestMove: nil, lines: []) }
+            if ContinuousClock.now - waitStart > Self.lostAnswer {
+                Self.trace?("an ended search never answered; carrying on")
+                unansweredGos = 0
+                break
             }
             try? await Task.sleep(for: .milliseconds(5))
         }
@@ -141,6 +154,8 @@ actor StockfishEngine: ChessEngine {
             await engine.send(command: .setoption(id: name, value: value))
         }
         await engine.send(command: .position(.fen(fen)))
+        // Counted before it is sent, so its answer can never find the count at zero.
+        unansweredGos += 1
         await engine.send(command: go)
         if pending?.id == id { pending?.goSent = true }
 
@@ -152,7 +167,7 @@ actor StockfishEngine: ChessEngine {
             let stopped = await self?.stopIfPending(searchID: id) ?? false
             guard stopped else { return }
             try? await Task.sleep(for: Self.stopGrace)
-            await self?.finish(searchID: id, bestMove: nil, orphaned: true)
+            await self?.finish(searchID: id, bestMove: nil)
         }
 
         for await result in stream {
@@ -239,10 +254,13 @@ actor StockfishEngine: ChessEngine {
             readyCount += 1
             return
         }
-        if case .bestmove = response, orphanedBestMoves > 0 {
-            orphanedBestMoves -= 1
-            Self.trace?("dropped a late bestmove from an ended search")
-            return
+        if case .bestmove = response {
+            unansweredGos = max(0, unansweredGos - 1)
+            // An answer for a search already ended: no search has started since, so drop it.
+            guard pending?.goSent == true else {
+                Self.trace?("late bestmove from an ended search")
+                return
+            }
         }
         guard var search = pending else { return }
 
@@ -293,11 +311,8 @@ actor StockfishEngine: ChessEngine {
         return true
     }
 
-    /// Ends a search. `orphaned` marks one ended without its "bestmove", which is still owed.
-    private func finish(searchID: Int, bestMove: String?, orphaned: Bool = false) {
+    private func finish(searchID: Int, bestMove: String?) {
         guard let search = pending, search.id == searchID else { return }
-        // Capped, so an answer that truly never comes can only cost a search or two.
-        if orphaned { orphanedBestMoves = min(orphanedBestMoves + 1, 2) }
         Self.trace?("finish search \(searchID): \(bestMove ?? "no move")")
         let lines = search.lines.sorted { $0.key < $1.key }.map { $0.value.line }
         search.continuation.yield(SearchResult(bestMove: bestMove ?? lines.first?.firstMove, lines: lines))
