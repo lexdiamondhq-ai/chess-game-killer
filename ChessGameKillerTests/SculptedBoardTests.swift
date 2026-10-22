@@ -63,11 +63,13 @@ final class SculptedBoardTests: XCTestCase {
         }
     }
 
-    /// The same with the 3D pieces off, and on every small board: the pictures of the carved sets
-    /// on each look's board picture. The white pieces washed out there too, on Midnight from Black's side.
-    func testTheFlatIvoryStandsOutOnTheLightSquares() throws {
-        for theme in BoardTheme.all where theme.sculptedLook != nil {
-            let name = try XCTUnwrap(theme.boardArt, "\(theme.name) has no board picture")
+    /// The same with the 3D pieces off, and on every small board: each look's piece pictures on its
+    /// board picture. The white pieces washed out there too, on Midnight from Black's side, a little
+    /// darker than the cream squares. White pieces must stand brighter than the light squares, or,
+    /// like Fabergé's gold on white enamel, far darker.
+    func testTheFlatWhitePiecesStandOutOnTheLightSquares() throws {
+        for theme in BoardTheme.all {
+            guard let name = theme.boardArt else { continue }
             let art = try XCTUnwrap(UIImage(named: name)?.cgImage, "\(theme.name) is missing \(name)")
             // The picture is nine squares wide: the board, in a frame half a square wide.
             let inset = CGFloat(art.width) / 18
@@ -80,8 +82,8 @@ final class SculptedBoardTests: XCTestCase {
                 let image = try XCTUnwrap(UIImage(named: sprite)?.cgImage, "\(theme.name) is missing \(sprite)")
                 total += Self.opaqueLuminance(image)
             }
-            let ivory = total / Double(Piece.Kind.allCases.count)
-            XCTAssertGreaterThan(ivory, light * 1.05, "\(theme.name): the white pieces would wash out on the light squares")
+            let ratio = total / Double(Piece.Kind.allCases.count) / light
+            XCTAssertTrue(ratio > 1.05 || ratio < 0.5, "\(theme.name): the white pieces would wash out on the light squares (\(ratio))")
         }
     }
 
