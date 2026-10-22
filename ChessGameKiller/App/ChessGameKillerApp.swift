@@ -4,6 +4,7 @@ import SwiftUI
 struct ChessGameKillerApp: App {
     init() {
         LookIntroduction.applyOnce()
+        HintsIntroduction.applyOnce()
     }
 
     var body: some Scene {
@@ -29,5 +30,18 @@ enum LookIntroduction {
             defaults.set(true, forKey: sculptedKey)
             defaults.set(false, forKey: "matchRival")
         }
+    }
+}
+
+/// Move hints (the best-move arrows) are off unless the player turns them on: seeing your
+/// best moves before you play spoils the game. This turns them off once for players who
+/// had them on from before; switching them back on afterwards sticks.
+enum HintsIntroduction {
+    static let key = "hintsOffByDefault"
+
+    static func applyOnce(defaults: UserDefaults = .standard) {
+        guard !defaults.bool(forKey: key) else { return }
+        defaults.set(true, forKey: key)
+        defaults.set(false, forKey: "showBestMoves")
     }
 }

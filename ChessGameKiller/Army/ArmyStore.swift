@@ -527,7 +527,7 @@ final class ArmyStore {
         do {
             try JSONEncoder().encode(army).write(to: fileURL, options: .atomic)
         } catch {
-            print("Couldn't save the army: \(error)")
+            NSLog("Couldn't save the army: %@", "\(error)")
         }
     }
 }

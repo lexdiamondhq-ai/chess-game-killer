@@ -83,7 +83,7 @@ struct NewGameSheet: View {
     @AppStorage("setup.side") private var side: SideChoice = .white
     @AppStorage("setup.level") private var level: MatchController.Level = .club
     @AppStorage("setup.clock") private var timeControl: TimeControl = .unlimited
-    @AppStorage("showBestMoves") private var showBestMoves = true
+    @AppStorage("showBestMoves") private var showBestMoves = false
     @AppStorage("coachVerdicts") private var showVerdicts = true
     @AppStorage("showSecondBest") private var showSecondBest = true
 

@@ -85,7 +85,7 @@ final class GameVault {
         do {
             try JSONEncoder().encode(games).write(to: fileURL, options: .atomic)
         } catch {
-            print("Couldn't save the games: \(error)")
+            NSLog("Couldn't save the games: %@", "\(error)")
         }
     }
 }

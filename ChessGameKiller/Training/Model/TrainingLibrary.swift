@@ -41,7 +41,7 @@ final class TrainingLibrary {
         do {
             return try load()
         } catch {
-            print("Training content failed to load: \(error)")
+            NSLog("Training content failed to load: %@", "\(error)")
             return nil
         }
     }()
