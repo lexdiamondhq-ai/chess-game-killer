@@ -7,18 +7,36 @@ import XCTest
 actor FakeEngine: ChessEngine {
     private let scripted: [String: [EngineLine]]
     private(set) var analyzed: [String] = []
+    /// How many of the next move requests get no answer, like a search the real engine dropped.
+    private var missedMoves: Int
+    /// An engine that never answers anything.
+    private let silent: Bool
+    private(set) var moveRequests = 0
 
-    init(scripted: [String: [EngineLine]] = [:]) {
+    /// The score given to unscripted positions, for the side to move.
+    private let score: Int
+
+    init(scripted: [String: [EngineLine]] = [:], missedMoves: Int = 0, silent: Bool = false, score: Int = 0) {
         self.scripted = scripted
+        self.score = score
+        self.missedMoves = missedMoves
+        self.silent = silent
     }
 
     func analyze(fen: String, depth: Int, lines: Int, maxTimeMs: Int?) async -> [EngineLine] {
         analyzed.append(fen)
+        if silent { return [] }
         if let lines = scripted[fen] { return lines }
-        return Self.legalMoves(fen: fen).prefix(lines).map { EngineLine(moves: [$0], evaluation: .centipawns(0)) }
+        return Self.legalMoves(fen: fen).prefix(lines).map { EngineLine(moves: [$0], evaluation: .centipawns(score)) }
     }
 
     func chooseMove(fen: String, skill: Int, thinkTimeMs: Int) async -> String? {
+        moveRequests += 1
+        if silent { return nil }
+        if missedMoves > 0 {
+            missedMoves -= 1
+            return nil
+        }
         if let line = scripted[fen]?.first { return line.firstMove }
         return Self.legalMoves(fen: fen).first
     }
@@ -422,6 +440,80 @@ final class MatchControllerTests: XCTestCase {
         XCTAssertEqual(match.game.moves, ["a3"])
         XCTAssertEqual(match.game.sideToMove, .black)
         XCTAssertFalse(match.engineFailed)
+    }
+
+    /// Alex played Spark with Spark as white and nothing moved: the engine's first
+    /// answer went missing and the game sat on "Engine unavailable" for good.
+    func testTheComputerOpensAsWhiteEvenWhenTheEngineMissesAnAnswer() async {
+        for level in MatchController.Level.allCases {
+            let engine = FakeEngine(missedMoves: 2)
+            let match = MatchController(engine: engine, sounds: nil)
+            match.chance = { 0.99 }
+            match.start(.init(opponent: .computer, playerColor: .black, level: level), playSound: false)
+            await waitUntil("\(level) opens") { match.game.plyCount == 1 }
+            XCTAssertEqual(match.game.sideToMove, .black, "\(level)")
+            XCTAssertFalse(match.engineFailed, "\(level) shouldn't say the engine is unavailable")
+            let requests = await engine.moveRequests
+            XCTAssertEqual(requests, 3, "\(level) should ask again after a missed answer")
+        }
+    }
+
+    /// With no engine answer at all, the rival still moves rather than freezing the game.
+    func testTheComputerStillMovesWhenTheEngineIsSilent() async {
+        let match = MatchController(engine: FakeEngine(silent: true), sounds: nil)
+        match.start(.init(opponent: .computer, playerColor: .black, level: .beginner), playSound: false)
+        await waitUntil("the computer opens") { match.game.plyCount == 1 }
+        XCTAssertEqual(match.game.sideToMove, .black)
+        tapMove(match, "e7e5")
+        await waitUntil("the computer answers") { match.game.plyCount == 3 }
+    }
+
+    /// The fallback takes what is hanging rather than shuffling pieces.
+    func testTheFallbackMoveTakesAHangingQueen() async {
+        // White to move; the black queen on d5 is free for the knight on c3.
+        let position = Position(fen: "4k3/8/8/3q4/8/2N5/8/4K3 w - - 0 1")!
+        let match = MatchController(engine: FakeEngine(silent: true), sounds: nil)
+        match.start(.init(opponent: .computer, playerColor: .black, level: .club), from: position, playSound: false)
+        await waitUntil("the computer moves") { match.game.plyCount == 1 }
+        XCTAssertEqual(match.game.moves, ["Nxd5"])
+    }
+
+    func testThePersonCanResign() async {
+        let sounds = SilentSounds()
+        let match = MatchController(engine: FakeEngine(), sounds: sounds)
+        match.start(.init(opponent: .computer, playerColor: .white, level: .club), playSound: false)
+        XCTAssertFalse(match.canResign, "nothing to resign before the first move")
+        tapMove(match, "e2e4")
+        await waitUntil("the computer answers") { match.game.plyCount == 2 }
+        match.resign()
+        XCTAssertEqual(match.outcome, .resigned(loser: .white))
+        XCTAssertEqual(match.winner, .black)
+        XCTAssertTrue(match.isOver)
+        XCTAssertEqual(sounds.played.last, .gameOver)
+        XCTAssertFalse(match.canResign)
+    }
+
+    func testAHopelessRivalResignsAndTheVictoryThemePlays() async {
+        let sounds = SilentSounds()
+        // Every position scores 20 pawns for the person on their turn.
+        let match = MatchController(engine: FakeEngine(score: 2000), sounds: sounds)
+        match.start(.init(opponent: .computer, playerColor: .white, level: .club), playSound: false)
+        await waitUntil("the first look at the position") { match.evaluation != nil }
+        XCTAssertNil(match.outcome, "one bad look isn't enough to resign")
+        tapMove(match, "e2e4")
+        await waitUntil("the rival resigns") { match.outcome != nil }
+        XCTAssertEqual(match.outcome, .resigned(loser: .black))
+        XCTAssertEqual(match.winner, .white)
+        XCTAssertEqual(sounds.played.last, .victory)
+    }
+
+    func testCheckmatingTheRivalPlaysTheVictoryTheme() async {
+        let sounds = SilentSounds()
+        let match = MatchController(engine: FakeEngine(), sounds: sounds)
+        match.start(.init(opponent: .friend), playSound: false)
+        for move in ["f2f3", "e7e5", "g2g4", "d8h4"] { tapMove(match, move) }
+        XCTAssertEqual(match.winner, .black)
+        XCTAssertEqual(sounds.played.last, .victory)
     }
 
     func testStrongerRivalsAlwaysPlayTheEnginesMove() async {

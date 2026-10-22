@@ -1,11 +1,17 @@
 name: Generate sounds with ElevenLabs
 
 # Push to the generate-sounds branch to (re)generate every sound in
-# scripts/make_sounds.py. The new files are committed back to that branch.
+# scripts/make_sounds.py, or run it by hand on any branch with a list of names
+# to make just those. The new files are committed back to that branch.
 on:
   push:
     branches: [generate-sounds]
   workflow_dispatch:
+    inputs:
+      names:
+        description: "Only these sounds, space-separated (empty: all)"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -18,11 +24,13 @@ jobs:
       - name: Generate sound effects
         env:
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
-        run: python3 scripts/make_sounds.py ChessGameKiller/Sounds
+          NAMES: ${{ github.event.inputs.names }}
+        run: python3 scripts/make_sounds.py ChessGameKiller/Sounds $NAMES
       - name: Commit the sounds
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add ChessGameKiller/Sounds
           git commit -m "Generate sound effects with ElevenLabs" || echo "No changes"
-          git push origin HEAD:generate-sounds
+          # Back to the branch that asked: generate-sounds on a push, any branch by hand.
+          git push origin "HEAD:${GITHUB_REF_NAME}"

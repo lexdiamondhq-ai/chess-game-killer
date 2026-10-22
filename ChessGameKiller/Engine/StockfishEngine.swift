@@ -75,7 +75,8 @@ actor StockfishEngine: ChessEngine {
             fen: fen,
             options: [("Skill Level", "\(max(0, min(20, skill)))"), ("MultiPV", "1")],
             go: .go(movetime: thinkTimeMs),
-            timeout: .milliseconds(thinkTimeMs + 600)
+            // Room for a search the engine is still winding down before this one runs.
+            timeout: .milliseconds(thinkTimeMs + 1500)
         )
         return result.bestMove
     }
@@ -220,7 +221,13 @@ actor StockfishEngine: ChessEngine {
             attempts += 1
             try? await Task.sleep(for: .milliseconds(20))
         }
-        return readyCount > seen
+        if readyCount == seen {
+            // Slow to load its networks, but running: searches queue up behind the
+            // load, so the engine is still usable. Giving up here would leave it
+            // unavailable for the rest of the session.
+            NSLog("Stockfish: no readyok after loading networks; carrying on")
+        }
+        return await engine.isRunning
     }
 
     private func handle(_ response: EngineResponse) {

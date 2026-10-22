@@ -70,4 +70,34 @@ final class StockfishTests: XCTestCase {
             match.start(.init(opponent: .friend), playSound: false)
         }
     }
+
+    /// Alex's report: Spark as white never made its first move. Every rival opens as
+    /// white with the real engine, including when the new game starts while the last
+    /// game's hint search is still running (the usual way into a game).
+    @MainActor
+    func testEveryRivalOpensAsWhite() async throws {
+        try XCTSkipUnless(StockfishEngine.hasNetworks)
+        await StockfishEngine.shared.warmUp()
+        StockfishEngine.trace = { NSLog("TIMING engine %@", $0) }
+        defer { StockfishEngine.trace = nil }
+        let match = MatchController(engine: StockfishEngine.shared, sounds: nil)
+        for level in MatchController.Level.allCases {
+            // A game where the person is to move, so a long hint search is under way.
+            match.start(.init(opponent: .computer, playerColor: .white, level: level), playSound: false)
+            try? await Task.sleep(for: .milliseconds(300))
+            let started = ContinuousClock.now
+            match.start(.init(opponent: .computer, playerColor: .black, level: level), playSound: false)
+            var waited = 0
+            while match.game.plyCount < 1, waited < 1200 {
+                try? await Task.sleep(for: .milliseconds(5))
+                waited += 1
+            }
+            let elapsed = ContinuousClock.now - started
+            NSLog("TIMING opening level=\(level) total=\(elapsed)")
+            XCTAssertEqual(match.game.plyCount, 1, "\(level) never opened as white")
+            XCTAssertEqual(match.game.sideToMove, .black)
+            XCTAssertFalse(match.engineFailed, "\(level) said the engine was unavailable")
+        }
+        match.start(.init(opponent: .friend), playSound: false)
+    }
 }

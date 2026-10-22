@@ -99,7 +99,11 @@ struct ContentView: View {
                                 stakes: GameStakes(level: setup.level, assisted: assisted))
                 }
             }
-            .task { await StockfishEngine.shared.warmUp() }
+            .task {
+                // The welcome chime as the app opens, once per launch.
+                SoundPlayer.shared.playWelcome()
+                await StockfishEngine.shared.warmUp()
+            }
             .onChange(of: showBestMoves) { _, _ in syncCoachSettings() }
             .onChange(of: showSecondBest) { _, _ in syncCoachSettings() }
             .onChange(of: showVerdicts) { _, _ in syncCoachSettings() }
