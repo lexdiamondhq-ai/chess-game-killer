@@ -329,8 +329,11 @@ extension SculptedLook {
         look.keyColor = UIColor(red: 1, green: 0.95, blue: 0.88, alpha: 1)
         look.rimColor = UIColor(red: 0.8, green: 0.87, blue: 1, alpha: 1)
         look.spot = (inner: 36, outer: 110)
-        // A warm ivory a step deeper than the light squares, so the white pieces keep their shape on them.
-        look.ivory = UIColor(red: 0.8, green: 0.75, blue: 0.665, alpha: 1)
+        // Ivory well brighter than the cream squares, darker toward its outline and casting a
+        // deeper shadow, so the white pieces stand out on the light squares from either side.
+        look.ivory = UIColor(red: 0.88, green: 0.84, blue: 0.76, alpha: 1)
+        look.ivoryEdge = 0.35
+        look.shadowAlpha = 0.75
         look.ebony = UIColor(red: 0.1, green: 0.095, blue: 0.09, alpha: 1)
         look.stoneRoughness = 0.22
         look.stoneCoat = 0.5
@@ -349,11 +352,6 @@ extension SculptedLook {
         look.pieces = "gilded-pieces"
         look.squares = "sculpted-squares-gilded"
         look.lacquer = UIColor(red: 0.04, green: 0.04, blue: 0.045, alpha: 1)
-        // Ivory a step brighter than the cream squares, darker toward its outline and casting a
-        // deeper shadow, so the white pieces stand out on the light squares from either side.
-        look.ivory = UIColor(red: 0.88, green: 0.84, blue: 0.76, alpha: 1)
-        look.ivoryEdge = 0.35
-        look.shadowAlpha = 0.75
         // Onyx polished to a mirror.
         look.ebony = UIColor(red: 0.06, green: 0.06, blue: 0.066, alpha: 1)
         look.ivoryPolish = Polish(roughness: 0.3, coat: 0.6, coatRoughness: 0.05)
@@ -379,7 +377,7 @@ extension SculptedLook {
         return look
     }()
 
-    /// Ivory and black marble, a champagne line and a black lacquer frame.
+    /// Deep cream and black marble, a champagne line and a black lacquer frame.
     static let noir: SculptedLook = {
         var look = lit(SculptedLook())
         look.name = "Noir"
@@ -390,7 +388,7 @@ extension SculptedLook {
         return look
     }()
 
-    /// Cream and deep wine-red marble, a black frame and platinum; the marks in warm gold.
+    /// Deep cream and wine-red marble, a black frame and platinum; the marks in warm gold.
     static let bordeaux: SculptedLook = {
         var look = lit(SculptedLook())
         look.name = "Bordeaux"
@@ -400,7 +398,7 @@ extension SculptedLook {
         return look
     }()
 
-    /// Cream and ink-blue stone, a black frame and platinum; the marks in warm gold.
+    /// Deep cream and ink-blue stone, a black frame and platinum; the marks in warm gold.
     static let midnight: SculptedLook = {
         var look = lit(SculptedLook())
         look.name = "Midnight"

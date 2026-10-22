@@ -22,8 +22,9 @@ repository root with Blender's Python module (`pip install bpy==5.2.2 numpy scip
    (Noir uses the champagne line CCB88F, Gilded and Portoro the gold DDB06C; copy to `Assets.xcassets/Boards/board-<look>.imageset`).
    A spec with `"crisp": true` draws even, sharp-edged veins: Gilded's brown marble with black veins
    (`m-gilded.json`) and Portoro's black marble with gold veins (`m-portoro.json`), both on deep cream.
-   Keep the ivory well brighter than the light squares (a test checks it): the gilded ivory sprites use
-   the 3D look's ivory and its darker outline.
+   Noir, Bordeaux and Midnight keep their own dark stone on the same deep cream. Keep the ivory well
+   brighter than the light squares, in 3D and flat (tests check every look): the ivory sprites of both
+   sets use the 3D looks' ivory and its darker outline (`edge` in `sprites.py`).
 6. Finishing for the asset catalog: `python scripts/sculpted/fade.py build/sculpted/sprites build/sculpted/final`
    fades each sprite's shadow out before its edge (copy to `Assets.xcassets/Pieces/sculpted-*.imageset`, or
    `gilded-*.imageset`), and

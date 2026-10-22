@@ -1,5 +1,6 @@
 import ChessKit
 import SceneKit
+import SwiftUI
 import XCTest
 @testable import ChessGameKiller
 
@@ -73,14 +74,30 @@ final class SculptedSnapshotTests: XCTestCase {
         window.isHidden = true
     }
 
-    /// The start from Black's side, where the ivory is farthest away and smallest: Gilded and Portoro.
+    /// The start from Black's side, where the ivory is farthest away and smallest, on every 3D look.
     func testTheIvoryFromBlacksSide() throws {
         var start = SculptedBoardState(pieces: SculptedBoardTests.startPieces)
         start.flipped = true
-        for look in [SculptedLook.gilded, .portoro] {
+        for look in SculptedLook.all {
             let (scene, window) = try stage(start, look: look, side: 402)
             try save(scene.snapshot(), "study-\(look.name.lowercased())-black")
             window.isHidden = true
+        }
+    }
+
+    /// The flat board after 1.d4 from Black's side, as the game shows it with 3D pieces off,
+    /// for every theme, at phone size.
+    func testFlatBoardsFromBlacksSide() throws {
+        let draft = try XCTUnwrap(PositionDraft(fen: "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1"))
+        for theme in BoardTheme.all {
+            let board = PositionBoard(draft: draft, theme: theme, flipped: true, tints: [.d2: theme.lastMove, .d4: theme.lastMove])
+                .frame(width: 370, height: 370)
+                .padding(16)
+                .background(Color(red: 0.11, green: 0.115, blue: 0.125))
+            let renderer = ImageRenderer(content: board)
+            renderer.scale = 3
+            let image = try XCTUnwrap(renderer.uiImage, "\(theme.name) did not draw")
+            try save(image, "study-flat-\(theme.id.rawValue)-black")
         }
     }
 
