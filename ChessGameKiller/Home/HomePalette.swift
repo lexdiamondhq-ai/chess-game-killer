@@ -75,8 +75,7 @@ struct HomeIconBadge: View {
     var size: CGFloat = 40
 
     var body: some View {
-        Image(systemName: symbol)
-            .font(.system(size: size * 0.42, weight: .bold))
+        Glyph(name: symbol, size: Glyph.isGlyph(symbol) ? size * 0.56 : size * 0.54, weight: .bold)
             .foregroundStyle(HomePalette.amber)
             .frame(width: size, height: size)
             .background(HomePalette.amberDeep.opacity(0.55), in: Circle())

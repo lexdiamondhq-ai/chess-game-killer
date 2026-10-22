@@ -2,46 +2,63 @@ import ChessKit
 import SwiftUI
 import UIKit
 
-/// The picture at the top of the home screen: the 3D board seen low and from the corner,
-/// like a photograph of a real set, lit by the board's own studio. It is drawn once as a
-/// still, so the scroll can fade, lift and darken it like any image.
+/// The board at the top of the home screen: the real 3D set seen low and from the corner,
+/// like a photograph of a real board, lit by the board's own studio. As the page scrolls
+/// the camera walks around the board and moves in on White's king and queen; pulled down
+/// past the top, it rises and steps back to take in the whole board.
 enum HomeHeroCamera {
     /// Low and from White's left corner, close enough that the board runs off the sides
     /// and White's pieces stand large in front, Black's in the distance.
     static func camera(aspect: Float) -> SculptedCamera {
+        camera(aspect: aspect, progress: 0, pull: 0)
+    }
+
+    /// `progress`: 0 at rest, 1 once the page has scrolled the hero away.
+    /// `pull`: 0 at rest, 1 when the page is pulled well down past the top.
+    static func camera(aspect: Float, progress: Float, pull: Float) -> SculptedCamera {
+        let t = Ease.smooth(progress)
+        let lift = Ease.slowEnd(pull)
         var camera = SculptedCamera()
-        camera.elevation = 20 * .pi / 180
-        camera.azimuth = -24 * .pi / 180
-        camera.fieldOfView = 32 * .pi / 180
-        camera.distance = 11
-        camera.focus = SIMD3(0, 0, 1.6)
+        camera.elevation = (mix(20, 12, t) + 16 * lift) * .pi / 180
+        camera.azimuth = (mix(-24, 36, t) + 8 * lift) * .pi / 180
+        camera.fieldOfView = mix(32, 30, t) * .pi / 180
+        camera.distance = mix(11, 6, t) + 3 * lift
+        // The look point, measured as if White sat at the bottom: the board's near half
+        // at rest, the king's side of White's back rank at the end of the walk.
+        camera.focus = SIMD3(mix(0, -1.52, t), mix(0, 0.3, t), mix(1.6, 2.6, t) - 0.8 * lift)
         camera.aspect = aspect
         return camera
     }
+
+    private static func mix(_ a: Float, _ b: Float, _ t: Float) -> Float { a + (b - a) * t }
 }
 
-@MainActor
-enum HomeHeroRenderer {
-    private static var cache: [String: UIImage] = [:]
+/// The live board for the hero: no taps, just the pieces and a camera the page moves.
+struct HomeHeroBoard: UIViewRepresentable {
+    let stage: SculptedStage
+    let look: SculptedLook
+    let pieces: [Piece]
+    let camera: SculptedCamera
 
-    /// The board in `look` with these pieces, at `size` points.
-    static func image(look: SculptedLook, pieces: [Piece], size: CGSize, scale: CGFloat) -> UIImage? {
-        let key = "\(look.name)|\(Int(size.width))x\(Int(size.height))@\(scale)|" +
-            pieces.map { "\($0.color == .white ? "w" : "b")\($0.kind)\($0.square)" }.sorted().joined()
-        if let made = cache[key] { return made }
-        guard SculptedAssets.shared.isLoaded else { return nil }
-        let scene = SculptedBoardScene(look: look)
-        scene.apply(SculptedBoardState(pieces: pieces.map { PlacedPiece(id: 0, piece: $0) }, matchesPieces: true),
-                    animated: false)
-        let camera = HomeHeroCamera.camera(aspect: Float(size.width / max(size.height, 1)))
-        guard let image = scene.still(from: camera, size: size, scale: scale) else { return nil }
-        // One board at a time is plenty; a new position replaces the old picture.
-        cache = [key: image]
-        return image
+    func makeUIView(context: Context) -> SculptedSceneKitView {
+        let scene = stage.scene(for: look)
+        scene.apply(state, animated: false)
+        scene.heldCamera = camera
+        return scene.view
+    }
+
+    func updateUIView(_ view: SculptedSceneKitView, context: Context) {
+        let scene = stage.scene(for: look)
+        scene.apply(state, animated: true)
+        if scene.heldCamera != camera { scene.heldCamera = camera }
+    }
+
+    private var state: SculptedBoardState {
+        SculptedBoardState(pieces: pieces.map { PlacedPiece(id: 0, piece: $0) }, matchesPieces: true)
     }
 }
 
-/// The hero: the board picture over a warm studio glow, sinking into the page below.
+/// The hero: the board over a warm studio glow, sinking into the page below.
 /// `offset` is how far the page has scrolled (negative when pulled down past the top).
 struct HomeHero: View {
     let look: SculptedLook
@@ -49,35 +66,35 @@ struct HomeHero: View {
     let height: CGFloat
     let offset: CGFloat
 
-    @Environment(\.displayScale) private var displayScale
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var image: UIImage?
+    @State private var stage = SculptedStage()
     @State private var breathe = false
+    @State private var shown = false
 
-    /// 0 at rest, 1 once the hero has scrolled out of sight.
-    private var progress: CGFloat { min(max(offset / (height * 0.8), 0), 1) }
-    /// Pulling down past the top stretches the picture.
-    private var stretch: CGFloat { max(-offset, 0) }
+    /// How far the page scrolls while the camera walks around: a little over half the hero.
+    private var walk: CGFloat { height * 0.62 }
+    /// 0 at rest, 1 once the walk is over.
+    private var progress: CGFloat { min(max(offset / walk, 0), 1) }
+    /// 0 at rest, 1 when pulled well down past the top.
+    private var pull: CGFloat { min(max(-offset / 150, 0), 1) }
 
     var body: some View {
         GeometryReader { geo in
             let width = geo.size.width
+            let total = height + max(-offset, 0)
             ZStack(alignment: .top) {
                 studio
-                if let image {
-                    Image(uiImage: image)
-                        .resizable()
-                        .interpolation(.high)
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: width, height: height + stretch)
-                        .scaleEffect(breathe ? 1.045 : 1, anchor: .center)
-                        .clipped()
-                        .contrast(1.06)
-                        .transition(.opacity)
-                } else {
-                    Color.clear.frame(width: width, height: height + stretch)
+                if SculptedAssets.shared.isLoaded {
+                    HomeHeroBoard(stage: stage, look: look, pieces: pieces,
+                                  camera: HomeHeroCamera.camera(aspect: Float(width / max(height, 1)),
+                                                                progress: Float(reduceMotion ? 0 : progress),
+                                                                pull: Float(reduceMotion ? 0 : pull)))
+                        .id(look.name)
+                        .frame(width: width, height: height)
+                        .scaleEffect(breathe ? 1.035 : 1, anchor: .center)
+                        .opacity(shown ? 1 : 0)
                 }
-                // The picture sinks into the page: clear at the top, the page color at the foot.
+                // The board sinks into the page: clear at the top, the page color at the foot.
                 LinearGradient(stops: [
                     .init(color: .clear, location: 0.0),
                     .init(color: .clear, location: 0.52),
@@ -85,22 +102,22 @@ struct HomeHero: View {
                     .init(color: HomePalette.background, location: 1.0),
                 ], startPoint: .top, endPoint: .bottom)
                 // The status bar stays readable over the far side of the board.
-                LinearGradient(colors: [.black.opacity(0.55), .clear], startPoint: .top, endPoint: .center)
-                    .frame(height: height * 0.32)
+                LinearGradient(colors: [.black.opacity(0.5), .clear], startPoint: .top, endPoint: .center)
+                    .frame(height: height * 0.3)
                     .frame(maxHeight: .infinity, alignment: .top)
-                // Darkens as it scrolls away.
-                HomePalette.background.opacity(Double(progress) * 0.85)
+                // Darkens once the camera has come close, as the cards cover it.
+                HomePalette.background.opacity(Double(max(progress - 0.45, 0) / 0.55) * 0.88)
             }
-            .frame(width: width, height: height + stretch)
+            .frame(width: width, height: total)
             .clipped()
             // Moves up at half the page's speed, so it lingers behind the cards.
-            .offset(y: offset > 0 ? offset * 0.5 : -stretch)
-            .task(id: renderKey(width: width)) { await render(width: width) }
+            .offset(y: offset > 0 ? offset * 0.5 : offset)
         }
         .frame(height: height)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
         .onAppear {
+            withAnimation(.easeOut(duration: 0.6)) { shown = true }
             guard !reduceMotion else { return }
             withAnimation(.easeInOut(duration: 14).repeatForever(autoreverses: true)) { breathe = true }
         }
@@ -116,19 +133,5 @@ struct HomeHero: View {
             RadialGradient(colors: [HomePalette.amber.opacity(0.12), .clear],
                            center: UnitPoint(x: 0.2, y: 0.12), startRadius: 0, endRadius: height * 0.5)
         }
-    }
-
-    private func renderKey(width: CGFloat) -> String {
-        "\(look.name)|\(Int(width))|" + pieces.map { "\($0.kind)\($0.color)\($0.square)" }.joined()
-    }
-
-    @MainActor
-    private func render(width: CGFloat) async {
-        guard width > 1 else { return }
-        // Let the page appear first; the picture fades in a moment later.
-        if image == nil { try? await Task.sleep(for: .milliseconds(30)) }
-        let made = HomeHeroRenderer.image(look: look, pieces: pieces, size: CGSize(width: width, height: height),
-                                          scale: min(displayScale, 3))
-        withAnimation(.easeOut(duration: 0.5)) { image = made }
     }
 }

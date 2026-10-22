@@ -281,9 +281,29 @@ final class SculptedBoardScene {
         return result.sorted { $0.id < $1.id }
     }
 
+    /// A camera set from outside, such as the home screen's hero turning with the scroll.
+    /// While it is set the board no longer fits itself to the view; only the shape is kept up to date.
+    var heldCamera: SculptedCamera? {
+        didSet {
+            guard var held = heldCamera else { return }
+            if size.width > 1, size.height > 1 { held.aspect = Float(size.width / size.height) }
+            // Close-ups come nearer the pieces than the game's camera ever does.
+            cameraNode.camera?.zNear = 0.5
+            cameraNode.removeAction(forKey: "orbit")
+            camera = held
+            place(held)
+        }
+    }
+
     private func layout(_ newSize: CGSize) {
         guard newSize.width > 1, newSize.height > 1, newSize != size else { return }
         size = newSize
+        if var held = heldCamera {
+            held.aspect = Float(newSize.width / newSize.height)
+            camera = held
+            place(held)
+            return
+        }
         let flipped = state?.flipped ?? false
         camera = .fitted(aspect: Float(newSize.width / newSize.height), flipped: flipped)
         cameraNode.removeAction(forKey: "orbit")

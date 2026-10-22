@@ -621,17 +621,17 @@ private struct CoachPanel: View {
 
     private var actions: some View {
         HStack(spacing: 6) {
-            ActionButton(title: "Undo", symbol: "arrow.uturn.backward", theme: theme) {
+            ActionButton(title: "Undo", symbol: Glyphs.undo, theme: theme) {
                 withAnimation(.snappy(duration: 0.22)) { match.undo() }
             }
             .disabled(!match.canUndo)
-            ActionButton(title: "Hints", symbol: showBestMoves ? "lightbulb.fill" : "lightbulb.slash", isOn: showBestMoves, theme: theme) {
+            ActionButton(title: "Hints", symbol: showBestMoves ? Glyphs.hints : Glyphs.hintsOff, isOn: showBestMoves, theme: theme) {
                 showBestMoves.toggle()
             }
             if gameCoach != nil {
                 ThinkActionButton(match: match, theme: theme)
             }
-            ActionButton(title: "Flip", symbol: "arrow.triangle.2.circlepath", theme: theme) {
+            ActionButton(title: "Flip", symbol: Glyphs.flip, theme: theme) {
                 withAnimation(.snappy(duration: 0.45)) { match.flipBoard() }
             }
             if match.canResign {
@@ -646,11 +646,11 @@ private struct CoachPanel: View {
                     Button("Keep playing", role: .cancel) {}
                 }
             } else if vault != nil {
-                ActionButton(title: "Games", symbol: "backward.circle", theme: theme) {
+                ActionButton(title: "Games", symbol: Glyphs.games, theme: theme) {
                     showingGames = true
                 }
             }
-            ActionButton(title: "New game", symbol: "plus", theme: theme) {
+            ActionButton(title: "New game", symbol: Glyphs.play, theme: theme) {
                 collapse()
                 newGame()
             }
@@ -887,8 +887,7 @@ private struct ActionButton: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 5) {
-                Image(systemName: symbol)
-                    .font(.system(size: 18, weight: .semibold))
+                Glyph(name: symbol, size: 23)
                     .frame(width: 44, height: 44)
                     .background(Color.primary.opacity(theme.isDark ? 0.07 : 0.05), in: Circle())
                     .overlay(Circle().strokeBorder(lit ? accent.opacity(0.5) : Color.primary.opacity(0.11), lineWidth: 1))
