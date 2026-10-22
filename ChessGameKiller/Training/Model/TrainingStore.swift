@@ -261,7 +261,7 @@ final class TrainingStore {
             let data = try JSONEncoder().encode(progress)
             try data.write(to: fileURL, options: .atomic)
         } catch {
-            print("Couldn't save training progress: \(error)")
+            NSLog("Couldn't save training progress: %@", "\(error)")
         }
     }
 }

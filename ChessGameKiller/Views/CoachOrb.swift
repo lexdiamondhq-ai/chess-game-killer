@@ -355,7 +355,7 @@ private struct CoachPanel: View {
     let newGame: () -> Void
     let collapse: () -> Void
 
-    @AppStorage("showBestMoves") private var showBestMoves = true
+    @AppStorage("showBestMoves") private var showBestMoves = false
     @Environment(GameCoach.self) private var gameCoach: GameCoach?
     @Environment(TrainingStore.self) private var training: TrainingStore?
     @Environment(ArmyStore.self) private var army: ArmyStore?

@@ -16,7 +16,7 @@ struct ContentView: View {
     @State private var coachPeeking = false
     @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .noir
     @AppStorage("matchRival") private var matchRival = false
-    @AppStorage("showBestMoves") private var showBestMoves = true
+    @AppStorage("showBestMoves") private var showBestMoves = false
     @AppStorage("showSecondBest") private var showSecondBest = true
     @AppStorage("coachVerdicts") private var showVerdicts = true
     @State private var training = TrainingStore.live()
@@ -646,7 +646,8 @@ struct ContentView: View {
                             withAnimation(.snappy(duration: 0.22)) { match.undo() }
                         }
                         .disabled(!match.canUndo)
-                        DockButton(title: "Hint", symbol: showBestMoves ? "lightbulb.fill" : "lightbulb",
+                        DockButton(title: showBestMoves ? "Hints on" : "Hints off",
+                                   symbol: showBestMoves ? "lightbulb.fill" : "lightbulb.slash",
                                    isOn: showBestMoves, theme: theme) {
                             showBestMoves.toggle()
                         }

@@ -7,7 +7,7 @@ import SwiftUI
 struct SettingsSheet: View {
     @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .noir
     @AppStorage("matchRival") private var matchRival = false
-    @AppStorage("showBestMoves") private var showBestMoves = true
+    @AppStorage("showBestMoves") private var showBestMoves = false
     @AppStorage("showSecondBest") private var showSecondBest = true
     @AppStorage("coachVerdicts") private var showVerdicts = true
     @AppStorage("soundEffects") private var soundOn = true
@@ -55,7 +55,7 @@ struct SettingsSheet: View {
 
                     section("Coach") {
                         SettingsGroup(theme: theme) {
-                            ToggleRow(title: "Best-move arrows", subtitle: "Solid for the best, dashed for the next",
+                            ToggleRow(title: "Move hints", subtitle: "Arrows for your best moves before you play. Off for a fair game.",
                                       symbol: "sparkles", isOn: $showBestMoves, theme: theme)
                             rule
                             ToggleRow(title: "Second-best arrow", subtitle: "The dashed one. Off leaves just the best.",

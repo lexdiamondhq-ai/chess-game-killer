@@ -104,8 +104,10 @@ final class SculptedBoardScene {
         view.backgroundColor = .clear
         view.isOpaque = false
         view.antialiasingMode = .multisampling4X
-        view.isJitteringEnabled = true
-        view.preferredFramesPerSecond = 120
+        // No jittering: it keeps redrawing a still board, which takes the CPU and GPU
+        // from Stockfish while the computer thinks. 60 frames a second is smooth enough.
+        view.isJitteringEnabled = false
+        view.preferredFramesPerSecond = 60
         view.isUserInteractionEnabled = false
         view.accessibilityElementsHidden = true
         view.autoenablesDefaultLighting = false
