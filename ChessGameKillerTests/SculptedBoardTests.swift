@@ -47,6 +47,24 @@ final class SculptedBoardTests: XCTestCase {
         XCTAssertTrue(assets.parts(for: .noir)[.knight]?.first?.geometry === assets.parts[.knight]?.first?.geometry)
     }
 
+    /// SceneKit draws only the front of each triangle, so a solid wound inside out shows its far
+    /// side through itself: the knights once looked hollow, their base ring showing through the neck.
+    /// Every solid of every part must enclose a positive volume.
+    func testEveryPartFacesOutward() {
+        let assets = SculptedAssets.shared
+        for (name, set) in [("classic", assets.parts), ("gilded", assets.parts(for: .gilded))] {
+            for (kind, parts) in set {
+                for part in parts {
+                    let volumes = Self.solidVolumes(part.geometry)
+                    XCTAssertFalse(volumes.isEmpty, "\(name) \(kind) \(part.finish) has no solids")
+                    for volume in volumes {
+                        XCTAssertGreaterThan(volume, 0, "\(name) \(kind) \(part.finish) has a solid turned inside out")
+                    }
+                }
+            }
+        }
+    }
+
     /// Tournament heights, so every piece is told apart by its height alone.
     func testPiecesStandAtTournamentHeights() {
         let h = SculptedAssets.shared.heights
@@ -189,6 +207,60 @@ final class SculptedBoardTests: XCTestCase {
     }
 
     // MARK: Helpers
+
+    /// The signed volume of each solid in a mesh (positive when its triangles face outward),
+    /// for solids of 30 triangles or more. Split vertices are welded by position first.
+    static func solidVolumes(_ geometry: SCNGeometry) -> [Double] {
+        guard let source = geometry.sources(for: .vertex).first, let element = geometry.elements.first else { return [] }
+        var welded: [SIMD3<Int32>: Int] = [:]
+        var points: [SIMD3<Double>] = []
+        var vertex = [Int](repeating: 0, count: source.vectorCount)
+        source.data.withUnsafeBytes { raw in
+            for i in 0..<source.vectorCount {
+                let base = source.dataOffset + i * source.dataStride
+                let p = SIMD3<Float>(raw.loadUnaligned(fromByteOffset: base, as: Float.self),
+                                     raw.loadUnaligned(fromByteOffset: base + 4, as: Float.self),
+                                     raw.loadUnaligned(fromByteOffset: base + 8, as: Float.self))
+                let key = SIMD3<Int32>(p * 100_000, rounding: .toNearestOrAwayFromZero)
+                if let id = welded[key] {
+                    vertex[i] = id
+                } else {
+                    vertex[i] = points.count
+                    welded[key] = points.count
+                    points.append(SIMD3<Double>(p))
+                }
+            }
+        }
+        var triangles: [(Int, Int, Int)] = []
+        element.data.withUnsafeBytes { raw in
+            for t in 0..<element.primitiveCount {
+                let read = { (k: Int) in vertex[Int(raw.loadUnaligned(fromByteOffset: (t * 3 + k) * 4, as: UInt32.self))] }
+                triangles.append((read(0), read(1), read(2)))
+            }
+        }
+        var parent = Array(0..<points.count)
+        func root(_ x: Int) -> Int {
+            var x = x
+            while parent[x] != x { parent[x] = parent[parent[x]]; x = parent[x] }
+            return x
+        }
+        for (a, b, c) in triangles {
+            let ra = root(a), rb = root(b)
+            parent[rb] = ra
+            let rc = root(c)
+            parent[rc] = ra
+        }
+        var volume: [Int: Double] = [:]
+        var count: [Int: Int] = [:]
+        for (a, b, c) in triangles {
+            let (p, q, r) = (points[a], points[b], points[c])
+            let cross = SIMD3(q.y * r.z - q.z * r.y, q.z * r.x - q.x * r.z, q.x * r.y - q.y * r.x)
+            let solid = root(a)
+            volume[solid, default: 0] += (p * cross).sum() / 6
+            count[solid, default: 0] += 1
+        }
+        return volume.filter { count[$0.key, default: 0] >= 30 }.map(\.value)
+    }
 
     static var startPieces: [PlacedPiece] {
         (Position(fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")?.pieces ?? [])

@@ -61,7 +61,8 @@ def ring_lathe(name, prof, mat, seg=256):
 
 
 def mesh_object(name, v, f, mat):
-    me = bpy.data.meshes.new(name); me.from_pydata(v.tolist(), [], f[:, ::-1].tolist()); me.update()
+    # Marching cubes winds the faces outward as they come; SceneKit draws only that side.
+    me = bpy.data.meshes.new(name); me.from_pydata(v.tolist(), [], f.tolist()); me.update()
     for p in me.polygons: p.use_smooth = True
     o = bpy.data.objects.new(name, me); bpy.context.scene.collection.objects.link(o); me.materials.append(mat)
     return o

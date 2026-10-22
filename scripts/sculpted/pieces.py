@@ -195,7 +195,8 @@ def knight(M, verts, faces):
     R=0.3; p=base_profile(R); p+=body_start(R); p+=line(R-0.125,0.17,0.0,0.17,3)
     b=lathe('Nb',p,mat=M['body'])
     v=verts.copy(); s=0.84; v[:,0]*=s; v[:,1]*=s; v[:,2]=0.17+(v[:,2]-0.17)*s
-    me=bpy.data.meshes.new('Nh'); me.from_pydata(v.tolist(),[],faces[:,::-1].tolist()); me.update()
+    # marching cubes winds the sculpt's faces outward as they come (SceneKit culls the other side)
+    me=bpy.data.meshes.new('Nh'); me.from_pydata(v.tolist(),[],faces.tolist()); me.update()
     for f in me.polygons: f.use_smooth=True
     h=bpy.data.objects.new('Nh',me); bpy.context.scene.collection.objects.link(h); me.materials.append(M['body'])
     ring=torus('Nring',0.185,0.008,0.172,M['metal'])
