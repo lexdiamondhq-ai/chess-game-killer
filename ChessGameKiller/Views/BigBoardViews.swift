@@ -83,17 +83,17 @@ struct BigBoardTray<Dock: View>: View {
     private var extras: some View {
         HStack(spacing: 0) {
             if let onHome {
-                DockButton(title: "Home", symbol: "house", theme: theme, action: onHome)
+                DockButton(title: "Home", symbol: Glyphs.home, theme: theme, action: onHome)
             }
-            DockButton(title: "New game", symbol: "plus", theme: theme, action: onNewGame)
+            DockButton(title: "New game", symbol: Glyphs.play, theme: theme, action: onNewGame)
             if let onArmy {
-                DockButton(title: "Army", symbol: "shield.lefthalf.filled", theme: theme, action: onArmy)
+                DockButton(title: "Army", symbol: Glyphs.army, theme: theme, action: onArmy)
             }
             if let onGames {
-                DockButton(title: "Games", symbol: "backward.circle", theme: theme, action: onGames)
+                DockButton(title: "Games", symbol: Glyphs.games, theme: theme, action: onGames)
             }
-            DockButton(title: "Settings", symbol: "gearshape", theme: theme, action: onSettings)
-            DockButton(title: "Normal view", symbol: "arrow.down.right.and.arrow.up.left", theme: theme, action: onExit)
+            DockButton(title: "Settings", symbol: Glyphs.settings, theme: theme, action: onSettings)
+            DockButton(title: "Normal view", symbol: Glyphs.normalView, theme: theme, action: onExit)
         }
         .padding(.horizontal, 8)
         .padding(.bottom, 6)

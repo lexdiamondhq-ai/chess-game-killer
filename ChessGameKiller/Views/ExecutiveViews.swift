@@ -245,9 +245,8 @@ struct DockButton: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 5) {
-                Image(systemName: symbol)
-                    .font(.system(size: 19, weight: .regular))
-                    .frame(height: 24)
+                Glyph(name: symbol, size: Glyph.isGlyph(symbol) ? 25 : 24, weight: .regular)
+                    .frame(height: 25)
                     .contentTransition(.symbolEffect(.replace))
                 Text(title)
                     .font(.system(size: 10.5, weight: .medium))
