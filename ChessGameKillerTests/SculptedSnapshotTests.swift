@@ -73,33 +73,14 @@ final class SculptedSnapshotTests: XCTestCase {
         window.isHidden = true
     }
 
-    /// Ways to make the ivory pieces stand out on the light squares, from both sides of the board:
-    /// the board now, the black squares with deeper cream squares and brighter ivory, the black
-    /// squares with outlines and deeper shadows only, and rich brown squares with black veins.
-    func testWhitePieceOptions() throws {
-        let brighter = UIColor(red: 0.88, green: 0.84, blue: 0.76, alpha: 1)
-        let options: [(String, (inout SculptedLook) -> Void)] = [
-            ("now", { _ in }),
-            ("black", {
-                $0.squares = "sculpted-squares-gilded-deep"; $0.ivory = brighter; $0.ivoryEdge = 0.35; $0.shadowAlpha = 0.75
-            }),
-            ("black-edge", { $0.ivoryEdge = 0.45; $0.shadowAlpha = 0.78 }),
-            ("brown", {
-                $0.squares = "sculpted-squares-gilded-brown"; $0.ivory = brighter; $0.ivoryEdge = 0.35; $0.shadowAlpha = 0.75
-            }),
-        ]
+    /// The start from Black's side, where the ivory is farthest away and smallest: Gilded and Portoro.
+    func testTheIvoryFromBlacksSide() throws {
         var start = SculptedBoardState(pieces: SculptedBoardTests.startPieces)
         start.flipped = true
-        for (tag, change) in options {
-            var look = SculptedLook.gilded
-            look.name = "Gilded-\(tag)"
-            change(&look)
-            let (scene, window) = try stage(Self.midgame, look: look, side: 402)
-            try save(scene.snapshot(), "study-option-\(tag)-white")
+        for look in [SculptedLook.gilded, .portoro] {
+            let (scene, window) = try stage(start, look: look, side: 402)
+            try save(scene.snapshot(), "study-\(look.name.lowercased())-black")
             window.isHidden = true
-            let (blackScene, blackWindow) = try stage(start, look: look, side: 402)
-            try save(blackScene.snapshot(), "study-option-\(tag)-black")
-            blackWindow.isHidden = true
         }
     }
 

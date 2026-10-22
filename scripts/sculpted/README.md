@@ -19,8 +19,11 @@ repository root with Blender's Python module (`pip install bpy==5.2.2 numpy scip
 5. `python scripts/sculpted/env.py` draws the studio light tent the pieces reflect, and `env_studio.py` the dark
    studio (a few soft boxes in a near-black room) used by the richer looks. `marble.py looks/m-<name>.json out.png`
    draws a look's stone squares, and `flat_art.py <squares.jpg> <board.jpg> [line hex]` its flat board picture
-   (Noir uses the champagne line CCB88F, Gilded the gold DDB06C; copy to `Assets.xcassets/Boards/board-<look>.imageset`).
-   A spec with `"crisp": true` draws even, sharp-edged veins, as Gilded's gold-veined Portoro does.
+   (Noir uses the champagne line CCB88F, Gilded and Portoro the gold DDB06C; copy to `Assets.xcassets/Boards/board-<look>.imageset`).
+   A spec with `"crisp": true` draws even, sharp-edged veins: Gilded's brown marble with black veins
+   (`m-gilded.json`) and Portoro's black marble with gold veins (`m-portoro.json`), both on deep cream.
+   Keep the ivory well brighter than the light squares (a test checks it): the gilded ivory sprites use
+   the 3D look's ivory and its darker outline.
 6. Finishing for the asset catalog: `python scripts/sculpted/fade.py build/sculpted/sprites build/sculpted/final`
    fades each sprite's shadow out before its edge (copy to `Assets.xcassets/Pieces/sculpted-*.imageset`, or
    `gilded-*.imageset`), and

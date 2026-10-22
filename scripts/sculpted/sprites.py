@@ -11,9 +11,17 @@ PREFIX='gilded' if SET=='gilded' else 'sculpted'
 if SET=='gilded':
     import gilded as G
     knight_parts=G.load_knight()
-def mat(name,col,rough,metal=0,coat=0,sss=0,trans=0,ior=1.5,coat_rough=0.05,spec=None,emit=None,emit_strength=0):
+def mat(name,col,rough,metal=0,coat=0,sss=0,trans=0,ior=1.5,coat_rough=0.05,spec=None,emit=None,emit_strength=0,edge=0):
     m=bpy.data.materials.new(name); m.use_nodes=True; b=m.node_tree.nodes['Principled BSDF']
     b.inputs['Base Color'].default_value=(*col,1); b.inputs['Roughness'].default_value=rough; b.inputs['Metallic'].default_value=metal
+    if edge:
+        # darker toward the silhouette, as the 3D board's ivoryEdge: color * (1 - edge * (1 - N.V)^2)
+        nt=m.node_tree; lw=nt.nodes.new('ShaderNodeLayerWeight'); lw.inputs['Blend'].default_value=0.5
+        pw=nt.nodes.new('ShaderNodeMath'); pw.operation='POWER'; pw.inputs[1].default_value=2
+        mu=nt.nodes.new('ShaderNodeMath'); mu.operation='MULTIPLY_ADD'; mu.inputs[1].default_value=-edge; mu.inputs[2].default_value=1
+        sc=nt.nodes.new('ShaderNodeVectorMath'); sc.operation='SCALE'; sc.inputs[0].default_value=col
+        nt.links.new(lw.outputs['Facing'],pw.inputs[0]); nt.links.new(pw.outputs[0],mu.inputs[0])
+        nt.links.new(mu.outputs[0],sc.inputs['Scale']); nt.links.new(sc.outputs[0],b.inputs['Base Color'])
     b.inputs['Coat Weight'].default_value=coat; b.inputs['Coat Roughness'].default_value=coat_rough
     if spec is not None: b.inputs['Specular IOR Level'].default_value=spec
     if emit: b.inputs['Emission Color'].default_value=(*emit,1); b.inputs['Emission Strength'].default_value=emit_strength
@@ -28,8 +36,8 @@ for side in ('w','b'):
         if only and only!=name: continue
         bpy.ops.wm.read_factory_settings(use_empty=True); sc=bpy.context.scene
         if SET=='gilded':
-            # cream ivory and polished onyx, warm gold, the knight's amber eye
-            F=dict(white=mat('ivory',(0.5,0.41,0.28),0.3,coat=0.6,sss=0.25), black=mat('onyx',(0.006,0.006,0.007),0.22,coat=1.0,coat_rough=0.03),
+            # bright cream ivory, darker toward its outline, and polished onyx; warm gold, the knight's amber eye
+            F=dict(white=mat('ivory',(0.745,0.672,0.54),0.3,coat=0.6,sss=0.25,edge=0.35), black=mat('onyx',(0.006,0.006,0.007),0.22,coat=1.0,coat_rough=0.03),
                    metal=mat('gold',(1.0,0.6,0.26),0.2,metal=1), gem=mat('amber',(1.0,0.45,0.08),0.08,coat=1.0,coat_rough=0.02,emit=(1.0,0.38,0.04),emit_strength=2.2))
             F['pearl']=F['metal']
         else:
