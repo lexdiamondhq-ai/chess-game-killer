@@ -38,7 +38,7 @@ final class HomeSnapshotTests: XCTestCase {
         let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: now)!
         let games = [RewindSample.game(date: now), RewindSample.game(date: now), RewindSample.game(date: yesterday)]
         XCTAssertEqual(games.filter { Calendar.current.isDate($0.date, inSameDayAs: now) }.count, 2)
-        XCTAssertFalse(HomeScreen.defaultOn, "The home screen stays off until Alex picks it")
+        XCTAssertTrue(HomeScreen.defaultOn, "The app opens on the home screen")
     }
 
     func testTheHeroCameraLooksAtTheBoard() {
