@@ -49,14 +49,39 @@ final class SculptedBoardTests: XCTestCase {
     }
 
     /// The ivory pieces once washed out on the light squares: the two were nearly the same tone.
-    /// The ivory must stay well brighter than the light squares it stands on, with a darker outline.
+    /// On every 3D look the ivory must stay well brighter than the light squares it stands on, and
+    /// where the squares come near its tone, keep a darker outline.
     func testTheIvoryStandsOutOnTheLightSquares() throws {
-        for look in [SculptedLook.gilded, .portoro] {
+        for look in SculptedLook.all {
             let squares = try XCTUnwrap(UIImage(named: look.squares)?.cgImage, "\(look.name) is missing \(look.squares)")
             let light = Self.lightSquareLuminance(squares)
             let ivory = Self.luminance(look.ivory)
             XCTAssertGreaterThan(ivory, light * 1.3, "\(look.name): the ivory would wash out on the light squares")
-            XCTAssertGreaterThan(look.ivoryEdge, 0, "\(look.name): the ivory lost its outline")
+            if ivory < light * 2 {
+                XCTAssertGreaterThan(look.ivoryEdge, 0, "\(look.name): the ivory lost its outline")
+            }
+        }
+    }
+
+    /// The same with the 3D pieces off, and on every small board: the pictures of the carved sets
+    /// on each look's board picture. The white pieces washed out there too, on Midnight from Black's side.
+    func testTheFlatIvoryStandsOutOnTheLightSquares() throws {
+        for theme in BoardTheme.all where theme.sculptedLook != nil {
+            let name = try XCTUnwrap(theme.boardArt, "\(theme.name) has no board picture")
+            let art = try XCTUnwrap(UIImage(named: name)?.cgImage, "\(theme.name) is missing \(name)")
+            // The picture is nine squares wide: the board, in a frame half a square wide.
+            let inset = CGFloat(art.width) / 18
+            let board = try XCTUnwrap(art.cropping(to: CGRect(x: inset, y: inset, width: CGFloat(art.width) - inset * 2,
+                                                              height: CGFloat(art.height) - inset * 2)))
+            let light = Self.lightSquareLuminance(board)
+            var total = 0.0
+            for kind in Piece.Kind.allCases {
+                let sprite = theme.imageName(for: Piece(kind, color: .white, square: .a1))
+                let image = try XCTUnwrap(UIImage(named: sprite)?.cgImage, "\(theme.name) is missing \(sprite)")
+                total += Self.opaqueLuminance(image)
+            }
+            let ivory = total / Double(Piece.Kind.allCases.count)
+            XCTAssertGreaterThan(ivory, light * 1.05, "\(theme.name): the white pieces would wash out on the light squares")
         }
     }
 
@@ -256,6 +281,25 @@ final class SculptedBoardTests: XCTestCase {
             }
         }
         return max(sums[0] / Double(max(counts[0], 1)), sums[1] / Double(max(counts[1], 1)))
+    }
+
+    /// The average luminance of a piece picture where it is solid, leaving out its soft shadow.
+    static func opaqueLuminance(_ image: CGImage) -> Double {
+        let width = image.width, height = image.height
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        pixels.withUnsafeMutableBytes { buffer in
+            let context = CGContext(data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8,
+                                    bytesPerRow: width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+            context?.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        }
+        var sum = 0.0, count = 0
+        for i in stride(from: 0, to: pixels.count, by: 4) where pixels[i + 3] > 230 {
+            let alpha = Double(pixels[i + 3])
+            sum += luminance(Double(pixels[i]) / alpha, Double(pixels[i + 1]) / alpha, Double(pixels[i + 2]) / alpha)
+            count += 1
+        }
+        return sum / Double(max(count, 1))
     }
 
     /// The signed volume of each solid in a mesh (positive when its triangles face outward),

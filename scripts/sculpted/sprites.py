@@ -41,8 +41,8 @@ for side in ('w','b'):
                    metal=mat('gold',(1.0,0.6,0.26),0.2,metal=1), gem=mat('amber',(1.0,0.45,0.08),0.08,coat=1.0,coat_rough=0.02,emit=(1.0,0.38,0.04),emit_strength=2.2))
             F['pearl']=F['metal']
         else:
-            # a warm, slightly deep ivory, so the shading reads against the light squares
-            F=dict(white=mat('ivory',(0.6,0.52,0.4),0.32,coat=0.35,sss=0.3), black=mat('ebony',(0.012,0.011,0.011),0.42,coat=0.35,coat_rough=0.06,spec=0.25),
+            # bright ivory, darker toward its outline, as on the 3D board, so it stands out on the cream squares
+            F=dict(white=mat('ivory',(0.745,0.672,0.54),0.32,coat=0.35,sss=0.3,edge=0.35), black=mat('ebony',(0.012,0.011,0.011),0.42,coat=0.35,coat_rough=0.06,spec=0.25),
                    metal=mat('plat',(0.86,0.86,0.88),0.16,metal=1), gem=mat('sapph',(0.05,0.12,0.6),0.02,trans=1,ior=1.77), pearl=mat('pearl',(0.93,0.9,0.86),0.18,coat=1,sss=0.2))
         M={'body':F['white'] if side=='w' else F['black'],'metal':F['metal'],'gem':F['gem'],'pearl':F['pearl']}
         if SET=='gilded':

@@ -160,7 +160,7 @@ struct BoardTheme: Identifiable {
     static let portoro = BoardTheme(
         id: .portoro,
         name: "Portoro",
-        symbol: "diamond.fill",
+        symbol: "seal.fill",
         light: Color(hex: 0xCDBC9C),
         dark: Color(hex: 0x1E1E21),
         surface: nil,
@@ -196,12 +196,12 @@ struct BoardTheme: Identifiable {
         backdrop: [Color(hex: 0x2B2A2C), Color(hex: 0x070708)]
     )
 
-    /// The carved set on ivory and black marble, ruled in champagne, under a warm studio light.
+    /// The carved set on deep cream and black marble, ruled in champagne, under a warm studio light.
     static let noir = BoardTheme(
         id: .noir,
         name: "Noir",
         symbol: "circle.lefthalf.filled",
-        light: Color(hex: 0xE3D9C6),
+        light: Color(hex: 0xCDBC9C),
         dark: Color(hex: 0x1E1E21),
         surface: nil,
         gridLine: nil,
@@ -236,12 +236,12 @@ struct BoardTheme: Identifiable {
         backdrop: [Color(hex: 0x2B2A2C), Color(hex: 0x070708)]
     )
 
-    /// The carved set on cream and deep wine-red marble, with gold marks.
+    /// The carved set on deep cream and wine-red marble, with gold marks.
     static let bordeaux = BoardTheme(
         id: .bordeaux,
         name: "Bordeaux",
         symbol: "wineglass.fill",
-        light: Color(hex: 0xE8D9BE),
+        light: Color(hex: 0xCDBC9C),
         dark: Color(hex: 0x7A2530),
         surface: nil,
         gridLine: nil,
@@ -276,12 +276,12 @@ struct BoardTheme: Identifiable {
         backdrop: [Color(hex: 0x2E2426), Color(hex: 0x0A0607)]
     )
 
-    /// The carved set on cream and ink-blue stone, with gold marks.
+    /// The carved set on deep cream and ink-blue stone, with gold marks.
     static let midnight = BoardTheme(
         id: .midnight,
         name: "Midnight",
         symbol: "moon.stars.fill",
-        light: Color(hex: 0xE4E0D4),
+        light: Color(hex: 0xCDBC9C),
         dark: Color(hex: 0x2C3D6C),
         surface: nil,
         gridLine: nil,
