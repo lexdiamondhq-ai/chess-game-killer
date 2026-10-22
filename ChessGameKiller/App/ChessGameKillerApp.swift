@@ -9,9 +9,24 @@ struct ChessGameKillerApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            // The unit tests run inside the app. Its own screen (the 3D home board, the welcome
+            // chime, Stockfish warming up) would share the simulator's CPU, main thread and engine
+            // with the tests and make their timings flaky, so the test host shows an empty window.
+            // Tests that need the app's screens build their own windows on this scene.
+            if Self.isUnitTestHost {
+                Color.clear
+            } else {
+                ContentView()
+            }
         }
     }
+
+    /// Whether the app was launched to host the unit tests: XCTest sets these in its environment.
+    static let isUnitTestHost: Bool = {
+        let environment = ProcessInfo.processInfo.environment
+        return ["XCTestConfigurationFilePath", "XCTestBundlePath", "XCTestSessionIdentifier"]
+            .contains { environment[$0] != nil }
+    }()
 }
 
 /// Gilded, the black-and-gold set, replaced Noir as the default look. The first launch with it
