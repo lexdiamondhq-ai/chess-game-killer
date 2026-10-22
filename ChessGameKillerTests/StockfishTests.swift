@@ -14,6 +14,7 @@ final class StockfishTests: XCTestCase {
         let start = Position.standard.fen
         let lines = await StockfishEngine.shared.analyze(fen: start, depth: 10, lines: 2)
         XCTAssertEqual(lines.count, 2)
+        guard lines.count == 2 else { return }
         for line in lines {
             let move = try XCTUnwrap(line.firstMove)
             XCTAssertNotNil(Notation.san(of: move, fen: start), "\(move) should be legal")
