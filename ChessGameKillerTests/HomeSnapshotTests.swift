@@ -27,7 +27,8 @@ final class HomeSnapshotTests: XCTestCase {
 
     /// The real app opening on the home screen.
     func testAppOpensHome() throws {
-        let window = try show(ContentView(startsAtHome: true))
+        // The engine warms up on launch, so the hero picture is given longer to arrive.
+        let window = try show(ContentView(startsAtHome: true), wait: 7)
         try save(window, "zz-home-app")
         window.isHidden = true
     }
@@ -45,17 +46,22 @@ final class HomeSnapshotTests: XCTestCase {
         let center = camera.normalized(SIMD3(0, 0, 0))
         XCTAssertLessThan(abs(center.x), 0.2)
         XCTAssertLessThan(abs(center.y), 0.4)
+        // White's back rank stands in the picture, below Black's.
+        let whiteQueen = camera.normalized(SIMD3(-0.5, 1.2, 3.5))
+        let blackQueen = camera.normalized(SIMD3(-0.5, 1.2, -3.5))
+        XCTAssertLessThan(abs(whiteQueen.x), 1)
+        XCTAssertLessThan(whiteQueen.y, blackQueen.y)
     }
 
     // MARK: Drawing
 
-    private func show(_ view: some View) throws -> UIWindow {
+    private func show(_ view: some View, wait: TimeInterval = 3) throws -> UIWindow {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let window = UIWindow(windowScene: scene)
         window.frame = scene.coordinateSpace.bounds
         window.rootViewController = UIHostingController(rootView: view)
         window.makeKeyAndVisible()
-        RunLoop.main.run(until: Date().addingTimeInterval(3))
+        RunLoop.main.run(until: Date().addingTimeInterval(wait))
         return window
     }
 

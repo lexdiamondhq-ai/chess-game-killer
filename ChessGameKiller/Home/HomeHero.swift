@@ -6,14 +6,15 @@ import UIKit
 /// like a photograph of a real set, lit by the board's own studio. It is drawn once as a
 /// still, so the scroll can fade, lift and darken it like any image.
 enum HomeHeroCamera {
-    /// Low and from White's left corner, close enough that the board runs off the sides.
+    /// Low and from White's left corner, close enough that the board runs off the sides
+    /// and White's pieces stand large in front, Black's in the distance.
     static func camera(aspect: Float) -> SculptedCamera {
         var camera = SculptedCamera()
-        camera.elevation = 34 * .pi / 180
-        camera.azimuth = -30 * .pi / 180
-        camera.fieldOfView = 30 * .pi / 180
-        camera.distance = 15
-        camera.focus = SIMD3(0, 0, -0.8)
+        camera.elevation = 20 * .pi / 180
+        camera.azimuth = -24 * .pi / 180
+        camera.fieldOfView = 32 * .pi / 180
+        camera.distance = 11
+        camera.focus = SIMD3(0, 0, 1.6)
         camera.aspect = aspect
         return camera
     }
@@ -71,6 +72,7 @@ struct HomeHero: View {
                         .frame(width: width, height: height + stretch)
                         .scaleEffect(breathe ? 1.045 : 1, anchor: .center)
                         .clipped()
+                        .contrast(1.06)
                         .transition(.opacity)
                 } else {
                     Color.clear.frame(width: width, height: height + stretch)
