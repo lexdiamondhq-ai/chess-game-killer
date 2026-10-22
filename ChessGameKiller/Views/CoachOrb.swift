@@ -362,6 +362,7 @@ private struct CoachPanel: View {
     @State private var reel: GameReel?
     @State private var rewind: SavedGame?
     @State private var showingGames = false
+    @State private var confirmingResign = false
     @Environment(GameVault.self) private var vault: GameVault?
 
     /// This game's Piece of the Match, once the game is over and counted.
@@ -509,6 +510,7 @@ private struct CoachPanel: View {
             switch outcome {
             case .timeout(let loser): return "\(theme.name(of: loser.opposite)) wins on time"
             case .timeoutDraw: return "Draw"
+            case .resigned(let loser): return "\(resignerName(loser)) resigns"
             }
         }
         if match.game.winner != nil { return "Checkmate!" }
@@ -522,6 +524,11 @@ private struct CoachPanel: View {
                 return "\(theme.name(of: loser)) ran out of time."
             case .timeoutDraw(let flagged):
                 return "\(theme.name(of: flagged)) ran out of time, but \(theme.name(of: flagged.opposite)) cannot checkmate."
+            case .resigned(let loser):
+                if match.setup.opponent == .computer, loser != match.setup.playerColor {
+                    return "\(match.setup.level.rival.name) saw no way back. You win."
+                }
+                return "\(theme.name(of: loser.opposite)) wins."
             }
         }
         if let winner = match.game.winner {
@@ -529,6 +536,12 @@ private struct CoachPanel: View {
             return "\(last) ends the game. \(theme.name(of: winner)) wins."
         }
         return match.game.status(white: theme.whiteName, black: theme.blackName)
+    }
+
+    /// Who resigned: the rival by name, or "You", or a colour in a game between friends.
+    private func resignerName(_ loser: Piece.Color) -> String {
+        guard match.setup.opponent == .computer else { return theme.name(of: loser) }
+        return loser == match.setup.playerColor ? "You" : match.setup.level.rival.name
     }
 
     private var scoreline: String {
@@ -621,7 +634,18 @@ private struct CoachPanel: View {
             ActionButton(title: "Flip", symbol: Glyphs.flip, theme: theme) {
                 withAnimation(.snappy(duration: 0.45)) { match.flipBoard() }
             }
-            if vault != nil {
+            if match.canResign {
+                // While a game is on, Resign takes the place of Games (also in the dock).
+                ActionButton(title: "Resign", symbol: "flag.fill", theme: theme) {
+                    confirmingResign = true
+                }
+                .confirmationDialog("Resign this game?", isPresented: $confirmingResign, titleVisibility: .visible) {
+                    Button("Resign", role: .destructive) {
+                        withAnimation(.snappy) { match.resign() }
+                    }
+                    Button("Keep playing", role: .cancel) {}
+                }
+            } else if vault != nil {
                 ActionButton(title: "Games", symbol: Glyphs.games, theme: theme) {
                     showingGames = true
                 }

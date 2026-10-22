@@ -12,6 +12,7 @@ struct SettingsSheet: View {
     @AppStorage("coachVerdicts") private var showVerdicts = true
     @AppStorage("soundEffects") private var soundOn = true
     @AppStorage("haptics") private var hapticsOn = true
+    @AppStorage("rivalBanter") private var banterOn = true
     @AppStorage("bigBoard") private var bigBoard = false
     @AppStorage("sculpted3D") private var sculpted3D = true
     @AppStorage(HomeScreen.key) private var homeScreen = HomeScreen.defaultOn
@@ -72,6 +73,9 @@ struct SettingsSheet: View {
                             ToggleRow(title: "Sound effects", symbol: "speaker.wave.2.fill", isOn: $soundOn, theme: theme)
                             rule
                             ToggleRow(title: "Haptics", symbol: "iphone.radiowaves.left.and.right", isOn: $hapticsOn, theme: theme)
+                            rule
+                            ToggleRow(title: "Rival banter", subtitle: "Rivals react to your moves in a speech bubble",
+                                      symbol: "bubble.left.fill", isOn: $banterOn, theme: theme)
                         }
                     }
 

@@ -33,6 +33,12 @@ actor StockfishEngine: ChessEngine {
     private var nextSearchID = 0
     /// Counts requests for the engine, so a waiting one can tell a newer one came.
     private var latestRequest = 0
+    /// "go"s sent whose "bestmove" hasn't come yet. A search given up on can still get its
+    /// "bestmove" later, so no new "go" is sent until it has (or is surely lost): a late
+    /// answer can then never end the next search, where in the same position it would be legal.
+    private var unansweredGos = 0
+    /// How long to wait for a given-up search's "bestmove" before counting it lost.
+    static let lostAnswer = Duration.seconds(2)
 
     private struct PendingSearch {
         let id: Int
@@ -75,7 +81,8 @@ actor StockfishEngine: ChessEngine {
             fen: fen,
             options: [("Skill Level", "\(max(0, min(20, skill)))"), ("MultiPV", "1")],
             go: .go(movetime: thinkTimeMs),
-            timeout: .milliseconds(thinkTimeMs + 600)
+            // Room for a search the engine is still winding down before this one runs.
+            timeout: .milliseconds(thinkTimeMs + 1500)
         )
         return result.bestMove
     }
@@ -124,6 +131,17 @@ actor StockfishEngine: ChessEngine {
             }
             try? await Task.sleep(for: .milliseconds(5))
         }
+        // The engine may still owe the answer to a search that was given up on.
+        let waitStart = ContinuousClock.now
+        while unansweredGos > 0 {
+            if Task.isCancelled || latestRequest != ticket { return SearchResult(bestMove: nil, lines: []) }
+            if ContinuousClock.now - waitStart > Self.lostAnswer {
+                Self.trace?("an ended search never answered; carrying on")
+                unansweredGos = 0
+                break
+            }
+            try? await Task.sleep(for: .milliseconds(5))
+        }
         if latestRequest != ticket { return SearchResult(bestMove: nil, lines: []) }
 
         let (stream, continuation) = AsyncStream<SearchResult>.makeStream()
@@ -136,6 +154,8 @@ actor StockfishEngine: ChessEngine {
             await engine.send(command: .setoption(id: name, value: value))
         }
         await engine.send(command: .position(.fen(fen)))
+        // Counted before it is sent, so its answer can never find the count at zero.
+        unansweredGos += 1
         await engine.send(command: go)
         if pending?.id == id { pending?.goSent = true }
 
@@ -220,13 +240,27 @@ actor StockfishEngine: ChessEngine {
             attempts += 1
             try? await Task.sleep(for: .milliseconds(20))
         }
-        return readyCount > seen
+        if readyCount == seen {
+            // Slow to load its networks, but running: searches queue up behind the
+            // load, so the engine is still usable. Giving up here would leave it
+            // unavailable for the rest of the session.
+            NSLog("Stockfish: no readyok after loading networks; carrying on")
+        }
+        return await engine.isRunning
     }
 
     private func handle(_ response: EngineResponse) {
         if case .readyok = response {
             readyCount += 1
             return
+        }
+        if case .bestmove = response {
+            unansweredGos = max(0, unansweredGos - 1)
+            // An answer for a search already ended: no search has started since, so drop it.
+            guard pending?.goSent == true else {
+                Self.trace?("late bestmove from an ended search")
+                return
+            }
         }
         guard var search = pending else { return }
 

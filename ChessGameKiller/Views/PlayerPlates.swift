@@ -93,6 +93,7 @@ private struct PlayerPlate: View {
         .animation(.snappy(duration: 0.3), value: isActive)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(spokenLabel)
+        .rivalBubble(match, theme: theme, show: isComputer, avatarWidth: 52)
     }
 
     /// Name, status and time left. The label stands in for the children's own,

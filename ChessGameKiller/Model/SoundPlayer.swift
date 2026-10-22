@@ -12,6 +12,10 @@ enum GameSound: String, CaseIterable {
     case gameStart = "game-start"
     case win
     case gameOver = "game-over"
+    /// A short video-game "level clear" theme, when a person wins.
+    case victory
+    /// The chime as the app opens.
+    case welcome
 
     /// Evens out the generated files, which come out at different loudness.
     var volume: Float {
@@ -24,6 +28,8 @@ enum GameSound: String, CaseIterable {
         case .gameStart: return 0.5
         case .win: return 0.6
         case .gameOver: return 0.5
+        case .victory: return 0.7
+        case .welcome: return 0.55
         }
     }
 }
@@ -60,7 +66,20 @@ final class SoundPlayer: SoundPlaying {
         }
     }
 
+    /// The welcome chime, once per launch.
+    private var welcomed = false
+
+    func playWelcome() {
+        guard !welcomed else { return }
+        welcomed = true
+        play(.welcome)
+    }
+
     func play(_ sound: GameSound) {
+        // The victory theme stands in for the short win chime until its file is in the app.
+        if sound == .victory, players[.victory] == nil {
+            return play(.win)
+        }
         guard isEnabled, let player = players[sound] else { return }
         player.currentTime = 0
         player.play()

@@ -80,16 +80,18 @@ final class MatchController {
         var timeControl: TimeControl = .unlimited
     }
 
-    /// How the game ended when the board itself doesn't say (the clock did).
+    /// How the game ended when the board itself doesn't say (the clock, or a resignation).
     enum Outcome: Equatable {
         case timeout(loser: Piece.Color)
         /// The flag fell, but the other side has nothing that could ever give mate.
         case timeoutDraw(flagged: Piece.Color)
+        /// One side gave up: the person, or a rival with no way back.
+        case resigned(loser: Piece.Color)
 
         /// Nil for a draw.
         var winner: Piece.Color? {
             switch self {
-            case .timeout(let loser): return loser.opposite
+            case .timeout(let loser), .resigned(let loser): return loser.opposite
             case .timeoutDraw: return nil
             }
         }
@@ -134,6 +136,12 @@ final class MatchController {
     /// Called when a game against the computer is left unfinished for a new one,
     /// so it can count as a loss. Short games (fewer than two moves each) don't count.
     @ObservationIgnored var onAbandon: ((_ ledger: PieceLedger, _ setup: Setup, _ assisted: Bool) -> Void)?
+
+    /// The rival's latest remark, shown in a bubble by its portrait. Nil against a friend.
+    private(set) var rivalLine: RivalLine?
+    private var nextLineID = 0
+    /// The ply of the rival's last remark, so it doesn't talk over every move.
+    private var lastLinePly = -10
 
     /// What this game is worth to the army.
     var armyStakes: GameStakes {
@@ -218,13 +226,51 @@ final class MatchController {
         game.newGame(from: position)
         game.humanColors = setup.opponent == .computer ? [setup.playerColor] : [.white, .black]
         outcome = nil
+        hopelessTurns = 0
         gradeLog = [:]
         reelLog = [:]
         isFlippedByHand = false
         evaluation = nil
         startClock()
         if playSound { sounds?.play(.gameStart) }
+        rivalLine = nil
+        lastLinePly = -10
+        rivalSays(.greeting)
         scheduleWork(after: nil)
+    }
+
+    // MARK: The rival's voice
+
+    /// Has the rival say something about `moment`: always for the big moments, and
+    /// otherwise only now and then, never on two moves running.
+    func rivalSays(_ moment: RivalMoment) {
+        guard setup.opponent == .computer else { return }
+        if !moment.isBig {
+            guard game.plyCount - lastLinePly >= 3, chance() < 0.75 else { return }
+        }
+        guard let text = RivalVoice.line(for: moment, level: setup.level, pick: chance()) else { return }
+        lastLinePly = game.plyCount
+        rivalLine = RivalLine(id: nextLineID, text: text)
+        nextLineID += 1
+    }
+
+    /// What the move just played means to the rival.
+    private func rivalReacts(to played: PlayedMove) {
+        guard setup.opponent == .computer else { return }
+        let byRival = !game.humanColors.contains(played.color)
+        if game.isGameOver {
+            if let winner = game.winner {
+                rivalSays(game.humanColors.contains(winner) ? .playerWins : .rivalWins)
+            } else {
+                rivalSays(.draw)
+            }
+            return
+        }
+        if played.isCapture, let taken = game.captureEvents.last?.piece.kind {
+            rivalSays(byRival ? .tookPiece(taken) : .lostPiece(taken))
+        } else if played.givesCheck {
+            rivalSays(byRival ? .givesCheck : .inCheck)
+        }
     }
 
     /// The same game again: same rival, same side, same clock.
@@ -312,6 +358,60 @@ final class MatchController {
         isFlippedByHand.toggle()
     }
 
+    /// Whether the person can resign now: a game under way that isn't over.
+    var canResign: Bool { hasStarted && !isOver && game.plyCount > 0 }
+
+    /// The person gives up. Against a friend, the side to move does.
+    func resign() {
+        guard canResign else { return }
+        let loser = setup.opponent == .computer ? setup.playerColor : game.activeColor
+        end(.resigned(loser: loser))
+    }
+
+    /// Ends the game off the board: work stops, the clock stops, and the right sound plays.
+    private func end(_ result: Outcome) {
+        resetWork()
+        if game.pendingPromotion != nil { game.undo() }
+        outcome = result
+        clock?.pause()
+        playEndSound(winner: result.winner)
+        if case .resigned(let loser) = result, !game.humanColors.contains(loser) {
+            rivalSays(.rivalResigns)
+        } else if let winner = result.winner {
+            rivalSays(game.humanColors.contains(winner) ? .playerWins : .rivalWins)
+        } else {
+            rivalSays(.draw)
+        }
+    }
+
+    /// The victory theme when a person wins, a quiet chime otherwise.
+    private func playEndSound(winner: Piece.Color?) {
+        if let winner, setup.opponent == .friend || game.humanColors.contains(winner) {
+            sounds?.play(.victory)
+        } else {
+            sounds?.play(.gameOver)
+        }
+    }
+
+    /// How far ahead the person must be (in centipawns) for the rival to resign.
+    static let resignThreshold = 1500
+    /// The person's turns in a row the rival has been that far behind.
+    private var hopelessTurns = 0
+
+    /// A rival resigns when it is hopelessly lost two turns running, like a real
+    /// player would. A forced mate is left on the board for the person to finish.
+    private func rivalConsidersResigning(_ evaluation: Evaluation) {
+        guard setup.opponent == .computer, !isOver, game.isHumanTurn else { return }
+        if case .centipawns(let cp) = evaluation, cp >= Self.resignThreshold {
+            hopelessTurns += 1
+        } else {
+            hopelessTurns = 0
+        }
+        if hopelessTurns >= 2 {
+            end(.resigned(loser: setup.playerColor.opposite))
+        }
+    }
+
     /// The game's story for the highlight reel. `pieceName` names the player's
     /// piece that started on a square, and `hero` is the Piece of the Match line.
     func highlightReel(pieceName: (Square) -> String? = { _ in nil }, hero: String? = nil) -> GameReel {
@@ -384,14 +484,12 @@ final class MatchController {
         if game.pendingPromotion != nil { game.undo() }
         if Self.hasMatingMaterial(game.board.position.pieces, for: loser.opposite) {
             outcome = .timeout(loser: loser)
-            if setup.opponent == .friend || game.humanColors.contains(loser.opposite) {
-                sounds?.play(.win)
-            } else {
-                sounds?.play(.gameOver)
-            }
+            playEndSound(winner: loser.opposite)
+            rivalSays(game.humanColors.contains(loser.opposite) ? .playerWins : .rivalWins)
         } else {
             outcome = .timeoutDraw(flagged: loser)
             sounds?.play(.gameOver)
+            rivalSays(.draw)
         }
     }
 
@@ -421,6 +519,7 @@ final class MatchController {
     private func didPlayMove(byPerson: Bool) {
         guard let played = game.lastPlayed else { return }
         playSound(for: played)
+        rivalReacts(to: played)
         if game.isGameOver {
             clock?.pause()
         } else {
@@ -530,6 +629,12 @@ final class MatchController {
             bestUCI: best == nil ? nil : bestUCI, bestLine: line, reply: reply,
             beforeEval: before, afterEval: evaluation
         )
+        // The rival notices a blunder, and now and then a best move in a game still in the balance.
+        switch grade {
+        case .blunder: rivalSays(.playerBlunder)
+        case .best where (before?.winningChances ?? 0) < 0.85 && chance() < 0.4: rivalSays(.playerGreatMove)
+        default: break
+        }
         guard showVerdicts || grade == .checkmate else { return }
         review = MoveReview(
             id: nextReviewID, grade: grade, played: move.san, best: best, evaluation: evaluation,
@@ -548,7 +653,19 @@ final class MatchController {
         isComputerThinking = true
         let clock = ContinuousClock()
         let started = clock.now
-        let chosen = await engine.chooseMove(fen: game.fen, skill: setup.level.skill, thinkTimeMs: setup.level.thinkTimeMs)
+        let fen = game.fen
+        let level = setup.level
+        // The engine can miss an answer (a search it was still finishing, a stop it
+        // never acknowledged). Ask again before giving up, with a little more time.
+        var chosen: String?
+        for attempt in 0..<Self.engineAttempts {
+            chosen = await engine.chooseMove(fen: fen, skill: level.skill,
+                                             thinkTimeMs: level.thinkTimeMs * (attempt + 1))
+            guard gen == generation, !Task.isCancelled else { return }
+            if chosen != nil { break }
+            NSLog("Computer move: engine gave no move (attempt %d)", attempt + 1)
+        }
+        let engineAnswered = chosen != nil
 
         // A short pause so the reply never feels instant.
         let minimum = Duration.milliseconds(250)
@@ -560,25 +677,62 @@ final class MatchController {
         isComputerThinking = false
 
         // The weakest rivals miss things on purpose: now and then they play any
-        // legal move instead of the engine's. An engine that gave no move stays a failure.
-        let slips = chosen != nil && setup.level.slipRate > 0 && chance() < setup.level.slipRate
+        // legal move instead of the engine's.
+        let slips = engineAnswered && level.slipRate > 0 && chance() < level.slipRate
         let slip = slips ? randomLegalMove() : nil
         // A slip the game refuses (a castling ChessKit still offers after the rook was
         // taken) falls back to the engine's move.
         var moved = false
         if let slip { moved = game.playEngineMove(slip) }
         if !moved, let chosen { moved = game.playEngineMove(chosen) }
+        // The game must never freeze on the computer's turn: with no answer from the
+        // engine at all, the rival still plays a sensible move of its own.
+        if !moved, let fallback = fallbackMove() { moved = game.playEngineMove(fallback) }
         guard moved, let played = game.lastPlayed else {
             engineFailed = true
             return
         }
-        engineFailed = false
+        engineFailed = !engineAnswered
         playSound(for: played)
+        rivalReacts(to: played)
         if game.isGameOver {
             self.clock?.pause()
         } else {
             self.clock?.moved(by: played.color)
         }
+    }
+
+    /// How many times the computer asks the engine for its move before playing one of its own.
+    static let engineAttempts = 3
+
+    /// A move for the side to move when the engine has nothing: mate if there is one,
+    /// otherwise the most valuable safe-looking capture, otherwise any legal move.
+    private func fallbackMove() -> String? {
+        let board = game.board
+        let position = board.position
+        let value: (Piece.Kind) -> Int = { kind in
+            switch kind {
+            case .pawn: return 1
+            case .knight, .bishop: return 3
+            case .rook: return 5
+            case .queen: return 9
+            case .king: return 0
+            }
+        }
+        var best: (move: String, score: Int)?
+        for piece in position.pieces where piece.color == game.sideToMove {
+            for target in board.legalMoves(forPieceAt: piece.square) {
+                let uci = piece.square.notation + target.notation
+                let probe = GameModel(position: position)
+                guard probe.playEngineMove(uci) else { continue }
+                var score = 0
+                if probe.isGameOver, probe.winner == piece.color { score = 1000 }
+                if let taken = position.pieces.first(where: { $0.square == target }) { score += value(taken.kind) * 10 - value(piece.kind) }
+                if best == nil || score > best!.score { best = (uci, score) }
+            }
+        }
+        if let best, best.score > 0 { return best.move }
+        return randomLegalMove()
     }
 
     /// Any legal move for the side to move, in engine notation; `chance` picks which.
@@ -607,6 +761,8 @@ final class MatchController {
         analysis = (fen, lines)
         if let best = lines.first {
             evaluation = game.sideToMove == .white ? best.evaluation : best.evaluation.flipped
+            rivalConsidersResigning(best.evaluation)
+            if isOver { return }
         }
         cachedHints = lines.prefix(2).enumerated().compactMap { index, line in
             guard
@@ -622,11 +778,7 @@ final class MatchController {
     private func playSound(for move: PlayedMove) {
         guard let sounds else { return }
         if game.isGameOver {
-            if let winner = game.winner, setup.opponent == .friend || game.humanColors.contains(winner) {
-                sounds.play(.win)
-            } else {
-                sounds.play(.gameOver)
-            }
+            playEndSound(winner: game.winner)
         } else if move.isCapture {
             sounds.play(.capture)
         } else if move.givesCheck {

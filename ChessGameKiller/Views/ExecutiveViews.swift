@@ -51,6 +51,7 @@ struct ExecutivePlate: View {
         .animation(.snappy(duration: 0.3), value: isActive)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(spokenLabel)
+        .rivalBubble(match, theme: theme, show: isComputer, avatarWidth: 54)
     }
 
     /// Name, status, time left and captures. The label stands in for the children's
