@@ -502,11 +502,11 @@ struct ContentView: View {
     /// Neon keeps Analyze, Train and Army in its top bar; Big Board has none, so they come into the tray.
     private var neonToolRow: some View {
         HStack(spacing: 0) {
-            DockButton(title: "Analyze", symbol: "camera.viewfinder", theme: theme) { showingAnalyze = true }
-            DockButton(title: "Train", symbol: "graduationcap", theme: theme) { showingTraining = true }
-            DockButton(title: "Puzzles", symbol: "puzzlepiece.extension", theme: theme) { showingPuzzles = true }
-            DockButton(title: "Army", symbol: "shield.lefthalf.filled", theme: theme) { showingArmy = true }
-            DockButton(title: "Flip", symbol: "arrow.up.arrow.down", theme: theme) {
+            DockButton(title: "Analyze", symbol: Glyphs.analyze, theme: theme) { showingAnalyze = true }
+            DockButton(title: "Train", symbol: Glyphs.train, theme: theme) { showingTraining = true }
+            DockButton(title: "Puzzles", symbol: Glyphs.puzzles, theme: theme) { showingPuzzles = true }
+            DockButton(title: "Army", symbol: Glyphs.army, theme: theme) { showingArmy = true }
+            DockButton(title: "Flip", symbol: Glyphs.flip, theme: theme) {
                 withAnimation(.snappy) { match.flipBoard() }
             }
         }
@@ -627,13 +627,13 @@ struct ContentView: View {
             ZStack {
                 HStack(spacing: 0) {
                     HStack(spacing: 0) {
-                        DockButton(title: "Analyze", symbol: "camera.viewfinder", theme: theme) {
+                        DockButton(title: "Analyze", symbol: Glyphs.analyze, theme: theme) {
                             showingAnalyze = true
                         }
-                        DockButton(title: "Train", symbol: "graduationcap", theme: theme) {
+                        DockButton(title: "Train", symbol: Glyphs.train, theme: theme) {
                             showingTraining = true
                         }
-                        DockButton(title: "Puzzles", symbol: "puzzlepiece.extension", theme: theme) {
+                        DockButton(title: "Puzzles", symbol: Glyphs.puzzles, theme: theme) {
                             showingPuzzles = true
                         }
                     }
@@ -642,16 +642,16 @@ struct ContentView: View {
                     // height it is offered, which pushed the dock up and squeezed the board to nothing.
                     Color.clear.frame(width: CoachOrb.orbSize + 12, height: 1)
                     HStack(spacing: 0) {
-                        DockButton(title: "Undo", symbol: "arrow.uturn.backward", theme: theme) {
+                        DockButton(title: "Undo", symbol: Glyphs.undo, theme: theme) {
                             withAnimation(.snappy(duration: 0.22)) { match.undo() }
                         }
                         .disabled(!match.canUndo)
                         DockButton(title: showBestMoves ? "Hints on" : "Hints off",
-                                   symbol: showBestMoves ? "lightbulb.fill" : "lightbulb.slash",
+                                   symbol: showBestMoves ? Glyphs.hints : Glyphs.hintsOff,
                                    isOn: showBestMoves, theme: theme) {
                             showBestMoves.toggle()
                         }
-                        DockButton(title: "Flip", symbol: "arrow.up.arrow.down", theme: theme) {
+                        DockButton(title: "Flip", symbol: Glyphs.flip, theme: theme) {
                             withAnimation(.snappy) { match.flipBoard() }
                         }
                     }
@@ -677,12 +677,12 @@ struct ContentView: View {
     private func dock(coachHeight: CGFloat) -> some View {
         ZStack {
             HStack {
-                RoundButton(title: "Undo", symbol: "arrow.uturn.backward", theme: theme) {
+                RoundButton(title: "Undo", symbol: Glyphs.undo, theme: theme) {
                     withAnimation(.snappy(duration: 0.22)) { match.undo() }
                 }
                 .disabled(!match.canUndo)
                 Spacer()
-                RoundButton(title: "Hints", symbol: showBestMoves ? "lightbulb.fill" : "lightbulb.slash",
+                RoundButton(title: "Hints", symbol: showBestMoves ? Glyphs.hints : Glyphs.hintsOff,
                             isOn: showBestMoves, theme: theme) {
                     showBestMoves.toggle()
                 }
@@ -821,8 +821,7 @@ private struct RoundButton: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 4) {
-                Image(systemName: symbol)
-                    .font(.system(size: 17, weight: .semibold))
+                Glyph(name: symbol, size: 23)
                     .frame(width: 48, height: 48)
                     .background(
                         theme.isDark ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)),

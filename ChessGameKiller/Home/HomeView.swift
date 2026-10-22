@@ -17,8 +17,10 @@ struct HomeActions {
 
 /// The home screen: the 3D board as a hero picture at the top, a card with the week's
 /// games over its foot, then a page of cards, one for every part of the app. As the page
-/// scrolls the board lifts away slower than the cards, darkens and sinks into the black;
-/// the top buttons fade with it, and a dark veil gathers under the status bar.
+/// scrolls the camera walks around the board and moves in on White's king while the cards
+/// rise over it. Nothing sits on top of the board: pull it down and the war room drops in
+/// (your army, puzzle rating, games, Settings); once the board has scrolled away, a slim
+/// bar with the same things settles under the status bar.
 struct HomeView: View {
     let match: MatchController
     let theme: BoardTheme
@@ -31,6 +33,16 @@ struct HomeView: View {
 
     /// How far the page has scrolled; negative while pulled down past the top.
     @State private var offset: CGFloat = 0
+    /// The panel the board is pulled down to open.
+    @State private var warRoomOpen = false
+    /// Ready to open again once the page is back near the top.
+    @State private var pullArmed = true
+    /// Launches that have shown the "pull down" hint; it stops after a few.
+    @AppStorage("homePullHintShown") private var pullHintShown = 0
+    @State private var showPullHint = false
+
+    /// How far the board must be pulled down to open the war room.
+    static let pullToOpen: CGFloat = 86
 
     private static let space = "home-scroll"
 
@@ -58,16 +70,44 @@ struct HomeView: View {
                 .coordinateSpace(name: Self.space)
                 .ignoresSafeArea(edges: .top)
 
-                topBar
-                    .padding(.top, safeTop + 4)
-                    .opacity(Double(1 - min(max(offset / 90, 0), 1)))
-                    .offset(y: -min(max(offset, 0), 90) * 0.35)
-                    .allowsHitTesting(offset < 60)
+                pullIndicator
+                    .padding(.top, safeTop + 6)
+                    .allowsHitTesting(false)
 
-                statusVeil(height: safeTop + 28)
-                    .opacity(Double(min(max((offset - heroHeight * 0.45) / 120, 0), 1)))
+                let barShown = min(max((offset - heroHeight * 0.5) / 100, 0), 1)
+                statusVeil(height: safeTop + 64)
+                    .opacity(Double(barShown))
                     .ignoresSafeArea(edges: .top)
                     .allowsHitTesting(false)
+                compactBar
+                    .padding(.top, safeTop + 2)
+                    .opacity(Double(barShown))
+                    .offset(y: (1 - barShown) * -10)
+                    .allowsHitTesting(barShown > 0.6)
+
+                if warRoomOpen {
+                    Color.black.opacity(0.5)
+                        .ignoresSafeArea()
+                        .onTapGesture { closeWarRoom() }
+                        .transition(.opacity)
+                        .accessibilityHidden(true)
+                    HomeWarRoom(theme: theme, armyLine: armyRankLine, rating: puzzles.progress.rating,
+                                games: vault.games.count, actions: actions, close: closeWarRoom)
+                        .padding(.horizontal, 10)
+                        .padding(.top, safeTop + 4)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .zIndex(2)
+                }
+            }
+            .onChange(of: offset) { _, now in pulled(to: now) }
+            .sensoryFeedback(.impact(weight: .medium), trigger: warRoomOpen) { _, open in open }
+            .onAppear {
+                guard pullHintShown < 3 else { return }
+                pullHintShown += 1
+                withAnimation(.easeOut(duration: 0.5).delay(1.2)) { showPullHint = true }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 5.5) {
+                    withAnimation(.easeIn(duration: 0.6)) { showPullHint = false }
+                }
             }
             .overlay(alignment: .bottom) {
                 HomeTabBar(actions: actions)
@@ -78,6 +118,103 @@ struct HomeView: View {
         .environment(\.colorScheme, .dark)
         .preferredColorScheme(.dark)
         .tint(HomePalette.amber)
+        .accessibilityAction(named: "Army, games and Settings") { openWarRoom() }
+    }
+
+    // MARK: The war room
+
+    private func pulled(to now: CGFloat) {
+        if now > -12 { pullArmed = true }
+        guard pullArmed, !warRoomOpen, now < -Self.pullToOpen else { return }
+        pullArmed = false
+        openWarRoom()
+    }
+
+    private func openWarRoom() {
+        showPullHint = false
+        withAnimation(.spring(response: 0.42, dampingFraction: 0.82)) { warRoomOpen = true }
+    }
+
+    private func closeWarRoom() {
+        withAnimation(.spring(response: 0.36, dampingFraction: 0.9)) { warRoomOpen = false }
+    }
+
+    /// Under the status bar: a ring that fills as the board is pulled down, around a pawn in
+    /// a helmet; on the first launches a line saying what pulling does.
+    private var pullIndicator: some View {
+        let pull = min(max(-offset / Self.pullToOpen, 0), 1)
+        return VStack(spacing: 8) {
+            ZStack {
+                Circle().stroke(Color.white.opacity(0.18), lineWidth: 2)
+                Circle()
+                    .trim(from: 0, to: pull)
+                    .stroke(HomePalette.amber, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                Glyph(name: Glyphs.army, size: 18)
+                    .foregroundStyle(pull >= 1 ? HomePalette.amber : HomePalette.text)
+            }
+            .frame(width: 34, height: 34)
+            .scaleEffect(0.7 + 0.3 * pull)
+            .opacity(Double(pull) * 1.4)
+            if showPullHint && offset >= 0 {
+                HStack(spacing: 6) {
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 11, weight: .heavy))
+                    Text("Pull the board down for your army and Settings")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                .foregroundStyle(HomePalette.text.opacity(0.85))
+                .padding(.horizontal, 12)
+                .frame(height: 28)
+                .homeGlass(Capsule())
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    /// Once the board has scrolled away: your army on the left, rating and Settings on the right.
+    private var compactBar: some View {
+        HStack(spacing: 10) {
+            Button(action: actions.army) {
+                HStack(spacing: 7) {
+                    Glyph(name: Glyphs.army, size: 18)
+                        .foregroundStyle(HomePalette.amber)
+                    Text(armyRankLine)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(HomePalette.text)
+                }
+                .padding(.horizontal, 12)
+                .frame(height: 36)
+                .homeGlass(Capsule())
+            }
+            .buttonStyle(HomePressStyle())
+            .accessibilityLabel("Your army, \(armyRankLine)")
+            Spacer(minLength: 0)
+            Button(action: actions.puzzles) {
+                HStack(spacing: 6) {
+                    Glyph(name: Glyphs.puzzles, size: 17)
+                        .foregroundStyle(HomePalette.amber)
+                    Text(puzzles.progress.rating.formatted())
+                        .font(.system(size: 14, weight: .bold).monospacedDigit())
+                        .foregroundStyle(HomePalette.text)
+                }
+                .padding(.horizontal, 12)
+                .frame(height: 36)
+                .homeGlass(Capsule())
+            }
+            .buttonStyle(HomePressStyle())
+            .accessibilityLabel("Puzzle rating \(puzzles.progress.rating)")
+            Button(action: actions.settings) {
+                Glyph(name: Glyphs.settings, size: 19)
+                    .foregroundStyle(HomePalette.text)
+                    .frame(width: 36, height: 36)
+                    .homeGlass(Circle())
+            }
+            .buttonStyle(HomePressStyle())
+            .accessibilityLabel("Settings")
+        }
+        .padding(.horizontal, HomePalette.gutter)
     }
 
     /// The pieces the hero shows: the game being played, or the start of one.
@@ -107,10 +244,10 @@ struct HomeView: View {
             VStack(spacing: 12) {
                 HomeCoachCard(minutes: training.todaysMinutes, focus: training.todaysFocus?.title,
                               streak: training.streak, trainedToday: training.trainedToday, action: actions.train)
-                HomeRowCard(symbol: "puzzlepiece.extension.fill", title: "Puzzles",
+                HomeRowCard(symbol: Glyphs.puzzles, title: "Puzzles",
                             detail: "Rating \(puzzles.progress.rating.formatted()) · \(puzzles.progress.streak) solved in a row",
                             action: actions.puzzles)
-                HomeRowCard(symbol: "camera.viewfinder", title: "Analyze a position",
+                HomeRowCard(symbol: Glyphs.analyze, title: "Analyze a position",
                             detail: "Snap a real board or set one up, see the best move",
                             action: actions.analyze)
             }
@@ -143,68 +280,6 @@ struct HomeView: View {
         .padding(.horizontal, HomePalette.gutter + 2)
         .padding(.top, 30)
         .padding(.bottom, 12)
-    }
-
-    // MARK: Top
-
-    /// Your army on the left; puzzle rating and Settings on the right, in frosted pills.
-    private var topBar: some View {
-        HStack(spacing: 10) {
-            Button(action: actions.army) {
-                HStack(spacing: 8) {
-                    PieceImage(piece: Piece(.king, color: .white, square: .e1), theme: theme, size: 26)
-                        .frame(width: 34, height: 34)
-                        .background(HomePalette.amberDeep.opacity(0.7), in: Circle())
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text("Your army")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(HomePalette.text.opacity(0.7))
-                        Text(armyRankLine)
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(HomePalette.text)
-                    }
-                    .padding(.trailing, 6)
-                }
-                .padding(4)
-                .homeGlass(Capsule())
-            }
-            .buttonStyle(HomePressStyle())
-            .accessibilityLabel("Your army, \(armyRankLine)")
-
-            Spacer(minLength: 0)
-
-            Button(action: actions.puzzles) {
-                HStack(spacing: 8) {
-                    Image(systemName: "chart.bar.fill")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(HomePalette.amber)
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text("Puzzle rating")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(HomePalette.text.opacity(0.7))
-                        Text(puzzles.progress.rating.formatted())
-                            .font(.system(size: 15, weight: .bold).monospacedDigit())
-                            .foregroundStyle(HomePalette.text)
-                    }
-                }
-                .padding(.horizontal, 14)
-                .frame(height: 42)
-                .homeGlass(Capsule())
-            }
-            .buttonStyle(HomePressStyle())
-            .accessibilityLabel("Puzzle rating \(puzzles.progress.rating)")
-
-            Button(action: actions.settings) {
-                Image(systemName: "gearshape.fill")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(HomePalette.text)
-                    .frame(width: 42, height: 42)
-                    .homeGlass(Circle())
-            }
-            .buttonStyle(HomePressStyle())
-            .accessibilityLabel("Settings")
-        }
-        .padding(.horizontal, HomePalette.gutter)
     }
 
     /// A dark veil under the status bar once the cards scroll beneath it.
@@ -429,7 +504,7 @@ struct HomeResumeCard: View {
         HomeCard {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 12) {
-                    HomeIconBadge(symbol: "hourglass")
+                    HomeIconBadge(symbol: Glyphs.play)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(opponent)
                             .font(.system(size: 18, weight: .bold))
@@ -463,7 +538,7 @@ struct HomeCoachCard: View {
         HomeCard {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 12) {
-                    HomeIconBadge(symbol: "graduationcap.fill")
+                    HomeIconBadge(symbol: Glyphs.train)
                     Text("Today with Coach Leo")
                         .font(.system(size: 18, weight: .bold))
                         .foregroundStyle(HomePalette.text)
@@ -615,7 +690,7 @@ struct HomeRewindStrip: View {
 
     var body: some View {
         if games.isEmpty {
-            HomeRowCard(symbol: "backward.fill", title: "Rewind",
+            HomeRowCard(symbol: Glyphs.games, title: "Rewind",
                         detail: "Finished games land here to replay and rewrite", action: openAll)
                 .padding(.horizontal, HomePalette.gutter)
         } else {
@@ -680,11 +755,11 @@ struct HomeTabBar: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            item("Home", "house.fill", lit: true) {}
-            item("Train", "graduationcap.fill") { actions.train() }
+            item("Home", Glyphs.home, lit: true) {}
+            item("Train", Glyphs.train) { actions.train() }
             playButton
-            item("Puzzles", "puzzlepiece.extension.fill") { actions.puzzles() }
-            item("Analyze", "camera.viewfinder") { actions.analyze() }
+            item("Puzzles", Glyphs.puzzles) { actions.puzzles() }
+            item("Analyze", Glyphs.analyze) { actions.analyze() }
         }
         .padding(6)
         .homeGlass(Capsule())
@@ -694,8 +769,7 @@ struct HomeTabBar: View {
     private var playButton: some View {
         Button(action: actions.play) {
             VStack(spacing: 2) {
-                Image(systemName: "play.fill")
-                    .font(.system(size: 20, weight: .heavy))
+                Glyph(name: Glyphs.play, size: 26)
                     .foregroundStyle(.black)
                     .frame(width: 52, height: 40)
                     .background(HomePalette.amber, in: Capsule())
@@ -713,8 +787,7 @@ struct HomeTabBar: View {
     private func item(_ title: String, _ symbol: String, lit: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 3) {
-                Image(systemName: symbol)
-                    .font(.system(size: 20, weight: .semibold))
+                Glyph(name: symbol, size: 26)
                     .frame(height: 26)
                 Text(title)
                     .font(.system(size: 11, weight: .semibold))
@@ -730,5 +803,90 @@ struct HomeTabBar: View {
         }
         .buttonStyle(HomePressStyle())
         .accessibilityAddTraits(lit ? .isSelected : [])
+    }
+}
+
+// MARK: - War room
+
+/// What used to sit on top of the board, dropped in from the top when the board is pulled
+/// down: four tiles, each opening its screen. Swipe it up or tap outside to close.
+struct HomeWarRoom: View {
+    let theme: BoardTheme
+    let armyLine: String
+    let rating: Int
+    let games: Int
+    let actions: HomeActions
+    let close: () -> Void
+
+    @State private var drag: CGFloat = 0
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Capsule()
+                .fill(Color.white.opacity(0.25))
+                .frame(width: 38, height: 5)
+                .padding(.top, 2)
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                tile(Glyphs.army, "Your army", armyLine, action: actions.army)
+                tile(Glyphs.puzzles, "Puzzle rating", rating.formatted(), action: actions.puzzles)
+                tile(Glyphs.games, "Your games", games == 0 ? "None yet" : "\(games) saved", action: actions.rewind)
+                tile(Glyphs.settings, "Settings", "Boards, sound, hints", action: actions.settings)
+            }
+        }
+        .padding(12)
+        .background {
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 30, style: .continuous)
+                        .fill(HomePalette.card.opacity(0.82))
+                }
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
+                .strokeBorder(LinearGradient(colors: [Color.white.opacity(0.16), HomePalette.stroke],
+                                             startPoint: .top, endPoint: .bottom), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.5), radius: 30, y: 14)
+        .offset(y: min(drag, 0))
+        .gesture(
+            DragGesture()
+                .onChanged { drag = $0.translation.height }
+                .onEnded { value in
+                    if value.predictedEndTranslation.height < -40 { close() }
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { drag = 0 }
+                }
+        )
+        .accessibilityAction(.escape) { close() }
+    }
+
+    private func tile(_ glyph: String, _ title: String, _ value: String, action: @escaping () -> Void) -> some View {
+        Button {
+            close()
+            action()
+        } label: {
+            VStack(alignment: .leading, spacing: 10) {
+                HomeIconBadge(symbol: glyph, size: 36)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(HomePalette.secondary)
+                    Text(value)
+                        .font(.system(size: 17, weight: .bold).monospacedDigit())
+                        .foregroundStyle(HomePalette.text)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(HomePalette.cardRaised.opacity(0.9), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(HomePalette.stroke, lineWidth: 1)
+            }
+        }
+        .buttonStyle(HomePressStyle())
+        .accessibilityLabel("\(title), \(value)")
     }
 }
