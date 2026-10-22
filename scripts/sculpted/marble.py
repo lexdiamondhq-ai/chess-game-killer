@@ -36,7 +36,17 @@ def slab(s, seed):
         d = np.abs(np.sin(u * np.pi))
         # vary the vein along its length so it fades in and out like real stone
         fade = np.clip((fbm(seed + 31 + fam, N, base=3, octaves=3) - 0.36) * 3.0, 0, 1)
-        m = np.exp(-(d / width) ** 2) * fade * strength
+        if s.get('crisp'):
+            # even, sharp-edged veins: divide by the slope of u so the line keeps its width where the
+            # warp stretches it (no smudges), a hard core with a pixel of anti-aliasing and a faint halo
+            gy, gx = np.gradient(u, 8 / N)
+            dist = d / (np.pi * np.hypot(gx, gy) + 1e-6)
+            w = width * (0.75 + 0.5 * fbm(seed + 47 + fam, N, base=4, octaves=3))
+            aa = 1.2 * 8 / N
+            core = np.clip((w - dist) / aa + 0.5, 0, 1)
+            m = (core + 0.12 * np.exp(-(dist / (w * 3.5)) ** 2) * (1 - core)) * fade * strength
+        else:
+            m = np.exp(-(d / width) ** 2) * fade * strength
         col = col * (1 - m[..., None]) + to_lin(hexc(colour)) * m[..., None]
     return col
 light = slab(spec['light'], 11); dark = slab(spec['dark'], 23)

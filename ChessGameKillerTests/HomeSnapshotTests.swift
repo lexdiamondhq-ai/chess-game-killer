@@ -109,7 +109,7 @@ enum HomeSample {
             puzzleProgress.streak = 7
         }
         let puzzles = PuzzleStore(progress: puzzleProgress)
-        return HomeView(match: match, theme: .named(.noir), actions: HomeActions())
+        return HomeView(match: match, theme: .named(.gilded), actions: HomeActions())
             .environment(vault)
             .environment(army)
             .environment(training)
