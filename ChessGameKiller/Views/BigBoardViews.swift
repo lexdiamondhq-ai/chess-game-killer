@@ -15,6 +15,8 @@ struct BigBoardTray<Dock: View>: View {
     var onArmy: (() -> Void)?
     /// Your saved games, to rewind.
     var onGames: (() -> Void)?
+    /// Back to the home screen, when it is on.
+    var onHome: (() -> Void)?
     @ViewBuilder let dock: () -> Dock
 
     @GestureState private var drag: CGFloat = 0
@@ -80,6 +82,9 @@ struct BigBoardTray<Dock: View>: View {
     /// What the hidden top bar would have held, and the way back to the normal screen.
     private var extras: some View {
         HStack(spacing: 0) {
+            if let onHome {
+                DockButton(title: "Home", symbol: "house", theme: theme, action: onHome)
+            }
             DockButton(title: "New game", symbol: "plus", theme: theme, action: onNewGame)
             if let onArmy {
                 DockButton(title: "Army", symbol: "shield.lefthalf.filled", theme: theme, action: onArmy)

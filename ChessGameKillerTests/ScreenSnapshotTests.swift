@@ -101,7 +101,7 @@ final class ScreenSnapshotTests: XCTestCase {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let window = UIWindow(windowScene: scene)
         window.frame = scene.coordinateSpace.bounds
-        window.rootViewController = UIHostingController(rootView: ContentView(startsWithNewGame: startsWithNewGame, trayOpen: trayOpen))
+        window.rootViewController = UIHostingController(rootView: ContentView(startsWithNewGame: startsWithNewGame, trayOpen: trayOpen, startsAtHome: false))
         window.makeKeyAndVisible()
         RunLoop.main.run(until: Date().addingTimeInterval(3))
         if startsWithNewGame {

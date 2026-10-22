@@ -1,4 +1,5 @@
 import ChessKit
+import Metal
 import SceneKit
 import UIKit
 import simd
@@ -143,6 +144,36 @@ final class SculptedBoardScene {
     /// The picture as it is now, for tests and screenshots.
     func snapshot() -> UIImage {
         view.snapshot()
+    }
+
+    /// A still picture from any camera, drawn off screen at `scale` pixels per point.
+    /// The home screen's hero uses it, so the board can be faded and moved like any image.
+    func still(from camera: SculptedCamera, size: CGSize, scale: CGFloat) -> UIImage? {
+        guard size.width > 1, size.height > 1, let device = MTLCreateSystemDefaultDevice() else { return nil }
+        let lens = SCNCamera()
+        lens.fieldOfView = CGFloat(camera.fieldOfView * 180 / .pi)
+        lens.projectionDirection = .horizontal
+        lens.zNear = 1
+        lens.zFar = 120
+        let eye = SCNNode()
+        eye.camera = lens
+        eye.simdPosition = camera.eye
+        eye.simdLook(at: camera.target, up: SculptedCamera.up, localFront: SCNNode.simdLocalFront)
+        scene.rootNode.addChildNode(eye)
+        let turned = rig.simdOrientation
+        rig.simdOrientation = simd_quatf(angle: camera.azimuth, axis: SculptedCamera.up)
+        defer {
+            eye.removeFromParentNode()
+            rig.simdOrientation = turned
+        }
+        let renderer = SCNRenderer(device: device, options: nil)
+        renderer.scene = scene
+        renderer.pointOfView = eye
+        renderer.autoenablesDefaultLighting = false
+        let pixels = CGSize(width: (size.width * scale).rounded(), height: (size.height * scale).rounded())
+        let image = renderer.snapshot(atTime: 0, with: pixels, antialiasingMode: .multisampling4X)
+        guard let cgImage = image.cgImage else { return image }
+        return UIImage(cgImage: cgImage, scale: scale, orientation: .up)
     }
 
     private static func pieceID(of node: SCNNode) -> Int? {
