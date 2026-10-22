@@ -30,6 +30,12 @@ struct SculptedHalo: Equatable {
     }
 }
 
+/// The end of a decided game: the losing king, which tips over while the camera leans in.
+struct SculptedFinale: Equatable {
+    let kingID: Int
+    let square: Square
+}
+
 /// Everything the 3D board shows, copied out of the game so the scene can tell what changed.
 struct SculptedBoardState: Equatable {
     var pieces: [PlacedPiece] = []
@@ -43,6 +49,8 @@ struct SculptedBoardState: Equatable {
     var lastCapture: CaptureEvent?
     /// Veteran glows by piece id.
     var halos: [Int: SculptedHalo] = [:]
+    /// Set once the game is decided.
+    var finale: SculptedFinale?
     /// The pieces come without lasting ids (an earlier position of the game, a preview):
     /// the scene matches them to the pieces on the board so each one moves rather than fades.
     var matchesPieces = false
@@ -91,6 +99,14 @@ final class SculptedBoardScene {
     private let marksNode = SCNNode()
     private let arrowsNode = SCNNode()
     private let labelsNode = SCNNode()
+    /// Dust puffs and other passing effects.
+    private let effectsNode = SCNNode()
+    private var keyLight: SCNLight?
+    private var rimLight: SCNLight?
+    /// The finale's glow under the fallen king.
+    private var finaleGlow: SCNNode?
+    /// The king lying on its side, stood back up when the finale ends.
+    private var fallenID: Int?
 
     private var nodes: [Int: PieceNode] = [:]
     private var state: SculptedBoardState?
@@ -119,7 +135,7 @@ final class SculptedBoardScene {
         buildCamera()
         buildLights()
         buildBoard()
-        for node in [piecesNode, marksNode, arrowsNode, labelsNode] {
+        for node in [piecesNode, marksNode, arrowsNode, labelsNode, effectsNode] {
             scene.rootNode.addChildNode(node)
         }
         buildLabels(flipped: false)
@@ -201,6 +217,11 @@ final class SculptedBoardScene {
         guard state != new else { return }
         state = new
 
+        // The finale ends before the pieces move, so a fallen king stands up and then walks home.
+        if old.finale != nil, new.finale == nil {
+            // A board about to turn around walks the camera itself.
+            endFinale(animated: animate && old.flipped == new.flipped)
+        }
         if old.flipped != new.flipped {
             orbit(flipped: new.flipped, animated: animate && old.flipped != new.flipped)
         }
@@ -213,6 +234,10 @@ final class SculptedBoardScene {
         }
         if old.halos != new.halos || old.pieces != new.pieces {
             updateHalos(new)
+        }
+        if let finale = new.finale, old.finale != finale {
+            // After the last move has landed.
+            playFinale(finale, after: animate ? 0.75 * Self.motionScale : 0, animated: animate)
         }
     }
 
@@ -344,18 +369,26 @@ final class SculptedBoardScene {
         let lead = moved.first { $0.square == new.lastMove?.to } ?? moved.first
         let leadOrigin = lead.flatMap { oldByID[$0.id] }.map { SculptedCamera.position(of: $0.square) }
         var leadTiming = MoveTiming.quick
+        // Taking a rook or a queen is a big moment: the move slows down and the board shakes.
+        let bigCapture = !bulk && removed.contains {
+            isCapture($0, in: new, old: old) && ($0.piece.kind == .queen || $0.piece.kind == .rook)
+        }
 
         for placed in moved {
             guard let node = nodes[placed.id], let before = oldByID[placed.id] else { continue }
             let capturing = placed.id == lead?.id && removed.contains { isCapture($0, in: new, old: old) }
             let timing = bulk ? MoveTiming.bulk : MoveTiming(
                 from: before.square, to: placed.square, knight: placed.piece.kind == .knight,
-                capturing: capturing, lifted: node.lifted
+                capturing: capturing, lifted: node.lifted, dramatic: capturing && bigCapture
             )
             if placed.id == lead?.id { leadTiming = timing }
             node.piece = placed.piece
             node.lifted = false
-            animateMove(node, to: placed.square, timing: timing)
+            animateMove(node, to: placed.square, timing: timing,
+                        dust: bulk ? 0 : (capturing ? (bigCapture ? 1.6 : 1.2) : 1))
+        }
+        if bigCapture {
+            shake(after: leadTiming.lift + leadTiming.travel, strength: 0.05)
         }
 
         for gone in removed {
@@ -437,16 +470,17 @@ final class SculptedBoardScene {
 
         /// Longer moves take a little longer, growing with the square root of the distance.
         /// Knights hop in an arc. A capture slows the move so the taken piece can fall first.
-        init(from: Square, to: Square, knight: Bool, capturing: Bool, lifted: Bool) {
+        init(from: Square, to: Square, knight: Bool, capturing: Bool, lifted: Bool, dramatic: Bool = false) {
             let dx = Double(to.fileIndex - from.fileIndex)
             let dz = Double(to.rankIndex - from.rankIndex)
             let distance = (dx * dx + dz * dz).squareRoot()
             lift = lifted ? 0.06 : 0.1
-            travel = (0.16 + 0.075 * distance.squareRoot()) * (capturing ? 1.35 : 1)
-            land = 0.08
+            travel = (0.16 + 0.075 * distance.squareRoot()) * (capturing ? 1.35 : 1) * (dramatic ? 1.7 : 1)
+            land = dramatic ? 0.06 : 0.08
             wobble = 0.34
-            hop = knight ? 0.42 : 0
-            lean = (knight ? 5 : 2) * .pi / 180
+            // Knights jump in an arc; a big capture rises high and slams down.
+            hop = knight ? 0.58 : (dramatic ? 0.3 : 0)
+            lean = (knight ? 6 : (dramatic ? 5 : 2)) * .pi / 180
             if UIAccessibility.isReduceMotionEnabled {
                 hop = 0
                 lean = 0
@@ -462,7 +496,7 @@ final class SculptedBoardScene {
         var total: Double { lift + travel + land + wobble }
     }
 
-    private func animateMove(_ node: PieceNode, to square: Square, timing: MoveTiming) {
+    private func animateMove(_ node: PieceNode, to square: Square, timing: MoveTiming, dust: Float = 1) {
         let start = node.root.simdPosition
         let end = SculptedCamera.position(of: square)
         let startY = node.model.simdPosition.y
@@ -506,6 +540,159 @@ final class SculptedBoardScene {
             .wait(duration: t.travel * 0.7),
             .fadeOpacity(to: 1, duration: t.travel * 0.3 + t.land),
         ]), forKey: "contact")
+        if dust > 0 {
+            // A soft puff of dust where it lands.
+            DispatchQueue.main.asyncAfter(deadline: .now() + t.lift + t.travel) { [weak self] in
+                self?.puff(at: end, strength: dust, radius: node.baseRadius)
+            }
+        }
+    }
+
+    /// A ring of dust that spreads from a piece's foot and fades.
+    private func puff(at position: SIMD3<Float>, strength: Float, radius: Float) {
+        guard !UIAccessibility.isReduceMotionEnabled else { return }
+        let node = SCNNode(geometry: dustMark)
+        node.simdPosition = position + SIMD3(0, 0.004, 0)
+        node.simdOrientation = Self.flat
+        node.renderingOrder = 9
+        node.castsShadow = false
+        let from = radius * 2.2
+        let to = radius * (3.2 + 1.4 * strength)
+        node.scale = SCNVector3(from, from, 1)
+        node.opacity = CGFloat(min(0.55 + 0.25 * strength, 1))
+        let duration = 0.42 * Self.motionScale
+        let grow = SCNAction.customAction(duration: duration) { node, elapsed in
+            let u = Ease.slowEnd(Float(Double(elapsed) / duration))
+            let s = from + (to - from) * u
+            node.scale = SCNVector3(s, s, 1)
+        }
+        node.runAction(.sequence([.group([grow, .fadeOut(duration: duration)]), .removeFromParentNode()]))
+        effectsNode.addChildNode(node)
+    }
+
+    /// The camera shudders, as if the board took a blow.
+    private func shake(after delay: Double, strength: Float) {
+        guard !UIAccessibility.isReduceMotionEnabled else { return }
+        let resting = camera
+        let duration = 0.4 * Self.motionScale
+        let jolt = SCNAction.customAction(duration: duration) { node, elapsed in
+            let u = Float(Double(elapsed) / duration)
+            let amount = strength * exp(-5 * u)
+            let offset = SIMD3<Float>(sin(u * 46) * amount, cos(u * 38) * amount * 0.6, sin(u * 29) * amount * 0.4)
+            node.simdPosition = resting.eye + offset
+            node.simdLook(at: resting.target + offset * 0.3, up: SculptedCamera.up, localFront: SCNNode.simdLocalFront)
+        }
+        let settle = SCNAction.run { node in
+            node.simdPosition = resting.eye
+            node.simdLook(at: resting.target, up: SculptedCamera.up, localFront: SCNNode.simdLocalFront)
+        }
+        cameraNode.runAction(.sequence([.wait(duration: delay), jolt, settle]), forKey: "shake")
+    }
+
+    // MARK: The finale
+
+    /// The losing king tips over slowly and stays down, the studio dims, a warm glow
+    /// gathers under the king and the camera leans in.
+    private func playFinale(_ finale: SculptedFinale, after delay: Double, animated: Bool) {
+        guard let node = nodes[finale.kingID] else { return }
+        fallenID = finale.kingID
+        let reduce = UIAccessibility.isReduceMotionEnabled || !animated
+        let fallTime = reduce ? 0.01 : 1.15 * Self.motionScale
+
+        // Tip over sideways, so the crown falls across the player's view.
+        let away = SIMD3<Float>(camera.azimuth == 0 ? 1 : -1, 0, 0)
+        let direction = local(away, in: node)
+        let axis = local(simd_cross(SculptedCamera.up, away), in: node)
+        let pivot = direction * node.baseRadius
+        let yaw = node.yaw
+        let model = node.model
+        let fall = SCNAction.customAction(duration: fallTime) { _, elapsed in
+            let u = Float(Double(elapsed) / fallTime)
+            // Slow to start, then down, with a small bounce as it hits the stone.
+            let drop = Ease.slowStart(min(u / 0.82, 1))
+            let bounce: Float = u > 0.82 ? 0.06 * sin(.pi * (u - 0.82) / 0.18) : 0
+            let angle = (84 * .pi / 180) * (drop - bounce)
+            let turn = simd_quatf(angle: angle, axis: axis)
+            model.simdTransform = Self.translation(pivot) * simd_float4x4(turn) * Self.translation(-pivot)
+                * simd_float4x4(simd_quatf(angle: yaw, axis: SculptedCamera.up))
+        }
+        node.root.runAction(.sequence([.wait(duration: delay), fall]), forKey: "pose")
+        node.contact.runAction(.sequence([.wait(duration: delay), .fadeOpacity(to: 0.4, duration: fallTime)]), forKey: "contact")
+
+        // A glow on the stone where the king lies.
+        finaleGlow?.removeFromParentNode()
+        let glow = SCNNode(geometry: Self.mark(size: 2.6, color: look.accent, alpha: 0.85, mask: MarkImages.glow))
+        glow.simdPosition = SculptedCamera.position(of: finale.square) + SIMD3(0, 0.0025, 0)
+        glow.simdOrientation = Self.flat
+        glow.renderingOrder = 7
+        glow.castsShadow = false
+        glow.opacity = 0
+        glow.runAction(.sequence([
+            .wait(duration: delay + fallTime * 0.6),
+            .fadeOpacity(to: 0.9, duration: 0.6),
+            .repeatForever(.sequence([.fadeOpacity(to: 0.5, duration: 1.2), .fadeOpacity(to: 0.9, duration: 1.2)])),
+        ]))
+        effectsNode.addChildNode(glow)
+        finaleGlow = glow
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self, self.fallenID == finale.kingID else { return }
+            self.dim(true, duration: reduce ? 0 : 1.0)
+            if !reduce { self.leanIn(toward: SculptedCamera.position(of: finale.square)) }
+        }
+    }
+
+    /// Back to the full studio and the usual camera, with the king on its feet.
+    private func endFinale(animated: Bool) {
+        finaleGlow?.removeAllActions()
+        finaleGlow?.runAction(.sequence([.fadeOut(duration: 0.2), .removeFromParentNode()]))
+        finaleGlow = nil
+        if let id = fallenID, let node = nodes[id] {
+            node.root.removeAction(forKey: "pose")
+            setPose(node, y: 0)
+            node.contact.opacity = 1
+        }
+        fallenID = nil
+        dim(false, duration: animated ? 0.4 : 0)
+        cameraNode.removeAction(forKey: "finale")
+        let resting = camera
+        if animated, !UIAccessibility.isReduceMotionEnabled {
+            let from = cameraNode.simdPosition
+            let duration = 0.5
+            let back = SCNAction.customAction(duration: duration) { node, elapsed in
+                let u = Ease.smooth(Float(Double(elapsed) / duration))
+                node.simdPosition = from + (resting.eye - from) * u
+                node.simdLook(at: resting.target, up: SculptedCamera.up, localFront: SCNNode.simdLocalFront)
+            }
+            cameraNode.runAction(back, forKey: "finale")
+        } else {
+            place(resting)
+        }
+    }
+
+    /// The studio lights down to a warm hush for the finale, or back up.
+    private func dim(_ dimmed: Bool, duration: Double) {
+        SCNTransaction.begin()
+        SCNTransaction.animationDuration = duration
+        keyLight?.intensity = look.key * (dimmed ? 0.5 : 1)
+        rimLight?.intensity = look.rim * (dimmed ? 0.6 : 1)
+        scene.lightingEnvironment.intensity = look.environment * (dimmed ? 0.55 : 1)
+        SCNTransaction.commit()
+    }
+
+    /// The camera drifts closer, its gaze moving toward the fallen king.
+    private func leanIn(toward point: SIMD3<Float>) {
+        let resting = camera
+        let eye = resting.eye + (point - resting.eye) * 0.22
+        let target = resting.target + (point - resting.target) * 0.6
+        let duration = 1.6 * Self.motionScale
+        let lean = SCNAction.customAction(duration: duration) { node, elapsed in
+            let u = Ease.smooth(Float(Double(elapsed) / duration))
+            node.simdPosition = resting.eye + (eye - resting.eye) * u
+            let look = resting.target + (target - resting.target) * u
+            node.simdLook(at: look, up: SculptedCamera.up, localFront: SCNNode.simdLocalFront)
+        }
+        cameraNode.runAction(lean, forKey: "finale")
     }
 
     /// The taken piece tips away from the attacker about the far edge of its foot,
@@ -589,7 +776,17 @@ final class SculptedBoardScene {
             let e = lifted ? Ease.slowEnd(u) : Ease.smooth(u)
             model.simdTransform = Self.pose(y: from + (to - from) * e, axis: SIMD3(1, 0, 0), angle: 0, scale: 1, yaw: yaw)
         }
-        node.root.runAction(action, forKey: "pose")
+        if lifted, !UIAccessibility.isReduceMotionEnabled {
+            // A held piece hovers, bobbing gently, until it is played or let go.
+            let period = 1.5
+            let bob = SCNAction.customAction(duration: period) { _, elapsed in
+                let y = to + 0.022 * sin(Float(Double(elapsed) / period) * 2 * .pi)
+                model.simdTransform = Self.pose(y: y, axis: SIMD3(1, 0, 0), angle: 0, scale: 1, yaw: yaw)
+            }
+            node.root.runAction(.sequence([action, .repeatForever(bob)]), forKey: "pose")
+        } else {
+            node.root.runAction(action, forKey: "pose")
+        }
         node.contact.runAction(.fadeOpacity(to: lifted ? 0.55 : 1, duration: duration), forKey: "contact")
     }
 
@@ -657,14 +854,22 @@ final class SculptedBoardScene {
             addMark(selectedMark, at: selected, height: 0.0017)
         }
         if let king = new.checkedKing {
-            addMark(checkMark, at: king, height: 0.0019)
+            let mark = addMark(checkMark, at: king, height: 0.0019)
+            // The square under a king in check throbs.
+            if !UIAccessibility.isReduceMotionEnabled {
+                mark.runAction(.repeatForever(.sequence([
+                    .fadeOpacity(to: 0.35, duration: 0.42),
+                    .fadeOpacity(to: 1, duration: 0.42),
+                ])))
+            }
         }
         for target in new.targets {
             addMark(occupied.contains(target) ? captureMark : dotMark, at: target, height: 0.0023, fade: true)
         }
     }
 
-    private func addMark(_ geometry: SCNGeometry, at square: Square, height: Float, fade: Bool = false) {
+    @discardableResult
+    private func addMark(_ geometry: SCNGeometry, at square: Square, height: Float, fade: Bool = false) -> SCNNode {
         let node = SCNNode(geometry: geometry)
         node.simdPosition = SculptedCamera.position(of: square) + SIMD3(0, height, 0)
         node.simdOrientation = Self.flat
@@ -675,6 +880,7 @@ final class SculptedBoardScene {
             node.runAction(.fadeIn(duration: 0.14))
         }
         marksNode.addChildNode(node)
+        return node
     }
 
     private static let flat = simd_quatf(angle: -.pi / 2, axis: SIMD3(1, 0, 0))
@@ -697,6 +903,7 @@ final class SculptedBoardScene {
     private lazy var selectedMark = Self.mark(size: 1, color: look.accent, alpha: 0.3, mask: nil)
     private lazy var checkMark = Self.mark(size: 1.5, color: look.check, alpha: 0.9, mask: MarkImages.glow)
     private lazy var dotMark = Self.mark(size: 1, color: look.accent, alpha: 0.92, mask: MarkImages.dot)
+    private lazy var dustMark = Self.mark(size: 1, color: UIColor(white: 0.93, alpha: 1), alpha: 0.5, mask: MarkImages.contact)
     private lazy var captureMark = Self.mark(size: 1, color: look.accent, alpha: 0.92, mask: MarkImages.ring)
     private static let contactGeometry = mark(size: 1, color: .black, alpha: 0.5, mask: MarkImages.contact)
     private static let haloMask = MarkImages.halo
@@ -870,6 +1077,7 @@ final class SculptedBoardScene {
         key.shadowColor = UIColor(white: 0, alpha: 0.62)
         let keyNode = SCNNode()
         keyNode.light = key
+        keyLight = key
         keyNode.simdPosition = SIMD3(-6, 9, 5)
         keyNode.simdLook(at: .zero, up: SculptedCamera.up, localFront: SCNNode.simdLocalFront)
         rig.addChildNode(keyNode)
@@ -881,6 +1089,7 @@ final class SculptedBoardScene {
         rim.color = look.rimColor
         let rimNode = SCNNode()
         rimNode.light = rim
+        rimLight = rim
         rimNode.simdPosition = SIMD3(7, 4, -6)
         rimNode.simdLook(at: .zero, up: SculptedCamera.up, localFront: SCNNode.simdLocalFront)
         rig.addChildNode(rimNode)

@@ -124,9 +124,9 @@ struct ContentView: View {
                 recordArmy()
                 recordGame()
                 if bigBoard { trayOpen = true }
-                // Let the last move land and the sound play, then open the summary.
+                // Let the last move land and the king fall, then open the summary.
                 Task { @MainActor in
-                    try? await Task.sleep(for: .seconds(1.4))
+                    try? await Task.sleep(for: .seconds(2.6))
                     guard match.isOver, !showingNewGame else { return }
                     setCoach(expanded: true)
                 }

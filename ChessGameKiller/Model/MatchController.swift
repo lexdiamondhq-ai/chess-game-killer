@@ -137,6 +137,12 @@ final class MatchController {
     /// so it can count as a loss. Short games (fewer than two moves each) don't count.
     @ObservationIgnored var onAbandon: ((_ ledger: PieceLedger, _ setup: Setup, _ assisted: Bool) -> Void)?
 
+    /// The rival's latest remark, shown in a bubble by its portrait. Nil against a friend.
+    private(set) var rivalLine: RivalLine?
+    private var nextLineID = 0
+    /// The ply of the rival's last remark, so it doesn't talk over every move.
+    private var lastLinePly = -10
+
     /// What this game is worth to the army.
     var armyStakes: GameStakes {
         GameStakes(level: setup.level, assisted: wasAssisted)
@@ -227,7 +233,44 @@ final class MatchController {
         evaluation = nil
         startClock()
         if playSound { sounds?.play(.gameStart) }
+        rivalLine = nil
+        lastLinePly = -10
+        rivalSays(.greeting)
         scheduleWork(after: nil)
+    }
+
+    // MARK: The rival's voice
+
+    /// Has the rival say something about `moment`: always for the big moments, and
+    /// otherwise only now and then, never on two moves running.
+    func rivalSays(_ moment: RivalMoment) {
+        guard setup.opponent == .computer else { return }
+        if !moment.isBig {
+            guard game.plyCount - lastLinePly >= 3, chance() < 0.75 else { return }
+        }
+        guard let text = RivalVoice.line(for: moment, level: setup.level, pick: chance()) else { return }
+        lastLinePly = game.plyCount
+        rivalLine = RivalLine(id: nextLineID, text: text)
+        nextLineID += 1
+    }
+
+    /// What the move just played means to the rival.
+    private func rivalReacts(to played: PlayedMove) {
+        guard setup.opponent == .computer else { return }
+        let byRival = !game.humanColors.contains(played.color)
+        if game.isGameOver {
+            if let winner = game.winner {
+                rivalSays(game.humanColors.contains(winner) ? .playerWins : .rivalWins)
+            } else {
+                rivalSays(.draw)
+            }
+            return
+        }
+        if played.isCapture, let taken = game.captureEvents.last?.piece.kind {
+            rivalSays(byRival ? .tookPiece(taken) : .lostPiece(taken))
+        } else if played.givesCheck {
+            rivalSays(byRival ? .givesCheck : .inCheck)
+        }
     }
 
     /// The same game again: same rival, same side, same clock.
@@ -332,6 +375,13 @@ final class MatchController {
         outcome = result
         clock?.pause()
         playEndSound(winner: result.winner)
+        if case .resigned(let loser) = result, !game.humanColors.contains(loser) {
+            rivalSays(.rivalResigns)
+        } else if let winner = result.winner {
+            rivalSays(game.humanColors.contains(winner) ? .playerWins : .rivalWins)
+        } else {
+            rivalSays(.draw)
+        }
     }
 
     /// The victory theme when a person wins, a quiet chime otherwise.
@@ -435,9 +485,11 @@ final class MatchController {
         if Self.hasMatingMaterial(game.board.position.pieces, for: loser.opposite) {
             outcome = .timeout(loser: loser)
             playEndSound(winner: loser.opposite)
+            rivalSays(game.humanColors.contains(loser.opposite) ? .playerWins : .rivalWins)
         } else {
             outcome = .timeoutDraw(flagged: loser)
             sounds?.play(.gameOver)
+            rivalSays(.draw)
         }
     }
 
@@ -467,6 +519,7 @@ final class MatchController {
     private func didPlayMove(byPerson: Bool) {
         guard let played = game.lastPlayed else { return }
         playSound(for: played)
+        rivalReacts(to: played)
         if game.isGameOver {
             clock?.pause()
         } else {
@@ -576,6 +629,12 @@ final class MatchController {
             bestUCI: best == nil ? nil : bestUCI, bestLine: line, reply: reply,
             beforeEval: before, afterEval: evaluation
         )
+        // The rival notices a blunder, and now and then a best move in a game still in the balance.
+        switch grade {
+        case .blunder: rivalSays(.playerBlunder)
+        case .best where (before?.winningChances ?? 0) < 0.85 && chance() < 0.4: rivalSays(.playerGreatMove)
+        default: break
+        }
         guard showVerdicts || grade == .checkmate else { return }
         review = MoveReview(
             id: nextReviewID, grade: grade, played: move.san, best: best, evaluation: evaluation,
@@ -635,6 +694,7 @@ final class MatchController {
         }
         engineFailed = !engineAnswered
         playSound(for: played)
+        rivalReacts(to: played)
         if game.isGameOver {
             self.clock?.pause()
         } else {

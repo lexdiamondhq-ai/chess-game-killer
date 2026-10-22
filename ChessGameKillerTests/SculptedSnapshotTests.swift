@@ -118,6 +118,49 @@ final class SculptedSnapshotTests: XCTestCase {
         window.isHidden = true
     }
 
+    /// Checkmate: the losing king tips over, the light drops and the camera leans in.
+    func testCheckmateFinale() throws {
+        // Fool's mate: Black's queen on h4, White's king mated on e1.
+        let fen = "rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3"
+        let pieces = (Position(fen: fen)?.pieces ?? []).map { PlacedPiece(id: $0.square.rawValue, piece: $0) }
+        let before = SculptedBoardState(pieces: pieces, lastMove: LastMove(from: .d8, to: .h4), checkedKing: .e1)
+        let (scene, window) = try stage(before)
+        var after = before
+        after.finale = SculptedFinale(kingID: Square.e1.rawValue, square: .e1)
+        SculptedBoardScene.motionScale = 4
+        defer { SculptedBoardScene.motionScale = 1 }
+        let start = Date()
+        scene.apply(after, animated: true)
+        for (index, time) in [3.4, 4.6, 9.0].enumerated() {
+            RunLoop.main.run(until: start.addingTimeInterval(time))
+            try save(scene.snapshot(), "sculpted-finale-\(index + 1)")
+        }
+        window.isHidden = true
+    }
+
+    /// Bxd8: a queen taken slows the move, lands with a puff of dust and shakes the board.
+    func testBigCaptureInMotion() throws {
+        let fen = "r2qk2r/ppp2ppp/2n2n2/3pp1B1/1b2P3/2NP1N2/PPP2PPP/R2QKB1R w KQkq - 0 7"
+        let pieces = (Position(fen: fen)?.pieces ?? []).map { PlacedPiece(id: $0.square.rawValue, piece: $0) }
+        let (scene, window) = try stage(SculptedBoardState(pieces: pieces))
+        var after = SculptedBoardState(lastMove: LastMove(from: .g5, to: .d8))
+        after.pieces = pieces.compactMap { placed in
+            if placed.square == .d8 { return nil }
+            if placed.square == .g5 { return PlacedPiece(id: placed.id, piece: Piece(.bishop, color: .white, square: .d8)) }
+            return placed
+        }
+        after.lastCapture = CaptureEvent(id: 1, piece: Piece(.queen, color: .black, square: .d8))
+        SculptedBoardScene.motionScale = 10
+        defer { SculptedBoardScene.motionScale = 1 }
+        let start = Date()
+        scene.apply(after, animated: true)
+        for (index, time) in [2.5, 5.2, 6.4].enumerated() {
+            RunLoop.main.run(until: start.addingTimeInterval(time))
+            try save(scene.snapshot(), "sculpted-big-capture-\(index + 1)")
+        }
+        window.isHidden = true
+    }
+
     // MARK: Helpers
 
     private func stage(

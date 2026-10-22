@@ -516,6 +516,46 @@ final class MatchControllerTests: XCTestCase {
         XCTAssertEqual(sounds.played.last, .victory)
     }
 
+    func testEveryRivalHasSomethingToSay() {
+        let moments: [RivalMoment] = [
+            .greeting, .tookPiece(.knight), .lostPiece(.queen), .givesCheck, .playerBlunder,
+            .playerGreatMove, .rivalResigns, .rivalWins, .playerWins, .draw,
+        ]
+        for level in MatchController.Level.allCases {
+            for moment in moments {
+                for pick in [0, 0.5, 0.999] {
+                    let line = RivalVoice.line(for: moment, level: level, pick: pick)
+                    XCTAssertNotNil(line, "\(level.rival.name) says nothing for \(moment)")
+                    XCTAssertLessThanOrEqual(line?.count ?? 0, 48, "too long for the bubble: \(line ?? "")")
+                }
+            }
+        }
+        XCTAssertEqual(RivalVoice.line(for: .tookPiece(.rook), level: .beginner, pick: 0), "Yay, I got your rook!")
+    }
+
+    func testTheRivalGreetsAndReactsToACapture() async {
+        let match = MatchController(engine: FakeEngine(), sounds: nil)
+        match.chance = { 0.1 }
+        match.start(.init(opponent: .computer, playerColor: .white, level: .beginner), playSound: false)
+        XCTAssertNotNil(match.rivalLine, "the rival says hello")
+        let hello = match.rivalLine
+        tapMove(match, "e2e4")
+        await waitUntil("the rival answers") { match.game.plyCount == 2 }
+        // A big moment always gets a line: taking the queen.
+        let position = Position(fen: "4k3/8/8/3q4/4P3/8/8/4K3 w - - 0 1")!
+        match.start(.init(opponent: .computer, playerColor: .white, level: .beginner), from: position, playSound: false)
+        XCTAssertNotEqual(match.rivalLine, hello)
+        tapMove(match, "e4d5")
+        XCTAssertEqual(match.rivalLine?.text.contains("queen"), true, "\(match.rivalLine?.text ?? "nothing")")
+    }
+
+    func testFriendsGetNoBanter() {
+        let match = MatchController(engine: nil, sounds: nil)
+        match.start(.init(opponent: .friend), playSound: false)
+        for move in ["f2f3", "e7e5", "g2g4", "d8h4"] { tapMove(match, move) }
+        XCTAssertNil(match.rivalLine)
+    }
+
     func testStrongerRivalsAlwaysPlayTheEnginesMove() async {
         let start = GameModel().fen
         let engine = FakeEngine(scripted: [start: [EngineLine(moves: ["e2e4"], evaluation: .centipawns(30))]])

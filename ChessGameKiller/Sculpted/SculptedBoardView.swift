@@ -94,6 +94,27 @@ struct SculptedBoardView: View {
         .sensoryFeedback(.impact(weight: .heavy, intensity: 0.7), trigger: game.captureEvents.last?.id) { _, new in
             hapticsOn && new != nil
         }
+        // A rook or queen taken lands with a thud, felt as the board shakes.
+        .sensoryFeedback(.impact(weight: .heavy, intensity: 1), trigger: bigCaptureID) { _, new in
+            hapticsOn && new != nil
+        }
+        .sensoryFeedback(.success, trigger: finale) { _, new in
+            hapticsOn && new != nil && match.winner.map { game.humanColors.contains($0) } == true
+        }
+    }
+
+    /// The newest capture of a rook or queen.
+    private var bigCaptureID: Int? {
+        guard let last = game.captureEvents.last, last.piece.kind == .queen || last.piece.kind == .rook else { return nil }
+        return last.id
+    }
+
+    /// Once the game is decided on the board, the clock or by resignation: the losing king.
+    private var finale: SculptedFinale? {
+        guard browsing == nil, match.isOver, let winner = match.winner,
+              let king = game.pieces.first(where: { $0.piece.kind == .king && $0.piece.color == winner.opposite })
+        else { return nil }
+        return SculptedFinale(kingID: king.id, square: king.square)
     }
 
     /// The game, copied for the scene.
@@ -111,7 +132,8 @@ struct SculptedBoardView: View {
             hints: match.hints.map { SculptedHint(from: $0.from, to: $0.to, isBest: $0.rank == 0) },
             flipped: flipped,
             lastCapture: game.captureEvents.last,
-            halos: halos
+            halos: halos,
+            finale: finale
         )
     }
 
