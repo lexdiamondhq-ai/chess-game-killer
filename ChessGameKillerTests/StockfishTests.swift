@@ -60,9 +60,11 @@ final class StockfishTests: XCTestCase {
             }
             let elapsed = ContinuousClock.now - started
             let ms = Int(elapsed.components.seconds * 1000) + Int(elapsed.components.attoseconds / 1_000_000_000_000_000)
-            print("TIMING reply level=\(level) think=\(level.thinkTimeMs)ms total=\(ms)ms")
+            NSLog("TIMING reply level=\(level) think=\(level.thinkTimeMs)ms total=\(ms)ms")
             XCTAssertEqual(match.game.plyCount, 2, "\(level) never answered")
             XCTAssertLessThan(ms, level.thinkTimeMs + 2500, "\(level) took \(ms) ms to answer")
+            // Leave the engine alone for the next level: no grading or hints still running.
+            match.start(.init(opponent: .friend), playSound: false)
         }
     }
 }

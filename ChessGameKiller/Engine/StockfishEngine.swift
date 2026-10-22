@@ -31,6 +31,8 @@ actor StockfishEngine: ChessEngine {
     private var listener: Task<Void, Never>?
     private var pending: PendingSearch?
     private var nextSearchID = 0
+    /// Counts requests for the engine, so a waiting one can tell a newer one came.
+    private var latestRequest = 0
 
     private struct PendingSearch {
         let id: Int
@@ -90,14 +92,20 @@ actor StockfishEngine: ChessEngine {
         // not stop a search someone else is waiting for.
         if Task.isCancelled { return SearchResult(bestMove: nil, lines: []) }
 
-        // One search at a time: stop the current one and wait for it to report.
+        // One search at a time, and the newest request goes next: stop the current
+        // search and wait for it to report. A request that is still waiting when a
+        // newer one arrives gives up, so the computer's move never queues behind
+        // searches nobody is waiting for any more.
+        latestRequest += 1
+        let ticket = latestRequest
         if pending != nil {
             await engine.send(command: .stop)
         }
         while pending != nil {
-            if Task.isCancelled { return SearchResult(bestMove: nil, lines: []) }
-            try? await Task.sleep(for: .milliseconds(10))
+            if Task.isCancelled || latestRequest != ticket { return SearchResult(bestMove: nil, lines: []) }
+            try? await Task.sleep(for: .milliseconds(5))
         }
+        if latestRequest != ticket { return SearchResult(bestMove: nil, lines: []) }
 
         let (stream, continuation) = AsyncStream<SearchResult>.makeStream()
         let id = nextSearchID
