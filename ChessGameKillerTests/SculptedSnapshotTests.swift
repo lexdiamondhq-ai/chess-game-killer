@@ -64,6 +64,15 @@ final class SculptedSnapshotTests: XCTestCase {
         }
     }
 
+    /// The gilded set up close at full resolution: White's knight and bishop, then Black's knights.
+    func testGildedCloseUps() throws {
+        let (scene, window) = try stage(Self.midgame, look: .gilded, side: 402)
+        let image = scene.snapshot()
+        try save(crop(image, x: 0.1, y: 0.45, side: 0.5), "study-gilded-close-white")
+        try save(crop(image, x: 0.15, y: 0.0, side: 0.5), "study-gilded-close-black")
+        window.isHidden = true
+    }
+
     /// Every look has its own stone, studio and cache key.
     func testLooksAreDistinct() {
         let looks = SculptedLook.all
@@ -112,7 +121,7 @@ final class SculptedSnapshotTests: XCTestCase {
     // MARK: Helpers
 
     private func stage(
-        _ state: SculptedBoardState, look: SculptedLook = .noir, side: CGFloat = 390
+        _ state: SculptedBoardState, look: SculptedLook = .gilded, side: CGFloat = 390
     ) throws -> (SculptedBoardScene, UIWindow) {
         let scene = SculptedBoardScene(look: look, assets: SculptedAssets())
         let windowScene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)

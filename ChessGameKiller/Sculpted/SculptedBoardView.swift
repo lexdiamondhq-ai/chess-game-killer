@@ -53,7 +53,7 @@ struct SculptedBoardView: View {
 
     private var game: GameModel { match.game }
     private var flipped: Bool { match.isBoardFlipped }
-    private var look: SculptedLook { theme.sculptedLook ?? .noir }
+    private var look: SculptedLook { theme.sculptedLook ?? .gilded }
 
     var body: some View {
         GeometryReader { geo in
@@ -196,7 +196,7 @@ struct SculptedBoardView: View {
 /// A 3D board that is not for playing, such as the Settings preview: a position and arrows.
 struct SculptedStillBoard: View {
     let position: Position
-    var look: SculptedLook = .noir
+    var look: SculptedLook = .gilded
     var hints: [SculptedHint] = []
 
     @State private var stage = SculptedStage()

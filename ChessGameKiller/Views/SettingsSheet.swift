@@ -5,7 +5,7 @@ import SwiftUI
 /// Settings: the board's look with a live preview, how much the coach says,
 /// sound and haptics, and the credits. Every choice is remembered.
 struct SettingsSheet: View {
-    @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .noir
+    @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .gilded
     @AppStorage("matchRival") private var matchRival = false
     @AppStorage("showBestMoves") private var showBestMoves = true
     @AppStorage("showSecondBest") private var showSecondBest = true
@@ -189,7 +189,7 @@ struct BoardPreview: View {
     var body: some View {
         if threeD, SculptedAssets.shared.isLoaded, let position = Self.position {
             // As tall as the flat preview, and as wide as the angled board needs.
-            SculptedStillBoard(position: position, look: theme.sculptedLook ?? .noir, hints: stillHints)
+            SculptedStillBoard(position: position, look: theme.sculptedLook ?? .gilded, hints: stillHints)
                 .frame(width: size * SculptedBoardView.aspect, height: size)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Preview of the \(theme.name) board")

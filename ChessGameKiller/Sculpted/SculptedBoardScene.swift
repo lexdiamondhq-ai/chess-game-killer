@@ -96,7 +96,7 @@ final class SculptedBoardScene {
     private var state: SculptedBoardState?
     private var size: CGSize = .zero
 
-    init(look: SculptedLook = .noir, assets: SculptedAssets = .shared) {
+    init(look: SculptedLook = .gilded, assets: SculptedAssets = .shared) {
         self.look = look
         self.assets = assets
         view = SculptedSceneKitView(frame: CGRect(x: 0, y: 0, width: 320, height: 320), options: nil)

@@ -48,7 +48,7 @@ struct HomeView: View {
                             } action: { minY in
                                 offset = -minY
                             }
-                        HomeHero(look: theme.sculptedLook ?? .noir, pieces: heroPieces,
+                        HomeHero(look: theme.sculptedLook ?? .gilded, pieces: heroPieces,
                                  height: heroHeight, offset: offset)
                         content
                             .padding(.top, -112)

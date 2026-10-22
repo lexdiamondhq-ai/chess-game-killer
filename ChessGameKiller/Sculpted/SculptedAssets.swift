@@ -2,12 +2,13 @@ import ChessKit
 import SceneKit
 import UIKit
 
-/// The sculpted set made in Blender: six meshes, their finishes, the stone squares and the
+/// The sets made in Blender: six meshes each, their finishes, the stone squares and the
 /// studio light. Loaded once and shared by every 3D board; each look's finishes are made the
 /// first time a board in that look is drawn.
 ///
-/// The meshes come from `sculpted-pieces` in the asset catalog, written by the Blender export
-/// script in scripts/sculpted. Sizes are in squares,
+/// The meshes come from the asset catalog, written by the Blender export script in
+/// scripts/sculpted: `sculpted-pieces` is the classic carved set, and a look can name another
+/// (the black-and-gold gilded set), loaded the first time a board in that look is drawn. Sizes are in squares,
 /// with y up, the piece's foot at the origin and black's side of the board toward -z.
 final class SculptedAssets {
     static let shared = SculptedAssets()
@@ -22,25 +23,37 @@ final class SculptedAssets {
         let geometry: SCNGeometry
     }
 
-    /// Each kind's parts: the turned body, then its platinum, sapphires and pearls.
+    /// Each kind's parts in the classic set: the turned body, then its platinum, sapphires and pearls.
     let parts: [Piece.Kind: [Part]]
-    /// How tall each kind stands, in squares.
+    /// How tall each kind stands, in squares. The sets share their heights.
     let heights: [Piece.Kind: Float]
 
+    /// Every set loaded so far, by asset name.
+    private var sets: [String: [Piece.Kind: [Part]]] = [:]
     private var templates: [String: SCNNode] = [:]
     private var materials: [String: SCNMaterial] = [:]
 
     init(assetName: String = "sculpted-pieces") {
-        parts = Self.loadMeshes(named: assetName) ?? [:]
+        let parts = Self.loadMeshes(named: assetName) ?? [:]
         var heights: [Piece.Kind: Float] = [:]
         for (kind, list) in parts {
             heights[kind] = list.map { Float($0.geometry.boundingBox.max.y) }.max() ?? 1
         }
+        self.parts = parts
         self.heights = heights
+        sets[assetName] = parts
     }
 
     /// True when all six pieces loaded. The board falls back to the flat look otherwise.
     var isLoaded: Bool { parts.count == 6 }
+
+    /// The set a look plays with. A set that is missing or incomplete falls back to the classic one.
+    func parts(for look: SculptedLook) -> [Piece.Kind: [Part]] {
+        if let set = sets[look.pieces] { return set }
+        let loaded = Self.loadMeshes(named: look.pieces).flatMap { $0.count == 6 ? $0 : nil } ?? parts
+        sets[look.pieces] = loaded
+        return loaded
+    }
 
     func height(of kind: Piece.Kind) -> Float {
         heights[kind] ?? 1
@@ -52,7 +65,7 @@ final class SculptedAssets {
         let key = "\(look.name)-\(color.rawValue)\(kind)"
         if let template = templates[key] { return template.clone() }
         let node = SCNNode()
-        for part in parts[kind] ?? [] {
+        for part in parts(for: look)[kind] ?? [] {
             guard let geometry = part.geometry.copy() as? SCNGeometry else { continue }
             geometry.materials = [material(part.finish, for: color, look: look)]
             let child = SCNNode(geometry: geometry)
@@ -65,20 +78,21 @@ final class SculptedAssets {
 
     // MARK: Finishes
 
-    /// Ivory or ebony for the body; platinum, sapphire and pearl are the same on both sides.
+    /// Ivory or ebony for the body; the metal, gems and pearls are the same on both sides.
     func material(_ finish: Finish, for color: Piece.Color, look: SculptedLook) -> SCNMaterial {
         let key = "\(look.name)-" + (finish == .body ? "body-\(color.rawValue)" : "\(finish)")
         if let cached = materials[key] { return cached }
         let made: SCNMaterial
         switch finish {
         case .body where color == .white:
-            made = Self.pbr(look.ivory, roughness: 0.34, coat: 0.35, coatRoughness: 0.08)
+            made = Self.pbr(look.ivory, polish: look.ivoryPolish)
         case .body:
-            made = Self.pbr(look.ebony, roughness: 0.36, coat: 0.45, coatRoughness: 0.2)
+            made = Self.pbr(look.ebony, polish: look.ebonyPolish)
         case .metal:
-            made = Self.pbr(look.platinum, roughness: 0.16, metalness: 1)
+            made = Self.pbr(look.platinum, roughness: look.metalRoughness, metalness: 1)
         case .gem:
             made = Self.pbr(look.sapphire, roughness: 0.06, metalness: 0.35, coat: 1, coatRoughness: 0.02)
+            if let glow = look.gemGlow { made.emission.contents = glow }
         case .pearl:
             made = Self.pbr(look.pearl, roughness: 0.2, coat: 1, coatRoughness: 0.05)
         }
@@ -108,6 +122,10 @@ final class SculptedAssets {
 
     /// The studio light the pieces reflect, the same from every side.
     func environment(_ look: SculptedLook) -> UIImage? { UIImage(named: look.studio) }
+
+    static func pbr(_ color: UIColor, polish: SculptedLook.Polish) -> SCNMaterial {
+        pbr(color, roughness: polish.roughness, coat: polish.coat, coatRoughness: polish.coatRoughness)
+    }
 
     static func pbr(
         _ color: UIColor, roughness: CGFloat, metalness: CGFloat = 0, coat: CGFloat = 0, coatRoughness: CGFloat = 0.05
@@ -222,8 +240,17 @@ private struct ByteReader {
 
 /// The colors and light levels of the sculpted board. One place, so the look is tuned together.
 struct SculptedLook {
+    /// How a stone is finished: its roughness, and the clear coat over it.
+    struct Polish {
+        var roughness: CGFloat
+        var coat: CGFloat
+        var coatRoughness: CGFloat
+    }
+
     /// Also the key its finishes are cached under, so every look needs its own.
     var name = "Sculpted"
+    /// The piece meshes in the asset catalog: the classic carved set unless the look has its own.
+    var pieces = "sculpted-pieces"
     /// The baked stone squares in the asset catalog.
     var squares = "sculpted-squares"
     var stoneRoughness: CGFloat = 0.24
@@ -231,8 +258,14 @@ struct SculptedLook {
 
     var ivory = UIColor(red: 0.925, green: 0.9, blue: 0.85, alpha: 1)
     var ebony = UIColor(red: 0.15, green: 0.143, blue: 0.138, alpha: 1)
+    var ivoryPolish = Polish(roughness: 0.34, coat: 0.35, coatRoughness: 0.08)
+    var ebonyPolish = Polish(roughness: 0.36, coat: 0.45, coatRoughness: 0.2)
+    /// The pieces' metal: platinum on most looks, gold on the gilded set.
     var platinum = UIColor(red: 0.93, green: 0.93, blue: 0.945, alpha: 1)
+    var metalRoughness: CGFloat = 0.16
     var sapphire = UIColor(red: 0.12, green: 0.26, blue: 0.8, alpha: 1)
+    /// A glow of the gems' own, such as the gilded knight's amber eyes; nil for none.
+    var gemGlow: UIColor?
     var pearl = UIColor(red: 0.965, green: 0.95, blue: 0.93, alpha: 1)
     var lacquer = UIColor(red: 0.07, green: 0.07, blue: 0.08, alpha: 1)
     var lacquerRoughness: CGFloat = 0.42
@@ -265,7 +298,7 @@ extension SculptedLook {
     static let classic = SculptedLook()
 
     /// Every look a theme can play in.
-    static let all: [SculptedLook] = [.noir, .classic, .bordeaux, .midnight]
+    static let all: [SculptedLook] = [.gilded, .noir, .classic, .bordeaux, .midnight]
 
     /// A dark studio, a warm key falling as a pool of light and a cool rim: deep color and crisp
     /// highlights. Spot lights come out about pi times brighter than directional ones in SceneKit,
@@ -279,7 +312,8 @@ extension SculptedLook {
         look.keyColor = UIColor(red: 1, green: 0.95, blue: 0.88, alpha: 1)
         look.rimColor = UIColor(red: 0.8, green: 0.87, blue: 1, alpha: 1)
         look.spot = (inner: 36, outer: 110)
-        look.ivory = UIColor(red: 0.92, green: 0.885, blue: 0.82, alpha: 1)
+        // A warm ivory a step deeper than the light squares, so the white pieces keep their shape on them.
+        look.ivory = UIColor(red: 0.8, green: 0.75, blue: 0.665, alpha: 1)
         look.ebony = UIColor(red: 0.1, green: 0.095, blue: 0.09, alpha: 1)
         look.stoneRoughness = 0.22
         look.stoneCoat = 0.5
@@ -289,7 +323,31 @@ extension SculptedLook {
         return look
     }
 
-    /// The default: ivory and black marble, a champagne line and a black lacquer frame.
+    /// The default: polished onyx and cream ivory with gold bands and crowns, and a knight with
+    /// a striped gold mane and a glowing amber eye, on cream Calacatta and black Portoro marble
+    /// with fine gold veins, ruled in gold.
+    static let gilded: SculptedLook = {
+        var look = lit(SculptedLook())
+        look.name = "Gilded"
+        look.pieces = "gilded-pieces"
+        look.squares = "sculpted-squares-gilded"
+        look.lacquer = UIColor(red: 0.04, green: 0.04, blue: 0.045, alpha: 1)
+        // Cream, so the white pieces stand apart from the white marble; onyx polished to a mirror.
+        look.ivory = UIColor(red: 0.74, green: 0.67, blue: 0.56, alpha: 1)
+        look.ebony = UIColor(red: 0.06, green: 0.06, blue: 0.066, alpha: 1)
+        look.ivoryPolish = Polish(roughness: 0.3, coat: 0.6, coatRoughness: 0.05)
+        look.ebonyPolish = Polish(roughness: 0.22, coat: 1, coatRoughness: 0.04)
+        look.platinum = UIColor(red: 1, green: 0.8, blue: 0.55, alpha: 1)
+        look.metalRoughness = 0.2
+        look.sapphire = UIColor(red: 1, green: 0.62, blue: 0.22, alpha: 1)
+        look.gemGlow = UIColor(red: 1, green: 0.5, blue: 0.1, alpha: 1)
+        look.pearl = look.platinum
+        look.inlay = UIColor(red: 0.95, green: 0.74, blue: 0.45, alpha: 1)
+        look.platinumMark = UIColor(red: 0.95, green: 0.8, blue: 0.58, alpha: 1)
+        return look
+    }()
+
+    /// Ivory and black marble, a champagne line and a black lacquer frame.
     static let noir: SculptedLook = {
         var look = lit(SculptedLook())
         look.name = "Noir"

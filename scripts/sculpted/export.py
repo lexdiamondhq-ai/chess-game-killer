@@ -1,25 +1,47 @@
-# Exports the sculpted set as game-ready meshes for SceneKit.
+# Exports a set as game-ready meshes for SceneKit: the classic carved set or the gilded one.
 # Each piece type: up to four parts (body, metal, gem, pearl), decimated, with corner normals
 # split at sharp edges, converted to SceneKit axes (y up, ranks run toward -z), scaled to squares.
-import bpy, sys, numpy as np, math, struct, zlib, json
+# Usage: export.py -- [classic | gilded] [sharp angle, default 60]
+#   classic -> build/sculpted/sculpted-pieces.bin, gilded -> build/sculpted/gilded-pieces.bin
+import bpy, sys, numpy as np, math, re, struct, zlib, json
 sys.path.insert(0,'scripts/sculpted'); import pieces as P
+args=sys.argv[sys.argv.index('--')+1:] if '--' in sys.argv else []
+SET=args.pop(0) if args and args[0] in ('classic','gilded') else 'classic'
 bpy.ops.wm.read_factory_settings(use_empty=True)
 MATS=('body','metal','gem','pearl')
 M={k:bpy.data.materials.new(k) for k in MATS}
-kv=np.load('scripts/sculpted/kv.npy'); kf=np.load('scripts/sculpted/kf.npy')
-B={'K':P.king,'Q':P.queen,'B':P.bishop,'R':P.rook,'P':P.pawn,'N':lambda m:P.knight(m,kv,kf)}
+if SET=='gilded':
+    import gilded as G
+    knight_parts=G.load_knight()
+    def gilded_knight(m):
+        # The gilded knight faces right, as in its artwork: turned half round from the classic one.
+        g=G.knight(m,*knight_parts); g.rotation_euler=(0,0,math.pi); return g
+    B={'K':G.king,'Q':G.queen,'B':G.bishop,'R':G.rook,'P':G.pawn,'N':gilded_knight}
+    NAME='gilded'
+else:
+    kv=np.load('scripts/sculpted/kv.npy'); kf=np.load('scripts/sculpted/kf.npy')
+    B={'K':P.king,'Q':P.queen,'B':P.bishop,'R':P.rook,'P':P.pawn,'N':lambda m:P.knight(m,kv,kf)}
+    NAME='sculpted'
 # triangle budgets per object name prefix (body parts get the most)
-BUDGET={'K':20000,'Q':20000,'B':16000,'R':16000,'P':10000,'Nh':30000,'Nb':5000}
-SMALL={'ring':2400,'gem':700,'p':500,'ball':700,'fin':700}
+BUDGET={'K':20000,'Q':20000,'B':16000,'R':16000,'P':10000,'Nh':30000,'Nb':5000,'Nmane':18000}
+SMALL={'ring':2400,'gem':700,'p':500,'ball':700,'fin':700,'band':1600,'crown':1600,'mitre':3000,'stripe':1200}
+if SET=='gilded':
+    # more, finer metal than the classic set: the same board's worth of triangles overall
+    BUDGET.update({'P':8000,'Nh':26000,'Nmane':14000})
+    SMALL.update({'ring':1200,'ball':300,'band':1000,'crown':1000,'stripe':700})
 SCALE=1.1
-SHARP=math.radians(float(sys.argv[sys.argv.index('--')+1]) if '--' in sys.argv else 60)
+SHARP=math.radians(float(args[0]) if args else 60)
 def budget(name):
     if name in BUDGET: return BUDGET[name]
     low=name.lower()
     if 'ring' in low: return SMALL['ring']
     if 'gem' in low: return SMALL['gem']
     if name.startswith('Qp'): return SMALL['p']
-    if 'ball' in low or 'fin' in low: return SMALL['ball']
+    if 'ball' in low: return SMALL['ball'] if name!='Qtopball' else 700
+    if 'fin' in low: return SMALL['fin']
+    for key in ('band','crown','mitre'):
+        if key in low: return SMALL[key]
+    if re.match(r'^[KQBRP]st\d$',name): return SMALL['stripe']
     return None
 out={}
 stats={}
@@ -76,8 +98,8 @@ for t,merged in out.items():
         buf+=pos.tobytes(); buf+=nor.tobytes(); buf+=idx.tobytes()
 raw=bytes(buf)
 c=zlib.compressobj(9,zlib.DEFLATED,-15); comp=c.compress(raw)+c.flush()
-open('build/sculpted/sculpted-pieces.bin','wb').write(comp)
-np.savez('build/sculpted/meshes.npz',**{f'{t}_{k}_{a}':v for t,m in out.items() for k,arrs in m.items() for a,v in zip('pni',arrs)})
+open(f'build/sculpted/{NAME}-pieces.bin','wb').write(comp)
+np.savez(f'build/sculpted/{NAME}-meshes.npz',**{f'{t}_{k}_{a}':v for t,m in out.items() for k,arrs in m.items() for a,v in zip('pni',arrs)})
 tot=0
 for t,s in stats.items():
     for row in s: print(t,*row)

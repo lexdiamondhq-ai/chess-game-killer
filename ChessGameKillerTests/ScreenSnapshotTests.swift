@@ -23,26 +23,26 @@ final class ScreenSnapshotTests: XCTestCase {
         }
     }
 
-    func testNoirScreen() throws {
-        defaults.set("noir", forKey: "boardTheme")
+    func testGildedScreen() throws {
+        defaults.set("gilded", forKey: "boardTheme")
         defaults.set(false, forKey: "matchRival")
         defaults.set(true, forKey: "sculpted3D")
-        try snapshot("noir")
+        try snapshot("gilded")
     }
 
-    func testBigBoardNoir() throws {
-        defaults.set("noir", forKey: "boardTheme")
+    func testBigBoardGilded() throws {
+        defaults.set("gilded", forKey: "boardTheme")
         defaults.set(false, forKey: "matchRival")
         defaults.set(true, forKey: "sculpted3D")
         defaults.set(true, forKey: "bigBoard")
-        try snapshot("bigboard-noir")
+        try snapshot("bigboard-gilded")
     }
 
     /// The same set drawn flat, as small boards and the "3D pieces" switch show it.
     func testFlatScreens() throws {
         defaults.set(false, forKey: "matchRival")
         defaults.set(false, forKey: "sculpted3D")
-        for id in ["noir", "sculpted", "bordeaux", "midnight"] {
+        for id in ["gilded", "noir", "sculpted", "bordeaux", "midnight"] {
             defaults.set(id, forKey: "boardTheme")
             try snapshot("\(id)-flat")
         }
@@ -52,7 +52,7 @@ final class ScreenSnapshotTests: XCTestCase {
     func testLookScreens() throws {
         defaults.set(false, forKey: "matchRival")
         defaults.set(true, forKey: "sculpted3D")
-        for id in ["noir", "sculpted", "bordeaux", "midnight"] {
+        for id in ["gilded", "noir", "sculpted", "bordeaux", "midnight"] {
             defaults.set(id, forKey: "boardTheme")
             try snapshot("study-screen-\(id)")
         }

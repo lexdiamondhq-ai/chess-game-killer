@@ -22,6 +22,31 @@ final class SculptedBoardTests: XCTestCase {
         XCTAssertTrue(assets.parts[.queen]?.contains { $0.finish == .pearl } ?? false, "the queen lost her pearls")
     }
 
+    /// The gilded set: six pieces with gold on every one, amber in the king's cross and the
+    /// knight's eyes, standing at the same heights as the classic set.
+    func testTheGildedSetLoads() {
+        let assets = SculptedAssets.shared
+        let gilded = assets.parts(for: .gilded)
+        XCTAssertEqual(gilded.count, 6)
+        for kind in Piece.Kind.allCases {
+            let parts = gilded[kind] ?? []
+            XCTAssertTrue(parts.contains { $0.finish == .body }, "\(kind) has no body")
+            XCTAssertTrue(parts.contains { $0.finish == .metal }, "\(kind) has no gold")
+            for part in parts {
+                XCTAssertGreaterThan(part.geometry.sources.first?.vectorCount ?? 0, 100)
+            }
+            let height = parts.map { Float($0.geometry.boundingBox.max.y) }.max() ?? 0
+            XCTAssertEqual(height, assets.height(of: kind), accuracy: 0.03, "\(kind) changed height")
+        }
+        XCTAssertTrue(gilded[.king]?.contains { $0.finish == .gem } ?? false, "the king lost its amber")
+        XCTAssertTrue(gilded[.knight]?.contains { $0.finish == .gem } ?? false, "the knight lost its eyes")
+        XCTAssertFalse(assets.parts[.knight]?.contains { $0.finish == .gem } ?? true, "the classic knight has no gems")
+        // Loaded once, then shared.
+        XCTAssertTrue(assets.parts(for: .gilded)[.knight]?.first?.geometry === gilded[.knight]?.first?.geometry)
+        // Looks with the classic set get the classic meshes.
+        XCTAssertTrue(assets.parts(for: .noir)[.knight]?.first?.geometry === assets.parts[.knight]?.first?.geometry)
+    }
+
     /// Tournament heights, so every piece is told apart by its height alone.
     func testPiecesStandAtTournamentHeights() {
         let h = SculptedAssets.shared.heights
@@ -126,7 +151,7 @@ final class SculptedBoardTests: XCTestCase {
         defaults.set("faberge", forKey: "boardTheme")
         defaults.set(true, forKey: "matchRival")
         LookIntroduction.applyOnce(defaults: defaults)
-        XCTAssertEqual(defaults.string(forKey: "boardTheme"), "noir")
+        XCTAssertEqual(defaults.string(forKey: "boardTheme"), "gilded")
         XCTAssertEqual(defaults.bool(forKey: "matchRival"), false)
         // A look picked afterwards stays.
         defaults.set("neon", forKey: "boardTheme")
@@ -136,15 +161,30 @@ final class SculptedBoardTests: XCTestCase {
     }
 
     /// Someone who already met Sculpted and turned "Match rival" back on keeps it on.
-    func testNoirKeepsAMatchRivalChoiceMadeAfterSculpted() {
+    func testGildedKeepsAMatchRivalChoiceMadeAfterSculpted() {
         let defaults = UserDefaults(suiteName: "SculptedBoardTests")!
         defaults.removePersistentDomain(forName: "SculptedBoardTests")
         defaults.set(true, forKey: LookIntroduction.sculptedKey)
         defaults.set("sculpted", forKey: "boardTheme")
         defaults.set(true, forKey: "matchRival")
         LookIntroduction.applyOnce(defaults: defaults)
-        XCTAssertEqual(defaults.string(forKey: "boardTheme"), "noir")
+        XCTAssertEqual(defaults.string(forKey: "boardTheme"), "gilded")
         XCTAssertEqual(defaults.bool(forKey: "matchRival"), true)
+        defaults.removePersistentDomain(forName: "SculptedBoardTests")
+    }
+
+    /// Someone on Noir, the last default, moves to Gilded once and can go back to Noir.
+    func testANoirPlayerMovesToGildedOnce() {
+        let defaults = UserDefaults(suiteName: "SculptedBoardTests")!
+        defaults.removePersistentDomain(forName: "SculptedBoardTests")
+        defaults.set(true, forKey: "noirIntroduced")
+        defaults.set(true, forKey: LookIntroduction.sculptedKey)
+        defaults.set("noir", forKey: "boardTheme")
+        LookIntroduction.applyOnce(defaults: defaults)
+        XCTAssertEqual(defaults.string(forKey: "boardTheme"), "gilded")
+        defaults.set("noir", forKey: "boardTheme")
+        LookIntroduction.applyOnce(defaults: defaults)
+        XCTAssertEqual(defaults.string(forKey: "boardTheme"), "noir")
         defaults.removePersistentDomain(forName: "SculptedBoardTests")
     }
 

@@ -4,7 +4,7 @@ import sys, numpy as np
 from PIL import Image
 src, dst = sys.argv[1], sys.argv[2]
 import glob, os
-for p in sorted(glob.glob(src + '/sculpted-*.png')):
+for p in sorted(glob.glob(src + '/*.png')):
     im = np.asarray(Image.open(p).convert('RGBA')).astype(np.float32)
     h, w = im.shape[:2]
     a = im[..., 3] / 255

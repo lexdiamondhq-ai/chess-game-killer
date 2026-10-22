@@ -13,18 +13,18 @@ struct ChessGameKillerApp: App {
     }
 }
 
-/// Noir replaced Sculpted as the default look. The first launch with it switches to it once;
-/// the other looks stay in Settings, and anything picked after this is kept. (An install that
-/// never had Sculpted also turns "Match rival" off, as Sculpted's introduction did.)
+/// Gilded, the black-and-gold set, replaced Noir as the default look. The first launch with it
+/// switches to it once; the other looks stay in Settings, and anything picked after this is kept.
+/// (An install that never had Sculpted also turns "Match rival" off, as Sculpted's introduction did.)
 enum LookIntroduction {
-    static let key = "noirIntroduced"
+    static let key = "gildedIntroduced"
     /// Set by the Sculpted introduction, which also turned "Match rival" off.
     static let sculptedKey = "sculptedIntroduced"
 
     static func applyOnce(defaults: UserDefaults = .standard) {
         guard !defaults.bool(forKey: key) else { return }
         defaults.set(true, forKey: key)
-        defaults.set(BoardTheme.ID.noir.rawValue, forKey: "boardTheme")
+        defaults.set(BoardTheme.ID.gilded.rawValue, forKey: "boardTheme")
         if !defaults.bool(forKey: sculptedKey) {
             defaults.set(true, forKey: sculptedKey)
             defaults.set(false, forKey: "matchRival")

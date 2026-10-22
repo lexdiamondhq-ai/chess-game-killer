@@ -24,19 +24,24 @@ final class BoardThemeTests: XCTestCase {
         }
     }
 
-    func testNoirIsTheDefaultLook() {
-        XCTAssertEqual(BoardTheme.all.first?.id, .noir)
+    func testGildedIsTheDefaultLook() {
+        XCTAssertEqual(BoardTheme.all.first?.id, .gilded)
+        XCTAssertEqual(BoardTheme.named(.gilded).pieceSet, "gilded-")
+        XCTAssertEqual(BoardTheme.named(.gilded).sculptedLook?.name, "Gilded")
+        XCTAssertEqual(BoardTheme.named(.gilded).sculptedLook?.pieces, "gilded-pieces")
+        // Noir stays in Settings with the classic set.
         XCTAssertEqual(BoardTheme.named(.noir).pieceSet, "sculpted-")
         XCTAssertEqual(BoardTheme.named(.noir).sculptedLook?.name, "Noir")
+        XCTAssertEqual(BoardTheme.named(.noir).sculptedLook?.pieces, "sculpted-pieces")
     }
 
     func testTheCarvedLooksPlayIn3DAndTheRestStayFlat() {
-        for id in [BoardTheme.ID.noir, .sculpted, .bordeaux, .midnight] {
+        for id in [BoardTheme.ID.gilded, .noir, .sculpted, .bordeaux, .midnight] {
             let theme = BoardTheme.named(id)
             XCTAssertNotNil(theme.sculptedLook, "\(theme.name) lost its 3D look")
             XCTAssertEqual(theme.sculptedLook?.name, theme.name)
         }
-        for theme in BoardTheme.all where ![.noir, .sculpted, .bordeaux, .midnight].contains(theme.id) {
+        for theme in BoardTheme.all where ![.gilded, .noir, .sculpted, .bordeaux, .midnight].contains(theme.id) {
             XCTAssertNil(theme.sculptedLook, "\(theme.name) should stay flat")
         }
     }
@@ -47,8 +52,8 @@ final class BoardThemeTests: XCTestCase {
         for removed in ["walnut", "malachite"] {
             XCTAssertNil(BoardTheme.ID(rawValue: removed))
             defaults.set(removed, forKey: "boardTheme")
-            let saved = defaults.string(forKey: "boardTheme").flatMap(BoardTheme.ID.init(rawValue:)) ?? .noir
-            XCTAssertEqual(saved, .noir)
+            let saved = defaults.string(forKey: "boardTheme").flatMap(BoardTheme.ID.init(rawValue:)) ?? .gilded
+            XCTAssertEqual(saved, .gilded)
         }
         defaults.removePersistentDomain(forName: "BoardThemeTests")
     }
