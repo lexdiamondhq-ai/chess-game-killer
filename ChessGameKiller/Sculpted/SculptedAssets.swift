@@ -86,6 +86,7 @@ final class SculptedAssets {
         switch finish {
         case .body where color == .white:
             made = Self.pbr(look.ivory, polish: look.ivoryPolish)
+            if look.ivoryEdge > 0 { made.shaderModifiers = [.surface: Self.edgeShading(look.ivoryEdge)] }
         case .body:
             made = Self.pbr(look.ebony, polish: look.ebonyPolish)
         case .metal:
@@ -123,6 +124,15 @@ final class SculptedAssets {
 
     /// The studio light the pieces reflect, the same from every side.
     func environment(_ look: SculptedLook) -> UIImage? { UIImage(named: look.studio) }
+
+    /// Darkens a surface toward its silhouette, where it turns away from the eye, so a light piece
+    /// keeps a clear outline on light stone.
+    static func edgeShading(_ amount: CGFloat) -> String {
+        """
+        float facing = saturate(dot(normalize(_surface.normal), normalize(_surface.view)));
+        _surface.diffuse.rgb *= 1.0 - \(Float(amount)) * pow(1.0 - facing, 2.0);
+        """
+    }
 
     static func pbr(_ color: UIColor, polish: SculptedLook.Polish) -> SCNMaterial {
         pbr(color, roughness: polish.roughness, coat: polish.coat, coatRoughness: polish.coatRoughness)
@@ -260,6 +270,10 @@ struct SculptedLook {
     var ivory = UIColor(red: 0.925, green: 0.9, blue: 0.85, alpha: 1)
     var ebony = UIColor(red: 0.15, green: 0.143, blue: 0.138, alpha: 1)
     var ivoryPolish = Polish(roughness: 0.34, coat: 0.35, coatRoughness: 0.08)
+    /// How much the ivory darkens toward its silhouette; 0 for none.
+    var ivoryEdge: CGFloat = 0
+    /// How dark the pieces' shadows fall on the stone.
+    var shadowAlpha: CGFloat = 0.62
     var ebonyPolish = Polish(roughness: 0.36, coat: 0.45, coatRoughness: 0.2)
     /// The pieces' metal: platinum on most looks, gold on the gilded set.
     var platinum = UIColor(red: 0.93, green: 0.93, blue: 0.945, alpha: 1)

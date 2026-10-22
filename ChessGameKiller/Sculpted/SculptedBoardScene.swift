@@ -867,7 +867,7 @@ final class SculptedBoardScene {
         key.shadowSampleCount = 16
         key.shadowRadius = 3
         key.shadowMapSize = CGSize(width: 2048, height: 2048)
-        key.shadowColor = UIColor(white: 0, alpha: 0.62)
+        key.shadowColor = UIColor(white: 0, alpha: look.shadowAlpha)
         let keyNode = SCNNode()
         keyNode.light = key
         keyNode.simdPosition = SIMD3(-6, 9, 5)
