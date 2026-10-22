@@ -89,7 +89,7 @@ final class SculptedAssets {
         case .body:
             made = Self.pbr(look.ebony, polish: look.ebonyPolish)
         case .metal:
-            made = Self.pbr(look.platinum, roughness: look.metalRoughness, metalness: look.metalness)
+            made = Self.pbr(look.platinum, roughness: look.metalRoughness, metalness: 1)
             if let glow = look.metalGlow { made.emission.contents = glow }
         case .gem:
             made = Self.pbr(look.sapphire, roughness: 0.06, metalness: 0.35, coat: 1, coatRoughness: 0.02)
@@ -264,8 +264,6 @@ struct SculptedLook {
     /// The pieces' metal: platinum on most looks, gold on the gilded set.
     var platinum = UIColor(red: 0.93, green: 0.93, blue: 0.945, alpha: 1)
     var metalRoughness: CGFloat = 0.16
-    /// Below 1 the metal keeps some of its own color where it reflects the dark room.
-    var metalness: CGFloat = 1
     /// A faint glow of the metal's own, so it never reflects to black; nil for none.
     var metalGlow: UIColor?
     var sapphire = UIColor(red: 0.12, green: 0.26, blue: 0.8, alpha: 1)
@@ -342,8 +340,11 @@ extension SculptedLook {
         look.ebony = UIColor(red: 0.06, green: 0.06, blue: 0.066, alpha: 1)
         look.ivoryPolish = Polish(roughness: 0.3, coat: 0.6, coatRoughness: 0.05)
         look.ebonyPolish = Polish(roughness: 0.22, coat: 1, coatRoughness: 0.04)
-        look.platinum = UIColor(red: 1, green: 0.8, blue: 0.55, alpha: 1)
-        look.metalRoughness = 0.2
+        // Satin gold with a faint glow of its own: in the dark studio polished gold reflects the
+        // room and reads as dark lines on the ivory; this keeps every band and stripe gold.
+        look.platinum = UIColor(red: 1, green: 0.84, blue: 0.58, alpha: 1)
+        look.metalRoughness = 0.3
+        look.metalGlow = UIColor(red: 0.42, green: 0.3, blue: 0.12, alpha: 1)
         look.sapphire = UIColor(red: 1, green: 0.62, blue: 0.22, alpha: 1)
         look.gemGlow = UIColor(red: 1, green: 0.5, blue: 0.1, alpha: 1)
         look.pearl = look.platinum

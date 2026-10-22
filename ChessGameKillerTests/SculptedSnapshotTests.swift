@@ -73,26 +73,6 @@ final class SculptedSnapshotTests: XCTestCase {
         window.isHidden = true
     }
 
-    /// The gilded set's gold at a few finishes, to pick the one that reads as gold on both colors.
-    func testGildedGoldFinishes() throws {
-        let gold = UIColor(red: 1, green: 0.84, blue: 0.58, alpha: 1)
-        let variants: [(String, (inout SculptedLook) -> Void)] = [
-            ("a", { _ in }),
-            ("b", { $0.platinum = gold; $0.metalRoughness = 0.32 }),
-            ("c", { $0.platinum = gold; $0.metalRoughness = 0.3; $0.metalness = 0.8 }),
-            ("d", { $0.platinum = gold; $0.metalRoughness = 0.3; $0.metalGlow = UIColor(red: 0.42, green: 0.3, blue: 0.12, alpha: 1) }),
-            ("e", { $0.platinum = gold; $0.metalRoughness = 0.3; $0.metalness = 0.8; $0.ivory = UIColor(red: 0.8, green: 0.72, blue: 0.6, alpha: 1) }),
-        ]
-        for (tag, change) in variants {
-            var look = SculptedLook.gilded
-            look.name = "Gilded-\(tag)"
-            change(&look)
-            let (scene, window) = try stage(Self.midgame, look: look, side: 402)
-            try save(crop(scene.snapshot(), x: 0.1, y: 0.2, side: 0.62), "study-gold-\(tag)")
-            window.isHidden = true
-        }
-    }
-
     /// Every look has its own stone, studio and cache key.
     func testLooksAreDistinct() {
         let looks = SculptedLook.all
