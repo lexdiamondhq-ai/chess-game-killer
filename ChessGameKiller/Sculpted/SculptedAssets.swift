@@ -89,7 +89,8 @@ final class SculptedAssets {
         case .body:
             made = Self.pbr(look.ebony, polish: look.ebonyPolish)
         case .metal:
-            made = Self.pbr(look.platinum, roughness: look.metalRoughness, metalness: 1)
+            made = Self.pbr(look.platinum, roughness: look.metalRoughness, metalness: look.metalness)
+            if let glow = look.metalGlow { made.emission.contents = glow }
         case .gem:
             made = Self.pbr(look.sapphire, roughness: 0.06, metalness: 0.35, coat: 1, coatRoughness: 0.02)
             if let glow = look.gemGlow { made.emission.contents = glow }
@@ -263,6 +264,10 @@ struct SculptedLook {
     /// The pieces' metal: platinum on most looks, gold on the gilded set.
     var platinum = UIColor(red: 0.93, green: 0.93, blue: 0.945, alpha: 1)
     var metalRoughness: CGFloat = 0.16
+    /// Below 1 the metal keeps some of its own color where it reflects the dark room.
+    var metalness: CGFloat = 1
+    /// A faint glow of the metal's own, so it never reflects to black; nil for none.
+    var metalGlow: UIColor?
     var sapphire = UIColor(red: 0.12, green: 0.26, blue: 0.8, alpha: 1)
     /// A glow of the gems' own, such as the gilded knight's amber eyes; nil for none.
     var gemGlow: UIColor?
