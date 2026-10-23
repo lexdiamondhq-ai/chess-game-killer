@@ -167,6 +167,13 @@ struct PuzzlesView: View {
 
     private var ratedFooter: some View {
         VStack(spacing: 10) {
+            if let outcome = runner?.outcome, outcome != .firstTry {
+                // Anything short of a clean solve joins the review queue (PuzzleStore.record).
+                TrainingChip(text: "Back for review tomorrow", symbol: "arrow.triangle.2.circlepath",
+                             color: theme.trainingAccent)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
+            }
             if let puzzle {
                 HStack(spacing: 8) {
                     if let change {
