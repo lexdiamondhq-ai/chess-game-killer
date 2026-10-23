@@ -50,12 +50,35 @@ final class TrainSnapshotTests: XCTestCase {
         window.isHidden = true
     }
 
+    /// A puzzle in Leo's session, with Hint, Talk and Show me under it: on this phone, and on
+    /// an iPhone SE-sized screen, where the three buttons have the least room.
+    func testASessionPuzzleOffersTalk() throws {
+        let sample = TrainSample(settled: true)
+        let library = try XCTUnwrap(TrainingLibrary.shared)
+        let drills = library.drills(for: "forks").filter { $0.type == .move }.prefix(3)
+        XCTAssertEqual(drills.count, 3)
+        let plan = SessionPlan(title: "Today", focus: library.skill("forks"), lesson: nil,
+                               items: drills.map { SessionItem(content: .drill($0), role: .focus) })
+        let screens: [(name: String, frame: CGRect?)] = [
+            ("train-session-drill", nil),
+            ("train-session-drill-small", CGRect(x: 0, y: 42, width: 375, height: 667)),
+        ]
+        for (name, frame) in screens {
+            let view = SessionView(plan: plan, theme: theme, startsAtOnce: true)
+                .environment(sample.training)
+                .environment(sample.puzzles)
+            let window = try show(view, wait: 2.5, frame: frame)
+            try save(window, name)
+            window.isHidden = true
+        }
+    }
+
     // MARK: Drawing
 
-    private func show(_ view: some View, wait: TimeInterval = 3) throws -> UIWindow {
+    private func show(_ view: some View, wait: TimeInterval = 3, frame: CGRect? = nil) throws -> UIWindow {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let window = UIWindow(windowScene: scene)
-        window.frame = scene.coordinateSpace.bounds
+        window.frame = frame ?? scene.coordinateSpace.bounds
         window.rootViewController = UIHostingController(rootView: view)
         window.makeKeyAndVisible()
         RunLoop.main.run(until: Date().addingTimeInterval(wait))

@@ -34,6 +34,8 @@ final class DrillRunner {
     private(set) var marks: [SquareMark] = []
     private(set) var labels: [SquareLabel] = []
     private(set) var usedHint = false
+    /// The learner talked it through with Leo. Like a hint, it makes a solve one with help.
+    private(set) var talkedThrough = false
     private(set) var mistakes = 0
     /// Choice answers tried so far.
     private(set) var tried: Set<Int> = []
@@ -417,7 +419,7 @@ final class DrillRunner {
         game.humanColors = []
         tone = .success
         // A miss counts for more than a hint: the second miss hands out a hint on its own.
-        let outcome: Outcome = mistakes > 0 ? .afterMistake : (usedHint ? .withHint : .firstTry)
+        let outcome: Outcome = mistakes > 0 ? .afterMistake : (usedHint || talkedThrough ? .withHint : .firstTry)
         let praise = outcome == .firstTry ? pick(lines?.correct, or: "Yes!") : pick(lines?.correctAfterHint, or: "There it is.")
         message = [note, praise].compactMap { $0 }.joined(separator: " ")
         phase = .done(outcome)
@@ -464,6 +466,37 @@ final class DrillRunner {
             }
             self.phase = .done(.missed)
         }
+    }
+
+    // MARK: Talk it through
+
+    /// Talk it through is on offer: a find-the-move drill on the learner's turn, outside Rush and
+    /// Cycles, which give no help.
+    var canTalkItThrough: Bool {
+        guard phase == .solving, kind == .move, !strict else { return false }
+        return game.sideToMove == learner && game.pendingPromotion == nil && !game.isGameOver
+    }
+
+    /// The other side's last move in engine notation: the one that set the drill up, or their reply.
+    var lastMoveUCI: String? {
+        game.lastPlayed?.uci ?? game.lastMove.map { $0.from.notation + $0.to.notation }
+    }
+
+    /// The learner's words went to Leo: from now on a solve counts as one with help.
+    func talkedItThrough() {
+        talkedThrough = true
+    }
+
+    /// Plays the move the learner settled on with Leo, judged like one made on the board.
+    @discardableResult
+    func playLearnerMove(_ uci: String) -> Bool {
+        guard phase == .solving, kind == .move, game.sideToMove == learner else { return false }
+        let movesBefore = game.moveCount
+        guard game.playEngineMove(uci), game.moveCount != movesBefore, let played = game.lastPlayed else { return false }
+        sound(for: played)
+        marks = []
+        judge(played)
+        return true
     }
 
     // MARK: Tap the squares

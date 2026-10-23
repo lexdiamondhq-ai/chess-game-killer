@@ -96,7 +96,7 @@ struct SessionView: View {
                 }
                 if let drill = runner.drill {
                     ScrollView {
-                        DrillView(runner: drill, theme: theme, boardSide: boardSide)
+                        DrillView(runner: drill, theme: theme, boardSide: boardSide, talks: true)
                             .padding(.top, 4)
                             .padding(.bottom, 8)
                     }

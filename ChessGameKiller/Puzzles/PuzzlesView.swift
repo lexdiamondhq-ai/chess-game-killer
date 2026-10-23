@@ -56,7 +56,7 @@ struct PuzzlesView: View {
                         if mode == .rated { themeRow.padding(.horizontal, 16) }
                         if mode == .rush, let rush { RushBar(round: rush, theme: theme) { confirmingEnd = .end }.padding(.horizontal, 16) }
                         ScrollView {
-                            DrillView(runner: runner, theme: theme, boardSide: boardSide)
+                            DrillView(runner: runner, theme: theme, boardSide: boardSide, talks: true)
                                 .padding(.top, 4)
                                 .padding(.bottom, 8)
                         }
