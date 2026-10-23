@@ -661,7 +661,8 @@ private struct CoachPanel: View {
     }
 
     private var actions: some View {
-        HStack(spacing: 6) {
+        // Up to six buttons share the row, so they sit close.
+        HStack(spacing: 2) {
             ActionButton(title: "Undo", symbol: Glyphs.undo, theme: theme) {
                 withAnimation(.snappy(duration: 0.22)) { match.undo() }
             }
@@ -937,6 +938,9 @@ private struct ActionButton: View {
                     .shadow(color: lit && theme.glows ? accent.opacity(0.25) : .clear, radius: 10)
                 Text(title)
                     .font(.caption2.weight(.semibold))
+                    // "New game" is the longest; it shrinks a touch rather than lose its end.
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
             }
             .foregroundStyle(lit ? accent : Color.primary.opacity(0.85))
             .frame(maxWidth: .infinity)
