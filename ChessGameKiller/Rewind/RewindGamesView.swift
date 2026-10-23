@@ -5,6 +5,10 @@ import SwiftUI
 /// how many moments are left to rewrite. Tap one to rewind it.
 struct RewindGamesView: View {
     let theme: BoardTheme
+    /// The game picked on the home screen, if this list was opened for it.
+    let opening: UUID?
+    /// The rival of a game in progress that a rematch would cost, so the person is asked first.
+    let forfeits: String?
     var onPlayAgain: ((SavedGame) -> Void)?
 
     @Environment(GameVault.self) private var vault
@@ -12,8 +16,10 @@ struct RewindGamesView: View {
     @State private var path: [UUID]
 
     /// `opening` is a game to show straight away, as when one is picked on the home screen.
-    init(theme: BoardTheme, opening: UUID? = nil, onPlayAgain: ((SavedGame) -> Void)? = nil) {
+    init(theme: BoardTheme, opening: UUID? = nil, forfeits: String? = nil, onPlayAgain: ((SavedGame) -> Void)? = nil) {
         self.theme = theme
+        self.opening = opening
+        self.forfeits = forfeits
         self.onPlayAgain = onPlayAgain
         _path = State(initialValue: opening.map { [$0] } ?? [])
     }
@@ -50,13 +56,16 @@ struct RewindGamesView: View {
             .navigationTitle("Your games")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
+                        .fontWeight(.semibold)
                 }
             }
             .navigationDestination(for: UUID.self) { id in
                 if let game = vault.game(id) {
-                    RewindView(game: game, theme: theme) { game in
+                    // A game opened from the home screen goes straight back there.
+                    RewindView(game: game, theme: theme, forfeits: forfeits,
+                               leave: id == opening ? { dismiss() } : nil) { game in
                         dismiss()
                         onPlayAgain?(game)
                     }
@@ -115,13 +124,7 @@ struct RewindGamesView: View {
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(LinearGradient(colors: [RewindPalette.gold.opacity(0.10), Color.primary.opacity(0.04)],
-                                     startPoint: .topLeading, endPoint: .bottomTrailing))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .strokeBorder(RewindPalette.gold.opacity(0.25), lineWidth: 1)
-                }
+            GlassSurface(shape: RoundedRectangle(cornerRadius: 24, style: .continuous), tint: RewindPalette.gold)
         }
         .padding(.top, 8)
     }
@@ -156,24 +159,30 @@ private struct GameCard: View {
                 .frame(width: 104, height: 104)
                 .allowsHitTesting(false)
             VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 10) {
+                HStack(alignment: .top, spacing: 10) {
                     portrait
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(game.opponent)
-                            .font(.system(.headline, design: .themed))
+                    // The result sits beside the name, so the moves and the date get the whole line.
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text(game.opponent)
+                                .font(.system(.headline, design: .themed))
+                                .lineLimit(1)
+                            Spacer(minLength: 4)
+                            Text(game.result.title.uppercased())
+                                .font(.caption2.weight(.bold))
+                                .tracking(1.2)
+                                .foregroundStyle(resultColor)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(Capsule().fill(resultColor.opacity(0.14)))
+                                .fixedSize()
+                        }
                         Text("\(game.moveCount) moves · \(game.date.formatted(.relative(presentation: .named)))")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
+                            .minimumScaleFactor(0.85)
                     }
-                    Spacer(minLength: 4)
-                    Text(game.result.title.uppercased())
-                        .font(.caption.weight(.bold))
-                        .tracking(1.5)
-                        .foregroundStyle(resultColor)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Capsule().fill(resultColor.opacity(0.14)))
                 }
                 LifelineSpark(game: game, color: resultColor)
                     .frame(height: 30)
@@ -193,12 +202,7 @@ private struct GameCard: View {
         }
         .padding(14)
         .background {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(theme.isDark ? Color.white.opacity(0.06) : Color.white)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-                }
+            GlassSurface(shape: RoundedRectangle(cornerRadius: 22, style: .continuous))
         }
         .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .accessibilityElement(children: .combine)

@@ -365,7 +365,7 @@ final class PlayFromPositionTests: XCTestCase {
     func testAGameCanStartFromASetUpPosition() async {
         let draft = PositionDraft(fen: "6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1")!
         let match = MatchController(engine: nil, sounds: nil)
-        match.start(.init(opponent: .friend), from: draft.position!, playSound: false)
+        match.startTapping(from: draft.position!)
         XCTAssertEqual(match.game.fen, draft.position!.fen)
         match.tap(.a1)
         match.tap(.a8)

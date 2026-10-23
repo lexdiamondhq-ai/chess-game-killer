@@ -1,5 +1,4 @@
 import ChessKit
-import StoreKit
 import SwiftUI
 
 /// Settings: the board's look with a live preview, how much the coach says,
@@ -16,9 +15,11 @@ struct SettingsSheet: View {
     @AppStorage("bigBoard") private var bigBoard = false
     @AppStorage("sculpted3D") private var sculpted3D = true
     @AppStorage(HomeScreen.key) private var homeScreen = HomeScreen.defaultOn
+    /// Shared with the lessons' speaker button and the highlight reel.
+    @AppStorage("coachVoiceMuted") private var voiceMuted = false
+    @AppStorage(ReviewLevel.storageKey) private var reviewLevel = ReviewLevel.club.rawValue
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.requestReview) private var requestReview
 
     private var theme: BoardTheme { .named(themeID) }
     private var accent: Color { theme.accent ?? .accentColor }
@@ -30,20 +31,19 @@ struct SettingsSheet: View {
                     preview
 
                     section("Board") {
-                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
-                            ForEach(BoardTheme.all) { option in
-                                ThemeCard(option: option, isSelected: option.id == themeID, theme: theme) {
-                                    withAnimation(.easeInOut(duration: 0.35)) { themeID = option.id }
-                                }
-                            }
-                        }
+                        themeGrid(Self.looks)
+                        Text("Rival boards")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 6)
+                        themeGrid(BoardTheme.rivals)
                         SettingsGroup(theme: theme) {
                             if theme.sculptedLook != nil {
                                 ToggleRow(title: "3D pieces", subtitle: "Carved pieces that lift, glide and fall. Off draws the same set flat.",
                                           symbol: "cube", isOn: $sculpted3D, theme: theme)
                                 rule
                             }
-                            ToggleRow(title: "Match rival", subtitle: "Computer games use the rival's own board, not the one picked above",
+                            ToggleRow(title: "Match rival", subtitle: "Computer games use the rival's own board, not the one picked above.",
                                       symbol: "person.crop.circle.badge.checkmark", isOn: $matchRival, theme: theme)
                             rule
                             ToggleRow(title: "Big Board", subtitle: "The board fills the screen. Swipe up from the bottom for the tools, sideways on the board to replay moves.",
@@ -56,15 +56,24 @@ struct SettingsSheet: View {
 
                     section("Coach") {
                         SettingsGroup(theme: theme) {
-                            ToggleRow(title: "Move hints", subtitle: "Arrows for your best moves before you play. Off for a fair game.",
+                            ToggleRow(title: "Move hints", subtitle: "Marks the piece the coach would move. Tap it and its best square glows. Off for a fair game.",
                                       symbol: "sparkles", isOn: $showBestMoves, theme: theme)
                             rule
-                            ToggleRow(title: "Second-best arrow", subtitle: "The dashed one. Off leaves just the best.",
+                            ToggleRow(title: "Second-best hint", subtitle: "Also marks the runner-up, more faintly. Off leaves just the best.",
                                       symbol: "lightbulb", isOn: $showSecondBest, theme: theme)
                                 .disabled(!showBestMoves)
                             rule
-                            ToggleRow(title: "Move verdicts", subtitle: "Grades every move you make",
+                            ToggleRow(title: "Move grades", subtitle: "Rates each move you play, from Best to Blunder.",
                                       symbol: "star.fill", isOn: $showVerdicts, theme: theme)
+                            rule
+                            PickerRow(title: "Game review", subtitle: (ReviewLevel(rawValue: reviewLevel) ?? .club).blurb,
+                                      symbol: "backward.circle", theme: theme) {
+                                Picker("Game review", selection: $reviewLevel) {
+                                    ForEach(ReviewLevel.allCases) { level in
+                                        Text(level.title).tag(level.rawValue)
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -74,20 +83,16 @@ struct SettingsSheet: View {
                             rule
                             ToggleRow(title: "Haptics", symbol: "iphone.radiowaves.left.and.right", isOn: $hapticsOn, theme: theme)
                             rule
-                            ToggleRow(title: "Rival banter", subtitle: "Rivals react to your moves in a speech bubble",
+                            ToggleRow(title: "Rival banter", subtitle: "Rivals talk to you during the game.",
                                       symbol: "bubble.left.fill", isOn: $banterOn, theme: theme)
+                            rule
+                            ToggleRow(title: "Coach's voice", subtitle: "Leo reads lessons and highlight reels aloud. Captions always show.",
+                                      symbol: "waveform", isOn: Binding(get: { !voiceMuted }, set: { voiceMuted = !$0 }), theme: theme)
                         }
                     }
 
                     section("About") {
                         SettingsGroup(theme: theme) {
-                            Button {
-                                requestReview()
-                            } label: {
-                                LinkRowLabel(title: "Rate Chess Game Killer", symbol: "heart.fill", theme: theme)
-                            }
-                            .buttonStyle(.plain)
-                            rule
                             NavigationLink {
                                 LicensesView(theme: theme)
                             } label: {
@@ -134,7 +139,7 @@ struct SettingsSheet: View {
 
     // MARK: Pieces of the screen
 
-    /// The chosen board with the arrows as they will look in a game.
+    /// The chosen board with a piece tapped, its moves and hints as they look in a game.
     private var preview: some View {
         VStack(spacing: 14) {
             BoardPreview(theme: theme, showBest: showBestMoves, showSecond: showBestMoves && showSecondBest, size: 172,
@@ -153,6 +158,19 @@ struct SettingsSheet: View {
 
     private var rule: some View {
         Divider().padding(.leading, 60)
+    }
+
+    /// Every look that is not a rival's own board, in the menu's order.
+    private static let looks = BoardTheme.all.filter { look in !BoardTheme.rivals.contains { $0.id == look.id } }
+
+    private func themeGrid(_ options: [BoardTheme]) -> some View {
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+            ForEach(options) { option in
+                ThemeCard(option: option, isSelected: option.id == themeID, theme: theme) {
+                    withAnimation(.easeInOut(duration: 0.35)) { themeID = option.id }
+                }
+            }
+        }
     }
 
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
@@ -176,30 +194,43 @@ struct SettingsSheet: View {
 
 // MARK: - The live preview
 
-/// A small board that is not for playing: it shows a theme with the best-move
-/// arrows the way a game draws them. White is about to castle; Bg5 is the runner-up.
+/// A small board that is not for playing: it shows a theme the way a game draws it,
+/// with the king tapped and its moves dotted. White is about to castle, the coach's
+/// pick; Bg5 is the runner-up.
 struct BoardPreview: View {
     let theme: BoardTheme
     let showBest: Bool
     let showSecond: Bool
     var size: CGFloat = 160
-    /// The look's real 3D board, with the same position and arrows.
+    /// The look's real 3D board, with the same position and marks.
     var threeD = false
 
     private static let position = Position(fen: "r1bqk2r/ppp2ppp/2np1n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQK2R w KQkq - 0 6")
     private static let best = (from: Square.e1, to: Square.g1)
     private static let second = (from: Square.c1, to: Square.g5)
+    /// The tapped king and where it can go.
+    private static let selected = Square.e1
+    private static let targets: Set<Square> = [.d2, .e2, .f1, .g1]
 
     var body: some View {
         if threeD, SculptedAssets.shared.isLoaded, let position = Self.position {
             // As tall as the flat preview, and as wide as the angled board needs.
-            SculptedStillBoard(position: position, look: theme.sculptedLook ?? .gilded, hints: stillHints)
+            SculptedStillBoard(position: position, look: theme.sculptedLook ?? .gilded, hints: stillHints,
+                               selected: Self.selected, targets: Self.targets)
                 .frame(width: size * SculptedBoardView.aspect, height: size)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Preview of the \(theme.name) board")
         } else {
             flatPreview
         }
+    }
+
+    /// The pieces the coach would move, true for the best move's piece.
+    private var hintedPieces: [Square: Bool] {
+        var pieces: [Square: Bool] = [:]
+        if showBest, showSecond { pieces[Self.second.from] = false }
+        if showBest { pieces[Self.best.from] = true }
+        return pieces
     }
 
     private var stillHints: [SculptedHint] {
@@ -215,37 +246,31 @@ struct BoardPreview: View {
         let sq = (size - inset * 2) / 8
         let corner = RoundedRectangle(cornerRadius: sq * 0.12, style: .continuous)
         ZStack(alignment: .topLeading) {
-            if let art = theme.boardArt {
-                BoardArt(name: art, flipped: false)
-            }
-            if let surface = theme.surface {
-                LinearGradient(colors: surface, startPoint: .topLeading, endPoint: .bottomTrailing)
-            }
-            ZStack(alignment: .topLeading) {
+            ZStack {
+                if let art = theme.boardArt {
+                    BoardArt(name: art, flipped: false)
+                }
+                if let surface = theme.surface {
+                    LinearGradient(colors: surface, startPoint: .topLeading, endPoint: .bottomTrailing)
+                }
                 squares(size: sq)
+                    .padding(inset)
+            }
+            .frame(width: size, height: size)
+            .clipShape(corner)
+            // Only the picture is clipped, so a king on the far rank may rise above the frame.
+            ZStack(alignment: .topLeading) {
                 ForEach(Self.position?.pieces ?? [], id: \.square) { piece in
                     PieceImage(piece: piece, theme: theme, size: sq, onBoard: true)
                         .position(center(of: piece.square, size: sq))
-                        .zIndex(Double(7 - piece.square.rankIndex))
-                }
-                if showBest, showSecond {
-                    MoveArrow(from: center(of: Self.second.from, size: sq), to: center(of: Self.second.to, size: sq),
-                              squareSize: sq, isBest: false, color: theme.secondArrow, glow: theme.arrowGlow)
-                        .transition(.opacity)
-                        .zIndex(10)
-                }
-                if showBest {
-                    MoveArrow(from: center(of: Self.best.from, size: sq), to: center(of: Self.best.to, size: sq),
-                              squareSize: sq, isBest: true, color: theme.bestArrow, glow: theme.arrowGlow)
-                        .transition(.opacity)
-                        .zIndex(11)
+                        // Nearer rows in front, and left to right within a row, so overlaps never flicker.
+                        .zIndex(Double((7 - piece.square.rankIndex) * 8 + piece.square.fileIndex))
                 }
             }
             .frame(width: sq * 8, height: sq * 8)
             .padding(inset)
         }
         .frame(width: size, height: size)
-        .clipShape(corner)
         .overlay {
             if let edge = theme.boardEdge {
                 corner.strokeBorder(edge, lineWidth: 1)
@@ -269,19 +294,40 @@ struct BoardPreview: View {
             ForEach(0..<8, id: \.self) { row in
                 HStack(spacing: 0) {
                     ForEach(0..<8, id: \.self) { column in
-                        let isLight = (column + 7 - row) % 2 == 1
-                        Rectangle()
-                            .fill(theme.squareFill(isLight: isLight))
-                            .overlay {
-                                if let gridLine = theme.gridLine {
-                                    Rectangle().strokeBorder(gridLine, lineWidth: 0.5)
-                                }
-                            }
-                            .frame(width: size, height: size)
+                        squareView(Square(file: column, rank: 7 - row), size: size)
                     }
                 }
             }
         }
+    }
+
+    /// One square as the game draws it: the tapped king's square, the coach's brackets,
+    /// and a dot (or a ring around a piece) where the king can go.
+    private func squareView(_ square: Square, size: CGFloat) -> some View {
+        let isLight = (square.fileIndex + square.rankIndex) % 2 == 1
+        let isTarget = Self.targets.contains(square)
+        return ZStack {
+            Rectangle().fill(theme.squareFill(isLight: isLight))
+            if let gridLine = theme.gridLine {
+                Rectangle().strokeBorder(gridLine, lineWidth: 0.5)
+            }
+            if square == Self.selected {
+                Rectangle().fill(theme.selected)
+                if let ring = theme.selectedRing {
+                    Rectangle().strokeBorder(ring, lineWidth: size * 0.035)
+                }
+            }
+            if let isBest = hintedPieces[square] {
+                HintBrackets(color: theme.hint, size: size)
+                    .opacity(isBest ? 1 : 0.5)
+            }
+            if isTarget {
+                MoveDot(occupied: Self.position?.piece(at: square) != nil,
+                        hint: showBest && square == Self.best.to ? true : nil,
+                        color: theme.hint, glow: theme.hintGlow, size: size)
+            }
+        }
+        .frame(width: size, height: size)
     }
 
     private func center(of square: Square, size: CGFloat) -> CGPoint {
@@ -291,7 +337,7 @@ struct BoardPreview: View {
 
 // MARK: - Rows and cards
 
-/// One board look: a four-square swatch, its name, and a check when it is the current one.
+/// One board look: a four-square swatch, its name, and a check on the swatch when it is the current one.
 private struct ThemeCard: View {
     let option: BoardTheme
     let isSelected: Bool
@@ -303,18 +349,23 @@ private struct ThemeCard: View {
         Button(action: select) {
             HStack(spacing: 12) {
                 swatch
+                    .overlay(alignment: .topTrailing) {
+                        if isSelected {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 17, weight: .semibold))
+                                .symbolRenderingMode(.palette)
+                                .foregroundStyle(Color.black, theme.accent ?? .accentColor)
+                                .background(Circle().fill(Color.black).padding(-1.5))
+                                .offset(x: 7, y: -7)
+                                .transition(.scale.combined(with: .opacity))
+                        }
+                    }
                 Text(option.name)
                     .font(.headline)
                     .foregroundStyle(Color.primary)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.5)
+                    .minimumScaleFactor(0.8)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.title3)
-                        .foregroundStyle(theme.accent ?? .accentColor)
-                        .transition(.scale.combined(with: .opacity))
-                }
             }
             .padding(.horizontal, 14)
             .frame(maxWidth: .infinity)
@@ -396,6 +447,38 @@ private struct ToggleRow: View {
     }
 }
 
+/// A choice with an icon tile, a line under the title, and a menu of options on the right.
+private struct PickerRow<Choice: View>: View {
+    let title: String
+    var subtitle: String?
+    let symbol: String
+    let theme: BoardTheme
+    @ViewBuilder let choice: Choice
+
+    var body: some View {
+        HStack(spacing: 12) {
+            IconTile(symbol: symbol, theme: theme)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.body.weight(.semibold))
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 8)
+            choice
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .tint(theme.accent ?? .accentColor)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+    }
+}
+
 /// A row that leads somewhere: icon tile, title, chevron.
 private struct LinkRowLabel: View {
     let title: String
@@ -448,7 +531,7 @@ private struct SettingsGroup<Content: View>: View {
     }
 }
 
-/// Glass on the dark themes; outlined in color when selected.
+/// The app's glass, outlined in color when selected.
 private struct SettingsCard: View {
     let theme: BoardTheme
     let selected: Bool
@@ -456,14 +539,13 @@ private struct SettingsCard: View {
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
-        shape
-            .fill(theme.isDark ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)))
+        GlassSurface(shape: shape)
             .overlay {
-                shape.strokeBorder(selected ? color : Color.primary.opacity(theme.isDark ? 0.12 : 0.08),
-                                   lineWidth: selected ? 1.5 : 1)
+                if selected {
+                    shape.strokeBorder(color, lineWidth: 1.5)
+                        .shadow(color: color.opacity(theme.glows ? 0.45 : 0.2), radius: theme.glows ? 10 : 6)
+                }
             }
-            .shadow(color: selected ? color.opacity(theme.glows ? 0.45 : 0.25) : .black.opacity(theme.glows ? 0 : 0.05),
-                    radius: selected ? 12 : 6, y: theme.glows ? 0 : 2)
     }
 }
 
@@ -509,6 +591,12 @@ struct LicensesView: View {
                url: URL(string: "https://database.lichess.org/#puzzles")!),
     ]
 
+    /// "ChessKit on GitHub", or the site's own name, such as "stockfishchess.org".
+    private func linkTitle(_ credit: Credit) -> String {
+        let host = credit.url.host ?? "Website"
+        return host == "github.com" ? "\(credit.name) on GitHub" : host
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
@@ -534,7 +622,7 @@ struct LicensesView: View {
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                         Link(destination: credit.url) {
-                            Label(credit.url.host ?? "Website", systemImage: "arrow.up.right")
+                            Label(linkTitle(credit), systemImage: "arrow.up.right")
                                 .font(.caption.weight(.semibold))
                         }
                         .padding(.top, 2)

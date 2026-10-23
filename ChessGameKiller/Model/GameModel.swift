@@ -24,10 +24,12 @@ struct LastMove: Equatable {
     let to: Square
 }
 
-/// A captured piece, so the board can blow it up where it stood.
+/// A captured piece, so the board can show it falling where it stood.
 struct CaptureEvent: Identifiable, Equatable {
     let id: Int
     let piece: Piece
+    /// Where the capturing piece came from, so the taken one falls away from it.
+    var from: Square? = nil
 }
 
 /// The move that was just completed, with what the coach and sounds need.
@@ -67,6 +69,12 @@ final class GameModel {
     private(set) var ledger: PieceLedger?
     /// Colors a person moves by tapping. The computer's color is left out.
     var humanColors: Set<Piece.Color> = [.white, .black]
+    /// The check last called out over the board (by `moveCount`), and when its callout comes
+    /// and goes. It is kept with the game, so a board drawn again never calls a check twice.
+    @ObservationIgnored var checkCallout: (move: Int, from: Date, until: Date)?
+    /// The last move was a promotion finished from the picker, its pawn already on the last rank.
+    /// On the 3D board its new piece rises in place; a promotion played in one go walks there.
+    @ObservationIgnored private(set) var promotedInPlace = false
 
     /// Snapshots taken before each move, for undo.
     private var history: [Snapshot] = []
@@ -231,6 +239,7 @@ final class GameModel {
         guard let move = pendingPromotion else { return }
         let completed = board.completePromotion(of: move, to: kind)
         pendingPromotion = nil
+        promotedInPlace = true
         finishMove(completed)
     }
 
@@ -280,6 +289,9 @@ final class GameModel {
         pendingPromotion = nil
         captureEvents = []
         moves = []
+        // A mate's callout stays up for good; it mustn't carry over to a game that starts in check.
+        checkCallout = nil
+        promotedInPlace = false
         clearSelection()
         syncPieces()
     }
@@ -297,6 +309,7 @@ final class GameModel {
             return false
         }
         history.append(before)
+        promotedInPlace = false
         lastMove = LastMove(from: from, to: to)
         fenBeforePendingMove = fenBefore
         clearSelection()
@@ -322,10 +335,10 @@ final class GameModel {
             isCapture = true
             let id = nextEventID
             nextEventID += 1
-            captureEvents.append(CaptureEvent(id: id, piece: captured))
+            captureEvents.append(CaptureEvent(id: id, piece: captured, from: lastMove?.from))
             if captureEvents.count > 6 { captureEvents.removeFirst(captureEvents.count - 6) }
-            // The explosion is over in under a second. After that the event only costs
-            // drawing time, and would burst again if the board were rebuilt. Ids never
+            // The fall is over in under a second. After that the event only costs
+            // drawing time, and would play again if the board were rebuilt. Ids never
             // repeat, so a removal that lands after a new game finds nothing.
             Task { @MainActor [weak self] in
                 try? await Task.sleep(for: .seconds(1.2))
@@ -358,7 +371,8 @@ final class GameModel {
         syncPieces()
     }
 
-    private func clearSelection() {
+    /// Lets go of the selected piece, so no piece is lifted and no move is marked.
+    func clearSelection() {
         selected = nil
         targets = []
     }
@@ -455,7 +469,7 @@ extension Board.State.DrawReason {
         case .agreement: return "agreement"
         case .fiftyMoves: return "the 50-move rule"
         case .insufficientMaterial: return "insufficient material"
-        case .repetition: return "repetition"
+        case .repetition: return "threefold repetition"
         case .stalemate: return "stalemate"
         }
     }

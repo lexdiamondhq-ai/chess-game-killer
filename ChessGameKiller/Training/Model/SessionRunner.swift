@@ -22,6 +22,8 @@ final class SessionRunner {
     private(set) var reward = TrainingReward()
     /// A word from the coach between drills, like after two misses in a row.
     private(set) var coachNote: String?
+    /// Stopped before the last drill, so there's no session bonus.
+    private(set) var endedEarly = false
 
     private let engine: ChessEngine?
     private let playsSounds: Bool
@@ -105,11 +107,12 @@ final class SessionRunner {
         }
     }
 
-    /// Ends the session early, keeping what was done.
+    /// Ends the session early, keeping what was done. The session bonus (and the
+    /// session counting toward how gentle the next one is) is only for finishing.
     func end() {
         drill?.cancel()
         if !outcomes.isEmpty, stage == .drills {
-            finish()
+            finish(completed: false)
         }
     }
 
@@ -157,9 +160,12 @@ final class SessionRunner {
         return true
     }
 
-    private func finish() {
+    private func finish(completed: Bool = true) {
         guard stage != .summary else { return }
-        reward.add(store.finishSession(accuracy: accuracy))
+        if completed {
+            reward.add(store.finishSession(accuracy: accuracy))
+        }
+        endedEarly = !completed
         drill = nil
         stage = .summary
     }

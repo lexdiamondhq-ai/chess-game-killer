@@ -193,26 +193,26 @@ final class ArmyTests: XCTestCase {
             store.record(ledger, playerColor: setup.playerColor, won: false,
                          stakes: GameStakes(level: setup.level, assisted: assisted))
         }
-        match.start(.init(opponent: .computer, playerColor: .white), playSound: false)
+        match.start(.init(opponent: .computer, playerColor: .white))
         for move in ["e2e4", "e7e5", "g1f3", "b8c6"] { XCTAssertTrue(match.game.playEngineMove(move)) }
-        match.start(.init(opponent: .computer, playerColor: .white), playSound: false)
+        match.start(.init(opponent: .computer, playerColor: .white))
         XCTAssertEqual(abandoned, 1)
         XCTAssertEqual(store.record(for: .king).games, 1)
         XCTAssertEqual(store.record(for: .king).wins, 0)
 
         // Starting again straight away, before any moves, doesn't count.
-        match.start(.init(opponent: .computer, playerColor: .white), playSound: false)
+        match.start(.init(opponent: .computer, playerColor: .white))
         XCTAssertEqual(abandoned, 1)
     }
 
     func testUndoMarksTheGameAssisted() {
         let match = MatchController(engine: nil, sounds: nil)
-        match.start(.init(opponent: .friend), playSound: false)
+        match.startTapping()
         XCTAssertFalse(match.wasAssisted)
         XCTAssertTrue(match.game.playEngineMove("e2e4"))
         match.undo()
         XCTAssertTrue(match.wasAssisted)
-        match.start(.init(opponent: .friend), playSound: false)
+        match.startTapping()
         XCTAssertFalse(match.wasAssisted)
     }
 
@@ -234,6 +234,8 @@ final class ArmyTests: XCTestCase {
         XCTAssertNotNil(name)
         XCTAssertEqual(hero.name, name)
         XCTAssertEqual(hero.line, "\(name ?? "") took Pulse's queen.")
+        // The honor's 5 XP as this game counted it: half as much again against Pulse.
+        XCTAssertEqual(hero.xp, 8)
         XCTAssertEqual(store.record(for: .kingsKnight).honors, 1)
         XCTAssertEqual(store.record(for: .ePawn).honors, 0)
     }
@@ -270,21 +272,36 @@ final class ArmyTests: XCTestCase {
         let store = ArmyStore()
         let vector = GameStakes(level: .expert, assisted: false)
         store.record(dPawnFalls(), playerColor: .white, won: false, stakes: vector)
-        XCTAssertNil(store.grudge(against: .expert))
         store.record(dPawnFalls(), playerColor: .white, won: false, stakes: vector)
-        XCTAssertEqual(store.record(for: .dPawn).takenBy[MatchController.Level.expert.rawValue], 2)
+        // Twice could be chance.
+        XCTAssertNil(store.grudge(against: .expert))
+        XCTAssertNil(store.record(for: .dPawn).nemesis)
+        store.record(dPawnFalls(), playerColor: .white, won: false, stakes: vector)
+        XCTAssertEqual(store.record(for: .dPawn).takenBy[MatchController.Level.expert.rawValue], 3)
         XCTAssertEqual(store.record(for: .dPawn).nemesis?.level, .expert)
         let grudge = store.grudge(against: .expert)
         XCTAssertEqual(grudge?.slot, .dPawn)
-        XCTAssertEqual(grudge?.kind, .grudge(rival: "Vector", times: 2))
+        XCTAssertEqual(grudge?.kind, .grudge(rival: "Vector", times: 3))
+        // Mid-sentence, a piece without a name is "your d-pawn".
+        let name = store.record(for: .dPawn).name ?? "your \(ArmySlot.dPawn.title.lowercased())"
+        XCTAssertEqual(grudge?.headline, "Vector has taken \(name) three times.")
         XCTAssertNil(store.grudge(against: .beginner))
+    }
+
+    func testCountsReadAsWords() {
+        XCTAssertEqual(ArmyNews.times(1), "once")
+        XCTAssertEqual(ArmyNews.times(2), "twice")
+        XCTAssertEqual(ArmyNews.times(3), "three times")
+        XCTAssertEqual(ArmyNews.times(10), "ten times")
+        XCTAssertEqual(ArmyNews.times(11), "11 times")
     }
 
     func testWinningAndTakingSomethingIsRevenge() {
         let store = ArmyStore()
         let vector = GameStakes(level: .expert, assisted: false)
-        store.record(dPawnFalls(), playerColor: .white, won: false, stakes: vector)
-        store.record(dPawnFalls(), playerColor: .white, won: false, stakes: vector)
+        for _ in 0..<ArmyStore.grudgeAt {
+            store.record(dPawnFalls(), playerColor: .white, won: false, stakes: vector)
+        }
         let xpBefore = store.record(for: .dPawn).xp
 
         let game = GameModel()

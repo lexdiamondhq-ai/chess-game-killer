@@ -1,0 +1,196 @@
+name: Coach server
+
+# Tests the Talk It Through server (coach/) and deploys it to Cloudflare.
+# Pull requests also run the live check (coach/test/live.mjs): the real
+# pipeline against the real APIs for every case in test/fixtures/talks.json,
+# printed in the run's summary. It costs about a cent a case.
+#
+# Secrets: ANTHROPIC_API_KEY and CLOUDFLARE_API_TOKEN to deploy
+# (CLOUDFLARE_ACCOUNT_ID is optional; it is looked up from the token).
+# ELEVENLABS_API_KEY is optional: without it Leo's answers come without
+# George's voice and the app reads them with the device's. Without the
+# secrets it only tests.
+on:
+  pull_request:
+    paths: ["coach/**", ".github/workflows/coach.yml"]
+  push:
+    branches: [main]
+    paths: ["coach/**", ".github/workflows/coach.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: coach/package-lock.json
+      - name: Install
+        working-directory: coach
+        run: npm ci
+      - name: Unit tests
+        working-directory: coach
+        run: npm test
+      - name: Bundle for Workers (dry run)
+        working-directory: coach
+        env:
+          WRANGLER_SEND_METRICS: "false"
+        run: npm run check
+
+  live:
+    needs: test
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: coach-live-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: coach/package-lock.json
+      - name: Check the key is set
+        id: secrets
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::notice::Skipping the live check. Missing secret: ANTHROPIC_API_KEY"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install
+        if: steps.secrets.outputs.ready == 'true'
+        working-directory: coach
+        run: npm ci
+      - name: Talk it through with Claude, for real
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+        shell: bash
+        run: node coach/test/live.mjs | tee -a "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    needs: test
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: coach-deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: coach/package-lock.json
+      - name: Install (the Anthropic SDK goes into the bundle)
+        working-directory: coach
+        run: npm ci
+      - name: Check the secrets are set
+        id: secrets
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          missing=""
+          [ -n "$ANTHROPIC_API_KEY" ] || missing="$missing ANTHROPIC_API_KEY"
+          [ -n "$CLOUDFLARE_API_TOKEN" ] || missing="$missing CLOUDFLARE_API_TOKEN"
+          if [ -n "$missing" ]; then
+            echo "::notice::Not deploying the coach yet. Missing secrets:$missing"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -n "$ELEVENLABS_API_KEY" ]; then
+            echo "voice=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::No ELEVENLABS_API_KEY: Leo's answers will come without George's voice."
+            echo "voice=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            # Not set: use the account the token belongs to.
+            CLOUDFLARE_ACCOUNT_ID=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              "https://api.cloudflare.com/client/v4/accounts" | jq -r '.result[0].id // empty')
+          fi
+          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::Couldn't find the Cloudflare account. Check the token uses the Edit Cloudflare Workers template with your account included."
+            exit 1
+          fi
+          echo "CF_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID" >> "$GITHUB_ENV"
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+      - name: Make sure the account has a workers.dev address
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        shell: bash
+        run: |
+          api="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/workers/subdomain"
+          auth="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          current=$(curl -s -H "$auth" "$api" | jq -r '.result.subdomain // empty')
+          if [ -z "$current" ]; then
+            # A new account has none yet; pick a free name.
+            for name in chess-game-killer "chessgamekiller-$RANDOM" "chessgamekiller-$(date +%s)"; do
+              ok=$(curl -s -X PUT -H "$auth" -H "Content-Type: application/json" \
+                --data "{\"subdomain\":\"$name\"}" "$api" | jq -r '.success')
+              if [ "$ok" = "true" ]; then current="$name"; break; fi
+            done
+          fi
+          if [ -z "$current" ]; then
+            echo "::error::Couldn't set up a workers.dev address. Open Workers & Pages in the Cloudflare dashboard once, then re-run."
+            exit 1
+          fi
+          echo "workers.dev address: $current.workers.dev"
+          echo "WORKERS_SUBDOMAIN=$current" >> "$GITHUB_ENV"
+      # wrangler-action turns down a secret with no value, so there's one
+      # deploy with the voice key and one without it.
+      - name: Deploy to Cloudflare (with George's voice)
+        id: deploy_voice
+        if: steps.secrets.outputs.ready == 'true' && steps.secrets.outputs.voice == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CF_ACCOUNT_ID }}
+          workingDirectory: coach
+          wranglerVersion: "4"
+          secrets: |
+            ANTHROPIC_API_KEY
+            ELEVENLABS_API_KEY
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+      - name: Deploy to Cloudflare (without a voice key)
+        id: deploy_plain
+        if: steps.secrets.outputs.ready == 'true' && steps.secrets.outputs.voice != 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CF_ACCOUNT_ID }}
+          workingDirectory: coach
+          wranglerVersion: "4"
+          secrets: |
+            ANTHROPIC_API_KEY
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      - name: Talk it through with the live server
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          DEPLOY_URL: ${{ steps.deploy_voice.outputs.deployment-url || steps.deploy_plain.outputs.deployment-url }}
+        shell: bash
+        run: |
+          url="${DEPLOY_URL:-https://coach.$WORKERS_SUBDOMAIN.workers.dev}"
+          url="${url%/}"
+          echo "Coach is live at $url"
+          echo "### Coach: $url" >> "$GITHUB_STEP_SUMMARY"
+          node coach/test/smoke.mjs "$url" | tee -a "$GITHUB_STEP_SUMMARY"

@@ -1,4 +1,5 @@
 import ChessKit
+import SwiftUI
 import UIKit
 import XCTest
 @testable import ChessGameKiller
@@ -77,5 +78,42 @@ final class BoardThemeTests: XCTestCase {
         for id in BoardTheme.ID.allCases {
             XCTAssertEqual(BoardTheme.named(id).id, id)
         }
+    }
+
+    /// The last move reads at a glance on light and dark squares alike: a color difference of
+    /// at least 15, where under 5 can't be seen. Neon is left out; it has a glow of its own.
+    @MainActor
+    func testTheLastMoveShowsOnLightAndDarkSquares() {
+        for theme in BoardTheme.all where !theme.glows {
+            for (name, square) in [("light", theme.light), ("dark", theme.dark)] {
+                let bare = Self.rgba(square)
+                let wash = Self.rgba(theme.lastMove)
+                let washed = (0..<3).map { wash[$0] * wash[3] + bare[$0] * (1 - wash[3]) }
+                let difference = Self.deltaE(Array(bare.prefix(3)), washed)
+                XCTAssertGreaterThanOrEqual(difference, 15, "\(theme.name): the last move is hard to see on \(name) squares")
+            }
+        }
+    }
+
+    @MainActor
+    private static func rgba(_ color: Color) -> [Double] {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        _ = UIColor(color).getRed(&r, green: &g, blue: &b, alpha: &a)
+        return [r, g, b, a].map { Double($0) }
+    }
+
+    /// The CIE76 difference between two sRGB colors with components from 0 to 1.
+    private static func deltaE(_ one: [Double], _ other: [Double]) -> Double {
+        let a = lab(one), b = lab(other)
+        return sqrt((0..<3).map { pow(a[$0] - b[$0], 2) }.reduce(0, +))
+    }
+
+    private static func lab(_ rgb: [Double]) -> [Double] {
+        let linear = rgb.map { $0 <= 0.04045 ? $0 / 12.92 : pow(($0 + 0.055) / 1.055, 2.4) }
+        let x = (0.4124 * linear[0] + 0.3576 * linear[1] + 0.1805 * linear[2]) / 0.95047
+        let y = 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+        let z = (0.0193 * linear[0] + 0.1192 * linear[1] + 0.9505 * linear[2]) / 1.08883
+        let f = { (t: Double) -> Double in t > 0.008856 ? cbrt(t) : 7.787 * t + 16.0 / 116.0 }
+        return [116 * f(y) - 16, 500 * (f(x) - f(y)), 200 * (f(y) - f(z))]
     }
 }

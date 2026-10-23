@@ -16,6 +16,8 @@ final class SculptedAssets {
     /// What a part of a piece is made of.
     enum Finish: UInt8 {
         case body = 0, metal = 1, gem = 2, pearl = 3
+        /// The floor inside the rook's tower, which the studio light never reaches.
+        case shade = 4
     }
 
     struct Part {
@@ -78,9 +80,10 @@ final class SculptedAssets {
 
     // MARK: Finishes
 
-    /// Ivory or ebony for the body; the metal, gems and pearls are the same on both sides.
+    /// Ivory or ebony for the body and its shade; the metal, gems and pearls are the same on both sides.
     func material(_ finish: Finish, for color: Piece.Color, look: SculptedLook) -> SCNMaterial {
-        let key = "\(look.name)-" + (finish == .body ? "body-\(color.rawValue)" : "\(finish)")
+        let sided = finish == .body || finish == .shade
+        let key = "\(look.name)-" + (sided ? "\(finish)-\(color.rawValue)" : "\(finish)")
         if let cached = materials[key] { return cached }
         let made: SCNMaterial
         switch finish {
@@ -97,6 +100,9 @@ final class SculptedAssets {
             if let glow = look.gemGlow { made.emission.contents = glow }
         case .pearl:
             made = Self.pbr(look.pearl, roughness: 0.2, coat: 1, coatRoughness: 0.05)
+        case .shade:
+            // Matte and dark: the scene has no ambient occlusion, so the rook's well would light up like its top.
+            made = Self.pbr(color == .white ? look.ivoryShade : look.ebonyShade, roughness: 0.7)
         }
         materials[key] = made
         return made
@@ -111,9 +117,20 @@ final class SculptedAssets {
         return material
     }
 
-    /// The black lacquered frame.
+    /// The frame around the squares: glass on every look.
     func frameMaterial(_ look: SculptedLook) -> SCNMaterial {
-        return Self.pbr(look.lacquer, roughness: look.lacquerRoughness, coat: look.lacquerCoat, coatRoughness: 0.08)
+        Self.glass()
+    }
+
+    /// Smoked polished glass: a faint dark body that shows what is behind it, a mirror-smooth coat
+    /// that picks up the studio's light along every edge.
+    static func glass() -> SCNMaterial {
+        // Smoked: a dark body, so the polished faces show the light and never turn milky white.
+        let material = pbr(UIColor(white: 0.1, alpha: 1), roughness: 0.04, coat: 1, coatRoughness: 0.02)
+        material.transparency = 0.6
+        material.transparencyMode = .dualLayer
+        material.blendMode = .alpha
+        return material
     }
 
     /// The fine metal line around the squares: platinum, or the look's own metal.
@@ -272,6 +289,9 @@ struct SculptedLook {
     var ivoryPolish = Polish(roughness: 0.34, coat: 0.35, coatRoughness: 0.08)
     /// How much the ivory darkens toward its silhouette; 0 for none.
     var ivoryEdge: CGFloat = 0
+    /// The floor of the rook's well, in each color: dark, so its top reads as a tower, never as a ball.
+    var ivoryShade = UIColor(red: 0.24, green: 0.21, blue: 0.18, alpha: 1)
+    var ebonyShade = UIColor(white: 0.05, alpha: 1)
     /// How dark the pieces' shadows fall on the stone.
     var shadowAlpha: CGFloat = 0.62
     var ebonyPolish = Polish(roughness: 0.36, coat: 0.45, coatRoughness: 0.2)
@@ -306,8 +326,11 @@ struct SculptedLook {
     var accent = UIColor(red: 0.37, green: 0.56, blue: 1.0, alpha: 1)
     var check = UIColor(red: 1.0, green: 0.23, blue: 0.3, alpha: 1)
     var platinumMark = UIColor(red: 0.86, green: 0.88, blue: 0.93, alpha: 1)
-    var lastMove = UIColor.white
-    var lastMoveAlpha: CGFloat = 0.13
+    /// A gold wash on the last move's squares, strong enough to show on cream stone too.
+    var lastMove = UIColor(red: 0.851, green: 0.663, blue: 0.169, alpha: 1)
+    var lastMoveAlpha: CGFloat = 0.4
+    /// The warm glow under a fallen king.
+    var finaleGlow = UIColor(red: 0.96, green: 0.78, blue: 0.43, alpha: 1)
 }
 
 extension SculptedLook {
@@ -335,11 +358,13 @@ extension SculptedLook {
         look.ivoryEdge = 0.35
         look.shadowAlpha = 0.75
         look.ebony = UIColor(red: 0.1, green: 0.095, blue: 0.09, alpha: 1)
+        // Polished platinum reflects the dark studio as near black: a faint glow of its own keeps
+        // the king's cross and the bishop's cut bright against the dark frame on the far side.
+        look.metalGlow = UIColor(red: 0.28, green: 0.28, blue: 0.29, alpha: 1)
         look.stoneRoughness = 0.22
         look.stoneCoat = 0.5
         look.lacquerRoughness = 0.28
         look.lacquerCoat = 0.7
-        look.lastMoveAlpha = 0.15
         return look
     }
 
@@ -395,6 +420,9 @@ extension SculptedLook {
         look.squares = "sculpted-squares-bordeaux"
         look.lacquer = UIColor(red: 0.05, green: 0.04, blue: 0.04, alpha: 1)
         look.accent = UIColor(red: 0.92, green: 0.7, blue: 0.34, alpha: 1)
+        // Yellow-green, so the last move doesn't read as one of the gold marks.
+        look.lastMove = UIColor(red: 0.725, green: 0.761, blue: 0.29, alpha: 1)
+        look.lastMoveAlpha = 0.45
         return look
     }()
 
@@ -405,6 +433,9 @@ extension SculptedLook {
         look.squares = "sculpted-squares-midnight"
         look.lacquer = UIColor(red: 0.04, green: 0.045, blue: 0.06, alpha: 1)
         look.accent = UIColor(red: 0.95, green: 0.74, blue: 0.36, alpha: 1)
+        // Yellow-green, so the last move doesn't read as one of the gold marks.
+        look.lastMove = UIColor(red: 0.725, green: 0.761, blue: 0.29, alpha: 1)
+        look.lastMoveAlpha = 0.45
         return look
     }()
 }

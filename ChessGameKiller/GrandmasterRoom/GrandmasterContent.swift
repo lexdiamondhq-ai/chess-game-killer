@@ -20,16 +20,60 @@ struct ClassicGame: Decodable, Identifiable, Hashable {
     var title: String { "\(white) – \(black)" }
 }
 
-/// An endgame to play perfectly against the tablebase.
+/// An endgame every player must know, played against perfect defence. Built and checked
+/// by scripts/grandmaster/build_endgames.py.
 struct EndgameStudy: Decodable, Identifiable, Hashable {
+    /// The shelves of the endgame library, in the order they are shown.
+    enum Group: String, Decodable, CaseIterable {
+        case mustKnow = "Must know"
+        case rookEndings = "Rook endings"
+        case expert = "Expert"
+    }
+
+    /// The side the player takes: always the side to move in the position.
+    enum Side: String, Decodable {
+        case white, black
+
+        var color: Piece.Color { self == .white ? .white : .black }
+    }
+
+    /// The result the player must keep, which is the position's true result.
+    enum Goal: String, Decodable {
+        case win, draw
+
+        /// 1 for a win, 0 for a draw, the way judges score a position for the player.
+        var value: Int { self == .win ? 1 : 0 }
+    }
+
     let id: String
     let title: String
+    let group: Group
     /// 1 basic, 2 classic, 3 hard.
     let level: Int
     let fen: String
+    let side: Side
+    let goal: Goal
+    /// The plan, shown before the first move.
     let idea: String
+    /// The one thing to remember, shown after a slip.
+    let tip: String
+    /// For a draw: how many good moves in a row count as holding it, when not the usual number.
+    let hold: Int?
 
-    var player: Piece.Color { fen.split(separator: " ").dropFirst().first == "b" ? .black : .white }
+    var player: Piece.Color { side.color }
+
+    /// Good moves in a row that hold a draw.
+    var movesToHold: Int { hold ?? 10 }
+
+    /// "White to play and win", "Black to play and draw".
+    var goalText: String {
+        "\(player.displayName) to play and \(goal.rawValue)"
+    }
+
+    /// The level in a word: "Basic", "Classic" or "Hard".
+    var levelName: String {
+        ["Basic", "Classic", "Hard"][min(max(level, 1), 3) - 1]
+    }
 }
 
 /// A named opening line from lichess-org/chess-openings (CC0).
@@ -93,8 +137,8 @@ struct GrandmasterContent {
 // MARK: Tablebase
 
 /// What the Lichess tablebase says about a position, from the side to move.
-struct TablebaseResult: Decodable {
-    struct Move: Decodable {
+struct TablebaseResult: Decodable, Sendable {
+    struct Move: Decodable, Sendable {
         let uci: String
         let san: String
         /// The result for the side to move after this move: "loss" here is a win for the mover.
@@ -103,13 +147,23 @@ struct TablebaseResult: Decodable {
     }
 
     let category: String
+    /// Plies to mate with perfect play (five pieces or fewer): positive when the side to move mates.
     let dtm: Int?
     let checkmate: Bool?
     let stalemate: Bool?
+    /// Every legal move, best first.
     let moves: [Move]
 
     /// +1 win, 0 draw, -1 loss for the side to move.
     var value: Int { Self.value(of: category) }
+
+    /// Moves (not plies) to mate with perfect play, when the tablebase knows: positive when the
+    /// side to move mates, negative when it is mated.
+    var mateInMoves: Int? {
+        guard let dtm, dtm != 0 else { return nil }
+        let moves = (abs(dtm) + 1) / 2
+        return dtm > 0 ? moves : -moves
+    }
 
     /// The value of a move for the side that plays it.
     func value(of uci: String) -> Int? {
@@ -127,14 +181,39 @@ struct TablebaseResult: Decodable {
 
 /// Looks positions up in the Lichess endgame tablebase (up to seven pieces).
 enum Tablebase {
-    static func probe(_ fen: String) async throws -> TablebaseResult {
+    /// The most pieces, kings included, the tablebase knows.
+    static let maxPieces = 7
+
+    /// Whether the tablebase can answer for a position: seven pieces or fewer, and no castling rights.
+    static func covers(_ fen: String) -> Bool {
+        let fields = fen.split(separator: " ")
+        guard let placement = fields.first else { return false }
+        let castling = fields.count > 2 ? fields[2] : "-"
+        return placement.filter(\.isLetter).count <= maxPieces && castling == "-"
+    }
+
+    static func probe(_ fen: String, timeout: TimeInterval = 8) async throws -> TablebaseResult {
         var components = URLComponents(string: "https://tablebase.lichess.ovh/standard")!
         components.queryItems = [URLQueryItem(name: "fen", value: fen)]
         var request = URLRequest(url: components.url!)
-        request.timeoutInterval = 8
+        request.timeoutInterval = timeout
         let (data, response) = try await URLSession.shared.data(for: request)
         guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
         return try JSONDecoder().decode(TablebaseResult.self, from: data)
+    }
+}
+
+/// Something that looks positions up in a tablebase: Lichess in the app, a fake in tests.
+protocol TablebaseProbing: Sendable {
+    func probe(_ fen: String) async throws -> TablebaseResult
+}
+
+/// The Lichess tablebase, with a short timeout so a weak connection soon hands over to Stockfish.
+struct LichessTablebase: TablebaseProbing {
+    var timeout: TimeInterval = 4
+
+    func probe(_ fen: String) async throws -> TablebaseResult {
+        try await Tablebase.probe(fen, timeout: timeout)
     }
 }
 

@@ -53,10 +53,26 @@ actor FakeEngine: ChessEngine {
     }
 }
 
+extension MatchController {
+    /// A game whose moves the test taps out for both sides: the computer never answers.
+    func startTapping(_ setup: Setup = Setup(), from position: Position = .standard) {
+        start(setup, from: position)
+        game.humanColors = [.white, .black]
+    }
+}
+
 @MainActor
 final class SilentSounds: SoundPlaying {
     private(set) var played: [GameSound] = []
     func play(_ sound: GameSound) { played.append(sound) }
+}
+
+/// Keeps each sound with how long after it was asked for it plays.
+@MainActor
+final class TimedSounds: SoundPlaying {
+    private(set) var played: [(sound: GameSound, delay: TimeInterval)] = []
+    func play(_ sound: GameSound) { play(sound, after: 0) }
+    func play(_ sound: GameSound, after delay: TimeInterval) { played.append((sound, delay)) }
 }
 
 @MainActor
@@ -93,15 +109,15 @@ final class MatchControllerTests: XCTestCase {
 
     func testShowsTwoBestMovesForThePlayer() async {
         let match = MatchController(engine: FakeEngine(), sounds: nil)
-        match.start(.init(opponent: .friend), playSound: false)
+        match.startTapping()
         await waitUntil("hints appear") { match.hints.count == 2 }
         XCTAssertEqual(match.hints.map(\.rank), [0, 1])
         XCTAssertFalse(match.hints[0].san.isEmpty)
     }
 
-    func testHidingBestMovesClearsTheArrows() async {
+    func testHidingBestMovesClearsTheHints() async {
         let match = MatchController(engine: FakeEngine(), sounds: nil)
-        match.start(.init(opponent: .friend), playSound: false)
+        match.startTapping()
         await waitUntil("hints appear") { match.hints.count == 2 }
         match.showBestMoves = false
         XCTAssertTrue(match.hints.isEmpty)
@@ -118,7 +134,7 @@ final class MatchControllerTests: XCTestCase {
             ],
         ])
         let match = MatchController(engine: engine, sounds: nil)
-        match.start(.init(opponent: .friend), playSound: false)
+        match.startTapping()
         await waitUntil("hints appear") { match.hints.count == 2 }
 
         tapMove(match, "e2e4")
@@ -139,7 +155,7 @@ final class MatchControllerTests: XCTestCase {
             fen(after: "a2a3"): [EngineLine(moves: ["e7e5"], evaluation: .centipawns(250))],
         ])
         let match = MatchController(engine: engine, sounds: nil)
-        match.start(.init(opponent: .friend), playSound: false)
+        match.startTapping()
         await waitUntil("hints appear") { match.hints.count == 2 }
 
         tapMove(match, "a2a3")
@@ -152,7 +168,7 @@ final class MatchControllerTests: XCTestCase {
     func testComputerRepliesAndPlayerCanMoveAgain() async {
         let sounds = SilentSounds()
         let match = MatchController(engine: FakeEngine(), sounds: sounds)
-        match.start(.init(opponent: .computer, playerColor: .white, level: .beginner), playSound: false)
+        match.start(.init(opponent: .computer, playerColor: .white, level: .beginner))
         tapMove(match, "e2e4")
         XCTAssertFalse(match.game.isHumanTurn)
 
@@ -165,7 +181,7 @@ final class MatchControllerTests: XCTestCase {
 
     func testComputerOpensWhenThePlayerTakesBlack() async {
         let match = MatchController(engine: FakeEngine(), sounds: nil)
-        match.start(.init(opponent: .computer, playerColor: .black, level: .club), playSound: false)
+        match.start(.init(opponent: .computer, playerColor: .black, level: .club))
         XCTAssertTrue(match.isBoardFlipped)
         await waitUntil("the computer opens") { match.game.plyCount == 1 }
         XCTAssertEqual(match.game.sideToMove, .black)
@@ -173,14 +189,14 @@ final class MatchControllerTests: XCTestCase {
 
     func testCannotMoveTheComputersPieces() {
         let match = MatchController(engine: nil, sounds: nil)
-        match.start(.init(opponent: .computer, playerColor: .black), playSound: false)
+        match.start(.init(opponent: .computer, playerColor: .black))
         tapMove(match, "e2e4")
         XCTAssertEqual(match.game.plyCount, 0)
     }
 
     func testUndoAgainstTheComputerTakesBackBothMoves() async {
         let match = MatchController(engine: FakeEngine(), sounds: nil)
-        match.start(.init(opponent: .computer, playerColor: .white), playSound: false)
+        match.start(.init(opponent: .computer, playerColor: .white))
         tapMove(match, "e2e4")
         await waitUntil("the computer replies") { match.game.plyCount == 2 }
 
@@ -189,13 +205,15 @@ final class MatchControllerTests: XCTestCase {
         XCTAssertTrue(match.game.isHumanTurn)
     }
 
-    func testCapturesAreRecordedForTheExplosion() {
+    func testCapturesAreRecordedForTheFall() {
         let match = MatchController(engine: nil, sounds: nil)
-        match.start(.init(opponent: .friend), playSound: false)
+        match.startTapping()
         for move in ["e2e4", "d7d5", "e4d5"] { tapMove(match, move) }
         XCTAssertEqual(match.game.captureEvents.count, 1)
         XCTAssertEqual(match.game.captureEvents.first?.piece.kind, .pawn)
         XCTAssertEqual(match.game.captureEvents.first?.piece.square, .d5)
+        // It falls away from the pawn that took it.
+        XCTAssertEqual(match.game.captureEvents.first?.from, .e4)
         XCTAssertEqual(match.game.lastPlayed?.san, "exd5")
         XCTAssertTrue(match.game.lastPlayed?.isCapture == true)
     }
@@ -203,8 +221,8 @@ final class MatchControllerTests: XCTestCase {
     func testCaptureAndCheckSounds() {
         let sounds = SilentSounds()
         let match = MatchController(engine: nil, sounds: sounds)
-        match.start(.init(opponent: .friend), playSound: true)
-        XCTAssertEqual(sounds.played.last, .gameStart)
+        match.startTapping()
+        XCTAssertTrue(sounds.played.isEmpty, "a game starts quietly")
         for move in ["e2e4", "d7d5", "e4d5"] { tapMove(match, move) }
         XCTAssertEqual(sounds.played.last, .capture)
         for move in ["e7e6", "f1b5"] { tapMove(match, move) }
@@ -213,7 +231,7 @@ final class MatchControllerTests: XCTestCase {
 
     func testCheckmateIsReviewedAsCheckmate() async {
         let match = MatchController(engine: FakeEngine(), sounds: nil)
-        match.start(.init(opponent: .friend), playSound: false)
+        match.startTapping()
         for move in ["f2f3", "e7e5", "g2g4", "d8h4"] { tapMove(match, move) }
         XCTAssertEqual(match.game.winner, .black)
         await waitUntil("the mate is reviewed") { match.review?.grade == .checkmate }
@@ -222,23 +240,23 @@ final class MatchControllerTests: XCTestCase {
     func testSavedSetupReadsLastChoices() {
         let defaults = UserDefaults(suiteName: "MatchControllerTests")!
         defaults.removePersistentDomain(forName: "MatchControllerTests")
-        XCTAssertEqual(NewGameSheet.savedSetup(defaults).opponent, .computer)
         XCTAssertEqual(NewGameSheet.savedSetup(defaults).timeControl, .unlimited)
+        // A friend game picked before pass-and-play was removed is ignored.
         defaults.set("friend", forKey: "setup.opponent")
         defaults.set("black", forKey: "setup.side")
         defaults.set(MatchController.Level.expert.rawValue, forKey: "setup.level")
         defaults.set("5+0", forKey: "setup.clock")
         let setup = NewGameSheet.savedSetup(defaults)
-        XCTAssertEqual(setup.opponent, .friend)
+        XCTAssertEqual(setup.opponent, .computer)
         XCTAssertEqual(setup.playerColor, .black)
         XCTAssertEqual(setup.level, .expert)
         XCTAssertEqual(setup.timeControl, .blitz5)
     }
 
-    func testOnlyTheBestArrowWhenTheSecondIsOff() async {
+    func testOnlyTheBestHintWhenTheSecondIsOff() async {
         let match = MatchController(engine: FakeEngine(), sounds: nil)
         match.showSecondBest = false
-        match.start(.init(opponent: .friend), playSound: false)
+        match.startTapping()
         await waitUntil("the hint appears") { match.hints.count == 1 }
         XCTAssertEqual(match.hints.map(\.rank), [0])
         match.showSecondBest = true
@@ -247,7 +265,7 @@ final class MatchControllerTests: XCTestCase {
 
     func testPlayingAHintMakesTheMove() async {
         let match = MatchController(engine: FakeEngine(), sounds: nil)
-        match.start(.init(opponent: .friend), playSound: false)
+        match.startTapping()
         await waitUntil("hints appear") { match.hints.count == 2 }
         let hint = match.hints[0]
         match.play(hint)
@@ -256,28 +274,42 @@ final class MatchControllerTests: XCTestCase {
         XCTAssertEqual(match.game.sideToMove, .black)
     }
 
-    func testTimedGameRunsTheClockForTheSideToMove() {
+    func testTheClockStartsWithTheFirstMove() {
         let match = MatchController(engine: nil, sounds: nil)
-        match.start(.init(opponent: .friend, timeControl: .blitz5), playSound: false)
-        XCTAssertEqual(match.clock?.running, .white)
-        XCTAssertEqual(match.clock?.remaining(for: .black), .seconds(300))
+        match.startTapping(.init(timeControl: .blitz5))
+        XCTAssertNil(match.clock?.running, "nobody's time runs before the first move")
+        XCTAssertEqual(match.clock?.remaining(for: .white), .seconds(300))
 
         tapMove(match, "e2e4")
         XCTAssertEqual(match.clock?.running, .black)
-        match.undo()
+        tapMove(match, "e7e5")
         XCTAssertEqual(match.clock?.running, .white)
+        match.undo()
+        XCTAssertEqual(match.clock?.running, .black)
+        match.undo()
+        XCTAssertNil(match.clock?.running, "back at the start, the clock waits for the first move again")
 
-        match.start(.init(opponent: .friend), playSound: false)
+        match.startTapping()
         XCTAssertNil(match.clock)
+    }
+
+    func testABoardHiddenBeforeTheFirstMoveLeavesTheClockStopped() {
+        let match = MatchController(engine: nil, sounds: nil)
+        match.startTapping(.init(timeControl: .blitz5))
+        match.suspend()
+        match.resume()
+        XCTAssertNil(match.clock?.running)
+        tapMove(match, "e2e4")
+        XCTAssertEqual(match.clock?.running, .black)
     }
 
     func testFlipTurnsTheBoardAround() {
         let match = MatchController(engine: nil, sounds: nil)
-        match.start(.init(opponent: .computer, playerColor: .black), playSound: false)
+        match.start(.init(opponent: .computer, playerColor: .black))
         XCTAssertTrue(match.isBoardFlipped)
         match.flipBoard()
         XCTAssertFalse(match.isBoardFlipped)
-        match.start(.init(opponent: .computer, playerColor: .black), playSound: false)
+        match.start(.init(opponent: .computer, playerColor: .black))
         XCTAssertTrue(match.isBoardFlipped, "a new game puts the player's side back at the bottom")
     }
 
@@ -290,7 +322,7 @@ final class MatchControllerTests: XCTestCase {
             ],
         ])
         let match = MatchController(engine: engine, sounds: nil)
-        match.start(.init(opponent: .computer, playerColor: .white), playSound: false)
+        match.start(.init(opponent: .computer, playerColor: .white))
         await waitUntil("hints appear") { match.hints.count == 2 }
 
         tapMove(match, "e2e4")
@@ -305,14 +337,14 @@ final class MatchControllerTests: XCTestCase {
     func testEveryStartCountsAGame() {
         let match = MatchController(engine: nil, sounds: nil)
         XCTAssertEqual(match.gameNumber, 0)
-        match.start(.init(opponent: .friend), playSound: false)
+        match.startTapping()
         match.rematch()
         XCTAssertEqual(match.gameNumber, 2)
     }
 
     func testAFinishedGameCannotBeUndone() {
         let match = MatchController(engine: nil, sounds: nil)
-        match.start(.init(opponent: .friend), playSound: false)
+        match.startTapping()
         for move in ["f2f3", "e7e5", "g2g4", "d8h4"] { tapMove(match, move) }
         XCTAssertTrue(match.isOver)
         XCTAssertFalse(match.canUndo)
@@ -330,7 +362,7 @@ final class MatchControllerTests: XCTestCase {
             fen(after: "a2a3"): [EngineLine(moves: ["e7e5"], evaluation: .centipawns(250))],
         ])
         let match = MatchController(engine: engine, sounds: nil)
-        match.start(.init(opponent: .friend), playSound: false)
+        match.startTapping()
         await waitUntil("hints appear") { match.hints.count == 2 }
 
         tapMove(match, "a2a3")
@@ -345,13 +377,14 @@ final class MatchControllerTests: XCTestCase {
 
     func testUndoGivesBackTheIncrementOfTheUndoneMove() {
         let match = MatchController(engine: nil, sounds: nil)
-        match.start(.init(opponent: .friend, timeControl: .blitz3Plus2), playSound: false)
+        match.startTapping(.init(timeControl: .blitz3Plus2))
         tapMove(match, "e2e4")
+        tapMove(match, "e7e5")
         match.undo()
-        let left = match.clock?.remaining(for: .white) ?? .zero
-        XCTAssertLessThanOrEqual(left, .seconds(180), "the two seconds for e4 must come off again")
+        let left = match.clock?.remaining(for: .black) ?? .zero
+        XCTAssertLessThanOrEqual(left, .seconds(180), "the two seconds for e5 must come off again")
         XCTAssertGreaterThan(left, .seconds(170))
-        XCTAssertEqual(match.clock?.running, .white)
+        XCTAssertEqual(match.clock?.running, .black)
     }
 
     func testFlagFallIsADrawWhenTheOtherSideCannotMate() throws {
@@ -359,7 +392,7 @@ final class MatchControllerTests: XCTestCase {
         let match = MatchController(engine: nil, sounds: sounds)
         // White has a queen, Black only a king: if White's flag falls, Black could never have won.
         let position = try XCTUnwrap(Position(fen: "k7/8/8/8/8/8/8/KQ6 w - - 0 1"))
-        match.start(.init(opponent: .friend, timeControl: .blitz5), from: position, playSound: false)
+        match.startTapping(.init(timeControl: .blitz5), from: position)
         match.flagFell(.white)
         XCTAssertEqual(match.outcome, .timeoutDraw(flagged: .white))
         XCTAssertNil(match.winner)
@@ -370,7 +403,7 @@ final class MatchControllerTests: XCTestCase {
     func testFlagFallIsALossWhenTheOtherSideCanMate() throws {
         let match = MatchController(engine: nil, sounds: nil)
         let position = try XCTUnwrap(Position(fen: "k6r/8/8/8/8/8/8/KQ6 w - - 0 1"))
-        match.start(.init(opponent: .friend, timeControl: .blitz5), from: position, playSound: false)
+        match.startTapping(.init(timeControl: .blitz5), from: position)
         match.flagFell(.white)
         XCTAssertEqual(match.outcome, .timeout(loser: .white))
         XCTAssertEqual(match.winner, .black)
@@ -397,7 +430,7 @@ final class MatchControllerTests: XCTestCase {
     func testAFlagDuringPromotionPutsThePawnBack() throws {
         let match = MatchController(engine: nil, sounds: nil)
         let position = try XCTUnwrap(Position(fen: "7k/P7/8/8/8/8/8/K7 w - - 0 1"))
-        match.start(.init(opponent: .friend, timeControl: .blitz5), from: position, playSound: false)
+        match.startTapping(.init(timeControl: .blitz5), from: position)
         tapMove(match, "a7a8")
         XCTAssertNotNil(match.game.pendingPromotion)
 
@@ -407,27 +440,31 @@ final class MatchControllerTests: XCTestCase {
         XCTAssertEqual(match.outcome, .timeoutDraw(flagged: .white))
     }
 
-    func testASuspendedClockStaysStoppedThroughTheComputersReply() async {
+    func testTheRivalAndTheClockWaitWhileTheBoardIsHidden() async {
         let match = MatchController(engine: FakeEngine(), sounds: nil)
-        match.start(.init(opponent: .computer, playerColor: .white, timeControl: .blitz5), playSound: false)
+        match.start(.init(opponent: .computer, playerColor: .white, timeControl: .blitz5))
         tapMove(match, "e2e4")
         XCTAssertEqual(match.clock?.running, .black)
 
-        match.suspendClock()
+        match.suspend()
         XCTAssertNil(match.clock?.running)
-        await waitUntil("the computer replies") { match.game.plyCount == 2 }
-        XCTAssertNil(match.clock?.running, "the reply must not restart a held clock")
+        try? await Task.sleep(for: .milliseconds(600))
+        XCTAssertEqual(match.game.plyCount, 1, "the rival doesn't move where nobody can see it")
+        XCTAssertNil(match.clock?.running)
 
-        match.resumeClock()
+        match.resume()
+        XCTAssertEqual(match.clock?.running, .black)
+        await waitUntil("the computer replies") { match.game.plyCount == 2 }
         XCTAssertEqual(match.clock?.running, .white)
+        await waitUntil("the move held back is graded") { match.review?.played == "e4" }
     }
 
     func testResumingTheClockOfAFinishedGameDoesNothing() {
         let match = MatchController(engine: nil, sounds: nil)
-        match.start(.init(opponent: .friend, timeControl: .blitz5), playSound: false)
+        match.startTapping(.init(timeControl: .blitz5))
         for move in ["f2f3", "e7e5", "g2g4", "d8h4"] { tapMove(match, move) }
-        match.suspendClock()
-        match.resumeClock()
+        match.suspend()
+        match.resume()
         XCTAssertNil(match.clock?.running)
     }
 
@@ -437,7 +474,7 @@ final class MatchControllerTests: XCTestCase {
         let match = MatchController(engine: engine, sounds: nil)
         // Always slip, and take the first legal move in notation order.
         match.chance = { 0 }
-        match.start(.init(opponent: .computer, playerColor: .black, level: .beginner), playSound: false)
+        match.start(.init(opponent: .computer, playerColor: .black, level: .beginner))
         await waitUntil("the computer opens") { match.game.plyCount == 1 }
         XCTAssertEqual(match.game.moves, ["a3"])
         XCTAssertEqual(match.game.sideToMove, .black)
@@ -451,7 +488,7 @@ final class MatchControllerTests: XCTestCase {
             let engine = FakeEngine(missedMoves: 2)
             let match = MatchController(engine: engine, sounds: nil)
             match.chance = { 0.99 }
-            match.start(.init(opponent: .computer, playerColor: .black, level: level), playSound: false)
+            match.start(.init(opponent: .computer, playerColor: .black, level: level))
             await waitUntil("\(level) opens") { match.game.plyCount == 1 }
             XCTAssertEqual(match.game.sideToMove, .black, "\(level)")
             XCTAssertFalse(match.engineFailed, "\(level) shouldn't say the engine is unavailable")
@@ -463,7 +500,7 @@ final class MatchControllerTests: XCTestCase {
     /// With no engine answer at all, the rival still moves rather than freezing the game.
     func testTheComputerStillMovesWhenTheEngineIsSilent() async {
         let match = MatchController(engine: FakeEngine(silent: true), sounds: nil)
-        match.start(.init(opponent: .computer, playerColor: .black, level: .beginner), playSound: false)
+        match.start(.init(opponent: .computer, playerColor: .black, level: .beginner))
         await waitUntil("the computer opens") { match.game.plyCount == 1 }
         XCTAssertEqual(match.game.sideToMove, .black)
         tapMove(match, "e7e5")
@@ -475,7 +512,7 @@ final class MatchControllerTests: XCTestCase {
         // White to move; the black queen on d5 is free for the knight on c3.
         let position = Position(fen: "4k3/8/8/3q4/8/2N5/8/4K3 w - - 0 1")!
         let match = MatchController(engine: FakeEngine(silent: true), sounds: nil)
-        match.start(.init(opponent: .computer, playerColor: .black, level: .club), from: position, playSound: false)
+        match.start(.init(opponent: .computer, playerColor: .black, level: .club), from: position)
         await waitUntil("the computer moves") { match.game.plyCount == 1 }
         XCTAssertEqual(match.game.moves, ["Nxd5"])
     }
@@ -483,7 +520,7 @@ final class MatchControllerTests: XCTestCase {
     func testThePersonCanResign() async {
         let sounds = SilentSounds()
         let match = MatchController(engine: FakeEngine(), sounds: sounds)
-        match.start(.init(opponent: .computer, playerColor: .white, level: .club), playSound: false)
+        match.start(.init(opponent: .computer, playerColor: .white, level: .club))
         XCTAssertFalse(match.canResign, "nothing to resign before the first move")
         tapMove(match, "e2e4")
         await waitUntil("the computer answers") { match.game.plyCount == 2 }
@@ -499,7 +536,7 @@ final class MatchControllerTests: XCTestCase {
         let sounds = SilentSounds()
         // Every position scores 20 pawns for the person on their turn.
         let match = MatchController(engine: FakeEngine(score: 2000), sounds: sounds)
-        match.start(.init(opponent: .computer, playerColor: .white, level: .club), playSound: false)
+        match.start(.init(opponent: .computer, playerColor: .white, level: .club))
         await waitUntil("the first look at the position") { match.evaluation != nil }
         XCTAssertNil(match.outcome, "one bad look isn't enough to resign")
         tapMove(match, "e2e4")
@@ -512,7 +549,7 @@ final class MatchControllerTests: XCTestCase {
     func testCheckmatingTheRivalPlaysTheVictoryTheme() async {
         let sounds = SilentSounds()
         let match = MatchController(engine: FakeEngine(), sounds: sounds)
-        match.start(.init(opponent: .friend), playSound: false)
+        match.startTapping()
         for move in ["f2f3", "e7e5", "g2g4", "d8h4"] { tapMove(match, move) }
         XCTAssertEqual(match.winner, .black)
         XCTAssertEqual(sounds.played.last, .victory)
@@ -521,7 +558,7 @@ final class MatchControllerTests: XCTestCase {
     func testEveryRivalHasSomethingToSay() {
         let moments: [RivalMoment] = [
             .greeting, .tookPiece(.knight), .lostPiece(.queen), .givesCheck, .playerBlunder,
-            .playerGreatMove, .rivalResigns, .rivalWins, .playerWins, .draw,
+            .playerGreatMove, .rivalResigns, .playerResigned, .rivalWins, .playerWins, .draw,
         ]
         for level in MatchController.Level.allCases {
             for moment in moments {
@@ -532,30 +569,23 @@ final class MatchControllerTests: XCTestCase {
                 }
             }
         }
-        XCTAssertEqual(RivalVoice.line(for: .tookPiece(.rook), level: .beginner, pick: 0), "Yay, I got your rook!")
+        XCTAssertEqual(RivalVoice.line(for: .tookPiece(.rook), level: .beginner, pick: 0), "Oh! I took your rook.")
     }
 
     func testTheRivalGreetsAndReactsToACapture() async {
         let match = MatchController(engine: FakeEngine(), sounds: nil)
         match.chance = { 0.1 }
-        match.start(.init(opponent: .computer, playerColor: .white, level: .beginner), playSound: false)
+        match.start(.init(opponent: .computer, playerColor: .white, level: .beginner))
         XCTAssertNotNil(match.rivalLine, "the rival says hello")
         let hello = match.rivalLine
         tapMove(match, "e2e4")
         await waitUntil("the rival answers") { match.game.plyCount == 2 }
         // A big moment always gets a line: taking the queen.
         let position = Position(fen: "4k3/8/8/3q4/4P3/8/8/4K3 w - - 0 1")!
-        match.start(.init(opponent: .computer, playerColor: .white, level: .beginner), from: position, playSound: false)
+        match.start(.init(opponent: .computer, playerColor: .white, level: .beginner), from: position)
         XCTAssertNotEqual(match.rivalLine, hello)
         tapMove(match, "e4d5")
         XCTAssertEqual(match.rivalLine?.text.contains("queen"), true, "\(match.rivalLine?.text ?? "nothing")")
-    }
-
-    func testFriendsGetNoBanter() {
-        let match = MatchController(engine: nil, sounds: nil)
-        match.start(.init(opponent: .friend), playSound: false)
-        for move in ["f2f3", "e7e5", "g2g4", "d8h4"] { tapMove(match, move) }
-        XCTAssertNil(match.rivalLine)
     }
 
     func testStrongerRivalsAlwaysPlayTheEnginesMove() async {
@@ -563,9 +593,144 @@ final class MatchControllerTests: XCTestCase {
         let engine = FakeEngine(scripted: [start: [EngineLine(moves: ["e2e4"], evaluation: .centipawns(30))]])
         let match = MatchController(engine: engine, sounds: nil)
         match.chance = { 0 }
-        match.start(.init(opponent: .computer, playerColor: .black, level: .club), playSound: false)
+        match.start(.init(opponent: .computer, playerColor: .black, level: .club))
         await waitUntil("the computer opens") { match.game.plyCount == 1 }
         XCTAssertEqual(match.game.moves, ["e4"])
+    }
+
+    /// Two moves made before the coach could grade the first: both are graded, only the newest is shown.
+    func testAQuickPlayerStillGetsEveryMoveGraded() async {
+        let match = MatchController(engine: FakeEngine(), sounds: nil)
+        match.startTapping()
+        var seen: [(played: String?, latest: Bool)] = []
+        match.onReview = { review, latest in seen.append((review?.played, latest)) }
+        tapMove(match, "e2e4")
+        tapMove(match, "e7e5")
+        await waitUntil("both moves are graded") { match.gradeCounts.values.reduce(0, +) == 2 }
+        XCTAssertEqual(match.review?.played, "e5")
+        XCTAssertEqual(seen.map { $0.played }, ["e4", "e5"])
+        XCTAssertEqual(seen.map { $0.latest }, [false, true])
+    }
+
+    func testPlayingBlackTheRivalsOpeningCannotBeTakenBack() async {
+        let match = MatchController(engine: FakeEngine(), sounds: nil)
+        match.start(.init(opponent: .computer, playerColor: .black))
+        await waitUntil("the rival opens") { match.game.plyCount == 1 }
+        XCTAssertFalse(match.canUndo)
+        let opening = match.game.moves.first
+        tapMove(match, "e7e5")
+        await waitUntil("the rival answers") { match.game.plyCount == 3 }
+        XCTAssertTrue(match.canUndo)
+        match.undo()
+        XCTAssertEqual(match.game.plyCount, 1)
+        XCTAssertEqual(match.game.moves.first, opening)
+        XCTAssertFalse(match.canUndo)
+    }
+
+    func testAPawnWaitingToPromoteCanGoBack() throws {
+        let match = MatchController(engine: nil, sounds: nil)
+        let position = try XCTUnwrap(Position(fen: "7k/P7/8/8/8/8/8/K7 w - - 0 1"))
+        match.startTapping(from: position)
+        tapMove(match, "a7a8")
+        XCTAssertNotNil(match.game.pendingPromotion)
+        match.cancelPromotion()
+        XCTAssertNil(match.game.pendingPromotion)
+        XCTAssertEqual(match.game.piece(at: .a7)?.kind, .pawn)
+        XCTAssertEqual(match.game.plyCount, 0)
+        XCTAssertFalse(match.wasAssisted, "changing your mind about a promotion isn't help")
+    }
+
+    func testAMovePlayedByTheCoachIsNotGraded() async {
+        let match = MatchController(engine: FakeEngine(), sounds: nil)
+        match.startTapping()
+        await waitUntil("hints appear") { match.hints.count == 2 }
+        match.play(match.hints[0])
+        XCTAssertTrue(match.wasAssisted)
+        await waitUntil("hints for the next move") { match.hints.count == 2 }
+        XCTAssertTrue(match.gradeCounts.isEmpty)
+        XCTAssertNil(match.review)
+    }
+
+    func testLeavingAGameForANewOneIsSavedAsALoss() {
+        let match = MatchController(engine: nil, sounds: nil)
+        var saved: [SavedGame] = []
+        match.onArchive = { saved.append($0) }
+        match.start(.init(opponent: .computer, playerColor: .white, level: .expert))
+        for move in ["e2e4", "e7e5", "g1f3"] { XCTAssertTrue(match.game.playEngineMove(move)) }
+        XCTAssertFalse(match.newGameForfeits, "three plies in, leaving costs nothing")
+        XCTAssertTrue(match.game.playEngineMove("b8c6"))
+        XCTAssertTrue(match.newGameForfeits)
+        match.start(.init(opponent: .computer, playerColor: .white))
+        XCTAssertEqual(saved.count, 1)
+        XCTAssertEqual(saved.first?.result, .loss, "the saved game and the army agree")
+        XCTAssertFalse(match.isOver, "the new game starts fresh")
+        XCTAssertFalse(match.newGameForfeits)
+    }
+
+    func testTakingBackAMoveClearsTheRivalsRemark() async {
+        let match = MatchController(engine: FakeEngine(), sounds: nil)
+        match.chance = { 0.1 }
+        match.start(.init(opponent: .computer, playerColor: .white, level: .beginner))
+        XCTAssertNotNil(match.rivalLine)
+        tapMove(match, "e2e4")
+        await waitUntil("the rival answers") { match.game.plyCount == 2 }
+        match.undo()
+        XCTAssertNil(match.rivalLine)
+    }
+
+    func testARematchStartsFromTheSamePosition() throws {
+        let match = MatchController(engine: nil, sounds: nil)
+        let position = try XCTUnwrap(Position(fen: "4k3/8/8/3q4/4P3/8/8/4K3 w - - 0 1"))
+        match.startTapping(from: position)
+        let start = match.game.fen
+        tapMove(match, "e4d5")
+        match.rematch()
+        XCTAssertEqual(match.game.fen, start)
+        XCTAssertEqual(match.game.plyCount, 0)
+    }
+
+    func testTheVerdictLeavesTheLineWhenTheNextPieceIsPicked() async {
+        let start = GameModel().fen
+        let engine = FakeEngine(scripted: [
+            start: [
+                EngineLine(moves: ["e2e4", "e7e5"], evaluation: .centipawns(30)),
+                EngineLine(moves: ["d2d4", "d7d5"], evaluation: .centipawns(25)),
+            ],
+        ])
+        let match = MatchController(engine: engine, sounds: nil)
+        match.startTapping()
+        await waitUntil("hints appear") { match.hints.count == 2 }
+        tapMove(match, "e2e4")
+        await waitUntil("the verdict shows in the player's line") { match.verdictLine != nil }
+        match.tap(.e7)
+        XCTAssertNil(match.verdictLine)
+        XCTAssertNotNil(match.review, "the coach still has it")
+    }
+
+    func testAnalyzingAGameUnderWayCountsAsHelp() {
+        let match = MatchController(engine: nil, sounds: nil)
+        match.startTapping()
+        match.markAssisted()
+        XCTAssertFalse(match.wasAssisted, "nothing to help with before the first move")
+        tapMove(match, "e2e4")
+        match.markAssisted()
+        XCTAssertTrue(match.wasAssisted)
+    }
+
+    func testTheMoveIsHeardWhenItsPieceLandsAndTheEndWhenTheKingHasFallen() {
+        let sounds = TimedSounds()
+        let match = MatchController(engine: nil, sounds: sounds)
+        match.landingDelay = { _ in 0.5 }
+        match.finaleDelay = { _ in 1.9 }
+        match.startTapping()
+        tapMove(match, "e2e4")
+        XCTAssertEqual(sounds.played.last?.sound, .move)
+        XCTAssertEqual(sounds.played.last?.delay, 0.5)
+        // Scholar's mate: 2. Bc4 Nc6 3. Qh5 Nf6 4. Qxf7#.
+        for move in ["e7e5", "f1c4", "b8c6", "d1h5", "g8f6", "h5f7"] { tapMove(match, move) }
+        XCTAssertTrue(match.game.isCheckmate)
+        XCTAssertEqual(sounds.played.suffix(2).map { $0.sound }, [.capture, .victory])
+        XCTAssertEqual(sounds.played.last?.delay, 1.9)
     }
 
     func testHintsAreTurnedOffOnceForEveryone() {

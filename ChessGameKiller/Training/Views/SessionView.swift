@@ -6,7 +6,11 @@ import SwiftUI
 struct SessionView: View {
     let plan: SessionPlan
     let theme: BoardTheme
+    /// Skips the intro, for a session started from a card that already showed what's in it.
+    var startsAtOnce = false
     @Environment(TrainingStore.self) private var store
+    /// Puzzles from the Lichess pack report back to the puzzle store, for review.
+    @Environment(PuzzleStore.self) private var puzzles: PuzzleStore?
     @Environment(\.dismiss) private var dismiss
     @State private var runner: SessionRunner?
 
@@ -23,17 +27,19 @@ struct SessionView: View {
                     }
                     .transition(.opacity)
                 case .lesson:
-                    if let lesson = plan.lesson {
-                        LessonPlayerView(lesson: lesson, theme: theme) {
+                    if let lesson = runner.plan.lesson {
+                        LessonPlayerView(lesson: lesson, theme: theme, onFinish: {
                             withAnimation(.snappy) { runner.lessonFinished() }
-                        }
+                        }, onSkip: {
+                            withAnimation(.snappy) { runner.skipLesson() }
+                        })
                         .transition(.opacity)
                     }
                 case .drills:
                     drills(runner)
                         .transition(.opacity)
                 case .summary:
-                    SessionSummary(runner: runner, theme: theme) {
+                    SessionSummary(runner: runner, theme: theme, next: nextStep(after: runner)) {
                         dismiss()
                     }
                     .transition(.opacity.combined(with: .scale(scale: 0.97)))
@@ -44,10 +50,36 @@ struct SessionView: View {
         .tint(theme.trainingAccent)
         .onAppear {
             if runner == nil {
-                runner = SessionRunner(plan: plan, store: store, engine: StockfishEngine.shared)
+                let made = SessionRunner(plan: plan, store: store, engine: StockfishEngine.shared)
+                runner = made
+                if startsAtOnce { made.begin() }
             }
         }
         .onDisappear { runner?.drill?.cancel() }
+    }
+
+    /// What to offer after a finished session: the player's own mistakes, when some are due.
+    private func nextStep(after runner: SessionRunner) -> SessionSummary.Next? {
+        let onlyMistakes = runner.plan.items.allSatisfy {
+            if case .mistake = $0.content { return true } else { return false }
+        }
+        guard !runner.endedEarly, !onlyMistakes else { return nil }
+        let due = store.dueMistakeCount
+        guard due > 0, let plan = store.mistakesPlan() else { return nil }
+        return SessionSummary.Next(title: due == 1 ? "Fix 1 position from your games" : "Fix \(due) positions from your games",
+                                   symbol: "arrow.uturn.backward") {
+            start(plan)
+        }
+    }
+
+    /// Moves straight on to another session in the same screen.
+    private func start(_ plan: SessionPlan) {
+        runner?.drill?.cancel()
+        let made = SessionRunner(plan: plan, store: store, engine: StockfishEngine.shared)
+        withAnimation(.snappy) {
+            runner = made
+            made.begin()
+        }
     }
 
     // MARK: Drills
@@ -64,7 +96,7 @@ struct SessionView: View {
                 }
                 if let drill = runner.drill {
                     ScrollView {
-                        DrillView(runner: drill, theme: theme, boardSide: boardSide)
+                        DrillView(runner: drill, theme: theme, boardSide: boardSide, talks: true)
                             .padding(.top, 4)
                             .padding(.bottom, 8)
                     }
@@ -73,7 +105,11 @@ struct SessionView: View {
                     .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity),
                                             removal: .move(edge: .leading).combined(with: .opacity)))
                     .onChange(of: drill.outcome) { _, outcome in
-                        if let outcome { runner.record(outcome) }
+                        guard let outcome else { return }
+                        if case .drill(let played)? = runner.current?.content, let id = played.lichessPuzzleID {
+                            puzzles?.recordTraining(id, outcome: outcome)
+                        }
+                        runner.record(outcome)
                     }
                 }
                 Spacer(minLength: 0)
@@ -105,6 +141,8 @@ struct SessionView: View {
                     .font(.system(size: 15, weight: .bold))
                     .frame(width: 36, height: 36)
                     .background(.thinMaterial, in: Circle())
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("End session")
@@ -156,6 +194,19 @@ struct ProgressDots: View {
         .animation(.snappy, value: index)
         .accessibilityElement()
         .accessibilityLabel("Drill \(min(index + 1, count)) of \(count)")
+        .accessibilityValue(summary)
+    }
+
+    /// The results so far in words, since the dots only say it in color.
+    private var summary: String {
+        guard !outcomes.isEmpty else { return "" }
+        let solved = outcomes.filter { $0 == .firstTry }.count
+        let helped = outcomes.filter { $0 == .withHint || $0 == .afterMistake }.count
+        let missed = outcomes.filter { $0 == .missed }.count
+        var parts = ["\(solved) solved"]
+        if helped > 0 { parts.append("\(helped) with help") }
+        if missed > 0 { parts.append("\(missed) missed") }
+        return parts.joined(separator: ", ")
     }
 
     private func color(at i: Int) -> Color {
@@ -186,6 +237,8 @@ struct SessionIntro: View {
                         .font(.system(size: 15, weight: .bold))
                         .frame(width: 36, height: 36)
                         .background(.thinMaterial, in: Circle())
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Close")
@@ -203,6 +256,10 @@ struct SessionIntro: View {
                         .multilineTextAlignment(.center)
                     if let focus = plan.focus {
                         Label(focus.title, systemImage: focus.symbol)
+                            .font(.headline)
+                            .foregroundStyle(theme.trainingAccent)
+                    } else if let headline = plan.headline {
+                        Label(headline, systemImage: plan.symbol ?? "puzzlepiece.fill")
                             .font(.headline)
                             .foregroundStyle(theme.trainingAccent)
                     }
@@ -240,7 +297,8 @@ struct SessionIntro: View {
         HStack(spacing: 12) {
             Image(systemName: symbol)
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(color.color(on: theme))
+                // One accent on the executive looks; Neon keeps its colors.
+                .foregroundStyle(theme.glows ? color.color(on: theme) : theme.trainingAccent)
                 .frame(width: 24)
             Text(text)
                 .font(.system(.subheadline, design: .themed).weight(.medium))
@@ -250,8 +308,16 @@ struct SessionIntro: View {
 
 /// The end of a session: how it went, what was earned, and the next rank.
 struct SessionSummary: View {
+    /// A follow-up worth doing right away, offered under Done.
+    struct Next {
+        let title: String
+        let symbol: String
+        let action: () -> Void
+    }
+
     let runner: SessionRunner
     let theme: BoardTheme
+    var next: Next?
     let done: () -> Void
 
     @State private var shown = false
@@ -260,7 +326,8 @@ struct SessionSummary: View {
 
     var body: some View {
         let accuracy = runner.accuracy
-        let green = TrainingColor.green.color(on: theme)
+        let days = max(runner.reward.streak, store.streak)
+        let green = theme.glows ? TrainingColor.green.color(on: theme) : theme.trainingAccent
         ScrollView {
             VStack(spacing: 20) {
                 ZStack {
@@ -283,7 +350,7 @@ struct SessionSummary: View {
 
                 HStack(spacing: 10) {
                     stat("+\(runner.reward.xp)", "XP", "sparkles", theme.trainingAccent)
-                    stat("\(max(runner.reward.streak, store.streak))", runner.reward.streak == 1 ? "day" : "days", "flame.fill",
+                    stat("\(days)", days == 1 ? "day" : "days", "flame.fill",
                          TrainingColor.orange.color(on: theme))
                 }
 
@@ -312,10 +379,18 @@ struct SessionSummary: View {
         }
         .scrollBounceBehavior(.basedOnSize)
         .safeAreaInset(edge: .bottom) {
-            Button("Done", action: done)
-                .buttonStyle(TrainingButtonStyle(theme: theme))
-                .padding(.horizontal, 20)
-                .padding(.bottom, 8)
+            VStack(spacing: 10) {
+                if let next {
+                    Button(action: next.action) {
+                        Label(next.title, systemImage: next.symbol)
+                    }
+                    .buttonStyle(TrainingButtonStyle(theme: theme))
+                }
+                Button("Done", action: done)
+                    .buttonStyle(TrainingButtonStyle(theme: theme, prominent: next == nil))
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 8)
         }
         .onAppear {
             withAnimation(.easeOut(duration: 1.1).delay(0.2)) { shown = true }

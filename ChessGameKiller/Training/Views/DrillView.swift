@@ -6,20 +6,30 @@ struct DrillView: View {
     let runner: DrillRunner
     let theme: BoardTheme
     let boardSide: CGFloat
+    /// Offers Talk it through on find-the-move puzzles. Rush and Cycles never do: they give no help.
+    var talks = false
+
+    /// The talk open over the puzzle.
+    @State private var talk: TalkSession?
+    /// The move Play picked in the talk, made once the talk has closed.
+    @State private var talkMove: DrillTalkMove?
 
     var body: some View {
         VStack(spacing: 14) {
-            TrainingBoardView(
-                game: runner.game,
-                theme: theme,
-                flipped: runner.learner == .black,
-                arrows: runner.arrows,
-                marks: runner.marks,
-                labels: runner.labels,
-                onTap: runner.acceptsTaps ? { (square: Square) in runner.tap(square) } : nil
-            )
-            .frame(width: boardSide, height: boardSide)
-            .overlay(alignment: .bottom) { turnBadge }
+            VStack(spacing: 6) {
+                TrainingBoardView(
+                    game: runner.game,
+                    theme: theme,
+                    flipped: runner.learner == .black,
+                    arrows: runner.arrows,
+                    marks: runner.marks,
+                    labels: runner.labels,
+                    onTap: runner.acceptsTaps ? { (square: Square) in runner.tap(square) } : nil
+                )
+                .frame(width: boardSide, height: boardSide)
+                // Under the board, never over the back rank; the space is kept so nothing jumps.
+                turnBadge
+            }
 
             messageCard
                 .padding(.horizontal, 16)
@@ -28,63 +38,66 @@ struct DrillView: View {
                 .padding(.horizontal, 16)
         }
         .animation(.snappy(duration: 0.25), value: runner.phase)
+        .fullScreenCover(item: $talk, onDismiss: playTalkMove) { (session: TalkSession) in
+            TalkPanel(session: session, theme: theme, play: { (uci: String) in
+                talkMove = DrillTalkMove(fen: session.fen, uci: uci)
+                talk = nil
+            }, close: {
+                talk = nil
+            })
+        }
     }
 
     // MARK: Pieces of the screen
 
-    /// "Your move" in the learner's color, under the board.
-    @ViewBuilder
+    /// "White to move" in the learner's color, under the board.
     private var turnBadge: some View {
-        if runner.phase == .solving, runner.kind == .move || runner.kind == .playout {
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(theme.sideColor(runner.learner))
-                    .overlay(Circle().strokeBorder(Color.secondary.opacity(0.5), lineWidth: theme.isDark ? 0 : 1))
-                    .frame(width: 10, height: 10)
-                Text("\(theme.name(of: runner.learner)) to move")
-                    .font(.caption.weight(.semibold))
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(.ultraThinMaterial, in: Capsule())
-            .offset(y: 13)
-            .transition(.opacity)
-        }
+        TurnBadge(theme: theme, side: runner.learner,
+                  showing: runner.phase == .solving && (runner.kind == .move || runner.kind == .playout))
     }
 
     private var messageCard: some View {
         let tint = runner.tone == .coach ? nil : theme.trainingTone(runner.tone)
         return HStack(alignment: .top, spacing: 12) {
-            CoachAvatar(theme: theme, size: 40, tint: tint)
-            VStack(alignment: .leading, spacing: 6) {
-                if let chip = roleChip {
-                    TrainingChip(text: chip.text, symbol: chip.symbol, color: chip.color)
+            HStack(alignment: .top, spacing: 12) {
+                CoachAvatar(theme: theme, size: 40, tint: tint)
+                VStack(alignment: .leading, spacing: 6) {
+                    if let chip = roleChip {
+                        TrainingChip(text: chip.text, symbol: chip.symbol, color: chip.color)
+                    }
+                    Text(runner.message)
+                        .font(.system(.body, design: .themed).weight(.medium))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .id(runner.message)
+                        .transition(.opacity)
                 }
-                Text(runner.message)
-                    .font(.system(.body, design: .themed).weight(.medium))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .id(runner.message)
-                    .transition(.opacity)
+            }
+            .accessibilityElement(children: .combine)
+            if showsTalk {
+                talkButton
+                    .transition(.scale(scale: 0.6).combined(with: .opacity))
             }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .trainingCard(theme, tint: tint)
         .animation(.easeInOut(duration: 0.2), value: runner.message)
-        .accessibilityElement(children: .combine)
+        .animation(.snappy(duration: 0.25), value: showsTalk)
     }
 
     private var roleChip: (text: String, symbol: String, color: Color)? {
+        // One accent on the executive looks; Neon keeps a color for each.
+        func color(_ neon: TrainingColor) -> Color { theme.glows ? neon.color(on: theme) : theme.trainingAccent }
         if case .mistake = runner.item.content {
-            return ("From your game", "arrow.uturn.backward.circle.fill", TrainingColor.pink.color(on: theme))
+            return ("From your game", "arrow.uturn.backward.circle.fill", color(.pink))
         }
         switch runner.item.role {
-        case .warmUp: return ("Warm-up", "sun.max.fill", TrainingColor.yellow.color(on: theme))
+        case .warmUp: return ("Warm-up", "sun.max.fill", color(.yellow))
         case .focus: return nil
-        case .review: return ("Review", "arrow.triangle.2.circlepath", TrainingColor.violet.color(on: theme))
-        case .mixed: return ("Mixed: no clues", "shuffle", TrainingColor.teal.color(on: theme))
-        case .finisher: return ("Finisher", "flag.checkered", TrainingColor.green.color(on: theme))
+        case .review: return ("Review", "arrow.triangle.2.circlepath", color(.violet))
+        case .mixed: return ("Mixed: no clues", "shuffle", color(.teal))
+        case .finisher: return ("Finisher", "flag.checkered", color(.green))
         }
     }
 
@@ -132,8 +145,9 @@ struct DrillView: View {
                     Button {
                         runner.reveal()
                     } label: {
-                        Text("Move on")
+                        Text("Skip")
                     }
+                    .accessibilityHint("Gives this one up and moves on")
                     .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false))
                 }
             } else if runner.phase == .solving {
@@ -154,8 +168,9 @@ struct DrillView: View {
                     Button {
                         withAnimation(.snappy) { runner.reveal() }
                     } label: {
-                        Text("Move on")
+                        Text("Skip")
                     }
+                    .accessibilityHint("Gives this one up and moves on")
                     .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false))
                     .frame(maxWidth: 130)
                 }
@@ -163,22 +178,73 @@ struct DrillView: View {
         }
     }
 
+    @ViewBuilder
     private var helpButtons: some View {
-        HStack(spacing: 10) {
-            Button {
-                withAnimation(.snappy) { runner.hint() }
-            } label: {
-                Label("Hint", systemImage: "lightbulb.fill")
-            }
-            .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false, tint: TrainingColor.yellow.color(on: theme)))
-            .disabled(runner.usedHint)
+        if runner.strict {
+            // Rush and Cycles give no hints. Passing counts as a miss, and says so.
             Button {
                 withAnimation(.snappy) { runner.reveal() }
             } label: {
-                Label("Show me", systemImage: "eye.fill")
+                Label("Pass (counts as a miss)", systemImage: "forward.fill")
             }
             .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false))
+        } else {
+            HStack(spacing: 10) {
+                Button {
+                    withAnimation(.snappy) { runner.hint() }
+                } label: {
+                    Label("Hint", systemImage: "lightbulb.fill")
+                }
+                .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false, tint: TrainingColor.yellow.color(on: theme)))
+                .disabled(runner.usedHint)
+                Button {
+                    withAnimation(.snappy) { runner.reveal() }
+                } label: {
+                    Label("Show me", systemImage: "eye.fill")
+                }
+                .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false))
+            }
         }
+    }
+
+    // MARK: Talk it through
+
+    /// Leo's microphone sits in his card for the whole of a find-the-move puzzle, so the words
+    /// never jump; it only works on the learner's turn.
+    private var showsTalk: Bool {
+        talks && runner.kind == .move && !runner.strict && !runner.isDone
+    }
+
+    /// Answer Leo out loud: his microphone, at the end of what he just asked.
+    private var talkButton: some View {
+        let ready = runner.canTalkItThrough && talk == nil
+        return Button(action: openTalk) {
+            TalkMic(theme: theme)
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        // Lined up with Leo's 40-point face, so the card keeps its height; still a 44-point target.
+        .padding(.vertical, -2)
+        .disabled(!ready)
+        .opacity(ready ? 1 : 0.4)
+        .animation(.easeInOut(duration: 0.2), value: ready)
+        .accessibilityLabel("Talk it through")
+        .accessibilityHint("Tell Leo your plan. He checks every part. Counts as a hint.")
+    }
+
+    private func openTalk() {
+        guard talk == nil, let session = runner.talkSession() else { return }
+        talkMove = nil
+        talk = session
+    }
+
+    /// Makes the move Play picked, on the position the talk was about.
+    private func playTalkMove() {
+        guard let pending = talkMove else { return }
+        talkMove = nil
+        guard runner.game.fen == pending.fen else { return }
+        withAnimation(.snappy) { _ = runner.playLearnerMove(pending.uci) }
     }
 
     private func optionButton(_ option: ChoiceOption, index: Int) -> some View {
@@ -215,4 +281,10 @@ struct DrillView: View {
         .buttonStyle(.plain)
         .disabled(tried || runner.isDone || runner.phase != .solving)
     }
+}
+
+/// A move picked with Play in a talk over a puzzle, and the position it was for.
+private struct DrillTalkMove: Equatable {
+    let fen: String
+    let uci: String
 }

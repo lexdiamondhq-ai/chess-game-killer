@@ -23,24 +23,35 @@ struct TrainingBoardView: View {
             let sq = (side - inset * 2) / 8
             let corner = RoundedRectangle(cornerRadius: sq * 0.12, style: .continuous)
             ZStack(alignment: .topLeading) {
-                if let art = theme.boardArt {
-                    BoardArt(name: art, flipped: flipped)
+                // Only the board is cut to its rounded corners, so a tall piece on the far rank
+                // may rise a little above the frame.
+                ZStack {
+                    if let art = theme.boardArt {
+                        BoardArt(name: art, flipped: flipped)
+                    }
+                    if let surface = theme.surface {
+                        LinearGradient(colors: surface, startPoint: .topLeading, endPoint: .bottomTrailing)
+                    }
                 }
-                if let surface = theme.surface {
-                    LinearGradient(colors: surface, startPoint: .topLeading, endPoint: .bottomTrailing)
-                }
+                .frame(width: side, height: side)
+                .clipShape(corner)
                 ZStack(alignment: .topLeading) {
                     squares(size: sq)
                     markLayer(size: sq)
                     pieceLayer(size: sq)
+                    if theme.spritePieces {
+                        dotsOverPieces(size: sq)
+                    }
                     arrowLayer(size: sq)
                     labelLayer(size: sq)
                 }
                 .frame(width: sq * 8, height: sq * 8)
                 .padding(inset)
+                if theme.boardArt != nil {
+                    FrameCoordinates(flipped: flipped, inset: inset, squareSize: sq, color: theme.labelOnDark)
+                }
             }
             .frame(width: side, height: side)
-            .clipShape(corner)
             .overlay {
                 if let edge = theme.boardEdge {
                     corner.strokeBorder(edge, lineWidth: 1)
@@ -56,11 +67,9 @@ struct TrainingBoardView: View {
             }
         }
         .aspectRatio(1, contentMode: .fit)
-        .sensoryFeedback(.impact(weight: .light), trigger: game.moveCount) { _, _ in hapticsOn }
-        // Capture events are dropped once the explosion is over, which changes the
-        // trigger a second time; only a new capture should thump.
-        .sensoryFeedback(.impact(weight: .heavy, intensity: 0.9), trigger: game.captureEvents.last?.id) { _, new in
-            hapticsOn && new != nil
+        // One tap per move, as on the game board: firmer for a capture, a sharp knock for a check.
+        .sensoryFeedback(trigger: game.moveCount) { _, _ in
+            hapticsOn ? MoveFeel(of: game).feedback(heavy: false) : nil
         }
     }
 
@@ -73,8 +82,7 @@ struct TrainingBoardView: View {
     }
 
     private func center(of square: Square, size: CGFloat) -> CGPoint {
-        let cell = cell(of: square)
-        return CGPoint(x: (CGFloat(cell.column) + 0.5) * size, y: (CGFloat(cell.row) + 0.5) * size)
+        BoardTapResolver.center(of: square, squareSize: size, flipped: flipped)
     }
 
     private func square(column: Int, row: Int) -> Square {
@@ -104,6 +112,27 @@ struct TrainingBoardView: View {
                 }
             }
         }
+        // One tap for the whole board, read where the finger landed: a tall piece's head
+        // is drawn over the square behind it.
+        .contentShape(Rectangle())
+        .gesture(SpatialTapGesture().onEnded { value in
+            guard let onTap, let tapped = tappedSquare(at: value.location, size: size) else { return }
+            withAnimation(.snappy(duration: 0.22)) { onTap(tapped) }
+        })
+    }
+
+    /// The square a tap on the squares means: see `BoardTapResolver`.
+    private func tappedSquare(at point: CGPoint, size: CGFloat) -> Square? {
+        var isSolid: ((Piece, CGPoint) -> Bool)?
+        if theme.spritePieces {
+            let theme = theme
+            isSolid = { piece, offset in SpriteMasks.shared.isSolid(piece, in: theme, at: offset) }
+        }
+        return BoardTapResolver.square(
+            at: point, squareSize: size, flipped: flipped,
+            selected: game.selected, targets: game.targets,
+            piece: { game.piece(at: $0) }, isSolid: isSolid
+        )
     }
 
     private func squareView(_ square: Square, column: Int, row: Int, size: CGFloat) -> some View {
@@ -128,39 +157,33 @@ struct TrainingBoardView: View {
                 Rectangle().fill(theme.selected)
                 if let ring = theme.selectedRing {
                     Rectangle().strokeBorder(ring, lineWidth: ringWidth)
-                        .shadow(color: ring, radius: size * 0.08)
+                        .shadow(color: theme.glows ? ring : .clear, radius: size * 0.08)
                 }
             }
             if game.checkedKing == square {
-                RadialGradient(colors: [theme.check, theme.check.opacity(0.6), .clear],
-                               center: .center, startRadius: 0, endRadius: size * 0.62)
+                CheckSquareMark(color: theme.check, size: size)
             }
-            if column == 0 {
-                coordinate("\(square.rankIndex + 1)", size: size, color: labelColor, alignment: .topLeading)
-            }
-            if row == 7 {
-                coordinate(square.file.rawValue, size: size, color: labelColor, alignment: .bottomTrailing)
+            // Coordinates in the corners, like a printed board. A board picture has them in its frame.
+            if theme.boardArt == nil {
+                if column == 0 {
+                    coordinate("\(square.rankIndex + 1)", size: size, color: labelColor, alignment: .topLeading)
+                }
+                if row == 7 {
+                    coordinate(square.file.rawValue, size: size, color: labelColor, alignment: .bottomTrailing)
+                }
             }
             if isTarget {
-                Group {
-                    if occupant == nil {
-                        Circle().fill(theme.hint).frame(width: size * 0.3, height: size * 0.3)
-                    } else {
-                        Circle().strokeBorder(theme.hint, lineWidth: size * 0.08).padding(size * 0.02)
-                    }
-                }
-                .shadow(color: theme.hintGlow ?? .clear, radius: theme.hintGlow == nil ? 0 : size * 0.1)
+                MoveDot(occupied: occupant != nil, color: theme.hint, glow: theme.hintGlow, size: size)
             }
         }
         .frame(width: size, height: size)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            guard let onTap else { return }
-            withAnimation(.snappy(duration: 0.22)) { onTap(square) }
-        }
         .accessibilityElement()
         .accessibilityLabel(accessibilityLabel(square, occupant: occupant, isTarget: isTarget))
         .accessibilityAddTraits(onTap == nil ? [] : .isButton)
+        .accessibilityAction {
+            guard let onTap else { return }
+            withAnimation(.snappy(duration: 0.22)) { onTap(square) }
+        }
     }
 
     private func coordinate(_ text: String, size: CGFloat, color: Color, alignment: Alignment) -> some View {
@@ -216,11 +239,13 @@ struct TrainingBoardView: View {
     private func pieceLayer(size: CGFloat) -> some View {
         ZStack(alignment: .topLeading) {
             ForEach(game.pieces) { placed in
+                let place = cell(of: placed.square)
                 PieceImage(piece: placed.piece, theme: theme, size: size, onBoard: true)
-                    .scaleEffect(game.selected == placed.square ? 1.08 : 1)
+                    .scaleEffect(game.selected == placed.square ? PieceImage.liftedScale : 1)
                     .position(center(of: placed.square, size: size))
-                    // Nearer rows draw last, so tall 3D pieces overlap the ones behind them.
-                    .zIndex(Double(cell(of: placed.square).row))
+                    // Nearer rows draw last, so tall 3D pieces overlap the ones behind them, and
+                    // left to right within a row, so each soft shadow falls on the board, not on a piece.
+                    .zIndex(Double(place.row) * 8 + Double(place.column))
                     .transition(.asymmetric(
                         insertion: .opacity.combined(with: .scale(scale: 0.6)),
                         removal: .opacity.animation(.easeOut(duration: 0.12))
@@ -298,10 +323,27 @@ struct TrainingBoardView: View {
 
     // MARK: Captures
 
+    /// The move dots again, faintly over the pieces, so a dot behind a tall piece's head still
+    /// shows through it, as on the game board: a tap there plays the move.
+    private func dotsOverPieces(size: CGFloat) -> some View {
+        ZStack(alignment: .topLeading) {
+            ForEach(Array(game.targets), id: \.self) { target in
+                MoveDot(occupied: game.piece(at: target) != nil, color: theme.hint, size: size)
+                    .frame(width: size, height: size)
+                    .position(center(of: target, size: size))
+            }
+        }
+        .frame(width: size * 8, height: size * 8)
+        .opacity(0.4)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
     private func explosions(size: CGFloat) -> some View {
         ZStack(alignment: .topLeading) {
             ForEach(game.captureEvents) { event in
-                CaptureExplosion(piece: event.piece, theme: theme, size: size, seed: event.id)
+                CaptureFall(piece: event.piece, theme: theme, size: size, seed: event.id,
+                            away: CaptureFall.direction(of: event, flipped: flipped))
                     .position(center(of: event.piece.square, size: size))
             }
         }

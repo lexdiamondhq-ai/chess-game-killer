@@ -49,7 +49,7 @@ final class StockfishTests: XCTestCase {
         defer { StockfishEngine.trace = nil }
         for level in MatchController.Level.allCases {
             let match = MatchController(engine: StockfishEngine.shared, sounds: nil)
-            match.start(.init(opponent: .computer, playerColor: .white, level: level), playSound: false)
+            match.start(.init(opponent: .computer, playerColor: .white, level: level))
             // Let the hint search get going, so the reply has to stop it first.
             try? await Task.sleep(for: .milliseconds(300))
             let started = ContinuousClock.now
@@ -68,7 +68,7 @@ final class StockfishTests: XCTestCase {
             XCTAssertEqual(match.game.plyCount, 2, "\(level) never answered")
             XCTAssertLessThan(ms, level.thinkTimeMs + 2500, "\(level) took \(ms) ms to answer")
             // Leave the engine alone for the next level: no grading or hints still running.
-            match.start(.init(opponent: .friend), playSound: false)
+            await match.settleEngine()
         }
     }
 
@@ -84,10 +84,10 @@ final class StockfishTests: XCTestCase {
         let match = MatchController(engine: StockfishEngine.shared, sounds: nil)
         for level in MatchController.Level.allCases {
             // A game where the person is to move, so a long hint search is under way.
-            match.start(.init(opponent: .computer, playerColor: .white, level: level), playSound: false)
+            match.start(.init(opponent: .computer, playerColor: .white, level: level))
             try? await Task.sleep(for: .milliseconds(300))
             let started = ContinuousClock.now
-            match.start(.init(opponent: .computer, playerColor: .black, level: level), playSound: false)
+            match.start(.init(opponent: .computer, playerColor: .black, level: level))
             var waited = 0
             while match.game.plyCount < 1, waited < 1200 {
                 try? await Task.sleep(for: .milliseconds(5))
@@ -99,6 +99,20 @@ final class StockfishTests: XCTestCase {
             XCTAssertEqual(match.game.sideToMove, .black)
             XCTAssertFalse(match.engineFailed, "\(level) said the engine was unavailable")
         }
-        match.start(.init(opponent: .friend), playSound: false)
+        await match.settleEngine()
+    }
+}
+
+extension MatchController {
+    /// Leaves the shared engine idle for whatever runs next. A fresh two-person game still
+    /// starts a hint search, and that search landing in the next test's search cuts it short
+    /// (the newest search wins), so this waits for it to report: it sets the evaluation.
+    func settleEngine() async {
+        startTapping()
+        var waited = 0
+        while evaluation == nil, waited < 800 {
+            try? await Task.sleep(for: .milliseconds(5))
+            waited += 1
+        }
     }
 }

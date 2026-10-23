@@ -1,3 +1,4 @@
+import ChessKit
 import SceneKit
 import SwiftUI
 import UIKit
@@ -13,8 +14,12 @@ final class ScreenSnapshotTests: XCTestCase {
     private var saved: [String: Any?] = [:]
 
     override func setUp() async throws {
-        for key in ["boardTheme", "matchRival", "bigBoard", "sculpted3D"] { saved[key] = defaults.object(forKey: key) }
+        for key in ["boardTheme", "matchRival", "bigBoard", "sculpted3D", "showBestMoves", "showSecondBest", "rivalBanter"] {
+            saved[key] = defaults.object(forKey: key)
+        }
         defaults.set(false, forKey: "bigBoard")
+        // The rival's greeting would stand in for its line in every picture.
+        defaults.set(false, forKey: "rivalBanter")
     }
 
     override func tearDown() async throws {
@@ -94,29 +99,131 @@ final class ScreenSnapshotTests: XCTestCase {
     func testRivalBoardAfterTheNewGameSheet() throws {
         defaults.removeObject(forKey: "boardTheme")
         defaults.set(true, forKey: "matchRival")
-        try snapshot("rival-after-sheet", startsWithNewGame: true)
+        try snapshot("rival-after-sheet", startsWithNewGame: true, match: MatchController(engine: nil, sounds: nil))
     }
 
-    private func snapshot(_ name: String, startsWithNewGame: Bool = false, trayOpen: Bool = false) throws {
+    /// A king in check against Spark, a moment after the check: the red callout over the king,
+    /// the ring on its square, the CHECK tag in the player's line, and Spark's remark written
+    /// into its own line instead of a bubble. Flat and in 3D.
+    func testCheckAndRivalRemark() throws {
+        defaults.set(false, forKey: "matchRival")
+        defaults.set(true, forKey: "rivalBanter")
+        for (id, threeD) in [("midnight", false), ("gilded", true), ("faberge", false)] {
+            defaults.set(id, forKey: "boardTheme")
+            defaults.set(threeD, forKey: "sculpted3D")
+            let match = MatchController(engine: nil, sounds: nil)
+            match.chance = { 0 }
+            // 1. f3 e5 2. Nc3 Qh4+: White blocks on g3 or walks.
+            let position = try XCTUnwrap(Position(fen: "rnb1kbnr/pppp1ppp/8/4p3/7q/2N2P2/PPPPP1PP/R1BQKBNR w KQkq - 2 3"))
+            match.start(MatchController.Setup(opponent: .computer, playerColor: .white, level: .beginner), from: position)
+            XCTAssertNotNil(match.game.checkedKing)
+            XCTAssertNotNil(match.rivalLine)
+            try snapshot("check-\(id)\(threeD ? "-3d" : "-flat")", match: match, wait: 1.4)
+        }
+    }
+
+    /// The person mates on a flat board: the king falls, and a moment later the coach opens
+    /// with the result and the game's summary.
+    func testTheEndOfAGame() throws {
+        defaults.set("gilded", forKey: "boardTheme")
+        defaults.set(false, forKey: "matchRival")
+        defaults.set(false, forKey: "sculpted3D")
+        let match = MatchController(engine: nil, sounds: nil)
+        match.chance = { 0 }
+        // A back-rank mate for Black, the person: Ra1.
+        let position = try XCTUnwrap(Position(fen: "r5k1/5ppp/8/8/8/8/5PPP/6K1 b - - 0 1"))
+        match.start(MatchController.Setup(opponent: .computer, playerColor: .black, level: .beginner), from: position)
+        try snapshot("game-end-gilded-flat", match: match, wait: 1.5, then: {
+            match.tap(.a8)
+            match.tap(.a1)
+        }, settle: 4)
+        XCTAssertTrue(match.isOver)
+    }
+
+    /// Hints on and the king tapped, on the whole game screen: brackets on the pieces the
+    /// coach would move, dots where the king can go, and a halo on castling, its best move.
+    func testHintsOnTheGameScreen() throws {
+        defaults.set(false, forKey: "matchRival")
+        defaults.set(true, forKey: "showBestMoves")
+        defaults.set(true, forKey: "showSecondBest")
+        let fen = "r1bqk2r/ppp2ppp/2np1n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQK2R w KQkq - 0 6"
+        for (id, threeD) in [("midnight", false), ("gilded", true)] {
+            defaults.set(id, forKey: "boardTheme")
+            defaults.set(threeD, forKey: "sculpted3D")
+            let engine = FakeEngine(scripted: [fen: [
+                EngineLine(moves: ["e1g1"], evaluation: .centipawns(40)),
+                EngineLine(moves: ["c1g5"], evaluation: .centipawns(25)),
+            ]])
+            let match = MatchController(engine: engine, sounds: nil)
+            let position = try XCTUnwrap(Position(fen: fen))
+            match.start(MatchController.Setup(opponent: .computer, playerColor: .white, level: .beginner), from: position)
+            match.tap(.e1)
+            XCTAssertEqual(match.game.selected, .e1)
+            try snapshot("hints-\(id)\(threeD ? "-3d" : "-flat")", match: match, wait: 2.5)
+            XCTAssertEqual(match.hints.map(\.uci), ["e1g1", "c1g5"])
+        }
+    }
+
+    /// The coach unfolded over a game in progress: the players fold into one line.
+    func testCoachOpen() throws {
+        defaults.set("gilded", forKey: "boardTheme")
+        defaults.set(false, forKey: "matchRival")
+        defaults.set(false, forKey: "sculpted3D")
+        try snapshot("coach-open-gilded", coachOpen: true)
+    }
+
+    /// A 375 by 667 point window, about an iPhone SE, still under the island's safe area: tighter than any phone.
+    func testSmallScreen() throws {
+        defaults.set("gilded", forKey: "boardTheme")
+        defaults.set(false, forKey: "matchRival")
+        defaults.set(false, forKey: "sculpted3D")
+        try snapshot("small-gilded-flat", size: CGSize(width: 375, height: 667))
+    }
+
+    /// A real game against Pulse on a 10-minute clock, seven moves in, with captures on both sides and you to move.
+    private static func gameInProgress() -> MatchController {
+        let match = MatchController(engine: nil, sounds: nil)
+        match.start(MatchController.Setup(level: .club, timeControl: .rapid10))
+        for move in Showcase.moves { _ = match.game.playEngineMove(move) }
+        return match
+    }
+
+    /// `play` runs once the screen is up, so whatever the game screen does in answer to a
+    /// move (a check, the end of the game) happens as it would for a person; then the picture
+    /// waits `settle` seconds more.
+    private func snapshot(_ name: String, startsWithNewGame: Bool = false, trayOpen: Bool = false,
+                          match: MatchController? = nil, coachOpen: Bool = false, size: CGSize? = nil,
+                          wait: TimeInterval = 3, then play: (() -> Void)? = nil, settle: TimeInterval = 0) throws {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let window = UIWindow(windowScene: scene)
-        window.frame = scene.coordinateSpace.bounds
-        window.rootViewController = UIHostingController(rootView: ContentView(startsWithNewGame: startsWithNewGame, trayOpen: trayOpen, startsAtHome: false))
+        window.frame = size.map { CGRect(origin: .zero, size: $0) } ?? scene.coordinateSpace.bounds
+        window.rootViewController = UIHostingController(rootView: ContentView(
+            startsWithNewGame: startsWithNewGame, trayOpen: trayOpen, startsAtHome: false,
+            match: match ?? Self.gameInProgress(), coachOpen: coachOpen))
         window.makeKeyAndVisible()
-        RunLoop.main.run(until: Date().addingTimeInterval(3))
+        RunLoop.main.run(until: Date().addingTimeInterval(wait))
         if startsWithNewGame {
             window.rootViewController?.presentedViewController?.dismiss(animated: true)
             RunLoop.main.run(until: Date().addingTimeInterval(3))
         }
+        if let play {
+            play()
+            RunLoop.main.run(until: Date().addingTimeInterval(settle))
+        }
         window.layoutIfNeeded()
 
+        // SceneKit draws with Metal, which drawHierarchy leaves out: each 3D board is covered
+        // with a picture of itself first, so what floats over it (the Check callout) still shows.
+        let covers = Self.sceneViews(in: window).map { view in
+            let cover = UIImageView(image: view.snapshot())
+            cover.frame = view.bounds
+            view.addSubview(cover)
+            return cover
+        }
         let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
             window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
-            // Metal content is drawn by SceneKit itself, so 3D boards are pictured separately.
-            for view in Self.sceneViews(in: window) {
-                view.snapshot().draw(in: view.convert(view.bounds, to: window))
-            }
         }
+        covers.forEach { $0.removeFromSuperview() }
         if let dir = ProcessInfo.processInfo.environment["SNAPSHOT_DIR"], let data = image.pngData() {
             try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
             try data.write(to: URL(fileURLWithPath: dir).appendingPathComponent("\(name).png"))

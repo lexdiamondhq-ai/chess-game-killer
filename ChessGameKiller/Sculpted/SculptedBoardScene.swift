@@ -4,7 +4,8 @@ import SceneKit
 import UIKit
 import simd
 
-/// One of the best-move arrows on the 3D board.
+/// One of the coach's suggested moves on the 3D board: brackets around the piece,
+/// and a ringed dot where it goes once the piece is picked up.
 struct SculptedHint: Equatable {
     let from: Square
     let to: Square
@@ -63,6 +64,8 @@ struct SculptedBoardState: Equatable {
             selected.map { "\($0)" } ?? "-",
             checkedKing.map { "\($0)" } ?? "-",
             targets.map { "\($0)\(occupied.contains($0) ? "x" : "")" }.sorted().joined(),
+            hints.map { "\($0.from)\($0.to)\($0.isBest ? "!" : "")" }.sorted().joined(),
+            finale.map { "\($0.square)" } ?? "-",
         ]
     }
 }
@@ -82,6 +85,7 @@ final class SculptedSceneKitView: SCNView {
 /// It owns its SceneKit view. `apply(_:animated:)` takes a copy of the game and animates
 /// whatever changed: moves glide (knights hop), captured pieces tip over and shrink away,
 /// a promoted pawn turns into its new piece, and the camera walks around the board when it flips.
+/// Legal moves and the coach's hints are marks on the stone, never arrows.
 final class SculptedBoardScene {
     static let pieceCategory = 1 << 1
 
@@ -97,7 +101,6 @@ final class SculptedBoardScene {
     private let rig = SCNNode()
     private let piecesNode = SCNNode()
     private let marksNode = SCNNode()
-    private let arrowsNode = SCNNode()
     private let labelsNode = SCNNode()
     /// Dust puffs and other passing effects.
     private let effectsNode = SCNNode()
@@ -107,6 +110,12 @@ final class SculptedBoardScene {
     private var finaleGlow: SCNNode?
     /// The king lying on its side, stood back up when the finale ends.
     private var fallenID: Int?
+    /// Where the finale's camera leans in, kept through a resize.
+    private var leanPoint: SIMD3<Float>?
+    /// When the red under a king in check shows: as the checking piece lands.
+    private var checkShowsAt: Date?
+    /// When the red under a mated king gives way to the finale's glow.
+    private var checkFadesAt: Date?
 
     private var nodes: [Int: PieceNode] = [:]
     private var state: SculptedBoardState?
@@ -135,7 +144,7 @@ final class SculptedBoardScene {
         buildCamera()
         buildLights()
         buildBoard()
-        for node in [piecesNode, marksNode, arrowsNode, labelsNode, effectsNode] {
+        for node in [piecesNode, marksNode, labelsNode, effectsNode] {
             scene.rootNode.addChildNode(node)
         }
         buildLabels(flipped: false)
@@ -144,9 +153,21 @@ final class SculptedBoardScene {
 
     // MARK: Reading the view
 
-    /// The square under a point of the view: the piece there when a piece is in the way
-    /// (its head can stand in front of the square behind it), otherwise the stone.
+    /// The square under a point of the view. With a piece picked up, a move mark there comes
+    /// first, even one seen through a piece standing in front of it. Then the piece there when
+    /// a piece is in the way (its head can stand in front of the square behind it), otherwise the stone.
     func square(at point: CGPoint) -> Square? {
+        let size = view.bounds.size
+        if let state, state.selected != nil {
+            for target in state.targets {
+                // About the mark's own size, as the camera sees it.
+                let frame = camera.frame(of: target, in: size)
+                let mark = camera.screenPoint(SculptedCamera.position(of: target), in: size)
+                let dx = (point.x - mark.x) / max(frame.width * 0.2, 1)
+                let dy = (point.y - mark.y) / max(frame.height * 0.2, 1)
+                if dx * dx + dy * dy <= 1 { return target }
+            }
+        }
         let hits = view.hitTest(point, options: [
             .searchMode: SCNHitTestSearchMode.closest.rawValue,
             .categoryBitMask: Self.pieceCategory,
@@ -156,7 +177,7 @@ final class SculptedBoardScene {
            let placed = state?.pieces.first(where: { $0.id == id }) {
             return placed.square
         }
-        return camera.square(at: point, in: view.bounds.size)
+        return camera.square(at: point, in: size)
     }
 
     /// The picture as it is now, for tests and screenshots.
@@ -166,7 +187,7 @@ final class SculptedBoardScene {
 
     /// A still picture from any camera, drawn off screen at `scale` pixels per point.
     /// The home screen's hero uses it, so the board can be faded and moved like any image.
-    func still(from camera: SculptedCamera, size: CGSize, scale: CGFloat) -> UIImage? {
+    func still(from camera: SculptedCamera, size: CGSize, scale: CGFloat, antialiased: Bool = true) -> UIImage? {
         guard size.width > 1, size.height > 1, let device = MTLCreateSystemDefaultDevice() else { return nil }
         let lens = SCNCamera()
         lens.fieldOfView = CGFloat(camera.fieldOfView * 180 / .pi)
@@ -189,7 +210,7 @@ final class SculptedBoardScene {
         renderer.pointOfView = eye
         renderer.autoenablesDefaultLighting = false
         let pixels = CGSize(width: (size.width * scale).rounded(), height: (size.height * scale).rounded())
-        let image = renderer.snapshot(atTime: 0, with: pixels, antialiasingMode: .multisampling4X)
+        let image = renderer.snapshot(atTime: 0, with: pixels, antialiasingMode: antialiased ? .multisampling4X : .none)
         guard let cgImage = image.cgImage else { return image }
         return UIImage(cgImage: cgImage, scale: scale, orientation: .up)
     }
@@ -225,24 +246,72 @@ final class SculptedBoardScene {
         if old.flipped != new.flipped {
             orbit(flipped: new.flipped, animated: animate && old.flipped != new.flipped)
         }
-        updatePieces(from: old, to: new, animated: animate)
+        let landing = updatePieces(from: old, to: new, animated: animate)
+        if let finale = new.finale, old.finale != finale {
+            // Once the last move has landed.
+            playFinale(finale, after: animate ? Self.finaleWait(afterLanding: landing) : 0, animated: animate)
+        }
+        if new.checkedKing == nil || old.checkedKing != new.checkedKing || old.lastMove != new.lastMove {
+            // A new check shows as the checking piece lands.
+            checkShowsAt = new.checkedKing != nil && animate && landing > 0 ? Date().addingTimeInterval(landing) : nil
+        }
         if old.marks != new.marks || old.pieces.isEmpty {
             updateMarks(new)
         }
-        if old.hints != new.hints {
-            updateArrows(new.hints)
-        }
         if old.halos != new.halos || old.pieces != new.pieces {
             updateHalos(new)
-        }
-        if let finale = new.finale, old.finale != finale {
-            // After the last move has landed.
-            playFinale(finale, after: animate ? 0.75 * Self.motionScale : 0, animated: animate)
         }
     }
 
     /// Stretches every move, so a test can photograph one in flight. 1 in the app.
     static var motionScale: Double = 1
+
+    // MARK: Timing, for sounds and haptics
+
+    /// Seconds from a move being played until the moving piece touches down on the 3D board,
+    /// so its sound and haptic can wait for it. Same timing as the animation.
+    static func landingDelay(for move: PlayedMove, in game: GameModel) -> TimeInterval {
+        guard let squares = Notation.squares(of: move.uci) else { return 0 }
+        let byPerson = game.humanColors.contains(move.color)
+        let promotion = move.uci.count == 5
+        // A pawn that waited on the last rank for the picker: its new piece rises in its place.
+        // One played in one go (the computer's, or Leo's for the person) walks there first.
+        if promotion, game.promotedInPlace { return riseDelay + riseTime }
+        let taken = game.captureEvents.last?.piece.kind
+        let timing = MoveTiming(
+            from: squares.from, to: squares.to,
+            knight: !promotion && game.piece(at: squares.to)?.kind == .knight,
+            capturing: move.isCapture, lifted: byPerson,
+            dramatic: move.isCapture && (taken == .queen || taken == .rook)
+        )
+        return timing.touchdown
+    }
+
+    /// Seconds from a mating move being played until the fallen king has settled.
+    static func finaleDelay(for move: PlayedMove, in game: GameModel) -> TimeInterval {
+        finaleDelay(afterLanding: landingDelay(for: move, in: game))
+    }
+
+    /// Seconds until the fallen king has settled, when the last move touches down `landing`
+    /// seconds from now: 0 for a game decided off the board, by the clock or a resignation.
+    static func finaleDelay(afterLanding landing: TimeInterval) -> TimeInterval {
+        finaleWait(afterLanding: landing) + fallTime(reduced: UIAccessibility.isReduceMotionEnabled)
+    }
+
+    /// The finale starts once the last move has landed and settled a moment.
+    private static func finaleWait(afterLanding landing: TimeInterval) -> TimeInterval {
+        max(0.75 * motionScale, landing + 0.3 * motionScale)
+    }
+
+    /// How long the losing king takes to go over.
+    private static func fallTime(reduced: Bool) -> TimeInterval {
+        reduced ? 0.01 : 1.15 * motionScale
+    }
+
+    /// A promoted pawn's new piece starts to rise this long after the player's choice, and
+    /// stands at full height `riseTime` later.
+    private static let riseDelay = 0.14
+    private static let riseTime = 0.15
 
     private var nextLooseID = 1_000_000
 
@@ -289,6 +358,8 @@ final class SculptedBoardScene {
             if size.width > 1, size.height > 1 { held.aspect = Float(size.width / size.height) }
             // Close-ups come nearer the pieces than the game's camera ever does.
             cameraNode.camera?.zNear = 0.5
+            // The lens follows the held camera too, so the view matches its framing math and its stills.
+            cameraNode.camera?.fieldOfView = CGFloat(held.fieldOfView * 180 / .pi)
             cameraNode.removeAction(forKey: "orbit")
             camera = held
             place(held)
@@ -308,6 +379,13 @@ final class SculptedBoardScene {
         camera = .fitted(aspect: Float(newSize.width / newSize.height), flipped: flipped)
         cameraNode.removeAction(forKey: "orbit")
         place(camera)
+        if let point = leanPoint {
+            // The finale keeps its close view through a resize, without moving again.
+            cameraNode.removeAction(forKey: "finale")
+            let pose = Self.leaned(camera, toward: point)
+            cameraNode.simdPosition = pose.eye
+            cameraNode.simdLook(at: pose.target, up: SculptedCamera.up, localFront: SCNNode.simdLocalFront)
+        }
     }
 
     // MARK: Pieces
@@ -338,11 +416,14 @@ final class SculptedBoardScene {
             case .bishop: yaw = -112 * .pi / 180
             default: yaw = 0
             }
+            // The bases' radii, at the game's 1.1 scale (scripts/sculpted/pieces.py and gilded.py),
+            // so the contact shadow ends at the foot and a falling piece tips over its rim.
             switch piece.kind {
-            case .king: baseRadius = 0.36
-            case .queen: baseRadius = 0.35
-            case .pawn: baseRadius = 0.3
-            default: baseRadius = 0.33
+            case .king: baseRadius = 0.34
+            case .queen, .rook: baseRadius = 0.33
+            case .knight: baseRadius = 0.32
+            case .bishop: baseRadius = 0.315
+            case .pawn: baseRadius = 0.285
             }
         }
     }
@@ -371,17 +452,32 @@ final class SculptedBoardScene {
         return node
     }
 
-    private func updatePieces(from old: SculptedBoardState, to new: SculptedBoardState, animated: Bool) {
+    /// Moves, removes and adds pieces. Returns the seconds until the move's piece touches
+    /// down, 0 when nothing was played.
+    @discardableResult
+    private func updatePieces(from old: SculptedBoardState, to new: SculptedBoardState, animated: Bool) -> Double {
         let oldByID = Dictionary(old.pieces.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let newIDs = Set(new.pieces.map(\.id))
 
-        let moved = new.pieces.filter { placed in oldByID[placed.id].map { $0.square != placed.square } ?? false }
-        let added = new.pieces.filter { oldByID[$0.id] == nil }
-        let removed = old.pieces.filter { !newIDs.contains($0.id) }
+        var moved = new.pieces.filter { placed in oldByID[placed.id].map { $0.square != placed.square } ?? false }
+        var added = new.pieces.filter { oldByID[$0.id] == nil }
+        var removed = old.pieces.filter { !newIDs.contains($0.id) }
 
         guard animated else {
             snap(to: new)
-            return
+            return 0
+        }
+
+        // A pawn the computer promotes leaves its square as its new piece appears on the last
+        // rank: the pawn walks there first, then turns into it as it lands.
+        var promotion: (pawnID: Int, successor: PlacedPiece)?
+        if let last = new.lastMove, last != old.lastMove,
+           let pawn = removed.first(where: { $0.square == last.from && $0.piece.kind == .pawn }),
+           let successor = added.first(where: { $0.square == last.to && $0.piece.color == pawn.piece.color }) {
+            removed.removeAll { $0.id == pawn.id }
+            added.removeAll { $0.id == successor.id }
+            moved.append(PlacedPiece(id: pawn.id, piece: Piece(.pawn, color: pawn.piece.color, square: last.to)))
+            promotion = (pawn.id, successor)
         }
 
         // A new game or a position set up by hand: everything glides home together.
@@ -389,6 +485,7 @@ final class SculptedBoardScene {
         let lead = moved.first { $0.square == new.lastMove?.to } ?? moved.first
         let leadOrigin = lead.flatMap { oldByID[$0.id] }.map { SculptedCamera.position(of: $0.square) }
         var leadTiming = MoveTiming.quick
+        var touchdown = 0.0
         // Taking a rook or a queen is a big moment: the move slows down and the board shakes.
         let bigCapture = !bulk && removed.contains {
             isCapture($0, in: new, old: old) && ($0.piece.kind == .queen || $0.piece.kind == .rook)
@@ -397,27 +494,39 @@ final class SculptedBoardScene {
         for placed in moved {
             guard let node = nodes[placed.id], let before = oldByID[placed.id] else { continue }
             let capturing = placed.id == lead?.id && removed.contains { isCapture($0, in: new, old: old) }
-            let timing = bulk ? MoveTiming.bulk : MoveTiming(
+            var timing = bulk ? MoveTiming.bulk : MoveTiming(
                 from: before.square, to: placed.square, knight: placed.piece.kind == .knight,
                 capturing: capturing, lifted: node.lifted, dramatic: capturing && bigCapture
             )
-            if placed.id == lead?.id { leadTiming = timing }
+            let promoting = placed.id == promotion?.pawnID
+            // A pawn about to turn into its new piece doesn't rock as it lands.
+            if promoting { timing.wobble = 0 }
+            if placed.id == lead?.id {
+                leadTiming = timing
+                touchdown = timing.touchdown
+            }
             node.piece = placed.piece
             node.lifted = false
             animateMove(node, to: placed.square, timing: timing,
                         dust: bulk ? 0 : (capturing ? (bigCapture ? 1.6 : 1.2) : 1))
+            if promoting, let successor = promotion?.successor {
+                nodes[placed.id] = nil
+                vanish(node, after: timing.touchdown, duration: 0.14, key: "promotion")
+                appear(makeNode(for: successor), after: timing.touchdown)
+            }
         }
         if bigCapture {
-            shake(after: leadTiming.lift + leadTiming.travel, strength: 0.05)
+            shake(after: leadTiming.touchdown, strength: 0.05)
         }
 
         for gone in removed {
             guard let node = nodes[gone.id] else { continue }
             nodes[gone.id] = nil
             if let successor = added.first(where: { $0.square == gone.square && $0.piece.color == gone.piece.color }), !bulk {
-                // Promotion: the pawn sinks away and its new piece rises in its place.
+                // The player's promotion: the pawn sinks away and its new piece rises in its place.
                 vanish(node, after: 0, duration: 0.18)
-                appear(makeNode(for: successor), after: 0.14)
+                appear(makeNode(for: successor), after: Self.riseDelay)
+                touchdown = max(touchdown, Self.riseDelay + Self.riseTime)
             } else if !bulk, isCapture(gone, in: new, old: old) {
                 let origin = leadOrigin ?? SculptedCamera.position(of: gone.square) + SIMD3(0, 0, 1)
                 topple(node, awayFrom: origin, timing: leadTiming)
@@ -441,6 +550,7 @@ final class SculptedBoardScene {
                 settle(node, lifted: wantsLift)
             }
         }
+        return bulk ? 0 : touchdown
     }
 
     /// Whether a piece left the board because it was taken in the move just played.
@@ -514,6 +624,8 @@ final class SculptedBoardScene {
         }
 
         var total: Double { lift + travel + land + wobble }
+        /// When the piece touches down, before it rocks to rest.
+        var touchdown: Double { lift + travel + land }
     }
 
     private func animateMove(_ node: PieceNode, to square: Square, timing: MoveTiming, dust: Float = 1) {
@@ -561,8 +673,8 @@ final class SculptedBoardScene {
             .fadeOpacity(to: 1, duration: t.travel * 0.3 + t.land),
         ]), forKey: "contact")
         if dust > 0 {
-            // A soft puff of dust where it lands.
-            DispatchQueue.main.asyncAfter(deadline: .now() + t.lift + t.travel) { [weak self] in
+            // A soft puff of dust as it touches down.
+            DispatchQueue.main.asyncAfter(deadline: .now() + t.touchdown) { [weak self] in
                 self?.puff(at: end, strength: dust, radius: node.baseRadius)
             }
         }
@@ -617,7 +729,9 @@ final class SculptedBoardScene {
         guard let node = nodes[finale.kingID] else { return }
         fallenID = finale.kingID
         let reduce = UIAccessibility.isReduceMotionEnabled || !animated
-        let fallTime = reduce ? 0.01 : 1.15 * Self.motionScale
+        let fallTime = Self.fallTime(reduced: reduce)
+        // The red under the king gives way to the glow as it goes over; a king already down has none.
+        checkFadesAt = animated ? Date().addingTimeInterval(delay + fallTime * 0.3) : Date.distantPast
 
         // Tip over sideways, so the crown falls across the player's view.
         let away = SIMD3<Float>(camera.azimuth == 0 ? 1 : -1, 0, 0)
@@ -639,18 +753,21 @@ final class SculptedBoardScene {
         node.root.runAction(.sequence([.wait(duration: delay), fall]), forKey: "pose")
         node.contact.runAction(.sequence([.wait(duration: delay), .fadeOpacity(to: 0.4, duration: fallTime)]), forKey: "contact")
 
-        // A glow on the stone where the king lies.
+        // A warm glow on the stone where the king lies.
         finaleGlow?.removeFromParentNode()
-        let glow = SCNNode(geometry: Self.mark(size: 2.6, color: look.accent, alpha: 0.85, mask: MarkImages.glow))
+        let glow = SCNNode(geometry: Self.mark(size: 2.6, color: look.finaleGlow, alpha: 0.85, mask: MarkImages.glow))
         glow.simdPosition = SculptedCamera.position(of: finale.square) + SIMD3(0, 0.0025, 0)
         glow.simdOrientation = Self.flat
         glow.renderingOrder = 7
         glow.castsShadow = false
         glow.opacity = 0
+        // It gathers as the king lands, breathes twice and then rests.
+        let breath = SCNAction.sequence([.fadeOpacity(to: 0.5, duration: 1.2), .fadeOpacity(to: 0.9, duration: 1.2)])
         glow.runAction(.sequence([
             .wait(duration: delay + fallTime * 0.6),
             .fadeOpacity(to: 0.9, duration: 0.6),
-            .repeatForever(.sequence([.fadeOpacity(to: 0.5, duration: 1.2), .fadeOpacity(to: 0.9, duration: 1.2)])),
+            SCNAction.repeat(breath, count: 2),
+            .fadeOpacity(to: 0.75, duration: 1.0),
         ]))
         effectsNode.addChildNode(glow)
         finaleGlow = glow
@@ -658,7 +775,12 @@ final class SculptedBoardScene {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
             guard let self, self.fallenID == finale.kingID else { return }
             self.dim(true, duration: reduce ? 0 : 1.0)
-            if !reduce { self.leanIn(toward: SculptedCamera.position(of: finale.square)) }
+            // A board turning around keeps its walk.
+            if !reduce, self.cameraNode.action(forKey: "orbit") == nil {
+                let point = SculptedCamera.position(of: finale.square)
+                self.leanPoint = point
+                self.leanIn(toward: point)
+            }
         }
     }
 
@@ -673,6 +795,8 @@ final class SculptedBoardScene {
             node.contact.opacity = 1
         }
         fallenID = nil
+        leanPoint = nil
+        checkFadesAt = nil
         dim(false, duration: animated ? 0.4 : 0)
         cameraNode.removeAction(forKey: "finale")
         let resting = camera
@@ -703,16 +827,22 @@ final class SculptedBoardScene {
     /// The camera drifts closer, its gaze moving toward the fallen king.
     private func leanIn(toward point: SIMD3<Float>) {
         let resting = camera
-        let eye = resting.eye + (point - resting.eye) * 0.22
-        let target = resting.target + (point - resting.target) * 0.6
+        let pose = Self.leaned(resting, toward: point)
         let duration = 1.6 * Self.motionScale
         let lean = SCNAction.customAction(duration: duration) { node, elapsed in
             let u = Ease.smooth(Float(Double(elapsed) / duration))
-            node.simdPosition = resting.eye + (eye - resting.eye) * u
-            let look = resting.target + (target - resting.target) * u
+            node.simdPosition = resting.eye + (pose.eye - resting.eye) * u
+            let look = resting.target + (pose.target - resting.target) * u
             node.simdLook(at: look, up: SculptedCamera.up, localFront: SCNNode.simdLocalFront)
         }
+        // A shudder still settling would snap the camera back.
+        cameraNode.removeAction(forKey: "shake")
         cameraNode.runAction(lean, forKey: "finale")
+    }
+
+    /// Where the camera ends up leaning in from `resting`: a little nearer, looking mostly at the point.
+    private static func leaned(_ resting: SculptedCamera, toward point: SIMD3<Float>) -> (eye: SIMD3<Float>, target: SIMD3<Float>) {
+        (resting.eye + (point - resting.eye) * 0.22, resting.target + (point - resting.target) * 0.6)
     }
 
     /// The taken piece tips away from the attacker about the far edge of its foot,
@@ -750,8 +880,9 @@ final class SculptedBoardScene {
         node.halo?.runAction(.fadeOut(duration: 0.15))
     }
 
-    /// Fades a piece out where it stands, sinking a touch.
-    private func vanish(_ node: PieceNode, after delay: Double, duration: Double) {
+    /// Fades a piece out where it stands, sinking a touch. A key of its own lets it run
+    /// beside a move that is still landing.
+    private func vanish(_ node: PieceNode, after delay: Double, duration: Double, key: String = "pose") {
         let model = node.model
         let yaw = node.yaw
         let sink = SCNAction.customAction(duration: duration) { _, elapsed in
@@ -762,7 +893,7 @@ final class SculptedBoardScene {
             .wait(duration: delay),
             .group([sink, .fadeOut(duration: duration)]),
             .removeFromParentNode(),
-        ]), forKey: "pose")
+        ]), forKey: key)
     }
 
     /// A piece arriving on the board: it rises out of the stone and settles.
@@ -874,26 +1005,63 @@ final class SculptedBoardScene {
             addMark(selectedMark, at: selected, height: 0.0017)
         }
         if let king = new.checkedKing {
-            let mark = addMark(checkMark, at: king, height: 0.0019)
-            // The square under a king in check throbs.
-            if !UIAccessibility.isReduceMotionEnabled {
-                mark.runAction(.repeatForever(.sequence([
-                    .fadeOpacity(to: 0.35, duration: 0.42),
-                    .fadeOpacity(to: 1, duration: 0.42),
-                ])))
+            // A new check shows as the checking piece lands.
+            let shows = max(checkShowsAt?.timeIntervalSinceNow ?? 0, 0)
+            // Once the game is decided, it gives way to the finale's glow as the king goes over.
+            let fades: TimeInterval? = new.finale == nil ? nil : (checkFadesAt?.timeIntervalSinceNow ?? 0)
+            if fades.map({ $0 > shows }) ?? true {
+                let glow = addMark(checkMark, at: king, height: 0.0019)
+                // A crisp red ring around the square, so the check reads at a glance.
+                let ring = addMark(checkRingMark, at: king, height: 0.0021)
+                let marks: [(node: SCNNode, low: CGFloat, beat: TimeInterval)] = [(glow, 0.35, 0.42), (ring, 0.55, 0.7)]
+                for mark in marks {
+                    var steps: [SCNAction] = []
+                    if shows > 0 {
+                        mark.node.opacity = 0
+                        steps.append(.wait(duration: shows))
+                        steps.append(.fadeIn(duration: 0.14))
+                    }
+                    if let fades {
+                        steps.append(.wait(duration: max(fades - shows - (shows > 0 ? 0.14 : 0), 0)))
+                        steps.append(.fadeOut(duration: 0.5))
+                    } else if !UIAccessibility.isReduceMotionEnabled {
+                        // The square under a king in check throbs.
+                        steps.append(.repeatForever(.sequence([
+                            .fadeOpacity(to: mark.low, duration: mark.beat),
+                            .fadeOpacity(to: 1, duration: mark.beat),
+                        ])))
+                    }
+                    if !steps.isEmpty {
+                        mark.node.runAction(.sequence(steps))
+                    }
+                }
             }
         }
+        // The coach's picks: brackets around each piece it would move, best brightest.
+        var hintedPieces: [Square: Bool] = [:]
+        for hint in new.hints { hintedPieces[hint.from] = (hintedPieces[hint.from] ?? false) || hint.isBest }
+        for (square, isBest) in hintedPieces {
+            addMark(isBest ? bracketsMark : bracketsFaintMark, at: square, height: 0.0022, fade: true)
+        }
+        // Where the selected piece can go; its suggested moves get a halo.
+        var hintedTargets: [Square: Bool] = [:]
+        for hint in new.hints where hint.from == new.selected {
+            hintedTargets[hint.to] = (hintedTargets[hint.to] ?? false) || hint.isBest
+        }
         for target in new.targets {
-            addMark(occupied.contains(target) ? captureMark : dotMark, at: target, height: 0.0023, fade: true)
+            let kind = TargetKind(capture: occupied.contains(target), hint: hintedTargets[target])
+            for (index, layer) in targetLayers(kind).enumerated() {
+                addMark(layer, at: target, height: 0.0023, order: 11 + index, fade: true)
+            }
         }
     }
 
     @discardableResult
-    private func addMark(_ geometry: SCNGeometry, at square: Square, height: Float, fade: Bool = false) -> SCNNode {
+    private func addMark(_ geometry: SCNGeometry, at square: Square, height: Float, order: Int = 10, fade: Bool = false) -> SCNNode {
         let node = SCNNode(geometry: geometry)
         node.simdPosition = SculptedCamera.position(of: square) + SIMD3(0, height, 0)
         node.simdOrientation = Self.flat
-        node.renderingOrder = 10
+        node.renderingOrder = order
         node.castsShadow = false
         if fade {
             node.opacity = 0
@@ -903,9 +1071,40 @@ final class SculptedBoardScene {
         return node
     }
 
+    /// A move mark: on a piece to take or on an empty square, and whether it is one of the
+    /// coach's moves (true for its best).
+    private struct TargetKind: Hashable {
+        let capture: Bool
+        let hint: Bool?
+    }
+
+    private var targetMarks: [TargetKind: [SCNGeometry]] = [:]
+
+    /// A move mark's layers, made the first time each kind is needed: its dark rim and the mark
+    /// on the stone, hidden by a piece standing in front, then both again, faint, over that piece.
+    /// Where nothing is in the way both show, so the first two make up the rest.
+    private func targetLayers(_ kind: TargetKind) -> [SCNGeometry] {
+        if let layers = targetMarks[kind] { return layers }
+        let images = MarkImages.target(capture: kind.capture, hint: kind.hint)
+        let strength: CGFloat = kind.hint == true ? 0.95 : 0.92
+        let seen: CGFloat = 0.4
+        let rim: CGFloat = 0.35
+        let rimSeen: CGFloat = 0.15
+        let layers = [
+            Self.mark(size: 1, color: .black, alpha: (rim - rimSeen) / (1 - rimSeen), mask: images.rim),
+            Self.mark(size: 1, color: look.accent, alpha: (strength - seen) / (1 - seen), mask: images.mark),
+            Self.mark(size: 1, color: .black, alpha: rimSeen, mask: images.rim, throughPieces: true),
+            Self.mark(size: 1, color: look.accent, alpha: seen, mask: images.through, throughPieces: true),
+        ]
+        targetMarks[kind] = layers
+        return layers
+    }
+
     private static let flat = simd_quatf(angle: -.pi / 2, axis: SIMD3(1, 0, 0))
 
-    private static func mark(size: CGFloat, color: UIColor, alpha: CGFloat, mask: UIImage?) -> SCNGeometry {
+    /// A flat mark on the stone. One drawn `throughPieces` shows over a piece standing in front of it.
+    private static func mark(size: CGFloat, color: UIColor, alpha: CGFloat, mask: UIImage?,
+                             throughPieces: Bool = false) -> SCNGeometry {
         let plane = SCNPlane(width: size, height: size)
         let material = SCNMaterial()
         material.lightingModel = .constant
@@ -914,6 +1113,7 @@ final class SculptedBoardScene {
         material.transparencyMode = .aOne
         material.transparency = alpha
         material.writesToDepthBuffer = false
+        material.readsFromDepthBuffer = !throughPieces
         material.blendMode = .alpha
         plane.materials = [material]
         return plane
@@ -922,99 +1122,12 @@ final class SculptedBoardScene {
     private lazy var lastMoveMark = Self.mark(size: 1, color: look.lastMove, alpha: look.lastMoveAlpha, mask: nil)
     private lazy var selectedMark = Self.mark(size: 1, color: look.accent, alpha: 0.3, mask: nil)
     private lazy var checkMark = Self.mark(size: 1.5, color: look.check, alpha: 0.9, mask: MarkImages.glow)
-    private lazy var dotMark = Self.mark(size: 1, color: look.accent, alpha: 0.92, mask: MarkImages.dot)
+    private lazy var checkRingMark = Self.mark(size: 1, color: look.check, alpha: 1, mask: MarkImages.squareRing)
     private lazy var dustMark = Self.mark(size: 1, color: UIColor(white: 0.93, alpha: 1), alpha: 0.5, mask: MarkImages.contact)
-    private lazy var captureMark = Self.mark(size: 1, color: look.accent, alpha: 0.92, mask: MarkImages.ring)
+    private lazy var bracketsMark = Self.mark(size: 1, color: look.accent, alpha: 0.95, mask: MarkImages.brackets)
+    private lazy var bracketsFaintMark = Self.mark(size: 1, color: look.accent, alpha: 0.5, mask: MarkImages.brackets)
     private static let contactGeometry = mark(size: 1, color: .black, alpha: 0.5, mask: MarkImages.contact)
     private static let haloMask = MarkImages.halo
-
-    // MARK: Best-move arrows
-
-    private func updateArrows(_ hints: [SculptedHint]) {
-        for old in arrowsNode.childNodes {
-            old.runAction(.sequence([.fadeOut(duration: 0.15), .removeFromParentNode()]))
-        }
-        // The runner-up first, so the best arrow lies on top where they cross.
-        for (index, hint) in hints.sorted(by: { !$0.isBest && $1.isBest }).enumerated() {
-            let node = SCNNode(geometry: Self.arrow(hint, color: look.accent))
-            node.simdOrientation = Self.flat
-            node.simdPosition = SIMD3(0, 0.003 + 0.0004 * Float(index), 0)
-            node.renderingOrder = 12 + index
-            node.castsShadow = false
-            node.opacity = 0
-            node.runAction(.fadeIn(duration: 0.25))
-            arrowsNode.addChildNode(node)
-        }
-    }
-
-    /// A flat arrow lying on the stone: solid with a round tail for the best move,
-    /// dashed for the second best. Sizes match the flat board's arrows.
-    private static func arrow(_ hint: SculptedHint, color: UIColor) -> SCNGeometry {
-        // Path coordinates are (x, -z): the shape is drawn upright, then laid flat.
-        func point(_ v: SIMD3<Float>) -> CGPoint { CGPoint(x: CGFloat(v.x), y: CGFloat(-v.z)) }
-        let from = point(SculptedCamera.position(of: hint.from))
-        let to = point(SculptedCamera.position(of: hint.to))
-        let dx = to.x - from.x
-        let dy = to.y - from.y
-        let length = max(hypot(dx, dy), 0.001)
-        let ux = dx / length
-        let uy = dy / length
-        let nx = -uy
-        let ny = ux
-        let headLength: CGFloat = hint.isBest ? 0.42 : 0.36
-        let headHalf: CGFloat = hint.isBest ? 0.25 : 0.21
-        let shaftHalf: CGFloat = hint.isBest ? 0.085 : 0.055
-        let start = CGPoint(x: from.x + ux * 0.18, y: from.y + uy * 0.18)
-        let tip = CGPoint(x: to.x - ux * 0.08, y: to.y - uy * 0.08)
-        let base = CGPoint(x: tip.x - ux * headLength, y: tip.y - uy * headLength)
-        func offset(_ p: CGPoint, _ along: CGFloat, _ across: CGFloat) -> CGPoint {
-            CGPoint(x: p.x + ux * along + nx * across, y: p.y + uy * along + ny * across)
-        }
-
-        let path = UIBezierPath()
-        if hint.isBest {
-            path.move(to: offset(start, 0, shaftHalf))
-            path.addLine(to: offset(base, 0, shaftHalf))
-            path.addLine(to: offset(base, 0, headHalf))
-            path.addLine(to: tip)
-            path.addLine(to: offset(base, 0, -headHalf))
-            path.addLine(to: offset(base, 0, -shaftHalf))
-            path.addLine(to: offset(start, 0, -shaftHalf))
-            // The round tail.
-            let angle = atan2(ny, nx)
-            path.addArc(withCenter: start, radius: shaftHalf, startAngle: angle + .pi, endAngle: angle, clockwise: false)
-            path.close()
-        } else {
-            let shaft = hypot(base.x - start.x, base.y - start.y)
-            let dash = shaftHalf * 2 * 1.6
-            let gap = shaftHalf * 2 * 1.1
-            var along: CGFloat = 0
-            while along < shaft - 0.01 {
-                let end = min(along + dash, shaft)
-                path.move(to: offset(start, along, shaftHalf))
-                path.addLine(to: offset(start, end, shaftHalf))
-                path.addLine(to: offset(start, end, -shaftHalf))
-                path.addLine(to: offset(start, along, -shaftHalf))
-                path.close()
-                along = end + gap
-            }
-            path.move(to: tip)
-            path.addLine(to: offset(base, 0, -headHalf))
-            path.addLine(to: offset(base, 0, headHalf))
-            path.close()
-        }
-        path.flatness = 0.004
-        let shape = SCNShape(path: path, extrusionDepth: 0)
-        let material = SCNMaterial()
-        material.lightingModel = .constant
-        material.diffuse.contents = color
-        material.transparency = hint.isBest ? 0.95 : 0.75
-        material.transparencyMode = .aOne
-        material.writesToDepthBuffer = false
-        material.isDoubleSided = true
-        shape.materials = [material]
-        return shape
-    }
 
     // MARK: Camera and light
 
@@ -1043,6 +1156,9 @@ final class SculptedBoardScene {
         let target = SculptedCamera.fitted(aspect: camera.aspect, flipped: flipped)
         let turn: Float = flipped ? .pi : 0
         camera = target
+        // The walk takes over from any lean toward a fallen king.
+        leanPoint = nil
+        cameraNode.removeAction(forKey: "finale")
         guard animated, !UIAccessibility.isReduceMotionEnabled else {
             cameraNode.removeAction(forKey: "orbit")
             place(target)
@@ -1141,7 +1257,7 @@ final class SculptedBoardScene {
         squares.simdOrientation = Self.flat
         board.addChildNode(squares)
 
-        // Four lacquered rails with softened edges, standing a hair above the stone.
+        // Four glass rails with rounded edges that catch the light, standing a hair above the stone.
         let frame = assets.frameMaterial(look)
         let width: Float = 0.55
         let height: Float = 0.14
@@ -1152,7 +1268,8 @@ final class SculptedBoardScene {
             (-4 - width / 2, 0, width, 8),
         ]
         for rail in rails {
-            let box = SCNBox(width: CGFloat(rail.width), height: CGFloat(height), length: CGFloat(rail.length), chamferRadius: 0.012)
+            let box = SCNBox(width: CGFloat(rail.width), height: CGFloat(height), length: CGFloat(rail.length), chamferRadius: 0.045)
+            box.chamferSegmentCount = 6
             box.materials = [frame]
             let node = SCNNode(geometry: box)
             node.simdPosition = SIMD3(rail.x, 0.005 - height / 2, rail.z)
@@ -1192,7 +1309,7 @@ final class SculptedBoardScene {
     }
 
     private func addLabel(_ text: String, at position: SIMD3<Float>, orientation: simd_quatf) {
-        let node = SCNNode(geometry: Self.mark(size: 0.24, color: look.platinumMark, alpha: 0.8, mask: MarkImages.label(text)))
+        let node = SCNNode(geometry: Self.mark(size: 0.4, color: look.platinumMark, alpha: 0.8, mask: MarkImages.label(text)))
         node.simdPosition = position
         node.simdOrientation = orientation
         node.castsShadow = false
@@ -1221,16 +1338,114 @@ enum Ease {
 
 /// The soft shapes drawn on the stone, as white-on-clear masks.
 enum MarkImages {
-    static let dot = draw(128) { context, size in
-        let r = size * 0.15
-        context.fillEllipse(in: CGRect(x: size / 2 - r, y: size / 2 - r, width: r * 2, height: r * 2))
+    /// A rounded square outline just inside a square's edge.
+    static let squareRing = draw(256) { context, size in
+        let line = size * 0.06
+        let rect = CGRect(x: 0, y: 0, width: size, height: size).insetBy(dx: size * 0.04 + line / 2, dy: size * 0.04 + line / 2)
+        context.setLineWidth(line)
+        context.addPath(CGPath(roundedRect: rect, cornerWidth: size * 0.1, cornerHeight: size * 0.1, transform: nil))
+        context.strokePath()
     }
 
-    static let ring = draw(256) { context, size in
-        let line = size * 0.055
-        let r = size * 0.45 - line / 2
+    /// Four brackets in the corners of a square: the piece the coach would move.
+    static let brackets = draw(256) { context, size in
+        let line = size * 0.05
+        let low = size * 0.08
+        let high = size - low
+        let arm = size * 0.2
         context.setLineWidth(line)
-        context.strokeEllipse(in: CGRect(x: size / 2 - r, y: size / 2 - r, width: r * 2, height: r * 2))
+        context.setLineCap(.round)
+        context.setLineJoin(.round)
+        let corners: [(x: CGFloat, y: CGFloat, dx: CGFloat, dy: CGFloat)] = [
+            (low, low, 1, 1), (high, low, -1, 1), (high, high, -1, -1), (low, high, 1, -1),
+        ]
+        for (x, y, dx, dy) in corners {
+            context.move(to: CGPoint(x: x, y: y + arm * dy))
+            context.addLine(to: CGPoint(x: x, y: y))
+            context.addLine(to: CGPoint(x: x + arm * dx, y: y))
+        }
+        context.strokePath()
+    }
+
+    /// A move mark's masks.
+    struct Target {
+        /// The mark itself.
+        let mark: UIImage
+        /// The part seen through a piece standing in front: all of it but the coach's soft wash.
+        let through: UIImage
+        /// The dark edge around it.
+        let rim: UIImage
+    }
+
+    /// How wide the dark edge around a move mark is, as a share of a square.
+    static let rimWidth: CGFloat = 0.03
+
+    /// A move mark, as on the flat boards: a dot, or four wedges in the corners of a square with
+    /// a piece to take. The coach's moves add a halo ring around the dot, or a soft wash under
+    /// the wedges; both fainter for its second choice.
+    static func target(capture: Bool, hint: Bool?) -> Target {
+        let choice = hint.map { $0 ? "best" : "second" } ?? "plain"
+        let key = "\(capture ? "capture" : "move") \(choice)"
+        if let cached = targets[key] { return cached }
+        let mark = draw(256) { context, size in
+            drawTarget(context, size: size, capture: capture, hint: hint, grow: 0, wash: true)
+        }
+        var through = mark
+        if capture, hint != nil {
+            through = draw(256) { context, size in
+                drawTarget(context, size: size, capture: capture, hint: hint, grow: 0, wash: false)
+            }
+        }
+        // The shape grown by the rim's width, less the shape: an edge that never lies under the mark.
+        let rim = draw(256) { context, size in
+            drawTarget(context, size: size, capture: capture, hint: hint, grow: rimWidth, wash: false, solid: true)
+            context.setBlendMode(.clear)
+            drawTarget(context, size: size, capture: capture, hint: hint, grow: 0, wash: false, solid: true)
+        }
+        let target = Target(mark: mark, through: through, rim: rim)
+        targets[key] = target
+        return target
+    }
+
+    private static var targets: [String: Target] = [:]
+
+    /// Draws a move mark's shapes grown by `grow` of a square, with the coach's wash if `wash`.
+    /// `solid` draws the second choice's halo at full strength, for the rim.
+    private static func drawTarget(_ context: CGContext, size: CGFloat, capture: Bool, hint: Bool?,
+                                   grow: CGFloat, wash: Bool, solid: Bool = false) {
+        func circle(radius: CGFloat) -> CGRect {
+            CGRect(x: size / 2 - radius * size, y: size / 2 - radius * size, width: radius * size * 2, height: radius * size * 2)
+        }
+        if capture {
+            if wash, let hint {
+                context.setFillColor(UIColor(white: 1, alpha: hint ? 0.24 : 0.14).cgColor)
+                context.fillEllipse(in: circle(radius: 0.42))
+                context.setFillColor(UIColor.white.cgColor)
+            }
+            // Growing a wedge moves its long side out by `grow`; the short sides stay on the edges.
+            let leg = ((hint == nil ? 0.22 : 0.26) + grow * 1.414) * size
+            let corners: [(x: CGFloat, y: CGFloat, dx: CGFloat, dy: CGFloat)] = [
+                (0, 0, 1, 1), (size, 0, -1, 1), (size, size, -1, -1), (0, size, 1, -1),
+            ]
+            for (x, y, dx, dy) in corners {
+                context.move(to: CGPoint(x: x, y: y))
+                context.addLine(to: CGPoint(x: x + leg * dx, y: y))
+                context.addLine(to: CGPoint(x: x, y: y + leg * dy))
+                context.closePath()
+            }
+            context.fillPath()
+        } else {
+            context.fillEllipse(in: circle(radius: 0.17 + grow))
+            if let hint {
+                let line: CGFloat = hint ? 0.05 : 0.04
+                // Drawn twice where nothing stands in front, the second choice's 0.46 shows as
+                // the flat boards' 0.55.
+                context.setStrokeColor(UIColor(white: 1, alpha: hint || solid ? 1 : 0.46).cgColor)
+                context.setLineWidth((line + grow * 2) * size)
+                context.strokeEllipse(in: circle(radius: 0.33 - line / 2))
+                context.setStrokeColor(UIColor.white.cgColor)
+            }
+        }
     }
 
     static let glow = radial(256, stops: [(0, 1), (0.35, 0.75), (1, 0)])
@@ -1252,8 +1467,8 @@ enum MarkImages {
 
     static func label(_ text: String) -> UIImage {
         if let cached = labels[text] { return cached }
-        let image = draw(96) { _, size in
-            let font = UIFont.systemFont(ofSize: size * 0.62, weight: .semibold)
+        let image = draw(192) { _, size in
+            let font = UIFont.systemFont(ofSize: size * 0.8, weight: .semibold)
             let string = NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: UIColor.white])
             let bounds = string.size()
             string.draw(at: CGPoint(x: (size - bounds.width) / 2, y: (size - bounds.height) / 2))

@@ -16,60 +16,52 @@ enum SideChoice: String, CaseIterable, Identifiable {
     }
 }
 
-/// How much the coach says during a game. Two switches, shown as one choice.
+/// How much the coach says during a game. Two switches, shown as one choice, in two words:
+/// "grades" say how good your move was, "hints" say where to move.
 enum CoachMode: CaseIterable, Identifiable {
-    case full, arrows, verdicts, silent
+    case full, verdicts, hints, silent
 
     var id: Self { self }
 
     var name: String {
         switch self {
-        case .full: return "Full coach"
-        case .arrows: return "Arrows only"
-        case .verdicts: return "Verdicts only"
-        case .silent: return "Silent"
+        case .full: return "Grades + hints"
+        case .verdicts: return "Grades"
+        case .hints: return "Hints"
+        case .silent: return "Just play"
         }
     }
 
-    /// One line about the mode. How many arrows it promises follows the
-    /// second-best setting, so the text matches what the game draws.
-    func detail(twoArrows: Bool) -> String {
+    /// One line about the mode. How many hints it promises follows the
+    /// second-best setting, so the text matches what the game marks.
+    func detail(twoHints: Bool) -> String {
         switch self {
-        case .full: return twoArrows ? "Grades every move and shows the two best moves" : "Grades every move and shows the best move"
-        case .arrows: return twoArrows ? "Shows the two best moves, no grades" : "Shows the best move, no grades"
-        case .verdicts: return "Grades your moves, no arrows. A fair test."
+        case .full: return twoHints ? "Rates each move and marks your two best moves" : "Rates each move and marks your best move"
+        case .verdicts: return "Rates each move, no hints. A fair test."
+        case .hints: return twoHints ? "Marks your two best moves, no grades" : "Marks your best move, no grades"
         case .silent: return "Just chess. The coach keeps quiet."
         }
     }
 
-    /// A couple of words for the match card, next to the name.
-    var short: String {
-        switch self {
-        case .full: return "arrows + verdicts"
-        case .arrows: return "no grades"
-        case .verdicts: return "no arrows"
-        case .silent: return "just chess"
-        }
-    }
-
-    var showsArrows: Bool { self == .full || self == .arrows }
+    var showsHints: Bool { self == .full || self == .hints }
     var showsVerdicts: Bool { self == .full || self == .verdicts }
 
-    init(arrows: Bool, verdicts: Bool) {
-        switch (arrows, verdicts) {
+    init(hints: Bool, verdicts: Bool) {
+        switch (hints, verdicts) {
         case (true, true): self = .full
-        case (true, false): self = .arrows
+        case (true, false): self = .hints
         case (false, true): self = .verdicts
         case (false, false): self = .silent
         }
     }
 }
 
-/// Picks the opponent, the rival, the side, the clock and the coach, then starts the game.
+/// Picks the rival, the side, the clock and the coach, then starts the game.
 ///
 /// Side, clock and coach live in one card of three rows. A row shows its
 /// current choice; tapping it unfolds the options in place, and picking one
-/// folds it back up.
+/// folds it back up. Nothing is kept until the game starts: Cancel, or closing
+/// the sheet, leaves every choice as it was.
 struct NewGameSheet: View {
     /// The rows of the match card.
     private enum MatchRow {
@@ -77,9 +69,12 @@ struct NewGameSheet: View {
     }
 
     let theme: BoardTheme
+    /// The rival of a game in progress that starting a new one would cost, so the person is asked first.
+    let forfeits: String?
     let start: (MatchController.Setup) -> Void
+    /// Opens Challenge a friend instead. Nil hides the row.
+    var challenge: (() -> Void)? = nil
 
-    @AppStorage("setup.opponent") private var opponent: MatchController.Opponent = .computer
     @AppStorage("setup.side") private var side: SideChoice = .white
     @AppStorage("setup.level") private var level: MatchController.Level = .club
     @AppStorage("setup.clock") private var timeControl: TimeControl = .unlimited
@@ -89,72 +84,81 @@ struct NewGameSheet: View {
 
     @AppStorage("haptics") private var hapticsOn = true
 
+    /// The choices on the sheet, kept only when the game starts.
+    @State private var draftSide: SideChoice
+    @State private var draftLevel: MatchController.Level
+    @State private var draftClock: TimeControl
+    @State private var draftCoach: CoachMode
     @State private var scrolledLevel: MatchController.Level?
     @State private var openRow: MatchRow?
-    /// The coach as it was when the sheet opened, so Cancel can put it back.
-    @State private var coachOnOpen: CoachMode?
+    @State private var confirmingForfeit = false
     @Environment(\.dismiss) private var dismiss
+
+    init(theme: BoardTheme, forfeits: String? = nil, defaults: UserDefaults = .standard,
+         start: @escaping (MatchController.Setup) -> Void, challenge: (() -> Void)? = nil) {
+        self.theme = theme
+        self.forfeits = forfeits
+        self.start = start
+        self.challenge = challenge
+        let level = (defaults.object(forKey: "setup.level") as? Int).flatMap { MatchController.Level(rawValue: $0) } ?? .club
+        _draftSide = State(initialValue: defaults.string(forKey: "setup.side").flatMap { SideChoice(rawValue: $0) } ?? .white)
+        _draftLevel = State(initialValue: level)
+        _draftClock = State(initialValue: defaults.string(forKey: "setup.clock").flatMap { TimeControl(rawValue: $0) } ?? .unlimited)
+        _draftCoach = State(initialValue: CoachMode(
+            hints: defaults.object(forKey: "showBestMoves") as? Bool ?? false,
+            verdicts: defaults.object(forKey: "coachVerdicts") as? Bool ?? true
+        ))
+        _scrolledLevel = State(initialValue: level)
+    }
 
     /// The choices from last time, for when the sheet is closed without starting.
     static func savedSetup(_ defaults: UserDefaults = .standard) -> MatchController.Setup {
-        let opponent = defaults.string(forKey: "setup.opponent").flatMap { MatchController.Opponent(rawValue: $0) } ?? .computer
         let side = defaults.string(forKey: "setup.side").flatMap { SideChoice(rawValue: $0) } ?? .white
         let level = (defaults.object(forKey: "setup.level") as? Int).flatMap { MatchController.Level(rawValue: $0) } ?? .club
         let clock = defaults.string(forKey: "setup.clock").flatMap { TimeControl(rawValue: $0) } ?? TimeControl.unlimited
-        return MatchController.Setup(opponent: opponent, playerColor: side.color, level: level, timeControl: clock)
+        return MatchController.Setup(playerColor: side.color, level: level, timeControl: clock)
     }
 
     private var accent: Color { theme.accent ?? .accentColor }
-    private var coachMode: CoachMode { CoachMode(arrows: showBestMoves, verdicts: showVerdicts) }
+
+    /// Keeps the choices for next time, then starts the game.
+    private func play() {
+        side = draftSide
+        level = draftLevel
+        timeControl = draftClock
+        showBestMoves = draftCoach.showsHints
+        showVerdicts = draftCoach.showsVerdicts
+        start(MatchController.Setup(playerColor: draftSide.color, level: draftLevel, timeControl: draftClock))
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
-                    section("Opponent") {
-                        Picker("Opponent", selection: $opponent) {
-                            ForEach(MatchController.Opponent.allCases) { opponent in
-                                Label(opponent.title, systemImage: opponent.symbol).tag(opponent)
-                            }
-                        }
-                        .pickerStyle(.segmented)
+                    if let challenge {
+                        ChallengeEntryRow(theme: theme, action: challenge)
                     }
 
-                    if opponent == .computer {
-                        section("Your rival") {
-                            rivalCarousel
-                            dots
-                        }
-                    } else {
-                        Label("Pass the phone back and forth. The coach grades both of you.",
-                              systemImage: "person.2.fill")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                    section("Your rival") {
+                        rivalCarousel
+                        dots
                     }
 
                     section("The match") {
                         matchCard
-                        if openRow == nil {
-                            Text("Tap a row to change it")
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                                .frame(maxWidth: .infinity)
-                                .transition(.opacity)
-                        }
                     }
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 12)
                 .padding(.bottom, 24)
-                .animation(.snappy, value: opponent)
                 .animation(.spring(response: 0.42, dampingFraction: 0.86), value: openRow)
             }
             .sensoryFeedback(.selection, trigger: openRow) { _, _ in hapticsOn }
             .safeAreaInset(edge: .bottom) {
                 Button {
-                    start(MatchController.Setup(opponent: opponent, playerColor: side.color, level: level, timeControl: timeControl))
+                    if forfeits == nil { play() } else { confirmingForfeit = true }
                 } label: {
-                    Label(opponent == .computer ? "Play \(level.rival.name)" : "Start Game", systemImage: "play.fill")
+                    Label("Play \(draftLevel.rival.name)", systemImage: "play.fill")
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
@@ -167,21 +171,20 @@ struct NewGameSheet: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 8)
                 .shadow(color: theme.glows ? accent.opacity(0.6) : .clear, radius: 14)
-                .animation(.snappy, value: level)
+                .animation(.snappy, value: draftLevel)
+                .confirmationDialog("Leave your game against \(forfeits ?? "your rival")?",
+                                    isPresented: $confirmingForfeit, titleVisibility: .visible) {
+                    Button("Resign and play \(draftLevel.rival.name)", role: .destructive) { play() }
+                    Button("Keep playing", role: .cancel) {}
+                } message: {
+                    Text("It counts as a loss for your army.")
+                }
             }
             .navigationTitle("New Game")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        // The coach keys reach the running game at once, so a
-                        // choice that was only tried out goes back on Cancel.
-                        if let coachOnOpen, coachOnOpen != coachMode {
-                            showBestMoves = coachOnOpen.showsArrows
-                            showVerdicts = coachOnOpen.showsVerdicts
-                        }
-                        dismiss()
-                    }
+                    Button("Cancel") { dismiss() }
                 }
             }
         }
@@ -191,10 +194,6 @@ struct NewGameSheet: View {
         }
         .tint(accent)
         .preferredColorScheme(theme.isDark ? .dark : nil)
-        .onAppear {
-            scrolledLevel = level
-            coachOnOpen = coachMode
-        }
     }
 
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
@@ -203,6 +202,7 @@ struct NewGameSheet: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .tracking(1)
+                .accessibilityAddTraits(.isHeader)
             content()
         }
     }
@@ -211,52 +211,47 @@ struct NewGameSheet: View {
 
     private var matchCard: some View {
         VStack(spacing: 0) {
-            if opponent == .computer {
-                MatchRowButton(label: "Play as", value: sideName(side), detail: nil, isOpen: openRow == .side,
-                               theme: theme, icon: { sideIcon }) {
-                    toggle(.side)
-                }
-                if openRow == .side {
-                    HStack(spacing: 8) {
-                        ForEach(SideChoice.allCases) { choice in
-                            sideCard(choice)
-                        }
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.top, 4)
-                    .padding(.bottom, 12)
-                    .transition(unfold)
-                }
-                rowDivider
+            MatchRowButton(label: "Play as", value: sideName(draftSide), detail: nil, isOpen: openRow == .side,
+                           theme: theme, icon: { sideIcon }) {
+                toggle(.side)
             }
+            if openRow == .side {
+                HStack(spacing: 8) {
+                    ForEach(SideChoice.allCases) { choice in
+                        sideCard(choice)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.top, 4)
+                .padding(.bottom, 12)
+                .transition(unfold)
+            }
+            rowDivider
 
-            MatchRowButton(label: "Clock", value: timeControl.name, detail: timeControl.kind, isOpen: openRow == .clock,
+            MatchRowButton(label: "Clock", value: draftClock.name, detail: draftClock.kind, isOpen: openRow == .clock,
                            theme: theme, icon: { Image(systemName: "stopwatch") }) {
                 toggle(.clock)
             }
             if openRow == .clock {
                 optionList {
                     ForEach(TimeControl.allCases) { control in
-                        OptionRow(title: control.name, detail: control.detail, isOn: timeControl == control, theme: theme) {
-                            choose { timeControl = control }
+                        OptionRow(title: control.name, detail: control.detail, isOn: draftClock == control, theme: theme) {
+                            choose { draftClock = control }
                         }
                     }
                 }
             }
             rowDivider
 
-            MatchRowButton(label: "Coach", value: coachMode.name, detail: coachMode.short, isOpen: openRow == .coach,
+            MatchRowButton(label: "Coach", value: draftCoach.name, detail: nil, isOpen: openRow == .coach,
                            theme: theme, icon: { Image(systemName: "graduationcap.fill") }) {
                 toggle(.coach)
             }
             if openRow == .coach {
                 optionList {
                     ForEach(CoachMode.allCases) { mode in
-                        OptionRow(title: mode.name, detail: mode.detail(twoArrows: showSecondBest), isOn: coachMode == mode, theme: theme) {
-                            choose {
-                                showBestMoves = mode.showsArrows
-                                showVerdicts = mode.showsVerdicts
-                            }
+                        OptionRow(title: mode.name, detail: mode.detail(twoHints: showSecondBest), isOn: draftCoach == mode, theme: theme) {
+                            choose { draftCoach = mode }
                         }
                     }
                 }
@@ -275,7 +270,7 @@ struct NewGameSheet: View {
     /// The king of the chosen side, for the Play as row.
     @ViewBuilder
     private var sideIcon: some View {
-        switch side {
+        switch draftSide {
         case .white:
             PieceImage(piece: Piece(.king, color: .white, square: .e1), theme: theme, size: 24)
         case .black:
@@ -328,7 +323,7 @@ struct NewGameSheet: View {
         ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(spacing: 12) {
                 ForEach(Rival.all) { rival in
-                    RivalCard(rival: rival, isSelected: level == rival.level, theme: theme)
+                    RivalCard(rival: rival, isSelected: draftLevel == rival.level, theme: theme)
                         .containerRelativeFrame(.horizontal) { length, _ in length - 50 }
                         .scrollTransition(.interactive, axis: .horizontal) { content, phase in
                             content
@@ -337,6 +332,10 @@ struct NewGameSheet: View {
                         }
                         .id(rival.level)
                         .onTapGesture {
+                            withAnimation(.snappy) { scrolledLevel = rival.level }
+                        }
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityAction {
                             withAnimation(.snappy) { scrolledLevel = rival.level }
                         }
                 }
@@ -350,8 +349,8 @@ struct NewGameSheet: View {
         .safeAreaPadding(.horizontal, 25)
         .padding(.horizontal, -20)
         .onChange(of: scrolledLevel) { _, scrolled in
-            if let scrolled, scrolled != level {
-                withAnimation(.snappy) { level = scrolled }
+            if let scrolled, scrolled != draftLevel {
+                withAnimation(.snappy) { draftLevel = scrolled }
             }
         }
     }
@@ -359,7 +358,7 @@ struct NewGameSheet: View {
     private var dots: some View {
         HStack(spacing: 6) {
             ForEach(Rival.all) { rival in
-                let isOn = rival.level == level
+                let isOn = rival.level == draftLevel
                 Capsule()
                     .fill(isOn ? rival.hue : Color.secondary.opacity(0.3))
                     .frame(width: isOn ? 18 : 6, height: 6)
@@ -367,14 +366,14 @@ struct NewGameSheet: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .animation(.snappy, value: level)
+        .animation(.snappy, value: draftLevel)
         .accessibilityHidden(true)
     }
 
     // MARK: Side
 
     private func sideCard(_ choice: SideChoice) -> some View {
-        let isSelected = side == choice
+        let isSelected = draftSide == choice
         let color: Color
         let glow: Color?
         switch choice {
@@ -389,7 +388,7 @@ struct NewGameSheet: View {
             glow = theme.glows ? accent : nil
         }
         return Button {
-            choose { side = choice }
+            choose { draftSide = choice }
         } label: {
             VStack(spacing: 4) {
                 sideArt(choice)
@@ -424,10 +423,11 @@ struct NewGameSheet: View {
         }
     }
 
+    /// White and Black, as in any chess game. Neon keeps its own colours' names.
     private func sideName(_ choice: SideChoice) -> String {
         switch choice {
-        case .white: return theme.whiteName
-        case .black: return theme.blackName
+        case .white: return theme.glows ? theme.whiteName : "White"
+        case .black: return theme.glows ? theme.blackName : "Black"
         case .random: return "Random"
         }
     }
@@ -496,7 +496,7 @@ private struct RivalCard: View {
         .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .animation(.snappy, value: isSelected)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(rival.name), \(rival.level.name), Elo \(rival.elo). \(rival.blurb)")
+        .accessibilityLabel("\(rival.name), \(rival.level.name), \(rival.spokenElo). \(rival.blurb)")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }

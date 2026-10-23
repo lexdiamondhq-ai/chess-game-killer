@@ -21,11 +21,23 @@ final class GameVault {
         let url = try? FileManager.default
             .url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
             .appendingPathComponent("games.json")
-        var games: [SavedGame] = []
-        if let url, let data = try? Data(contentsOf: url), let saved = try? JSONDecoder().decode([SavedGame].self, from: data) {
-            games = saved
-        }
+        let games = url.map { Self.load(from: $0) } ?? []
         return GameVault(games: games, fileURL: url)
+    }
+
+    /// The games saved at `url`, skipping any one that can't be read (say, after its format
+    /// changed). A file that can't be read at all is moved aside instead of being written
+    /// over by the next save, so nothing is lost for good.
+    static func load(from url: URL) -> [SavedGame] {
+        guard let data = try? Data(contentsOf: url) else { return [] }
+        if let saved = try? JSONDecoder().decode([Lossy<SavedGame>].self, from: data) {
+            return saved.compactMap(\.value)
+        }
+        let aside = url.deletingPathExtension().appendingPathExtension("unreadable.json")
+        try? FileManager.default.removeItem(at: aside)
+        try? FileManager.default.moveItem(at: url, to: aside)
+        NSLog("The saved games couldn't be read; the file was moved aside")
+        return []
     }
 
     func game(_ id: UUID) -> SavedGame? {
@@ -80,12 +92,34 @@ final class GameVault {
         return games.filter { $0.date >= start }
     }
 
+    /// Saving runs off the main thread, one write after another, so the end of a game
+    /// (when the king falls) never waits on the disk.
+    private let writer = DispatchQueue(label: "GameVault.writer", qos: .utility)
+
     private func save() {
         guard let fileURL else { return }
-        do {
-            try JSONEncoder().encode(games).write(to: fileURL, options: .atomic)
-        } catch {
-            NSLog("Couldn't save the games: %@", "\(error)")
+        let snapshot = games
+        writer.async {
+            do {
+                try JSONEncoder().encode(snapshot).write(to: fileURL, options: .atomic)
+            } catch {
+                NSLog("Couldn't save the games: %@", "\(error)")
+            }
         }
+    }
+
+    /// Waits until every save asked for so far is on disk.
+    func waitUntilSaved() {
+        writer.sync {}
+    }
+}
+
+/// Decodes a value when it can, and stands in for it with nil when it can't, so one
+/// unreadable item never costs the rest.
+struct Lossy<Value: Decodable>: Decodable {
+    let value: Value?
+
+    init(from decoder: Decoder) throws {
+        value = try? Value(from: decoder)
     }
 }

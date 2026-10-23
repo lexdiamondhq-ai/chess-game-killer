@@ -1,54 +1,60 @@
+import Accessibility
 import ChessKit
 import SwiftUI
 
-/// The coach as one circle at the bottom of the screen. Its ring is the live
-/// evaluation, Gold against Violet. After a move it stretches sideways to show
-/// the verdict for a moment, then shrinks back. Tapped, it unfolds into the
-/// full coach panel: the eval bar, the two best moves, and the game's controls.
+/// The coach as one circle at the bottom of the screen. Its ring is the player's share
+/// of the game and its face the grade of their last move. Tapped, it unfolds into the
+/// full coach panel: the grade, the eval bar, Leo's picks and the game's controls, and
+/// after a game the result and what comes next.
 struct CoachOrb: View {
     let match: MatchController
     let theme: BoardTheme
     @Binding var isExpanded: Bool
-    /// True while the orb is stretched to show a verdict; the parent hides what sits beside it.
-    @Binding var isPeeking: Bool
     /// How tall the unfolded panel may get before its contents scroll, so the board keeps its room.
     var expandedMaxHeight: CGFloat? = nil
     let newGame: () -> Void
+    /// Opens the player's saved games.
+    let showGames: () -> Void
+    /// Opens Talk it through for the position on the board. Nil leaves it out.
+    var talk: (() -> Void)? = nil
 
-    @State private var peekTask: Task<Void, Never>?
     @AppStorage("haptics") private var hapticsOn = true
+    /// Counts the times the person opened or closed the panel, for a light tap each.
+    /// The panel also opens by itself when a game ends, and that stays silent.
+    @State private var touches = 0
+    /// Counts the holds on the closed orb that opened Talk it through, for a firmer tap each.
+    @State private var talkHolds = 0
+    /// The move Leo last played for the person, by the game's move count. Moves he plays
+    /// aren't graded, so the panel mustn't promise a grade for one.
+    @State private var coachMove: Int?
     /// Coach Leo, when the app has training. His tips show in the open panel.
     @Environment(GameCoach.self) private var gameCoach: GameCoach?
-    /// The player's army, so a verdict can name the piece that moved.
-    @Environment(ArmyStore.self) private var army: ArmyStore?
 
     static let orbSize: CGFloat = 68
 
     private var accent: Color { theme.accent ?? .accentColor }
     private var tint: Color {
-        if match.isOver { return theme.accent ?? .accentColor }
-        return match.review?.grade.color ?? accent
+        if match.isOver { return accent }
+        return match.review?.grade.color(on: theme) ?? accent
     }
 
     var body: some View {
         ZStack {
             if isExpanded {
-                CoachPanel(match: match, theme: theme, newGame: newGame, collapse: collapse)
+                CoachPanel(match: match, theme: theme, coachMove: $coachMove, newGame: newGame, showGames: showGames,
+                           talk: talk, close: { collapse(felt: true) }, collapse: { collapse() })
                     .transition(.opacity.combined(with: .scale(scale: 0.97)))
-            } else if isPeeking, let review = match.review {
-                PeekRow(review: review, theme: theme, pieceName: army?.pieceName(for: review, in: match))
-                    .transition(.opacity)
             } else {
-                OrbFace(match: match, theme: theme)
+                OrbFace(match: match, theme: theme, open: { expand() })
                     .transition(.opacity)
             }
         }
-        .frame(maxWidth: isExpanded || isPeeking ? .infinity : Self.orbSize)
+        .frame(maxWidth: isExpanded ? .infinity : Self.orbSize)
         .frame(minHeight: isExpanded ? nil : Self.orbSize, maxHeight: isExpanded ? expandedMaxHeight : Self.orbSize)
         .background { orbBackground }
         .overlay(alignment: .topTrailing) {
             ZStack {
-                if !isExpanded, !isPeeking, let gameCoach, let moment = gameCoach.moment {
+                if !isExpanded, let gameCoach, let moment = gameCoach.moment {
                     CoachOrbBadge(moment: moment, theme: theme)
                         .transition(.scale(scale: 0.3).combined(with: .opacity))
                 }
@@ -57,128 +63,209 @@ struct CoachOrb: View {
             .animation(.spring(response: 0.4, dampingFraction: 0.7), value: gameCoach?.moment)
         }
         .contentShape(RoundedRectangle(cornerRadius: Self.orbSize / 2, style: .continuous))
-        .onTapGesture {
-            if !isExpanded { expand() }
-        }
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 24)
-                .onEnded { value in
-                    if isExpanded, value.translation.height > 60 { collapse() }
-                }
-        )
+        // Only on the closed orb: the open panel's buttons and scrolling keep their own gestures.
+        .gesture(orbGesture, including: isExpanded ? .subviews : .all)
         .onChange(of: match.review?.id) { _, id in
-            guard id != nil, !isExpanded else { return }
-            peek()
+            // Once the game is over the result is said instead, and it names the mate.
+            guard id != nil, !match.isOver, let review = match.review else { return }
+            announce("\(review.title). \(review.shortDetail.replacingOccurrences(of: " · ", with: ", "))")
         }
-        .onChange(of: isExpanded) { _, expanded in
-            if expanded { cancelPeek() }
+        .onChange(of: match.isOver) { _, over in
+            guard over else { return }
+            let result = ResultText(match: match)
+            announce("\(result.title). \(result.detail)")
         }
-        .sensoryFeedback(.impact(weight: .medium), trigger: isExpanded) { _, _ in hapticsOn }
+        .sensoryFeedback(.impact(weight: .light, intensity: 0.5), trigger: touches) { _, _ in hapticsOn }
+        .sensoryFeedback(.impact(weight: .medium), trigger: talkHolds) { (_: Int, _: Int) -> Bool in hapticsOn }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Coach")
-        .accessibilityHint(isExpanded ? "Swipe down to close" : "Tap to open the coach")
+        .accessibilityHint(isExpanded ? "Double-tap to close" : "Double-tap to open the coach")
         .accessibilityAction(named: isExpanded ? "Close" : "Open") {
-            if isExpanded { collapse() } else { expand() }
+            if isExpanded { collapse(felt: true) } else { expand() }
+        }
+        .accessibilityActions {
+            if let talk, match.canTalkItThrough {
+                Button("Talk it through", action: talk)
+            }
         }
     }
 
     // MARK: Opening and closing
 
+    /// A tap opens the panel. A hold goes straight to Talk it through on the player's turn, and
+    /// opens the panel like a tap any other time. The hold is tried first, so a tap waits for it to fail.
+    private var orbGesture: some Gesture {
+        LongPressGesture(minimumDuration: 0.45)
+            .onEnded { _ in holdToTalk() }
+            .exclusively(before: TapGesture().onEnded { _ in expand() })
+    }
+
+    private func holdToTalk() {
+        guard !isExpanded else { return }
+        guard let talk, match.canTalkItThrough else {
+            expand()
+            return
+        }
+        talkHolds += 1
+        talk()
+    }
+
+    /// Opens the panel at the person's tap, with a light tap back.
     private func expand() {
-        cancelPeek()
+        touches += 1
         withAnimation(.spring(response: 0.5, dampingFraction: 0.82)) {
             isExpanded = true
         }
     }
 
-    private func collapse() {
+    /// Closes the panel. `felt` when the person closed it themselves; a button that
+    /// closes it on the way to something else stays quiet.
+    private func collapse(felt: Bool = false) {
+        if felt { touches += 1 }
         withAnimation(.spring(response: 0.5, dampingFraction: 0.82)) {
             isExpanded = false
         }
     }
 
-    /// Shows the verdict in the stretched orb for a few seconds.
-    private func peek() {
-        peekTask?.cancel()
-        withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
-            isPeeking = true
-        }
-        peekTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(3.5))
-            guard !Task.isCancelled else { return }
-            withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
-                isPeeking = false
-            }
-        }
-    }
-
-    private func cancelPeek() {
-        peekTask?.cancel()
-        peekTask = nil
-        if isPeeking {
-            withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
-                isPeeking = false
-            }
-        }
+    /// Read out by VoiceOver, when it is on.
+    private func announce(_ text: String) {
+        AccessibilityNotification.Announcement(text).post()
     }
 
     // MARK: Background
 
+    /// The orb sits on the dock's glass, so it has no glass of its own (glass on glass turns
+    /// muddy): a faint well while it is round or stretched for a verdict, and nothing once it
+    /// unfolds, when the dock's glass grows to hold the panel.
+    @ViewBuilder
     private var orbBackground: some View {
-        let shape = RoundedRectangle(cornerRadius: isExpanded ? 30 : Self.orbSize / 2, style: .continuous)
-        return shape
-            .fill(theme.isDark ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)))
-            .overlay {
-                shape.strokeBorder(
-                    LinearGradient(colors: [tint.opacity(theme.glows ? 0.9 : 0.45), tint.opacity(0.15)],
-                                   startPoint: .topLeading, endPoint: .bottomTrailing),
-                    lineWidth: 1
-                )
+        if !isExpanded {
+            let shape = RoundedRectangle(cornerRadius: Self.orbSize / 2, style: .continuous)
+            shape
+                .fill(Color.primary.opacity(theme.isDark ? 0.055 : 0.04))
+                .overlay {
+                    shape.strokeBorder(
+                        LinearGradient(colors: [tint.opacity(theme.glows ? 0.9 : 0.35), Color.primary.opacity(0.08)],
+                                       startPoint: .topLeading, endPoint: .bottomTrailing),
+                        lineWidth: 0.75
+                    )
+                }
+                .shadow(color: theme.glows ? tint.opacity(0.35) : .clear, radius: 16)
+                .transition(.opacity)
+        }
+    }
+}
+
+// MARK: - The game from the player's side
+
+private extension MatchController {
+    /// The engine's score turned to the player's side, as the Big Board strip shows it:
+    /// plus is good for them. `whiteView` is from White's side, like `evaluation`.
+    func forPlayer(_ whiteView: Evaluation) -> Evaluation {
+        setup.playerColor == .white ? whiteView : whiteView.flipped
+    }
+
+    /// True when the player won, false when they lost, nil for a draw or a game still on.
+    var playerWon: Bool? { winner.map { $0 == setup.playerColor } }
+
+    /// The player's share of the game, 0 to 1: all of it once they have won, none once they have lost.
+    var playerShare: Double {
+        if isOver {
+            guard let won = playerWon else { return 0.5 }
+            return won ? 1 : 0
+        }
+        guard let evaluation else { return 0.5 }
+        return (forPlayer(evaluation).winningChances + 1) / 2
+    }
+}
+
+/// How a game ended, in words, from the player's side: "you", and the rival by name.
+@MainActor
+private struct ResultText {
+    let match: MatchController
+
+    private var rival: String { match.setup.level.rival.name }
+    private var player: Piece.Color { match.setup.playerColor }
+
+    var title: String {
+        if let outcome = match.outcome {
+            switch outcome {
+            case .timeout(let loser):
+                return loser == player ? "\(rival) wins on time" : "You win on time"
+            case .timeoutDraw:
+                return "Draw"
+            case .resigned(let loser):
+                return loser == player ? "You resigned" : "\(rival) resigns"
             }
-            .shadow(color: theme.glows ? tint.opacity(0.35) : .black.opacity(0.12),
-                    radius: theme.glows ? 16 : 10, y: theme.glows ? 0 : 3)
+        }
+        guard let winner = match.game.winner else { return "Draw" }
+        return winner == player ? "You win" : "\(rival) wins"
+    }
+
+    var detail: String {
+        if let outcome = match.outcome {
+            switch outcome {
+            case .timeout(let loser):
+                return loser == player ? "Your clock ran out." : "\(rival)'s clock ran out."
+            case .timeoutDraw(let flagged):
+                return flagged == player
+                    ? "Your clock ran out, but \(rival) can't checkmate with what's left."
+                    : "\(rival)'s clock ran out, but you can't checkmate with what's left."
+            case .resigned(let loser):
+                return loser == player ? "\(rival) takes this one." : "You win. There was no way back for \(rival)."
+            }
+        }
+        if match.game.winner != nil {
+            return match.game.moves.last.map { "Checkmate with \($0)." } ?? "Checkmate."
+        }
+        if case .draw(let reason) = match.game.state {
+            switch reason {
+            case .stalemate: return "Stalemate: no legal move, and no check."
+            case .repetition: return "The same position came up three times."
+            case .fiftyMoves: return "Fifty moves without a capture or a pawn move."
+            case .insufficientMaterial: return "Neither side has enough left to checkmate."
+            case .agreement: return "Both sides agreed to a draw."
+            }
+        }
+        return ""
     }
 }
 
 // MARK: - The orb itself
 
-/// The circle: the eval ring around the last verdict's mark.
+/// The circle: the player's share of the game around the mark of the last grade.
 private struct OrbFace: View {
     let match: MatchController
     let theme: BoardTheme
+    /// What a VoiceOver double-tap does: the same as a tap.
+    let open: () -> Void
+
+    private var accent: Color { theme.accent ?? .accentColor }
 
     var body: some View {
         ZStack {
-            if match.isComputerThinking {
-                ThinkingRing(color: match.setup.level.rival.hue)
-            } else {
-                EvalRing(share: goldShare, theme: theme)
-            }
+            EvalRing(share: match.playerShare, theme: theme)
             mark
         }
         .frame(width: CoachOrb.orbSize, height: CoachOrb.orbSize)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
-    }
-
-    /// Gold's (White's) share of the ring, 0 to 1.
-    private var goldShare: Double {
-        if match.isOver {
-            guard let winner = match.winner else { return 0.5 }
-            return winner == .white ? 1 : 0
-        }
-        return ((match.evaluation?.winningChances ?? 0) + 1) / 2
+        .accessibilityHint("Double-tap to open the coach")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { open() }
     }
 
     @ViewBuilder
     private var mark: some View {
         if match.isComputerThinking {
-            RivalSigil(rival: match.setup.level.rival, size: 36, glows: theme.glows)
+            ThinkingSigil(rival: match.setup.level.rival, size: 36, glows: theme.glows)
         } else if match.isOver {
-            if let winner = match.winner {
-                Image(systemName: "crown.fill")
+            // What the result means to the player, never a side's own color.
+            if let won = match.playerWon {
+                Image(systemName: won ? "crown.fill" : "flag.fill")
                     .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(theme.sideColor(winner))
-                    .shadow(color: theme.glows ? theme.sideColor(winner).opacity(0.9) : .clear, radius: 8)
+                    .foregroundStyle(won ? accent : Color.primary.opacity(0.85))
+                    .shadow(color: theme.glows && won ? accent.opacity(0.9) : .clear, radius: 8)
             } else {
                 Text("½")
                     .font(.system(size: 24, weight: .heavy, design: .themed))
@@ -193,48 +280,60 @@ private struct OrbFace: View {
                     Text(text).font(.system(size: 22, weight: .heavy, design: .themed))
                 }
             }
-            .foregroundStyle(review.grade.color)
-            .shadow(color: theme.glows ? review.grade.color.opacity(0.9) : .clear, radius: 8)
+            .foregroundStyle(review.grade.color(on: theme))
+            .shadow(color: theme.glows ? review.grade.color(on: theme).opacity(0.9) : .clear, radius: 8)
             .contentTransition(.symbolEffect(.replace))
         } else {
             Image(systemName: "sparkles")
                 .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(theme.accent ?? .accentColor)
-                .shadow(color: theme.glows ? (theme.accent ?? .accentColor).opacity(0.9) : .clear, radius: 8)
+                .foregroundStyle(accent)
+                .shadow(color: theme.glows ? accent.opacity(0.9) : .clear, radius: 8)
         }
     }
 
     private var accessibilityText: String {
         if match.isComputerThinking { return "\(match.setup.level.rival.name) is thinking" }
-        if match.isOver {
-            return match.winner.map { "\(theme.name(of: $0)) wins" } ?? "Draw"
-        }
-        var text = match.review.map { "\($0.title). \($0.detail)" } ?? "Your coach"
+        if match.isOver { return ResultText(match: match).title }
+        var text = match.review.map { "\($0.title). \($0.detail)" } ?? "Leo, your coach."
         if let evaluation = match.evaluation {
-            text += " Evaluation \(evaluation.label) for \(theme.whiteName)."
+            text += " Score \(match.forPlayer(evaluation).label) for you."
         }
         return text
     }
 }
 
-/// A ring split between the two sides: Gold's part from the top, clockwise.
+/// A gauge round the orb: the player's share of the game against the rival's. Theirs
+/// fills in the accent from the bottom, clockwise; the rest is the rival's. The two meet
+/// at the tick at the top when the game is even.
 struct EvalRing: View {
-    /// Gold's (White's) share, 0 to 1.
+    /// The player's share, 0 to 1.
     let share: Double
     let theme: BoardTheme
     var lineWidth: CGFloat = 3.5
 
+    /// The rival's part of the ring and the bar: light enough to read as a share on
+    /// every look, not as an empty track.
+    static let rivalTone = Color.primary.opacity(0.3)
+    /// The "even" tick.
+    static let tickTone = Color.primary.opacity(0.8)
+
+    private var accent: Color { theme.accent ?? .accentColor }
+
     var body: some View {
         ZStack {
             Circle()
-                .stroke(theme.blackSide.opacity(theme.isDark ? 0.9 : 0.85), lineWidth: lineWidth)
-                .shadow(color: theme.glows ? theme.blackSide.opacity(0.8) : .clear, radius: 4)
+                .stroke(Self.rivalTone, lineWidth: lineWidth)
             Circle()
                 .trim(from: 0, to: max(0, min(1, share)))
-                .stroke(theme.whiteSide, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-                .shadow(color: theme.glows ? (theme.whiteGlow ?? theme.whiteSide).opacity(0.9) : .black.opacity(0.35),
-                        radius: theme.glows ? 4 : 1)
+                .stroke(accent, style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt))
+                .rotationEffect(.degrees(90))
+                .shadow(color: theme.glows ? accent.opacity(0.9) : .clear, radius: 4)
+            // Across the ring at the top, and a little into the orb so it shows on the accent too.
+            Rectangle()
+                .fill(Self.tickTone)
+                .frame(width: 1, height: lineWidth + 3)
+                .frame(maxHeight: .infinity, alignment: .top)
+                .offset(y: -lineWidth / 2)
         }
         .padding(lineWidth / 2)
         .animation(.spring(response: 0.6, dampingFraction: 0.9), value: share)
@@ -242,75 +341,25 @@ struct EvalRing: View {
     }
 }
 
-/// A sweeping arc in the rival's color while the computer thinks. With Reduce
-/// Motion on it steps round once every four seconds instead of sweeping.
-private struct ThinkingRing: View {
-    let color: Color
+/// The rival's sigil breathing slowly while it thinks: a turn under way, not a spinner.
+/// With Reduce Motion on it holds still.
+private struct ThinkingSigil: View {
+    let rival: Rival
+    let size: CGFloat
+    let glows: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        Group {
-            if reduceMotion {
-                TimelineView(.periodic(from: .now, by: 0.5)) { context in
-                    let steps = (context.date.timeIntervalSinceReferenceDate / 0.5).rounded(.down)
-                    arc(turn: steps.truncatingRemainder(dividingBy: 8) / 8)
-                }
-            } else {
-                TimelineView(.animation) { context in
-                    let seconds = context.date.timeIntervalSinceReferenceDate
-                    arc(turn: seconds.truncatingRemainder(dividingBy: 1.1) / 1.1)
-                }
-            }
+        if reduceMotion {
+            RivalSigil(rival: rival, size: size, glows: glows)
+        } else {
+            RivalSigil(rival: rival, size: size, glows: glows)
+                .phaseAnimator([false, true]) { sigil, full in
+                    sigil
+                        .scaleEffect(full ? 1 : 0.88)
+                        .opacity(full ? 1 : 0.55)
+                } animation: { _ in .easeInOut(duration: 1.1) }
         }
-        .accessibilityHidden(true)
-    }
-
-    /// The ring with the arc `turn` of the way round, 0 to 1.
-    private func arc(turn: Double) -> some View {
-        ZStack {
-            Circle().stroke(Color.primary.opacity(0.12), lineWidth: 3.5)
-            Circle()
-                .trim(from: 0, to: 0.28)
-                .stroke(color, style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
-                .rotationEffect(.degrees(turn * 360 - 90))
-                .shadow(color: color.opacity(0.9), radius: 5)
-        }
-        .padding(1.75)
-    }
-}
-
-// MARK: - The stretched orb
-
-/// The verdict, shown in the stretched orb right after a move.
-private struct PeekRow: View {
-    let review: MoveReview
-    let theme: BoardTheme
-    /// The army name of the piece that moved, when it has one.
-    var pieceName: String? = nil
-
-    var body: some View {
-        HStack(spacing: 12) {
-            GradeBadge(grade: review.grade, glows: theme.glows)
-            VStack(alignment: .leading, spacing: 1) {
-                ReviewTitle(review: review, pieceName: pieceName)
-                    .font(.subheadline.weight(.bold))
-                    .lineLimit(1)
-                Text(review.shortDetail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            Spacer(minLength: 4)
-            if let evaluation = review.evaluationForWhite {
-                EvalChip(text: evaluation.label, color: review.grade.color)
-            }
-        }
-        .padding(.horizontal, 14)
-        .frame(height: CoachOrb.orbSize)
-        // The stretched orb is as tall as the orb, so the type stops growing at the
-        // largest regular size instead of spilling past the pill.
-        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-        .accessibilityElement(children: .combine)
     }
 }
 
@@ -319,6 +368,8 @@ struct EvalChip: View {
     let text: String
     let color: Color
     var large = false
+    /// What VoiceOver says, when "Score" and the text isn't enough.
+    var spoken: String? = nil
 
     var body: some View {
         Text(text)
@@ -327,43 +378,36 @@ struct EvalChip: View {
             .padding(.horizontal, large ? 10 : 8)
             .padding(.vertical, large ? 5 : 4)
             .background(color.opacity(0.18), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .accessibilityLabel("Score \(text)")
+            .accessibilityLabel(spoken ?? "Score \(text)")
     }
 }
 
-/// The verdict's title, with the army name of the piece that moved after it.
-private struct ReviewTitle: View {
-    let review: MoveReview
-    let pieceName: String?
+// MARK: - The unfolded coach
 
-    var body: some View {
-        if let pieceName {
-            Text(review.title).foregroundColor(review.grade.color)
-                + Text(" · \(pieceName)").foregroundColor(.secondary)
-        } else {
-            Text(review.title).foregroundColor(review.grade.color)
-        }
-    }
-}
-
-// MARK: - The expanded coach
-
-/// Everything the coach knows, in the unfolded orb.
+/// Everything the coach knows, in the unfolded orb. The handle and the latest word sit at
+/// the top, the controls at the bottom, both always in sight; on a short screen the
+/// details between them scroll.
 private struct CoachPanel: View {
     let match: MatchController
     let theme: BoardTheme
+    @Binding var coachMove: Int?
     let newGame: () -> Void
+    let showGames: () -> Void
+    /// Opens Talk it through. Nil leaves it out.
+    let talk: (() -> Void)?
+    /// Closes the panel when the person closes it themselves, with a light tap.
+    let close: () -> Void
+    /// Closes the panel quietly, on the way to something else.
     let collapse: () -> Void
 
     @AppStorage("showBestMoves") private var showBestMoves = false
     @Environment(GameCoach.self) private var gameCoach: GameCoach?
     @Environment(TrainingStore.self) private var training: TrainingStore?
     @Environment(ArmyStore.self) private var army: ArmyStore?
+    @Environment(GameVault.self) private var vault: GameVault?
     @State private var reel: GameReel?
     @State private var rewind: SavedGame?
-    @State private var showingGames = false
     @State private var confirmingResign = false
-    @Environment(GameVault.self) private var vault: GameVault?
 
     /// This game's Piece of the Match, once the game is over and counted.
     private var hero: MatchHero? {
@@ -372,27 +416,33 @@ private struct CoachPanel: View {
     }
 
     private var accent: Color { theme.accent ?? .accentColor }
+    private var rival: String { match.setup.level.rival.name }
 
     var body: some View {
         VStack(spacing: 0) {
-            Capsule()
-                .fill(Color.secondary.opacity(0.4))
-                .frame(width: 36, height: 4)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 8)
-                .padding(.bottom, 10)
-                .contentShape(Rectangle())
-                .onTapGesture(perform: collapse)
-                .accessibilityHidden(true)
+            // A swipe down on the handle or the header closes the panel. Only there:
+            // anywhere else it would fight the scrolling below.
+            VStack(spacing: 0) {
+                handle
+                header
+            }
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 8)
+                    .onEnded { value in
+                        if value.translation.height > 40 { close() }
+                    }
+            )
             // Where it all fits the panel is its natural height; on a short screen
-            // the rest scrolls under the handle instead of squeezing the board.
+            // the details scroll instead of squeezing the board.
             ViewThatFits(in: .vertical) {
-                content
+                details
                 ScrollView {
-                    content
+                    details
                 }
                 .scrollBounceBehavior(.basedOnSize)
             }
+            controls
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 12)
@@ -400,32 +450,20 @@ private struct CoachPanel: View {
         .animation(.snappy(duration: 0.3), value: match.isComputerThinking)
     }
 
-    private var content: some View {
-        VStack(spacing: 0) {
-            header
-            if let gameCoach, let training, GameCoachRow.hasContent(coach: gameCoach, match: match) {
-                GameCoachRow(coach: gameCoach, store: training, match: match, theme: theme)
-                    .padding(.top, 10)
-            }
-            EvalBar(share: evalShare, label: evalLabel, theme: theme)
-                .padding(.top, 12)
-            if match.isOver {
-                summary.padding(.top, 12)
-                if let hero {
-                    PieceOfTheMatchCard(hero: hero, color: match.setup.playerColor, theme: theme)
-                        .padding(.top, 10)
-                }
-                endButtons.padding(.top, 10)
-                HStack(spacing: 8) {
-                    rewindButton
-                    reelButton
-                }
-                .padding(.top, 8)
-            } else {
-                bestMoves.padding(.top, 12)
-                actions.padding(.top, 8)
-            }
-        }
+    /// The grabber. A tap on it closes the panel, and so does a swipe down.
+    private var handle: some View {
+        Capsule()
+            .fill(Color.secondary.opacity(0.4))
+            .frame(width: 36, height: 4)
+            .frame(maxWidth: .infinity)
+            .padding(.top, 8)
+            .padding(.bottom, 10)
+            .contentShape(Rectangle())
+            .onTapGesture(perform: close)
+            .accessibilityElement()
+            .accessibilityLabel("Close the coach")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { close() }
     }
 
     // MARK: Header
@@ -434,52 +472,57 @@ private struct CoachPanel: View {
     private var header: some View {
         HStack(alignment: .center, spacing: 12) {
             if match.isOver {
+                let result = ResultText(match: match)
                 resultBadge
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(resultTitle).font(.headline).foregroundStyle(resultColor)
-                    Text(resultDetail).font(.subheadline).foregroundStyle(.secondary)
+                    Text(result.title).font(.headline).foregroundStyle(resultColor)
+                    Text(result.detail).font(.subheadline).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 4)
+                // The title has already said who won.
                 EvalChip(text: scoreline, color: resultColor, large: true)
+                    .accessibilityHidden(true)
             } else if match.isComputerThinking {
-                ThinkingRing(color: match.setup.level.rival.hue).frame(width: 40, height: 40)
+                ThinkingSigil(rival: match.setup.level.rival, size: 40, glows: theme.glows)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(match.setup.level.rival.name) is thinking").font(.headline)
-                    Text("Your move is graded here as soon as it answers.")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Text("\(rival) is thinking").font(.headline)
+                    if gradeIsComing {
+                        Text("Your grade comes right after \(rival)'s reply.")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 Spacer(minLength: 4)
             } else if match.engineFailed {
-                // Ahead of the last verdict, which is about a move that is no longer the news.
+                // Ahead of the last grade, which is about a move that is no longer the news.
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.title3).foregroundStyle(accent).frame(width: 40, height: 40)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Coach offline").font(.headline)
-                    Text("Stockfish didn't answer. Undo and try again, or play a friend.")
+                    Text("Leo is offline").font(.headline)
+                    Text("The engine didn't answer. Play on: grades and hints come back when it does.")
                         .font(.subheadline).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 4)
             } else if let review = match.review {
-                GradeBadge(grade: review.grade, glows: theme.glows)
+                GradeBadge(grade: review.grade, glows: theme.glows, theme: theme)
                 VStack(alignment: .leading, spacing: 2) {
-                    ReviewTitle(review: review, pieceName: army?.pieceName(for: review, in: match))
-                        .font(.headline)
+                    Text(review.title).font(.headline).foregroundStyle(review.grade.color(on: theme))
                     Text(review.detail).font(.subheadline).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 4)
                 if let evaluation = review.evaluationForWhite {
-                    EvalChip(text: evaluation.label, color: review.grade.color, large: true)
+                    let score = match.forPlayer(evaluation).label
+                    EvalChip(text: score, color: review.grade.color(on: theme), large: true,
+                             spoken: "Score \(score) for you")
                 }
             } else {
-                Image(systemName: "sparkles")
-                    .font(.title3).foregroundStyle(accent).frame(width: 40, height: 40)
+                CoachAvatar(theme: theme, size: 40)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Your coach").font(.headline)
-                    Text("Make a move and I'll tell you how good it was.")
+                    Text("Leo").font(.headline)
+                    Text("Play a move and I'll tell you how it was.")
                         .font(.subheadline).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -489,59 +532,32 @@ private struct CoachPanel: View {
         .accessibilityElement(children: .combine)
     }
 
+    /// The person's last move is waiting for its grade, which comes once the rival has replied.
+    /// Not one Leo played for them: those aren't graded.
+    private var gradeIsComing: Bool {
+        match.showVerdicts && match.game.lastPlayed?.color == match.setup.playerColor
+            && match.game.moveCount != coachMove
+    }
+
+    /// What the result means to the player: the accent when they won, plain when they lost,
+    /// quiet for a draw. Never a side's own color: Black's is near-black on the dark looks.
     private var resultColor: Color {
-        if let winner = match.winner { return theme.sideColor(winner) }
-        return .secondary
+        guard let won = match.playerWon else { return .secondary }
+        return won ? accent : .primary
     }
 
     private var resultBadge: some View {
-        ZStack {
-            Circle().fill(resultColor)
-            Image(systemName: match.winner == nil ? "equal" : "crown.fill")
+        let symbol = match.playerWon.map { $0 ? "crown.fill" : "flag.fill" } ?? "equal"
+        return ZStack {
+            Circle().fill(resultColor.opacity(0.16))
+            Circle().strokeBorder(resultColor.opacity(0.55), lineWidth: 1)
+            Image(systemName: symbol)
                 .font(.system(size: 17, weight: .bold))
-                .foregroundStyle(.black.opacity(0.8))
+                .foregroundStyle(resultColor)
         }
         .frame(width: 38, height: 38)
-        .shadow(color: theme.glows ? resultColor.opacity(0.8) : .clear, radius: 8)
-    }
-
-    private var resultTitle: String {
-        if let outcome = match.outcome {
-            switch outcome {
-            case .timeout(let loser): return "\(theme.name(of: loser.opposite)) wins on time"
-            case .timeoutDraw: return "Draw"
-            case .resigned(let loser): return "\(resignerName(loser)) resigns"
-            }
-        }
-        if match.game.winner != nil { return "Checkmate!" }
-        return "Draw"
-    }
-
-    private var resultDetail: String {
-        if let outcome = match.outcome {
-            switch outcome {
-            case .timeout(let loser):
-                return "\(theme.name(of: loser)) ran out of time."
-            case .timeoutDraw(let flagged):
-                return "\(theme.name(of: flagged)) ran out of time, but \(theme.name(of: flagged.opposite)) cannot checkmate."
-            case .resigned(let loser):
-                if match.setup.opponent == .computer, loser != match.setup.playerColor {
-                    return "\(match.setup.level.rival.name) saw no way back. You win."
-                }
-                return "\(theme.name(of: loser.opposite)) wins."
-            }
-        }
-        if let winner = match.game.winner {
-            let last = match.game.moves.last ?? "The last move"
-            return "\(last) ends the game. \(theme.name(of: winner)) wins."
-        }
-        return match.game.status(white: theme.whiteName, black: theme.blackName)
-    }
-
-    /// Who resigned: the rival by name, or "You", or a colour in a game between friends.
-    private func resignerName(_ loser: Piece.Color) -> String {
-        guard match.setup.opponent == .computer else { return theme.name(of: loser) }
-        return loser == match.setup.playerColor ? "You" : match.setup.level.rival.name
+        .shadow(color: theme.glows ? resultColor.opacity(0.6) : .clear, radius: 8)
+        .accessibilityHidden(true)
     }
 
     private var scoreline: String {
@@ -549,37 +565,64 @@ private struct CoachPanel: View {
         return winner == .white ? "1–0" : "0–1"
     }
 
-    // MARK: Evaluation
+    // MARK: Details
 
-    private var evalShare: Double {
-        if match.isOver {
-            guard let winner = match.winner else { return 0.5 }
-            return winner == .white ? 1 : 0
+    private var details: some View {
+        VStack(spacing: 0) {
+            if let gameCoach, let training, GameCoachRow.hasContent(coach: gameCoach, match: match) {
+                GameCoachRow(coach: gameCoach, store: training, match: match, theme: theme)
+                    .padding(.top, 10)
+            }
+            if match.isOver {
+                summary.padding(.top, 12)
+                if let hero {
+                    PieceOfTheMatchCard(hero: hero, color: match.setup.playerColor, theme: theme)
+                        .padding(.top, 10)
+                }
+            } else {
+                if let talk, match.canTalkItThrough {
+                    TalkEntryRow(theme: theme, countsAsHelp: match.talkCountsAsHelp) {
+                        collapse()
+                        talk()
+                    }
+                    .padding(.top, 12)
+                }
+                EvalBar(share: match.playerShare, label: evalLabel, theme: theme)
+                    .padding(.top, 12)
+                bestMoves.padding(.top, 12)
+            }
         }
-        return ((match.evaluation?.winningChances ?? 0) + 1) / 2
     }
 
-    private var evalLabel: String {
-        if match.isOver {
-            guard let winner = match.winner else { return "Draw" }
-            return "\(theme.name(of: winner)) wins"
-        }
-        return match.evaluation?.label ?? "0.0"
+    /// The score from the player's side, plus being good for them. Nil until the engine has answered.
+    private var evalLabel: String? {
+        match.evaluation.map { match.forPlayer($0).label }
     }
 
-    // MARK: Best moves
+    private var summary: some View {
+        HStack(spacing: 8) {
+            StatTile(title: "Accuracy", value: match.accuracy.map { "\($0)%" } ?? "–",
+                     color: MoveReview.Grade.best.color(on: theme), theme: theme)
+            StatTile(title: "Best", value: "\(match.gradeCounts[.best, default: 0] + match.gradeCounts[.checkmate, default: 0])",
+                     color: .primary, theme: theme)
+            StatTile(title: "Mistakes", value: "\(match.gradeCounts[.mistake, default: 0])",
+                     color: MoveReview.Grade.mistake.color(on: theme), theme: theme)
+            StatTile(title: "Blunders", value: "\(match.gradeCounts[.blunder, default: 0])",
+                     color: MoveReview.Grade.blunder.color(on: theme), theme: theme)
+        }
+    }
+
+    // MARK: Leo's picks
 
     @ViewBuilder
     private var bestMoves: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(showBestMoves ? "Best moves now · tap to play one" : "Hints are off")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .tracking(1)
-                .textCase(.uppercase)
             if showBestMoves {
+                Text("Leo's picks")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
                 if match.engineFailed {
-                    Text("Stockfish is offline, so there are no best moves to show.")
+                    Text("No picks right now. The engine is offline.")
                         .font(.footnote.weight(.medium))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -588,7 +631,7 @@ private struct CoachPanel: View {
                 } else if match.hints.isEmpty {
                     HStack(spacing: 8) {
                         ProgressView().controlSize(.small)
-                        Text(match.isComputerThinking ? "Waiting for \(match.setup.level.rival.name)" : "Looking at the position")
+                        Text(match.isComputerThinking ? "Waiting for \(rival)…" : "Thinking…")
                             .font(.footnote.weight(.medium))
                             .foregroundStyle(.secondary)
                     }
@@ -596,17 +639,25 @@ private struct CoachPanel: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
                     ForEach(match.hints) { hint in
-                        HintRow(hint: hint, mover: match.game.sideToMove, theme: theme) {
-                            match.play(hint)
-                            collapse()
-                        }
+                        HintRow(hint: hint, score: playerScore(of: hint), theme: theme,
+                                show: {
+                                    // Points at the move on the board and leaves the move to the player.
+                                    if match.game.selected != hint.from { match.tap(hint.from) }
+                                    collapse()
+                                },
+                                play: {
+                                    let before = match.game.moveCount
+                                    match.play(hint)
+                                    if match.game.moveCount != before { coachMove = match.game.moveCount }
+                                    collapse()
+                                })
                     }
                 }
             } else {
                 Button {
                     showBestMoves = true
                 } label: {
-                    Label("Show the two best moves", systemImage: "lightbulb.fill")
+                    Label("Show Leo's picks", systemImage: "lightbulb.fill")
                         .font(.footnote.weight(.semibold))
                 }
                 .buttonStyle(.plain)
@@ -617,10 +668,37 @@ private struct CoachPanel: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    // MARK: Actions
+    /// A hint's score is from the side to move. Hints only come on the player's turn, so
+    /// that is the player, but it is turned round should it ever not be.
+    private func playerScore(of hint: MoveHint) -> String {
+        let mine = match.game.sideToMove == match.setup.playerColor
+        return (mine ? hint.evaluation : hint.evaluation.flipped).label
+    }
+
+    // MARK: Controls
+
+    /// The game's buttons, or once it is over what comes next.
+    @ViewBuilder
+    private var controls: some View {
+        if match.isOver {
+            VStack(spacing: 8) {
+                endButtons
+                if canReview || hasHighlights {
+                    HStack(spacing: 8) {
+                        if canReview { reviewButton }
+                        if hasHighlights { highlightsButton }
+                    }
+                }
+            }
+            .padding(.top, 12)
+        } else {
+            actions.padding(.top, 10)
+        }
+    }
 
     private var actions: some View {
-        HStack(spacing: 6) {
+        // Top-aligned, so every circle sits on one line whatever its label does.
+        HStack(alignment: .top, spacing: 6) {
             ActionButton(title: "Undo", symbol: Glyphs.undo, theme: theme) {
                 withAnimation(.snappy(duration: 0.22)) { match.undo() }
             }
@@ -645,89 +723,16 @@ private struct CoachPanel: View {
                     }
                     Button("Keep playing", role: .cancel) {}
                 }
-            } else if vault != nil {
+            } else {
                 ActionButton(title: "Games", symbol: Glyphs.games, theme: theme) {
-                    showingGames = true
+                    collapse()
+                    showGames()
                 }
             }
             ActionButton(title: "New game", symbol: Glyphs.play, theme: theme) {
                 collapse()
                 newGame()
             }
-        }
-        .fullScreenCover(isPresented: $showingGames) {
-            if let vault {
-                RewindGamesView(theme: theme) { game in
-                    collapse()
-                    var setup = match.setup
-                    if let raw = game.level, let level = MatchController.Level(rawValue: raw) {
-                        setup.opponent = .computer
-                        setup.level = level
-                        setup.playerColor = game.playerColor
-                    }
-                    withAnimation(.snappy) { match.start(setup) }
-                }
-                .environment(vault)
-            }
-        }
-    }
-
-    private var summary: some View {
-        HStack(spacing: 8) {
-            StatTile(title: "Accuracy", value: match.accuracy.map { "\($0)%" } ?? "–",
-                     color: MoveReview.Grade.best.color, theme: theme)
-            StatTile(title: "Best", value: "\(match.gradeCounts[.best, default: 0] + match.gradeCounts[.checkmate, default: 0])",
-                     color: .primary, theme: theme)
-            StatTile(title: "Mistakes", value: "\(match.gradeCounts[.mistake, default: 0])",
-                     color: MoveReview.Grade.mistake.color, theme: theme)
-            StatTile(title: "Blunders", value: "\(match.gradeCounts[.blunder, default: 0])",
-                     color: MoveReview.Grade.blunder.color, theme: theme)
-        }
-    }
-
-    /// Rewind: the game's line, Leo on each moment, and a second chance at the mistakes.
-    private var rewindButton: some View {
-        Button {
-            guard let game = match.savedGame() else { return }
-            vault?.record(game)
-            rewind = vault?.game(game.id) ?? game
-        } label: {
-            Label("Rewind", systemImage: "backward.circle.fill")
-                .font(.subheadline.weight(.semibold))
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: 40)
-        }
-        .buttonStyle(.bordered)
-        .buttonBorderShape(.capsule)
-        .tint(accent)
-        .fullScreenCover(item: $rewind) { game in
-            if let vault {
-                RewindView(game: game, theme: theme) { _ in
-                    collapse()
-                    withAnimation(.snappy) { match.rematch() }
-                }
-                .environment(vault)
-            }
-        }
-    }
-
-    /// Leo's 30-second story of the game, to watch and share.
-    private var reelButton: some View {
-        Button {
-            let names = match.setup.opponent == .computer
-                ? army?.names(for: match.setup.playerColor) ?? [:] : [:]
-            reel = match.highlightReel(pieceName: { names[$0] }, hero: hero?.line)
-        } label: {
-            Label("Highlight reel", systemImage: "film.stack")
-                .font(.subheadline.weight(.semibold))
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: 40)
-        }
-        .buttonStyle(.bordered)
-        .buttonBorderShape(.capsule)
-        .tint(accent)
-        .fullScreenCover(item: $reel) { reel in
-            HighlightReelView(reel: reel, theme: theme)
         }
     }
 
@@ -761,14 +766,73 @@ private struct CoachPanel: View {
             .buttonBorderShape(.roundedRectangle(radius: 16))
         }
     }
+
+    /// Rewind needs somewhere to keep the game, and a move to look back on.
+    private var canReview: Bool { vault != nil && match.game.plyCount > 0 }
+
+    /// The reel is only offered when the game has moments for one. Working that out is
+    /// quick, and grades that land just after the end are counted too.
+    private var hasHighlights: Bool { !match.highlightReel().highlights.isEmpty }
+
+    /// Rewind: the game's line, Leo on each moment, and a second chance at the mistakes.
+    private var reviewButton: some View {
+        Button {
+            guard let game = match.savedGame() else { return }
+            vault?.record(game)
+            rewind = vault?.game(game.id) ?? game
+        } label: {
+            Label("Review game", systemImage: "backward.circle")
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 28)
+        }
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.capsule)
+        .controlSize(.small)
+        .tint(.primary)
+        .fullScreenCover(item: $rewind) { game in
+            if let vault {
+                RewindView(game: game, theme: theme) { _ in
+                    rewind = nil
+                    collapse()
+                    withAnimation(.snappy) { match.rematch() }
+                }
+                .environment(vault)
+            }
+        }
+    }
+
+    /// Leo's 30-second story of the game, to watch and share.
+    private var highlightsButton: some View {
+        Button {
+            let names = army?.names(for: match.setup.playerColor) ?? [:]
+            reel = match.highlightReel(pieceName: { names[$0] }, hero: hero?.line)
+        } label: {
+            Label("Highlights", systemImage: "film.stack")
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 28)
+        }
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.capsule)
+        .controlSize(.small)
+        .tint(.primary)
+        .fullScreenCover(item: $reel) { reel in
+            HighlightReelView(reel: reel, theme: theme)
+        }
+    }
 }
 
-/// The Gold-versus-Violet bar with the score riding on the boundary.
+/// The player's share of the game against the rival's, the same as the orb's ring, with
+/// the score riding on the boundary.
 struct EvalBar: View {
-    /// Gold's (White's) share, 0 to 1.
+    /// The player's share, 0 to 1.
     let share: Double
-    let label: String
+    /// The score from the player's side, like "+0.4". Nil until the engine has answered.
+    let label: String?
     let theme: BoardTheme
+
+    private var accent: Color { theme.accent ?? .accentColor }
 
     var body: some View {
         GeometryReader { geo in
@@ -776,15 +840,17 @@ struct EvalBar: View {
             let clamped = max(0, min(1, share))
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(theme.blackSide.opacity(theme.isDark ? 0.55 : 0.8))
-                    .shadow(color: theme.glows ? theme.blackSide.opacity(0.25) : .clear, radius: 12)
+                    .fill(EvalRing.rivalTone)
                 Capsule()
-                    .fill(LinearGradient(colors: [theme.whiteSide.opacity(0.75), theme.whiteSide],
-                                         startPoint: .leading, endPoint: .trailing))
+                    .fill(accent)
                     .frame(width: max(12, width * clamped))
-                    .shadow(color: theme.glows ? (theme.whiteGlow ?? theme.whiteSide).opacity(0.6) : .black.opacity(0.2),
-                            radius: theme.glows ? 12 : 2)
-                Text(label)
+                    .shadow(color: theme.glows ? accent.opacity(0.6) : .clear, radius: 12)
+                // Even.
+                Rectangle()
+                    .fill(EvalRing.tickTone)
+                    .frame(width: 1, height: geo.size.height + 4)
+                    .position(x: width / 2, y: geo.size.height / 2)
+                Text(label ?? "—")
                     .font(.system(size: 11, weight: .bold, design: .themed).monospacedDigit())
                     .foregroundStyle(Color.black)
                     .padding(.horizontal, 6)
@@ -797,73 +863,87 @@ struct EvalBar: View {
         .frame(height: 12)
         .animation(.spring(response: 0.6, dampingFraction: 0.9), value: share)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Evaluation \(label)")
+        .accessibilityLabel(label.map { "Score \($0) for you" } ?? "No score yet")
     }
 }
 
-/// One of the best moves: how it is drawn, what it is, how good it is, and a button to play it.
+/// One of Leo's picks: its mark on the board, the move, how good it is for the player, and
+/// a button that plays it. A tap on the row itself only points at the move on the board.
 private struct HintRow: View {
     let hint: MoveHint
-    /// Whose move it is. The hint's score is from their side; the row shows White's, like the eval bar.
-    let mover: Piece.Color
+    /// The score after the move, from the player's side.
+    let score: String
     let theme: BoardTheme
+    let show: () -> Void
     let play: () -> Void
 
     private var isBest: Bool { hint.rank == 0 }
-    private var score: String { (mover == .white ? hint.evaluation : hint.evaluation.flipped).label }
+    private var rankName: String { isBest ? "Best" : "Runner-up" }
+    private var accent: Color { theme.accent ?? .accentColor }
 
     var body: some View {
-        Button(action: play) {
-            HStack(spacing: 10) {
-                HintSwatch(color: isBest ? theme.bestArrow : theme.secondArrow, dashed: !isBest, glow: theme.glows ? theme.arrowGlow : nil)
-                Text(hint.san)
-                    .font(.system(.body, design: .themed).weight(.bold))
-                    .frame(minWidth: 46, alignment: .leading)
-                Text(isBest ? "Best" : "Next best")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 4)
-                Text(score)
-                    .font(.system(.footnote, design: .themed).weight(.bold).monospacedDigit())
-                    .foregroundStyle(isBest ? theme.bestArrow : Color.secondary)
+        HStack(spacing: 4) {
+            Button(action: show) {
+                HStack(spacing: 10) {
+                    HintSwatch(color: theme.hint, isBest: isBest, glow: theme.hintGlow)
+                    Text(hint.san)
+                        .font(.system(.body, design: .themed).weight(.bold))
+                        .frame(minWidth: 46, alignment: .leading)
+                    Text(rankName)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 4)
+                    Text(score)
+                        .font(.system(.footnote, design: .themed).weight(.bold).monospacedDigit())
+                        .foregroundStyle(isBest ? theme.bestArrow : Color.secondary)
+                }
+                .padding(.leading, 12)
+                .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Show \(hint.san)")
+            .accessibilityValue("\(rankName), score \(score) for you")
+
+            Button(action: play) {
                 Image(systemName: "play.fill")
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(theme.accent ?? .accentColor)
+                    .foregroundStyle(accent)
                     .frame(width: 30, height: 30)
-                    .background((theme.accent ?? .accentColor).opacity(0.16), in: Circle())
+                    .background(accent.opacity(0.16), in: Circle())
+                    .frame(width: 38, height: 38)
+                    .contentShape(Rectangle())
             }
-            .padding(.leading, 12)
-            .padding(.trailing, 6)
-            .frame(minHeight: 38)
-            .background(
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .fill(Color.primary.opacity(theme.isDark ? 0.05 : 0.04))
-                    .overlay(RoundedRectangle(cornerRadius: 13, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(theme.isDark ? 0.09 : 0.08), lineWidth: 1))
-            )
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            .accessibilityLabel("Play \(hint.san) for me")
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(isBest ? "Best" : "Next best") move \(hint.san), score \(score)")
-        .accessibilityHint("Plays it for you")
+        .padding(.trailing, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                .fill(Color.primary.opacity(theme.isDark ? 0.05 : 0.04))
+                .overlay(RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(theme.isDark ? 0.09 : 0.08), lineWidth: 1))
+        )
     }
 }
 
-/// A short line in an arrow's style.
+/// The board's mark for a hint, in small: a dot in a halo, fainter for the runner-up.
 private struct HintSwatch: View {
     let color: Color
-    let dashed: Bool
+    let isBest: Bool
     let glow: Color?
 
     var body: some View {
-        Path { path in
-            path.move(to: CGPoint(x: 2, y: 5))
-            path.addLine(to: CGPoint(x: 26, y: 5))
+        ZStack {
+            Circle()
+                .strokeBorder(color.opacity(isBest ? 1 : 0.55), lineWidth: isBest ? 1.8 : 1.4)
+                .frame(width: 18, height: 18)
+            Circle()
+                .fill(color.opacity(isBest ? 1 : 0.7))
+                .frame(width: 7, height: 7)
         }
-        .stroke(color, style: StrokeStyle(lineWidth: dashed ? 3 : 4, lineCap: dashed ? .butt : .round,
-                                          dash: dashed ? [5, 3] : []))
-        .shadow(color: glow?.opacity(dashed ? 0.5 : 0.9) ?? .clear, radius: 4)
-        .frame(width: 28, height: 10)
+        .shadow(color: glow?.opacity(isBest ? 0.9 : 0.5) ?? .clear, radius: 4)
+        .frame(width: 28, height: 18)
         .accessibilityHidden(true)
     }
 }
@@ -894,6 +974,9 @@ private struct ActionButton: View {
                     .shadow(color: lit && theme.glows ? accent.opacity(0.25) : .clear, radius: 10)
                 Text(title)
                     .font(.caption2.weight(.semibold))
+                    // Six to a row: "New game" shrinks a little rather than break onto two lines.
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
             }
             .foregroundStyle(lit ? accent : Color.primary.opacity(0.85))
             .frame(maxWidth: .infinity)
@@ -935,20 +1018,20 @@ private struct StatTile: View {
 }
 
 extension MoveReview {
-    /// The score after the move from White's point of view, the way the eval bar
-    /// and ring show it. `evaluation` itself is from the mover's side.
+    /// The score after the move from White's point of view. `evaluation` itself is
+    /// from the mover's side; the coach turns it to the player's.
     var evaluationForWhite: Evaluation? {
         guard let evaluation else { return nil }
         let moverWasBlack = fenBefore?.split(separator: " ").dropFirst().first == "b"
         return moverWasBlack ? evaluation.flipped : evaluation
     }
 
-    /// One short line for the stretched orb.
+    /// The verdict in one short line, after its title: what VoiceOver says when the grade lands.
     var shortDetail: String {
         let better = best ?? "another move"
         switch grade {
-        case .checkmate: return "\(played) ends it. Beautiful."
-        case .best: return "\(played) is Stockfish's choice too."
+        case .checkmate: return "\(played) ends it."
+        case .best: return "\(played) · the top choice."
         case .excellent: return "\(played) · nearly as good as \(better)."
         case .good: return "\(played) · \(better) was a little better."
         case .inaccuracy: return "\(played) · \(better) was better."

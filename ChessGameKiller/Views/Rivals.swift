@@ -17,6 +17,13 @@ struct Rival: Identifiable {
     /// 1 to 5, for the strength bars.
     var strength: Int { level.rawValue + 1 }
 
+    /// The rating as VoiceOver should say it: "about 1500 Elo", "over 3000 Elo".
+    var spokenElo: String {
+        if elo.hasPrefix("~") { return "about \(elo.dropFirst()) Elo" }
+        if elo.hasSuffix("+") { return "over \(elo.dropLast()) Elo" }
+        return "\(elo) Elo"
+    }
+
     /// The rival's portrait in Assets.xcassets/Rivals.
     var portraitName: String { "rival-" + name.lowercased() }
 
@@ -48,7 +55,7 @@ extension MatchController.Level {
                          boardTheme: .vector)
         case .grandmaster:
             return Rival(level: self, name: "Singularity", elo: "3000+",
-                         blurb: "Full-strength Stockfish. Nobody wins. Try anyway.",
+                         blurb: "Full engine strength. The ultimate test.",
                          hue: Color(hex: 0xFF5AC8), hue2: Color(hex: 0xFF3B6B),
                          boardTheme: .singularity)
         }

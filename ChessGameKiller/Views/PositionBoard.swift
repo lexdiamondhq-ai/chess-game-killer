@@ -22,12 +22,18 @@ struct PositionBoard: View {
             let sq = (side - inset * 2) / 8
             let corner = RoundedRectangle(cornerRadius: sq * 0.12, style: .continuous)
             ZStack(alignment: .topLeading) {
-                if let art = theme.boardArt {
-                    BoardArt(name: art, flipped: flipped)
+                // Only the board is cut to its rounded corners, so a tall piece on the far rank
+                // may rise a little above the frame.
+                ZStack {
+                    if let art = theme.boardArt {
+                        BoardArt(name: art, flipped: flipped)
+                    }
+                    if let surface = theme.surface {
+                        LinearGradient(colors: surface, startPoint: .topLeading, endPoint: .bottomTrailing)
+                    }
                 }
-                if let surface = theme.surface {
-                    LinearGradient(colors: surface, startPoint: .topLeading, endPoint: .bottomTrailing)
-                }
+                .frame(width: side, height: side)
+                .clipShape(corner)
                 ZStack(alignment: .topLeading) {
                     VStack(spacing: 0) {
                         ForEach(0..<8, id: \.self) { row in
@@ -38,6 +44,13 @@ struct PositionBoard: View {
                             }
                         }
                     }
+                    // One tap for the whole board, read where the finger landed: a tall piece's
+                    // head is drawn over the square behind it.
+                    .contentShape(Rectangle())
+                    .gesture(SpatialTapGesture().onEnded { value in
+                        guard let onTap, let tapped = tappedSquare(at: value.location, size: sq) else { return }
+                        onTap(tapped)
+                    })
                     ZStack {
                         ForEach(Array(hints.reversed())) { hint in
                             MoveArrow(
@@ -58,9 +71,11 @@ struct PositionBoard: View {
                 }
                 .frame(width: sq * 8, height: sq * 8)
                 .padding(inset)
+                if theme.boardArt != nil {
+                    FrameCoordinates(flipped: flipped, inset: inset, squareSize: sq, color: theme.labelOnDark)
+                }
             }
             .frame(width: side, height: side)
-            .clipShape(corner)
             .overlay {
                 if let edge = theme.boardEdge {
                     corner.strokeBorder(edge, lineWidth: 1)
@@ -82,9 +97,21 @@ struct PositionBoard: View {
     }
 
     private func center(of square: Square, size: CGFloat) -> CGPoint {
-        let column = flipped ? 7 - square.fileIndex : square.fileIndex
-        let row = flipped ? square.rankIndex : 7 - square.rankIndex
-        return CGPoint(x: (CGFloat(column) + 0.5) * size, y: (CGFloat(row) + 0.5) * size)
+        BoardTapResolver.center(of: square, squareSize: size, flipped: flipped)
+    }
+
+    /// The square a tap on the squares means: see `BoardTapResolver`. Nothing is picked up here.
+    private func tappedSquare(at point: CGPoint, size: CGFloat) -> Square? {
+        var isSolid: ((Piece, CGPoint) -> Bool)?
+        if theme.spritePieces {
+            let theme = theme
+            isSolid = { piece, offset in SpriteMasks.shared.isSolid(piece, in: theme, at: offset) }
+        }
+        let draft = draft
+        return BoardTapResolver.square(
+            at: point, squareSize: size, flipped: flipped, selected: nil, targets: [],
+            piece: { square in draft[square]?.piece(at: square) }, isSolid: isSolid
+        )
     }
 
     private func squareView(column: Int, row: Int, size: CGFloat) -> some View {
@@ -101,11 +128,14 @@ struct PositionBoard: View {
             if let gridLine = theme.gridLine {
                 Rectangle().strokeBorder(gridLine, lineWidth: 0.5)
             }
-            if column == 0 {
-                label("\(square.rankIndex + 1)", size: size, color: labelColor, alignment: .topLeading)
-            }
-            if row == 7 {
-                label(square.file.rawValue, size: size, color: labelColor, alignment: .bottomTrailing)
+            // Coordinates in the corners, like a printed board. A board picture has them in its frame.
+            if theme.boardArt == nil {
+                if column == 0 {
+                    label("\(square.rankIndex + 1)", size: size, color: labelColor, alignment: .topLeading)
+                }
+                if row == 7 {
+                    label(square.file.rawValue, size: size, color: labelColor, alignment: .bottomTrailing)
+                }
             }
             if let token {
                 let isGhost = ghosts.contains(square)
@@ -116,11 +146,10 @@ struct PositionBoard: View {
             }
         }
         .frame(width: size, height: size)
-        .contentShape(Rectangle())
-        .onTapGesture { onTap?(square) }
         .accessibilityElement()
         .accessibilityLabel(token.map { "\(square.notation), \($0.piece(at: square).spokenName)" } ?? square.notation)
         .accessibilityAddTraits(onTap == nil ? [] : .isButton)
+        .accessibilityAction { onTap?(square) }
     }
 
     private func label(_ text: String, size: CGFloat, color: Color, alignment: Alignment) -> some View {

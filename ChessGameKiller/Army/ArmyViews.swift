@@ -23,16 +23,17 @@ extension ArmyStore {
 extension ArmyRank {
     static let gold = Color(hex: 0xFFD27A)
 
-    /// The rank's color: the piece's side color, or gold for a Legend.
+    /// The rank's color: the piece's side, in a shade that reads as text, or gold for a Legend.
     func color(for piece: Piece, theme: BoardTheme) -> Color {
-        self == .legend ? Self.gold : theme.sideColor(piece.color)
+        self == .legend ? Self.gold : theme.ink(for: piece.color)
     }
 }
 
 // MARK: How a veteran piece looks
 
 /// Draws a piece's rank around it: a soft glow for a Veteran, a battle scar
-/// for Elite, and a breathing golden glow for a Legend.
+/// for Elite, and a breathing golden glow for a Legend. On the board the glow
+/// stays still and there is no scar, so nothing moves on or marks a piece you play with.
 struct VeteranAura: ViewModifier {
     let rank: ArmyRank
     let piece: Piece
@@ -40,11 +41,13 @@ struct VeteranAura: ViewModifier {
     let size: CGFloat
     var onBoard = true
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func body(content: Content) -> some View {
         content
             .background {
                 if rank >= .veteran {
-                    if rank == .legend {
+                    if rank == .legend, !onBoard, !reduceMotion {
                         halo.phaseAnimator([0.5, 1.0]) { view, phase in
                             view.opacity(phase).scaleEffect(0.92 + 0.08 * phase)
                         } animation: { _ in .easeInOut(duration: 1.6) }
@@ -54,8 +57,8 @@ struct VeteranAura: ViewModifier {
                 }
             }
             .overlay {
-                if rank >= .elite {
-                    ScarMark(size: size, raised: onBoard && theme.spritePieces)
+                if rank >= .elite, !onBoard {
+                    ScarMark(size: size, raised: false)
                         .mask { content }
                         .allowsHitTesting(false)
                 }
@@ -124,33 +127,6 @@ private struct ScarMark: View {
     }
 }
 
-/// The name of the selected piece, floating over it on the board.
-struct ArmyNameTag: View {
-    let name: String
-    let rank: ArmyRank
-    let color: Color
-
-    var body: some View {
-        HStack(spacing: 5) {
-            Image(systemName: rank == .legend ? "crown.fill" : "shield.lefthalf.filled")
-                .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(color)
-            Text(name)
-                .font(.system(.caption, design: .themed).weight(.bold))
-            Text(rank.title.uppercased())
-                .font(.system(size: 8, weight: .heavy, design: .themed))
-                .tracking(0.6)
-                .foregroundStyle(color)
-        }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 5)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay { Capsule().strokeBorder(color.opacity(0.7), lineWidth: 1) }
-        .shadow(color: color.opacity(0.45), radius: 8)
-        .fixedSize()
-    }
-}
-
 // MARK: After a game
 
 /// A banner at the top of the game screen when a piece earns a name, a scar or gold.
@@ -214,7 +190,7 @@ struct PieceOfTheMatchCard: View {
                 Text(hero.line)
                     .font(.system(.subheadline, design: .themed).weight(.semibold))
                     .fixedSize(horizontal: false, vertical: true)
-                Text("+\(ArmyStore.heroXP) XP · \(record.honors) \(record.honors == 1 ? "honor" : "honors")")
+                Text("+\(hero.xp) XP · \(record.honors) \(record.honors == 1 ? "honor" : "honors")")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
@@ -247,6 +223,16 @@ struct ArmyView: View {
     ]
     private static let pawns: [ArmySlot] = [.aPawn, .bPawn, .cPawn, .dPawn, .ePawn, .fPawn, .gPawn, .hPawn]
 
+    /// How a piece earns experience, one line each.
+    private static let xpRules = [
+        "1 per game, 3 per win, 2 more if the piece is still standing.",
+        "2 per pawn's worth taken, 10 per promotion, 20 per checkmate.",
+        "Stronger rivals are worth more, up to 3× against Singularity.",
+        "Games with Undo or a played hint earn half.",
+        "Leaving a game unfinished counts as a loss.",
+        "Piece of the Match earns 5 more; revenge on a rival that keeps taking a piece earns 15.",
+    ]
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -264,26 +250,27 @@ struct ArmyView: View {
                 .padding(.vertical, 12)
             }
             .background { TrainingBackdrop(theme: theme) }
-            .navigationTitle("Your Army")
+            .navigationTitle("Your army")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Done") { dismiss() }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         Button(role: .destructive) {
                             confirmingReset = true
                         } label: {
-                            Label("Retire the Whole Army", systemImage: "arrow.counterclockwise")
+                            Label("Retire the whole army", systemImage: "arrow.counterclockwise")
                         }
                     } label: {
-                        Label("Army Settings", systemImage: "ellipsis.circle")
+                        Label("Army settings", systemImage: "ellipsis.circle")
                     }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                        .fontWeight(.semibold)
                 }
             }
             .confirmationDialog("Retire the whole army?", isPresented: $confirmingReset, titleVisibility: .visible) {
-                Button("Erase Every Piece's Record", role: .destructive) { store.reset() }
+                Button("Erase every piece's record", role: .destructive) { store.reset() }
             } message: {
                 Text("Names, scars and records will be erased. Training isn't affected.")
             }
@@ -337,9 +324,9 @@ struct ArmyView: View {
             PieceImage(piece: piece, theme: theme, size: 36)
                 .modifier(VeteranAura(rank: record.rank, piece: piece, theme: theme, size: 36, onBoard: false))
             Text(record.name ?? " ")
-                .font(.system(size: 9, weight: .bold, design: .themed))
+                .font(.system(.caption2, design: .themed).weight(.bold))
                 .lineLimit(1)
-                .minimumScaleFactor(0.6)
+                .minimumScaleFactor(0.85)
                 .foregroundStyle(record.rank.color(for: piece, theme: theme))
             RankPips(rank: record.rank, color: record.rank.color(for: piece, theme: theme))
         }
@@ -358,7 +345,7 @@ struct ArmyView: View {
 
     private var honorRoll: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Most Decorated")
+            Text("Most decorated")
                 .font(.system(.headline, design: .themed))
             ForEach(decorated) { slot in
                 Button { selected = slot } label: { honorRow(slot) }
@@ -418,10 +405,21 @@ struct ArmyView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            Text("XP: 1 per game, 3 per win, 2 more if the piece is still standing, 2 per pawn's worth taken, 10 per promotion, 20 per checkmate. Stronger rivals are worth more, up to 3× against Singularity. Games with Undo or a played hint earn half. Leaving a game unfinished counts as a loss. Piece of the Match earns +5, revenge on a rival that keeps taking a piece earns +15.")
-                .font(.caption2)
+            DisclosureGroup("How XP works") {
+                VStack(alignment: .leading, spacing: 5) {
+                    ForEach(Self.xpRules, id: \.self) { rule in
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text("·")
+                            Text(rule).fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+                .font(.footnote)
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 6)
+            }
+            .font(.subheadline.weight(.semibold))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
@@ -549,8 +547,8 @@ struct PieceDetailView: View {
                         Text(avenged ? "Old rival: \(rival.name)" : "Nemesis: \(rival.name)")
                             .font(.system(.subheadline, design: .themed).weight(.semibold))
                         Text(avenged
-                             ? "Took it \(nemesis.times) times. Revenge taken."
-                             : "Has taken it \(nemesis.times) times. Win against \(rival.name) and take something back for revenge.")
+                             ? "Took it \(ArmyNews.times(nemesis.times)). Revenge taken."
+                             : "Has taken it \(ArmyNews.times(nemesis.times)). Win against \(rival.name) and take something back for revenge.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -583,8 +581,8 @@ struct PieceDetailView: View {
     private func stats(_ record: PieceRecord) -> some View {
         let items: [(String, Int)] = [
             ("Games", record.games), ("Wins", record.wins), ("Captures", record.captures),
-            ("Material Taken", record.captureValue), ("Checkmates", record.mates),
-            ("Promotions", record.promotions), ("Times Fallen", record.falls),
+            ("Material taken", record.captureValue), ("Checkmates", record.mates),
+            ("Promotions", record.promotions), ("Times fallen", record.falls),
             ("Piece of the Match", record.honors),
         ]
         return LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {

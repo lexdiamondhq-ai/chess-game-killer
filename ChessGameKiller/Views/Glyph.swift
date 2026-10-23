@@ -13,7 +13,8 @@ struct Glyph: View {
 
     var body: some View {
         if Self.isGlyph(name) {
-            Image(name)
+            // Decorative: the button or row it sits in says what it is, not the file's name.
+            Image(decorative: name)
                 .renderingMode(.template)
                 .resizable()
                 .interpolation(.high)
