@@ -502,19 +502,16 @@ private struct LinkRowLabel: View {
     }
 }
 
-/// A rounded square with a symbol in the accent color.
+/// A dark well with the symbol in ivory ink, as on the home screen.
 private struct IconTile: View {
     let symbol: String
     let theme: BoardTheme
 
     var body: some View {
-        let accent = theme.accent ?? .accentColor
-        Image(systemName: symbol)
-            .font(.system(size: 15, weight: .semibold))
-            .foregroundStyle(accent)
-            .frame(width: 34, height: 34)
-            .background(accent.opacity(theme.isDark ? 0.14 : 0.12), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-            .accessibilityHidden(true)
+        IconWell(radius: 9, isDark: theme.isDark) {
+            Image(systemName: symbol)
+                .font(.system(size: 15, weight: .semibold))
+        }
     }
 }
 

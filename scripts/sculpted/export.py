@@ -23,7 +23,7 @@ else:
     B={'K':P.king,'Q':P.queen,'B':P.bishop,'R':P.rook,'P':P.pawn,'N':lambda m:P.knight(m,kv,kf)}
     NAME='sculpted'
 # triangle budgets per object name prefix (body parts get the most)
-BUDGET={'K':20000,'Q':20000,'B':16000,'R':16000,'P':10000,'Nh':30000,'Nb':5000,'Nmane':18000}
+BUDGET={'K':22000,'Q':22000,'B':16000,'R':30000,'P':10000,'Nh':30000,'Nb':5000,'Nmane':18000}
 SMALL={'ring':2400,'gem':700,'p':500,'ball':700,'fin':700,'band':1600,'crown':1600,'mitre':3000,'stripe':1200,'cap':2000}
 if SET=='gilded':
     # more, finer metal than the classic set: the same board's worth of triangles overall
@@ -34,6 +34,7 @@ SHARP=math.radians(float(args[0]) if args else 60)
 def budget(name):
     if name in BUDGET: return BUDGET[name]
     low=name.lower()
+    if 'bead' in low or 'slit' in low: return None   # already low: small icospheres and flat slabs
     if 'ring' in low: return SMALL['ring']
     if 'gem' in low: return SMALL['gem']
     if name.startswith('Qp'): return SMALL['p']
