@@ -47,6 +47,8 @@ targets:
         INFOPLIST_KEY_UIUserInterfaceStyle: Dark
         INFOPLIST_KEY_CFBundleDisplayName: Chess Game Killer
         INFOPLIST_KEY_NSCameraUsageDescription: Take a photo of a chess board to find the best move.
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: Leo listens while you hold the button to talk through your move.
+        INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: Your words become text so Leo can check your plan.
         # The game and lesson screens are laid out for portrait; iPad keeps every orientation.
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
         TARGETED_DEVICE_FAMILY: "1,2"

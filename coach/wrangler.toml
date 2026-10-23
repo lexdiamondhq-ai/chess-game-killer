@@ -1,0 +1,41 @@
+# Coach Leo's "Talk it through" server. Deployed by .github/workflows/coach.yml
+# to https://coach.chess-game-killer.workers.dev. The protocol is in PROTOCOL.md.
+# The keys are Worker secrets, copied from the GitHub secrets of the same names:
+# ANTHROPIC_API_KEY, and ELEVENLABS_API_KEY for Leo's voice (without it the app
+# speaks Leo's answer with the device's voice).
+name = "coach"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+workers_dev = true
+
+[vars]
+# The Claude model that hears the player's claims and words Leo's answer, and
+# how hard it thinks for each (low to max). It always thinks a little.
+MODEL = "claude-opus-5-5"
+PARSE_EFFORT = "low"
+ANSWER_EFFORT = "low"
+# How long each Claude call may take, in milliseconds. A slow answer falls back
+# to the server's own wording.
+CLAUDE_TIMEOUT_MS = "12000"
+# The most talks a day across everyone, and the most characters of Leo's voice.
+# The address is public, so these cap the bill.
+DAILY_TALKS = "400"
+DAILY_VOICE_CHARS = "40000"
+# Leo's voice on ElevenLabs: George, with the lessons' model, so he sounds the same.
+VOICE_ID = "JBFqnCBsd6RMkjVDRZzb"
+VOICE_MODEL = "eleven_multilingual_v2"
+
+# At most 12 talks a minute from one address, so a leaked URL can't run up the bill.
+[[ratelimits]]
+name = "TALK_LIMITER"
+namespace_id = "3001"
+simple = { limit = 12, period = 60 }
+
+# Counts the day's talks and voice characters. SQLite storage works on the Workers Free plan.
+[[durable_objects.bindings]]
+name = "BUDGET"
+class_name = "TalkBudget"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["TalkBudget"]

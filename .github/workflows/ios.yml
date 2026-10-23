@@ -127,6 +127,18 @@ jobs:
             base64 -i /tmp/small.jpg | fold -w 3000
             echo "END-SCREEN"
           done
+      - name: Print the newest screens again, small
+        if: always()
+        # The screens being worked on, once more at the very end and small, so a short tail of the log holds them.
+        run: |
+          [ -d snapshots ] || exit 0
+          for f in snapshots/talk-*.png snapshots/coach-open-*.png; do
+            [ -e "$f" ] || continue
+            sips -s format jpeg -s formatOptions 50 -Z 360 "$f" --out /tmp/tiny.jpg >/dev/null
+            echo "BEGIN-SCREEN $(basename "$f")"
+            base64 -i /tmp/tiny.jpg | fold -w 3000
+            echo "END-SCREEN"
+          done
       - name: Test results again
         # The pictures above fill the end of the log, so the test outcome is repeated after them,
         # where a reader of only the last lines still finds a failing test.
