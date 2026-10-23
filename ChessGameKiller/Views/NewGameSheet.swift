@@ -78,6 +78,8 @@ struct NewGameSheet: View {
 
     let theme: BoardTheme
     let start: (MatchController.Setup) -> Void
+    /// Opens Challenge a friend instead. Nil hides the row.
+    var challenge: (() -> Void)? = nil
 
     @AppStorage("setup.side") private var side: SideChoice = .white
     @AppStorage("setup.level") private var level: MatchController.Level = .club
@@ -109,6 +111,10 @@ struct NewGameSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
+                    if let challenge {
+                        ChallengeEntryRow(theme: theme, action: challenge)
+                    }
+
                     section("Your rival") {
                         rivalCarousel
                         dots
