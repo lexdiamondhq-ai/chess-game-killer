@@ -1,19 +1,23 @@
 import SwiftUI
 
 /// The way into Challenge a friend from the New Game sheet: one compact row, in the same
-/// frosted card as the sheet's match card, with the same dark icon well as its rows.
+/// frosted card as the sheet's match card, with the same accent tile as its rows.
 struct ChallengeEntryRow: View {
     let theme: BoardTheme
     let action: () -> Void
 
     var body: some View {
+        let accent = theme.challengeAccent
         let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+        let tile = RoundedRectangle(cornerRadius: 11, style: .continuous)
         Button(action: action) {
             HStack(spacing: 12) {
-                IconWell(isDark: theme.isDark) {
-                    Image(systemName: "paperplane.fill")
-                        .font(.system(size: 16, weight: .semibold))
-                }
+                Image(systemName: "paperplane.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(accent)
+                    .frame(width: 34, height: 34)
+                    .background(accent.opacity(0.12), in: tile)
+                    .overlay { tile.strokeBorder(accent.opacity(0.18), lineWidth: 1) }
                 (Text("Challenge a friend")
                     .font(.system(.callout, design: theme.challengeDesign).weight(.bold))
                     .foregroundStyle(.primary)
