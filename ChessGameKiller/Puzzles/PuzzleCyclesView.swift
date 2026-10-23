@@ -572,7 +572,7 @@ private struct CycleSummaryView: View {
         .safeAreaInset(edge: .bottom) { buttons }
     }
 
-    private var runs: [PuzzleCycleRun] { set.finishedRuns }
+    private var runs: [PuzzleCycleRun] { self.set.finishedRuns }
 
     private var title: String {
         if case .between(let next, _) = set.stage { return "Cycle \(next - 1) done" }
