@@ -79,16 +79,16 @@ struct ChallengeJoinView: View {
             }
             .padding(.top, 18)
 
+            // A smaller board when the name is asked for, so the name field shows above the buttons.
             if let draft = PositionDraft(fen: Position.standard.fen) {
+                let side: CGFloat = asksForName ? 168 : 228
                 PositionBoard(draft: draft, theme: theme, flipped: mySeat == .black)
-                    .frame(width: 228, height: 228)
+                    .frame(width: side, height: side)
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                     .shadow(color: .black.opacity(0.45), radius: 18, y: 10)
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
             }
-
-            FairPlayCard(theme: theme)
 
             if asksForName {
                 VStack(alignment: .leading, spacing: 10) {
@@ -99,6 +99,8 @@ struct ChallengeJoinView: View {
                         .foregroundStyle(.tertiary)
                 }
             }
+
+            FairPlayCard(theme: theme)
         }
     }
 

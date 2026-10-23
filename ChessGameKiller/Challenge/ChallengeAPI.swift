@@ -211,8 +211,12 @@ final class ChallengeSocket: ChallengeLive {
     private var pinger: Task<Void, Never>?
     private(set) var isConnected = false
     private var failures = 0
+    /// When the server was last heard from. It answers every ping, so a long silence means a dead connection.
+    private var lastHeard: ContinuousClock.Instant = .now
 
     static let pingInterval: Duration = .seconds(20)
+    /// Two pings unanswered: the connection is dropped and opened again, even if it never reported an error.
+    static let silenceLimit: Duration = .seconds(30)
 
     init(url: URL, session: URLSession = .shared) {
         self.url = url
@@ -292,6 +296,7 @@ final class ChallengeSocket: ChallengeLive {
                 return
             }
             failures = 0
+            lastHeard = .now
             setConnected(true)
             let text: String?
             switch message {
@@ -307,10 +312,17 @@ final class ChallengeSocket: ChallengeLive {
 
     private func ping(_ socket: URLSessionWebSocketTask) {
         pinger?.cancel()
-        pinger = Task { [weak socket] in
+        lastHeard = .now
+        pinger = Task { [weak self, weak socket] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: Self.pingInterval)
-                guard !Task.isCancelled, let socket else { return }
+                guard !Task.isCancelled, let self, let socket else { return }
+                // A connection can go dead without failing (a network change, say): no pong, no moves.
+                // Cancelling it ends the read, and the run loop opens a new one.
+                if ContinuousClock.now - self.lastHeard > Self.silenceLimit {
+                    socket.cancel(with: .goingAway, reason: nil)
+                    return
+                }
                 try? await socket.send(.string("ping"))
             }
         }

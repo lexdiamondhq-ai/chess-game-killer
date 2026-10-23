@@ -403,42 +403,66 @@ struct ChallengeGameView: View {
         "\(game.clock?.label ?? "No clock") · You play \(game.seat.name)"
     }
 
-    /// The result, then Done beside Rematch: compact, so it rises over the dock without covering the board.
+    /// The result beside Rematch, in one row about the dock's height, so it takes the dock's place
+    /// without covering the board or your plate. The close button in the top bar leaves.
     private var endCard: some View {
-        VStack(spacing: 14) {
-            VStack(spacing: 4) {
+        // Worked out first, so the view below stays quick to type-check.
+        let offered = rematchOffered
+        let lineWeight: Font.Weight = offered ? .semibold : .regular
+        let lineColor: Color = offered ? theme.challengeAccent : .secondary
+        return HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(game.resultHeadline ?? "Game over")
-                    .font(theme.challengeFont(22, .bold))
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(game.resultDetail)
-                    .font(theme.challengeFont(13))
-                    .foregroundStyle(.secondary)
-                if canRematch, game.rematchStage == .offered {
-                    Text("\(game.opponentName) wants a rematch")
-                        .font(theme.challengeFont(14, .semibold))
-                        .foregroundStyle(theme.challengeAccent)
-                        .padding(.top, 4)
-                        .transition(.opacity)
-                }
+                    .font(theme.challengeFont(17, .bold))
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.8)
+                Text(endLine)
+                    .font(theme.challengeFont(13, lineWeight))
+                    .foregroundStyle(lineColor)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.85)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityElement(children: .combine)
-            HStack(spacing: 10) {
-                Button("Done") {
-                    center.dismiss()
-                }
-                .buttonStyle(ChallengeButtonStyle(kind: .glass, theme: theme))
-                if canRematch {
-                    rematch
-                }
-            }
+            endButton
+                .frame(width: 148)
         }
-        .padding(18)
-        .challengeGlass(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .padding(.leading, 20)
+        .padding(.trailing, 8)
+        .padding(.vertical, 8)
+        .challengeGlass(RoundedRectangle(cornerRadius: 30, style: .continuous))
         .frame(maxWidth: 520)
         .padding(.horizontal, 16)
         .padding(.bottom, 6)
         .animation(.snappy(duration: 0.25), value: game.rematchStage)
+    }
+
+    /// The friend asked for a rematch and is waiting on you.
+    private var rematchOffered: Bool { canRematch && game.rematchStage == .offered }
+
+    /// Under the result: where the rematch stands, or how the game ended.
+    private var endLine: String {
+        guard canRematch else { return game.resultDetail }
+        switch game.rematchStage {
+        case .offered: return "\(game.opponentName) wants a rematch"
+        case .asked: return "Rematch asked. Waiting for \(game.opponentName)."
+        case .starting: return "Starting the rematch…"
+        case .ready: return "The rematch is ready"
+        case .none: return game.resultDetail
+        }
+    }
+
+    /// Rematch when both players were there, else Done.
+    @ViewBuilder
+    private var endButton: some View {
+        if canRematch {
+            rematch
+        } else {
+            Button("Done") {
+                center.dismiss()
+            }
+            .buttonStyle(ChallengeButtonStyle(kind: .glass, theme: theme))
+        }
     }
 
     /// A rematch needs both players: not for a challenge nobody took.
@@ -456,11 +480,11 @@ struct ChallengeGameView: View {
         case .offered:
             rematchButton("Accept")
         case .ready:
-            rematchButton("Open rematch")
+            rematchButton("Open")
         case .asked:
-            rematchProgress("Waiting for \(game.opponentName)…")
+            rematchProgress("Waiting")
         case .starting:
-            rematchProgress("Starting…")
+            rematchProgress("Starting")
         }
     }
 
@@ -531,7 +555,7 @@ struct ChallengeGameView: View {
             Button("Resign", role: .destructive) { Task { await game.resign() } }
             Button("Keep playing", role: .cancel) {}
         case .abort:
-            Button("Abort", role: .destructive) { Task { await game.resign() } }
+            Button("Abort", role: .destructive) { Task { await game.abort() } }
             Button("Keep playing", role: .cancel) {}
         case .leave:
             Button("Leave", role: .destructive) { center.dismiss() }

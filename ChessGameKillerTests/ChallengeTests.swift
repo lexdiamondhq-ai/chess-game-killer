@@ -749,7 +749,8 @@ final class ChallengeTests: XCTestCase {
         let center = ChallengeCenter(api: api, store: ChallengeStore(), sounds: nil, defaults: defaults)
         let kept = Recorder<SavedGame>()
         center.onGameFinished = { kept.record($0) }
-        let state = FriendGameState.sample(moves: ["e2e4", "e7e5", "g1f3"])
+        // Played today: a finished game more than a month old leaves the list, and sampleNow is long past.
+        let state = FriendGameState.sample(moves: ["e2e4", "e7e5", "g1f3"], now: Date.now.timeIntervalSince1970 * 1000)
         let record = FriendGame.sample(state, seat: .white)
         center.store.add(record)
         let game = center.makeGame(record, initial: state)
@@ -781,6 +782,59 @@ final class ChallengeTests: XCTestCase {
         aborted.status = .over
         aborted.result = FriendGameState.Result(winner: nil, reason: .aborted)
         XCTAssertNil(FriendGameArchive.savedGame(aborted, seat: .white, id: UUID(), date: .now, opponent: "Sam"))
+    }
+
+    func testAbortIsSentAsAnAbortSoALateTapNeverResigns() async {
+        let api = FakeChallengeAPI()
+        let opening = FriendGameState.sample(moves: ["e2e4"])
+        api.games[opening.code] = opening
+        let game = OnlineGame(record: .sample(opening, seat: .white), api: api, sounds: nil, initial: opening)
+        XCTAssertTrue(game.canAbort)
+        await game.abort()
+        XCTAssertEqual(api.actions.map(\.action), [.abort])
+    }
+
+    func testALinkDuringATimedGameWaitsUntilTheGameIsClosed() async {
+        let api = FakeChallengeAPI()
+        let playing = FriendGameState.sample(moves: ["e2e4", "e7e5"])
+        api.games[playing.code] = playing
+        let other = FriendGameState.sample(code: "AAAAAA", status: .waiting, white: "Jordan")
+        api.games[other.code] = other
+        let center = ChallengeCenter(api: api, store: ChallengeStore(), sounds: nil, defaults: defaults)
+        let record = FriendGame.sample(playing, seat: .white)
+        center.store.add(record)
+        center.play(record, initial: playing)
+        guard case .game(let game)? = center.screen else { return XCTFail("the game should be up") }
+
+        center.open(code: "AAAAAA")
+        guard case .game(let still)? = center.screen else { return XCTFail("the timed game should stay up") }
+        XCTAssertTrue(still === game)
+        XCTAssertEqual(center.heldCode, "AAAAAA")
+        XCTAssertEqual(game.toast?.text, "Finish this game first. The other challenge opens after it.")
+        try? await Task.sleep(for: .milliseconds(200))
+        XCTAssertFalse(api.actions.map(\.action).contains(.away), "the player never left the game")
+
+        center.dismiss()
+        guard case .invite(let invite)? = center.screen else { return XCTFail("the held challenge should open") }
+        XCTAssertEqual(invite.code, "AAAAAA")
+        XCTAssertNil(center.heldCode)
+        center.dismiss()
+    }
+
+    func testClosingTheComposerWhileTheChallengeIsMadeLeavesNothingRunning() async {
+        let api = FakeChallengeAPI()
+        let waiting = FriendGameState.sample(status: .waiting)
+        api.created = CreatedChallenge(code: waiting.code, url: "https://play.chess-game-killer.workers.dev/c/7KQ2XM",
+                                       appUrl: "chessgamekiller://c/7KQ2XM", seat: .white, token: "token-white", game: waiting)
+        let center = ChallengeCenter(api: api, store: ChallengeStore(), sounds: nil, defaults: defaults)
+        center.compose()
+        guard case .composer(let composer)? = center.screen else { return XCTFail("the composer should be up") }
+        let making = Task { await composer.create(name: "Alex", clock: nil, side: .white) }
+        center.dismiss()
+        await making.value
+        XCTAssertNil(composer.game)
+        XCTAssertTrue(api.lives.isEmpty, "no live connection is left running")
+        XCTAssertEqual(center.store.games.first?.code, "7KQ2XM", "the challenge waits in Friend games")
     }
 
     func testRefreshingTheListBringsItUpToDate() async {

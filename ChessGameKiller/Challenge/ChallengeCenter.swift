@@ -37,6 +37,8 @@ final class ChallengeCenter {
     /// the only place games.json is written from.
     @ObservationIgnored var onGameFinished: (@MainActor (SavedGame) -> Void)?
     @ObservationIgnored private var lastRefresh: Date?
+    /// A link opened during a timed game: it opens once that game is closed.
+    @ObservationIgnored private(set) var heldCode: String?
 
     /// The list is fetched again at most this often, unless asked.
     static let refreshInterval: TimeInterval = 15
@@ -87,6 +89,12 @@ final class ChallengeCenter {
     func open(code text: String) {
         guard let code = ChallengeLink.code(fromText: text) else { return }
         if case .game(let game)? = screen, game.code == code { return }
+        // Leaving a timed game under way for 20 seconds forfeits it, so the link waits for it to close.
+        if case .game(let game)? = screen, game.phase == .playing, game.isTimed {
+            heldCode = code
+            game.notify("Finish this game first. The other challenge opens after it.", symbol: "hourglass")
+            return
+        }
         if let record = store.game(code: code) {
             play(record)
             return
@@ -134,6 +142,10 @@ final class ChallengeCenter {
     func dismiss() {
         leaveScreen(keeping: nil)
         screen = nil
+        if let held = heldCode {
+            heldCode = nil
+            open(code: held)
+        }
     }
 
     /// Takes a finished game off the list. Games still going stay.
@@ -235,6 +247,8 @@ final class ChallengeComposer {
             let reply = try await center.api.create(name: ChallengeName.clean(name), side: side, clock: clock)
             let record = FriendGame(code: reply.code, token: reply.token, seat: reply.seat, state: reply.game)
             center.store.add(record)
+            // Closed while the challenge was being made: it waits in Friend games, with nothing left running.
+            guard case .composer(let shown)? = center.screen, shown === self else { return }
             let game = center.makeGame(record, initial: reply.game)
             game.activate()
             self.game = game

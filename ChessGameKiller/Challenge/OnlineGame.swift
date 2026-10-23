@@ -94,6 +94,10 @@ final class OnlineGame {
     @ObservationIgnored private(set) var isActive = false
     /// When the player left the app in a timed game.
     @ObservationIgnored private var leftAt: Date?
+    /// When the app last went to the background, in any game.
+    @ObservationIgnored private var backgroundedAt: Date?
+    /// The start of the player's own absence already answered with `back`, so it is said once.
+    @ObservationIgnored private var reclaimedAway: Double?
     @ObservationIgnored private var nextToastID = 0
     /// The friend's screenshots and recordings already told.
     @ObservationIgnored private var toldShots = 0
@@ -101,6 +105,8 @@ final class OnlineGame {
 
     /// How often the game is fetched while the live connection is down, as the protocol asks.
     static let pollInterval: Duration = .seconds(3)
+    /// Back from the background after this long (seconds), the live connection is opened afresh.
+    static let staleAfterBackground: TimeInterval = 10
 
     init(record: FriendGame, api: ChallengeAPI, sounds: SoundPlaying?, initial: FriendGameState? = nil) {
         self.record = record
@@ -139,8 +145,8 @@ final class OnlineGame {
     var leaveRuleApplies: Bool { state.map(FriendClockMath.leaveRuleApplies) ?? false }
     /// A timed game: closing it is leaving it.
     var isTimed: Bool { clock != nil }
-    /// Before both sides have moved, giving up aborts the game instead.
-    var canAbort: Bool { phase == .playing && (state?.moves.count ?? 0) < 2 }
+    /// Before both sides have moved, giving up aborts the game instead. A move still on its way counts.
+    var canAbort: Bool { phase == .playing && (state?.moves.count ?? 0) + (pending == nil ? 0 : 1) < 2 }
     var drawOfferedByMe: Bool { phase == .playing && state?.drawOffer == seat }
     var drawOfferedToMe: Bool { phase == .playing && state?.drawOffer == opponentSeat }
     var isMyTurn: Bool { phase == .playing && state?.turn == seat && pending == nil }
@@ -280,6 +286,11 @@ final class OnlineGame {
         toast = nil
     }
 
+    /// A word for the player from outside the game, such as a link that has to wait.
+    func notify(_ text: String, symbol: String) {
+        say(text, symbol: symbol)
+    }
+
     func dismissCameBack() {
         cameBack = false
     }
@@ -291,6 +302,9 @@ final class OnlineGame {
     func declineDraw() async { await act(.declineDraw) }
     /// Before both sides have moved, the server aborts instead.
     func resign() async { await act(.resign) }
+    /// Stops the game before both sides have moved. Asked for any later (a move crossed the tap),
+    /// the server refuses instead of counting it as a resignation.
+    func abort() async { await act(.abort) }
     func cancelChallenge() async { await act(.cancel) }
 
     func askForRematch() async {
@@ -347,6 +361,7 @@ final class OnlineGame {
         record.update(from: new)
         syncBoard(with: new, quietly: previous == nil)
         updatePhase(to: new)
+        reclaimPresence(new)
         tellChanges(from: previous, to: new)
         scheduleDeadline()
         refreshIdleTimer()
@@ -354,6 +369,17 @@ final class OnlineGame {
         if new.status == .over, let next = new.rematch?.code {
             switchToRematch(next)
         }
+    }
+
+    /// The server can think the player left while they're looking right at the board: the live connection
+    /// dropped and polling doesn't count as being there, or the report of leaving arrived after the one of
+    /// coming back. In a timed game that would forfeit in 20 seconds, so the app says it's here, once per absence.
+    private func reclaimPresence(_ new: FriendGameState) {
+        guard isActive, connection != .elsewhere, new.status == .active,
+              let away = new[seat].away, away != reclaimedAway,
+              UIApplication.shared.applicationState == .active else { return }
+        reclaimedAway = away
+        report(.back)
     }
 
     /// Games only move forward: a state with fewer moves, an earlier status or an earlier time is old news.
@@ -378,6 +404,11 @@ final class OnlineGame {
         phase = next
         if old == .waiting, next == .playing {
             say("\(opponentName) joined the game", symbol: "person.fill.checkmark")
+        }
+        // A recording already running when play begins is reported too: the game may have opened
+        // before its state arrived, or started in the lobby, or as a rematch.
+        if next == .playing, isActive, screenIsCaptured {
+            report(.recording)
         }
         if next == .over {
             finish(new, seenLive: old == .playing)
@@ -797,7 +828,9 @@ final class OnlineGame {
 
     private func handle(_ event: AppEvent) {
         switch event {
-        case .background: wentToBackground()
+        case .background:
+            backgroundedAt = .now
+            wentToBackground()
         case .foreground: cameToForeground()
         case .screenshot:
             if phase == .playing { report(.screenshot) }
@@ -825,7 +858,12 @@ final class OnlineGame {
     }
 
     private func cameToForeground() {
-        defer { leftAt = nil }
+        // A connection that sat through a while in the background may look live and be dead.
+        let wasAwayAWhile = backgroundedAt.map { Date.now.timeIntervalSince($0) >= Self.staleAfterBackground } ?? false
+        defer {
+            leftAt = nil
+            backgroundedAt = nil
+        }
         guard isActive, phase == .playing || phase == .waiting else { return }
         if phase == .playing {
             report(.back)
@@ -840,7 +878,7 @@ final class OnlineGame {
             }
         }
         // A game taken up somewhere newer stays there until the player says otherwise.
-        if connection != .live, connection != .elsewhere { connect() }
+        if connection != .elsewhere, connection != .live || wasAwayAWhile { connect() }
         Task { [weak self] in await self?.refresh() }
     }
 
