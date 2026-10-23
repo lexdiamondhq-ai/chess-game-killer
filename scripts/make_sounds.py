@@ -46,6 +46,10 @@ SOUNDS = {
 # Composed as music rather than as a sound effect: text and length come from SOUNDS.
 MUSIC = {"victory"}
 
+# Raised after generating, in dB. The check's bell comes out quieter than a plain move,
+# and check is the more important news.
+GAIN_DB = {"check": 3.0}
+
 
 def castle_from_move(out: str) -> bytes | None:
     """Castling is the move knock twice, king then rook, so it always matches the
@@ -64,6 +68,26 @@ def castle_from_move(out: str) -> bytes | None:
     with open(castle, "rb") as f:
         audio = f.read()
     os.remove(castle)
+    return audio
+
+
+def louder(audio: bytes, decibels: float, out: str) -> bytes:
+    """`audio` raised by `decibels`. Unchanged without ffmpeg."""
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        return audio
+    source = os.path.join(out, "gain-in.mp3")
+    target = os.path.join(out, "gain-out.mp3")
+    with open(source, "wb") as f:
+        f.write(audio)
+    subprocess.run([
+        ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", source,
+        "-af", f"volume={decibels}dB", "-ar", "44100", "-b:a", "128k", target,
+    ], check=True)
+    with open(target, "rb") as f:
+        audio = f.read()
+    os.remove(source)
+    os.remove(target)
     return audio
 
 
@@ -126,6 +150,8 @@ def main() -> None:
             audio = castle_from_move(out)
         if audio is None:
             audio = generate(text, seconds, key)
+        if name in GAIN_DB:
+            audio = louder(audio, GAIN_DB[name], out)
         with open(os.path.join(out, f"{name}.mp3"), "wb") as f:
             f.write(audio)
         print(f"{name}.mp3: {len(audio)} bytes")

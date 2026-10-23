@@ -122,6 +122,24 @@ final class ScreenSnapshotTests: XCTestCase {
         }
     }
 
+    /// The person mates on a flat board: the king falls, and a moment later the coach opens
+    /// with the result and the game's summary.
+    func testTheEndOfAGame() throws {
+        defaults.set("gilded", forKey: "boardTheme")
+        defaults.set(false, forKey: "matchRival")
+        defaults.set(false, forKey: "sculpted3D")
+        let match = MatchController(engine: nil, sounds: nil)
+        match.chance = { 0 }
+        // A back-rank mate for Black, the person: Ra1.
+        let position = try XCTUnwrap(Position(fen: "r5k1/5ppp/8/8/8/8/5PPP/6K1 b - - 0 1"))
+        match.start(MatchController.Setup(opponent: .computer, playerColor: .black, level: .beginner), from: position)
+        try snapshot("game-end-gilded-flat", match: match, wait: 1.5, then: {
+            match.tap(.a8)
+            match.tap(.a1)
+        }, settle: 4)
+        XCTAssertTrue(match.isOver)
+    }
+
     /// Hints on and the king tapped, on the whole game screen: brackets on the pieces the
     /// coach would move, dots where the king can go, and a halo on castling, its best move.
     func testHintsOnTheGameScreen() throws {
@@ -170,9 +188,12 @@ final class ScreenSnapshotTests: XCTestCase {
         return match
     }
 
+    /// `play` runs once the screen is up, so whatever the game screen does in answer to a
+    /// move (a check, the end of the game) happens as it would for a person; then the picture
+    /// waits `settle` seconds more.
     private func snapshot(_ name: String, startsWithNewGame: Bool = false, trayOpen: Bool = false,
                           match: MatchController? = nil, coachOpen: Bool = false, size: CGSize? = nil,
-                          wait: TimeInterval = 3) throws {
+                          wait: TimeInterval = 3, then play: (() -> Void)? = nil, settle: TimeInterval = 0) throws {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let window = UIWindow(windowScene: scene)
         window.frame = size.map { CGRect(origin: .zero, size: $0) } ?? scene.coordinateSpace.bounds
@@ -185,15 +206,24 @@ final class ScreenSnapshotTests: XCTestCase {
             window.rootViewController?.presentedViewController?.dismiss(animated: true)
             RunLoop.main.run(until: Date().addingTimeInterval(3))
         }
+        if let play {
+            play()
+            RunLoop.main.run(until: Date().addingTimeInterval(settle))
+        }
         window.layoutIfNeeded()
 
+        // SceneKit draws with Metal, which drawHierarchy leaves out: each 3D board is covered
+        // with a picture of itself first, so what floats over it (the Check callout) still shows.
+        let covers = Self.sceneViews(in: window).map { view in
+            let cover = UIImageView(image: view.snapshot())
+            cover.frame = view.bounds
+            view.addSubview(cover)
+            return cover
+        }
         let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
             window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
-            // Metal content is drawn by SceneKit itself, so 3D boards are pictured separately.
-            for view in Self.sceneViews(in: window) {
-                view.snapshot().draw(in: view.convert(view.bounds, to: window))
-            }
         }
+        covers.forEach { $0.removeFromSuperview() }
         if let dir = ProcessInfo.processInfo.environment["SNAPSHOT_DIR"], let data = image.pngData() {
             try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
             try data.write(to: URL(fileURLWithPath: dir).appendingPathComponent("\(name).png"))
