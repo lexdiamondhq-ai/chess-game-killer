@@ -85,3 +85,13 @@ jobs:
             base64 -i /tmp/small.jpg | fold -w 3000
             echo "END-SCREEN"
           done
+      - name: Repeat the test failures
+        if: always()
+        # The pictures above fill the end of the log, so the failures are printed again after them,
+        # where a reader of only the last lines still sees them.
+        run: |
+          [ -f build.log ] || exit 0
+          echo "FAILURES-BEGIN"
+          grep -E "error:|Test Case .* failed|Executed .* tests" build.log | tail -60 || true
+          grep -B2 -A12 "Fatal error" build.log | head -40 || true
+          echo "FAILURES-END"

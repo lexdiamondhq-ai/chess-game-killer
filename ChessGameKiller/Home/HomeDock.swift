@@ -221,12 +221,12 @@ struct HomeTopEdge: View {
         let shown = min(max((scroll.y - start) / 60, 0), 1)
         ZStack {
             Rectangle().fill(.ultraThinMaterial)
-            tone.canvas.opacity(0.55)
+            tone.canvas.opacity(0.74)
         }
         .mask {
             LinearGradient(stops: [
                 .init(color: .black, location: 0),
-                .init(color: .black, location: 0.55),
+                .init(color: .black, location: 0.62),
                 .init(color: .clear, location: 1),
             ], startPoint: .top, endPoint: .bottom)
         }

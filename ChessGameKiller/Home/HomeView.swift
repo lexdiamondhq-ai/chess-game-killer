@@ -67,6 +67,8 @@ struct HomeView: View {
     @State private var clockGone = false
     @State private var clockHeight: CGFloat = 236
     @State private var confirmingLeave = false
+    /// The rival picked on the ladder while a game is under way, waiting on the question.
+    @State private var leavingFor: MatchController.Level?
 
     enum YouOrigin { case top, bottom }
 
@@ -112,7 +114,7 @@ struct HomeView: View {
                 page(layout, upNext: upNext)
 
                 HomeTopEdge(scroll: scroll, tone: tone, start: layout.cardTop - layout.safeTop - 24,
-                            height: layout.safeTop + 30)
+                            height: layout.safeTop + 40)
                     .ignoresSafeArea(edges: .top)
 
                 HomePullCue(scroll: scroll, tone: tone, threshold: Self.pullToOpen, armed: pullArmed)
@@ -124,8 +126,11 @@ struct HomeView: View {
             }
             .confirmationDialog("Leave your game with \(upNext.rival.name)?", isPresented: $confirmingLeave,
                                 titleVisibility: .visible) {
-                Button("Set up a new game", role: .destructive) { actions.play() }
-                Button("Cancel", role: .cancel) {}
+                Button("Set up a new game", role: .destructive) {
+                    if let level = leavingFor { actions.playRival(level) } else { actions.play() }
+                    leavingFor = nil
+                }
+                Button("Keep playing", role: .cancel) { leavingFor = nil }
             } message: {
                 Text("Starting a new game ends this one, and it counts as a loss.")
             }
@@ -219,7 +224,7 @@ struct HomeView: View {
         HomeSectionHeader(title: "The ladder", tone: tone,
                           note: ladder.nextToBeat == nil ? "You lead every rival" : "Beat the next rung to climb")
         HomeLadderCard(ladder: ladder, tone: tone, pieceTheme: pieceTheme, youColor: upNext.playerColor,
-                       play: actions.playRival)
+                       play: { level in choose(level, upNext) })
 
         let rows = HomeGameRow.rows(vault.games)
         if !rows.isEmpty {
@@ -249,9 +254,20 @@ struct HomeView: View {
     /// New game (asking first if leaving the game under way counts as a loss), or Change.
     private func secondary(_ upNext: HomeUpNext) {
         if upNext.leavingCosts {
+            leavingFor = nil
             confirmingLeave = true
         } else {
             actions.play()
+        }
+    }
+
+    /// A rung of the ladder: set up a game against that rival, asking first in the same way.
+    private func choose(_ level: MatchController.Level, _ upNext: HomeUpNext) {
+        if upNext.leavingCosts {
+            leavingFor = level
+            confirmingLeave = true
+        } else {
+            actions.playRival(level)
         }
     }
 

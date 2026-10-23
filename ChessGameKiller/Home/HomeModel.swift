@@ -206,7 +206,7 @@ struct HomeLadder: Equatable {
 /// One line of the scoresheet.
 struct HomeGameRow: Identifiable, Equatable {
     let game: SavedGame
-    /// "Today", "Yesterday", "Wed" or "Oct 18".
+    /// "Today", "Wed" or "Oct 18", the way a scoresheet dates a game.
     let day: String
     /// Moves left to go back and fix in Rewind.
     let toFix: Int
@@ -222,9 +222,6 @@ struct HomeGameRow: Identifiable, Equatable {
 
     static func day(_ date: Date, now: Date, calendar: Calendar) -> String {
         if calendar.isDate(date, inSameDayAs: now) { return "Today" }
-        if let yesterday = calendar.date(byAdding: .day, value: -1, to: now), calendar.isDate(date, inSameDayAs: yesterday) {
-            return "Yesterday"
-        }
         let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: date), to: calendar.startOfDay(for: now)).day ?? 99
         if days > 0, days < 7 {
             return date.formatted(.dateTime.weekday(.abbreviated))

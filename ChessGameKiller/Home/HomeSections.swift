@@ -312,13 +312,16 @@ struct HomeScoresheet: View {
     let openAll: () -> Void
 
     @Environment(\.dynamicTypeSize) private var typeSize
-    @ScaledMetric(relativeTo: .subheadline) private var dayWidth: CGFloat = 46
+    @ScaledMetric(relativeTo: .subheadline) private var dayWidth: CGFloat = 48
     @ScaledMetric(relativeTo: .subheadline) private var resultWidth: CGFloat = 58
     @ScaledMetric(relativeTo: .subheadline) private var accuracyWidth: CGFloat = 56
     @ScaledMetric(relativeTo: .subheadline) private var reviewWidth: CGFloat = 54
 
-    /// Columns while they fit; at large text sizes each game takes two lines instead.
-    private var columns: Bool { typeSize <= .xLarge }
+    /// Room for the columns: false on a narrow phone, where each game takes two lines.
+    @State private var roomy = true
+
+    /// Columns while they fit; at large text sizes or on a narrow phone each game takes two lines instead.
+    private var columns: Bool { typeSize <= .xLarge && roomy }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -355,6 +358,12 @@ struct HomeScoresheet: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(HomeRowPressStyle(tone: tone))
+        }
+        .onGeometryChange(for: Bool.self) { proxy in
+            // Date, result, accuracy and review take about 260 points; the rival needs the rest.
+            proxy.size.width >= 330
+        } action: { fits in
+            roomy = fits
         }
         .padding(.horizontal, 14)
         .padding(.top, 2)

@@ -133,7 +133,8 @@ final class HomeModelTests: XCTestCase {
         let now = calendar.date(bySettingHour: 15, minute: 0, second: 0, of: .now)!
         func daysAgo(_ n: Int) -> Date { calendar.date(byAdding: .day, value: -n, to: now)! }
         XCTAssertEqual(HomeGameRow.day(now, now: now, calendar: calendar), "Today")
-        XCTAssertEqual(HomeGameRow.day(daysAgo(1), now: now, calendar: calendar), "Yesterday")
+        XCTAssertEqual(HomeGameRow.day(daysAgo(1), now: now, calendar: calendar),
+                       daysAgo(1).formatted(.dateTime.weekday(.abbreviated)), "A scoresheet dates games, so no Yesterday")
         XCTAssertEqual(HomeGameRow.day(daysAgo(3), now: now, calendar: calendar),
                        daysAgo(3).formatted(.dateTime.weekday(.abbreviated)))
         XCTAssertEqual(HomeGameRow.day(daysAgo(12), now: now, calendar: calendar),
