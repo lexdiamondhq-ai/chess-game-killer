@@ -248,6 +248,7 @@ src/vendor/chess.js   chess.js 1.4.0, the same file as play/public/vendor/chess.
       "target": "f2",
       "moves": [],
       "afterMove": false,
+      "negated": false,
       "eval": "",
       "gain": ""
     }
@@ -264,6 +265,7 @@ src/vendor/chess.js   chess.js 1.4.0, the same file as play/public/vendor/chess.
 | `target` | `""` or the square it attacks, defends or threatens. |
 | `moves` | A move or a line in SAN, starting from the claim's position, sides alternating. |
 | `afterMove` | The claim is about P′. |
+| `negated` | The player said it is not so ("his queen doesn't defend f7", "my knight isn't pinned"). The claim is written without the not; verify.js judges it that way and turns the verdict around (right and wrong swap; partly and unclear stay). The note says what is true either way. Denying a real threat counts as missing it; "my king isn't safe", said rightly, counts as spotting it. "He has no threats" stays a `safe` claim, not a negated `threat`. |
 | `eval` | `""` or `winning`, `better`, `slightly_better`, `equal`, `slightly_worse`, `worse`, `losing`, from `side`'s view. |
 | `gain` | `""` or `pawn`, `two_pawns`, `exchange`, `piece`, `rook`, `queen`, `mate`, `even`: what a `wins` move gains, or how far `side` is ahead for `material`. |
 

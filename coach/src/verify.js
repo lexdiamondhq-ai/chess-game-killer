@@ -351,6 +351,7 @@ function readClaim(raw) {
     target: squareIndex(typeof raw.target === "string" ? raw.target.trim().toLowerCase() : ""),
     moves: moves.slice(0, MAX_LINE).map((move) => move.trim()),
     afterMove: raw.afterMove === true,
+    negated: raw.negated === true,
     eval: BANDS.includes(raw.eval) ? raw.eval : "",
     gain: Object.hasOwn(GAINS, raw.gain) ? raw.gain : "",
   };
@@ -1528,7 +1529,19 @@ const JUDGES = {
 function judgeClaim(ctx, claim) {
   const scene = sceneOf(ctx, claim);
   if (!scene) return needMove();
-  return JUDGES[claim.kind](ctx, claim, scene);
+  const result = JUDGES[claim.kind](ctx, claim, scene);
+  return claim.negated ? turnedAround(result) : result;
+}
+
+/**
+ * "His queen doesn't defend f7": the claim is judged as if said without the not, then its verdict
+ * is turned around. Each note says what is true, so it reads as the correction or the agreement
+ * either way ("The queen on e7 covers f7."). Partly and unclear stay as they are.
+ */
+function turnedAround(result) {
+  if (result.verdict === "right") return { ...result, verdict: "wrong" };
+  if (result.verdict === "wrong") return { ...result, verdict: "right" };
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -1689,12 +1702,14 @@ function threatStillWorks(ctx, threat) {
 
 /** Whether a right or partly claim named this threat: its move, the piece it takes, or the mate. */
 function threatNamed(ctx, claims, verdicts, threat) {
+  const target = threat.move.isCapture ? threat.move.takenIndex : -1;
   return claims.some((claim, index) => {
     const result = verdicts[index].verdict;
+    // Saying a move isn't a threat never names it; "my knight isn't safe", said rightly, does.
+    if (claim.negated) return result === "right" && unsafeNamed(claim, threat, target);
     if (result !== "right" && result !== "partly") return false;
     const said = claim.moves.map(strip);
     if (claim.side === "opponent" && said.includes(strip(threat.move.san))) return true;
-    const target = threat.move.isCapture ? threat.move.takenIndex : -1;
     switch (claim.kind) {
       case "threat":
         if (claim.side !== "opponent") return false;
@@ -1712,13 +1727,29 @@ function threatNamed(ctx, claims, verdicts, threat) {
   });
 }
 
+/** "My knight isn't safe" about the piece the threat takes, or "my king isn't safe" against a mate. */
+function unsafeNamed(claim, threat, target) {
+  if (claim.kind !== "safe" || claim.side !== "me") return false;
+  return (target >= 0 && claim.square === target) || (threat.mate && claim.piece === "k");
+}
+
 /** Whether a claim said the very thing the threat hits is safe, and was wrong. */
 function threatMisjudged(claims, verdicts, threat) {
   const target = threat.move.isCapture ? threat.move.takenIndex : -1;
   return claims.some((claim, index) => {
+    if (claim.negated) return deniedThreat(claim, verdicts[index].verdict, threat, target);
     if (claim.kind !== "safe" || claim.side !== "me" || claim.afterMove || verdicts[index].verdict !== "wrong") return false;
     return (!claim.piece && claim.square < 0) || (target >= 0 && claim.square === target) || (threat.mate && claim.piece === "k");
   });
+}
+
+/** "He isn't threatening Bxf2" when he is: the threat was looked at, and judged wrong. */
+function deniedThreat(claim, verdict, threat, target) {
+  if (verdict !== "wrong" || claim.side !== "opponent" || claim.afterMove) return false;
+  if (claim.kind !== "threat" && claim.kind !== "mate") return false;
+  if (claim.moves.map(strip).includes(strip(threat.move.san))) return true;
+  if (claim.kind === "mate") return threat.mate && !claim.moves.length;
+  return (target >= 0 && claim.target === target) || (!claim.moves.length && claim.target < 0 && claim.square < 0);
 }
 
 function missedThreat(ctx, threat) {
@@ -1818,7 +1849,8 @@ function threatsHabit(ctx, claims, verdicts) {
   if (!firstRealThreat(ctx)) {
     // No real threat: saying so, and being right, is the habit done well.
     const saidSafe = claims.some(
-      (claim, index) => claim.kind === "safe" && !claim.afterMove && claim.side === "me" && verdicts[index].verdict === "right" && (!claim.piece || claim.piece === "k"),
+      (claim, index) =>
+        claim.kind === "safe" && !claim.negated && !claim.afterMove && claim.side === "me" && verdicts[index].verdict === "right" && (!claim.piece || claim.piece === "k"),
     );
     return saidSafe ? "good" : "none";
   }

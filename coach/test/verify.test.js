@@ -36,6 +36,7 @@ function claim(kind, said, fields = {}) {
     target: fields.target ?? "",
     moves: fields.moves ?? [],
     afterMove: fields.afterMove ?? false,
+    negated: fields.negated ?? false,
     eval: fields.eval ?? "",
     gain: fields.gain ?? "",
   };
@@ -365,6 +366,58 @@ test("a pinned defender doesn't defend: the protocol's example of a fake guard",
 
 // ---------------------------------------------------------------------------
 // Grades and bands
+
+test("a claim said with a not is judged without it, then turned around", () => {
+  const italian = fixture("italian: names the bishop on f2");
+  const parsed = {
+    about: true,
+    move: null,
+    claims: [
+      claim("attacks", "his bishop doesn't eye f2", { side: "opponent", piece: "B", square: "c5", target: "f2", negated: true }),
+      claim("attacks", "his bishop doesn't eye h7", { side: "opponent", piece: "B", square: "c5", target: "h7", negated: true }),
+      claim("safe", "my knight on f3 isn't safe", { piece: "N", square: "f3", negated: true }),
+      claim("attacks", "his bishop eyes f2", { side: "opponent", piece: "B", square: "c5", target: "f2" }),
+    ],
+  };
+  const { checked, spoken } = run(italian, { parsed });
+  assert.deepEqual(checked.claims.map((item) => item.verdict), ["wrong", "right", "wrong", "right"]);
+  // The note says what is true, so it reads as the correction for a wrong "not" and as the agreement for a right one.
+  assert.equal(checked.claims[0].note, checked.claims[3].note);
+  assert.equal(checked.claims[0].note, "The bishop on c5 hits f2.");
+  assert.equal(checked.claims[1].note, "The bishop on c5 doesn't hit h7.");
+  // Leo's lines go to the turned-around verdict, in claim order: the bishop does hit f2 is the correction.
+  assert.equal(spoken.wrong.length, 2);
+  assert.equal(spoken.right.length, 2);
+  assert.equal(spoken.wrong[0], spoken.right[1], "the correction of claim 1 is the agreement with claim 4");
+  assert.equal(spoken.right[0], "The bishop on c5 doesn't hit h7.");
+});
+
+test("\"my king isn't safe\" against a real mate threat spots it; said when the king is fine, it's wrong", () => {
+  const mate = fixture("black a pawn up misses the mate on h7");
+  const unsafe = claim("safe", "my king isn't safe", { piece: "K", square: "g8", negated: true });
+  const spotted = run(mate, { parsed: { about: true, move: null, claims: [unsafe] } }).checked;
+  assert.equal(spotted.claims[0].verdict, "right");
+  assert.equal(spotted.habits.threats, "good");
+  assert.equal(spotted.missed.length, 0, "Leo agrees with the claim instead of calling the mate missed");
+
+  const calm = fixture("queen's gambit declined: black is right that nothing is threatened");
+  const wrong = run(calm, { parsed: { about: true, move: null, claims: [{ ...unsafe, square: "g8" }] } }).checked;
+  assert.equal(wrong.claims[0].verdict, "wrong");
+  assert.notEqual(wrong.habits.threats, "good", "saying the king is in danger when it isn't is not the habit done well");
+});
+
+test("denying a real threat is a missed threat habit, and the threat isn't repeated in missed", () => {
+  const ruy = fixture("ruy lopez: black spots the threat on e5");
+  const parsed = {
+    about: true,
+    move: { said: "d6", san: "d6" },
+    claims: [claim("threat", "he isn't threatening to take on c6", { side: "opponent", moves: ["Bxc6"], negated: true })],
+  };
+  const { checked } = run(ruy, { parsed });
+  assert.equal(checked.claims[0].verdict, "wrong");
+  assert.equal(checked.habits.threats, "missed");
+  assert.equal(checked.missed.filter((item) => item.kind === "threat").length, 0, "the claim's own note corrects it");
+});
 
 test("eval bands: ±40, ±100 and ±300, and mates", () => {
   const bands = [300, 299, 100, 99, 41, 40, 0, -40, -41, -99, -100, -299, -300].map((cp) => bandOf({ cp }));

@@ -1096,7 +1096,7 @@
           "gain": ""
         },
         {
-          "said": "his queen defends f7",
+          "said": "his queen doesn't defend f7",
           "kind": "defends",
           "side": "opponent",
           "piece": "Q",
@@ -1104,6 +1104,7 @@
           "target": "f7",
           "moves": [],
           "afterMove": false,
+          "negated": true,
           "eval": "",
           "gain": ""
         }
@@ -1114,7 +1115,7 @@
       "move": { "san": "Qxf7+", "grade": "blunder" },
       "claims": [
         { "verdict": "wrong" },
-        { "verdict": "right" }
+        { "verdict": "wrong" }
       ],
       "missed": [],
       "habits": { "threats": "none", "forcing": "none", "safety": "missed" },

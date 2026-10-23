@@ -48,6 +48,7 @@ const PARSED = {
       target: "f2",
       moves: [],
       afterMove: false,
+      negated: false,
       eval: "",
       gain: "",
     },
@@ -180,6 +181,15 @@ test("the player's words can't close the tag they are quoted in", () => {
 
 // ---------------------------------------------------------------------------
 // normalizeParsed
+
+test("negated is true only when Claude says true", () => {
+  const parsed = normalizeParsed({
+    about: true,
+    move: null,
+    claims: [claim({ negated: true }), claim({ negated: "yes", target: "f7" }), claim({ negated: undefined, target: "h7" })],
+  });
+  assert.deepEqual(parsed.claims.map((item) => item.negated), [true, false, false]);
+});
 
 test("a well-formed reply comes through unchanged", () => {
   assert.deepEqual(normalizeParsed(structuredClone(PARSED)), PARSED);

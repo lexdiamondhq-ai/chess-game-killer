@@ -601,17 +601,28 @@ struct TalkPanel: View {
         }
     }
 
+    // One modifier per statement, each closure typed, so the type checker has an easy time.
     private func withHaptics(_ content: some View) -> some View {
-        content
-            .sensoryFeedback(.impact(weight: .medium), trigger: session.phase) { old, new in
-                hapticsOn && new == .listening && old != .listening
-            }
-            .sensoryFeedback(.error, trigger: session.phase) { old, new in
-                hapticsOn && new == .failed && old != .failed
-            }
-            .sensoryFeedback(trigger: session.check) { old, new in
-                Self.feedback(from: old, to: new, enabled: hapticsOn)
-            }
+        let on: Bool = hapticsOn
+        let phase: TalkSession.Phase = session.phase
+        let check: TalkCheck? = session.check
+        let listening = content.sensoryFeedback(SensoryFeedback.impact(weight: .medium), trigger: phase) {
+            (old: TalkSession.Phase, new: TalkSession.Phase) -> Bool in
+            on && Self.enters(.listening, from: old, to: new)
+        }
+        let failing = listening.sensoryFeedback(SensoryFeedback.error, trigger: phase) {
+            (old: TalkSession.Phase, new: TalkSession.Phase) -> Bool in
+            on && Self.enters(.failed, from: old, to: new)
+        }
+        return failing.sensoryFeedback(trigger: check) { (old: TalkCheck?, new: TalkCheck?) -> SensoryFeedback? in
+            Self.feedback(from: old, to: new, enabled: on)
+        }
+    }
+
+    /// The phase became `phase` just now.
+    private static func enters(_ phase: TalkSession.Phase, from old: TalkSession.Phase,
+                               to new: TalkSession.Phase) -> Bool {
+        new == phase && old != phase
     }
 
     /// A tap of success when every idea held up, a warning when something didn't.
