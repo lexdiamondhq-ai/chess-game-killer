@@ -9,9 +9,7 @@ on:
   pull_request:
     paths: ["play/**", ".github/workflows/play.yml"]
   push:
-    # TEMPORARY: the feature branch deploys too, so the live server can be checked before merging.
-    # Remove claude/project-thread-0j84v2 from this list before the pull request is merged.
-    branches: [main, claude/project-thread-0j84v2]
+    branches: [main]
     paths: ["play/**", ".github/workflows/play.yml"]
   workflow_dispatch:
 
