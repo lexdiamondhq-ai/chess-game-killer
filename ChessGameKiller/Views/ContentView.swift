@@ -130,8 +130,6 @@ struct ContentView: View {
                 syncCoachSettings()
                 // A game left unfinished when a new one starts is still kept.
                 match.onArchive = { [vault] game in vault.record(game) }
-                match.studyGames = { [vault] in vault.games }
-                match.onTrapResult = { trap, fell, level in ScoutingLedger.record(trap, fell: fell, level: level) }
                 // So is a finished friend game.
                 challenges?.onGameFinished = { [vault] game in vault.record(game) }
                 match.onAbandon = { [army] ledger, setup, assisted in
@@ -225,7 +223,6 @@ struct ContentView: View {
                     showingNewGame = false
                     challenges?.compose()
                 }
-                .environment(vault)
             }
             .sheet(isPresented: $showingSettings) {
                 SettingsSheet()

@@ -150,17 +150,6 @@ final class MatchController {
     /// Seconds from the mating move until the end is seen: the king has fallen, in 3D.
     @ObservationIgnored var finaleDelay: @MainActor (PlayedMove) -> TimeInterval = { _ in 0.4 }
 
-    /// The games the rivals study before a match (the Scouting Report). Nil: no scouting.
-    @ObservationIgnored var studyGames: (@MainActor () -> [SavedGame])?
-    /// Told how each trap the rival set ended, so the next report can say so.
-    @ObservationIgnored var onTrapResult: (@MainActor (_ trap: ScoutingReport.Trap, _ fell: Bool, _ level: Level) -> Void)?
-    /// What the rival knows about the player this game.
-    private(set) var scouting: ScoutingReport = .empty
-    /// A trap the player now stands in, waiting for their answer.
-    private(set) var trapSprung: ScoutingReport.Trap?
-    /// How this game's traps went: (sprung, dodged).
-    private(set) var trapsThisGame: (sprung: Int, dodged: Int) = (0, 0)
-
     /// The rival's latest remark, shown for a few seconds in its line by the board.
     private(set) var rivalLine: RivalLine?
     private var nextLineID = 0
@@ -295,9 +284,6 @@ final class MatchController {
         startClock()
         clearRivalLine()
         lastLinePly = -10
-        scouting = ScoutingReport.make(from: studyGames?() ?? [])
-        trapSprung = nil
-        trapsThisGame = (0, 0)
         rivalSays(.greeting)
         restartWork()
     }
@@ -683,7 +669,6 @@ final class MatchController {
         guard let played = game.lastPlayed else { return }
         if byPerson {
             clearVerdictLine()
-            answerTrap(played)
             if !byCoach {
                 pendingReviews.append(PersonMove(
                     move: played, fenAfter: game.fen,
@@ -910,16 +895,6 @@ final class MatchController {
         }
         let engineAnswered = chosen != nil
 
-        // The Scouting Report: among moves about as good as its own, the rival heads for a
-        // position where the player went wrong before.
-        if let pick = chosen, game.plyCount < Self.steeringPlies, !scouting.traps.isEmpty {
-            let lines = await engine.analyze(fen: fen, depth: 10, lines: 4, maxTimeMs: 400)
-            guard gen == generation, !Task.isCancelled else { return }
-            if let steer = scouting.steer(fen: fen, lines: lines, chosen: pick, tolerance: level.steeringTolerance) {
-                chosen = steer.uci
-            }
-        }
-
         // A short pause so the reply never feels instant.
         let minimum = Duration.milliseconds(250)
         let elapsed = clock.now - started
@@ -947,29 +922,6 @@ final class MatchController {
         }
         engineFailed = !engineAnswered
         moveLanded(played)
-        noticeTrap()
-    }
-
-    /// How deep into a game the rival still steers toward traps.
-    static let steeringPlies = 40
-
-    /// The player stands where they went wrong before: the rival says so.
-    private func noticeTrap() {
-        guard !isOver, game.isHumanTurn, let trap = scouting.trap(at: game.fen) else { return }
-        trapSprung = trap
-        trapsThisGame.sprung += 1
-        rivalSays(.trapSet(when: ScoutingReport.when(trap.date, now: Date())))
-    }
-
-    /// The player answered a trap: the same move as last time, or something else.
-    private func answerTrap(_ played: PlayedMove) {
-        guard let trap = trapSprung else { return }
-        trapSprung = nil
-        guard TrainingChess.key(played.fenBefore) == trap.key else { return }
-        let fell = played.uci.prefix(4) == trap.playedUCI.prefix(4)
-        if !fell { trapsThisGame.dodged += 1 }
-        rivalSays(fell ? .trapFell : .trapDodged)
-        onTrapResult?(trap, fell, setup.level)
     }
 
     /// How many times the computer asks the engine for its move before playing one of its own.
