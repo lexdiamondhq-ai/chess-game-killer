@@ -75,6 +75,8 @@ final class MatchController {
         var playerColor: Piece.Color = .white
         var level: Level = .club
         var timeControl: TimeControl = .unlimited
+        /// The army piece put on the line for this game (On the line), if any.
+        var stake: ArmySlot? = nil
     }
 
     /// How the game ended when the board itself doesn't say (the clock, or a resignation).
@@ -158,7 +160,7 @@ final class MatchController {
 
     /// What this game is worth to the army.
     var armyStakes: GameStakes {
-        GameStakes(level: setup.level, assisted: wasAssisted)
+        GameStakes(level: setup.level, assisted: wasAssisted, staked: setup.stake)
     }
 
     var showBestMoves = true {

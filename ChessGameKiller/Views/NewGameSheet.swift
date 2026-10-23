@@ -65,7 +65,7 @@ enum CoachMode: CaseIterable, Identifiable {
 struct NewGameSheet: View {
     /// The rows of the match card.
     private enum MatchRow {
-        case side, clock, coach
+        case side, clock, coach, stake
     }
 
     let theme: BoardTheme
@@ -89,13 +89,21 @@ struct NewGameSheet: View {
     @State private var draftLevel: MatchController.Level
     @State private var draftClock: TimeControl
     @State private var draftCoach: CoachMode
+    /// The piece the player means to put on the line. Never remembered: every stake is chosen afresh.
+    @State private var draftStake: ArmySlot?
+    /// The army, for On the line. Absent in tests that draw the sheet without one.
+    @Environment(ArmyStore.self) private var army: ArmyStore?
     @State private var scrolledLevel: MatchController.Level?
     @State private var openRow: MatchRow?
     @State private var confirmingForfeit = false
     @Environment(\.dismiss) private var dismiss
 
+    /// `stakesOpen` and `stake` are for pictures: On the line unfolded, with a piece already picked.
     init(theme: BoardTheme, forfeits: String? = nil, defaults: UserDefaults = .standard,
+         stakesOpen: Bool = false, stake: ArmySlot? = nil,
          start: @escaping (MatchController.Setup) -> Void, challenge: (() -> Void)? = nil) {
+        _openRow = State(initialValue: stakesOpen ? .stake : nil)
+        _draftStake = State(initialValue: stake)
         self.theme = theme
         self.forfeits = forfeits
         self.start = start
@@ -128,7 +136,8 @@ struct NewGameSheet: View {
         timeControl = draftClock
         showBestMoves = draftCoach.showsHints
         showVerdicts = draftCoach.showsVerdicts
-        start(MatchController.Setup(playerColor: draftSide.color, level: draftLevel, timeControl: draftClock))
+        start(MatchController.Setup(playerColor: draftSide.color, level: draftLevel, timeControl: draftClock,
+                                    stake: stake))
     }
 
     var body: some View {
@@ -158,7 +167,7 @@ struct NewGameSheet: View {
                 Button {
                     if forfeits == nil { play() } else { confirmingForfeit = true }
                 } label: {
-                    Label("Play \(draftLevel.rival.name)", systemImage: "play.fill")
+                    Label(playTitle, systemImage: "play.fill")
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
@@ -256,6 +265,18 @@ struct NewGameSheet: View {
                     }
                 }
             }
+
+            if army != nil {
+                rowDivider
+                MatchRowButton(label: "On the line", value: stakeValue, detail: nil, isOpen: openRow == .stake,
+                               theme: theme, icon: { stakeIcon }) {
+                    toggle(.stake)
+                }
+                if openRow == .stake {
+                    stakePicker
+                        .transition(unfold)
+                }
+            }
         }
         .background {
             let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
@@ -317,13 +338,133 @@ struct NewGameSheet: View {
         }
     }
 
+    // MARK: On the line
+
+    /// The stake that will count: the one picked, if it is still allowed with these choices.
+    private var stake: ArmySlot? {
+        guard let army, let draftStake, !draftCoach.showsHints,
+              army.canStake(draftStake, against: draftLevel) else { return nil }
+        return draftStake
+    }
+
+    /// The piece the chosen rival is holding, if any: the next game against it is a rescue.
+    private var prisoner: ArmySlot? { army?.prisoner(of: draftLevel) }
+
+    /// The colour the army's pieces are drawn in here: the side picked, White for Random.
+    private var armyColor: Piece.Color { draftSide == .black ? .black : .white }
+
+    private var playTitle: String {
+        if let army, let stake { return "Play for \(army.displayName(of: stake))" }
+        if let army, let prisoner { return "Rescue \(army.displayName(of: prisoner))" }
+        return "Play \(draftLevel.rival.name)"
+    }
+
+    private var stakeValue: String {
+        if let army, let stake { return army.displayName(of: stake) }
+        if let army, let prisoner { return "Rescue \(army.displayName(of: prisoner))" }
+        return "Nothing"
+    }
+
+    @ViewBuilder
+    private var stakeIcon: some View {
+        if let slot = stake ?? prisoner {
+            PieceImage(piece: Piece(slot.kind, color: armyColor, square: .a1), theme: theme, size: 24)
+        } else {
+            Glyph(name: Glyphs.army, size: 22)
+        }
+    }
+
+    /// Why nothing can go on the line right now, if that's the case.
+    private var stakeBlocked: String? {
+        guard let army else { return nil }
+        let rival = draftLevel.rival.name
+        if let prisoner {
+            return "\(rival) is holding \(army.displayName(of: prisoner, capitalized: false)). Win this game to get it back. Nothing else can go on the line against \(rival) until then."
+        }
+        if army.stakeable.isEmpty {
+            return "Pieces earn a name at Veteran (25 XP). Named pieces can go on the line."
+        }
+        if draftCoach.showsHints {
+            return "Turn hints off in Coach to put a piece on the line."
+        }
+        return nil
+    }
+
+    private var stakePicker: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let reason = stakeBlocked {
+                Text(reason)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if let army {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        stakeCard(nil, army: army)
+                        ForEach(army.stakeable) { slot in
+                            stakeCard(slot, army: army)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+                Text("Win: double XP and a trophy from \(draftLevel.rival.name). Lose: \(draftLevel.rival.name) keeps the piece until you beat \(draftLevel.rival.name) again.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 4)
+        .padding(.bottom, 12)
+    }
+
+    private func stakeCard(_ slot: ArmySlot?, army: ArmyStore) -> some View {
+        let isSelected = stake == slot
+        let record = slot.map { army.record(for: $0) }
+        let name = slot.map { army.displayName(of: $0) } ?? "Nothing"
+        return Button {
+            choose { draftStake = slot }
+        } label: {
+            VStack(spacing: 4) {
+                Group {
+                    if let slot, let record {
+                        let piece = Piece(slot.kind, color: armyColor, square: .a1)
+                        PieceImage(piece: piece, theme: theme, size: 40)
+                            .modifier(VeteranAura(rank: record.rank, piece: piece, theme: theme, size: 40, onBoard: false))
+                    } else {
+                        Image(systemName: "minus")
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(height: 42)
+                Text(name)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(isSelected ? accent : Color.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Text(record.map { "\($0.rank.title) · \($0.xp) XP" } ?? "Just play")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .frame(width: 92)
+            .frame(minHeight: 96)
+            .background(card(selected: isSelected, color: accent, glow: theme.glows ? accent : nil))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(slot == nil ? "Nothing on the line" : "Put \(name) on the line")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
     // MARK: Rivals
 
     private var rivalCarousel: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(spacing: 12) {
                 ForEach(Rival.all) { rival in
-                    RivalCard(rival: rival, isSelected: draftLevel == rival.level, theme: theme)
+                    RivalCard(rival: rival, isSelected: draftLevel == rival.level, theme: theme,
+                          holding: army?.prisoner(of: rival.level).map { army?.displayName(of: $0) ?? "" })
                         .containerRelativeFrame(.horizontal) { length, _ in length - 50 }
                         .scrollTransition(.interactive, axis: .horizontal) { content, phase in
                             content
@@ -449,6 +590,12 @@ private struct RivalCard: View {
     let rival: Rival
     let isSelected: Bool
     let theme: BoardTheme
+    /// The name of the player's piece this rival is holding (On the line), if any.
+    var holding: String? = nil
+
+    private var holdingNote: String {
+        holding.map { " Holding your \($0)." } ?? ""
+    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -466,6 +613,16 @@ private struct RivalCard: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 2)
+                if let holding {
+                    Label("Holding \(holding)", systemImage: "lock.fill")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(rival.hue)
+                        .lineLimit(1)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(rival.hue.opacity(0.14), in: Capsule())
+                        .padding(.top, 2)
+                }
                 HStack(spacing: 4) {
                     ForEach(0..<5, id: \.self) { index in
                         let lit = index < rival.strength
@@ -496,7 +653,7 @@ private struct RivalCard: View {
         .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .animation(.snappy, value: isSelected)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(rival.name), \(rival.level.name), \(rival.spokenElo). \(rival.blurb)")
+        .accessibilityLabel("\(rival.name), \(rival.level.name), \(rival.spokenElo). \(rival.blurb)\(holdingNote)")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
