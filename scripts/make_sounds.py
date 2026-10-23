@@ -11,6 +11,8 @@ back to the Sound Effects API if music isn't available on the account.
 """
 import json
 import os
+import shutil
+import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -43,6 +45,26 @@ SOUNDS = {
 
 # Composed as music rather than as a sound effect: text and length come from SOUNDS.
 MUSIC = {"victory"}
+
+
+def castle_from_move(out: str) -> bytes | None:
+    """Castling is the move knock twice, king then rook, so it always matches the
+    move sound. None without ffmpeg, and the castle prompt is used instead."""
+    ffmpeg = shutil.which("ffmpeg")
+    move = os.path.join(out, "move.mp3")
+    if not ffmpeg or not os.path.exists(move):
+        return None
+    castle = os.path.join(out, "castle-made.mp3")
+    subprocess.run([
+        ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", move, "-i", move,
+        "-filter_complex",
+        "[1]adelay=delays=115:all=1,volume=0.8[rook];[0][rook]amix=inputs=2:normalize=0,atrim=0:0.5",
+        "-b:a", "128k", castle,
+    ], check=True)
+    with open(castle, "rb") as f:
+        audio = f.read()
+    os.remove(castle)
+    return audio
 
 
 def generate(text: str, seconds: float, key: str) -> bytes:
@@ -100,6 +122,8 @@ def main() -> None:
         if only and name not in only:
             continue
         audio = compose(text, seconds, key) if name in MUSIC else None
+        if name == "castle":
+            audio = castle_from_move(out)
         if audio is None:
             audio = generate(text, seconds, key)
         with open(os.path.join(out, f"{name}.mp3"), "wb") as f:
