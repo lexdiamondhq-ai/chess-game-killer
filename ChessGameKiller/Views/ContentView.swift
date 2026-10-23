@@ -197,7 +197,11 @@ struct ContentView: View {
                 LessonScreen(lesson: lesson, theme: theme).environment(training)
             }
             .fullScreenCover(item: $coach.presentedSession) { plan in
-                SessionView(plan: plan, theme: theme).environment(training)
+                // Asked for with one tap, so it starts at once. The puzzle store lets a missed
+                // puzzle in the session come back for review.
+                SessionView(plan: plan, theme: theme, startsAtOnce: true)
+                    .environment(training)
+                    .environment(puzzles)
             }
             .animation(.easeInOut(duration: 0.35), value: theme.id)
             .sheet(isPresented: $showingNewGame, onDismiss: startIfNeeded) {
