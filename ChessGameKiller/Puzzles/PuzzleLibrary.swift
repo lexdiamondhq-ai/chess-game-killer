@@ -137,9 +137,18 @@ struct LichessPuzzle: Identifiable, Hashable {
 /// Every puzzle in the app, from the Lichess pack in the bundle.
 struct PuzzleLibrary {
     let puzzles: [LichessPuzzle]
+    /// Where each puzzle is in `puzzles`, by id.
+    private let positions: [String: Int]
 
     init(puzzles: [LichessPuzzle]) {
-        self.puzzles = puzzles.sorted { $0.rating < $1.rating }
+        let sorted = puzzles.sorted { $0.rating < $1.rating }
+        self.puzzles = sorted
+        positions = Dictionary(sorted.enumerated().map { ($0.element.id, $0.offset) }, uniquingKeysWith: { first, _ in first })
+    }
+
+    /// The puzzle with this Lichess id, if the pack has it.
+    func puzzle(id: String) -> LichessPuzzle? {
+        positions[id].map { puzzles[$0] }
     }
 
     /// Reads the pack. Nil when it isn't in the bundle.

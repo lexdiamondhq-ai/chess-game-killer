@@ -182,7 +182,7 @@ struct ContentView: View {
     private var presented: some View {
         observed
             .fullScreenCover(isPresented: $showingTraining) {
-                TrainingHubView(theme: theme).environment(training).environment(puzzles)
+                TrainingHubView(theme: theme).environment(training).environment(puzzles).environment(vault)
             }
             .fullScreenCover(isPresented: $showingPuzzles) {
                 PuzzlesView(theme: theme).environment(puzzles).environment(training)
@@ -201,7 +201,11 @@ struct ContentView: View {
                 LessonScreen(lesson: lesson, theme: theme).environment(training)
             }
             .fullScreenCover(item: $coach.presentedSession) { plan in
-                SessionView(plan: plan, theme: theme).environment(training)
+                // Asked for with one tap, so it starts at once. The puzzle store lets a missed
+                // puzzle in the session come back for review.
+                SessionView(plan: plan, theme: theme, startsAtOnce: true)
+                    .environment(training)
+                    .environment(puzzles)
             }
             .fullScreenCover(item: $talk, onDismiss: playTalkMove) { (session: TalkSession) in
                 TalkPanel(session: session, theme: theme, play: { (uci: String) in

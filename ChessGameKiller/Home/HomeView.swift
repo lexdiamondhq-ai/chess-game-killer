@@ -140,13 +140,15 @@ struct HomeView: View {
             if gone { puzzles.prepareUpNext() }
         }
         .task(id: planKey) {
-            plan = training.dailyPlan()
+            // The same plan as the Train page's Today card: Coach Leo's course while there is
+            // course left, then real puzzles at the player's level aimed at what their games show.
+            plan = await training.planToday(puzzles: puzzles, games: vault.games)
         }
     }
 
-    /// Changes whenever today's plan would: a session done, a new day.
+    /// Changes whenever today's plan would: a session done, a new day, a game saved.
     private var planKey: String {
-        "\(training.progress.sessionsDone) \(training.progress.xp) \(training.trainedToday) \(Trainer.dayString(.now))"
+        "\(training.progress.sessionsDone) \(training.progress.xp) \(training.trainedToday) \(Trainer.dayString(.now)) \(vault.games.count)"
     }
 
     // MARK: The page

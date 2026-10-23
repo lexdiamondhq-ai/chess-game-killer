@@ -9,17 +9,20 @@ struct DrillView: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            TrainingBoardView(
-                game: runner.game,
-                theme: theme,
-                flipped: runner.learner == .black,
-                arrows: runner.arrows,
-                marks: runner.marks,
-                labels: runner.labels,
-                onTap: runner.acceptsTaps ? { (square: Square) in runner.tap(square) } : nil
-            )
-            .frame(width: boardSide, height: boardSide)
-            .overlay(alignment: .bottom) { turnBadge }
+            VStack(spacing: 6) {
+                TrainingBoardView(
+                    game: runner.game,
+                    theme: theme,
+                    flipped: runner.learner == .black,
+                    arrows: runner.arrows,
+                    marks: runner.marks,
+                    labels: runner.labels,
+                    onTap: runner.acceptsTaps ? { (square: Square) in runner.tap(square) } : nil
+                )
+                .frame(width: boardSide, height: boardSide)
+                // Under the board, never over the back rank; the space is kept so nothing jumps.
+                turnBadge
+            }
 
             messageCard
                 .padding(.horizontal, 16)
@@ -32,24 +35,10 @@ struct DrillView: View {
 
     // MARK: Pieces of the screen
 
-    /// "Your move" in the learner's color, under the board.
-    @ViewBuilder
+    /// "White to move" in the learner's color, under the board.
     private var turnBadge: some View {
-        if runner.phase == .solving, runner.kind == .move || runner.kind == .playout {
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(theme.sideColor(runner.learner))
-                    .overlay(Circle().strokeBorder(Color.secondary.opacity(0.5), lineWidth: theme.isDark ? 0 : 1))
-                    .frame(width: 10, height: 10)
-                Text("\(theme.name(of: runner.learner)) to move")
-                    .font(.caption.weight(.semibold))
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(.ultraThinMaterial, in: Capsule())
-            .offset(y: 13)
-            .transition(.opacity)
-        }
+        TurnBadge(theme: theme, side: runner.learner,
+                  showing: runner.phase == .solving && (runner.kind == .move || runner.kind == .playout))
     }
 
     private var messageCard: some View {
@@ -76,15 +65,17 @@ struct DrillView: View {
     }
 
     private var roleChip: (text: String, symbol: String, color: Color)? {
+        // One accent on the executive looks; Neon keeps a color for each.
+        func color(_ neon: TrainingColor) -> Color { theme.glows ? neon.color(on: theme) : theme.trainingAccent }
         if case .mistake = runner.item.content {
-            return ("From your game", "arrow.uturn.backward.circle.fill", TrainingColor.pink.color(on: theme))
+            return ("From your game", "arrow.uturn.backward.circle.fill", color(.pink))
         }
         switch runner.item.role {
-        case .warmUp: return ("Warm-up", "sun.max.fill", TrainingColor.yellow.color(on: theme))
+        case .warmUp: return ("Warm-up", "sun.max.fill", color(.yellow))
         case .focus: return nil
-        case .review: return ("Review", "arrow.triangle.2.circlepath", TrainingColor.violet.color(on: theme))
-        case .mixed: return ("Mixed: no clues", "shuffle", TrainingColor.teal.color(on: theme))
-        case .finisher: return ("Finisher", "flag.checkered", TrainingColor.green.color(on: theme))
+        case .review: return ("Review", "arrow.triangle.2.circlepath", color(.violet))
+        case .mixed: return ("Mixed: no clues", "shuffle", color(.teal))
+        case .finisher: return ("Finisher", "flag.checkered", color(.green))
         }
     }
 
@@ -132,8 +123,9 @@ struct DrillView: View {
                     Button {
                         runner.reveal()
                     } label: {
-                        Text("Move on")
+                        Text("Skip")
                     }
+                    .accessibilityHint("Gives this one up and moves on")
                     .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false))
                 }
             } else if runner.phase == .solving {
@@ -154,8 +146,9 @@ struct DrillView: View {
                     Button {
                         withAnimation(.snappy) { runner.reveal() }
                     } label: {
-                        Text("Move on")
+                        Text("Skip")
                     }
+                    .accessibilityHint("Gives this one up and moves on")
                     .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false))
                     .frame(maxWidth: 130)
                 }
@@ -163,21 +156,32 @@ struct DrillView: View {
         }
     }
 
+    @ViewBuilder
     private var helpButtons: some View {
-        HStack(spacing: 10) {
-            Button {
-                withAnimation(.snappy) { runner.hint() }
-            } label: {
-                Label("Hint", systemImage: "lightbulb.fill")
-            }
-            .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false, tint: TrainingColor.yellow.color(on: theme)))
-            .disabled(runner.usedHint)
+        if runner.strict {
+            // Rush and Cycles give no hints. Passing counts as a miss, and says so.
             Button {
                 withAnimation(.snappy) { runner.reveal() }
             } label: {
-                Label("Show me", systemImage: "eye.fill")
+                Label("Pass (counts as a miss)", systemImage: "forward.fill")
             }
             .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false))
+        } else {
+            HStack(spacing: 10) {
+                Button {
+                    withAnimation(.snappy) { runner.hint() }
+                } label: {
+                    Label("Hint", systemImage: "lightbulb.fill")
+                }
+                .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false, tint: TrainingColor.yellow.color(on: theme)))
+                .disabled(runner.usedHint)
+                Button {
+                    withAnimation(.snappy) { runner.reveal() }
+                } label: {
+                    Label("Show me", systemImage: "eye.fill")
+                }
+                .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false))
+            }
         }
     }
 

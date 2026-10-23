@@ -63,7 +63,8 @@ struct TrainingBackdrop: View {
     }
 }
 
-/// A rounded card: paper with a soft shadow, or glass with a colored edge.
+/// A rounded card: the app's shared glass on the dark boards (see GlassPane), paper with a
+/// soft shadow on light ones. Neon keeps its colored edge and halo.
 struct TrainingCard: ViewModifier {
     let theme: BoardTheme
     var tint: Color?
@@ -72,30 +73,31 @@ struct TrainingCard: ViewModifier {
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         let edge = tint ?? theme.trainingAccent
-        content.background {
-            if theme.isDark {
-                shape
-                    .fill(.ultraThinMaterial)
-                    .overlay {
-                        shape.strokeBorder(
-                            LinearGradient(colors: [edge.opacity(theme.glows ? 0.85 : 0.45), edge.opacity(0.12)],
-                                           startPoint: .topLeading, endPoint: .bottomTrailing),
-                            lineWidth: 1
-                        )
-                    }
-                    // Only Neon gets the colored halo; the other boards keep the
-                    // same quiet shadow as the coach's orb.
-                    .shadow(color: theme.glows ? edge.opacity(0.28) : .black.opacity(0.12),
-                            radius: theme.glows ? 14 : 10, y: theme.glows ? 0 : 3)
-            } else {
-                shape
-                    .fill(Color(.secondarySystemGroupedBackground))
-                    .overlay {
-                        if let tint {
-                            shape.strokeBorder(tint.opacity(0.35), lineWidth: 1)
+        if theme.isDark, !theme.glows {
+            content.glassPane(shape, tint: tint)
+        } else {
+            content.background {
+                if theme.isDark {
+                    shape
+                        .fill(.ultraThinMaterial)
+                        .overlay {
+                            shape.strokeBorder(
+                                LinearGradient(colors: [edge.opacity(0.85), edge.opacity(0.12)],
+                                               startPoint: .topLeading, endPoint: .bottomTrailing),
+                                lineWidth: 1
+                            )
                         }
-                    }
-                    .shadow(color: .black.opacity(0.07), radius: 10, y: 3)
+                        .shadow(color: edge.opacity(0.28), radius: 14)
+                } else {
+                    shape
+                        .fill(Color(.secondarySystemGroupedBackground))
+                        .overlay {
+                            if let tint {
+                                shape.strokeBorder(tint.opacity(0.35), lineWidth: 1)
+                            }
+                        }
+                        .shadow(color: .black.opacity(0.07), radius: 10, y: 3)
+                }
             }
         }
     }
@@ -107,7 +109,8 @@ extension View {
     }
 }
 
-/// A big rounded button: a glowing gradient on dark boards, solid on light ones.
+/// A big rounded button in the board's accent: solid on the executive looks, Neon's
+/// glowing gradient on Neon.
 struct TrainingButtonStyle: ButtonStyle {
     let theme: BoardTheme
     var prominent = true
@@ -139,7 +142,7 @@ struct TrainingButtonStyle: ButtonStyle {
     }
 
     private func fill(_ color: Color) -> LinearGradient {
-        if theme.isDark, tint == nil {
+        if theme.glows, tint == nil {
             return LinearGradient(colors: [Color(hex: 0x7CF7FF), Color(hex: 0xB98CFF)],
                                   startPoint: .leading, endPoint: .trailing)
         }
@@ -221,6 +224,35 @@ struct TrafficLightDots: View {
             }
         }
         .accessibilityHidden(true)
+    }
+}
+
+/// "White to move" with a dot in the side's color, or another short line. Instructions say
+/// White and Black, as chess notation does, whatever the look calls its sides. It sits under the board,
+/// never over the back rank, and keeps its space while hidden so nothing jumps.
+struct TurnBadge: View {
+    let theme: BoardTheme
+    let side: Piece.Color
+    var text: String?
+    var showing = true
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(theme.sideColor(side))
+                .overlay(Circle().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
+                .frame(width: 10, height: 10)
+            Text(text ?? "\(side.displayName) to move")
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .glassPane(Capsule())
+        .opacity(showing ? 1 : 0)
+        .accessibilityHidden(!showing)
+        .animation(.easeInOut(duration: 0.2), value: showing)
+        .animation(.easeInOut(duration: 0.2), value: text)
     }
 }
 

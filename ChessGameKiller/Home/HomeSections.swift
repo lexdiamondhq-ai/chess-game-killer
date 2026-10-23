@@ -142,7 +142,7 @@ struct HomeTodayCard: View {
 
     private var coachTitle: String {
         guard let plan else { return "Lessons and drills" }
-        return "\(plan.focus?.title ?? "Today's session") · \(plan.minutes) min"
+        return "\(plan.focus?.title ?? plan.headline ?? "Today's session") · \(plan.minutes) min"
     }
 
     private var coachDetail: String {
@@ -151,6 +151,8 @@ struct HomeTodayCard: View {
         let positions = count == 1 ? "1 position" : "\(count) positions"
         let shape = plan.lesson == nil ? "\(positions), picked for you." : "A short lesson, then \(positions)."
         if let blurb = plan.focus?.blurb { return "\(blurb) \(shape)" }
+        // Past the course: why today's puzzles, like "Your games say: shaky starts."
+        if plan.focus == nil, let reason = plan.reason { return reason }
         return shape
     }
 }

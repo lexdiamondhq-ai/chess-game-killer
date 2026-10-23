@@ -111,7 +111,7 @@ final class CalcRunner {
         }
         tried += 1
         let guess = picked.notation + square.notation
-        if answer.hasPrefix(guess) {
+        if answer.hasPrefix(guess) || isOtherMate(guess) {
             solved += 1
             streak += 1
             phase = .right
@@ -121,6 +121,14 @@ final class CalcRunner {
             phase = .wrong
         }
         from = nil
+    }
+
+    /// A different move that also mates at once is just as right.
+    private func isOtherMate(_ guess: String) -> Bool {
+        guard let fen = finalFEN, var board = TrainingChess.board(after: [], from: fen) else { return false }
+        let move = TrainingChess.legalMoves(in: board).first { $0.hasPrefix(guess) }
+        guard let move, TrainingChess.play(move, on: &board) != nil else { return false }
+        return TrainingChess.isCheckmate(board)
     }
 
     func giveUp() {
@@ -134,47 +142,53 @@ final class CalcRunner {
 struct CalculationView: View {
     let theme: BoardTheme
     @Environment(PuzzleStore.self) private var puzzles
+    @Environment(TrainingStore.self) private var training: TrainingStore?
     @Environment(\.dismiss) private var dismiss
     @AppStorage("calc.depth") private var depth = 1
     @AppStorage("calc.blindfold") private var blindfold = false
+    /// The longest run of right answers, kept for the Calculation door.
+    @AppStorage(Self.bestStreakKey) private var bestStreak = 0
     @State private var runner: CalcRunner?
+
+    static let bestStreakKey = "calc.bestStreak"
 
     var body: some View {
         GeometryReader { geo in
             let side = max(200, min(geo.size.width - 24, geo.size.height * 0.52))
             VStack(spacing: 12) {
                 RoomHeader(title: "Calculation", subtitle: "See the moves in your head") { dismiss() }
-                settingsRow.padding(.horizontal, 16)
-                if let runner, runner.puzzle != nil {
-                    Text(runner.lineText)
-                        .font(.system(.title3, design: .monospaced).weight(.semibold))
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 16)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .trainingCard(theme, cornerRadius: 16)
-                        .padding(.horizontal, 16)
-                    PositionBoard(draft: runner.draft, theme: theme, flipped: runner.player == .black,
-                                  hints: runner.hints) { square in
-                        runner.tap(square)
-                    }
-                    .frame(width: side, height: side)
-                    .overlay(alignment: .bottom) {
-                        if let from = runner.from {
-                            Text("From \(from.notation). Now tap where it goes.")
-                                .font(.caption.weight(.semibold))
-                                .padding(.horizontal, 10).padding(.vertical, 5)
-                                .background(.ultraThinMaterial, in: Capsule())
-                                .offset(y: 13)
+                // Scrolls only when it must, so the buttons are never cut off on a small phone.
+                ScrollView {
+                    VStack(spacing: 12) {
+                        settingsRow.padding(.horizontal, 16)
+                        if let runner, runner.puzzle != nil {
+                            Text(runner.lineText)
+                                .font(.system(.title3, design: .monospaced).weight(.semibold))
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 16)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .trainingCard(theme, cornerRadius: 16)
+                                .padding(.horizontal, 16)
+                            PositionBoard(draft: runner.draft, theme: theme, flipped: runner.player == .black,
+                                          hints: runner.hints) { square in
+                                runner.tap(square)
+                            }
+                            .frame(width: side, height: side)
+                            TurnBadge(theme: theme, side: runner.player,
+                                      text: runner.from.map { "From \($0.notation). Now tap where it goes." },
+                                      showing: runner.from != nil)
+                                .padding(.top, -6)
+                            RoomMessage(text: message(runner), tone: tone(runner), theme: theme)
+                                .padding(.horizontal, 16)
+                            buttons(runner).padding(.horizontal, 16)
+                        } else if puzzles.library == nil {
+                            ProgressView("Loading puzzles…").padding(.top, 40)
                         }
                     }
-                    RoomMessage(text: message(runner), tone: tone(runner), theme: theme)
-                        .padding(.horizontal, 16)
-                    buttons(runner).padding(.horizontal, 16)
-                } else if puzzles.library == nil {
-                    ProgressView("Loading puzzles…").padding(.top, 40)
+                    .padding(.bottom, 12)
                 }
-                Spacer(minLength: 0)
+                .scrollBounceBehavior(.basedOnSize)
             }
             .frame(width: geo.size.width)
         }
@@ -186,6 +200,11 @@ struct CalculationView: View {
         }
         .onChange(of: depth) { _, _ in restart() }
         .onChange(of: blindfold) { _, _ in restart() }
+        .onChange(of: runner?.solved) { _, solved in
+            guard let runner, solved != nil, runner.phase == .right else { return }
+            bestStreak = max(bestStreak, runner.streak)
+            training?.recordPractice(xp: 4 + 2 * runner.depth)
+        }
     }
 
     private var settingsRow: some View {
@@ -197,10 +216,10 @@ struct CalculationView: View {
             }
             .pickerStyle(.segmented)
             Toggle(isOn: $blindfold) {
-                Image(systemName: "eye.slash.fill")
+                Label("Blindfold", systemImage: "eye.slash.fill")
+                    .font(.system(.subheadline, design: .themed).weight(.semibold))
             }
             .toggleStyle(.button)
-            .accessibilityLabel("Blindfold")
         }
     }
 
@@ -210,7 +229,9 @@ struct CalculationView: View {
         case .solving:
             let side = runner.player == .white ? "White" : "Black"
             return "Play the moves above in your head. Then find \(side)'s winning move: tap its piece's square, then where it goes."
-        case .right: return "Yes, \(runner.answerSAN)! That's the position you saw in your head. Streak \(runner.streak)."
+        case .right:
+            let record = runner.streak >= bestStreak && runner.streak > 1 ? " A new best!" : ""
+            return "Yes, \(runner.answerSAN)! That's the position you saw in your head. Streak \(runner.streak).\(record)"
         case .wrong: return "The move was \(runner.answerSAN). Here's the position you were picturing."
         }
     }

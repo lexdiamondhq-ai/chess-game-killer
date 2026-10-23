@@ -352,6 +352,18 @@ final class TrainingStoreTests: XCTestCase {
         XCTAssertEqual(store.progress.mistakes.first?.fixed, true)
     }
 
+    func testThreeSolvesInOneDayDoNotFixAMistake() throws {
+        let store = try store()
+        store.addMistake(fen: "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1", best: "a1a8", played: "h2h3",
+                         skill: "back-rank", title: "Mate", at: noon())
+        for _ in 0..<3 {
+            let mistake = try XCTUnwrap(store.openMistakes.first)
+            store.record(mistake: mistake, outcome: .firstTry, at: noon())
+        }
+        XCTAssertEqual(store.openMistakes.count, 1)
+        XCTAssertEqual(store.openMistakes.first?.box, 1)
+    }
+
     func testTheTodayCardNamesTheLessonTheSessionOpensWith() throws {
         let store = try store()
         // A brand-new learner starts with the welcome lesson, whatever skill is in focus.
@@ -667,5 +679,31 @@ final class SessionRunnerTests: XCTestCase {
         XCTAssertEqual(runner.items.count, 2)
         XCTAssertNil(runner.coachNote)
         runner.end()
+    }
+
+    func testOnlyAFinishedSessionEarnsTheBonus() throws {
+        let library = try loadLibrary()
+        let skill = try XCTUnwrap(library.orderedSkills.first)
+        let items = library.drills(for: skill.id).prefix(3).map { SessionItem(content: .drill($0), role: .focus) }
+
+        let quitter = try runner(items)
+        quitter.begin()
+        quitter.record(.firstTry)
+        quitter.end()
+        XCTAssertEqual(quitter.stage, .summary)
+        XCTAssertTrue(quitter.endedEarly)
+        XCTAssertEqual(quitter.store.progress.sessionsDone, 0)
+        XCTAssertNil(quitter.store.progress.lastAccuracy)
+
+        let finisher = try runner(items)
+        finisher.begin()
+        for _ in items {
+            finisher.record(.firstTry)
+            finisher.next()
+        }
+        XCTAssertEqual(finisher.stage, .summary)
+        XCTAssertFalse(finisher.endedEarly)
+        XCTAssertEqual(finisher.store.progress.sessionsDone, 1)
+        XCTAssertGreaterThan(finisher.reward.xp, quitter.reward.xp * 3)
     }
 }

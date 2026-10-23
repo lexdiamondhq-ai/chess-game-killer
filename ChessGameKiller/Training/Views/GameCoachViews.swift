@@ -82,6 +82,10 @@ struct GameCoachRow: View {
                         .foregroundStyle(.secondary)
                         .frame(width: 24, height: 24)
                         .background(Color.secondary.opacity(0.14), in: Circle())
+                        // A full 44 pt to tap, without moving anything around it.
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                        .padding(-10)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Dismiss")
@@ -110,6 +114,10 @@ struct GameCoachRow: View {
                         Capsule().strokeBorder(accent.opacity(0.4), lineWidth: 1)
                     }
                 }
+                // A full 44 pt to tap, without making the row taller.
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+                .padding(.vertical, -8)
         }
         .buttonStyle(.plain)
     }

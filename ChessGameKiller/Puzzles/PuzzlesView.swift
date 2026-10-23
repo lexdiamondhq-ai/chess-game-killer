@@ -16,12 +16,26 @@ struct PuzzlesView: View {
         var id: String { rawValue }
     }
 
-    @State private var mode: Mode = .rated
+    @State private var mode: Mode
     @State private var puzzle: LichessPuzzle?
     @State private var runner: DrillRunner?
     @State private var change: Int?
     @State private var showingThemes = false
     @State private var rush: RushRound?
+    /// Asking before a Rush under way is thrown away: by End, or by closing.
+    @State private var confirmingEnd: EndChoice?
+
+    enum EndChoice: Identifiable {
+        case end, close
+        var id: Self { self }
+    }
+
+    private var rushUnderWay: Bool { mode == .rush && rush != nil && rush?.isOver == false }
+
+    init(theme: BoardTheme, startMode: Mode = .rated) {
+        self.theme = theme
+        _mode = State(initialValue: startMode)
+    }
 
     var body: some View {
         ZStack {
@@ -40,7 +54,7 @@ struct PuzzlesView: View {
                         Spacer(minLength: 0)
                     } else if let runner {
                         if mode == .rated { themeRow.padding(.horizontal, 16) }
-                        if mode == .rush, let rush { RushBar(round: rush, theme: theme) { endRush() }.padding(.horizontal, 16) }
+                        if mode == .rush, let rush { RushBar(round: rush, theme: theme) { confirmingEnd = .end }.padding(.horizontal, 16) }
                         ScrollView {
                             DrillView(runner: runner, theme: theme, boardSide: boardSide)
                                 .padding(.top, 4)
@@ -55,8 +69,16 @@ struct PuzzlesView: View {
                     } else {
                         themeRow.padding(.horizontal, 16)
                         Spacer()
-                        Text("No puzzles in this theme yet.")
-                            .foregroundStyle(.secondary)
+                        VStack(spacing: 12) {
+                            Text("No puzzles in this theme at your level yet.")
+                                .font(.system(.subheadline, design: .themed))
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                            Button("Pick another theme") { showingThemes = true }
+                                .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false))
+                                .frame(maxWidth: 240)
+                        }
+                        .padding(.horizontal, 24)
                         Spacer()
                     }
                 }
@@ -83,6 +105,20 @@ struct PuzzlesView: View {
             if mode == .rated { rush = nil; nextRated() }
         }
         .onDisappear { runner?.cancel() }
+        .confirmationDialog("End this Rush?", isPresented: Binding(get: { confirmingEnd != nil },
+                                                                   set: { if !$0 { confirmingEnd = nil } }),
+                            titleVisibility: .visible, presenting: confirmingEnd) { choice in
+            Button(choice == .close ? "End and close" : "End the Rush", role: .destructive) {
+                endRush()
+                if choice == .close {
+                    runner?.cancel()
+                    dismiss()
+                }
+            }
+            Button("Keep going", role: .cancel) {}
+        } message: { _ in
+            Text("Your score so far counts toward your best.")
+        }
         .sheet(isPresented: $showingThemes) {
             ThemePicker(theme: theme, selected: store.theme, library: store.library) { picked in
                 store.theme = picked
@@ -98,13 +134,19 @@ struct PuzzlesView: View {
     private var header: some View {
         HStack(spacing: 12) {
             Button {
-                runner?.cancel()
-                dismiss()
+                if rushUnderWay {
+                    confirmingEnd = .close
+                } else {
+                    runner?.cancel()
+                    dismiss()
+                }
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 15, weight: .bold))
                     .frame(width: 36, height: 36)
                     .background(.thinMaterial, in: Circle())
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Close puzzles")
@@ -167,6 +209,13 @@ struct PuzzlesView: View {
 
     private var ratedFooter: some View {
         VStack(spacing: 10) {
+            if let outcome = runner?.outcome, outcome != .firstTry {
+                // Anything short of a clean solve joins the review queue (PuzzleStore.record).
+                TrainingChip(text: "Back for review tomorrow", symbol: "arrow.triangle.2.circlepath",
+                             color: theme.trainingAccent)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
+            }
             if let puzzle {
                 HStack(spacing: 8) {
                     if let change {
@@ -182,12 +231,6 @@ struct PuzzlesView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                     Spacer(minLength: 0)
-                    if let url = puzzle.url {
-                        Link(destination: url) {
-                            Image(systemName: "arrow.up.right.square")
-                        }
-                        .accessibilityLabel("Open on Lichess")
-                    }
                 }
                 .padding(.horizontal, 20)
             }
@@ -223,6 +266,7 @@ struct PuzzlesView: View {
         switch mode {
         case .rated:
             change = store.record(puzzle, outcome: outcome)
+            training.recordPractice(xp: outcome == .firstTry ? 6 : 2)
         case .rush:
             guard var round = rush, !round.isOver else { return }
             store.seen(puzzle)
@@ -263,6 +307,9 @@ struct PuzzlesView: View {
         runner?.cancel()
         round.isOver = true
         round.newBest = store.finishRush(score: round.score)
+        if round.score > 0 {
+            training.recordPractice(xp: 2 * round.score)
+        }
         withAnimation(.snappy) {
             rush = round
             runner = nil
@@ -290,6 +337,8 @@ private struct RushBar: View {
     let theme: BoardTheme
     let onStop: () -> Void
 
+    private var livesLeft: Int { max(0, RushRound.lives - round.strikes) }
+
     var body: some View {
         HStack(spacing: 14) {
             TimelineView(.periodic(from: .now, by: 0.25)) { context in
@@ -310,8 +359,19 @@ private struct RushBar: View {
                         .foregroundStyle(index < round.strikes ? TrainingColor.red.color(on: theme) : Color.secondary)
                 }
             }
-            Button("End", action: onStop)
-                .font(.caption.weight(.semibold))
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(livesLeft == 1 ? "1 life left" : "\(livesLeft) lives left")
+            Button(action: onStop) {
+                Text("End")
+                    .font(.system(.subheadline, design: .themed).weight(.semibold))
+                    .padding(.horizontal, 12)
+                    .frame(height: 30)
+                    .background(Capsule().strokeBorder(Color.secondary.opacity(0.5), lineWidth: 1))
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("End the Rush")
         }
         .padding(.horizontal, 14)
         .frame(height: 46)

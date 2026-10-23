@@ -31,14 +31,30 @@ final class GuessRunner {
         model.humanColors = []
         board = model
         message = "You're \(game.heroName). Guess each of their moves."
+        previousBest = Self.best(for: game.id)
     }
 
     var maxPoints: Int { guesses * 10 }
     var percent: Int { maxPoints == 0 ? 0 : Int((Double(points) / Double(maxPoints) * 100).rounded()) }
     var movesLeft: Int { game.moves.count - index }
+    /// The best score kept from earlier tries at this game, before this one.
+    let previousBest: Int?
 
-    /// A playful strength estimate from the score, like a TV commentator would give.
-    var performance: Int { 800 + percent * 20 }
+    // MARK: Best scores
+
+    private static let bestKey = "guess.best"
+
+    /// The best score, in percent, the player has had at a game.
+    static func best(for gameID: String, defaults: UserDefaults = .standard) -> Int? {
+        (defaults.dictionary(forKey: bestKey) as? [String: Int])?[gameID]
+    }
+
+    static func saveBest(_ percent: Int, for gameID: String, defaults: UserDefaults = .standard) {
+        var all = defaults.dictionary(forKey: bestKey) as? [String: Int] ?? [:]
+        guard percent > all[gameID] ?? -1 else { return }
+        all[gameID] = percent
+        defaults.set(all, forKey: bestKey)
+    }
 
     func start() {
         advance()
@@ -101,16 +117,23 @@ final class GuessRunner {
         let mine = played.uci
         pending = Task { [weak self] in
             guard let self else { return }
-            let score = await self.score(mine, against: gm, fen: fen)
+            let checked = await self.score(mine, against: gm, fen: fen)
             guard !Task.isCancelled else { return }
             self.board.undo()
             let gmSAN = Notation.san(of: gm, fen: fen) ?? gm
-            self.points += score
-            switch score {
-            case 8...: self.tone = .success; self.message = "Just as strong as the grandmaster's \(gmSAN). +\(score)"
-            case 4...: self.tone = .hint; self.message = "Decent. \(self.game.heroName) played \(gmSAN). +\(score)"
-            case 1...: self.tone = .hint; self.message = "Playable, but \(gmSAN) was much stronger. +\(score)"
-            default: self.tone = .wrong; self.message = "That one hurts. The grandmaster played \(gmSAN)."
+            if let score = checked {
+                self.points += score
+                switch score {
+                case 8...: self.tone = .success; self.message = "Just as strong as the grandmaster's \(gmSAN). +\(score)"
+                case 4...: self.tone = .hint; self.message = "Decent. \(self.game.heroName) played \(gmSAN). +\(score)"
+                case 1...: self.tone = .hint; self.message = "Playable, but \(gmSAN) was much stronger. +\(score)"
+                default: self.tone = .wrong; self.message = "That one hurts. The grandmaster played \(gmSAN)."
+                }
+            } else {
+                // Unchecked guesses don't count either way.
+                self.guesses -= 1
+                self.tone = .coach
+                self.message = "I couldn't check that one, so it doesn't count. \(self.game.heroName) played \(gmSAN)."
             }
             if let squares = Notation.squares(of: gm) {
                 self.arrows = [BoardArrow(from: squares.from.notation, to: squares.to.notation, color: .green, dashed: nil)]
@@ -126,15 +149,16 @@ final class GuessRunner {
         }
     }
 
-    /// 0 to 9 by how much winning chance the guess gives up compared with the grandmaster's move.
-    private func score(_ mine: String, against gm: String, fen: String) async -> Int {
+    /// 0 to 9 by how much winning chance the guess gives up compared with the grandmaster's
+    /// move. Nil when the engine couldn't check it.
+    private func score(_ mine: String, against gm: String, fen: String) async -> Int? {
         guard let engine,
               let afterMine = TrainingChess.fen(after: [mine], from: fen),
-              let afterGM = TrainingChess.fen(after: [gm], from: fen) else { return 3 }
+              let afterGM = TrainingChess.fen(after: [gm], from: fen) else { return nil }
         let mineLines = await engine.analyze(fen: afterMine, depth: 14, lines: 1, maxTimeMs: 700)
         let gmLines = await engine.analyze(fen: afterGM, depth: 14, lines: 1, maxTimeMs: 700)
         guard let m = mineLines.first?.evaluation.flipped.winningChances,
-              let g = gmLines.first?.evaluation.flipped.winningChances else { return 3 }
+              let g = gmLines.first?.evaluation.flipped.winningChances else { return nil }
         let loss = g - m
         switch loss {
         case ..<0.03: return 9
@@ -150,6 +174,9 @@ final class GuessRunner {
         board.humanColors = []
         tone = .success
         message = "Game over: \(game.result). You found \(exact) of \(guesses) moves exactly."
+        if guesses > 0 {
+            Self.saveBest(percent, for: game.id)
+        }
     }
 }
 
@@ -157,6 +184,7 @@ struct GuessTheMoveView: View {
     let game: ClassicGame
     let theme: BoardTheme
     @State private var runner: GuessRunner?
+    @Environment(TrainingStore.self) private var training: TrainingStore?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -166,9 +194,9 @@ struct GuessTheMoveView: View {
                 RoomHeader(title: game.title, subtitle: "\(game.event), \(String(game.year))") { dismiss() }
                 if let runner {
                     HStack {
-                        Label("\(runner.points) / \(runner.maxPoints)", systemImage: "star.fill")
+                        Label(runner.guesses == 0 ? "—" : "\(runner.points) / \(runner.maxPoints)", systemImage: "star.fill")
                         Spacer()
-                        Text("\(runner.percent)%")
+                        Text(runner.guesses == 0 ? "—" : "\(runner.percent)%")
                         Spacer()
                         Text("\(runner.movesLeft) moves left")
                             .foregroundStyle(.secondary)
@@ -183,18 +211,32 @@ struct GuessTheMoveView: View {
                         .padding(.horizontal, 16)
                     if runner.phase == .finished {
                         VStack(spacing: 6) {
-                            Text("Performance ≈ \(runner.performance)")
-                                .font(.system(.title2, design: .themed).weight(.bold).monospacedDigit())
+                            Text("You scored \(runner.percent)%")
+                                .font(.system(.title3, design: .themed).weight(.bold).monospacedDigit())
                                 .foregroundStyle(theme.trainingAccent)
+                                .multilineTextAlignment(.center)
+                            if let best = runner.previousBest {
+                                Text(runner.percent > best ? "A new best. Your last best was \(best)%." : "Your best here is \(best)%.")
+                                    .font(.system(.subheadline, design: .themed).weight(.medium))
+                                    .foregroundStyle(.secondary)
+                            }
                             Text(game.blurb)
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                                 .multilineTextAlignment(.center)
                         }
                         .padding(.horizontal, 24)
-                        Button("Done") { dismiss() }
-                            .buttonStyle(TrainingButtonStyle(theme: theme))
-                            .padding(.horizontal, 16)
+                        HStack(spacing: 10) {
+                            Button {
+                                restart()
+                            } label: {
+                                Label("Play again", systemImage: "arrow.counterclockwise")
+                            }
+                            .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false))
+                            Button("Done") { dismiss() }
+                                .buttonStyle(TrainingButtonStyle(theme: theme))
+                        }
+                        .padding(.horizontal, 16)
                     }
                 }
                 Spacer(minLength: 0)
@@ -205,11 +247,22 @@ struct GuessTheMoveView: View {
         .animation(.snappy, value: runner?.phase)
         .onAppear {
             guard runner == nil else { return }
-            let made = GuessRunner(game: game, engine: StockfishEngine.shared)
-            runner = made
-            made.start()
+            restart()
+        }
+        .onChange(of: runner?.phase) { _, phase in
+            // A finished game counts as a day's training.
+            if phase == .finished, let runner, runner.guesses > 0 {
+                training?.recordPractice(xp: max(10, runner.percent / 3))
+            }
         }
         .onDisappear { runner?.cancel() }
+    }
+
+    private func restart() {
+        runner?.cancel()
+        let made = GuessRunner(game: game, engine: StockfishEngine.shared)
+        runner = made
+        made.start()
     }
 }
 
@@ -228,6 +281,8 @@ struct RoomHeader: View {
                     .font(.system(size: 15, weight: .bold))
                     .frame(width: 36, height: 36)
                     .background(.thinMaterial, in: Circle())
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Close")
