@@ -68,7 +68,7 @@ final class StockfishTests: XCTestCase {
             XCTAssertEqual(match.game.plyCount, 2, "\(level) never answered")
             XCTAssertLessThan(ms, level.thinkTimeMs + 2500, "\(level) took \(ms) ms to answer")
             // Leave the engine alone for the next level: no grading or hints still running.
-            match.startTapping()
+            await match.settleEngine()
         }
     }
 
@@ -99,6 +99,20 @@ final class StockfishTests: XCTestCase {
             XCTAssertEqual(match.game.sideToMove, .black)
             XCTAssertFalse(match.engineFailed, "\(level) said the engine was unavailable")
         }
-        match.startTapping()
+        await match.settleEngine()
+    }
+}
+
+extension MatchController {
+    /// Leaves the shared engine idle for whatever runs next. A fresh two-person game still
+    /// starts a hint search, and that search landing in the next test's search cuts it short
+    /// (the newest search wins), so this waits for it to report: it sets the evaluation.
+    func settleEngine() async {
+        startTapping()
+        var waited = 0
+        while evaluation == nil, waited < 800 {
+            try? await Task.sleep(for: .milliseconds(5))
+            waited += 1
+        }
     }
 }

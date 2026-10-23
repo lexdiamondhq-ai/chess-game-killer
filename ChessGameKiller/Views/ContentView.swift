@@ -43,6 +43,10 @@ struct ContentView: View {
     /// The position being looked at while the player swipes back through the game; nil is live.
     @State private var browsePly: Int?
     @State private var scrubStart: Int?
+    /// Talk it through, open over the game.
+    @State private var talk: TalkSession?
+    /// The move the player pressed Play on in Talk it through, made once the talk has slid away.
+    @State private var talkMove: PendingTalkMove?
 
     /// The app opens on the home screen when it is on, otherwise on the New Game sheet;
     /// tests and screenshots that picture the game screen skip both, and may open the coach.
@@ -71,7 +75,7 @@ struct ContentView: View {
         scenePhase != .active || showingHome || showingTraining || showingArmy || showingPuzzles || showingGames
             || showingNewGame || showingSettings || showingAnalyze
             || coach.presentedLesson != nil || coach.presentedSession != nil
-            || challenges?.isPresenting == true
+            || challenges?.isPresenting == true || talk != nil
     }
     /// Starting a game now would cost the one in progress: the rival it is against, so the
     /// screens that start games can ask first.
@@ -198,6 +202,12 @@ struct ContentView: View {
             }
             .fullScreenCover(item: $coach.presentedSession) { plan in
                 SessionView(plan: plan, theme: theme).environment(training)
+            }
+            .fullScreenCover(item: $talk, onDismiss: playTalkMove) { (session: TalkSession) in
+                TalkPanel(session: session, theme: theme, play: { (uci: String) in
+                    talkMove = PendingTalkMove(fen: session.fen, uci: uci)
+                    talk = nil
+                }, close: { talk = nil })
             }
             .animation(.easeInOut(duration: 0.35), value: theme.id)
             .sheet(isPresented: $showingNewGame, onDismiss: startIfNeeded) {
@@ -667,11 +677,28 @@ struct ContentView: View {
             .scaleEffect(coachIsWide ? 0.92 : 1)
             .allowsHitTesting(!coachIsWide)
             CoachOrb(match: match, theme: theme, isExpanded: $coachExpanded, expandedMaxHeight: coachHeight,
-                     newGame: { showingNewGame = true }, showGames: { showingGames = true })
+                     newGame: { showingNewGame = true }, showGames: { showingGames = true },
+                     talk: { openTalk() })
                 .padding(.horizontal, coachExpanded ? 0 : 6)
         }
         .frame(minHeight: Self.dockHeight)
         .animation(.spring(response: 0.45, dampingFraction: 0.85), value: coachIsWide)
+    }
+
+    /// Talk it through for the position on the board, over the game, which waits under it.
+    private func openTalk() {
+        guard talk == nil, let session = match.talkSession() else { return }
+        setCoach(expanded: false)
+        talk = session
+    }
+
+    /// The move the player pressed Play on in Talk it through, made as their own now that the
+    /// board is back in sight, so they see it land. Only on the position they talked about.
+    private func playTalkMove() {
+        guard let pending = talkMove else { return }
+        talkMove = nil
+        guard match.game.fen == pending.fen else { return }
+        withAnimation(.snappy) { _ = match.playOwnMove(pending.uci) }
     }
 
     private func setCoach(expanded: Bool) {
@@ -778,6 +805,12 @@ struct ContentView: View {
 
 private extension Array {
     subscript(safe index: Int) -> Element? { indices.contains(index) ? self[index] : nil }
+}
+
+/// A move picked in Talk it through, and the position it was picked in.
+private struct PendingTalkMove: Equatable {
+    let fen: String
+    let uci: String
 }
 
 #Preview { ContentView() }

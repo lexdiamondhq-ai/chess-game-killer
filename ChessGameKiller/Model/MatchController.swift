@@ -379,6 +379,17 @@ final class MatchController {
         }
     }
 
+    /// Plays a move the person chose off the board, like Play in Talk it through: it is their
+    /// own move, so it is graded the same as one made on the board. False when it can't be played.
+    @discardableResult
+    func playOwnMove(_ uci: String) -> Bool {
+        guard outcome == nil, game.isHumanTurn, game.pendingPromotion == nil else { return false }
+        let movesBefore = game.moveCount
+        guard game.playEngineMove(uci), game.moveCount != movesBefore else { return false }
+        didPlayMove(byPerson: true)
+        return true
+    }
+
     /// A finished game stays finished. Before the person's first move there is nothing of
     /// theirs to take back (playing Black, the rival's opening move stays).
     var canUndo: Bool { game.canUndo && !isOver && game.plyCount > firstPersonPly }
