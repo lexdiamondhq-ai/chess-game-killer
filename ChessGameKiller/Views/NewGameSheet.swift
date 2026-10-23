@@ -229,7 +229,7 @@ struct NewGameSheet: View {
             rowDivider
 
             MatchRowButton(label: "Clock", value: draftClock.name, detail: draftClock.kind, isOpen: openRow == .clock,
-                           theme: theme, icon: { Image(systemName: "stopwatch") }) {
+                           theme: theme, icon: { Glyph(name: Glyphs.play, size: 22) }) {
                 toggle(.clock)
             }
             if openRow == .clock {
@@ -244,7 +244,7 @@ struct NewGameSheet: View {
             rowDivider
 
             MatchRowButton(label: "Coach", value: draftCoach.name, detail: nil, isOpen: openRow == .coach,
-                           theme: theme, icon: { Image(systemName: "graduationcap.fill") }) {
+                           theme: theme, icon: { Glyph(name: Glyphs.coach, size: 22) }) {
                 toggle(.coach)
             }
             if openRow == .coach {
@@ -516,15 +516,7 @@ private struct MatchRowButton<Icon: View>: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                icon()
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(accent)
-                    .frame(width: 34, height: 34)
-                    .background(accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 11, style: .continuous)
-                            .strokeBorder(accent.opacity(0.18), lineWidth: 1)
-                    }
+                GlyphTile(theme: theme, content: icon)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(label.uppercased())
                         .font(.caption2.weight(.semibold))
