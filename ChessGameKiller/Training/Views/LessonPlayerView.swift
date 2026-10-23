@@ -41,6 +41,8 @@ struct LessonPlayerView: View {
     let lesson: Lesson
     let theme: BoardTheme
     var onFinish: () -> Void = {}
+    /// Inside a session: skips the lesson and goes on to the puzzles.
+    var onSkip: (() -> Void)?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @State private var player: LessonPlayer?
@@ -138,6 +140,21 @@ struct LessonPlayerView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)
+            if let onSkip, player.phase != .finished {
+                Button {
+                    player.close()
+                    onSkip()
+                } label: {
+                    Text("Skip")
+                        .font(.system(.subheadline, design: .themed).weight(.semibold))
+                        .padding(.horizontal, 14)
+                        .frame(height: 36)
+                        .background(.thinMaterial, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Skip the lesson")
+                .accessibilityHint("Goes straight to the puzzles")
+            }
             Button {
                 muted.toggle()
                 if muted { CoachVoice.shared.stop() }

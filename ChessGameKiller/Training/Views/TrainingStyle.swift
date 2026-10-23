@@ -63,7 +63,9 @@ struct TrainingBackdrop: View {
     }
 }
 
-/// A rounded card: paper with a soft shadow, or glass with a colored edge.
+/// A rounded card: glass on the dark boards (Liquid Glass on iOS 26, a frosted pane
+/// with a bright hairline before it), paper with a soft shadow on light ones.
+/// Neon keeps its colored edge and halo.
 struct TrainingCard: ViewModifier {
     let theme: BoardTheme
     var tint: Color?
@@ -72,30 +74,32 @@ struct TrainingCard: ViewModifier {
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         let edge = tint ?? theme.trainingAccent
-        content.background {
-            if theme.isDark {
-                shape
-                    .fill(.ultraThinMaterial)
-                    .overlay {
-                        shape.strokeBorder(
-                            LinearGradient(colors: [edge.opacity(theme.glows ? 0.85 : 0.45), edge.opacity(0.12)],
-                                           startPoint: .topLeading, endPoint: .bottomTrailing),
-                            lineWidth: 1
-                        )
-                    }
-                    // Only Neon gets the colored halo; the other boards keep the
-                    // same quiet shadow as the coach's orb.
-                    .shadow(color: theme.glows ? edge.opacity(0.28) : .black.opacity(0.12),
-                            radius: theme.glows ? 14 : 10, y: theme.glows ? 0 : 3)
-            } else {
-                shape
-                    .fill(Color(.secondarySystemGroupedBackground))
-                    .overlay {
-                        if let tint {
-                            shape.strokeBorder(tint.opacity(0.35), lineWidth: 1)
+        if theme.isDark, !theme.glows {
+            content
+                .background { TrainingGlass(shape: shape, tint: tint) }
+        } else {
+            content.background {
+                if theme.isDark {
+                    shape
+                        .fill(.ultraThinMaterial)
+                        .overlay {
+                            shape.strokeBorder(
+                                LinearGradient(colors: [edge.opacity(0.85), edge.opacity(0.12)],
+                                               startPoint: .topLeading, endPoint: .bottomTrailing),
+                                lineWidth: 1
+                            )
                         }
-                    }
-                    .shadow(color: .black.opacity(0.07), radius: 10, y: 3)
+                        .shadow(color: edge.opacity(0.28), radius: 14)
+                } else {
+                    shape
+                        .fill(Color(.secondarySystemGroupedBackground))
+                        .overlay {
+                            if let tint {
+                                shape.strokeBorder(tint.opacity(0.35), lineWidth: 1)
+                            }
+                        }
+                        .shadow(color: .black.opacity(0.07), radius: 10, y: 3)
+                }
             }
         }
     }
@@ -107,7 +111,62 @@ extension View {
     }
 }
 
-/// A big rounded button: a glowing gradient on dark boards, solid on light ones.
+/// The training screens' glass: Liquid Glass on iOS 26; before it a frosted pane with
+/// light falling across it from the top left and a bright hairline edge, so it reads
+/// as glass over the backdrop, never as a grey box. A tint warms the edge.
+struct TrainingGlass<S: InsettableShape>: View {
+    let shape: S
+    var tint: Color?
+
+    var body: some View {
+        ZStack {
+            pane
+            // Light falls across the pane from the top left.
+            shape.fill(
+                LinearGradient(
+                    stops: [
+                        .init(color: .white.opacity(0.09), location: 0),
+                        .init(color: .white.opacity(0.025), location: 0.45),
+                        .init(color: .white.opacity(0.01), location: 1),
+                    ],
+                    startPoint: .topLeading, endPoint: .bottomTrailing
+                )
+            )
+            shape.strokeBorder(
+                LinearGradient(
+                    colors: [(tint ?? .white).opacity(tint == nil ? 0.32 : 0.6), .white.opacity(0.06),
+                             (tint ?? .white).opacity(tint == nil ? 0.14 : 0.22)],
+                    startPoint: .topLeading, endPoint: .bottomTrailing
+                ),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(color: .black.opacity(0.28), radius: 18, y: 8)
+        .allowsHitTesting(false)
+    }
+
+    @ViewBuilder
+    private var pane: some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) {
+            Color.clear.glassEffect(.regular, in: shape)
+        } else {
+            frosted
+        }
+        #else
+        frosted
+        #endif
+    }
+
+    private var frosted: some View {
+        shape
+            .fill(.ultraThinMaterial)
+            .overlay { shape.fill(Color.black.opacity(0.22)) }
+    }
+}
+
+/// A big rounded button in the board's accent: solid on the executive looks, Neon's
+/// glowing gradient on Neon.
 struct TrainingButtonStyle: ButtonStyle {
     let theme: BoardTheme
     var prominent = true
@@ -139,7 +198,7 @@ struct TrainingButtonStyle: ButtonStyle {
     }
 
     private func fill(_ color: Color) -> LinearGradient {
-        if theme.isDark, tint == nil {
+        if theme.glows, tint == nil {
             return LinearGradient(colors: [Color(hex: 0x7CF7FF), Color(hex: 0xB98CFF)],
                                   startPoint: .leading, endPoint: .trailing)
         }

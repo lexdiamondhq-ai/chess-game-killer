@@ -138,7 +138,7 @@ struct ContentView: View {
     private var presented: some View {
         observed
             .fullScreenCover(isPresented: $showingTraining) {
-                TrainingHubView(theme: theme).environment(training).environment(puzzles)
+                TrainingHubView(theme: theme).environment(training).environment(puzzles).environment(vault)
             }
             .fullScreenCover(isPresented: $showingPuzzles) {
                 PuzzlesView(theme: theme).environment(puzzles).environment(training)

@@ -92,6 +92,27 @@ final class TrainingStore {
         return TrainingPlanner(library: library, progress: progress).todaysFocus()
     }
 
+    /// Why today's skill was picked, for the Today card.
+    var todaysFocusReason: TrainingPlanner.FocusReason? {
+        guard let library else { return nil }
+        return TrainingPlanner(library: library, progress: progress).focusChoice()?.reason
+    }
+
+    /// Positions from the learner's games that are due for another try.
+    var dueMistakeCount: Int {
+        progress.mistakes.filter { !$0.fixed && $0.due <= .now }.count
+    }
+
+    /// Lessons watched, out of the whole course.
+    var lessonsDoneCount: Int {
+        library?.lessons.filter { isDone($0.id) }.count ?? 0
+    }
+
+    /// Whether to offer the level check: early on, before the learner has taken it.
+    var offersLevelCheck: Bool {
+        progress.placement == nil && progress.sessionsDone < 3
+    }
+
     /// The lesson today's session opens with, if any: the same rule the plan uses.
     var todaysLesson: Lesson? {
         guard let library else { return nil }
@@ -99,8 +120,19 @@ final class TrainingStore {
         return planner.todaysLesson(focus: planner.todaysFocus())
     }
 
-    /// About how long today's session takes, matching what its intro says.
-    var todaysMinutes: Int { dailyPlan()?.minutes ?? 6 }
+    /// About how long today's session takes, matching what its intro says. Home reads
+    /// this as it scrolls, so the plan behind it is only worked out again after a change.
+    var todaysMinutes: Int {
+        let day = Trainer.dayString(.now, calendar: calendar)
+        if let cache = minutesCache, cache.day == day, cache.progress == progress {
+            return cache.minutes
+        }
+        let minutes = dailyPlan()?.minutes ?? 6
+        minutesCache = (progress, day, minutes)
+        return minutes
+    }
+
+    @ObservationIgnored private var minutesCache: (progress: TrainingProgress, day: String, minutes: Int)?
 
     static func levelName(_ level: Int) -> String {
         switch level {
@@ -145,6 +177,9 @@ final class TrainingStore {
 
     @discardableResult
     func record(_ drill: Drill, outcome: Outcome, at date: Date = .now) -> TrainingReward {
+        // Lichess puzzles keep their own record in the puzzle store; here they earn XP
+        // and count for the streak.
+        guard !drill.isLichessPuzzle else { return earn(outcome.xp, at: date) }
         let skill = progress.skills[drill.skill] ?? SkillRecord()
         progress.skills[drill.skill] = Trainer.updated(skill, difficulty: Double(drill.rating), outcome: outcome, at: date)
         let item = progress.items[drill.id]
@@ -162,9 +197,14 @@ final class TrainingStore {
             return earn(outcome.xp, at: date)
         }
         var updated = progress.mistakes[index]
-        let schedule = Trainer.scheduled(box: updated.box, outcome: outcome, at: date, calendar: calendar)
-        updated.box = schedule.box
-        updated.due = schedule.due
+        // A clean solve only moves the box up once it's due, so "fixed for good" really
+        // takes three separate days, however often the player taps Fix.
+        let isDue = calendar.startOfDay(for: updated.due) <= calendar.startOfDay(for: date)
+        if outcome != .firstTry || isDue {
+            let schedule = Trainer.scheduled(box: updated.box, outcome: outcome, at: date, calendar: calendar)
+            updated.box = schedule.box
+            updated.due = schedule.due
+        }
         updated.attempts += 1
         var bonus = 0
         // Solved cleanly on three separate days: fixed for good.
@@ -174,6 +214,13 @@ final class TrainingStore {
         }
         progress.mistakes[index] = updated
         return earn(outcome.xp + bonus, at: date)
+    }
+
+    /// Training outside Coach Leo's sessions (puzzles, openings, endgames, the
+    /// calculation trainers) earns XP and keeps the streak alive too.
+    @discardableResult
+    func recordPractice(xp: Int, at date: Date = .now) -> TrainingReward {
+        earn(max(0, xp), at: date)
     }
 
     @discardableResult
@@ -229,6 +276,28 @@ final class TrainingStore {
         }
         return earn(Trainer.gamePatternXP, at: date, countsTowardStreak: false)
     }
+
+    /// Starts the journey at the learner's level after the level check: every skill whose
+    /// typical drill is well below that level counts as learned, so the path (and the
+    /// warm-ups) begin where the learner really is. Lessons stay there to watch.
+    func applyLevel(_ rating: Int, at date: Date = .now) {
+        guard let library else { return }
+        progress.placement = rating
+        for skill in library.orderedSkills {
+            let bands = library.bands(for: skill.id)
+            guard bands.strong <= Double(rating) - Self.levelMargin else { continue }
+            var record = progress.skills[skill.id] ?? SkillRecord()
+            guard record.attempts < TrainingPlanner.attemptsPerSkill else { continue }
+            record.rating = max(record.rating, min(Double(rating) - Self.levelMargin, bands.mastered))
+            record.attempts = TrainingPlanner.attemptsPerSkill
+            record.lastPracticed = record.lastPracticed ?? date
+            progress.skills[skill.id] = record
+        }
+        save()
+    }
+
+    /// How far below the learner's level a skill's typical drill must be to count as already known.
+    static let levelMargin = 100.0
 
     /// Starts over from nothing.
     func reset() {

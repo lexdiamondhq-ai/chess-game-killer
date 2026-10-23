@@ -93,80 +93,197 @@ final class OpeningDrillRunner {
     }
 }
 
-/// The opening library: search every named line, build a repertoire, and review what's due.
+/// Behind the Openings door: the player's repertoire with what's due, a short list of
+/// the openings most players start with, and every named line a tap or a search away.
 struct OpeningsView: View {
     let theme: BoardTheme
     @Environment(RepertoireStore.self) private var repertoire
-    @Environment(\.dismiss) private var dismiss
+    @Environment(TrainingStore.self) private var training: TrainingStore?
     @State private var query = ""
     @State private var reviewing: [RepertoireEntry] = []
 
-    private let content = GrandmasterContent.shared
+    /// Grouped once: there are thousands of lines.
+    static let families = GrandmasterContent.shared.openingFamilies
 
-    private var families: [(name: String, lines: [OpeningLine])] {
-        let all = content.openingFamilies
-        guard !query.isEmpty else { return all }
-        return all.filter { $0.name.localizedCaseInsensitiveContains(query)
-            || $0.lines.contains { $0.name.localizedCaseInsensitiveContains(query) || $0.eco.localizedCaseInsensitiveContains(query) } }
+    /// Where most players start: one or two for White, and Black's main answers.
+    static let popular = ["Italian Game", "Ruy Lopez", "Queen's Gambit", "London System", "English Opening",
+                          "Sicilian Defense", "French Defense", "Caro-Kann Defense", "Queen's Gambit Declined",
+                          "Slav Defense", "King's Indian Defense", "Scandinavian Defense"]
+
+    private var matches: [(name: String, lines: [OpeningLine])] {
+        Self.families.filter { family in
+            family.name.localizedCaseInsensitiveContains(query)
+                || family.lines.contains { $0.name.localizedCaseInsensitiveContains(query) || $0.eco.localizedCaseInsensitiveContains(query) }
+        }
     }
 
     var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    let due = repertoire.due
-                    Button {
-                        reviewing = due
-                    } label: {
-                        HStack {
-                            Label(due.isEmpty ? "Nothing due. Nice." : "Review \(due.count) line\(due.count == 1 ? "" : "s")",
-                                  systemImage: "arrow.triangle.2.circlepath")
-                            Spacer()
-                            Text("\(repertoire.entries.count) in repertoire")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .disabled(due.isEmpty)
-                    if !repertoire.entries.isEmpty {
-                        NavigationLink("My repertoire") {
-                            RepertoireList(theme: theme)
-                        }
-                    }
-                } footer: {
-                    Text("Lines come back on a schedule: tomorrow, then in 3, 7, 16 and 35 days as you get them right.")
+        TrainScreen(theme: theme, title: "Openings",
+                    intro: query.isEmpty ? "Pick a few lines you like and learn them. Leo brings each one back just before you'd forget it." : nil) {
+            if query.isEmpty {
+                repertoireCard
+                TrainSectionTitle(text: "Where most players start")
+                familyList(Self.popular.compactMap { name in Self.families.first { $0.name == name } })
+                NavigationLink {
+                    AllOpeningsView(theme: theme)
+                } label: {
+                    TrainRow(symbol: "books.vertical.fill", title: "Every opening",
+                             detail: "All \(GrandmasterContent.shared.openings.count) named lines, A to Z, with their ECO codes.",
+                             theme: theme)
                 }
-                Section("Openings") {
-                    ForEach(families, id: \.name) { family in
-                        NavigationLink {
-                            OpeningFamilyView(name: family.name, lines: family.lines, theme: theme)
-                        } label: {
-                            HStack {
-                                Text(family.name)
-                                Spacer()
-                                Text("\(family.lines.count)")
-                                    .font(.caption.monospacedDigit())
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
+                .buttonStyle(.plain)
+                .padding(.top, 8)
+            } else if matches.isEmpty {
+                Text("No opening matches \u{201C}\(query)\u{201D}.")
+                    .font(.system(.subheadline, design: .themed))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 30)
+            } else {
+                familyList(Array(matches.prefix(40)))
             }
-            .searchable(text: $query, prompt: "Sicilian, Italian, B90…")
-            .navigationTitle("Openings")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) { Button("Done") { dismiss() } }
-            }
-            .scrollContentBackground(.hidden)
-            .background { TrainingBackdrop(theme: theme) }
         }
-        .tint(theme.trainingAccent)
-        .preferredColorScheme(theme.isDark ? .dark : nil)
+        .searchable(text: $query, prompt: "Sicilian, Italian, B90…")
         .fullScreenCover(isPresented: Binding(get: { !reviewing.isEmpty }, set: { if !$0 { reviewing = [] } })) {
             RepertoireReview(entries: reviewing, theme: theme)
                 .environment(repertoire)
+                .environment(training)
         }
+    }
+
+    /// The repertoire: what's due today, or how to start one.
+    private var repertoireCard: some View {
+        let due = repertoire.due
+        let count = repertoire.entries.count
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("YOUR REPERTOIRE")
+                    .font(.system(.caption, design: .themed).weight(.bold))
+                    .tracking(1)
+                    .foregroundStyle(theme.trainingAccent)
+                Spacer()
+                if count > 0 {
+                    Text(count == 1 ? "1 line" : "\(count) lines")
+                        .font(.system(.footnote, design: .themed).weight(.semibold).monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Text(count == 0 ? "Start your repertoire"
+                 : due.isEmpty ? "Nothing due today" : (due.count == 1 ? "1 line to review" : "\(due.count) lines to review"))
+                .font(.system(.title3, design: .themed).weight(.bold))
+            Text(count == 0
+                 ? "Open an opening below, pick a line and tap Add. Reviews come back tomorrow, then in 3, 7, 16 and 35 days."
+                 : due.isEmpty ? "Every line is fresh. The next one comes back \(nextDue)."
+                 : "Play each line from memory. A clean run sends it further out; a slip brings it back tomorrow.")
+                .font(.system(.subheadline, design: .themed))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if !due.isEmpty {
+                Button {
+                    reviewing = due
+                } label: {
+                    Label("Review", systemImage: "arrow.triangle.2.circlepath")
+                }
+                .buttonStyle(TrainingButtonStyle(theme: theme))
+            }
+            if count > 0 {
+                NavigationLink {
+                    RepertoireList(theme: theme)
+                } label: {
+                    HStack {
+                        Text("My repertoire")
+                            .font(.system(.subheadline, design: .themed).weight(.semibold))
+                            .foregroundStyle(theme.trainingAccent)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(18)
+        .trainingCard(theme, tint: theme.trainingAccent)
+    }
+
+    private var nextDue: String {
+        guard let next = repertoire.entries.map(\.due).min() else { return "soon" }
+        return next.formatted(.relative(presentation: .named))
+    }
+
+    private func familyList(_ families: [(name: String, lines: [OpeningLine])]) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(families.enumerated()), id: \.element.name) { index, family in
+                NavigationLink {
+                    OpeningFamilyView(name: family.name, lines: family.lines, theme: theme)
+                } label: {
+                    OpeningFamilyRow(name: family.name, lines: family.lines)
+                }
+                .buttonStyle(.plain)
+                if index < families.count - 1 {
+                    Divider().opacity(0.4).padding(.leading, 16)
+                }
+            }
+        }
+        .trainingCard(theme)
+    }
+}
+
+/// One opening family in a list: its name, who plays it and how many lines it has.
+private struct OpeningFamilyRow: View {
+    let name: String
+    let lines: [OpeningLine]
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name)
+                    .font(.system(.subheadline, design: .themed).weight(.semibold))
+                    .foregroundStyle(.primary)
+                Text(caption)
+                    .font(.system(.caption, design: .themed))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+    }
+
+    private var caption: String {
+        let side = lines.first.map { $0.naturalSide == .white ? "For White" : "For Black" } ?? ""
+        let count = lines.count == 1 ? "1 line" : "\(lines.count) lines"
+        return side.isEmpty ? count : "\(side) · \(count)"
+    }
+}
+
+/// Every opening family, A to Z.
+private struct AllOpeningsView: View {
+    let theme: BoardTheme
+
+    var body: some View {
+        List(OpeningsView.families, id: \.name) { family in
+            NavigationLink {
+                OpeningFamilyView(name: family.name, lines: family.lines, theme: theme)
+            } label: {
+                OpeningFamilyRow(name: family.name, lines: family.lines)
+            }
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.white.opacity(0.05))
+        }
+        .navigationTitle("Every opening")
+        .navigationBarTitleDisplayMode(.inline)
+        .scrollContentBackground(.hidden)
+        .background { TrainingBackdrop(theme: theme) }
     }
 }
 
@@ -182,6 +299,7 @@ private struct OpeningFamilyView: View {
             } label: {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(line.variation)
+                        .font(.system(.subheadline, design: .themed).weight(.semibold))
                     Text("\(line.eco) · " + Notation.numbered(Notation.sanLine(of: line.moves, fen: Position.standard.fen,
                                                                                  limit: 8), blackFirst: false))
                         .font(.caption.monospaced())
@@ -189,8 +307,10 @@ private struct OpeningFamilyView: View {
                         .lineLimit(1)
                 }
             }
+            .listRowBackground(Color.white.opacity(0.05))
         }
         .navigationTitle(name)
+        .navigationBarTitleDisplayMode(.inline)
         .scrollContentBackground(.hidden)
         .background { TrainingBackdrop(theme: theme) }
     }
@@ -298,6 +418,7 @@ private struct RepertoireReview: View {
     let entries: [RepertoireEntry]
     let theme: BoardTheme
     @Environment(RepertoireStore.self) private var repertoire
+    @Environment(TrainingStore.self) private var training: TrainingStore?
     @Environment(\.dismiss) private var dismiss
     @State private var position = 0
     @State private var runner: OpeningDrillRunner?
@@ -337,6 +458,7 @@ private struct RepertoireReview: View {
             guard done == true, !recorded, let runner, !entries.isEmpty else { return }
             recorded = true
             repertoire.reviewed(entries[safeIndex], clean: runner.mistakes == 0)
+            training?.recordPractice(xp: runner.mistakes == 0 ? 8 : 4)
         }
         .onDisappear { runner?.cancel() }
     }

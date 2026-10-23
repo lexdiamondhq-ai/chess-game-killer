@@ -1,361 +1,204 @@
 import ChessKit
 import SwiftUI
 
-/// The Training screen: Coach Leo, today's session, the learner's own
-/// mistakes to fix, the Traffic Light habit, and the whole journey.
+/// The Train screen: one thing to do today, picked by Coach Leo from the player's own
+/// games and progress, and six doors to everything else. It fits on one screen; each
+/// door opens its own short page.
 struct TrainingHubView: View {
     /// The game screen's board look, so training looks like the game.
     let theme: BoardTheme
     @Environment(TrainingStore.self) private var store
     @Environment(PuzzleStore.self) private var puzzles
-    @State private var showingPuzzles = false
-    @State private var showingRoom = false
+    @Environment(GameVault.self) private var vault
     @Environment(\.dismiss) private var dismiss
     @AppStorage("coachVoiceMuted") private var voiceMuted = false
-    @State private var lesson: Lesson?
+    @State private var repertoire = RepertoireStore.live()
+    @State private var endgames = EndgameProgress.live()
+    @State private var path: [TrainDoor] = []
+    /// Today's session, made once so the card shows exactly what Start plays.
+    @State private var today: SessionPlan?
     @State private var session: SessionPlan?
     @State private var greeting = ""
     @State private var confirmingReset = false
+    @State private var showingLevelCheck = false
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ScrollView {
-                if let library = store.library {
-                    VStack(spacing: 18) {
-                        coachHeader(library)
-                        rankCard
-                        todayCard
-                        puzzlesCard
-                        roomCard
-                        if !store.openMistakes.isEmpty {
-                            mistakesCard
+                if store.library != nil {
+                    VStack(alignment: .leading, spacing: 16) {
+                        coachLine
+                        TodayCard(plan: today, theme: theme, offersLevelCheck: offersLevelCheck) {
+                            session = today ?? store.dailyPlan()
+                        } levelCheck: {
+                            showingLevelCheck = true
                         }
-                        habitCard(library)
-                        ForEach(library.course.units) { unit in
-                            UnitCard(unit: unit, library: library, theme: theme) { lesson in
-                                self.lesson = lesson
-                            } practice: { skill in
-                                session = store.practicePlan(for: skill)
-                            }
-                        }
-                        Text("Every lesson drill was checked by Stockfish. Puzzles come from real games on Lichess.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .padding(.top, 4)
+                        doors
+                        RankStrip(theme: theme)
+                            .padding(.top, 2)
                     }
                     .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
+                    .padding(.bottom, 28)
                 } else {
                     missingContent
                 }
             }
+            .scrollBounceBehavior(.basedOnSize)
             .background { TrainingBackdrop(theme: theme) }
-            .navigationTitle("Training")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Done") { dismiss() }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Toggle(isOn: Binding(get: { !voiceMuted }, set: { voiceMuted = !$0 })) {
-                            Label("Coach's Voice", systemImage: "speaker.wave.2.fill")
-                        }
-                        Button(role: .destructive) {
-                            confirmingReset = true
-                        } label: {
-                            Label("Start Training Over", systemImage: "arrow.counterclockwise")
-                        }
-                    } label: {
-                        Label("Training Settings", systemImage: "ellipsis.circle")
-                    }
-                }
-            }
-            .confirmationDialog("Start training over?", isPresented: $confirmingReset, titleVisibility: .visible) {
-                Button("Erase Training Progress", role: .destructive) { store.reset() }
-            } message: {
-                Text("Your XP, rank, streak and saved mistakes will be erased. Games aren't affected.")
+            .navigationTitle("Train")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar { toolbar }
+            .navigationDestination(for: TrainDoor.self) { door in
+                destination(door)
             }
         }
         .tint(theme.trainingAccent)
         .preferredColorScheme(theme.isDark ? .dark : nil)
+        .environment(repertoire)
+        .environment(endgames)
         .onAppear {
             if greeting.isEmpty {
                 greeting = store.library?.course.lines.greeting.randomElement() ?? "Ready when you are."
             }
-        }
-        .fullScreenCover(item: $lesson) { lesson in
-            LessonScreen(lesson: lesson, theme: theme)
-                .environment(store)
-        }
-        .fullScreenCover(isPresented: $showingRoom) {
-            GrandmasterRoomView(theme: theme)
-                .environment(puzzles)
-        }
-        .fullScreenCover(isPresented: $showingPuzzles) {
-            PuzzlesView(theme: theme)
-                .environment(puzzles)
-                .environment(store)
-        }
-        .fullScreenCover(item: $session) { plan in
-            SessionView(plan: plan, theme: theme)
-                .environment(store)
-        }
-    }
-
-    // MARK: Coach
-
-    private func coachHeader(_ library: TrainingLibrary) -> some View {
-        HStack(alignment: .center, spacing: 14) {
-            CoachAvatar(theme: theme, size: 64)
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    Text(library.coach.name)
-                        .font(.system(.title3, design: .themed).weight(.bold))
-                    Text(library.coach.title)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
-                Text(greeting)
-                    .font(.system(.subheadline, design: .themed))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+            // On the course, today's plan is ready at once; past it, it waits for the puzzles.
+            if today == nil, !isPastTheCourse {
+                today = store.dailyPlan()
             }
-            Spacer(minLength: 0)
-            streakBadge
         }
-        .padding(.top, 4)
-    }
-
-    private var streakBadge: some View {
-        let streak = store.streak
-        let color = TrainingColor.orange.color(on: theme)
-        return VStack(spacing: 2) {
-            Image(systemName: "flame.fill")
-                .font(.title2)
-                .foregroundStyle(streak > 0 ? color : Color.secondary.opacity(0.5))
-                .shadow(color: theme.glows && streak > 0 ? color : .clear, radius: 8)
-                .symbolEffect(.bounce, value: streak)
-            Text("\(streak)")
-                .font(.system(.headline, design: .themed).monospacedDigit())
-            Text(streak == 1 ? "day" : "days")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-        }
-        .frame(minWidth: 52)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Streak: \(streak) \(streak == 1 ? "day" : "days")")
-    }
-
-    @ViewBuilder
-    private var rankCard: some View {
-        if let rank = store.rank {
-            HStack(spacing: 14) {
-                PieceImage(piece: Piece(rank.pieceKind, color: .white, square: .a1), theme: theme, size: 48)
-                VStack(alignment: .leading, spacing: 7) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(rank.title)
-                            .font(.system(.headline, design: .themed))
-                        Text("\(store.progress.xp) XP")
-                            .font(.caption.weight(.semibold).monospacedDigit())
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        if let next = store.nextRank {
-                            Text("Next: \(next.title)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    ProgressView(value: store.rankProgress)
-                        .tint(theme.trainingAccent)
-                }
+        .task { await planToday() }
+        .confirmationDialog("Start training over?", isPresented: $confirmingReset, titleVisibility: .visible) {
+            Button("Erase Training Progress", role: .destructive) {
+                store.reset()
+                Task { await planToday() }
             }
-            .padding(16)
-            .trainingCard(theme)
-            .accessibilityElement(children: .combine)
+        } message: {
+            Text("Your XP, rank, streak and saved mistakes will be erased. Games and puzzles aren't affected.")
+        }
+        .fullScreenCover(item: $session, onDismiss: { Task { await planToday() } }) { plan in
+            SessionView(plan: plan, theme: theme, startsAtOnce: true)
+                .environment(store)
+        }
+        .fullScreenCover(isPresented: $showingLevelCheck, onDismiss: { Task { await planToday() } }) {
+            LevelCheckView(theme: theme) { rating in
+                store.applyLevel(rating)
+                puzzles.calibrate(rating: rating)
+                showingLevelCheck = false
+            }
+            .environment(puzzles)
         }
     }
 
     // MARK: Today
 
-    /// Real-game puzzles from Lichess, at the learner's level.
-    private var puzzlesCard: some View {
-        Button {
-            showingPuzzles = true
-        } label: {
-            HStack(spacing: 14) {
-                Image(systemName: "puzzlepiece.extension.fill")
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundStyle(theme.trainingAccent)
-                    .frame(width: 52, height: 52)
-                    .background(theme.trainingAccent.opacity(0.14), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Puzzles")
-                        .font(.system(.title3, design: .themed).weight(.bold))
-                    Text("Real games, every theme, rated to your level. Plus Puzzle Rush.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 0)
-                VStack(spacing: 0) {
-                    Text("\(puzzles.progress.rating)")
-                        .font(.system(.headline, design: .themed).monospacedDigit())
-                    Text("rating")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .padding(18)
-            .trainingCard(theme)
-        }
-        .buttonStyle(.plain)
+    private var offersLevelCheck: Bool {
+        store.offersLevelCheck && today?.headline == nil
     }
 
-    /// Training for strong players.
-    private var roomCard: some View {
-        Button {
-            showingRoom = true
-        } label: {
-            HStack(spacing: 14) {
-                Image(systemName: "crown.fill")
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundStyle(theme.trainingAccent)
-                    .frame(width: 52, height: 52)
-                    .background(theme.trainingAccent.opacity(0.14), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Grandmaster Room")
-                        .font(.system(.title3, design: .themed).weight(.bold))
-                    Text("Guess the Move, blindfold calculation, perfect endgames, your opening repertoire.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(18)
-            .trainingCard(theme)
-        }
-        .buttonStyle(.plain)
+    private var isPastTheCourse: Bool {
+        store.isPastTheCourse(puzzleRating: puzzles.progress.rating, puzzlesPlayed: puzzles.progress.played)
     }
 
-    private var todayCard: some View {
-        let focus = store.todaysFocus
-        let newLesson = store.todaysLesson
-        return VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 8) {
-                TrainingChip(text: store.trainedToday ? "Done today. More?" : "Today's training",
-                             symbol: store.trainedToday ? "checkmark" : "sun.max.fill",
-                             color: theme.trainingAccent)
-                Spacer()
-                Text("About \(store.todaysMinutes) min")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            if let focus {
-                HStack(spacing: 14) {
-                    Image(systemName: focus.symbol)
-                        .font(.system(size: 26, weight: .semibold))
-                        .foregroundStyle(theme.trainingAccent)
-                        .frame(width: 52, height: 52)
-                        .background(theme.trainingAccent.opacity(0.14), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(focus.title)
-                            .font(.system(.title3, design: .themed).weight(.bold))
-                        Text(newLesson.map { "New lesson: \($0.title), then practice" } ?? focus.blurb)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-            }
-            Button {
-                session = store.dailyPlan()
-            } label: {
-                Label("Start training", systemImage: "play.fill")
-            }
-            .buttonStyle(TrainingButtonStyle(theme: theme))
-        }
-        .padding(18)
-        .trainingCard(theme, tint: theme.trainingAccent)
+    /// Builds today's session: the course while there's course left, then real puzzles at
+    /// the player's level aimed at what their games say is weakest.
+    private func planToday() async {
+        today = await store.planToday(puzzles: puzzles, games: vault.games)
     }
 
-    private var mistakesCard: some View {
-        let count = store.openMistakes.count
-        let pink = TrainingColor.pink.color(on: theme)
-        return HStack(spacing: 14) {
-            Image(systemName: "arrow.uturn.backward.circle.fill")
-                .font(.system(size: 30))
-                .foregroundStyle(pink)
-                .shadow(color: theme.glows ? pink : .clear, radius: 8)
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Your mistakes, your puzzles")
-                    .font(.system(.headline, design: .themed))
-                Text(count == 1 ? "1 position saved from your games" : "\(count) positions saved from your games")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 4)
-            Button("Fix") {
-                session = store.mistakesPlan()
-            }
-            .font(.system(.subheadline, design: .themed).weight(.bold))
-            .buttonStyle(.borderedProminent)
-            .tint(pink)
-            .foregroundStyle(theme.isDark ? Color.black : Color.white)
-            .buttonBorderShape(.capsule)
-        }
-        .padding(16)
-        .trainingCard(theme, tint: pink)
-    }
-
-    // MARK: The habit
-
-    private func habitCard(_ library: TrainingLibrary) -> some View {
-        let colors: [TrainingColor] = [.red, .yellow, .green]
-        return VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text("The Traffic Light")
-                    .font(.system(.headline, design: .themed))
-                Spacer()
-                TrafficLightDots(theme: theme, size: 9)
-            }
-            Text("Three questions before every move. This one habit wins more games than any opening.")
-                .font(.subheadline)
+    private var coachLine: some View {
+        HStack(alignment: .center, spacing: 12) {
+            CoachAvatar(theme: theme, size: 34)
+            Text(greeting)
+                .font(.system(.subheadline, design: .themed))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            ForEach(Array(library.course.habit.enumerated()), id: \.offset) { index, light in
-                let color = colors[index % colors.count].color(on: theme)
-                HStack(alignment: .top, spacing: 12) {
-                    Circle()
-                        .fill(color)
-                        .frame(width: 14, height: 14)
-                        .shadow(color: theme.glows ? color : .clear, radius: 5)
-                        .padding(.top, 3)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(light.question)
-                            .font(.system(.subheadline, design: .themed).weight(.semibold))
-                        Text(light.detail)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            StreakPill(streak: store.streak, theme: theme)
+        }
+        .padding(.top, 2)
+    }
+
+    // MARK: Doors
+
+    private var doors: some View {
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+            ForEach(TrainDoor.allCases) { door in
+                NavigationLink(value: door) {
+                    DoorTile(door: door, status: status(of: door), badge: badge(of: door), theme: theme)
                 }
-            }
-            if let first = library.lessons.first {
-                Button {
-                    lesson = first
-                } label: {
-                    Label("Watch: \(first.title)", systemImage: "play.rectangle.fill")
-                }
-                .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false))
+                .buttonStyle(.plain)
             }
         }
-        .padding(18)
-        .trainingCard(theme)
+    }
+
+    private func status(of door: TrainDoor) -> String {
+        switch door {
+        case .puzzles:
+            return "Rating \(puzzles.progress.rating)"
+        case .lessons:
+            let total = store.library?.lessons.count ?? 0
+            return "\(store.lessonsDoneCount) of \(total) watched"
+        case .openings:
+            if !repertoire.due.isEmpty { return "\(repertoire.due.count) to review" }
+            return repertoire.entries.isEmpty ? "Build your repertoire" : "\(repertoire.entries.count) lines learned"
+        case .endgames:
+            return "\(endgames.doneCount) of \(GrandmasterContent.shared.endgames.count) mastered"
+        case .calculation:
+            return "Blindfold, vision, masters"
+        case .games:
+            let open = store.openMistakes.count
+            if open > 0 { return open == 1 ? "1 position to fix" : "\(open) positions to fix" }
+            return vault.games.isEmpty ? "Play a game first" : "What's costing you games"
+        }
+    }
+
+    /// Things due today get a count, so the player knows where to look.
+    private func badge(of door: TrainDoor) -> Int {
+        switch door {
+        case .puzzles: return puzzles.reviewsDue
+        case .openings: return repertoire.due.count
+        case .games: return store.dueMistakeCount
+        default: return 0
+        }
+    }
+
+    @ViewBuilder
+    private func destination(_ door: TrainDoor) -> some View {
+        switch door {
+        case .puzzles: PuzzlesDoorView(theme: theme)
+        case .lessons: LessonsDoorView(theme: theme)
+        case .openings: OpeningsView(theme: theme)
+        case .endgames: EndgamesDoorView(theme: theme)
+        case .calculation: CalculationDoorView(theme: theme)
+        case .games: GamesDoorView(theme: theme)
+        }
+    }
+
+    // MARK: Toolbar
+
+    @ToolbarContentBuilder
+    private var toolbar: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            Button("Done") { dismiss() }
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+            Menu {
+                Toggle(isOn: Binding(get: { !voiceMuted }, set: { voiceMuted = !$0 })) {
+                    Label("Coach's Voice", systemImage: "speaker.wave.2.fill")
+                }
+                Button {
+                    showingLevelCheck = true
+                } label: {
+                    Label("Find My Level", systemImage: "gauge.with.dots.needle.67percent")
+                }
+                Button(role: .destructive) {
+                    confirmingReset = true
+                } label: {
+                    Label("Start Training Over", systemImage: "arrow.counterclockwise")
+                }
+            } label: {
+                Label("Training Settings", systemImage: "ellipsis.circle")
+            }
+        }
     }
 
     private var missingContent: some View {
@@ -367,117 +210,156 @@ struct TrainingHubView: View {
                 .font(.headline)
                 .multilineTextAlignment(.center)
         }
+        .frame(maxWidth: .infinity)
         .padding(40)
     }
 }
 
-/// One unit of the journey: its lessons to watch and skills to practice.
-struct UnitCard: View {
-    let unit: CourseUnit
-    let library: TrainingLibrary
+/// Today's session at a glance: what it works on and why, what's in it, a peek at the
+/// first position, and one big Start.
+struct TodayCard: View {
+    let plan: SessionPlan?
     let theme: BoardTheme
-    let watch: (Lesson) -> Void
-    let practice: (Skill) -> Void
+    var offersLevelCheck = false
+    let start: () -> Void
+    var levelCheck: () -> Void = {}
     @Environment(TrainingStore.self) private var store
 
     var body: some View {
-        let color = unit.color.color(on: theme)
-        let lessons = unit.lessons.compactMap { library.lesson($0) }
-        let skills = unit.skills.compactMap { library.skill($0) }
-        let done = lessons.filter { store.isDone($0.id) }.count
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                Image(systemName: unit.symbol)
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(theme.isDark ? Color.black : Color.white)
-                    .frame(width: 40, height: 40)
-                    .background(color, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .shadow(color: theme.glows ? color.opacity(0.7) : .clear, radius: 8)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(unit.title)
-                        .font(.system(.headline, design: .themed))
-                    Text(unit.subtitle)
-                        .font(.caption)
+        let done = store.trainedToday
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 14) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(eyebrow(done: done))
+                        .font(.system(.caption, design: .themed).weight(.bold))
+                        .tracking(1)
+                        .foregroundStyle(theme.trainingAccent)
+                    Text(title)
+                        .font(.system(.title2, design: .themed).weight(.bold))
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
+                    Text(reason)
+                        .font(.system(.subheadline, design: .themed))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                Spacer(minLength: 4)
-                if !lessons.isEmpty {
-                    Text("\(done)/\(lessons.count)")
-                        .font(.caption.weight(.semibold).monospacedDigit())
-                        .foregroundStyle(done == lessons.count ? color : Color.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if let fen = previewFEN {
+                    BoardThumbnail(fen: fen, theme: theme)
+                        .frame(width: 92, height: 92)
+                        .id(fen)
                 }
             }
-
-            ForEach(lessons) { lesson in
-                Button {
-                    watch(lesson)
-                } label: {
-                    lessonRow(lesson, color: color)
+            if let plan {
+                steps(plan)
+            }
+            Button(action: start) {
+                Label(done ? "Train more" : "Start", systemImage: "play.fill")
+            }
+            .buttonStyle(TrainingButtonStyle(theme: theme, prominent: !done))
+            .disabled(plan == nil)
+            if offersLevelCheck {
+                Button(action: levelCheck) {
+                    Text("Already a strong player? Find your level in 2 minutes")
+                        .font(.system(.footnote, design: .themed).weight(.medium))
+                        .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.plain)
-            }
-            ForEach(skills) { skill in
-                skillRow(skill, color: color)
+                .foregroundStyle(theme.trainingAccent)
             }
         }
-        .padding(16)
-        .trainingCard(theme, tint: theme.isDark ? color : nil)
+        .padding(18)
+        .trainingCard(theme, tint: theme.trainingAccent)
     }
 
-    private func lessonRow(_ lesson: Lesson, color: Color) -> some View {
-        let isDone = store.isDone(lesson.id)
-        return HStack(spacing: 12) {
-            Image(systemName: isDone ? "checkmark.circle.fill" : "play.circle.fill")
-                .font(.system(size: 26))
-                .foregroundStyle(isDone ? TrainingColor.green.color(on: theme) : color)
-                .frame(width: 34)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(lesson.title)
-                    .font(.system(.subheadline, design: .themed).weight(.semibold))
-                Text(lesson.subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
-            Spacer(minLength: 4)
-            Image(systemName: "chevron.right")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(.tertiary)
-        }
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(lesson.title), lesson\(isDone ? ", done" : "")")
+    private func eyebrow(done: Bool) -> String {
+        if done { return "TODAY · DONE" }
+        return "TODAY · \(plan?.minutes ?? store.todaysMinutes) MIN"
     }
 
-    private func skillRow(_ skill: Skill, color: Color) -> some View {
-        let level = store.level(of: skill)
-        let mastery = store.mastery(of: skill)
-        let hasDrills = !library.drills(for: skill.id).isEmpty
-        return HStack(spacing: 12) {
-            ZStack {
-                ProgressRing(progress: mastery, color: color, lineWidth: 3.5)
-                Image(systemName: skill.symbol)
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(color)
+    private var title: String {
+        if store.trainedToday, plan == nil { return "Nice work today" }
+        if let lesson = plan?.lesson, lesson.id == store.library?.lessons.first?.id { return "Welcome to training" }
+        return plan?.headline ?? plan?.focus?.title ?? store.todaysFocus?.title ?? "Today's training"
+    }
+
+    private var reason: String {
+        if store.trainedToday {
+            return "You've trained today and your streak is safe. Another round is always welcome."
+        }
+        if let reason = plan?.reason { return reason }
+        switch store.todaysFocusReason {
+        case .firstDay?:
+            return "Meet Coach Leo and the one habit that wins more games than any opening."
+        case .fromGames(let count)?:
+            return "You missed this \(count == 2 ? "twice" : "\(count) times") in your games lately. Let's make it automatic."
+        case .struggling?:
+            return "This one's been tricky. A few friendlier positions to lock it in."
+        case .nextOnPath?:
+            if let lesson = plan?.lesson { return "New lesson: \(lesson.title), then practice at your level." }
+            return plan?.focus?.blurb ?? "The next step on your path."
+        case .polish?, nil:
+            return plan?.focus?.blurb ?? "A short session at your level."
+        }
+    }
+
+    private func steps(_ plan: SessionPlan) -> some View {
+        let mistakes = plan.items.filter {
+            if case .mistake = $0.content { return true } else { return false }
+        }.count
+        let drills = plan.items.count - mistakes
+        return HStack(spacing: 6) {
+            if plan.lesson != nil {
+                TrainingChip(text: "Lesson", symbol: "play.rectangle.fill", color: theme.trainingAccent)
             }
-            .frame(width: 34, height: 34)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(skill.title)
-                    .font(.system(.subheadline, design: .themed).weight(.semibold))
-                Text(TrainingStore.levelName(level))
-                    .font(.caption)
-                    .foregroundStyle(level >= 2 ? color : Color.secondary)
+            if drills > 0 {
+                TrainingChip(text: drills == 1 ? "1 puzzle" : "\(drills) puzzles", symbol: "puzzlepiece.fill",
+                             color: theme.trainingAccent)
             }
-            Spacer(minLength: 4)
-            if hasDrills {
-                Button("Practice") { practice(skill) }
-                    .font(.system(.caption, design: .themed).weight(.bold))
-                    .buttonStyle(.bordered)
-                    .buttonBorderShape(.capsule)
-                    .tint(color)
+            if mistakes > 0 {
+                TrainingChip(text: mistakes == 1 ? "1 from your games" : "\(mistakes) from your games",
+                             symbol: "arrow.uturn.backward", color: theme.trainingAccent)
             }
         }
-        .accessibilityElement(children: .combine)
+        .lineLimit(1)
+        .minimumScaleFactor(0.85)
+    }
+
+    /// The first position the session shows, from the side that will play it.
+    private var previewFEN: String? {
+        guard let plan else { return nil }
+        if let lesson = plan.lesson {
+            return lesson.steps.first { $0.fen != nil }?.fen
+        }
+        switch plan.items.first?.content {
+        case .drill(let drill)?:
+            return drill.setup.flatMap { TrainingChess.fen(after: [$0], from: drill.fen) } ?? drill.fen
+        case .mistake(let mistake)?:
+            return mistake.fen
+        case nil:
+            return nil
+        }
+    }
+}
+
+/// A small, still picture of a position on the player's board, from the side to move.
+struct BoardThumbnail: View {
+    let theme: BoardTheme
+    @State private var game: GameModel
+    private let flipped: Bool
+
+    init(fen: String, theme: BoardTheme) {
+        self.theme = theme
+        let position = Position(fen: fen) ?? .standard
+        let model = GameModel(position: position)
+        model.humanColors = []
+        _game = State(initialValue: model)
+        flipped = position.sideToMove == .black
+    }
+
+    var body: some View {
+        TrainingBoardView(game: game, theme: theme, flipped: flipped)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
     }
 }

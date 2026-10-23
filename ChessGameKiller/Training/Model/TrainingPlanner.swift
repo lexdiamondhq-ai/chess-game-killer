@@ -8,6 +8,12 @@ struct SessionPlan: Identifiable {
     /// Shown before the drills when the focus skill hasn't been taught yet.
     let lesson: Lesson?
     let items: [SessionItem]
+    /// What the Today card calls a session with no course skill in focus, like "Forks".
+    var headline: String?
+    /// Its icon, an SF Symbol.
+    var symbol: String?
+    /// One line on why this, today.
+    var reason: String?
 
     var minutes: Int {
         let lessonMinutes = lesson == nil ? 0.0 : 2.0
@@ -63,8 +69,28 @@ struct TrainingPlanner {
     let now: Date
     private var random: TrainingRandom
 
+    /// Why today's skill was picked, so the Today card can say so.
+    enum FocusReason: Equatable {
+        /// Day one: meet the coach and the habit.
+        case firstDay
+        /// Missed this many times in the learner's own recent games.
+        case fromGames(Int)
+        /// Taught, but below where it should be.
+        case struggling
+        /// The next step on the journey.
+        case nextOnPath
+        /// Everything has had its turn: the one that needs it most.
+        case polish
+    }
+
     /// Attempts on a skill before the journey moves to the next one.
     static let attemptsPerSkill = 6
+    /// Game mistakes this recent steer today's skill.
+    static let recentGameDays = 14.0
+    /// Misses of the same pattern in recent games that make it today's skill.
+    static let gameMissesToFocus = 2
+    /// A level check at or above this skips the welcome lesson: strong players start where they are.
+    static let skipWelcomeRating = 1300
     static let focusTarget = 0.8
     static let gentleTarget = 0.86
     static let easyTarget = 0.93
@@ -146,7 +172,7 @@ struct TrainingPlanner {
     /// The course's first lesson, for a brand-new learner who hasn't watched it yet.
     var openingLesson: Lesson? {
         guard progress.sessionsDone == 0, progress.items.isEmpty, let first = library.lessons.first,
-              progress.lessonsDone[first.id] == nil else {
+              progress.lessonsDone[first.id] == nil, (progress.placement ?? 0) < Self.skipWelcomeRating else {
             return nil
         }
         return first
@@ -162,36 +188,73 @@ struct TrainingPlanner {
 
     /// Today's skill: the first lesson's on day one, then the next one on the journey.
     func todaysFocus() -> Skill? {
+        focusChoice()?.skill
+    }
+
+    /// Today's skill and why it was picked.
+    func focusChoice() -> (skill: Skill, reason: FocusReason)? {
         if let opening = openingLesson, let skill = library.skill(opening.skill), !library.drills(for: skill.id).isEmpty {
-            return skill
+            return (skill, .firstDay)
         }
-        return focusSkill()
+        return focusSkillChoice()
     }
 
     /// The next skill on the journey, or the one that needs the most work.
     func focusSkill() -> Skill? {
+        focusSkillChoice()?.skill
+    }
+
+    private func focusSkillChoice() -> (skill: Skill, reason: FocusReason)? {
         let skills = library.orderedSkills.filter { !library.drills(for: $0.id).isEmpty }
-        // Struggling with something already taught? That comes first.
+        // A pattern the learner keeps missing in real games comes first: that's what costs points.
+        if let missed = gameMissFocus(among: skills) {
+            return (missed.skill, .fromGames(missed.count))
+        }
+        // Struggling with something already taught? That's next.
         let struggling = skills.filter { skill in
             guard let record = progress.skills[skill.id], record.attempts >= Self.attemptsPerSkill else { return false }
             return record.rating < library.bands(for: skill.id).learned - 60
         }
         if let weakest = struggling.min(by: { gap($0) > gap($1) }) {
-            return weakest
+            return (weakest, .struggling)
         }
         // Otherwise the next skill on the journey that hasn't had its turn.
         if let next = skills.first(where: { (progress.skills[$0.id]?.attempts ?? 0) < Self.attemptsPerSkill }) {
-            return next
+            return (next, .nextOnPath)
         }
-        // Everything has had a turn: the least mastered, least recently practiced.
-        return skills.min { a, b in
+        // Everything has had a turn: the least mastered, least recently practiced,
+        // and of those the harder skill.
+        let polish = skills.min { a, b in
             let ma = Trainer.mastery(of: progress.skills[a.id], bands: library.bands(for: a.id))
             let mb = Trainer.mastery(of: progress.skills[b.id], bands: library.bands(for: b.id))
             if abs(ma - mb) > 0.05 { return ma < mb }
             let da = progress.skills[a.id]?.lastPracticed ?? .distantPast
             let db = progress.skills[b.id]?.lastPracticed ?? .distantPast
-            return da < db
+            if da != db { return da < db }
+            return library.bands(for: a.id).strong > library.bands(for: b.id).strong
         }
+        return polish.map { ($0, .polish) }
+    }
+
+    /// The pattern the learner's recent games keep missing, if it has drills and isn't strong yet.
+    /// Most missed first; on a tie, the one earlier on the journey.
+    func gameMissFocus(among skills: [Skill]) -> (skill: Skill, count: Int)? {
+        let since = now.addingTimeInterval(-Self.recentGameDays * 24 * 60 * 60)
+        var counts: [String: Int] = [:]
+        for mistake in progress.mistakes where !mistake.fixed && !mistake.skill.isEmpty && mistake.created >= since {
+            counts[mistake.skill, default: 0] += 1
+        }
+        var best: (skill: Skill, count: Int)?
+        for skill in skills {
+            guard let count = counts[skill.id], count >= Self.gameMissesToFocus else { continue }
+            let level = Trainer.level(of: progress.skills[skill.id], bands: library.bands(for: skill.id),
+                                      lessonDone: progress.lessonsDone[skill.lesson] != nil)
+            guard level < 2 else { continue }
+            if count > (best?.count ?? 0) {
+                best = (skill, count)
+            }
+        }
+        return best
     }
 
     /// How far below its "learned" level a skill is.

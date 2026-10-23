@@ -111,7 +111,7 @@ final class CalcRunner {
         }
         tried += 1
         let guess = picked.notation + square.notation
-        if answer.hasPrefix(guess) {
+        if answer.hasPrefix(guess) || isOtherMate(guess) {
             solved += 1
             streak += 1
             phase = .right
@@ -121,6 +121,14 @@ final class CalcRunner {
             phase = .wrong
         }
         from = nil
+    }
+
+    /// A different move that also mates at once is just as right.
+    private func isOtherMate(_ guess: String) -> Bool {
+        guard let fen = finalFEN, var board = TrainingChess.board(after: [], from: fen) else { return false }
+        let move = TrainingChess.legalMoves(in: board).first { $0.hasPrefix(guess) }
+        guard let move, TrainingChess.play(move, on: &board) != nil else { return false }
+        return TrainingChess.isCheckmate(board)
     }
 
     func giveUp() {
@@ -134,10 +142,15 @@ final class CalcRunner {
 struct CalculationView: View {
     let theme: BoardTheme
     @Environment(PuzzleStore.self) private var puzzles
+    @Environment(TrainingStore.self) private var training: TrainingStore?
     @Environment(\.dismiss) private var dismiss
     @AppStorage("calc.depth") private var depth = 1
     @AppStorage("calc.blindfold") private var blindfold = false
+    /// The longest run of right answers, kept for the Calculation door.
+    @AppStorage(Self.bestStreakKey) private var bestStreak = 0
     @State private var runner: CalcRunner?
+
+    static let bestStreakKey = "calc.bestStreak"
 
     var body: some View {
         GeometryReader { geo in
@@ -186,6 +199,11 @@ struct CalculationView: View {
         }
         .onChange(of: depth) { _, _ in restart() }
         .onChange(of: blindfold) { _, _ in restart() }
+        .onChange(of: runner?.solved) { _, solved in
+            guard let runner, solved != nil, runner.phase == .right else { return }
+            bestStreak = max(bestStreak, runner.streak)
+            training?.recordPractice(xp: 4 + 2 * runner.depth)
+        }
     }
 
     private var settingsRow: some View {
@@ -210,7 +228,9 @@ struct CalculationView: View {
         case .solving:
             let side = runner.player == .white ? "White" : "Black"
             return "Play the moves above in your head. Then find \(side)'s winning move: tap its piece's square, then where it goes."
-        case .right: return "Yes, \(runner.answerSAN)! That's the position you saw in your head. Streak \(runner.streak)."
+        case .right:
+            let record = runner.streak >= bestStreak && runner.streak > 1 ? " A new best!" : ""
+            return "Yes, \(runner.answerSAN)! That's the position you saw in your head. Streak \(runner.streak).\(record)"
         case .wrong: return "The move was \(runner.answerSAN). Here's the position you were picturing."
         }
     }

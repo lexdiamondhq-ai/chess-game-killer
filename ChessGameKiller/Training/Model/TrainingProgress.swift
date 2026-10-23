@@ -12,6 +12,8 @@ struct TrainingProgress: Codable, Equatable {
     var sessionsDone = 0
     /// How the last session went, from 0 to 1, so the next one can be gentler.
     var lastAccuracy: Double?
+    /// The rating from the level check, when the learner took it.
+    var placement: Int?
 }
 
 /// A learner's level at one skill, on the same scale as drill ratings.
