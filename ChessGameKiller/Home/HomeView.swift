@@ -165,58 +165,70 @@ struct HomeView: View {
     // MARK: The page
 
     private func page(_ layout: HomeLayout, upNext: HomeUpNext) -> some View {
-        ScrollView(.vertical) {
-            VStack(alignment: .leading, spacing: 0) {
-                Color.clear.frame(height: 0)
-                    .onGeometryChange(for: CGFloat.self) { proxy in
-                        proxy.frame(in: .named(Self.space)).minY
-                    } action: { minY in
-                        scrolled(to: -minY)
-                    }
-                // The board shows through here. Nothing is drawn on it.
-                Color.clear
-                    .frame(height: layout.cardTop)
-                    .accessibilityHidden(true)
-                HomeClockCard(upNext: upNext, tone: tone, pieceTheme: pieceTheme,
-                              primary: { primary(upNext) }, secondary: { secondary(upNext) })
-                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { clockHeight = $0 }
-                    .onGeometryChange(for: Bool.self) { proxy in
-                        proxy.frame(in: .named(Self.space)).maxY < layout.safeTop + 20
-                    } action: { gone in
-                        clockGone = gone
-                    }
-                sections(upNext: upNext)
-            }
-            .padding(.horizontal, 16)
-            // The last card ends clear of the fade above the dock.
-            .padding(.bottom, Self.dockFade + 16)
-            .frame(maxWidth: 640)
-            .frame(maxWidth: .infinity)
-        }
-        .scrollIndicators(.hidden)
-        .coordinateSpace(name: Self.space)
-        .modifier(HomeScrollPhase { isInteracting, released in
-            interacting = isInteracting
-            if released, pullArmed {
-                pullArmed = false
-                openYou(.top)
-            }
-        })
-        .ignoresSafeArea(edges: .top)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            HomeDock(tone: tone, upNext: upNext, compact: clockGone, actions: actions,
-                     openYou: { openYou(.bottom) }, primary: { primary(upNext) })
-                .background(alignment: .top) {
-                    // The page fades away just above the dock and stays hidden under it.
-                    HomeBottomEdge(tone: tone, fade: Self.dockFade)
-                        .padding(.top, -Self.dockFade)
-                        .ignoresSafeArea(edges: .bottom)
+        ScrollViewReader { reader in
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: 0) {
+                    Color.clear.frame(height: 0)
+                        .onGeometryChange(for: CGFloat.self) { proxy in
+                            proxy.frame(in: .named(Self.space)).minY
+                        } action: { minY in
+                            scrolled(to: -minY)
+                        }
+                    // The board shows through here. Nothing is drawn on it.
+                    Color.clear
+                        .frame(height: layout.cardTop)
+                        .accessibilityHidden(true)
+                    HomeClockCard(upNext: upNext, tone: tone, pieceTheme: pieceTheme,
+                                  primary: { primary(upNext) }, secondary: { secondary(upNext) })
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { clockHeight = $0 }
+                        .onGeometryChange(for: Bool.self) { proxy in
+                            proxy.frame(in: .named(Self.space)).maxY < layout.safeTop + 20
+                        } action: { gone in
+                            clockGone = gone
+                        }
+                    sections(upNext: upNext)
                 }
+                .padding(.horizontal, 16)
+                // The last card ends clear of the fade above the dock.
+                .padding(.bottom, Self.dockFade + 16)
+                .frame(maxWidth: 640)
+                .frame(maxWidth: .infinity)
+            }
+            .scrollIndicators(.hidden)
+            .coordinateSpace(name: Self.space)
+            .modifier(HomeScrollPhase { isInteracting, released in
+                interacting = isInteracting
+                if released, pullArmed {
+                    pullArmed = false
+                    openYou(.top)
+                }
+            })
+            .ignoresSafeArea(edges: .top)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                HomeDock(tone: tone, upNext: upNext, compact: clockGone, actions: actions,
+                         openYou: { openYou(.bottom) }, primary: { primary(upNext) })
+                    .background(alignment: .top) {
+                        // The page fades away just above the dock and stays hidden under it.
+                        HomeBottomEdge(tone: tone, fade: Self.dockFade)
+                            .padding(.top, -Self.dockFade)
+                            .ignoresSafeArea(edges: .bottom)
+                    }
+            }
+            // With the You panel open the page steps back, out of focus.
+            .blur(radius: you == nil ? 0 : 12)
+            .accessibilityHidden(you != nil)
+            .allowsHitTesting(you == nil)
+            .task { await showcaseScroll(reader) }
         }
-        // With the You panel open the page steps back, out of focus.
-        .blur(radius: you == nil ? 0 : 12)
-        .accessibilityHidden(you != nil)
-        .allowsHitTesting(you == nil)
+    }
+
+    /// CI's pictures on the simulator open the page at a section with `-showcaseHomeAt today`
+    /// (or ladder, games, friends), as Showcase in ChessGameKillerApp.swift does for a game.
+    /// A normal launch never passes it.
+    private func showcaseScroll(_ reader: ScrollViewProxy) async {
+        guard let section = UserDefaults.standard.string(forKey: "showcaseHomeAt") else { return }
+        try? await Task.sleep(for: .seconds(1.5))
+        reader.scrollTo(section, anchor: UnitPoint(x: 0.5, y: 0.2))
     }
 
     @ViewBuilder
@@ -231,6 +243,7 @@ struct HomeView: View {
         TimelineView(.everyMinute) { context in
             HomeSectionHeader(title: "Today", tone: tone, note: HomeView.dateline(context.date), dateline: true)
         }
+        .id("today")
         HomeTodayCard(puzzle: puzzles.upNext.flatMap(HomePuzzle.init), rating: puzzles.progress.rating,
                       plan: plan, trainedToday: training.trainedToday,
                       tone: tone, pieceTheme: pieceTheme, solve: actions.puzzles,
@@ -239,6 +252,7 @@ struct HomeView: View {
         let ladder = HomeLadder(games: vault.games)
         HomeSectionHeader(title: "The ladder", tone: tone,
                           note: ladder.nextToBeat == nil ? "You lead every rival" : nil)
+            .id("ladder")
         HomeLadderCard(ladder: ladder, tone: tone, pieceTheme: pieceTheme, youColor: upNext.playerColor,
                        play: { level in choose(level, upNext) })
 
@@ -251,6 +265,7 @@ struct HomeView: View {
         if !rows.isEmpty {
             let week = HomeGameRow.thisWeek(vault.games)
             HomeSectionHeader(title: "Your games", tone: tone, note: week > 0 ? "\(week) this week" : nil)
+                .id("games")
             HomeScoresheet(rows: rows, total: vault.games.count, tone: tone,
                            open: actions.openGame, openAll: actions.rewind)
         }
@@ -262,6 +277,7 @@ struct HomeView: View {
     private func friends(_ games: [FriendGame]) -> some View {
         if let challenges {
             HomeSectionHeader(title: "With friends", tone: tone)
+                .id("friends")
             HomeFriendsCard(games: games, tone: tone, open: { challenges.play($0) }, challenge: { challenges.compose() })
                 .task { await challenges.refreshGames() }
         }

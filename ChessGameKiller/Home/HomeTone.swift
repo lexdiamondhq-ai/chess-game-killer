@@ -6,7 +6,7 @@ import SwiftUI
 struct HomeTone {
     /// The room: the deepest color, behind everything.
     let canvas: Color
-    /// Smoked glass: the fill of panes and the clock's faces.
+    /// A clock face's solid fill, for a reader who asks for less transparency.
     let smoke: Color
     /// The pool of light the board stands in.
     let pool: Color
@@ -70,19 +70,20 @@ enum HomeMetrics {
 
 // MARK: - Glass
 
-/// How much a pane holds back what is behind it.
+/// How a pane sits on the page.
 enum HomePaneWeight {
-    /// Cards with text: smoked enough that light text reads over anything.
+    /// Cards with text on them.
     case card
-    /// The dock and the clock capsule: lighter, a bar over the page.
+    /// The dock and the pull-down cue, a bar over the page.
     case bar
     /// A face inside a card: a darker well, or a lit one for the side to move.
     case well(lit: Bool)
 }
 
-/// The home's glass: Liquid Glass on iOS 26 (a frosted pane before it), smoked with the
-/// room's color so text stays crisp over the bright pieces, a soft light falling from the top
-/// left and a fine polished edge. Opaque when the reader asks for less transparency.
+/// The home's glass. Cards and bars are the app's one glass (`glassPane`): Liquid Glass on
+/// iOS 26, as on the game screen's bars and dock, and a frosted pane before it. A well inside
+/// a card has no glass of its own, since it sits on the card's: it is a darker or lighter
+/// tone with a fine edge. Opaque when the reader asks for less transparency.
 struct HomePane<S: InsettableShape>: ViewModifier {
     let shape: S
     let tone: HomeTone
@@ -91,40 +92,23 @@ struct HomePane<S: InsettableShape>: ViewModifier {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var contrast
 
+    @ViewBuilder
     func body(content: Content) -> some View {
-        content.background { surface }
-    }
-
-    private var smoke: Double {
         switch weight {
-        case .card: return 0.5
-        case .bar: return 0.34
-        case .well(let lit): return lit ? 0.1 : 0.42
+        case .well(let lit):
+            content.background { well(lit: lit) }
+        case .card, .bar:
+            content.glassPane(shape)
         }
     }
 
-    @ViewBuilder
-    private var surface: some View {
+    private func well(lit: Bool) -> some View {
         ZStack {
-            if !isWell {
-                // A soft shadow lifts the pane off the board. It sits under the glass rather than
-                // around it (no compositing group), so the glass still sees the board behind it.
-                shape.fill(Color.black.opacity(0.32))
-                    .blur(radius: 14)
-                    .offset(y: 8)
-            }
             if reduceTransparency {
                 shape.fill(tone.smoke)
-                if isLitWell { shape.fill(tone.ink.opacity(0.1)) }
+                if lit { shape.fill(tone.ink.opacity(0.1)) }
             } else {
-                switch weight {
-                case .well(let lit):
-                    // A well needs no glass of its own: it sits on the card's.
-                    shape.fill(lit ? tone.ink.opacity(0.13) : tone.canvas.opacity(smoke))
-                default:
-                    glass
-                    shape.fill(tone.canvas.opacity(smoke))
-                }
+                shape.fill(lit ? tone.ink.opacity(0.13) : tone.canvas.opacity(0.42))
                 shape.fill(LinearGradient(
                     stops: [
                         .init(color: tone.ink.opacity(0.09), location: 0),
@@ -140,33 +124,10 @@ struct HomePane<S: InsettableShape>: ViewModifier {
         .accessibilityHidden(true)
     }
 
-    private var isWell: Bool {
-        if case .well = weight { return true }
-        return false
-    }
-
-    private var isLitWell: Bool {
-        if case .well(let lit) = weight { return lit }
-        return false
-    }
-
     private var rim: LinearGradient {
-        let strong = contrast == .increased ? 0.42 : (isWell ? 0.16 : 0.26)
+        let strong = contrast == .increased ? 0.42 : 0.16
         return LinearGradient(colors: [tone.ink.opacity(strong), tone.ink.opacity(strong * 0.25), tone.ink.opacity(strong * 0.55)],
                               startPoint: .topLeading, endPoint: .bottomTrailing)
-    }
-
-    @ViewBuilder
-    private var glass: some View {
-        #if compiler(>=6.2)
-        if #available(iOS 26.0, *) {
-            Color.clear.glassEffect(.regular, in: shape)
-        } else {
-            shape.fill(.ultraThinMaterial)
-        }
-        #else
-        shape.fill(.ultraThinMaterial)
-        #endif
     }
 }
 
