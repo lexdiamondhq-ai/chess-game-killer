@@ -8,7 +8,7 @@ final class GrandmasterRoomTests: XCTestCase {
     func testBundledContentLoadsAndPlays() {
         let content = GrandmasterContent.shared
         XCTAssertGreaterThanOrEqual(content.games.count, 10)
-        XCTAssertGreaterThanOrEqual(content.endgames.count, 8)
+        XCTAssertGreaterThanOrEqual(content.endgames.count, 20)
         XCTAssertGreaterThan(content.openings.count, 3000)
         for game in content.games {
             XCTAssertNotNil(TrainingChess.fen(after: game.moves, from: Position.standard.fen), game.id)
@@ -55,6 +55,7 @@ final class GrandmasterRoomTests: XCTestCase {
         XCTAssertEqual(result.value(of: "h1h5"), 1)
         XCTAssertEqual(result.value(of: "e1d1"), 0)
         XCTAssertNil(result.value(of: "a1a2"))
+        XCTAssertEqual(result.mateInMoves, 9)
     }
 
     func testGuessScoresAnExactMove() {

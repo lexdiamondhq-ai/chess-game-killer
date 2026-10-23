@@ -1,0 +1,108 @@
+"""Perfect Endgames: the endgames every player must know, after Jesús de la Villa's
+"100 Endgames You Must Know". build_endgames.py checks each one and writes endgames.json.
+
+Each study:
+  id      stable: saved progress is keyed by it, so never rename one
+  group   "Must know", "Rook endings" or "Expert"
+  level   1 basic, 2 classic, 3 hard
+  fen     the position; the player is the side to move
+  side    "white" or "black", the side to move
+  goal    "win" or "draw": the position's true result, which the player must keep
+  idea    the plan, shown before the first move (one or two sentences)
+  tip     the one thing to remember, shown after a slip
+  hold    for a draw, how many good moves count as holding it (optional, 10 by default)
+"""
+
+STUDIES = [
+    # Must know
+    dict(id="kq-k", title="Queen mate", group="Must know", level=1,
+         fen="8/8/8/4k3/8/8/8/4K2Q w - - 0 1", side="white", goal="win",
+         idea="Box the king in with your queen a knight's jump away, bring your king up, then mate on the edge.",
+         tip="Mind the stalemate: until the mate, always leave their king a square to go to."),
+    dict(id="kr-k", title="Rook mate", group="Must know", level=1,
+         fen="8/8/8/4k3/8/8/8/R3K3 w - - 0 1", side="white", goal="win",
+         idea="Cut the king off with the rook, walk your king opposite theirs, and push them back one rank at a time.",
+         tip="Keep your rook far from their king, and check only when the two kings face each other."),
+    dict(id="square", title="Square of the pawn", group="Must know", level=1,
+         fen="8/8/8/6k1/1P6/8/8/7K b - - 0 1", side="black", goal="draw",
+         idea="Picture a square from the pawn to its queening rank. Step inside it, and your king catches the pawn.",
+         tip="The square runs from b4 up to f8. Your king has to step into it with this move."),
+    dict(id="kp-k-6th", title="King in front of the pawn", group="Must know", level=1,
+         fen="4k3/8/4K3/4P3/8/8/8/8 w - - 0 1", side="white", goal="win",
+         idea="Your king leads, the pawn follows. Take the opposition so their king has to step aside.",
+         tip="Step your king beside the pawn's path first. Push only when their king has to give way."),
+    dict(id="key-squares", title="Key squares", group="Must know", level=1,
+         fen="8/8/8/2k5/8/3KP3/8/8 w - - 0 1", side="white", goal="win",
+         idea="With the pawn on e3, your king wins once it stands on d5, e5 or f5. Walk the king there first; the pawn can wait.",
+         tip="Don't push yet. March your king to a key square two ranks in front of the pawn."),
+    dict(id="kp-k-opposition", title="The opposition", group="Must know", level=2,
+         fen="8/8/8/2k5/8/8/2KP4/8 w - - 0 1", side="white", goal="win",
+         idea="Get your king in front of the pawn first. Then win the opposition before pushing.",
+         tip="Stand face to face with their king, one square between you, and make them move first."),
+    dict(id="rook-pawn", title="Rook-pawn draw", group="Must know", level=1,
+         fen="8/3k4/1K6/P7/8/8/8/8 b - - 0 1", side="black", goal="draw",
+         idea="A rook's pawn can't win once your king reaches the corner. Head for b8 and a8 and stay there.",
+         tip="Run for the corner by the shortest road. Once your king is on b8 or a8, it's a draw."),
+    dict(id="outside-passer", title="Outside passed pawn", group="Must know", level=2,
+         fen="8/8/4k3/6p1/P3K3/6P1/8/8 w - - 0 1", side="white", goal="win",
+         idea="Your a-pawn is far from their king. Push it to drag their king away, then win the pawn it leaves behind.",
+         tip="Use the far pawn as a decoy: their king must chase it, and yours goes to the other side."),
+    dict(id="breakthrough", title="Pawn breakthrough", group="Must know", level=2,
+         fen="6k1/ppp5/8/PPP5/8/8/8/6K1 w - - 0 1", side="white", goal="win",
+         idea="Three pawns against three, kings far away. One sacrifice opens the door, and a pawn runs through to queen.",
+         tip="Lead with the middle pawn. After it is taken, push the pawn beside the gap."),
+    # Rook endings
+    dict(id="lucena", title="Lucena position", group="Rook endings", level=2,
+         fen="1K1k4/1P6/8/8/8/8/r7/2R5 w - - 0 1", side="white", goal="win",
+         idea="Build a bridge: bring your rook to the fourth rank so it can block checks later.",
+         tip="Your rook on the fourth rank is the bridge: it blocks the checks once your king walks out."),
+    dict(id="philidor", title="Philidor defence", group="Rook endings", level=2,
+         fen="4k3/8/r7/3KP3/8/8/8/7R b - - 0 1", side="black", goal="draw",
+         idea="Keep your rook on the sixth rank. When the pawn steps up, check from behind.",
+         tip="Your rook guards the sixth rank to keep their king out. Once the pawn reaches it, check from behind."),
+    dict(id="rook-behind", title="Rook behind the pawn", group="Rook endings", level=2,
+         fen="8/r5k1/8/P7/8/4K3/8/7R w - - 0 1", side="white", goal="win",
+         idea="Rooks belong behind passed pawns. From behind, yours pushes the pawn on while theirs is stuck in front.",
+         tip="Put your rook behind the pawn first. Then bring your king over to help."),
+    dict(id="short-side", title="Short-side defence", group="Rook endings", level=3,
+         fen="4k3/4r3/4P3/3K4/8/8/8/7R b - - 0 1", side="black", goal="draw",
+         idea="Your king belongs on the short side of the pawn. That leaves the long side for your rook to check from far away.",
+         tip="Take your king to the side with fewer files, and keep the long side for your rook's checks."),
+    dict(id="vancura", title="Vancura position", group="Rook endings", level=3,
+         fen="R7/6k1/P7/8/8/2K5/8/5r2 b - - 0 1", side="black", goal="draw",
+         idea="Against a rook's pawn on the sixth, attack it from the side. A rook on the sixth rank holds everything.",
+         tip="Put your rook on the sixth rank, beside the pawn, and check from behind when their king comes close."),
+    # Expert
+    dict(id="kq-kp", title="Queen against pawn", group="Expert", level=2,
+         fen="7K/8/8/8/8/8/3pk3/7Q w - - 0 1", side="white", goal="win",
+         idea="Check and pin until their king has to stand in front of the pawn. Each time it does, your king steps closer.",
+         tip="Force their king onto d1, in front of its pawn. That spare move is when your king walks up."),
+    dict(id="kn-kp", title="Knight against pawn", group="Expert", level=2,
+         fen="8/8/7K/8/8/5N2/1p6/k7 w - - 0 1", side="white", goal="draw",
+         idea="A knight stops a pawn by guarding the square in front of it. Put your knight where it covers b1, and keep it there.",
+         tip="Aim the knight at b1, the queening square. Checks can buy time, but b1 is what matters."),
+    dict(id="wrong-bishop", title="Wrong-coloured bishop", group="Expert", level=2,
+         fen="8/3k4/8/P1K5/3B4/8/8/8 b - - 0 1", side="black", goal="draw",
+         idea="Their bishop can never guard a8, the queening corner. Get your king into that corner and it can't be driven out.",
+         tip="Head straight for the corner by c8 or c7. Once your king reaches b8 or a8, it can't be driven out."),
+    dict(id="kbb-k", title="Two bishops mate", group="Expert", level=2,
+         fen="8/8/8/4k3/8/8/8/2B1KB2 w - - 0 1", side="white", goal="win",
+         idea="Side by side, the bishops make a wall. Shrink the box toward a corner and bring the king.",
+         tip="Keep the bishops side by side, close to your king, and herd their king into a corner."),
+    dict(id="reti", title="Réti's king", group="Expert", level=3,
+         fen="7K/8/k1P5/7p/8/8/8/8 w - - 0 1", side="white", goal="draw",
+         idea="Your king looks too far from both pawns. Walk the long diagonal, and it chases two goals at once.",
+         tip="Go down the diagonal: each step brings your king nearer their pawn and nearer to supporting yours."),
+    dict(id="kq-kr", title="Queen against rook", group="Expert", level=3,
+         fen="8/8/3k4/8/2r5/8/8/4K2Q w - - 0 1", side="white", goal="win",
+         idea="Drive the king and rook to the edge together, then win the rook with a fork or a skewer.",
+         tip="Keep your queen out of the rook's tricks, and use your king to push theirs back."),
+    dict(id="kr-kb", title="Rook against bishop", group="Expert", level=3,
+         fen="8/8/8/2k5/8/8/1b6/3RK3 b - - 0 1", side="black", goal="draw",
+         idea="Defend: keep your king in the corner that's the opposite colour of your bishop.",
+         tip="Your bishop is on dark squares, so head for a light corner, a8 or h1, where it can block the checks."),
+    dict(id="kbn-k", title="Bishop and knight mate", group="Expert", level=3,
+         fen="8/8/8/4k3/8/8/8/2B1KN2 w - - 0 1", side="white", goal="win",
+         idea="Mate only comes in a corner your bishop covers. Use the W-manoeuvre with the knight.",
+         tip="Your bishop is dark-squared, so the mate is on a1 or h8. Herd their king there with king and knight."),
+]
