@@ -39,6 +39,9 @@ struct TrainingBoardView: View {
                     squares(size: sq)
                     markLayer(size: sq)
                     pieceLayer(size: sq)
+                    if theme.spritePieces {
+                        dotsOverPieces(size: sq)
+                    }
                     arrowLayer(size: sq)
                     labelLayer(size: sq)
                 }
@@ -319,6 +322,22 @@ struct TrainingBoardView: View {
     }
 
     // MARK: Captures
+
+    /// The move dots again, faintly over the pieces, so a dot behind a tall piece's head still
+    /// shows through it, as on the game board: a tap there plays the move.
+    private func dotsOverPieces(size: CGFloat) -> some View {
+        ZStack(alignment: .topLeading) {
+            ForEach(Array(game.targets), id: \.self) { target in
+                MoveDot(occupied: game.piece(at: target) != nil, color: theme.hint, size: size)
+                    .frame(width: size, height: size)
+                    .position(center(of: target, size: size))
+            }
+        }
+        .frame(width: size * 8, height: size * 8)
+        .opacity(0.4)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
 
     private func explosions(size: CGFloat) -> some View {
         ZStack(alignment: .topLeading) {

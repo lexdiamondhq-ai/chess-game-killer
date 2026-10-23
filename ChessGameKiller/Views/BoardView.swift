@@ -71,6 +71,8 @@ struct BoardView: View {
                     CheckCalloutLayer(game: game, color: calloutColor, anchor: { square in
                         calloutPoint(over: square, size: sq)
                     })
+                    // Each game starts with a fresh layer: the move count runs on across games.
+                    .id(match.gameNumber)
                     .frame(width: sq * 8, height: sq * 8)
                     // A flag that falls mid-promotion puts the pawn back; this just makes sure
                     // the picker never outlives the game.

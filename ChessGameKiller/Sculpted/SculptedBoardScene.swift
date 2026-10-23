@@ -274,8 +274,9 @@ final class SculptedBoardScene {
         guard let squares = Notation.squares(of: move.uci) else { return 0 }
         let byPerson = game.humanColors.contains(move.color)
         let promotion = move.uci.count == 5
-        // A person's pawn waited on the last rank for its new piece, which rises in its place.
-        if promotion, byPerson { return riseDelay + riseTime }
+        // A pawn that waited on the last rank for the picker: its new piece rises in its place.
+        // One played in one go (the computer's, or Leo's for the person) walks there first.
+        if promotion, game.promotedInPlace { return riseDelay + riseTime }
         let taken = game.captureEvents.last?.piece.kind
         let timing = MoveTiming(
             from: squares.from, to: squares.to,

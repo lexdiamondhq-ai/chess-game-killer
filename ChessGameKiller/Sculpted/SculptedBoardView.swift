@@ -86,6 +86,8 @@ struct SculptedBoardView: View {
                     }, anchor: { square in
                         calloutPoint(over: square, camera: camera, size: size)
                     })
+                    // Each game starts with a fresh layer: the move count runs on across games.
+                    .id(match.gameNumber)
                     .frame(width: size.width, height: size.height)
                     // The fallen king says it all: no "Checkmate" over it.
                     .opacity(finale == nil ? 1 : 0)

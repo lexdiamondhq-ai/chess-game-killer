@@ -72,6 +72,9 @@ final class GameModel {
     /// The check last called out over the board (by `moveCount`), and when its callout comes
     /// and goes. It is kept with the game, so a board drawn again never calls a check twice.
     @ObservationIgnored var checkCallout: (move: Int, from: Date, until: Date)?
+    /// The last move was a promotion finished from the picker, its pawn already on the last rank.
+    /// On the 3D board its new piece rises in place; a promotion played in one go walks there.
+    @ObservationIgnored private(set) var promotedInPlace = false
 
     /// Snapshots taken before each move, for undo.
     private var history: [Snapshot] = []
@@ -236,6 +239,7 @@ final class GameModel {
         guard let move = pendingPromotion else { return }
         let completed = board.completePromotion(of: move, to: kind)
         pendingPromotion = nil
+        promotedInPlace = true
         finishMove(completed)
     }
 
@@ -285,6 +289,9 @@ final class GameModel {
         pendingPromotion = nil
         captureEvents = []
         moves = []
+        // A mate's callout stays up for good; it mustn't carry over to a game that starts in check.
+        checkCallout = nil
+        promotedInPlace = false
         clearSelection()
         syncPieces()
     }
@@ -302,6 +309,7 @@ final class GameModel {
             return false
         }
         history.append(before)
+        promotedInPlace = false
         lastMove = LastMove(from: from, to: to)
         fenBeforePendingMove = fenBefore
         clearSelection()
