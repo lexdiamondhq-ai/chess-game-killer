@@ -9,6 +9,7 @@ struct SettingsSheet: View {
     @AppStorage("showBestMoves") private var showBestMoves = false
     @AppStorage("showSecondBest") private var showSecondBest = true
     @AppStorage("coachVerdicts") private var showVerdicts = true
+    @AppStorage(GhostVision.storageKey) private var ghostVisionOn = true
     @AppStorage("soundEffects") private var soundOn = true
     @AppStorage("haptics") private var hapticsOn = true
     @AppStorage("rivalBanter") private var banterOn = true
@@ -62,6 +63,9 @@ struct SettingsSheet: View {
                             ToggleRow(title: "Second-best hint", subtitle: "Also marks the runner-up, more faintly. Off leaves just the best.",
                                       symbol: "lightbulb", isOn: $showSecondBest, theme: theme)
                                 .disabled(!showBestMoves)
+                            rule
+                            ToggleRow(title: "Ghost Vision", subtitle: "Hold the board to see the computer's line a few moves ahead. Slide left to step back through it. Counts as help.",
+                                      symbol: "eye", isOn: $ghostVisionOn, theme: theme)
                             rule
                             ToggleRow(title: "Move grades", subtitle: "Rates each move you play, from Best to Blunder.",
                                       symbol: "star.fill", isOn: $showVerdicts, theme: theme)

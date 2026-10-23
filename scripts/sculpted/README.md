@@ -48,3 +48,10 @@ Both sets share their tops and heights, so each type is told by its top as much 
 cross, a coronet of ball-tipped spikes round a central ball, a pointed mitre cut through to a metal core,
 a tower of five capped merlons round a dark well, the horse's head, one ball. Heights in squares, before
 the game's 1.1 scale: K 1.336, Q 1.08, B 1.0, N 0.83 (gilded 0.82), R 0.742, P 0.561.
+
+Fine detail (both sets): a row of carved beads round every plinth (gilded: gold beads along the recessed band),
+gadrooned crown cups on the king and queen, four stones round the king's crown (one faces the player), pearl or
+gold beading on the queen's and bishop's collars, and on the rook arrow slits on four sides with a dark back
+(`slits` in `pieces.py`), plus ashlar masonry with staggered joints on the classic tower. None of it touches the
+outlines the pieces are told apart by. Helpers: `beads`, `gadroons`, `compose`, `radius_at`, `slits` in `pieces.py`.
+

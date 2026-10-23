@@ -4,7 +4,7 @@ import fs from 'fs';
 // The page is served on port 8765, or on JEWEL_PORT when that is set.
 const args = process.argv.slice(2);
 const port = process.env.JEWEL_PORT || 8765;
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+const b = await chromium.launch({ executablePath: process.env.JEWEL_CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
   args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl', '--disable-gpu-watchdog'] });
 for (let i = 0; i < args.length; i += 2) {
   const query = args[i], out = args[i + 1];
