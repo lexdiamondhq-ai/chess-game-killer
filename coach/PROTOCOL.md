@@ -157,9 +157,9 @@ come; the stream then ends. A client that loses the connection after `checked` k
 |---|---|
 | `understood` | False when nothing they said was about the position: then `move` is null and `claims` is empty. |
 | `player` | `"white"` or `"black"`. |
-| `move` | The move they said they would play, or null. `san`/`uci` are null when it isn't legal. `grade`: `checkmate`, `best`, `excellent`, `good`, `inaccuracy`, `mistake`, `blunder` (the app's thresholds, see below), `illegal`, or `unknown` (legal but not in the facts). `reply`: the opponent's best answer from the engine, or null. |
+| `move` | The move they said they would play, or null. `san`/`uci` are null when it isn't legal, or when it fits two moves ("Nd7" with both knights able to go there). `grade`: `checkmate`, `best`, `excellent`, `good`, `inaccuracy`, `mistake`, `blunder` (the app's thresholds, see below), `illegal`, or `unknown` (legal but not in the facts, or fitting two moves). `reply`: the opponent's best answer from the engine, or null. |
 | `claims` | At most 6, in the order said. `kind` is one of the kinds below. `verdict`: `right`, `wrong`, `partly`, `unclear`. `note` is one line for the screen; it may use move notation. |
-| `missed` | At most 2 things that mattered and weren't said: `{ "kind": "threat" \| "hanging" \| "mate" \| "free", "note", "squares", "arrows" }`. |
+| `missed` | At most 2 things that mattered and weren't said: `{ "kind": "threat" \| "hanging" \| "mate" \| "free", "note", "squares", "arrows" }`. `mate` is the opponent's mate threat, or a mate the player has. |
 | `habits` | Leo's Traffic Light. Each is `good`, `missed` or `none` (nothing to judge). `threats`: did they name the opponent's real threat (red)? `forcing`: when the best move is a check, capture or attack that wins something, did they look at it (yellow)? `safety`: is the move they chose safe, not dropping material (green)? |
 | `eval` | P with best play, from the player's view (from the facts), or null. |
 | `best` | The engine's move, `{ "san", "uci" }`, only when `reveal` is true; otherwise null. |
@@ -202,10 +202,10 @@ For something the opponent could do in P, the server looks in N.
 
 | Kind | Example | Right when |
 |---|---|---|
-| `threat` | "he threatens Bxf2+", "he wants to take my knight" | The move (or a capture of the named piece) is legal for the opponent in N (or P′) and is one of the engine's threats there gaining a pawn or more, or wins material by exchange, or mates. `partly`: real, but a bigger threat exists (named in the note). `wrong`: not legal, or it loses material. |
+| `threat` | "he threatens Bxf2+", "he wants to take my knight" | The move (or a capture of the named piece) is legal for the opponent in N (or P′) and is one of the engine's threats there gaining a pawn or more over the eval and winning material along its line, or wins material by exchange, or mates. (The material test keeps a quiet move from counting just because the player has a strong move of their own, which lifts P's eval.) `partly`: real, but a bigger threat exists (named in the note). `wrong`: not legal, or it loses material. |
 | `attacks` | "his bishop eyes h7" | The piece attacks the square. `partly`: same line but blocked (names the blocker). |
 | `defends` | "my knight defends e5" | The piece covers the square. `partly`: it covers it but is pinned and can't take back. |
-| `safe` | "my knight is safe", "after h6 my king is safe" | The other side can't win the piece by capturing it (exchange count with legal moves, so pinned defenders don't count); for the king, no mate or decisive check against it in the facts. |
+| `safe` | "my knight is safe", "after h6 my king is safe", "he has no threats" | The other side can't win the piece by capturing it (exchange count with legal moves, so pinned defenders don't count); for the king, no mate or decisive check against it in the facts. With no piece and no square ("nothing of mine is hanging", "he isn't threatening anything"): no piece of `side` can be won and the other side has no real threat. |
 | `hanging` | "his rook on a8 is free" | It can be won by capturing. `partly`: it can be taken, but taking it loses to the engine's reply (named). |
 | `pinned` | "my d-pawn is pinned" | Pinned to the king, or to a queen or rook behind it. |
 | `check` | "Bb5 is check" | The move is legal and gives check. |
@@ -213,7 +213,7 @@ For something the opponent could do in P, the server looks in N.
 | `wins` | "Nxe5 wins a pawn" | Following the engine's line from that move, the material comes out at least that far ahead. `partly`: it wins less. |
 | `line` | "if he takes, I take back with the bishop" | Every move is legal in turn, and the opponent's reply is the engine's. `partly`: legal, but the opponent has a better reply (named). |
 | `eval` | "I'm winning", "it's about equal" | The facts' eval falls in the same band: winning ≥ +3, better +1…+3, slightly better +0.4…+1, equal within ±0.4 (and the mirror bands). `partly`: the next band. |
-| `material` | "I'm up a pawn", "we're even" | The material count (1, 3, 3, 5, 9) agrees. |
+| `material` | "I'm up a pawn", "we're even" | The material count (1, 3, 3, 5, 9) agrees. `partly`: the right side is ahead, by another amount. |
 | `plan` | "push the h-pawn", "trade queens" | A concrete first move is graded like M (good or better is right). Vague plans are `unclear`. |
 
 ## Server internals
@@ -223,7 +223,8 @@ For the people working on `coach/src`: these are the seams between the files.
 ```
 src/index.js    routes, validation, rate limit, the budget, the NDJSON stream; exports TalkBudget
 src/claims.js   Claude call 1. parseClaims(client, env, input) → parsed
-src/verify.js   verifyTalk({ fen, facts, parsed, reveal }) → { checked, spoken }   (no network)
+src/verify.js   verifyTalk({ fen, facts, parsed, reveal, said }) → { checked, spoken }   (no network; said is
+                optional, for spoken.said, which is otherwise rebuilt from parsed)
 src/words.js    move notation → spoken words; piece and square names
 src/answer.js   Claude call 2. wordAnswer(client, env, { checked, spoken }) → { text, source }
                 templateAnswer(checked, spoken) → string; guardAnswer(text, spoken) → string | null

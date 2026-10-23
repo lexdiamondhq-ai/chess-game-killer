@@ -124,10 +124,10 @@ The move
 - Reasons they give for the move are separate claims.
 
 Claim kinds. side is whose piece, move or advantage the claim is about. Fill every field; use "" for none and [] for no moves.
-- threat: what a side threatens. "He threatens Bxf2+": side opponent, piece B, square c5 (where it stands), target f2, moves ["Bxf2+"]. "He wants to take my knight": side opponent, target the knight's square; piece and square for the attacker only if they name it; moves the capture only if exactly one of their moves makes it.
+- threat: what a side threatens. "He threatens Bxf2+": side opponent, piece B, square c5 (where it stands), target f2, moves ["Bxf2+"]. "He wants to take my knight": side opponent, target the knight's square; piece and square for the attacker only if they name it; moves the capture only if exactly one of their moves makes it. Saying they threaten nothing is not a threat claim: write it as safe (below).
 - attacks: a piece attacks a square or piece. "His bishop eyes h7": side opponent, piece B, its square, target h7.
 - defends: a piece covers a square or piece. "My knight defends e5": side me, piece N, its square, target e5.
-- safe: a piece can't be won. "My knight is safe": side me, piece N, its square. For the king, safe means no mating attack.
+- safe: a piece can't be won. "My knight is safe": side me, piece N, its square. For the king, safe means no mating attack. A claim can't say "not", so "he isn't threatening anything", "he has no threats" and "nothing of mine is hanging" are one safe claim: side me, piece "", square "".
 - hanging: a piece is free to take. "His rook on a8 is free": side opponent, piece R, square a8.
 - pinned: a piece is pinned. "My d-pawn is pinned": side me, piece P, the d-pawn's square; target the square of what it is pinned to, if they say.
 - check: a move gives check. "Bb5 is check": side me, piece B, its square, target b5, moves ["Bb5+"].

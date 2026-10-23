@@ -1,0 +1,2251 @@
+[
+  {
+    "name": "italian: names the bishop on f2, castles, knight safe",
+    "fen": "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/3P1N2/PPP2PPP/RNBQK2R w KQkq - 1 5",
+    "said": "his bishop eyes f2 so I'll castle, and my knight on f3 is safe",
+    "typed": false,
+    "reveal": false,
+    "facts": {
+      "depth": 12,
+      "moves": [
+        {"uci":"b1c3","eval":{"cp":23},"pv":["b1c3","e8g8","a2a3","d7d6","c3a4","c5b6","h2h3","h7h6","c4a2","c8e6"]},
+        {"uci":"c2c3","eval":{"cp":14},"pv":["c2c3","d7d6","e1g1","a7a5","d3d4","c5b6","d4e5","c6e5","f3e5","d6e5"]},
+        {"uci":"a2a4","eval":{"cp":13},"pv":["a2a4","d7d6","e1g1","h7h6","b1c3","a7a5","h2h3","e8g8","c3e2","c5a7"]},
+        {"uci":"e1g1","eval":{"cp":11},"pv":["e1g1","d7d6","c2c3","h7h6","a2a4","c5b6","b1d2","e8g8","h2h3","a7a6"]},
+        {"uci":"a2a3","eval":{"cp":10},"pv":["a2a3","d7d6","b1c3","c6d4","c3a4","c8g4","c2c3","d4f3","g2f3","g4h5"]},
+        {"uci":"b1d2","eval":{"cp":7},"pv":["b1d2","a7a5","a2a4","h7h6","c2c3","e8g8","c4b3","d7d6","h2h3","c8e6"]},
+        {"uci":"h2h3","eval":{"cp":4},"pv":["h2h3","d7d6","a2a3","e8g8","b1c3","c8e6","c4e6","f7e6","e1g1"]},
+        {"uci":"c4b3","eval":{"cp":2},"pv":["c4b3","a7a5","c2c3","d7d6","b1d2","h7h6","e1g1","e8g8","h2h3","c8e6"]},
+        {"uci":"c1e3","eval":{"cp":-2},"pv":["c1e3","c5e3","f2e3","d7d6","d1d2","d8e7","c4b3","e8d8","e1d1","a7a6"]},
+        {"uci":"c1g5","eval":{"cp":-8},"pv":["c1g5","h7h6","g5e3","c5e3","f2e3","d7d6","a2a4","c6e7","d1e2","e8g8"]},
+        {"uci":"c1d2","eval":{"cp":-12},"pv":["c1d2","d7d6","e1g1","c8e6","c4e6","f7e6","h2h3","d8e7","c2c3","a7a6"]},
+        {"uci":"d1e2","eval":{"cp":-12},"pv":["d1e2","e8g8","c2c3","d7d6","h2h3","a7a6","c4b3","h7h6","e1g1","c5a7"]},
+        {"uci":"b2b3","eval":{"cp":-24},"pv":["b2b3","d7d5","e4d5","f6d5","e1g1","c8g4","c2c3","c5e7","h2h3"]},
+        {"uci":"f3g5","eval":{"cp":-25},"pv":["f3g5","e8g8","b1d2","h7h6","g5f3","d7d5","e4d5","f6d5"]},
+        {"uci":"c4d5","eval":{"cp":-28},"pv":["c4d5","e8g8","e1g1","d7d6","d5b3","c6a5","c2c3","a5b3","a2b3","d6d5"]},
+        {"uci":"c4b5","eval":{"cp":-35},"pv":["c4b5","c6d4","b5a4","d4f3","d1f3","c7c6","h2h3","e8g8","a4b3","a7a5"]},
+        {"uci":"f3d2","eval":{"cp":-39},"pv":["f3d2","c6e7","d2f3","e7g6","c1e3","c5e3","f2e3","c7c6","c4b3"]},
+        {"uci":"d1d2","eval":{"cp":-40},"pv":["d1d2","d7d6","e1g1","e8g8","h2h3","c6e7"]},
+        {"uci":"b1a3","eval":{"cp":-41},"pv":["b1a3","d7d6","c2c3","c5a3","b2a3","d6d5","e4d5","f6d5","e1g1","e8g8"]},
+        {"uci":"e1f1","eval":{"cp":-66},"pv":["e1f1","e8g8","c1g5","h7h6","g5h4","g7g5","h4g3","d7d6","b1d2","g5g4"]},
+        {"uci":"g2g3","eval":{"cp":-68},"pv":["g2g3","d7d6","c2c3","h7h6","b2b4","c5b6","e1g1","c8h3","f1e1","a7a6"]},
+        {"uci":"h2h4","eval":{"cp":-73},"pv":["h2h4","d7d6","b1c3","f6g4","e1g1","a7a6","c3d5","c5a7","c1e3","g4e3"]},
+        {"uci":"f3g1","eval":{"cp":-80},"pv":["f3g1","e8g8","c1g5","h7h6","g5h4","c6a5","b1c3"]},
+        {"uci":"h1g1","eval":{"cp":-85},"pv":["h1g1","c6a5","b1d2","c7c6"]},
+        {"uci":"h1f1","eval":{"cp":-93},"pv":["h1f1","d7d5","e4d5","f6d5","f1h1","e8g8","a2a4","h7h6","b1c3","d5c3"]},
+        {"uci":"e1e2","eval":{"cp":-105},"pv":["e1e2","e8g8","c1g5","h7h6","g5f6","d8f6","c2c3","c6e7","b1d2","c7c6"]},
+        {"uci":"b2b4","eval":{"cp":-109},"pv":["b2b4","c5b4","c2c3","b4e7","e1g1","e8g8","a2a4"]},
+        {"uci":"g2g4","eval":{"cp":-128},"pv":["g2g4","f6g4","h1f1","g4f6","f1g1","g7g6","b1c3","d7d6"]},
+        {"uci":"d3d4","eval":{"cp":-149},"pv":["d3d4","c6d4","f3e5","d8e7","e5d3","e7e4","e1f1","c5b6","b1c3","e4e7"]},
+        {"uci":"e1d2","eval":{"cp":-174},"pv":["e1d2","c6a5","d2e1","a5c4","d3c4","f6e4","d1d5","c5f2","e1f1"]},
+        {"uci":"f3h4","eval":{"cp":-187},"pv":["f3h4","d7d5","e4d5","f6g4","d5c6","c5f2","e1f1","d8h4","d1e2","b7c6"]},
+        {"uci":"c4f7","eval":{"cp":-257},"pv":["c4f7","e8f7","b2b4","c5b4","c2c3"]},
+        {"uci":"f3e5","eval":{"cp":-382},"pv":["f3e5","c6e5","d3d4","e5c4","d4c5","e8g8","b2b3","c4e5","b1c3","d7d6"]},
+        {"uci":"c1f4","eval":{"cp":-382},"pv":["c1f4","e5f4","e4e5","d7d5","c4b3","f6g8","b1c3","c6d4","c3d5","d4b3"]},
+        {"uci":"c1h6","eval":{"cp":-396},"pv":["c1h6","g7h6","d1d2","f6g4","b1c3","c5f2","e1f1","c6d4"]},
+        {"uci":"c4a6","eval":{"cp":-493},"pv":["c4a6","b7a6","f3e5","c5f2","e1f2","c6e5","b1c3","d7d6","d3d4","e5g6"]},
+        {"uci":"c4e6","eval":{"cp":-527},"pv":["c4e6","d7e6","e1g1","c5e7","b2b4","a7a6","c2c3"]},
+        {"uci":"f3d4","eval":{"cp":-531},"pv":["f3d4","c5d4","c2c3","d4b6","a2a4","a7a5","c1g5"]}
+      ],
+      "threats": [
+        {"uci":"d7d6","eval":{"cp":1},"pv":["d7d6","a2a4","h7h6","c2c3","a7a6","e1g1","c5a7","c1e3","a7e3","f2e3"]},
+        {"uci":"a7a6","eval":{"cp":-3},"pv":["a7a6","e1g1","d7d6","a2a4","h7h6","c1e3","c8g4","e3c5","d6c5","b1d2"]},
+        {"uci":"h7h6","eval":{"cp":-8},"pv":["h7h6","e1g1","d7d6","c2c3","a7a5","h2h3","g7g5","d3d4","c5a7","d4e5"]},
+        {"uci":"e8g8","eval":{"cp":-9},"pv":["e8g8","e1g1","d7d6","c2c3","a7a5","f1e1","c5a7","h2h3","c8e6","c4e6"]},
+        {"uci":"a7a5","eval":{"cp":-10},"pv":["a7a5","e1g1","d7d6","a2a4","h7h6","c1e3","c5e3","f2e3","e8g8","h2h3"]},
+        {"uci":"c6a5","eval":{"cp":-17},"pv":["c6a5","f3e5","a5c4","e5c4","d7d5","e4d5","c8g4","d1d2","d8e7","c4e3"]}
+      ]
+    },
+    "parsed": {
+      "about": true,
+      "move": { "said": "I'll castle", "san": "O-O" },
+      "claims": [
+        {
+          "said": "his bishop eyes f2",
+          "kind": "attacks",
+          "side": "opponent",
+          "piece": "B",
+          "square": "c5",
+          "target": "f2",
+          "moves": [],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        },
+        {
+          "said": "my knight on f3 is safe",
+          "kind": "safe",
+          "side": "me",
+          "piece": "N",
+          "square": "f3",
+          "target": "",
+          "moves": [],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        }
+      ]
+    },
+    "expect": {
+      "understood": true,
+      "move": { "san": "O-O", "grade": "excellent" },
+      "claims": [
+        { "verdict": "right" },
+        { "verdict": "right" }
+      ],
+      "missed": [],
+      "habits": { "threats": "none", "forcing": "none", "safety": "good" },
+      "best": null,
+      "nudge": null
+    },
+    "notes": ["The bishop on c5 hits f2."]
+  },
+  {
+    "name": "scotch four knights: the pinned knight's guard is fake",
+    "fen": "r1bqk2r/pppp1ppp/2n2n2/8/1b1NP3/2N5/PPP2PPP/R1BQKB1R w KQkq - 1 6",
+    "said": "his bishop is pinning my knight on c3, but the knight still guards e4, so that pawn is safe. I'll develop with bishop c4",
+    "typed": false,
+    "reveal": false,
+    "facts": {
+      "depth": 12,
+      "moves": [
+        {"uci":"d4c6","eval":{"cp":14},"pv":["d4c6","b7c6","f1e2","e8g8","e4e5","f6d5","d1d4","f8e8","e1g1","d5c3"]},
+        {"uci":"f2f3","eval":{"cp":-11},"pv":["f2f3","e8g8","d4c6","b7c6","f1d3","d7d5","e1g1","b4d6","c1g5","h7h6"]},
+        {"uci":"c1g5","eval":{"cp":-22},"pv":["c1g5","d8e7","f2f3","e7c5","d4f5","e8g8","f5h6","g8h8","d1d2","b4c3"]},
+        {"uci":"f1c4","eval":{"cp":-22},"pv":["f1c4","b4c3","b2c3","f6e4","d4c6","d7c6","d1d8","e8d8","c4f7"]},
+        {"uci":"c1e3","eval":{"cp":-30},"pv":["c1e3","e8g8","d4c6","b7c6","f1d3","d7d5","e4d5","b4c3","b2c3"]},
+        {"uci":"f1b5","eval":{"cp":-49},"pv":["f1b5","f6e4","e1g1","e4c3","f1e1","b4e7","b2c3","e8g8","b5d3","c6d4"]},
+        {"uci":"d1d3","eval":{"cp":-52},"pv":["d1d3","d8e7","c1d2","d7d5","d4c6","b7c6","e1c1","d5e4","d3g3"]},
+        {"uci":"a2a3","eval":{"cp":-69},"pv":["a2a3","b4c3","b2c3","f6e4","d4c6","d7c6","d1d8","e8d8","f2f3","e4d6"]},
+        {"uci":"f1e2","eval":{"cp":-92},"pv":["f1e2","f6e4","d1d3","e4c3","b2c3","b4e7","e1g1","e8g8","c1f4","f8e8"]},
+        {"uci":"c1f4","eval":{"cp":-108},"pv":["c1f4","f6e4","d4c6","b4c3","b2c3","d8f6","f1d3","f6f4","e1g1","d7c6"]},
+        {"uci":"d4f5","eval":{"cp":-130},"pv":["d4f5","e8g8","f5g3","d7d5","a2a3","b4c3","b2c3","f6e4","g3e4","d5e4"]},
+        {"uci":"h2h4","eval":{"cp":-157},"pv":["h2h4","f6e4","d4c6","b7c6","d1d4","d8e7","c1e3","e8g8","f1d3","f8e8"]},
+        {"uci":"d4e2","eval":{"cp":-162},"pv":["d4e2","f6e4","c1e3","e8g8","a2a3","e4c3","e2c3","b4c3","b2c3","f8e8"]},
+        {"uci":"d1d2","eval":{"cp":-168},"pv":["d1d2","f6e4","d4c6","d7c6","d2d8","e8d8","a2a3","b4c3","b2c3","e4c3"]},
+        {"uci":"d4b5","eval":{"cp":-168},"pv":["d4b5","a7a6","b5d4","f6e4","d4c6","b7c6","d1d4","d8e7","f1e2","e8g8"]},
+        {"uci":"d4b3","eval":{"cp":-177},"pv":["d4b3","f6e4","d1f3","d7d5","f1e2","c6e5","f3e3"]},
+        {"uci":"e4e5","eval":{"cp":-179},"pv":["e4e5","c6e5","d4f3","b4c3","b2c3","e5f3","d1f3","e8g8","c1g5","f8e8"]},
+        {"uci":"h2h3","eval":{"cp":-179},"pv":["h2h3","f6e4","d4c6","d7c6","d1d8","e8d8","a2a3","b4c3","b2c3","e4c3"]},
+        {"uci":"g2g3","eval":{"cp":-183},"pv":["g2g3","f6e4","d4c6","d7c6","d1d8","e8d8","a2a3","b4c3","b2c3","h8e8"]},
+        {"uci":"g2g4","eval":{"cp":-205},"pv":["g2g4","f6e4","d4c6","d7c6","d1d8","e8d8","c1e3","e4c3","a2a3","c3d5"]},
+        {"uci":"a2a4","eval":{"cp":-210},"pv":["a2a4","f6e4","d4c6","d7c6","d1d8","e8d8","c1d2","e4d2","e1c1","d8e7"]},
+        {"uci":"h1g1","eval":{"cp":-216},"pv":["h1g1","f6e4","d4c6","b7c6","d1d4","b4c3","b2c3","e8g8","f1d3","f8e8"]},
+        {"uci":"a1b1","eval":{"cp":-217},"pv":["a1b1","f6e4","d4c6","d7c6","d1d8","e8d8","c1d2","e4d2","e1d2","a7a5"]},
+        {"uci":"e1e2","eval":{"cp":-235},"pv":["e1e2","b4c3","b2c3","f6e4","d4c6","b7c6","e2e1","e8g8","f1d3","f8e8"]},
+        {"uci":"c1d2","eval":{"cp":-239},"pv":["c1d2","c6d4","e4e5","e8g8","e5f6","b4c3","b2c3","f8e8","d2e3","d4f5"]},
+        {"uci":"d4f3","eval":{"cp":-245},"pv":["d4f3","f6e4","d1d3","b4c3","b2c3","e8g8","f1e2","d8f6"]},
+        {"uci":"f2f4","eval":{"cp":-251},"pv":["f2f4","f6e4","d4c6","b7c6","d1d4","d8e7","c1e3","e8g8","e1c1","e4c3"]},
+        {"uci":"f1d3","eval":{"cp":-252},"pv":["f1d3","c6d4","e4e5","f6d5","e1g1","d5c3","b2c3","b4c3","a1b1","d7d6"]},
+        {"uci":"f1a6","eval":{"cp":-352},"pv":["f1a6","b7a6","e1g1","e8g8","c1g5","h7h6","c3d5","h6g5","d4f5","f6h7"]},
+        {"uci":"c1h6","eval":{"cp":-374},"pv":["c1h6","b4c3","b2c3","g7h6","d1f3","e8g8","e1c1","d7d6","f1d3","c6d4"]},
+        {"uci":"d1e2","eval":{"cp":-425},"pv":["d1e2","c6d4","e2d3","b4c3","b2c3","d4c6","d3g3","e8g8","c1h6","g7g6"]},
+        {"uci":"e1d2","eval":{"cp":-426},"pv":["e1d2","f6e4","d2e2","e4c3","b2c3","b4c3","d4c6","b7c6","a1b1"]},
+        {"uci":"d1f3","eval":{"cp":-430},"pv":["d1f3","c6d4","f3d3","b4c3","b2c3","d4c6","d3g3","e8g8","c1g5","f6e4"]},
+        {"uci":"d4e6","eval":{"cp":-524},"pv":["d4e6","d7e6","d1f3","e6e5","f3g3","d8e7","g3g7","h8g8","g7h6","b4c3"]},
+        {"uci":"b2b3","eval":{"cp":-646},"pv":["b2b3","b4c3","c1d2","c3d4","f1c4","d7d6","e1g1","d4a1","d1a1","h7h6"]},
+        {"uci":"d1h5","eval":{"cp":-665},"pv":["d1h5","f6h5","d4f5","b4c3","b2c3","d7d5","c1g5","f7f6","e4d5","c8f5"]},
+        {"uci":"d1g4","eval":{"cp":-677},"pv":["d1g4","f6g4","d4f5","e8g8","f5g3","b4c3","b2c3","d8f6"]}
+      ],
+      "threats": [
+        {"uci":"f6e4","eval":{"cp":201},"pv":["f6e4","d4c6","d7c6","d1d8","e8d8","a2a3","b4c3","b2c3","h8e8","f1d3"]},
+        {"uci":"d8e7","eval":{"cp":111},"pv":["d8e7","f2f3","d7d5","d4c6","b7c6","f1e2","d5e4","e1g1","e4f3","e2f3"]},
+        {"uci":"b4c3","eval":{"cp":80},"pv":["b4c3","b2c3","f6e4","d4c6","d7c6","d1d8","e8d8","c3c4","c6c5","c1e3"]},
+        {"uci":"c6e5","eval":{"cp":34},"pv":["c6e5","c1d2","d7d5","f2f4","b4c3","d2c3","e5g6","e4e5","f6e4","d1d3"]},
+        {"uci":"e8g8","eval":{"cp":33},"pv":["e8g8","d4c6","b7c6","f1d3","f6e4","d3e4","b4c3","b2c3","f8e8","f2f3"]},
+        {"uci":"d7d5","eval":{"cp":30},"pv":["d7d5","f1b5","c8d7","b5c6","b7c6","e4d5","d8e7","d1e2","c6d5"]}
+      ]
+    },
+    "parsed": {
+      "about": true,
+      "move": { "said": "I'll develop with bishop c4", "san": "Bc4" },
+      "claims": [
+        {
+          "said": "his bishop is pinning my knight on c3",
+          "kind": "pinned",
+          "side": "me",
+          "piece": "N",
+          "square": "c3",
+          "target": "",
+          "moves": [],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        },
+        {
+          "said": "the knight still guards e4",
+          "kind": "defends",
+          "side": "me",
+          "piece": "N",
+          "square": "c3",
+          "target": "e4",
+          "moves": [],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        },
+        {
+          "said": "that pawn is safe",
+          "kind": "safe",
+          "side": "me",
+          "piece": "P",
+          "square": "e4",
+          "target": "",
+          "moves": [],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        }
+      ]
+    },
+    "expect": {
+      "understood": true,
+      "move": { "san": "Bc4", "grade": "good" },
+      "claims": [
+        { "verdict": "right" },
+        { "verdict": "partly" },
+        { "verdict": "wrong" }
+      ],
+      "missed": [],
+      "habits": { "threats": "missed", "forcing": "none", "safety": "good" },
+      "best": null,
+      "nudge": "Look at your knight."
+    },
+    "notes": ["pinned to your king by the bishop on b4","so Nxe4 wins it"]
+  },
+  {
+    "name": "greedy bishop: the rook on a8 is poisoned",
+    "fen": "r4rk1/p1p2ppp/3p4/7q/3b2n1/2NP2P1/PPP1QPBP/R4RK1 w - - 0 14",
+    "said": "his rook on a8 is just hanging, I'll grab it with my bishop and then I'm winning",
+    "typed": false,
+    "reveal": false,
+    "facts": {
+      "depth": 12,
+      "moves": [
+        {"uci":"h2h3","eval":{"cp":391},"pv":["h2h3","g4f2","f1f2","d4f2","e2f2","a8b8","a1b1","h5a5","g1h2","f8e8"]},
+        {"uci":"h2h4","eval":{"cp":119},"pv":["h2h4","a8e8","e2f3","d4c3","b2c3","g7g5","g2h3","f7f5","h3g4","f5g4"]},
+        {"uci":"e2g4","eval":{"cp":-328},"pv":["e2g4","h5g4","g2a8","f8a8","a1e1","d4b6","e1e4","g4h5","f1e1","b6f2"]},
+        {"uci":"f1e1","eval":{"cp":-404},"pv":["f1e1","h5h2","g1f1","d4f2","e2f2","g4f2","f1f2","h2h6","e1e3","a8b8"]},
+        {"uci":"f1c1","eval":{"cp":-453},"pv":["f1c1","d4f2","g1f1","a8e8","h2h3","e8e2","h3g4","h5c5","c3e2","f2e3"]},
+        {"uci":"f1d1","eval":{"cp":-459},"pv":["f1d1","d4f2","e2f2","g4f2","g2a8","f2d1"]},
+        {"uci":"f1b1","eval":{"cp":-522},"pv":["f1b1","d4f2","e2f2","g4f2","g1f2","h5c5","f2f1","a8e8","a2a3"]},
+        {"uci":"g2h3","eval":{"cp":-589},"pv":["g2h3","h5h3","e2g4","h3g4","a1e1","g8h8","e1e4","g4d7","e4d4","a8e8"]},
+        {"uci":"a2a3","eval":{"mate":-1},"pv":["a2a3","h5h2"]},
+        {"uci":"b2b3","eval":{"mate":-1},"pv":["b2b3","h5h2"]},
+        {"uci":"g1h1","eval":{"mate":-1},"pv":["g1h1","h5h2"]},
+        {"uci":"a2a4","eval":{"mate":-1},"pv":["a2a4","h5h2"]},
+        {"uci":"b2b4","eval":{"mate":-1},"pv":["b2b4","h5h2"]},
+        {"uci":"e2e8","eval":{"mate":-1},"pv":["e2e8","h5h2"]},
+        {"uci":"c3b1","eval":{"mate":-1},"pv":["c3b1","h5h2"]},
+        {"uci":"c3d1","eval":{"mate":-1},"pv":["c3d1","h5h2"]},
+        {"uci":"c3a4","eval":{"mate":-1},"pv":["c3a4","h5h2"]},
+        {"uci":"c3e4","eval":{"mate":-1},"pv":["c3e4","h5h2"]},
+        {"uci":"c3b5","eval":{"mate":-1},"pv":["c3b5","h5h2"]},
+        {"uci":"c3d5","eval":{"mate":-1},"pv":["c3d5","h5h2"]},
+        {"uci":"g2h1","eval":{"mate":-1},"pv":["g2h1","h5h2"]},
+        {"uci":"g2f3","eval":{"mate":-1},"pv":["g2f3","h5h2"]},
+        {"uci":"g2e4","eval":{"mate":-1},"pv":["g2e4","h5h2"]},
+        {"uci":"g2d5","eval":{"mate":-1},"pv":["g2d5","h5h2"]},
+        {"uci":"g2c6","eval":{"mate":-1},"pv":["g2c6","h5h2"]},
+        {"uci":"g2b7","eval":{"mate":-1},"pv":["g2b7","h5h2"]},
+        {"uci":"g2a8","eval":{"mate":-1},"pv":["g2a8","h5h2"]},
+        {"uci":"a1b1","eval":{"mate":-1},"pv":["a1b1","h5h2"]},
+        {"uci":"a1c1","eval":{"mate":-1},"pv":["a1c1","h5h2"]},
+        {"uci":"a1d1","eval":{"mate":-1},"pv":["a1d1","h5h2"]},
+        {"uci":"a1e1","eval":{"mate":-1},"pv":["a1e1","h5h2"]},
+        {"uci":"e2d1","eval":{"mate":-1},"pv":["e2d1","h5h2"]},
+        {"uci":"e2e1","eval":{"mate":-1},"pv":["e2e1","h5h2"]},
+        {"uci":"e2d2","eval":{"mate":-1},"pv":["e2d2","h5h2"]},
+        {"uci":"e2e3","eval":{"mate":-1},"pv":["e2e3","h5h2"]},
+        {"uci":"e2f3","eval":{"mate":-1},"pv":["e2f3","h5h2"]},
+        {"uci":"e2e4","eval":{"mate":-1},"pv":["e2e4","h5h2"]},
+        {"uci":"e2e5","eval":{"mate":-1},"pv":["e2e5","h5h2"]},
+        {"uci":"e2e6","eval":{"mate":-1},"pv":["e2e6","h5h2"]},
+        {"uci":"e2e7","eval":{"mate":-1},"pv":["e2e7","h5h2"]}
+      ],
+      "threats": [
+        {"uci":"h5h2","eval":{"mate":1},"pv":["h5h2"]},
+        {"uci":"a8e8","eval":{"cp":369},"pv":["a8e8","h2h3","e8e2","h3g4","h5g4","c3e2","g4e2"]},
+        {"uci":"f8e8","eval":{"cp":277},"pv":["f8e8","h2h3","e8e2","h3g4","h5g4","c3e2","a8b8","e2d4","g4d4","b2b3"]},
+        {"uci":"d4c3","eval":{"cp":19},"pv":["d4c3","h2h3","c3b2","e2g4","h5g4","h3g4","b2a1","g2a8","a1f6","c2c3"]},
+        {"uci":"a8b8","eval":{"cp":-19},"pv":["a8b8","h2h3","g4f6","a1b1","h5e2","c3e2","d4b2","f1d1","f8e8","g1f1"]},
+        {"uci":"f7f5","eval":{"cp":-139},"pv":["f7f5","h2h3","a8e8","h3g4","f5g4","e2d2","f8f6","c3e2","f6h6","e2d4"]}
+      ]
+    },
+    "parsed": {
+      "about": true,
+      "move": { "said": "I'll grab it with my bishop", "san": "Bxa8" },
+      "claims": [
+        {
+          "said": "his rook on a8 is just hanging",
+          "kind": "hanging",
+          "side": "opponent",
+          "piece": "R",
+          "square": "a8",
+          "target": "",
+          "moves": [],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        },
+        {
+          "said": "then I'm winning",
+          "kind": "eval",
+          "side": "me",
+          "piece": "",
+          "square": "",
+          "target": "",
+          "moves": [],
+          "afterMove": true,
+          "eval": "winning",
+          "gain": ""
+        }
+      ]
+    },
+    "expect": {
+      "understood": true,
+      "move": { "san": "Bxa8", "grade": "blunder" },
+      "claims": [
+        { "verdict": "partly" },
+        { "verdict": "wrong" }
+      ],
+      "missed": [],
+      "habits": { "threats": "missed", "forcing": "none", "safety": "missed" },
+      "best": null,
+      "nudge": "Look at your h-pawn."
+    },
+    "notes": ["After Bxa8, Qxh2 is mate."]
+  },
+  {
+    "name": "greedy bishop: sees the mate threat on h2",
+    "fen": "r4rk1/p1p2ppp/3p4/7q/3b2n1/2NP2P1/PPP1QPBP/R4RK1 w - - 0 14",
+    "said": "he's threatening queen takes h2 mate, so I'll push h3 and hit his knight. My bishop could take a8 but not now",
+    "typed": false,
+    "reveal": false,
+    "facts": {
+      "depth": 12,
+      "moves": [
+        {"uci":"h2h3","eval":{"cp":391},"pv":["h2h3","g4f2","f1f2","d4f2","e2f2","a8b8","a1b1","h5a5","g1h2","f8e8"]},
+        {"uci":"h2h4","eval":{"cp":119},"pv":["h2h4","a8e8","e2f3","d4c3","b2c3","g7g5","g2h3","f7f5","h3g4","f5g4"]},
+        {"uci":"e2g4","eval":{"cp":-328},"pv":["e2g4","h5g4","g2a8","f8a8","a1e1","d4b6","e1e4","g4h5","f1e1","b6f2"]},
+        {"uci":"f1e1","eval":{"cp":-404},"pv":["f1e1","h5h2","g1f1","d4f2","e2f2","g4f2","f1f2","h2h6","e1e3","a8b8"]},
+        {"uci":"f1c1","eval":{"cp":-453},"pv":["f1c1","d4f2","g1f1","a8e8","h2h3","e8e2","h3g4","h5c5","c3e2","f2e3"]},
+        {"uci":"f1d1","eval":{"cp":-459},"pv":["f1d1","d4f2","e2f2","g4f2","g2a8","f2d1"]},
+        {"uci":"f1b1","eval":{"cp":-522},"pv":["f1b1","d4f2","e2f2","g4f2","g1f2","h5c5","f2f1","a8e8","a2a3"]},
+        {"uci":"g2h3","eval":{"cp":-589},"pv":["g2h3","h5h3","e2g4","h3g4","a1e1","g8h8","e1e4","g4d7","e4d4","a8e8"]},
+        {"uci":"a2a3","eval":{"mate":-1},"pv":["a2a3","h5h2"]},
+        {"uci":"b2b3","eval":{"mate":-1},"pv":["b2b3","h5h2"]},
+        {"uci":"g1h1","eval":{"mate":-1},"pv":["g1h1","h5h2"]},
+        {"uci":"a2a4","eval":{"mate":-1},"pv":["a2a4","h5h2"]},
+        {"uci":"b2b4","eval":{"mate":-1},"pv":["b2b4","h5h2"]},
+        {"uci":"e2e8","eval":{"mate":-1},"pv":["e2e8","h5h2"]},
+        {"uci":"c3b1","eval":{"mate":-1},"pv":["c3b1","h5h2"]},
+        {"uci":"c3d1","eval":{"mate":-1},"pv":["c3d1","h5h2"]},
+        {"uci":"c3a4","eval":{"mate":-1},"pv":["c3a4","h5h2"]},
+        {"uci":"c3e4","eval":{"mate":-1},"pv":["c3e4","h5h2"]},
+        {"uci":"c3b5","eval":{"mate":-1},"pv":["c3b5","h5h2"]},
+        {"uci":"c3d5","eval":{"mate":-1},"pv":["c3d5","h5h2"]},
+        {"uci":"g2h1","eval":{"mate":-1},"pv":["g2h1","h5h2"]},
+        {"uci":"g2f3","eval":{"mate":-1},"pv":["g2f3","h5h2"]},
+        {"uci":"g2e4","eval":{"mate":-1},"pv":["g2e4","h5h2"]},
+        {"uci":"g2d5","eval":{"mate":-1},"pv":["g2d5","h5h2"]},
+        {"uci":"g2c6","eval":{"mate":-1},"pv":["g2c6","h5h2"]},
+        {"uci":"g2b7","eval":{"mate":-1},"pv":["g2b7","h5h2"]},
+        {"uci":"g2a8","eval":{"mate":-1},"pv":["g2a8","h5h2"]},
+        {"uci":"a1b1","eval":{"mate":-1},"pv":["a1b1","h5h2"]},
+        {"uci":"a1c1","eval":{"mate":-1},"pv":["a1c1","h5h2"]},
+        {"uci":"a1d1","eval":{"mate":-1},"pv":["a1d1","h5h2"]},
+        {"uci":"a1e1","eval":{"mate":-1},"pv":["a1e1","h5h2"]},
+        {"uci":"e2d1","eval":{"mate":-1},"pv":["e2d1","h5h2"]},
+        {"uci":"e2e1","eval":{"mate":-1},"pv":["e2e1","h5h2"]},
+        {"uci":"e2d2","eval":{"mate":-1},"pv":["e2d2","h5h2"]},
+        {"uci":"e2e3","eval":{"mate":-1},"pv":["e2e3","h5h2"]},
+        {"uci":"e2f3","eval":{"mate":-1},"pv":["e2f3","h5h2"]},
+        {"uci":"e2e4","eval":{"mate":-1},"pv":["e2e4","h5h2"]},
+        {"uci":"e2e5","eval":{"mate":-1},"pv":["e2e5","h5h2"]},
+        {"uci":"e2e6","eval":{"mate":-1},"pv":["e2e6","h5h2"]},
+        {"uci":"e2e7","eval":{"mate":-1},"pv":["e2e7","h5h2"]}
+      ],
+      "threats": [
+        {"uci":"h5h2","eval":{"mate":1},"pv":["h5h2"]},
+        {"uci":"a8e8","eval":{"cp":369},"pv":["a8e8","h2h3","e8e2","h3g4","h5g4","c3e2","g4e2"]},
+        {"uci":"f8e8","eval":{"cp":277},"pv":["f8e8","h2h3","e8e2","h3g4","h5g4","c3e2","a8b8","e2d4","g4d4","b2b3"]},
+        {"uci":"d4c3","eval":{"cp":19},"pv":["d4c3","h2h3","c3b2","e2g4","h5g4","h3g4","b2a1","g2a8","a1f6","c2c3"]},
+        {"uci":"a8b8","eval":{"cp":-19},"pv":["a8b8","h2h3","g4f6","a1b1","h5e2","c3e2","d4b2","f1d1","f8e8","g1f1"]},
+        {"uci":"f7f5","eval":{"cp":-139},"pv":["f7f5","h2h3","a8e8","h3g4","f5g4","e2d2","f8f6","c3e2","f6h6","e2d4"]}
+      ]
+    },
+    "parsed": {
+      "about": true,
+      "move": { "said": "I'll push h3", "san": "h3" },
+      "claims": [
+        {
+          "said": "he's threatening queen takes h2 mate",
+          "kind": "threat",
+          "side": "opponent",
+          "piece": "Q",
+          "square": "h5",
+          "target": "h2",
+          "moves": ["Qxh2#"],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        },
+        {
+          "said": "h3 hits his knight",
+          "kind": "attacks",
+          "side": "me",
+          "piece": "P",
+          "square": "h3",
+          "target": "g4",
+          "moves": [],
+          "afterMove": true,
+          "eval": "",
+          "gain": ""
+        },
+        {
+          "said": "my bishop could take a8",
+          "kind": "attacks",
+          "side": "me",
+          "piece": "B",
+          "square": "g2",
+          "target": "a8",
+          "moves": [],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        }
+      ]
+    },
+    "expect": {
+      "understood": true,
+      "move": { "san": "h3", "grade": "best" },
+      "claims": [
+        { "verdict": "right" },
+        { "verdict": "right" },
+        { "verdict": "right" }
+      ],
+      "missed": [],
+      "habits": { "threats": "good", "forcing": "none", "safety": "good" },
+      "best": null,
+      "nudge": null
+    },
+    "notes": ["They do threaten Qxh2#."]
+  },
+  {
+    "name": "black a pawn up misses the mate on h7",
+    "fen": "r2q1rk1/pb1nbppp/1p2p3/n1p5/3P4/2NQ1N2/PPB2PPP/R1B2RK1 b - - 3 12",
+    "said": "I'm a pawn up and I'm better here. My bishop on b7 is aiming at his king on g2",
+    "typed": false,
+    "reveal": false,
+    "facts": {
+      "depth": 12,
+      "moves": [
+        {"uci":"d7f6","eval":{"cp":114},"pv":["d7f6","c1g5","c5c4","d3e3","f6d5","e3e4","g7g6","e4h4","f7f6","g5h6"]},
+        {"uci":"g7g6","eval":{"cp":78},"pv":["g7g6","f1d1","d7f6","c1h6","f8e8","c2a4","b7c6","d4c5","d8d3","d1d3"]},
+        {"uci":"f7f5","eval":{"cp":52},"pv":["f7f5","d4d5","d7f6","f3g5","b7d5","c3d5","d8d5","d3d5","e6d5","c2f5"]},
+        {"uci":"b7e4","eval":{"cp":-531},"pv":["b7e4","d3e4","d7f6","e4h4","a5c6","d4c5","c6d4","f3d4","b6c5","d4b5"]},
+        {"uci":"f8e8","eval":{"mate":-2},"pv":["f8e8","d3h7","g8f8","h7h8"]},
+        {"uci":"f7f6","eval":{"mate":-2},"pv":["f7f6","d3h7","g8f7","c2g6"]},
+        {"uci":"h7h6","eval":{"mate":-1},"pv":["h7h6","d3h7"]},
+        {"uci":"h7h5","eval":{"mate":-1},"pv":["h7h5","d3h7"]},
+        {"uci":"c5c4","eval":{"mate":-1},"pv":["c5c4","d3h7"]},
+        {"uci":"b6b5","eval":{"mate":-1},"pv":["b6b5","d3h7"]},
+        {"uci":"e6e5","eval":{"mate":-1},"pv":["e6e5","d3h7"]},
+        {"uci":"a7a6","eval":{"mate":-1},"pv":["a7a6","d3h7"]},
+        {"uci":"g7g5","eval":{"mate":-1},"pv":["g7g5","d3h7"]},
+        {"uci":"c5d4","eval":{"mate":-1},"pv":["c5d4","d3h7"]},
+        {"uci":"a5b3","eval":{"mate":-1},"pv":["a5b3","d3h7"]},
+        {"uci":"a5c4","eval":{"mate":-1},"pv":["a5c4","d3h7"]},
+        {"uci":"a5c6","eval":{"mate":-1},"pv":["a5c6","d3h7"]},
+        {"uci":"d7e5","eval":{"mate":-1},"pv":["d7e5","d3h7"]},
+        {"uci":"d7b8","eval":{"mate":-1},"pv":["d7b8","d3h7"]},
+        {"uci":"b7d5","eval":{"mate":-1},"pv":["b7d5","d3h7"]},
+        {"uci":"b7a6","eval":{"mate":-1},"pv":["b7a6","d3h7"]},
+        {"uci":"b7c6","eval":{"mate":-1},"pv":["b7c6","d3h7"]},
+        {"uci":"b7c8","eval":{"mate":-1},"pv":["b7c8","d3h7"]},
+        {"uci":"e7h4","eval":{"mate":-1},"pv":["e7h4","d3h7"]},
+        {"uci":"e7g5","eval":{"mate":-1},"pv":["e7g5","d3h7"]},
+        {"uci":"e7d6","eval":{"mate":-1},"pv":["e7d6","d3h7"]},
+        {"uci":"e7f6","eval":{"mate":-1},"pv":["e7f6","d3h7"]},
+        {"uci":"a8b8","eval":{"mate":-1},"pv":["a8b8","d3h7"]},
+        {"uci":"a8c8","eval":{"mate":-1},"pv":["a8c8","d3h7"]},
+        {"uci":"d8c7","eval":{"mate":-1},"pv":["d8c7","d3h7"]},
+        {"uci":"d8b8","eval":{"mate":-1},"pv":["d8b8","d3h7"]},
+        {"uci":"d8c8","eval":{"mate":-1},"pv":["d8c8","d3h7"]},
+        {"uci":"d8e8","eval":{"mate":-1},"pv":["d8e8","d3h7"]},
+        {"uci":"g8h8","eval":{"mate":-1},"pv":["g8h8","d3h7"]},
+        {"uci":"b7f3","eval":{"mate":-1},"pv":["b7f3","d3h7"]}
+      ],
+      "threats": [
+        {"uci":"d3h7","eval":{"mate":1},"pv":["d3h7"]},
+        {"uci":"b2b4","eval":{"cp":214},"pv":["b2b4","f7f5","b4a5","c5d4","c3b5"]},
+        {"uci":"c3d5","eval":{"cp":54},"pv":["c3d5","g7g6","d5e7","d8e7","d4c5","a5c6"]},
+        {"uci":"d4d5","eval":{"cp":34},"pv":["d4d5","d7f6","d5e6","d8d3","e6f7","g8h8","c2d3","b7f3","g2f3","f8f7"]},
+        {"uci":"d4c5","eval":{"cp":-17},"pv":["d4c5","d7f6","d3d8","f8d8","c5b6","a7b6","f1d1","f6d5"]},
+        {"uci":"f1e1","eval":{"cp":-33},"pv":["f1e1","d7f6","c1g5","c5c4","d3e3","a8c8","a1d1"]}
+      ]
+    },
+    "parsed": {
+      "about": true,
+      "move": null,
+      "claims": [
+        {
+          "said": "I'm a pawn up",
+          "kind": "material",
+          "side": "me",
+          "piece": "",
+          "square": "",
+          "target": "",
+          "moves": [],
+          "afterMove": false,
+          "eval": "",
+          "gain": "pawn"
+        },
+        {
+          "said": "I'm better here",
+          "kind": "eval",
+          "side": "me",
+          "piece": "",
+          "square": "",
+          "target": "",
+          "moves": [],
+          "afterMove": false,
+          "eval": "better",
+          "gain": ""
+        },
+        {
+          "said": "my bishop on b7 is aiming at g2",
+          "kind": "attacks",
+          "side": "me",
+          "piece": "B",
+          "square": "b7",
+          "target": "g2",
+          "moves": [],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        }
+      ]
+    },
+    "expect": {
+      "understood": true,
+      "move": null,
+      "claims": [
+        { "verdict": "right" },
+        { "verdict": "right" },
+        { "verdict": "partly" }
+      ],
+      "missed": [
+        { "kind": "mate" }
+      ],
+      "habits": { "threats": "missed", "forcing": "none", "safety": "none" },
+      "best": null,
+      "nudge": "Look at your knight."
+    },
+    "notes": ["They threaten Qxh7#.","the knight on f3 is in the way"]
+  },
+  {
+    "name": "ruy lopez: black thinks nothing is threatened",
+    "fen": "r1bqkb1r/1ppp1ppp/p1n2n2/4p3/B3P3/5N2/PPPP1PPP/RNBQ1RK1 b kq - 3 5",
+    "said": "he isn't threatening anything yet, so I'll just develop my bishop to e7",
+    "typed": false,
+    "reveal": false,
+    "facts": {
+      "depth": 12,
+      "moves": [
+        {"uci":"f6e4","eval":{"cp":-40},"pv":["f6e4","d2d4","b7b5","a4b3","d7d5","d4e5","c8e6","c2c3","f8e7","b3c2"]},
+        {"uci":"f8e7","eval":{"cp":-41},"pv":["f8e7","f1e1","b7b5","a4b3","e8g8","d2d4","c6d4","f3d4","e5d4","e4e5"]},
+        {"uci":"b7b5","eval":{"cp":-47},"pv":["b7b5","a4b3","f8c5","c2c3","d7d6","a2a4","c8g4","h2h3","g4h5","g2g4"]},
+        {"uci":"f8c5","eval":{"cp":-49},"pv":["f8c5","c2c3","e8g8","d2d4","c5b6","a4c6","d7c6","c1g5","c8g4","g5h4"]},
+        {"uci":"d7d6","eval":{"cp":-51},"pv":["d7d6","c2c3","f6e4","d2d4","c8d7","f1e1","e4f6","d4e5","d6e5","f3e5"]},
+        {"uci":"h7h6","eval":{"cp":-78},"pv":["h7h6","d2d4","c6d4","f3d4","e5d4","e4e5","f6e4","d1d4","e4c5","b1c3"]},
+        {"uci":"f8d6","eval":{"cp":-83},"pv":["f8d6","c2c3","d6e7","f1e1","d7d6","d2d4","e8g8","h2h3","c8d7"]},
+        {"uci":"h7h5","eval":{"cp":-105},"pv":["h7h5","d2d3","d7d6","h2h3","c8d7","c2c3","f8e7","b1d2","e8g8","f1e1"]},
+        {"uci":"c6a5","eval":{"cp":-107},"pv":["c6a5","c2c3","f8e7","f3e5","f6e4","e5f7","e8f7","d1h5","g7g6","h5a5"]},
+        {"uci":"d8e7","eval":{"cp":-112},"pv":["d8e7","f1e1","b7b5","a4b3","c6a5","d2d4","d7d6","c2c4","c7c6","b3c2"]},
+        {"uci":"c6d4","eval":{"cp":-121},"pv":["c6d4","f3d4","e5d4","d2d3","c7c6","a4b3","d7d6"]},
+        {"uci":"f8b4","eval":{"cp":-124},"pv":["f8b4","a4c6","d7c6","f3e5","d8e7","a2a3","b4d6","e5c4","f6g4","h2h3"]},
+        {"uci":"f6g4","eval":{"cp":-132},"pv":["f6g4","h2h3","g4f6","d2d4","c6d4","f3d4","e5d4","e4e5","f6e4","d1d4"]},
+        {"uci":"b7b6","eval":{"cp":-140},"pv":["b7b6","a4c6","d7c6","f3e5","d8e7","d2d4","c6c5","c2c3","c8b7","f1e1"]},
+        {"uci":"g7g6","eval":{"cp":-142},"pv":["g7g6","a4c6","d7c6","f3e5","f8g7","d2d3"]},
+        {"uci":"a6a5","eval":{"cp":-144},"pv":["a6a5","a4c6","d7c6","f3e5","f8c5","d2d3","d8e7","d3d4","c5a7","f1e1"]},
+        {"uci":"g7g5","eval":{"cp":-155},"pv":["g7g5","d2d4","h7h6","c2c4","d7d6","d4e5","f6d7","a4c6","b7c6"]},
+        {"uci":"a8b8","eval":{"cp":-157},"pv":["a8b8","a4c6","b7c6","f3e5","f8c5","f1e1","e8g8","d2d4","c5a7","h2h3"]},
+        {"uci":"d7d5","eval":{"cp":-164},"pv":["d7d5","f3e5","d5e4","e5c6","d8d6","c6a5","b7b5","a4b3","f6g4","g2g3"]},
+        {"uci":"f6g8","eval":{"cp":-188},"pv":["f6g8","a4c6","d7c6","f3e5","d8d4","e5f3","d4f6","d2d4"]},
+        {"uci":"h8g8","eval":{"cp":-189},"pv":["h8g8","d2d4","g8h8","f1e1","b7b5","d4e5","f6g4","c1g5","f8e7","g5e7"]},
+        {"uci":"a8a7","eval":{"cp":-190},"pv":["a8a7","a4c6","d7c6","f3e5","f8e7","f1e1","c6c5","c2c3","e8g8","d2d4"]},
+        {"uci":"c6e7","eval":{"cp":-196},"pv":["c6e7","f3e5","e7g6","e5f3","f8e7","e4e5","f6e4","d2d4","b7b5","a4b3"]},
+        {"uci":"e8e7","eval":{"cp":-230},"pv":["e8e7","d2d4","e7e8","f1e1","c6d4","f3d4","b7b5","a4b3"]},
+        {"uci":"c6a7","eval":{"cp":-247},"pv":["c6a7","f3e5","f8e7","d2d4","e8g8","f1e1","d7d6","e5d3","b7b5","a4b3"]},
+        {"uci":"c6b8","eval":{"cp":-251},"pv":["c6b8","f3e5","f8e7","d2d4","e8g8","f1e1","d7d6","e5f3","c7c5","c2c3"]},
+        {"uci":"f6h5","eval":{"cp":-259},"pv":["f6h5","f3e5","g7g6","e5c6","d7c6","d2d4","d8h4","f1e1","f8g7"]},
+        {"uci":"c6b4","eval":{"cp":-264},"pv":["c6b4","f3e5","f8e7","d2d4","e8g8","c2c3","b4c6","e5c6","d7c6","a4c2"]},
+        {"uci":"f8a3","eval":{"cp":-476},"pv":["f8a3","b1a3","b7b5","a4b3","d7d5","d2d3","c8g4","a3b1","d5e4","d3e4"]},
+        {"uci":"f6d5","eval":{"cp":-568},"pv":["f6d5","e4d5","c6d4","f1e1","d4f3","d1f3","b7b5","a4b3","f8d6","d2d4"]}
+      ],
+      "threats": [
+        {"uci":"a4c6","eval":{"cp":163},"pv":["a4c6","d7c6","f3e5","f8c5","b1c3","e8g8","d2d3","f8e8","e5f3","c8g4"]},
+        {"uci":"d2d4","eval":{"cp":119},"pv":["d2d4","c6d4","f3d4","e5d4","f1e1","f8c5","c1g5","c5e7","d1d4","c7c5"]},
+        {"uci":"f1e1","eval":{"cp":89},"pv":["f1e1","b7b5","a4b3","d7d6","a2a4","b5b4","d2d4","f8e7","b1d2"]},
+        {"uci":"b1c3","eval":{"cp":89},"pv":["b1c3","d7d6","d2d4","b7b5","d4e5","c6e5","a4b3","c8g4","f3e5","d6e5"]},
+        {"uci":"d1e2","eval":{"cp":86},"pv":["d1e2","b7b5","a4b3","c8b7","c2c3","d7d6","d2d4"]},
+        {"uci":"c2c3","eval":{"cp":79},"pv":["c2c3","f8e7","d2d4","e8g8","d4d5","c6b8","f3e5","f6e4","f1e1","e4f6"]}
+      ]
+    },
+    "parsed": {
+      "about": true,
+      "move": { "said": "I'll develop my bishop to e7", "san": "Be7" },
+      "claims": [
+        {
+          "said": "he isn't threatening anything yet",
+          "kind": "safe",
+          "side": "me",
+          "piece": "",
+          "square": "",
+          "target": "",
+          "moves": [],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        }
+      ]
+    },
+    "expect": {
+      "understood": true,
+      "move": { "san": "Be7", "grade": "excellent" },
+      "claims": [
+        { "verdict": "wrong" }
+      ],
+      "missed": [],
+      "habits": { "threats": "missed", "forcing": "none", "safety": "good" },
+      "best": null,
+      "nudge": null
+    },
+    "notes": ["They do have a threat: Bxc6"]
+  },
+  {
+    "name": "ruy lopez: black spots the threat on e5",
+    "fen": "r1bqkb1r/1ppp1ppp/p1n2n2/4p3/B3P3/5N2/PPPP1PPP/RNBQ1RK1 b kq - 3 5",
+    "said": "he wants to take my knight on c6 and then win my e5 pawn, so I'll defend it with d6",
+    "typed": false,
+    "reveal": false,
+    "facts": {
+      "depth": 12,
+      "moves": [
+        {"uci":"f6e4","eval":{"cp":-40},"pv":["f6e4","d2d4","b7b5","a4b3","d7d5","d4e5","c8e6","c2c3","f8e7","b3c2"]},
+        {"uci":"f8e7","eval":{"cp":-41},"pv":["f8e7","f1e1","b7b5","a4b3","e8g8","d2d4","c6d4","f3d4","e5d4","e4e5"]},
+        {"uci":"b7b5","eval":{"cp":-47},"pv":["b7b5","a4b3","f8c5","c2c3","d7d6","a2a4","c8g4","h2h3","g4h5","g2g4"]},
+        {"uci":"f8c5","eval":{"cp":-49},"pv":["f8c5","c2c3","e8g8","d2d4","c5b6","a4c6","d7c6","c1g5","c8g4","g5h4"]},
+        {"uci":"d7d6","eval":{"cp":-51},"pv":["d7d6","c2c3","f6e4","d2d4","c8d7","f1e1","e4f6","d4e5","d6e5","f3e5"]},
+        {"uci":"h7h6","eval":{"cp":-78},"pv":["h7h6","d2d4","c6d4","f3d4","e5d4","e4e5","f6e4","d1d4","e4c5","b1c3"]},
+        {"uci":"f8d6","eval":{"cp":-83},"pv":["f8d6","c2c3","d6e7","f1e1","d7d6","d2d4","e8g8","h2h3","c8d7"]},
+        {"uci":"h7h5","eval":{"cp":-105},"pv":["h7h5","d2d3","d7d6","h2h3","c8d7","c2c3","f8e7","b1d2","e8g8","f1e1"]},
+        {"uci":"c6a5","eval":{"cp":-107},"pv":["c6a5","c2c3","f8e7","f3e5","f6e4","e5f7","e8f7","d1h5","g7g6","h5a5"]},
+        {"uci":"d8e7","eval":{"cp":-112},"pv":["d8e7","f1e1","b7b5","a4b3","c6a5","d2d4","d7d6","c2c4","c7c6","b3c2"]},
+        {"uci":"c6d4","eval":{"cp":-121},"pv":["c6d4","f3d4","e5d4","d2d3","c7c6","a4b3","d7d6"]},
+        {"uci":"f8b4","eval":{"cp":-124},"pv":["f8b4","a4c6","d7c6","f3e5","d8e7","a2a3","b4d6","e5c4","f6g4","h2h3"]},
+        {"uci":"f6g4","eval":{"cp":-132},"pv":["f6g4","h2h3","g4f6","d2d4","c6d4","f3d4","e5d4","e4e5","f6e4","d1d4"]},
+        {"uci":"b7b6","eval":{"cp":-140},"pv":["b7b6","a4c6","d7c6","f3e5","d8e7","d2d4","c6c5","c2c3","c8b7","f1e1"]},
+        {"uci":"g7g6","eval":{"cp":-142},"pv":["g7g6","a4c6","d7c6","f3e5","f8g7","d2d3"]},
+        {"uci":"a6a5","eval":{"cp":-144},"pv":["a6a5","a4c6","d7c6","f3e5","f8c5","d2d3","d8e7","d3d4","c5a7","f1e1"]},
+        {"uci":"g7g5","eval":{"cp":-155},"pv":["g7g5","d2d4","h7h6","c2c4","d7d6","d4e5","f6d7","a4c6","b7c6"]},
+        {"uci":"a8b8","eval":{"cp":-157},"pv":["a8b8","a4c6","b7c6","f3e5","f8c5","f1e1","e8g8","d2d4","c5a7","h2h3"]},
+        {"uci":"d7d5","eval":{"cp":-164},"pv":["d7d5","f3e5","d5e4","e5c6","d8d6","c6a5","b7b5","a4b3","f6g4","g2g3"]},
+        {"uci":"f6g8","eval":{"cp":-188},"pv":["f6g8","a4c6","d7c6","f3e5","d8d4","e5f3","d4f6","d2d4"]},
+        {"uci":"h8g8","eval":{"cp":-189},"pv":["h8g8","d2d4","g8h8","f1e1","b7b5","d4e5","f6g4","c1g5","f8e7","g5e7"]},
+        {"uci":"a8a7","eval":{"cp":-190},"pv":["a8a7","a4c6","d7c6","f3e5","f8e7","f1e1","c6c5","c2c3","e8g8","d2d4"]},
+        {"uci":"c6e7","eval":{"cp":-196},"pv":["c6e7","f3e5","e7g6","e5f3","f8e7","e4e5","f6e4","d2d4","b7b5","a4b3"]},
+        {"uci":"e8e7","eval":{"cp":-230},"pv":["e8e7","d2d4","e7e8","f1e1","c6d4","f3d4","b7b5","a4b3"]},
+        {"uci":"c6a7","eval":{"cp":-247},"pv":["c6a7","f3e5","f8e7","d2d4","e8g8","f1e1","d7d6","e5d3","b7b5","a4b3"]},
+        {"uci":"c6b8","eval":{"cp":-251},"pv":["c6b8","f3e5","f8e7","d2d4","e8g8","f1e1","d7d6","e5f3","c7c5","c2c3"]},
+        {"uci":"f6h5","eval":{"cp":-259},"pv":["f6h5","f3e5","g7g6","e5c6","d7c6","d2d4","d8h4","f1e1","f8g7"]},
+        {"uci":"c6b4","eval":{"cp":-264},"pv":["c6b4","f3e5","f8e7","d2d4","e8g8","c2c3","b4c6","e5c6","d7c6","a4c2"]},
+        {"uci":"f8a3","eval":{"cp":-476},"pv":["f8a3","b1a3","b7b5","a4b3","d7d5","d2d3","c8g4","a3b1","d5e4","d3e4"]},
+        {"uci":"f6d5","eval":{"cp":-568},"pv":["f6d5","e4d5","c6d4","f1e1","d4f3","d1f3","b7b5","a4b3","f8d6","d2d4"]}
+      ],
+      "threats": [
+        {"uci":"a4c6","eval":{"cp":163},"pv":["a4c6","d7c6","f3e5","f8c5","b1c3","e8g8","d2d3","f8e8","e5f3","c8g4"]},
+        {"uci":"d2d4","eval":{"cp":119},"pv":["d2d4","c6d4","f3d4","e5d4","f1e1","f8c5","c1g5","c5e7","d1d4","c7c5"]},
+        {"uci":"f1e1","eval":{"cp":89},"pv":["f1e1","b7b5","a4b3","d7d6","a2a4","b5b4","d2d4","f8e7","b1d2"]},
+        {"uci":"b1c3","eval":{"cp":89},"pv":["b1c3","d7d6","d2d4","b7b5","d4e5","c6e5","a4b3","c8g4","f3e5","d6e5"]},
+        {"uci":"d1e2","eval":{"cp":86},"pv":["d1e2","b7b5","a4b3","c8b7","c2c3","d7d6","d2d4"]},
+        {"uci":"c2c3","eval":{"cp":79},"pv":["c2c3","f8e7","d2d4","e8g8","d4d5","c6b8","f3e5","f6e4","f1e1","e4f6"]}
+      ]
+    },
+    "parsed": {
+      "about": true,
+      "move": { "said": "I'll defend it with d6", "san": "d6" },
+      "claims": [
+        {
+          "said": "he wants to take my knight on c6 and then win my e5 pawn",
+          "kind": "threat",
+          "side": "opponent",
+          "piece": "B",
+          "square": "a4",
+          "target": "c6",
+          "moves": ["Bxc6"],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        },
+        {
+          "said": "d6 defends e5",
+          "kind": "defends",
+          "side": "me",
+          "piece": "P",
+          "square": "d6",
+          "target": "e5",
+          "moves": [],
+          "afterMove": true,
+          "eval": "",
+          "gain": ""
+        }
+      ]
+    },
+    "expect": {
+      "understood": true,
+      "move": { "san": "d6", "grade": "excellent" },
+      "claims": [
+        { "verdict": "right" },
+        { "verdict": "right" }
+      ],
+      "missed": [],
+      "habits": { "threats": "good", "forcing": "none", "safety": "good" },
+      "best": null,
+      "nudge": null
+    },
+    "notes": ["They do threaten Bxc6."]
+  },
+  {
+    "name": "nimzo: the pinned knight can't jump to d5",
+    "fen": "rnbqk2r/pppp1ppp/4pn2/8/1bPP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 2 4",
+    "said": "I'll jump in with knight d5 and hit his bishop. Queen a4 would be check too",
+    "typed": false,
+    "reveal": false,
+    "facts": {
+      "depth": 12,
+      "moves": [
+        {"uci":"g2g3","eval":{"cp":26},"pv":["g2g3","c7c5","g1f3","b4c3","b2c3","b7b6","f1g2","c8b7","e1g1","e8g8"]},
+        {"uci":"e2e3","eval":{"cp":24},"pv":["e2e3","c7c5","f1d3","d7d5","g1f3","d5c4","d3c4","c5d4","e3d4","b8d7"]},
+        {"uci":"c1d2","eval":{"cp":23},"pv":["c1d2","b4c3","d2c3","b7b6","g1f3","c8b7","d1c2","f6e4","g2g3","d7d5"]},
+        {"uci":"g1f3","eval":{"cp":22},"pv":["g1f3","b7b6","c1g5","b4c3","b2c3","h7h6","g5h4","c8b7","e2e3","d7d6"]},
+        {"uci":"d1c2","eval":{"cp":19},"pv":["d1c2","d7d5","e2e3","c7c5","d4c5","e8g8","g1f3","b4c5","a2a3","d5c4"]},
+        {"uci":"a2a3","eval":{"cp":10},"pv":["a2a3","b4c3","b2c3","e8g8","c1g5","c7c5","e2e3","c5d4","e3d4","d7d5"]},
+        {"uci":"d1b3","eval":{"cp":10},"pv":["d1b3","c7c5","g1f3","d7d5","d4c5","b8c6","c1g5","h7h6","g5f6","d8f6"]},
+        {"uci":"c1g5","eval":{"cp":2},"pv":["c1g5","c7c5","d4c5","b4c3","b2c3","d8a5","g1f3","a5c3","g5d2","c3c4"]},
+        {"uci":"h2h3","eval":{"cp":-2},"pv":["h2h3","d7d5","e2e3","c7c5","g1f3","e8g8","c1d2","c5d4","e3d4","d5c4"]},
+        {"uci":"c1f4","eval":{"cp":-6},"pv":["c1f4","c7c5","e2e3","c5d4","e3d4","d7d5","c4c5"]},
+        {"uci":"a1b1","eval":{"cp":-11},"pv":["a1b1","c7c5","e2e3","e8g8","a2a3","b4c3","b2c3","f8e8","g1f3"]},
+        {"uci":"d1d3","eval":{"cp":-17},"pv":["d1d3","c7c5","e2e3","d7d5","g1f3","e8g8","f1e2"]},
+        {"uci":"f2f3","eval":{"cp":-20},"pv":["f2f3","d7d5","a2a3","b4e7","e2e4","e8g8","e4e5","f6e8","f3f4","c7c5"]},
+        {"uci":"d1a4","eval":{"cp":-21},"pv":["d1a4","c7c5","g1f3","e8g8","e2e3","b4c3","b2c3","b7b6","f1d3","c8b7"]},
+        {"uci":"g1h3","eval":{"cp":-23},"pv":["g1h3","e8g8","c1d2","d7d5","e2e3","c7c5","a2a3","b4c3","d2c3","c5d4"]},
+        {"uci":"d1d2","eval":{"cp":-26},"pv":["d1d2","c7c5","e2e3","d7d5","a2a3","b4a5","g1f3","f6e4","d2c2","c8d7"]},
+        {"uci":"g2g4","eval":{"cp":-26},"pv":["g2g4","c7c5","d4c5","f6g4","a2a3","b4c5","c3e4"]},
+        {"uci":"h2h4","eval":{"cp":-29},"pv":["h2h4","c7c5","e2e3","d7d5","g1f3","e8g8","f1e2","d5c4","e1g1","b4c3"]},
+        {"uci":"f2f4","eval":{"cp":-29},"pv":["f2f4","b7b6","e2e3","f6e4","c1d2","b4c3","d2c3","e4c3","b2c3","c8b7"]},
+        {"uci":"a2a4","eval":{"cp":-31},"pv":["a2a4","c7c5","e2e3","d7d5","g1f3","e8g8","c4d5","e6d5","d4c5","b4c3"]},
+        {"uci":"c1e3","eval":{"cp":-36},"pv":["c1e3","d7d5","c4d5","e6d5","a2a3","b4c3","b2c3","e8g8","e3g5","h7h6"]},
+        {"uci":"e2e4","eval":{"cp":-58},"pv":["e2e4","f6e4","d1c2","e4c3","b2c3","b4e7","f1d3","c7c5","g1f3","c5d4"]},
+        {"uci":"c4c5","eval":{"cp":-61},"pv":["c4c5","b7b6","c5b6","a7b6","e2e3","f6e4","d1c2","c8b7","g1f3","e4c3"]},
+        {"uci":"d4d5","eval":{"cp":-64},"pv":["d4d5","b4c3","b2c3","d7d6","g1f3","e8g8","g2g3","d8e7","f1g2","e6e5"]},
+        {"uci":"e1d2","eval":{"cp":-274},"pv":["e1d2","f6e4","d2e3","e4c3","b2c3","b4c3","a1b1","b7b6","b1b3","c3a5"]},
+        {"uci":"c1h6","eval":{"cp":-437},"pv":["c1h6","b4c3","b2c3","g7h6","e2e3","d7d6","f1d3","d8e7","e3e4","b8d7"]},
+        {"uci":"b2b3","eval":{"cp":-575},"pv":["b2b3","b4c3","c1d2","c3d2","d1d2","d7d5","e2e3","b7b6","a1c1","c8b7"]}
+      ],
+      "threats": [
+        {"uci":"e8g8","eval":{"cp":20},"pv":["e8g8","e2e3","c7c5","a2a3","b4c3","b2c3","d8a5","c1d2","d7d6","f1d3"]},
+        {"uci":"d7d5","eval":{"cp":20},"pv":["d7d5","e2e3","c7c5","a2a3","b4a5","f1d3","d5c4","d3c4","c5d4","e3d4"]},
+        {"uci":"c7c5","eval":{"cp":17},"pv":["c7c5","e2e3","d7d5","a2a3","b4c3","b2c3","b8c6","f1d3","e6e5","c4d5"]},
+        {"uci":"b7b6","eval":{"cp":10},"pv":["b7b6","c1g5","h7h6","g5h4","b4c3","b2c3","g7g5","h4g3","f6e4","d1c2"]},
+        {"uci":"d7d6","eval":{"cp":8},"pv":["d7d6","c1d2","e8g8","g1f3","f8e8","a2a3","b4c3","d2c3","f6e4","d1c2"]},
+        {"uci":"f6e4","eval":{"cp":-1},"pv":["f6e4","d1c2","d7d5","a2a3","b4c3","b2c3","e8g8","e2e3","c7c5","f1d3"]}
+      ]
+    },
+    "parsed": {
+      "about": true,
+      "move": { "said": "knight d5", "san": "Nd5" },
+      "claims": [
+        {
+          "said": "queen a4 would be check",
+          "kind": "check",
+          "side": "me",
+          "piece": "Q",
+          "square": "",
+          "target": "",
+          "moves": ["Qa4+"],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        },
+        {
+          "said": "his knight on f6 is pinned",
+          "kind": "pinned",
+          "side": "opponent",
+          "piece": "N",
+          "square": "f6",
+          "target": "",
+          "moves": [],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        }
+      ]
+    },
+    "expect": {
+      "understood": true,
+      "move": { "san": null, "grade": "illegal" },
+      "claims": [
+        { "verdict": "wrong" },
+        { "verdict": "wrong" }
+      ],
+      "missed": [],
+      "habits": { "threats": "none", "forcing": "none", "safety": "none" },
+      "best": null,
+      "nudge": "Look at your g-pawn."
+    },
+    "notes": ["the knight on c3 is pinned to your king","Qa4 isn't check."]
+  },
+  {
+    "name": "italian: Ng5 hangs the knight",
+    "fen": "r1bqk1nr/ppppbppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4",
+    "said": "knight g5 attacks f7 twice with my bishop, and it wins the f7 pawn. If he plays d5 I take on d5",
+    "typed": false,
+    "reveal": false,
+    "facts": {
+      "depth": 12,
+      "moves": [
+        {"uci":"d2d4","eval":{"cp":65},"pv":["d2d4","d7d6","d4d5","c6b8","a2a4","g8f6","b1c3","e8g8","a4a5","b8d7"]},
+        {"uci":"e1g1","eval":{"cp":34},"pv":["e1g1","d7d6","d2d4","e5d4","f3d4","c6d4","d1d4","g8f6","b1c3","e8g8"]},
+        {"uci":"d2d3","eval":{"cp":33},"pv":["d2d3","g8f6","b1c3","d7d6","a2a4","a7a5","c1e3","f6g4","e1g1","g4e3"]},
+        {"uci":"b1c3","eval":{"cp":33},"pv":["b1c3","g8f6","d2d3","a7a5","e1g1","e8g8","c3d5","d7d6"]},
+        {"uci":"h2h3","eval":{"cp":26},"pv":["h2h3","g8f6","d2d3","d7d6","a2a3","e8g8","b1c3","c8e6","c3d5","e6d5"]},
+        {"uci":"c2c3","eval":{"cp":22},"pv":["c2c3","g8f6","d2d4","f6e4","d4e5","e8g8","c4d5","e4c5","c1e3","d7d6"]},
+        {"uci":"a2a4","eval":{"cp":19},"pv":["a2a4","g8f6","d2d3","d7d5","e4d5","f6d5","e1g1","e8g8","f1e1","c8g4"]},
+        {"uci":"c4b3","eval":{"cp":13},"pv":["c4b3","g8f6","d2d3","a7a5","b1c3","e7c5","e1g1","d7d6","h2h3"]},
+        {"uci":"a2a3","eval":{"cp":8},"pv":["a2a3","g8f6","d2d3","d7d5","e4d5","f6d5","e1g1","d5b6","c4b5","f7f6"]},
+        {"uci":"c4b5","eval":{"cp":7},"pv":["c4b5","c6d4","f3d4","e5d4","e1g1","g8f6","e4e5","f6d5","c2c3","c7c6"]},
+        {"uci":"c4d5","eval":{"cp":6},"pv":["c4d5","g8f6","d5c6","d7c6","d2d3","f6d7","h2h3","f7f6","a2a3"]},
+        {"uci":"d1e2","eval":{"cp":-3},"pv":["d1e2","g8f6","e1g1","e8g8","d2d3","d7d6","h2h3","c6a5","c4b3","h7h6"]},
+        {"uci":"b2b3","eval":{"cp":-20},"pv":["b2b3","g8f6","b1c3","e8g8","c1b2","e7c5","a2a3","d7d6","e1g1","c8g4"]},
+        {"uci":"c4e2","eval":{"cp":-30},"pv":["c4e2","g8f6","b1c3","d7d5","e4d5","f6d5","d2d3","e8g8","e1g1","a7a5"]},
+        {"uci":"b1a3","eval":{"cp":-36},"pv":["b1a3","g8f6","d2d3","e8g8","e1g1","d7d5","e4d5","f6d5","h2h3","d5b6"]},
+        {"uci":"h2h4","eval":{"cp":-38},"pv":["h2h4","g8f6","d2d3","d7d6","b1c3","c6a5","a2a4","a5c4","d3c4","e8g8"]},
+        {"uci":"c4f1","eval":{"cp":-62},"pv":["c4f1","g8f6","b1c3","e8g8","d2d4","e5d4","f3d4","e7b4","d4c6","b7c6"]},
+        {"uci":"c4d3","eval":{"cp":-64},"pv":["c4d3","f7f5","e4f5","g8h6","b1c3","d7d5","d3b5","e8g8","d2d4","e5e4"]},
+        {"uci":"b2b4","eval":{"cp":-70},"pv":["b2b4","g8f6","b4b5","c6a5","c4e2","d7d5","c1b2","d5e4","f3e5","e8g8"]},
+        {"uci":"f3g1","eval":{"cp":-72},"pv":["f3g1","g8f6","d2d3","c6a5","g1f3","a5c4","d3c4","f6e4"]},
+        {"uci":"h1g1","eval":{"cp":-81},"pv":["h1g1","g8f6","d2d3","d7d5","e4d5","f6d5","b1c3","c8e6","c1d2","e8g8"]},
+        {"uci":"e1f1","eval":{"cp":-95},"pv":["e1f1","g8f6","d2d3","d7d5","e4d5","f6d5","f1e1","c8e6","c1d2","e8g8"]},
+        {"uci":"e1e2","eval":{"cp":-98},"pv":["e1e2","g8f6","d2d3","d7d5","e4d5","f6d5","e2e1","e8g8","b1c3","d5c3"]},
+        {"uci":"g2g3","eval":{"cp":-104},"pv":["g2g3","g8f6","c4d5","f6d5","e4d5","e5e4","d5c6","e4f3","d1f3","d7c6"]},
+        {"uci":"h1f1","eval":{"cp":-110},"pv":["h1f1","g8f6","d2d3","d7d5","e4d5","f6d5","b1c3","c8e6","c1d2","f7f6"]},
+        {"uci":"g2g4","eval":{"cp":-125},"pv":["g2g4","g8f6","d2d3","d7d5","e4d5","f6d5","h1g1","c8e6","c1d2","e8g8"]},
+        {"uci":"c4f7","eval":{"cp":-317},"pv":["c4f7","e8f7","b1c3","e7f6","d2d4","c6d4","f3d4","e5d4"]},
+        {"uci":"f3e5","eval":{"cp":-335},"pv":["f3e5","c6e5","c4b3","d7d5","b3d5","g8f6","d5b3","c8e6","b3e6","f7e6"]},
+        {"uci":"f3g5","eval":{"cp":-391},"pv":["f3g5","e7g5","e1g1","g5e7","f2f4","d7d6","c4f7","e8f7","f4e5","f7e8"]},
+        {"uci":"f3h4","eval":{"cp":-400},"pv":["f3h4","e7h4","e1g1","h4g5"]},
+        {"uci":"f3d4","eval":{"cp":-439},"pv":["f3d4","c6d4","d1h5","d4e6","c4e6","d7e6","h5e5","g8f6","d2d3","e8g8"]},
+        {"uci":"c4a6","eval":{"cp":-491},"pv":["c4a6","b7a6","d2d4","e5d4","f3d4","g8f6","d4c6","d7c6","d1d8","e7d8"]},
+        {"uci":"c4e6","eval":{"cp":-525},"pv":["c4e6","f7e6","d2d4","d7d6","d4d5","c6b8","c2c4","g8f6"]}
+      ],
+      "threats": [
+        {"uci":"g8f6","eval":{"cp":30},"pv":["g8f6","d2d3","d7d5","e4d5","f6d5","e1g1","c8g4","h2h3","g4h5","b1c3"]},
+        {"uci":"d7d6","eval":{"cp":10},"pv":["d7d6","a2a3","g8f6","d2d3","d6d5","e4d5","f6d5","e1g1","c8g4","f1e1"]},
+        {"uci":"a7a6","eval":{"cp":-10},"pv":["a7a6","b1c3","d7d6","a2a4","c8e6","d2d3","e6c4","d3c4","g8f6","h2h3"]},
+        {"uci":"e7f6","eval":{"cp":-17},"pv":["e7f6","d2d3","g8e7","b1c3","e8g8","e1g1","c6d4","f3d4","e5d4","c3d5"]},
+        {"uci":"h7h6","eval":{"cp":-35},"pv":["h7h6","d2d4","e5d4","c2c3","g8f6","e4e5","f6h7","c3d4","d7d5","c4d3"]},
+        {"uci":"a7a5","eval":{"cp":-44},"pv":["a7a5","d2d4","e5d4","c2c3","d7d6","c3d4","g8f6","b1c3","f6e4","d1b3"]}
+      ]
+    },
+    "parsed": {
+      "about": true,
+      "move": { "said": "knight g5", "san": "Ng5" },
+      "claims": [
+        {
+          "said": "knight g5 attacks f7",
+          "kind": "attacks",
+          "side": "me",
+          "piece": "N",
+          "square": "g5",
+          "target": "f7",
+          "moves": [],
+          "afterMove": true,
+          "eval": "",
+          "gain": ""
+        },
+        {
+          "said": "it wins the f7 pawn",
+          "kind": "wins",
+          "side": "me",
+          "piece": "",
+          "square": "",
+          "target": "",
+          "moves": ["Ng5"],
+          "afterMove": false,
+          "eval": "",
+          "gain": "pawn"
+        },
+        {
+          "said": "if he plays d5 I take on d5",
+          "kind": "line",
+          "side": "opponent",
+          "piece": "",
+          "square": "",
+          "target": "",
+          "moves": ["d5","exd5"],
+          "afterMove": true,
+          "eval": "",
+          "gain": ""
+        }
+      ]
+    },
+    "expect": {
+      "understood": true,
+      "move": { "san": "Ng5", "grade": "blunder" },
+      "claims": [
+        { "verdict": "right" },
+        { "verdict": "wrong" },
+        { "verdict": "partly" }
+      ],
+      "missed": [],
+      "habits": { "threats": "none", "forcing": "none", "safety": "missed" },
+      "best": null,
+      "nudge": "Look at your d-pawn."
+    },
+    "notes": ["After Ng5, Bxg5 wins a piece.","but Bxg5 is better for them"]
+  },
+  {
+    "name": "scholar's mate: Qxf7 is mate",
+    "fen": "r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4",
+    "said": "his knight on f6 attacks my queen, but queen takes f7 is checkmate",
+    "typed": false,
+    "reveal": false,
+    "facts": {
+      "depth": 12,
+      "moves": [
+        {"uci":"h5f7","eval":{"mate":1},"pv":["h5f7"]},
+        {"uci":"h5h4","eval":{"cp":-133},"pv":["h5h4","d7d5","e4d5","c6d4","g1f3","d4f5","h4h3","f6d5","b1c3"]},
+        {"uci":"h5g5","eval":{"cp":-184},"pv":["h5g5","f6e4","g5d8","c6d8","b1c3","e4c3","g1f3"]},
+        {"uci":"h5d1","eval":{"cp":-194},"pv":["h5d1","f6e4","b1c3","e4f6","c4b3","d7d5","d2d3","f8e7","g1f3","c8g4"]},
+        {"uci":"h5e2","eval":{"cp":-217},"pv":["h5e2","c6d4","e2d1","f6e4","g1f3","d7d5","f3d4","e5d4","c4e2","f8e7"]},
+        {"uci":"h5f3","eval":{"cp":-219},"pv":["h5f3","c6d4","f3d1","f6e4","g1f3","d7d5","f3d4","d5c4","d4f3"]},
+        {"uci":"c4f7","eval":{"cp":-390},"pv":["c4f7","e8e7","d2d3","f6h5","f7h5","e7e6","g1f3","d7d5","f3g5","e6f6"]},
+        {"uci":"h5f5","eval":{"cp":-526},"pv":["h5f5","d7d5","e4d5","c8f5","d5c6","f5e4","c6b7","e4b7","g1f3","b7f3"]},
+        {"uci":"h5h3","eval":{"cp":-602},"pv":["h5h3","d7d5","e4d5","c8h3","g1h3","c6d4","h3g5","d4c2","e1f1","c2d4"]},
+        {"uci":"c4e2","eval":{"cp":-607},"pv":["c4e2","f6h5","e2h5","c6d4"]},
+        {"uci":"d2d3","eval":{"cp":-619},"pv":["d2d3","f6h5","g1f3","d8e7","f3g5","f7f6","g5f7","h8g8"]},
+        {"uci":"g2g4","eval":{"cp":-620},"pv":["g2g4","f6h5","g4h5","c6d4","c2c3","d4c2","e1d1","c2a1","g1f3","d7d5"]},
+        {"uci":"g1f3","eval":{"cp":-639},"pv":["g1f3","f6h5","g2g4","h5f4","d2d4","f4g2","e1f1","g2f4","b1c3"]},
+        {"uci":"g1e2","eval":{"cp":-644},"pv":["g1e2","f6h5","g2g4","h5f4","b1c3","f4e2","c3e2","c6d4","e2d4","e5d4"]},
+        {"uci":"g1h3","eval":{"cp":-654},"pv":["g1h3","f6h5"]},
+        {"uci":"b1c3","eval":{"cp":-660},"pv":["b1c3","f6h5","g2g4","c6d4","g4h5","d4c2","e1e2","c2a1","g1f3","d7d5"]},
+        {"uci":"a2a3","eval":{"cp":-660},"pv":["a2a3","f6h5","b1c3","d7d6","g1f3","c8d7","c4d5","d8b8","f3g5"]},
+        {"uci":"d2d4","eval":{"cp":-663},"pv":["d2d4","f6h5","d4e5","c6e5","c4e2","c7c6","e2h5"]},
+        {"uci":"h5e5","eval":{"cp":-665},"pv":["h5e5","c6e5","c4e2","e5g6","b1c3","d7d6","d2d4","c7c6","g1f3","d6d5"]},
+        {"uci":"h5g4","eval":{"cp":-667},"pv":["h5g4","f6g4","g1f3","d7d6","b1c3","a7a6","c4d5","c6d4","f3d4","e5d4"]},
+        {"uci":"c4d5","eval":{"cp":-667},"pv":["c4d5","f6h5","b1c3","c6d4","g1f3","d4c2","e1d1","c2d4"]},
+        {"uci":"c4b3","eval":{"cp":-667},"pv":["c4b3","f6h5","g1f3","d7d6","b1c3","c8d7"]},
+        {"uci":"h5h7","eval":{"cp":-667},"pv":["h5h7","h8h7","g1f3","d7d5","e4d5","c6d4","f3g5","d4c2","e1d1","c2a1"]},
+        {"uci":"g2g3","eval":{"cp":-671},"pv":["g2g3","f6h5","g1f3","d7d6","b1c3","f7f6","c3b5"]},
+        {"uci":"h2h4","eval":{"cp":-674},"pv":["h2h4","f6h5","g1f3","f7f6","g2g4","h5f4","b1c3","d7d6","g4g5","c8g4"]},
+        {"uci":"c2c3","eval":{"cp":-674},"pv":["c2c3","f6h5","g1e2","d8e7","c4d5","h5f6"]},
+        {"uci":"a2a4","eval":{"cp":-676},"pv":["a2a4","f6h5","g1f3","h5f4","g2g3","f4e6","b1c3","d7d6"]},
+        {"uci":"b2b4","eval":{"cp":-676},"pv":["b2b4","f6h5","g1f3","d8e7","b1c3","c6b4","c3b5","c7c6"]},
+        {"uci":"c4b5","eval":{"cp":-676},"pv":["c4b5","f6h5","g1f3","d7d6","d2d4","d8e7","d4e5"]},
+        {"uci":"h2h3","eval":{"cp":-679},"pv":["h2h3","f6h5","b1c3","d7d6","g1f3"]},
+        {"uci":"b2b3","eval":{"cp":-680},"pv":["b2b3","f6h5","g1f3","d7d6","b1c3","f7f6","c4d5","d8d7","c3b5","h5f4"]},
+        {"uci":"f2f4","eval":{"cp":-682},"pv":["f2f4","f6h5","g1f3","e5f4","b1c3","d7d6","d2d4","a7a6","e4e5","d6e5"]},
+        {"uci":"f2f3","eval":{"cp":-689},"pv":["f2f3","f6h5","g2g4","h5f4","g1e2","f4e6","c4e6","d7e6"]},
+        {"uci":"b1a3","eval":{"cp":-691},"pv":["b1a3","f6h5","g1e2","d7d6"]},
+        {"uci":"h5h6","eval":{"cp":-692},"pv":["h5h6","g7h6","g1e2","d8e7"]},
+        {"uci":"e1d1","eval":{"cp":-696},"pv":["e1d1","f6h5","d2d3","d7d6","b1c3","c8d7","g1f3","d7g4","c3d5","g4f3"]},
+        {"uci":"c4e6","eval":{"cp":-713},"pv":["c4e6","f6h5","e6b3","d7d6","b1c3","h5f4","g2g3","f4e6","g1f3","c8d7"]},
+        {"uci":"c4d3","eval":{"cp":-719},"pv":["c4d3","f6h5","b1c3","h5f4","d3f1","c6d4","g1f3","d4c2","e1d1","c2a1"]},
+        {"uci":"h5g6","eval":{"cp":-719},"pv":["h5g6","h7g6","b1c3","c6d4","d2d3","c7c6"]},
+        {"uci":"c4f1","eval":{"cp":-720},"pv":["c4f1","f6h5","g1f3","d7d6","f1b5","c8d7","b5c6","d7c6","d2d3","d8b8"]}
+      ],
+      "threats": [
+        {"uci":"f6h5","eval":{"cp":675},"pv":["f6h5","d2d3","c6b4","g1f3","d7d6","f3g5"]},
+        {"uci":"d7d5","eval":{"cp":594},"pv":["d7d5","c4d5","f6h5","c2c3","c6b4","c3b4","f8b4"]},
+        {"uci":"g7g6","eval":{"cp":228},"pv":["g7g6","h5g5","f6e4","g5d8","c6d8","b1c3","e4c3","b2c3","d7d6","d2d4"]},
+        {"uci":"d8e7","eval":{"cp":213},"pv":["d8e7","h5e2","c6d4","e2d1","f6e4","b1c3","e4f6","g1f3","c7c6","e1g1"]},
+        {"uci":"e8e7","eval":{"cp":-236},"pv":["e8e7","h5f7","e7d6","g1f3","d8e7","d2d3","e7f7","c4f7","d6e7","f7b3"]},
+        {"uci":"f6d5","eval":{"cp":-481},"pv":["f6d5","c4d5","d8f6","d2d3","g7g6","h5d1","f8c5","g1f3"]}
+      ]
+    },
+    "parsed": {
+      "about": true,
+      "move": { "said": "queen takes f7", "san": "Qxf7#" },
+      "claims": [
+        {
+          "said": "his knight on f6 attacks my queen",
+          "kind": "attacks",
+          "side": "opponent",
+          "piece": "N",
+          "square": "f6",
+          "target": "h5",
+          "moves": [],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        },
+        {
+          "said": "queen takes f7 is checkmate",
+          "kind": "mate",
+          "side": "me",
+          "piece": "Q",
+          "square": "",
+          "target": "",
+          "moves": ["Qxf7#"],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        }
+      ]
+    },
+    "expect": {
+      "understood": true,
+      "move": { "san": "Qxf7#", "grade": "checkmate" },
+      "claims": [
+        { "verdict": "right" },
+        { "verdict": "right" }
+      ],
+      "missed": [],
+      "habits": { "threats": "none", "forcing": "good", "safety": "good" },
+      "best": null,
+      "nudge": null
+    },
+    "notes": ["Qxf7# is checkmate."]
+  },
+  {
+    "name": "scholar's mate defended: Qxf7 is not mate",
+    "fen": "r1b1kbnr/ppppqppp/2n5/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4",
+    "said": "queen takes f7 is mate, his queen doesn't defend f7",
+    "typed": false,
+    "reveal": false,
+    "facts": {
+      "depth": 12,
+      "moves": [
+        {"uci":"d2d3","eval":{"cp":-15},"pv":["d2d3","g8f6","h5d1","c6a5","b1c3","a5c4","d3c4","e7e6","d1d3","f8b4"]},
+        {"uci":"c2c3","eval":{"cp":-20},"pv":["c2c3","c6a5","c4b5","c7c6","b5a4","d7d5","d2d3","g8f6","h5e2","b7b5"]},
+        {"uci":"h5d1","eval":{"cp":-23},"pv":["h5d1","e7g5","g2g3","f8c5","d2d3","g5f6","g1f3","d7d6","b1c3","g8e7"]},
+        {"uci":"b1c3","eval":{"cp":-27},"pv":["b1c3","c6d4","h5d1","c7c6","g1f3","b7b5","c4e2","g7g6","f3d4","e5d4"]},
+        {"uci":"g1f3","eval":{"cp":-28},"pv":["g1f3","g8f6","h5h4","d7d5","e4d5","c6b4","e1d1","c8g4","b1c3","e8c8"]},
+        {"uci":"g1e2","eval":{"cp":-47},"pv":["g1e2","g8f6","h5f3","c6b4","b1a3","d7d5","e4d5","c8g4","f3b3","e8c8"]},
+        {"uci":"h5e2","eval":{"cp":-57},"pv":["h5e2","c6d4","e2d1","b7b5","c4e2","c8b7","d2d3","d7d5","e4d5","e8c8"]},
+        {"uci":"h5f3","eval":{"cp":-63},"pv":["h5f3","c6d4","f3d1","g8f6","c2c3","b7b5","c3d4","b5c4","g1f3","e5d4"]},
+        {"uci":"c4d5","eval":{"cp":-108},"pv":["c4d5","c6d4","h5d1","c7c6","d5b3","g8f6","d2d3","d7d5","g1f3","d5e4"]},
+        {"uci":"h2h3","eval":{"cp":-128},"pv":["h2h3","g8f6","h5d1","f6e4","d2d3","e4f6","b1c3","e7d8","g1f3","d7d5"]},
+        {"uci":"b1a3","eval":{"cp":-129},"pv":["b1a3","g8f6","h5e2","c6d4","e2e3","e7a3","e3d4","e5d4","b2a3","f6e4"]},
+        {"uci":"a2a3","eval":{"cp":-145},"pv":["a2a3","g8f6","h5d1","f6e4","d2d3","e4f6","b1c3","e7d8","c3d5","f6d5"]},
+        {"uci":"c4b3","eval":{"cp":-151},"pv":["c4b3","g8f6","h5e2","c6d4","e2d1","f6e4","g1e2","e7f6","e1g1","d4b3"]},
+        {"uci":"c4d3","eval":{"cp":-153},"pv":["c4d3","g8f6","h5d1","c6b4","b1c3","d7d5","e4d5","b4d3","c2d3","c8g4"]},
+        {"uci":"e1d1","eval":{"cp":-153},"pv":["e1d1","g8f6","h5e2","c6d4","e2e1","b7b5","c4d3","c8b7","g1e2","e8c8"]},
+        {"uci":"g1h3","eval":{"cp":-161},"pv":["g1h3","g8f6","h5d1","f6e4","d2d3","e4f6","b1c3","e7d8","c1g5","d7d6"]},
+        {"uci":"a2a4","eval":{"cp":-166},"pv":["a2a4","g8f6","h5d1","f6e4","d2d3","e4f6","b1c3","e7d8","c3d5","f6d5"]},
+        {"uci":"d2d4","eval":{"cp":-176},"pv":["d2d4","g8f6","h5d1","f6e4","g1f3","c6d4","e1g1","d4f3","d1f3","e4f6"]},
+        {"uci":"h2h4","eval":{"cp":-178},"pv":["h2h4","g8f6","h5d1","f6e4","d2d3","e4f6","b1c3","e7d8","c3d5","f6d5"]},
+        {"uci":"b2b3","eval":{"cp":-180},"pv":["b2b3","g8f6","h5d1","f6e4","g1f3","e7c5","e1g1","d7d5","c4e2","c8g4"]},
+        {"uci":"g2g3","eval":{"cp":-194},"pv":["g2g3","g8f6","h5d1","f6e4","d2d3","e4f6","b1c3","h7h6","g1e2","d7d6"]},
+        {"uci":"b2b4","eval":{"cp":-220},"pv":["b2b4","g8f6","h5e2","c6d4","e2d1","f6e4","g1e2","e4f6","c2c3","d4e2"]},
+        {"uci":"e1f1","eval":{"cp":-225},"pv":["e1f1","g8f6","h5d1","f6e4","d2d3","e4f6","b1c3","h7h6","h2h3","d7d6"]},
+        {"uci":"c4b5","eval":{"cp":-229},"pv":["c4b5","g8f6","h5d1","f6e4","b5c6","d7c6","d2d3","e4f6","b1c3","c8g4"]},
+        {"uci":"c4f1","eval":{"cp":-236},"pv":["c4f1","g8f6","h5e2","d7d5","e4d5","c6d4","e2d1","c8f5","d2d3","f6d5"]},
+        {"uci":"c4e2","eval":{"cp":-255},"pv":["c4e2","g8f6","h5g5","f6e4","g5e7","f8e7","b1c3","e4c3","b2c3","d7d6"]},
+        {"uci":"f2f4","eval":{"cp":-258},"pv":["f2f4","g8f6","h5d1","e5f4","b1c3","f6e4","c3e4","f7f5","g1h3","e7e4"]},
+        {"uci":"g2g4","eval":{"cp":-293},"pv":["g2g4","g8f6","h5h3","c6d4","b1a3","f6e4","c2c3","d4e6","d2d3"]},
+        {"uci":"h5f7","eval":{"cp":-451},"pv":["h5f7","e7f7","c4f7","e8f7","b1c3","c6d4","c3d5","f8d6","g1e2","g8f6"]},
+        {"uci":"f2f3","eval":{"cp":-456},"pv":["f2f3","g7g6","h5g4","d7d5","e4d5","c8g4","d5c6","e8c8","c6b7","c8b8"]},
+        {"uci":"c4f7","eval":{"cp":-459},"pv":["c4f7","e7f7","h5f7","e8f7","b1c3","g8f6","d2d3","c6d4","f2f4","d7d6"]},
+        {"uci":"h5h3","eval":{"cp":-512},"pv":["h5h3","d7d5","h3c8","a8c8","c4d5","g8f6","d5c6","b7c6","d2d3","e7d7"]},
+        {"uci":"h5f5","eval":{"cp":-518},"pv":["h5f5","d7d5","f5c8","a8c8","c4d5","e8d8","g1f3"]},
+        {"uci":"h5g4","eval":{"cp":-531},"pv":["h5g4","d7d5","e4d5","c8g4","d5c6","b7c6","h2h3","g4d7","g1f3","e8d8"]},
+        {"uci":"e1e2","eval":{"cp":-539},"pv":["e1e2","g7g6","h5f3","c6d4","e2e1","d4f3","g1f3","c7c6","d2d3","b7b5"]},
+        {"uci":"c4a6","eval":{"cp":-540},"pv":["c4a6","b7a6","b1c3","g8f6","h5d1","h7h5","g1e2","c8b7","e1g1","h5h4"]},
+        {"uci":"c4e6","eval":{"cp":-576},"pv":["c4e6","e7e6","b1c3","g8f6","h5d1","d7d6","d2d3","h7h6","f2f4"]},
+        {"uci":"h5e5","eval":{"cp":-644},"pv":["h5e5","c6e5","c4b3","e5g6","b1c3","c7c6","g1f3"]},
+        {"uci":"h5h4","eval":{"cp":-658},"pv":["h5h4","e7h4","b1c3","c6d4"]},
+        {"uci":"h5h6","eval":{"cp":-678},"pv":["h5h6","g8h6","b1c3","c6b4","c3b5","b4c2","e1d1"]}
+      ],
+      "threats": [
+        {"uci":"g8f6","eval":{"cp":183},"pv":["g8f6","h5e2","c6d4","e2d1","f6e4","g1f3","e4d6","f3d4","d6c4","d4f3"]},
+        {"uci":"b7b5","eval":{"cp":91},"pv":["b7b5","c4b5","c6d4","b1a3","g8f6","h5h4","c8b7","g1e2","a7a6","e2d4"]},
+        {"uci":"c6d4","eval":{"cp":70},"pv":["c6d4","h5d1","g8f6","c2c3","b7b5","c3d4","b5c4","g1f3","e5d4","e1g1"]},
+        {"uci":"a7a6","eval":{"cp":49},"pv":["a7a6","b1c3","c6d4","h5d1","b7b5","c3d5","e7d8","c4b3","g8f6","d2d3"]},
+        {"uci":"a8b8","eval":{"cp":38},"pv":["a8b8","c2c3","b7b5","c4b3","g8f6","h5e2","a7a5","g1f3"]},
+        {"uci":"b7b6","eval":{"cp":34},"pv":["b7b6","b1c3","g8f6","h5d1","c8b7","d2d3","e8c8"]}
+      ]
+    },
+    "parsed": {
+      "about": true,
+      "move": { "said": "queen takes f7", "san": "Qxf7" },
+      "claims": [
+        {
+          "said": "queen takes f7 is mate",
+          "kind": "mate",
+          "side": "me",
+          "piece": "Q",
+          "square": "",
+          "target": "",
+          "moves": ["Qxf7"],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        },
+        {
+          "said": "his queen defends f7",
+          "kind": "defends",
+          "side": "opponent",
+          "piece": "Q",
+          "square": "e7",
+          "target": "f7",
+          "moves": [],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        }
+      ]
+    },
+    "expect": {
+      "understood": true,
+      "move": { "san": "Qxf7+", "grade": "blunder" },
+      "claims": [
+        { "verdict": "wrong" },
+        { "verdict": "right" }
+      ],
+      "missed": [],
+      "habits": { "threats": "none", "forcing": "none", "safety": "missed" },
+      "best": null,
+      "nudge": "Look at your d-pawn."
+    },
+    "notes": ["isn't mate: the queen on e7 takes it","The queen on e7 covers f7."]
+  },
+  {
+    "name": "rook ending: promote with check",
+    "fen": "6k1/4P3/3K4/8/8/8/1r6/8 w - - 0 50",
+    "said": "I push to e8 and make a queen, that's check, and I'm completely winning",
+    "typed": false,
+    "reveal": false,
+    "facts": {
+      "depth": 12,
+      "moves": [
+        {"uci":"e7e8q","eval":{"cp":538},"pv":["e7e8q","g8h7","e8f7","h7h8","f7f6","h8h7","f6b2","h7h6","b2a3","h6g5"]},
+        {"uci":"e7e8r","eval":{"cp":11},"pv":["e7e8r","g8g7","e8e1","g7f8","e1g1","b2d2","d6c7","d2c2","c7d6"]},
+        {"uci":"e7e8b","eval":{"cp":-20},"pv":["e7e8b","b2e2","e8c6","g8h8","c6d7","e2e3"]},
+        {"uci":"e7e8n","eval":{"cp":-25},"pv":["e7e8n","b2b6","d6c7","b6e6","e8d6","e6e7","c7b8","e7e8","b8c7"]},
+        {"uci":"d6c7","eval":{"cp":-518},"pv":["d6c7","g8f7","c7d8","b2d2","d8c8","f7e7","c8c7","e7f7","c7c8","d2e2"]},
+        {"uci":"d6d7","eval":{"cp":-518},"pv":["d6d7","b2b7","d7e6","b7b8","e6d7","g8f7","e7e8r","b8e8","d7c7","e8e3"]},
+        {"uci":"d6e6","eval":{"cp":-519},"pv":["d6e6","b2b8","e6d7","g8f7","e7e8r","b8e8","d7c7","f7g8","c7d6","e8a8"]},
+        {"uci":"d6e5","eval":{"cp":-530},"pv":["d6e5","g8f7","e7e8q","f7e8","e5d6","b2e2","d6c7","e2e1","c7c8","e1c1"]},
+        {"uci":"d6c6","eval":{"cp":-541},"pv":["d6c6","g8f7","c6d7","b2d2","d7c8","f7e8","c8b7","d2b2","b7c8","b2c2"]},
+        {"uci":"d6c5","eval":{"cp":-541},"pv":["d6c5","g8f7","e7e8q","f7e8","c5d6","b2b7"]},
+        {"uci":"d6d5","eval":{"cp":-547},"pv":["d6d5","g8f7","d5c6","f7e7","c6d5"]}
+      ],
+      "threats": [
+        {"uci":"b2d2","eval":{"cp":533},"pv":["b2d2","d6e6","d2e2","e6d6","g8f7","e7e8q","f7e8","d6c7","e2d2","c7c6"]},
+        {"uci":"g8f7","eval":{"cp":525},"pv":["g8f7","e7e8r","f7e8","d6c7","b2d2","c7c8","d2c2","c8b7"]},
+        {"uci":"b2e2","eval":{"cp":520},"pv":["b2e2","d6d7","g8f7","e7e8q","e2e8","d7d6","e8e7","d6d5","f7f8","d5d6"]},
+        {"uci":"b2b6","eval":{"cp":518},"pv":["b2b6","d6d7","b6b7","d7e6","b7b8","e6f6","b8b6","f6e5","g8f7","e7e8q"]},
+        {"uci":"b2b8","eval":{"cp":509},"pv":["b2b8","d6e6","b8b6","e6d7","b6b7","d7d8","b7b8","d8c7","b8e8","c7d6"]},
+        {"uci":"g8g7","eval":{"cp":-256},"pv":["g8g7","e7e8q","b2d2","d6c5","d2c2","c5b4","c2c1"]}
+      ]
+    },
+    "parsed": {
+      "about": true,
+      "move": { "said": "I push to e8 and make a queen", "san": "e8" },
+      "claims": [
+        {
+          "said": "that's check",
+          "kind": "check",
+          "side": "me",
+          "piece": "",
+          "square": "",
+          "target": "",
+          "moves": ["e8=Q+"],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        },
+        {
+          "said": "I'm completely winning",
+          "kind": "eval",
+          "side": "me",
+          "piece": "",
+          "square": "",
+          "target": "",
+          "moves": [],
+          "afterMove": false,
+          "eval": "winning",
+          "gain": ""
+        }
+      ]
+    },
+    "expect": {
+      "understood": true,
+      "move": { "san": "e8=Q+", "grade": "best" },
+      "claims": [
+        { "verdict": "right" },
+        { "verdict": "right" }
+      ],
+      "missed": [],
+      "habits": { "threats": "none", "forcing": "good", "safety": "good" },
+      "best": null,
+      "nudge": null
+    },
+    "notes": ["e8=Q+ is check."]
+  },
+  {
+    "name": "french advance: en passant doesn't win a pawn",
+    "fen": "r2qkbnr/pp1b2pp/2n1p3/2ppPp2/3P4/2P2N2/PP2BPPP/RNBQK2R w KQkq f6 0 7",
+    "said": "he just pushed f5, so I take en passant on f6 and win a pawn, his f-pawn is basically hanging",
+    "typed": false,
+    "reveal": true,
+    "lastMove": "f7f5",
+    "facts": {
+      "depth": 12,
+      "moves": [
+        {"uci":"e1g1","eval":{"cp":113},"pv":["e1g1","a7a6","c3c4","g8e7","d4c5","d5c4","b1c3","e7g6","c3a4","c6e5"]},
+        {"uci":"h2h3","eval":{"cp":96},"pv":["h2h3","f8e7","e1g1","c5d4","c3d4","g8h6","c1h6","g7h6","d1d2","e7g5"]},
+        {"uci":"c1e3","eval":{"cp":94},"pv":["c1e3","d8b6","d1d2","c5d4","c3d4","f8b4","b1c3","g8e7","h2h4","a8c8"]},
+        {"uci":"g2g3","eval":{"cp":92},"pv":["g2g3","f8e7","e1g1","c5d4","c3d4","g8h6","b1c3","h6f7","h2h4","e8g8"]},
+        {"uci":"a2a4","eval":{"cp":87},"pv":["a2a4","a7a6","e1g1","c5d4","c3d4","f8b4","f3e1","b4e1","f1e1","g8e7"]},
+        {"uci":"c1f4","eval":{"cp":72},"pv":["c1f4","d8b6","d1d2","c5d4","c3d4","f8b4","b1c3","g8e7","h2h4","c6a5"]},
+        {"uci":"e2b5","eval":{"cp":68},"pv":["e2b5","f8e7","a2a4","c5d4","c3d4","g8h6","c1h6","g7h6","b1c3"]},
+        {"uci":"e1f1","eval":{"cp":67},"pv":["e1f1","g8h6","g2g3","h6f7","h2h4","f8e7","f1g2","e8g8","b1a3","c5d4"]},
+        {"uci":"h2h4","eval":{"cp":67},"pv":["h2h4","f8e7","b1a3","g8h6","c1h6","g7h6","a3b5","a7a6","b5d6","e7d6"]},
+        {"uci":"b2b3","eval":{"cp":67},"pv":["b2b3","g8h6","c1h6","g7h6","e1g1","c5d4","c3d4","d8a5","a2a3","f8e7"]},
+        {"uci":"c3c4","eval":{"cp":64},"pv":["c3c4","d5c4","d4d5","e6d5","d1d5","d8e7","e1g1"]},
+        {"uci":"b1a3","eval":{"cp":63},"pv":["b1a3","c5d4","c3d4","f8a3","b2a3","g8e7","a1b1","c6a5","c1d2","e8g8"]},
+        {"uci":"d1c2","eval":{"cp":63},"pv":["d1c2","c5d4","c3d4","f8e7","b1c3","g7g5","g2g3"]},
+        {"uci":"b1d2","eval":{"cp":63},"pv":["b1d2","a7a5","a2a4","c5d4","c3d4","g7g5","h2h3"]},
+        {"uci":"d1d3","eval":{"cp":60},"pv":["d1d3","a7a6","c1e3","g8h6","e3h6","g7h6","e1g1","h8g8","d3d2","d8e7"]},
+        {"uci":"a2a3","eval":{"cp":57},"pv":["a2a3","c5c4","b2b4","c4b3","d1b3","c6a5","b3c2","f8e7","a3a4","a8c8"]},
+        {"uci":"e2d3","eval":{"cp":56},"pv":["e2d3","g8h6","c1h6","g7h6","d1d2","d8e7","g2g3","e7g7","d2e3","c5d4"]},
+        {"uci":"d4c5","eval":{"cp":56},"pv":["d4c5","f8c5","e1g1","c5b6","c3c4","g8e7","b1c3","d5c4","e2c4","e8g8"]},
+        {"uci":"f3g5","eval":{"cp":49},"pv":["f3g5","d8b6","g5f3","g8h6","c1h6","g7h6","d1d2"]},
+        {"uci":"c1g5","eval":{"cp":48},"pv":["c1g5","d8b6","e1g1","b6b2","b1d2","c5c4","a1b1","b2a2","b1b7","h7h6"]},
+        {"uci":"f3g1","eval":{"cp":44},"pv":["f3g1","d8b6","g1f3","g8h6","c1h6","b6b2","h6d2","b2a1","d1c2"]},
+        {"uci":"d1b3","eval":{"cp":43},"pv":["d1b3","g8h6","c1h6","g7h6","e1g1","d8b6","b3b6","a7b6","b1a3","f8e7"]},
+        {"uci":"c1d2","eval":{"cp":40},"pv":["c1d2","d8b6","d2c1","g8h6","c1h6","g7h6","d1d2","e8c8","e1g1","c8b8"]},
+        {"uci":"e2f1","eval":{"cp":39},"pv":["e2f1","d8b6","f1e2","g8h6","c1h6","g7h6","d1d2","e8c8","e1g1","c8b8"]},
+        {"uci":"d1d2","eval":{"cp":37},"pv":["d1d2","g8h6","e1g1","h6f7","b1a3","c5d4","c3d4","f8b4","d2d1","e8g8"]},
+        {"uci":"h1g1","eval":{"cp":23},"pv":["h1g1","d8b6","e1f1","f5f4","g2g3","g8h6","f1g2","f8e7","b1a3","c5d4"]},
+        {"uci":"b2b4","eval":{"cp":15},"pv":["b2b4","c5b4","e1g1","a8c8","c1d2","f8e7","c3b4","e7b4","b1c3","b4c3"]},
+        {"uci":"h1f1","eval":{"cp":13},"pv":["h1f1","g8h6","f1h1","f8e7","b1a3","h6f7","h2h4","d8b6","a3c2","e8g8"]},
+        {"uci":"e5f6","eval":{"cp":7},"pv":["e5f6","g8f6","c1f4","c5d4","f3d4","f8c5","e1g1","e8g8","d4c6","b7c6"]},
+        {"uci":"e1d2","eval":{"cp":-71},"pv":["e1d2","g7g5","h2h3","g5g4","h3g4","f5g4","f3h2","c5d4","h2g4"]},
+        {"uci":"f3d2","eval":{"cp":-83},"pv":["f3d2","c5d4","d2f3","d4c3","b1c3","g8h6","c1g5","d8b6","c3a4","f8b4"]},
+        {"uci":"g2g4","eval":{"cp":-156},"pv":["g2g4","f5g4","f3g5","f8e7","h2h4","c5d4","e2g4","e7g5","h4g5"]},
+        {"uci":"d1a4","eval":{"cp":-165},"pv":["d1a4","c6e5","a4b3","e5f3","e2f3","f8d6","b3b7","a8b8","b7a7"]},
+        {"uci":"e2c4","eval":{"cp":-363},"pv":["e2c4","d5c4","d4d5","e6d5","e1g1","d7e6","f3g5","d8d7","b1a3","e8c8"]},
+        {"uci":"f3h4","eval":{"cp":-413},"pv":["f3h4","d8h4","e1g1","c5d4","d1b3","f8c5","b3b7"]},
+        {"uci":"e2a6","eval":{"cp":-440},"pv":["e2a6","b7a6","e1g1","c5d4","b1d2","d8c7","c3c4","g8e7"]},
+        {"uci":"c1h6","eval":{"cp":-561},"pv":["c1h6","g8h6","b2b4","b7b6","b1a3","a7a6","e1g1","f8e7"]}
+      ],
+      "threats": [
+        {"uci":"f8e7","eval":{"cp":-73},"pv":["f8e7","e1g1","a7a6","c1e3","c5d4","c3d4","g8h6","e3h6","g7h6","d1d2"]},
+        {"uci":"c5d4","eval":{"cp":-76},"pv":["c5d4","c3d4","f8e7","h2h4","g8h6","c1h6","g7h6","d1d2","e8g8","b1c3"]},
+        {"uci":"a7a6","eval":{"cp":-85},"pv":["a7a6","e1g1","f8e7","b1a3","c5d4","c3d4","g8h6","c1h6","g7h6","a3c2"]},
+        {"uci":"g8h6","eval":{"cp":-93},"pv":["g8h6","c1h6","g7h6","e1g1","d8e7","b1a3","e7g7","a3b5"]},
+        {"uci":"d8c7","eval":{"cp":-95},"pv":["d8c7","e1g1","a7a6","c3c4","d5c4","d4d5","e6d5","d1d5","e8c8"]},
+        {"uci":"a8c8","eval":{"cp":-98},"pv":["a8c8","e1g1","a7a6","c1e3","g8h6","e3h6","g7h6","b1d2","f8e7","d4c5"]}
+      ]
+    },
+    "parsed": {
+      "about": true,
+      "move": { "said": "I take en passant on f6", "san": "exf6" },
+      "claims": [
+        {
+          "said": "I take en passant on f6 and win a pawn",
+          "kind": "wins",
+          "side": "me",
+          "piece": "",
+          "square": "",
+          "target": "",
+          "moves": ["exf6"],
+          "afterMove": false,
+          "eval": "",
+          "gain": "pawn"
+        },
+        {
+          "said": "his f-pawn is basically hanging",
+          "kind": "hanging",
+          "side": "opponent",
+          "piece": "P",
+          "square": "f5",
+          "target": "",
+          "moves": [],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        }
+      ]
+    },
+    "expect": {
+      "understood": true,
+      "move": { "san": "exf6", "grade": "inaccuracy" },
+      "claims": [
+        { "verdict": "wrong" },
+        { "verdict": "wrong" }
+      ],
+      "missed": [],
+      "habits": { "threats": "none", "forcing": "none", "safety": "good" },
+      "best": { "san": "O-O" },
+      "nudge": null
+    },
+    "notes": ["after exf6 the pawn on g7 takes back","O-O was stronger"]
+  },
+  {
+    "name": "in check: block with the bishop",
+    "fen": "rnbqk1nr/ppp2ppp/4p3/3p4/1bPP4/5N2/PP2PPPP/RNBQKB1R w KQkq - 2 4",
+    "said": "he's checking me with the bishop, so I'll block with bishop d2, and if he takes I take back with the knight",
+    "typed": false,
+    "reveal": false,
+    "facts": {
+      "depth": 12,
+      "moves": [
+        {"uci":"b1d2","eval":{"cp":66},"pv":["b1d2","g8f6","d1a4","b8c6","e2e3","d5c4"]},
+        {"uci":"c1d2","eval":{"cp":47},"pv":["c1d2","b4e7","b1c3","g8f6","d2f4","d5c4","e2e4","e7b4","d1a4","b8c6"]},
+        {"uci":"b1c3","eval":{"cp":28},"pv":["b1c3","g8f6","d1a4","b8c6","e2e3","b4c3","b2c3","e8g8","f1d3","h7h6"]},
+        {"uci":"f3d2","eval":{"cp":-14},"pv":["f3d2","d5c4","e2e3","b7b5","a2a3","b4d2","c1d2","a7a6","f1e2","c8b7"]},
+        {"uci":"d1d2","eval":{"cp":-531},"pv":["d1d2","b4d2","c1d2","g8f6","d2f4","d5c4","b1c3","e8g8","a2a3","b7b6"]}
+      ],
+      "threats": []
+    },
+    "parsed": {
+      "about": true,
+      "move": { "said": "block with bishop d2", "san": "Bd2" },
+      "claims": [
+        {
+          "said": "he's checking me with the bishop",
+          "kind": "check",
+          "side": "opponent",
+          "piece": "B",
+          "square": "b4",
+          "target": "",
+          "moves": [],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        },
+        {
+          "said": "if he takes I take back with the knight",
+          "kind": "line",
+          "side": "opponent",
+          "piece": "",
+          "square": "",
+          "target": "",
+          "moves": ["Bxd2+","Nbxd2"],
+          "afterMove": true,
+          "eval": "",
+          "gain": ""
+        }
+      ]
+    },
+    "expect": {
+      "understood": true,
+      "move": { "san": "Bd2", "grade": "excellent" },
+      "claims": [
+        { "verdict": "right" },
+        { "verdict": "right" }
+      ],
+      "missed": [],
+      "habits": { "threats": "none", "forcing": "none", "safety": "good" },
+      "best": null,
+      "nudge": null
+    },
+    "notes": ["The bishop on b4 is giving check."]
+  },
+  {
+    "name": "italian: black misses the loose knight on g5",
+    "fen": "r1bqk1nr/ppppbppp/2n5/4p1N1/2B1P3/8/PPPP1PPP/RNBQK2R b KQkq - 5 4",
+    "said": "he's attacking f7 twice and threatens bishop takes f7 check, so I'll defend with knight h6",
+    "typed": false,
+    "reveal": false,
+    "facts": {
+      "depth": 12,
+      "moves": [
+        {"uci":"e7g5","eval":{"cp":457},"pv":["e7g5","b1c3","g8f6","h2h4","g5f4","c3d5","d7d6","c2c3","e8g8","d2d3"]},
+        {"uci":"d7d5","eval":{"cp":241},"pv":["d7d5","g5f7","e8f7","c4d5","f7g6","d5c6","b7c6","d1f3","h7h6","d2d3"]},
+        {"uci":"g8h6","eval":{"cp":-10},"pv":["g8h6","g5f3","e8g8","b1c3","h6g4","d2d3","c6a5","c3d5","a5c4","d3c4"]},
+        {"uci":"e7b4","eval":{"cp":-110},"pv":["e7b4","g5f7","d8h4","f7h8","h4e4","c4e2","e4g2","e2h5","g7g6","h5f3"]},
+        {"uci":"e7c5","eval":{"cp":-133},"pv":["e7c5","g5f7","d8h4","e1g1","d7d5","e4d5","h4c4","f7h8"]},
+        {"uci":"e7d6","eval":{"cp":-252},"pv":["e7d6","g5f7","d8h4","e1g1","d6c5","f7h8","g8f6","c4e2","c6d4","h8f7"]},
+        {"uci":"e7a3","eval":{"cp":-293},"pv":["e7a3","g5f7","d8h4","b1a3","d7d5","f7h8","h4e4","e1f1","d5c4","d2d3"]},
+        {"uci":"e7f8","eval":{"cp":-354},"pv":["e7f8","c4f7","e8e7","f7b3","e7e8","d2d3","d8f6","g5f7","f8c5","e1g1"]},
+        {"uci":"c6b4","eval":{"cp":-378},"pv":["c6b4","g5f7","d7d5","f7d8","d5c4","d2d4","c4d3"]},
+        {"uci":"b7b5","eval":{"cp":-381},"pv":["b7b5","g5f7","b5c4","f7d8","e8d8","d2d4","c4d3","d1d3"]},
+        {"uci":"e8f8","eval":{"cp":-383},"pv":["e8f8","g5f7","d8e8","f7h8","g8f6","h8f7"]},
+        {"uci":"e7f6","eval":{"cp":-390},"pv":["e7f6","g5f7","d8e7","f7h8","d7d5","c4d5","g8h6","d5c6","b7c6","d1h5"]},
+        {"uci":"d7d6","eval":{"cp":-393},"pv":["d7d6","g5f7","d8d7","f7h8","g8f6","d2d3","f6g4","h8g6","h7g6","e1g1"]},
+        {"uci":"g8f6","eval":{"cp":-408},"pv":["g8f6","g5f7","d7d5","f7d8","c8g4","f2f3","d5c4"]},
+        {"uci":"c6a5","eval":{"cp":-439},"pv":["c6a5","g5f7","a5c4","f7d8","d7d5","d2d4","e5d4","d8f7","e8f7","e1g1"]},
+        {"uci":"c6d4","eval":{"cp":-442},"pv":["c6d4","g5f7","d7d5","f7d8","d5c4","c2c3","g8f6","c3d4","f6g4","d1a4"]},
+        {"uci":"f7f5","eval":{"cp":-451},"pv":["f7f5","g5f7","c6a5","f7d8","a5c4","d2d3","c4d6","b1c3","e7d8","d3d4"]},
+        {"uci":"h7h5","eval":{"cp":-473},"pv":["h7h5","g5f7","d7d5","f7d8","c8g4","c4e2","g4e2","d1e2","c6d4","e2d3"]},
+        {"uci":"c6b8","eval":{"cp":-489},"pv":["c6b8","g5f7","d7d5","f7d8","d5c4","d8f7","e8f7","d2d4","b8c6","d4e5"]},
+        {"uci":"a7a6","eval":{"cp":-490},"pv":["a7a6","g5f7","c6a5","f7d8","a5c4","d2d3","c4d6"]},
+        {"uci":"f7f6","eval":{"cp":-502},"pv":["f7f6","g5f7","c6a5","f7d8","a5c4","d8f7"]},
+        {"uci":"b7b6","eval":{"cp":-513},"pv":["b7b6","g5f7","c6a5","d1e2","a5c4","f7d8","e8d8","e2c4","g8f6","a2a3"]},
+        {"uci":"g7g6","eval":{"cp":-527},"pv":["g7g6","g5f7","c6a5","f7d8","a5c4","d2d3","c4d6","a2a4","e8d8","a1a3"]},
+        {"uci":"a8b8","eval":{"cp":-534},"pv":["a8b8","g5f7","c6a5","d1e2","a5c4","f7d8","c4d6","d2d3","e8d8"]},
+        {"uci":"a7a5","eval":{"cp":-555},"pv":["a7a5","g5f7","c6d4","f7d8","b7b5","d8f7","b5c4","f7h8","g8f6","d2d3"]},
+        {"uci":"h7h6","eval":{"cp":-573},"pv":["h7h6","g5f7","c6d4","f7d8","g8f6","d8f7","d7d5","e4d5","e8f7","d5d6"]}
+      ],
+      "threats": [
+        {"uci":"g5f7","eval":{"cp":546},"pv":["g5f7","c6a5","f7d8","a5c4","d8f7","e8f7","d2d3","c4b6","c1d2"]},
+        {"uci":"d1f3","eval":{"cp":285},"pv":["d1f3","e7f6","g5f7","c6d4","f3d3","d8e7","f7h8","d7d5","c4d5"]},
+        {"uci":"d1h5","eval":{"cp":259},"pv":["d1h5","g7g6","h5f3","g8h6","g5f7","c6d4","f7d8","d4f3","g2f3","e7d8"]},
+        {"uci":"c4f7","eval":{"cp":66},"pv":["c4f7","e8f8","f7g8","f8g8","g5f3","d7d5","b1c3","d5e4","c3e4","c8f5"]},
+        {"uci":"f2f4","eval":{"cp":21},"pv":["f2f4","e7g5","f4g5","d8g5","e1g1","g8f6","d2d3","g5g6","b1c3"]},
+        {"uci":"g5f3","eval":{"cp":-6},"pv":["g5f3","g8f6","d2d3","d7d5","e4d5","f6d5","b1c3","d5c3","b2c3","e8g8"]}
+      ]
+    },
+    "parsed": {
+      "about": true,
+      "move": { "said": "defend with knight h6", "san": "Nh6" },
+      "claims": [
+        {
+          "said": "he's attacking f7 twice",
+          "kind": "attacks",
+          "side": "opponent",
+          "piece": "N",
+          "square": "g5",
+          "target": "f7",
+          "moves": [],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        },
+        {
+          "said": "threatens bishop takes f7 check",
+          "kind": "threat",
+          "side": "opponent",
+          "piece": "B",
+          "square": "c4",
+          "target": "f7",
+          "moves": ["Bxf7+"],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        }
+      ]
+    },
+    "expect": {
+      "understood": true,
+      "move": { "san": "Nh6", "grade": "blunder" },
+      "claims": [
+        { "verdict": "right" },
+        { "verdict": "partly" }
+      ],
+      "missed": [
+        { "kind": "free" }
+      ],
+      "habits": { "threats": "good", "forcing": "missed", "safety": "good" },
+      "best": null,
+      "nudge": "Look at your bishop."
+    },
+    "notes": ["Their knight on g5 is loose.","Nxf7 is a bigger one"]
+  },
+  {
+    "name": "petroff trap: Nc6+ wins the queen",
+    "fen": "rnbqkb1r/pppp1ppp/5n2/4N3/8/8/PPPPQPPP/RNB1KB1R w KQkq - 2 5",
+    "said": "knight c6 is a discovered check with my queen and it wins his queen on d8",
+    "typed": false,
+    "reveal": false,
+    "facts": {
+      "depth": 12,
+      "moves": [
+        {"uci":"e5c6","eval":{"cp":541},"pv":["e5c6","f8e7","c6d8","e8g8","e2e7","b8c6","d8c6","d7c6","f1e2","c8g4"]},
+        {"uci":"e5g6","eval":{"cp":255},"pv":["e5g6","f8e7","g6h8","d7d5","h8f7","e8f7","d2d4","b8c6","c1e3","e7b4"]},
+        {"uci":"e5g4","eval":{"cp":113},"pv":["e5g4","f8e7","g4f6","g7f6","d2d4","d7d5","b1c3","c8e6","c1e3","b8c6"]},
+        {"uci":"d2d4","eval":{"cp":-13},"pv":["d2d4","f8e7","e2d1"]},
+        {"uci":"e2d1","eval":{"cp":-17},"pv":["e2d1","d7d6","e5f3","d6d5","d2d4"]},
+        {"uci":"a2a4","eval":{"cp":-26},"pv":["a2a4","f8e7","d2d4","e8g8","e2d1","d7d6","e5f3","d6d5"]},
+        {"uci":"b1c3","eval":{"cp":-27},"pv":["b1c3","f8e7","e2d1","e8g8","d2d4","f8e8"]},
+        {"uci":"g2g3","eval":{"cp":-30},"pv":["g2g3","f8e7","d2d4","d7d6","e5f3","d6d5","f1g2","e8g8","c1e3"]},
+        {"uci":"g2g4","eval":{"cp":-31},"pv":["g2g4","f8e7","g4g5","f6d5","b1c3","d5c3","b2c3","d7d5","d2d4","e8g8"]},
+        {"uci":"e5f3","eval":{"cp":-33},"pv":["e5f3","f8e7","g2g3","d7d5","f1g2","e8g8"]},
+        {"uci":"a2a3","eval":{"cp":-39},"pv":["a2a3","f8e7","d2d4","e8g8","b1c3","d7d6","e5f3","d6d5"]},
+        {"uci":"c2c3","eval":{"cp":-39},"pv":["c2c3","f8e7","e2d1","e8g8","d2d4","b8c6"]},
+        {"uci":"h2h3","eval":{"cp":-42},"pv":["h2h3","f8e7","b1c3","e8g8","d2d4","d7d6","e5f3","f8e8","c1e3"]},
+        {"uci":"d2d3","eval":{"cp":-44},"pv":["d2d3","f8e7","g2g3","d7d5","f1g2","e8g8"]},
+        {"uci":"c2c4","eval":{"cp":-48},"pv":["c2c4","f8e7","e2d1","e8g8","f1e2","d7d5","d2d4","d5c4","e1g1","c8e6"]},
+        {"uci":"e2e3","eval":{"cp":-49},"pv":["e2e3","f8e7","f1e2","e8g8"]},
+        {"uci":"b2b3","eval":{"cp":-49},"pv":["b2b3","f8e7","g2g3","e8g8","f1g2","f8e8","e1g1","e7f8"]},
+        {"uci":"h2h4","eval":{"cp":-71},"pv":["h2h4","f8e7","d2d4","d7d6","e5f3","e8g8","e2d1","f8e8","f1e2","d6d5"]},
+        {"uci":"e2d3","eval":{"cp":-75},"pv":["e2d3","d7d6","e5f3"]},
+        {"uci":"e2c4","eval":{"cp":-78},"pv":["e2c4","d7d5","c4h4","f8e7","d2d4","e8g8","f1d3","f6e4","h4h5","f7f6"]},
+        {"uci":"b1a3","eval":{"cp":-85},"pv":["b1a3","f8e7","d2d4","e8g8","a3c4","d7d6","e5f3","f8e8","c4e3","e7f8"]},
+        {"uci":"h1g1","eval":{"cp":-86},"pv":["h1g1","f8e7","d2d4"]},
+        {"uci":"f2f3","eval":{"cp":-89},"pv":["f2f3","f8e7","d2d4","e8g8","b1c3","c7c6","c1e3","d7d6","e1c1","f8e8"]},
+        {"uci":"e2b5","eval":{"cp":-94},"pv":["e2b5","f8d6","d2d4","e8g8","c1e3","f8e8","b1c3","b8c6","e1c1","c6e5"]},
+        {"uci":"f2f4","eval":{"cp":-104},"pv":["f2f4","f8e7","e2f2","e8g8","f1e2","d7d6","e5f3","c7c5","e1g1","b8c6"]},
+        {"uci":"e5d3","eval":{"cp":-114},"pv":["e5d3","f8e7","e2d1","c7c5","f1e2","e8g8","e1g1","b8c6"]},
+        {"uci":"e5c4","eval":{"cp":-124},"pv":["e5c4","f8e7","e2d1","e8g8","f1e2","d7d5","c4e5"]},
+        {"uci":"e2f3","eval":{"cp":-126},"pv":["e2f3","d7d6","e5d3","d6d5","d3e5","f8d6","d2d4","e8g8","c1e3"]},
+        {"uci":"b2b4","eval":{"cp":-133},"pv":["b2b4","f8e7","a2a3","e8g8","e2d1","c7c5","f1e2","b8c6","e5c6"]},
+        {"uci":"e1d1","eval":{"cp":-174},"pv":["e1d1","f8e7","d1e1","e8g8","e2d1","f8e8","d2d4","c7c5","f1e2","c5d4"]},
+        {"uci":"e5d7","eval":{"cp":-338},"pv":["e5d7","e8d7","g2g4","d8e8","g4g5","e8e2","f1e2","f6d5","b1c3","d5c3"]},
+        {"uci":"e5f7","eval":{"cp":-351},"pv":["e5f7","e8f7","g2g4","d7d5","g4g5","c8g4","f2f3","g4h5","g5f6","d8f6"]},
+        {"uci":"e2h5","eval":{"cp":-637},"pv":["e2h5","f6h5","d2d4","d7d5","f1e2","f8d6","b1c3"]},
+        {"uci":"e2g4","eval":{"cp":-638},"pv":["e2g4","f6g4","e5g4","d7d5","f1e2","c8g4"]},
+        {"uci":"e2a6","eval":{"cp":-674},"pv":["e2a6","b8a6","f1c4","d8e7","b1c3","a6b4","c4f7","e7f7","e5f7"]},
+        {"uci":"e2e4","eval":{"cp":-701},"pv":["e2e4","f6e4","d2d4","d7d6","e5d3","d6d5","d3e5","f8d6","f1d3","a7a6"]}
+      ],
+      "threats": [
+        {"uci":"f8e7","eval":{"cp":59},"pv":["f8e7","e2d1","c7c5","f1e2","d7d6","e5f3","e8g8","e1g1","f8e8","b1c3"]},
+        {"uci":"d8e7","eval":{"cp":21},"pv":["d8e7","d2d4","b8c6","c2c3","d7d6","e5c6","b7c6","b1d2","a7a5","d2c4"]},
+        {"uci":"d7d5","eval":{"cp":-421},"pv":["d7d5","e5c6","f8e7","c6d8","e8g8","d8f7","f8f7","d2d4","c8g4","e2d3"]},
+        {"uci":"f6e4","eval":{"cp":-465},"pv":["f6e4","e2e4","d7d5","e4a4","b8c6","e5c6","b7c6","a4c6","d8d7","c6a8"]},
+        {"uci":"f6d5","eval":{"cp":-476},"pv":["f6d5","e5c6","f8e7","c6d8","e8d8","d2d4","h8e8","c1e3"]},
+        {"uci":"b7b5","eval":{"cp":-509},"pv":["b7b5","e5c6","f8e7","c6d8","e8g8","d2d3","e7d8","c1e3","b8c6","e2d1"]}
+      ]
+    },
+    "parsed": {
+      "about": true,
+      "move": { "said": "knight c6", "san": "Nc6+" },
+      "claims": [
+        {
+          "said": "knight c6 is a discovered check",
+          "kind": "check",
+          "side": "me",
+          "piece": "",
+          "square": "",
+          "target": "",
+          "moves": ["Nc6+"],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        },
+        {
+          "said": "it wins his queen on d8",
+          "kind": "wins",
+          "side": "me",
+          "piece": "",
+          "square": "",
+          "target": "",
+          "moves": ["Nc6+"],
+          "afterMove": false,
+          "eval": "",
+          "gain": "queen"
+        },
+        {
+          "said": "we're even right now",
+          "kind": "material",
+          "side": "me",
+          "piece": "",
+          "square": "",
+          "target": "",
+          "moves": [],
+          "afterMove": false,
+          "eval": "",
+          "gain": "even"
+        }
+      ]
+    },
+    "expect": {
+      "understood": true,
+      "move": { "san": "Nc6+", "grade": "best" },
+      "claims": [
+        { "verdict": "right" },
+        { "verdict": "right" },
+        { "verdict": "right" }
+      ],
+      "missed": [],
+      "habits": { "threats": "none", "forcing": "good", "safety": "good" },
+      "best": null,
+      "nudge": null
+    },
+    "notes": ["Nc6+ wins the queen"]
+  },
+  {
+    "name": "giuoco piano: d4 plan, wrong about the pin",
+    "fen": "r1bqk2r/ppp2ppp/2np1n2/2b1p3/2B1P3/2PP1N2/PP3PPP/RNBQK2R w KQkq - 0 6",
+    "said": "I want to castle and then push d4 in the center. His knight on f6 is pinned, and I'm up a piece",
+    "typed": true,
+    "reveal": false,
+    "facts": {
+      "depth": 12,
+      "moves": [
+        {"uci":"b2b4","eval":{"cp":44},"pv":["b2b4","c5b6","a2a4","a7a5","b4b5","c6e7","b1d2","c7c6","c1a3"]},
+        {"uci":"h2h3","eval":{"cp":27},"pv":["h2h3","a7a5","e1g1","c5a7","c1e3","a7e3","f2e3","c6e7"]},
+        {"uci":"e1g1","eval":{"cp":20},"pv":["e1g1","a7a6","b1d2","c5a7","b2b4","c6e7","d3d4","e7g6","f1e1","e8g8"]},
+        {"uci":"b1d2","eval":{"cp":16},"pv":["b1d2","a7a5","d2f1","c8e6","c4b5","e8g8","f1g3","d6d5","e4d5","e6d5"]},
+        {"uci":"a2a4","eval":{"cp":10},"pv":["a2a4","a7a5","e1g1","e8g8","c1g5","h7h6","g5h4","g7g5","h4g3","g8g7"]},
+        {"uci":"c4b3","eval":{"cp":10},"pv":["c4b3","h7h6","b1d2","a7a5","h2h3","c8e6","b3e6","f7e6","e1g1","d8d7"]},
+        {"uci":"a2a3","eval":{"cp":1},"pv":["a2a3","a7a5","e1g1","h7h6","b1d2","e8g8","h2h3","c5a7","c4a2","c8e6"]},
+        {"uci":"d1e2","eval":{"cp":0},"pv":["d1e2","a7a6","e1g1","c8g4","h2h3","g4h5","a2a4","c5a7"]},
+        {"uci":"c4b5","eval":{"cp":-10},"pv":["c4b5","c5b6","e1g1","h7h6","b1d2","e8g8","a2a4","a7a6","b5c6","b7c6"]},
+        {"uci":"c1d2","eval":{"cp":-13},"pv":["c1d2","a7a6","e1g1","h7h6","a2a4","e8g8","h2h3","c6e7","f1e1","c5a7"]},
+        {"uci":"d1c2","eval":{"cp":-18},"pv":["d1c2","e8g8","e1g1","a7a5","a2a4","g8h8","c1g5","h7h6","g5h4","c5b6"]},
+        {"uci":"c1g5","eval":{"cp":-21},"pv":["c1g5","h7h6","g5h4","d8e7","a2a4","a7a6","h4g3","c5b6","b1a3","g7g5"]},
+        {"uci":"b2b3","eval":{"cp":-22},"pv":["b2b3","a7a6","a2a4","c5a7","e1g1","h7h6","b1d2","e8g8","h2h3","c6e7"]},
+        {"uci":"d1d2","eval":{"cp":-23},"pv":["d1d2","e8g8","e1g1"]},
+        {"uci":"c1e3","eval":{"cp":-23},"pv":["c1e3","c5e3","f2e3","e8g8","c4b3","c6a5","b3a4","d6d5","e4d5","f6d5"]},
+        {"uci":"d1b3","eval":{"cp":-23},"pv":["d1b3","e8g8","b3c2","c5b6","a2a4","a7a5","e1g1","c6e7","d3d4","e5d4"]},
+        {"uci":"d1a4","eval":{"cp":-24},"pv":["d1a4","a7a6","a4d1","c5a7","a2a4","h7h6","e1g1","c6e7","f1e1","e7g6"]},
+        {"uci":"f3g5","eval":{"cp":-27},"pv":["f3g5","e8g8","e1g1","h7h6","g5f3","c6e7","h2h3"]},
+        {"uci":"b1a3","eval":{"cp":-28},"pv":["b1a3","c5a3","b2a3","c8g4","e1g1","c6a5","c4b3","f6d7","h2h3","g4h5"]},
+        {"uci":"d3d4","eval":{"cp":-43},"pv":["d3d4","c5b6","e1g1","e5d4","c3d4","c8g4","d4d5","g4f3","d1f3","c6e5"]},
+        {"uci":"f3d2","eval":{"cp":-49},"pv":["f3d2","f6g4","d1f3","c5f2","e1e2","h8f8","h2h3","d8g5","h3g4","c8g4"]},
+        {"uci":"g2g3","eval":{"cp":-62},"pv":["g2g3","e8g8","a2a4","a7a5","c4b3","c8h3","f3g5","h3g4","f2f3","g4h5"]},
+        {"uci":"h1g1","eval":{"cp":-65},"pv":["h1g1","e8g8","c1g5","h7h6","g5h4","g8h8","g1h1","a7a5","a2a4","g7g5"]},
+        {"uci":"h1f1","eval":{"cp":-71},"pv":["h1f1","e8g8","h2h3","a7a5","f1h1","a5a4","c4b5","d6d5","b1d2","d5e4"]},
+        {"uci":"f3g1","eval":{"cp":-71},"pv":["f3g1","f6g4","g1h3","h7h6","e1g1","e8g8","b2b4","c5b6","a2a4","a7a6"]},
+        {"uci":"e1f1","eval":{"cp":-72},"pv":["e1f1","e8g8","f1e1","f6g4","h1f1","h7h6","h2h3","g4f6","f1h1","a7a5"]},
+        {"uci":"h2h4","eval":{"cp":-77},"pv":["h2h4","h7h6","b2b4","c5b6","a2a4","f6g4","a1a2","a7a6","a2e2","e8g8"]},
+        {"uci":"e1e2","eval":{"cp":-79},"pv":["e1e2","e8g8","e2e1","f6g4","h1f1","c6a5","b2b4","c5f2","f1f2","g4f2"]},
+        {"uci":"c4d5","eval":{"cp":-96},"pv":["c4d5","f6d5","e4d5","c6e7","e1g1","e8g8","c3c4","c8g4","h2h3","g4h5"]},
+        {"uci":"g2g4","eval":{"cp":-171},"pv":["g2g4","c8g4","h1g1","h7h6","a2a4","a7a6","b1d2","g7g6","b2b4"]},
+        {"uci":"e1d2","eval":{"cp":-187},"pv":["e1d2","c5f2","a2a4","f2b6","d1e2","e8g8","d2c2","d6d5","e4d5","f6d5"]},
+        {"uci":"f3h4","eval":{"cp":-219},"pv":["f3h4","f6g4","g2g3","c5f2","e1e2","e8g8","h1f1","f2c5","h2h3","g4f6"]},
+        {"uci":"f3e5","eval":{"cp":-415},"pv":["f3e5","d6e5","b1d2","c5b6","d2f3","a7a5","h2h3"]},
+        {"uci":"c4f7","eval":{"cp":-422},"pv":["c4f7","e8f7","b2b4","c5b6","a2a4","a7a5","b4b5","c6e7","e1g1","f7e8"]},
+        {"uci":"c1f4","eval":{"cp":-470},"pv":["c1f4","e5f4","d3d4","c5b6","e1g1","c8g4","a2a4","e8g8","a4a5","c6a5"]},
+        {"uci":"c1h6","eval":{"cp":-496},"pv":["c1h6","g7h6","d1d2","h8g8","e1g1","g8g6","f3h4","f6e4","d3e4","d8h4"]},
+        {"uci":"f3d4","eval":{"cp":-524},"pv":["f3d4","e5d4","e1g1","e8g8","c1g5","h7h6","g5h4","g7g5","b1d2","g8g7"]},
+        {"uci":"c4a6","eval":{"cp":-529},"pv":["c4a6","b7a6","b1d2","c5b6","d2c4","c8e6","c4b6","c7b6","d3d4"]},
+        {"uci":"c4e6","eval":{"cp":-563},"pv":["c4e6","c8e6","d3d4","e5d4","c1g5","d4c3","b1c3","h7h6","g5h4","e8g8"]}
+      ],
+      "threats": [
+        {"uci":"a7a6","eval":{"cp":11},"pv":["a7a6","e1g1","c5a7","a2a4","c6e7","c1e3","a7e3","f2e3","e8g8"]},
+        {"uci":"e8g8","eval":{"cp":6},"pv":["e8g8","a2a4","a7a6","e1g1","c5a7","c4b3","h7h6","h2h3","c6e7","f1e1"]},
+        {"uci":"h7h6","eval":{"cp":1},"pv":["h7h6","e1g1","a7a6","a2a4","c5a7","f1e1","c6e7","d3d4","e8g8","h2h3"]},
+        {"uci":"a7a5","eval":{"cp":-1},"pv":["a7a5","a2a4","h7h6","e1g1","c5a7","c1e3","a7e3","f2e3","c6e7","b1d2"]},
+        {"uci":"c5b6","eval":{"cp":-6},"pv":["c5b6","a2a4","a7a5","e1g1","e8g8","f1e1","h7h6","h2h3","c6e7","b1a3"]},
+        {"uci":"c8d7","eval":{"cp":-6},"pv":["c8d7","a2a4","a7a6","e1g1","c5a7","h2h3","h7h6","c1e3","a7e3","f2e3"]}
+      ]
+    },
+    "parsed": {
+      "about": true,
+      "move": { "said": "I want to castle", "san": "O-O" },
+      "claims": [
+        {
+          "said": "then push d4 in the center",
+          "kind": "plan",
+          "side": "me",
+          "piece": "",
+          "square": "",
+          "target": "",
+          "moves": ["d4"],
+          "afterMove": true,
+          "eval": "",
+          "gain": ""
+        },
+        {
+          "said": "his knight on f6 is pinned",
+          "kind": "pinned",
+          "side": "opponent",
+          "piece": "N",
+          "square": "f6",
+          "target": "",
+          "moves": [],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        },
+        {
+          "said": "I'm up a piece",
+          "kind": "material",
+          "side": "me",
+          "piece": "",
+          "square": "",
+          "target": "",
+          "moves": [],
+          "afterMove": false,
+          "eval": "",
+          "gain": "piece"
+        }
+      ]
+    },
+    "expect": {
+      "understood": true,
+      "move": { "san": "O-O", "grade": "good" },
+      "claims": [
+        { "verdict": "unclear" },
+        { "verdict": "wrong" },
+        { "verdict": "wrong" }
+      ],
+      "missed": [],
+      "habits": { "threats": "none", "forcing": "none", "safety": "good" },
+      "best": null,
+      "nudge": "Look at your b-pawn."
+    },
+    "notes": ["The knight on f6 isn't pinned.","Material is even."]
+  },
+  {
+    "name": "queen's gambit declined: black is right that nothing is threatened",
+    "fen": "rnbq1rk1/ppp1bppp/4pn2/3p2B1/2PP4/2N1PN2/PP3PPP/R2QKB1R b KQ - 2 6",
+    "said": "he isn't threatening anything right now and my king is safe, so I'll bring my knight to d7",
+    "typed": false,
+    "reveal": false,
+    "facts": {
+      "depth": 12,
+      "moves": [
+        {"uci":"b8d7","eval":{"cp":-27},"pv":["b8d7","a1c1","d5c4","f1c4","a7a6","c4d3","c7c5","d3b1","b7b5","d4c5"]},
+        {"uci":"h7h6","eval":{"cp":-30},"pv":["h7h6","g5h4","b8d7","a1c1","d5c4","f1c4","a7a6","c4d3","c7c5","d3b1"]},
+        {"uci":"b7b6","eval":{"cp":-36},"pv":["b7b6","c4d5","f6d5","c3d5","e6d5","g5e7","d8e7","a1c1","c7c6","f1e2"]},
+        {"uci":"d5c4","eval":{"cp":-38},"pv":["d5c4","f1c4","h7h6","g5f6","e7f6","d1c2","c7c5","d4c5","d8a5","e1g1"]},
+        {"uci":"c7c5","eval":{"cp":-40},"pv":["c7c5","d4c5","d5c4","f1c4","h7h6","g5f4","d8d1","a1d1","e7c5","e1g1"]},
+        {"uci":"a7a6","eval":{"cp":-41},"pv":["a7a6","c4d5","e6d5","f1d3","h7h6","g5h4","c8e6","h2h3"]},
+        {"uci":"c7c6","eval":{"cp":-43},"pv":["c7c6","a1c1","a7a5","d1c2","b8d7","h2h3","h7h6","g5f4","d5c4","f1c4"]},
+        {"uci":"f6e4","eval":{"cp":-46},"pv":["f6e4","g5e7","d8e7","a1c1","e4f6","h2h3","f8d8","d1c2","c7c6","f1d3"]},
+        {"uci":"f8e8","eval":{"cp":-47},"pv":["f8e8","d1c2","h7h6","g5h4","b8d7","f1e2","c7c5","c4d5","f6d5","h4e7"]},
+        {"uci":"a7a5","eval":{"cp":-51},"pv":["a7a5","d1c2","c7c6","h2h4","b8d7","a1d1","h7h6","g5f4","d5c4","f1c4"]},
+        {"uci":"b8c6","eval":{"cp":-52},"pv":["b8c6","h2h4","f6e4","a1c1","f7f6","g5f4","e4c3","b2c3","e7a3","c1c2"]},
+        {"uci":"d8d6","eval":{"cp":-77},"pv":["d8d6","a1c1","d6d8","f1d3","c7c6","d1c2","b8d7"]},
+        {"uci":"g8h8","eval":{"cp":-79},"pv":["g8h8","a2a3","h7h6","g5f4","b8d7","d1c2","c7c5","a1d1","c5d4","d1d4"]},
+        {"uci":"e7b4","eval":{"cp":-81},"pv":["e7b4","f1e2","b8d7","e1g1","d5c4","e2c4","b4e7"]},
+        {"uci":"d8d7","eval":{"cp":-97},"pv":["d8d7","d1c2","d7d8","a2a3","c7c6","f1d3","b8d7","e1g1"]},
+        {"uci":"b8a6","eval":{"cp":-111},"pv":["b8a6","c4d5","e6d5","f1a6","b7a6","f3e5","d8d6","e1g1","a8b8","b2b3"]},
+        {"uci":"h7h5","eval":{"cp":-113},"pv":["h7h5","d1c2","c7c5","d4c5","d8a5","c4d5","e6d5","f1e2","a5c5","e1g1"]},
+        {"uci":"g7g6","eval":{"cp":-118},"pv":["g7g6","h2h4","c7c6","d1c2","b8d7","a1d1","d5c4","f1c4","b7b5","c4b3"]},
+        {"uci":"c8d7","eval":{"cp":-138},"pv":["c8d7","g5f6","e7f6","c4d5","c7c5","d5c6","d7c6","f1e2","b8d7","e1g1"]},
+        {"uci":"b7b5","eval":{"cp":-151},"pv":["b7b5","c4b5","a7a6","a2a3","c8b7","d1c2","a6b5","f1b5","c7c6"]},
+        {"uci":"f6e8","eval":{"cp":-156},"pv":["f6e8","g5e7","d8e7","c4d5","e8f6","d5e6","c8e6"]},
+        {"uci":"f6h5","eval":{"cp":-157},"pv":["f6h5","g5e7","d8e7","c4d5","h5f6","f1c4","e6d5","c3d5","f6d5","c4d5"]},
+        {"uci":"e7d6","eval":{"cp":-165},"pv":["e7d6","c4d5","h7h6","g5f6","d8f6","d5e6","c8e6","f1d3","c7c5","d4d5"]},
+        {"uci":"f6d7","eval":{"cp":-181},"pv":["f6d7","g5e7","d8e7","c4d5","d7f6","f1c4","e6d5","c3d5","f6d5","c4d5"]},
+        {"uci":"f6g4","eval":{"cp":-181},"pv":["f6g4","g5e7","d8e7","c4d5","g4f6","f1c4","e6d5","c3d5","f6d5","c4d5"]},
+        {"uci":"d8e8","eval":{"cp":-192},"pv":["d8e8","g5f6","e7f6","c4d5","b8d7","d5e6","e8e6","d1c2","c7c5","a1d1"]},
+        {"uci":"e6e5","eval":{"cp":-261},"pv":["e6e5","d4e5","f6d7","g5e7","d8e7","c3d5","e7d8","d1c2","c7c6","d5c3"]},
+        {"uci":"e7a3","eval":{"cp":-547},"pv":["e7a3","b2a3","c7c5","g5f6","d8f6","a1c1","b8c6","d1d2"]},
+        {"uci":"e7c5","eval":{"cp":-596},"pv":["e7c5","d4c5","b8d7","c4d5","e6e5","g5f6","d7f6"]}
+      ],
+      "threats": [
+        {"uci":"d1c2","eval":{"cp":57},"pv":["d1c2","b8d7","a1d1","h7h6","g5f4","c7c5","f1e2","c5d4","d1d4","f6h5"]},
+        {"uci":"a1c1","eval":{"cp":53},"pv":["a1c1","h7h6","g5f6","e7f6","g2g4","c7c5","h2h4","c5d4","e3d4","b8c6"]},
+        {"uci":"c4d5","eval":{"cp":50},"pv":["c4d5","e6d5","f1d3","h7h6","g5f4","c7c5","d4c5","e7c5","h2h3","b8c6"]},
+        {"uci":"a2a3","eval":{"cp":48},"pv":["a2a3","f6e4","g5e7","d8e7","d1c2","e4c3","c2c3","c7c6","f1d3","f8d8"]},
+        {"uci":"g5f6","eval":{"cp":45},"pv":["g5f6","e7f6","d1c2","b8a6","a2a3","c7c5","c4d5","e6d5","f1a6","c5d4"]},
+        {"uci":"h2h4","eval":{"cp":41},"pv":["h2h4","c7c5","d4c5","d5c4","f1c4","d8a5","e1g1","a5c5","c4d3","h7h6"]}
+      ]
+    },
+    "parsed": {
+      "about": true,
+      "move": { "said": "I'll bring my knight to d7", "san": "Nbd7" },
+      "claims": [
+        {
+          "said": "he isn't threatening anything right now",
+          "kind": "safe",
+          "side": "me",
+          "piece": "",
+          "square": "",
+          "target": "",
+          "moves": [],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        },
+        {
+          "said": "my king is safe",
+          "kind": "safe",
+          "side": "me",
+          "piece": "K",
+          "square": "g8",
+          "target": "",
+          "moves": [],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        }
+      ]
+    },
+    "expect": {
+      "understood": true,
+      "move": { "san": "Nbd7", "grade": "best" },
+      "claims": [
+        { "verdict": "right" },
+        { "verdict": "right" }
+      ],
+      "missed": [],
+      "habits": { "threats": "good", "forcing": "none", "safety": "good" },
+      "best": null,
+      "nudge": null
+    },
+    "notes": ["there's no real threat"]
+  },
+  {
+    "name": "giuoco piano: a fake threat, a bishop that doesn't hit f3, a queen that doesn't guard c4",
+    "fen": "r1bqk2r/ppp2ppp/2np1n2/2b1p3/2B1P3/2PP1N2/PP3PPP/RNBQK2R w KQkq - 0 6",
+    "said": "he's threatening bishop takes f2 check, and his bishop on c5 is hitting my knight on f3. My queen defends my bishop on c4, so I'll castle",
+    "typed": false,
+    "reveal": false,
+    "facts": {
+      "depth": 12,
+      "moves": [
+        {"uci":"b2b4","eval":{"cp":44},"pv":["b2b4","c5b6","a2a4","a7a5","b4b5","c6e7","b1d2","c7c6","c1a3"]},
+        {"uci":"h2h3","eval":{"cp":27},"pv":["h2h3","a7a5","e1g1","c5a7","c1e3","a7e3","f2e3","c6e7"]},
+        {"uci":"e1g1","eval":{"cp":20},"pv":["e1g1","a7a6","b1d2","c5a7","b2b4","c6e7","d3d4","e7g6","f1e1","e8g8"]},
+        {"uci":"b1d2","eval":{"cp":16},"pv":["b1d2","a7a5","d2f1","c8e6","c4b5","e8g8","f1g3","d6d5","e4d5","e6d5"]},
+        {"uci":"a2a4","eval":{"cp":10},"pv":["a2a4","a7a5","e1g1","e8g8","c1g5","h7h6","g5h4","g7g5","h4g3","g8g7"]},
+        {"uci":"c4b3","eval":{"cp":10},"pv":["c4b3","h7h6","b1d2","a7a5","h2h3","c8e6","b3e6","f7e6","e1g1","d8d7"]},
+        {"uci":"a2a3","eval":{"cp":1},"pv":["a2a3","a7a5","e1g1","h7h6","b1d2","e8g8","h2h3","c5a7","c4a2","c8e6"]},
+        {"uci":"d1e2","eval":{"cp":0},"pv":["d1e2","a7a6","e1g1","c8g4","h2h3","g4h5","a2a4","c5a7"]},
+        {"uci":"c4b5","eval":{"cp":-10},"pv":["c4b5","c5b6","e1g1","h7h6","b1d2","e8g8","a2a4","a7a6","b5c6","b7c6"]},
+        {"uci":"c1d2","eval":{"cp":-13},"pv":["c1d2","a7a6","e1g1","h7h6","a2a4","e8g8","h2h3","c6e7","f1e1","c5a7"]},
+        {"uci":"d1c2","eval":{"cp":-18},"pv":["d1c2","e8g8","e1g1","a7a5","a2a4","g8h8","c1g5","h7h6","g5h4","c5b6"]},
+        {"uci":"c1g5","eval":{"cp":-21},"pv":["c1g5","h7h6","g5h4","d8e7","a2a4","a7a6","h4g3","c5b6","b1a3","g7g5"]},
+        {"uci":"b2b3","eval":{"cp":-22},"pv":["b2b3","a7a6","a2a4","c5a7","e1g1","h7h6","b1d2","e8g8","h2h3","c6e7"]},
+        {"uci":"d1d2","eval":{"cp":-23},"pv":["d1d2","e8g8","e1g1"]},
+        {"uci":"c1e3","eval":{"cp":-23},"pv":["c1e3","c5e3","f2e3","e8g8","c4b3","c6a5","b3a4","d6d5","e4d5","f6d5"]},
+        {"uci":"d1b3","eval":{"cp":-23},"pv":["d1b3","e8g8","b3c2","c5b6","a2a4","a7a5","e1g1","c6e7","d3d4","e5d4"]},
+        {"uci":"d1a4","eval":{"cp":-24},"pv":["d1a4","a7a6","a4d1","c5a7","a2a4","h7h6","e1g1","c6e7","f1e1","e7g6"]},
+        {"uci":"f3g5","eval":{"cp":-27},"pv":["f3g5","e8g8","e1g1","h7h6","g5f3","c6e7","h2h3"]},
+        {"uci":"b1a3","eval":{"cp":-28},"pv":["b1a3","c5a3","b2a3","c8g4","e1g1","c6a5","c4b3","f6d7","h2h3","g4h5"]},
+        {"uci":"d3d4","eval":{"cp":-43},"pv":["d3d4","c5b6","e1g1","e5d4","c3d4","c8g4","d4d5","g4f3","d1f3","c6e5"]},
+        {"uci":"f3d2","eval":{"cp":-49},"pv":["f3d2","f6g4","d1f3","c5f2","e1e2","h8f8","h2h3","d8g5","h3g4","c8g4"]},
+        {"uci":"g2g3","eval":{"cp":-62},"pv":["g2g3","e8g8","a2a4","a7a5","c4b3","c8h3","f3g5","h3g4","f2f3","g4h5"]},
+        {"uci":"h1g1","eval":{"cp":-65},"pv":["h1g1","e8g8","c1g5","h7h6","g5h4","g8h8","g1h1","a7a5","a2a4","g7g5"]},
+        {"uci":"h1f1","eval":{"cp":-71},"pv":["h1f1","e8g8","h2h3","a7a5","f1h1","a5a4","c4b5","d6d5","b1d2","d5e4"]},
+        {"uci":"f3g1","eval":{"cp":-71},"pv":["f3g1","f6g4","g1h3","h7h6","e1g1","e8g8","b2b4","c5b6","a2a4","a7a6"]},
+        {"uci":"e1f1","eval":{"cp":-72},"pv":["e1f1","e8g8","f1e1","f6g4","h1f1","h7h6","h2h3","g4f6","f1h1","a7a5"]},
+        {"uci":"h2h4","eval":{"cp":-77},"pv":["h2h4","h7h6","b2b4","c5b6","a2a4","f6g4","a1a2","a7a6","a2e2","e8g8"]},
+        {"uci":"e1e2","eval":{"cp":-79},"pv":["e1e2","e8g8","e2e1","f6g4","h1f1","c6a5","b2b4","c5f2","f1f2","g4f2"]},
+        {"uci":"c4d5","eval":{"cp":-96},"pv":["c4d5","f6d5","e4d5","c6e7","e1g1","e8g8","c3c4","c8g4","h2h3","g4h5"]},
+        {"uci":"g2g4","eval":{"cp":-171},"pv":["g2g4","c8g4","h1g1","h7h6","a2a4","a7a6","b1d2","g7g6","b2b4"]},
+        {"uci":"e1d2","eval":{"cp":-187},"pv":["e1d2","c5f2","a2a4","f2b6","d1e2","e8g8","d2c2","d6d5","e4d5","f6d5"]},
+        {"uci":"f3h4","eval":{"cp":-219},"pv":["f3h4","f6g4","g2g3","c5f2","e1e2","e8g8","h1f1","f2c5","h2h3","g4f6"]},
+        {"uci":"f3e5","eval":{"cp":-415},"pv":["f3e5","d6e5","b1d2","c5b6","d2f3","a7a5","h2h3"]},
+        {"uci":"c4f7","eval":{"cp":-422},"pv":["c4f7","e8f7","b2b4","c5b6","a2a4","a7a5","b4b5","c6e7","e1g1","f7e8"]},
+        {"uci":"c1f4","eval":{"cp":-470},"pv":["c1f4","e5f4","d3d4","c5b6","e1g1","c8g4","a2a4","e8g8","a4a5","c6a5"]},
+        {"uci":"c1h6","eval":{"cp":-496},"pv":["c1h6","g7h6","d1d2","h8g8","e1g1","g8g6","f3h4","f6e4","d3e4","d8h4"]},
+        {"uci":"f3d4","eval":{"cp":-524},"pv":["f3d4","e5d4","e1g1","e8g8","c1g5","h7h6","g5h4","g7g5","b1d2","g8g7"]},
+        {"uci":"c4a6","eval":{"cp":-529},"pv":["c4a6","b7a6","b1d2","c5b6","d2c4","c8e6","c4b6","c7b6","d3d4"]},
+        {"uci":"c4e6","eval":{"cp":-563},"pv":["c4e6","c8e6","d3d4","e5d4","c1g5","d4c3","b1c3","h7h6","g5h4","e8g8"]}
+      ],
+      "threats": [
+        {"uci":"a7a6","eval":{"cp":11},"pv":["a7a6","e1g1","c5a7","a2a4","c6e7","c1e3","a7e3","f2e3","e8g8"]},
+        {"uci":"e8g8","eval":{"cp":6},"pv":["e8g8","a2a4","a7a6","e1g1","c5a7","c4b3","h7h6","h2h3","c6e7","f1e1"]},
+        {"uci":"h7h6","eval":{"cp":1},"pv":["h7h6","e1g1","a7a6","a2a4","c5a7","f1e1","c6e7","d3d4","e8g8","h2h3"]},
+        {"uci":"a7a5","eval":{"cp":-1},"pv":["a7a5","a2a4","h7h6","e1g1","c5a7","c1e3","a7e3","f2e3","c6e7","b1d2"]},
+        {"uci":"c5b6","eval":{"cp":-6},"pv":["c5b6","a2a4","a7a5","e1g1","e8g8","f1e1","h7h6","h2h3","c6e7","b1a3"]},
+        {"uci":"c8d7","eval":{"cp":-6},"pv":["c8d7","a2a4","a7a6","e1g1","c5a7","h2h3","h7h6","c1e3","a7e3","f2e3"]}
+      ]
+    },
+    "parsed": {
+      "about": true,
+      "move": { "said": "I'll castle", "san": "O-O" },
+      "claims": [
+        {
+          "said": "he's threatening bishop takes f2 check",
+          "kind": "threat",
+          "side": "opponent",
+          "piece": "B",
+          "square": "c5",
+          "target": "f2",
+          "moves": ["Bxf2+"],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        },
+        {
+          "said": "his bishop on c5 is hitting my knight on f3",
+          "kind": "attacks",
+          "side": "opponent",
+          "piece": "B",
+          "square": "c5",
+          "target": "f3",
+          "moves": [],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        },
+        {
+          "said": "my queen defends my bishop on c4",
+          "kind": "defends",
+          "side": "me",
+          "piece": "Q",
+          "square": "d1",
+          "target": "c4",
+          "moves": [],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        }
+      ]
+    },
+    "expect": {
+      "understood": true,
+      "move": { "san": "O-O", "grade": "good" },
+      "claims": [
+        { "verdict": "wrong" },
+        { "verdict": "wrong" },
+        { "verdict": "wrong" }
+      ],
+      "missed": [],
+      "habits": { "threats": "none", "forcing": "none", "safety": "good" },
+      "best": null,
+      "nudge": "Look at your b-pawn."
+    },
+    "notes": ["Bxf2+ isn't a real threat: it loses material."]
+  },
+  {
+    "name": "italian: black takes the hanging knight on g5",
+    "fen": "r1bqk1nr/ppppbppp/2n5/4p1N1/2B1P3/8/PPPP1PPP/RNBQK2R b KQkq - 5 4",
+    "said": "his knight on g5 is just hanging, bishop takes g5 wins a piece and then I'm winning",
+    "typed": false,
+    "reveal": true,
+    "facts": {
+      "depth": 12,
+      "moves": [
+        {"uci":"e7g5","eval":{"cp":457},"pv":["e7g5","b1c3","g8f6","h2h4","g5f4","c3d5","d7d6","c2c3","e8g8","d2d3"]},
+        {"uci":"d7d5","eval":{"cp":241},"pv":["d7d5","g5f7","e8f7","c4d5","f7g6","d5c6","b7c6","d1f3","h7h6","d2d3"]},
+        {"uci":"g8h6","eval":{"cp":-10},"pv":["g8h6","g5f3","e8g8","b1c3","h6g4","d2d3","c6a5","c3d5","a5c4","d3c4"]},
+        {"uci":"e7b4","eval":{"cp":-110},"pv":["e7b4","g5f7","d8h4","f7h8","h4e4","c4e2","e4g2","e2h5","g7g6","h5f3"]},
+        {"uci":"e7c5","eval":{"cp":-133},"pv":["e7c5","g5f7","d8h4","e1g1","d7d5","e4d5","h4c4","f7h8"]},
+        {"uci":"e7d6","eval":{"cp":-252},"pv":["e7d6","g5f7","d8h4","e1g1","d6c5","f7h8","g8f6","c4e2","c6d4","h8f7"]},
+        {"uci":"e7a3","eval":{"cp":-293},"pv":["e7a3","g5f7","d8h4","b1a3","d7d5","f7h8","h4e4","e1f1","d5c4","d2d3"]},
+        {"uci":"e7f8","eval":{"cp":-354},"pv":["e7f8","c4f7","e8e7","f7b3","e7e8","d2d3","d8f6","g5f7","f8c5","e1g1"]},
+        {"uci":"c6b4","eval":{"cp":-378},"pv":["c6b4","g5f7","d7d5","f7d8","d5c4","d2d4","c4d3"]},
+        {"uci":"b7b5","eval":{"cp":-381},"pv":["b7b5","g5f7","b5c4","f7d8","e8d8","d2d4","c4d3","d1d3"]},
+        {"uci":"e8f8","eval":{"cp":-383},"pv":["e8f8","g5f7","d8e8","f7h8","g8f6","h8f7"]},
+        {"uci":"e7f6","eval":{"cp":-390},"pv":["e7f6","g5f7","d8e7","f7h8","d7d5","c4d5","g8h6","d5c6","b7c6","d1h5"]},
+        {"uci":"d7d6","eval":{"cp":-393},"pv":["d7d6","g5f7","d8d7","f7h8","g8f6","d2d3","f6g4","h8g6","h7g6","e1g1"]},
+        {"uci":"g8f6","eval":{"cp":-408},"pv":["g8f6","g5f7","d7d5","f7d8","c8g4","f2f3","d5c4"]},
+        {"uci":"c6a5","eval":{"cp":-439},"pv":["c6a5","g5f7","a5c4","f7d8","d7d5","d2d4","e5d4","d8f7","e8f7","e1g1"]},
+        {"uci":"c6d4","eval":{"cp":-442},"pv":["c6d4","g5f7","d7d5","f7d8","d5c4","c2c3","g8f6","c3d4","f6g4","d1a4"]},
+        {"uci":"f7f5","eval":{"cp":-451},"pv":["f7f5","g5f7","c6a5","f7d8","a5c4","d2d3","c4d6","b1c3","e7d8","d3d4"]},
+        {"uci":"h7h5","eval":{"cp":-473},"pv":["h7h5","g5f7","d7d5","f7d8","c8g4","c4e2","g4e2","d1e2","c6d4","e2d3"]},
+        {"uci":"c6b8","eval":{"cp":-489},"pv":["c6b8","g5f7","d7d5","f7d8","d5c4","d8f7","e8f7","d2d4","b8c6","d4e5"]},
+        {"uci":"a7a6","eval":{"cp":-490},"pv":["a7a6","g5f7","c6a5","f7d8","a5c4","d2d3","c4d6"]},
+        {"uci":"f7f6","eval":{"cp":-502},"pv":["f7f6","g5f7","c6a5","f7d8","a5c4","d8f7"]},
+        {"uci":"b7b6","eval":{"cp":-513},"pv":["b7b6","g5f7","c6a5","d1e2","a5c4","f7d8","e8d8","e2c4","g8f6","a2a3"]},
+        {"uci":"g7g6","eval":{"cp":-527},"pv":["g7g6","g5f7","c6a5","f7d8","a5c4","d2d3","c4d6","a2a4","e8d8","a1a3"]},
+        {"uci":"a8b8","eval":{"cp":-534},"pv":["a8b8","g5f7","c6a5","d1e2","a5c4","f7d8","c4d6","d2d3","e8d8"]},
+        {"uci":"a7a5","eval":{"cp":-555},"pv":["a7a5","g5f7","c6d4","f7d8","b7b5","d8f7","b5c4","f7h8","g8f6","d2d3"]},
+        {"uci":"h7h6","eval":{"cp":-573},"pv":["h7h6","g5f7","c6d4","f7d8","g8f6","d8f7","d7d5","e4d5","e8f7","d5d6"]}
+      ],
+      "threats": [
+        {"uci":"g5f7","eval":{"cp":546},"pv":["g5f7","c6a5","f7d8","a5c4","d8f7","e8f7","d2d3","c4b6","c1d2"]},
+        {"uci":"d1f3","eval":{"cp":285},"pv":["d1f3","e7f6","g5f7","c6d4","f3d3","d8e7","f7h8","d7d5","c4d5"]},
+        {"uci":"d1h5","eval":{"cp":259},"pv":["d1h5","g7g6","h5f3","g8h6","g5f7","c6d4","f7d8","d4f3","g2f3","e7d8"]},
+        {"uci":"c4f7","eval":{"cp":66},"pv":["c4f7","e8f8","f7g8","f8g8","g5f3","d7d5","b1c3","d5e4","c3e4","c8f5"]},
+        {"uci":"f2f4","eval":{"cp":21},"pv":["f2f4","e7g5","f4g5","d8g5","e1g1","g8f6","d2d3","g5g6","b1c3"]},
+        {"uci":"g5f3","eval":{"cp":-6},"pv":["g5f3","g8f6","d2d3","d7d5","e4d5","f6d5","b1c3","d5c3","b2c3","e8g8"]}
+      ]
+    },
+    "parsed": {
+      "about": true,
+      "move": { "said": "bishop takes g5", "san": "Bxg5" },
+      "claims": [
+        {
+          "said": "his knight on g5 is just hanging",
+          "kind": "hanging",
+          "side": "opponent",
+          "piece": "N",
+          "square": "g5",
+          "target": "",
+          "moves": [],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        },
+        {
+          "said": "bishop takes g5 wins a piece",
+          "kind": "wins",
+          "side": "me",
+          "piece": "",
+          "square": "",
+          "target": "",
+          "moves": ["Bxg5"],
+          "afterMove": false,
+          "eval": "",
+          "gain": "piece"
+        },
+        {
+          "said": "and then I'm winning",
+          "kind": "eval",
+          "side": "me",
+          "piece": "",
+          "square": "",
+          "target": "",
+          "moves": [],
+          "afterMove": true,
+          "eval": "winning",
+          "gain": ""
+        }
+      ]
+    },
+    "expect": {
+      "understood": true,
+      "move": { "san": "Bxg5", "grade": "best" },
+      "claims": [
+        { "verdict": "right" },
+        { "verdict": "right" },
+        { "verdict": "right" }
+      ],
+      "missed": [],
+      "habits": { "threats": "none", "forcing": "good", "safety": "good" },
+      "best": { "san": "Bxg5" },
+      "nudge": null
+    },
+    "notes": ["The knight on g5 is free: Bxg5 wins it."]
+  },
+  {
+    "name": "italian: the rook doesn't guard f2 before castling",
+    "fen": "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/3P1N2/PPP2PPP/RNBQK2R w KQkq - 1 5",
+    "said": "if he takes on f2 with check I just take back with my rook, so I'll play knight c3",
+    "typed": false,
+    "reveal": false,
+    "facts": {
+      "depth": 12,
+      "moves": [
+        {"uci":"b1c3","eval":{"cp":23},"pv":["b1c3","e8g8","a2a3","d7d6","c3a4","c5b6","h2h3","h7h6","c4a2","c8e6"]},
+        {"uci":"c2c3","eval":{"cp":14},"pv":["c2c3","d7d6","e1g1","a7a5","d3d4","c5b6","d4e5","c6e5","f3e5","d6e5"]},
+        {"uci":"a2a4","eval":{"cp":13},"pv":["a2a4","d7d6","e1g1","h7h6","b1c3","a7a5","h2h3","e8g8","c3e2","c5a7"]},
+        {"uci":"e1g1","eval":{"cp":11},"pv":["e1g1","d7d6","c2c3","h7h6","a2a4","c5b6","b1d2","e8g8","h2h3","a7a6"]},
+        {"uci":"a2a3","eval":{"cp":10},"pv":["a2a3","d7d6","b1c3","c6d4","c3a4","c8g4","c2c3","d4f3","g2f3","g4h5"]},
+        {"uci":"b1d2","eval":{"cp":7},"pv":["b1d2","a7a5","a2a4","h7h6","c2c3","e8g8","c4b3","d7d6","h2h3","c8e6"]},
+        {"uci":"h2h3","eval":{"cp":4},"pv":["h2h3","d7d6","a2a3","e8g8","b1c3","c8e6","c4e6","f7e6","e1g1"]},
+        {"uci":"c4b3","eval":{"cp":2},"pv":["c4b3","a7a5","c2c3","d7d6","b1d2","h7h6","e1g1","e8g8","h2h3","c8e6"]},
+        {"uci":"c1e3","eval":{"cp":-2},"pv":["c1e3","c5e3","f2e3","d7d6","d1d2","d8e7","c4b3","e8d8","e1d1","a7a6"]},
+        {"uci":"c1g5","eval":{"cp":-8},"pv":["c1g5","h7h6","g5e3","c5e3","f2e3","d7d6","a2a4","c6e7","d1e2","e8g8"]},
+        {"uci":"c1d2","eval":{"cp":-12},"pv":["c1d2","d7d6","e1g1","c8e6","c4e6","f7e6","h2h3","d8e7","c2c3","a7a6"]},
+        {"uci":"d1e2","eval":{"cp":-12},"pv":["d1e2","e8g8","c2c3","d7d6","h2h3","a7a6","c4b3","h7h6","e1g1","c5a7"]},
+        {"uci":"b2b3","eval":{"cp":-24},"pv":["b2b3","d7d5","e4d5","f6d5","e1g1","c8g4","c2c3","c5e7","h2h3"]},
+        {"uci":"f3g5","eval":{"cp":-25},"pv":["f3g5","e8g8","b1d2","h7h6","g5f3","d7d5","e4d5","f6d5"]},
+        {"uci":"c4d5","eval":{"cp":-28},"pv":["c4d5","e8g8","e1g1","d7d6","d5b3","c6a5","c2c3","a5b3","a2b3","d6d5"]},
+        {"uci":"c4b5","eval":{"cp":-35},"pv":["c4b5","c6d4","b5a4","d4f3","d1f3","c7c6","h2h3","e8g8","a4b3","a7a5"]},
+        {"uci":"f3d2","eval":{"cp":-39},"pv":["f3d2","c6e7","d2f3","e7g6","c1e3","c5e3","f2e3","c7c6","c4b3"]},
+        {"uci":"d1d2","eval":{"cp":-40},"pv":["d1d2","d7d6","e1g1","e8g8","h2h3","c6e7"]},
+        {"uci":"b1a3","eval":{"cp":-41},"pv":["b1a3","d7d6","c2c3","c5a3","b2a3","d6d5","e4d5","f6d5","e1g1","e8g8"]},
+        {"uci":"e1f1","eval":{"cp":-66},"pv":["e1f1","e8g8","c1g5","h7h6","g5h4","g7g5","h4g3","d7d6","b1d2","g5g4"]},
+        {"uci":"g2g3","eval":{"cp":-68},"pv":["g2g3","d7d6","c2c3","h7h6","b2b4","c5b6","e1g1","c8h3","f1e1","a7a6"]},
+        {"uci":"h2h4","eval":{"cp":-73},"pv":["h2h4","d7d6","b1c3","f6g4","e1g1","a7a6","c3d5","c5a7","c1e3","g4e3"]},
+        {"uci":"f3g1","eval":{"cp":-80},"pv":["f3g1","e8g8","c1g5","h7h6","g5h4","c6a5","b1c3"]},
+        {"uci":"h1g1","eval":{"cp":-85},"pv":["h1g1","c6a5","b1d2","c7c6"]},
+        {"uci":"h1f1","eval":{"cp":-93},"pv":["h1f1","d7d5","e4d5","f6d5","f1h1","e8g8","a2a4","h7h6","b1c3","d5c3"]},
+        {"uci":"e1e2","eval":{"cp":-105},"pv":["e1e2","e8g8","c1g5","h7h6","g5f6","d8f6","c2c3","c6e7","b1d2","c7c6"]},
+        {"uci":"b2b4","eval":{"cp":-109},"pv":["b2b4","c5b4","c2c3","b4e7","e1g1","e8g8","a2a4"]},
+        {"uci":"g2g4","eval":{"cp":-128},"pv":["g2g4","f6g4","h1f1","g4f6","f1g1","g7g6","b1c3","d7d6"]},
+        {"uci":"d3d4","eval":{"cp":-149},"pv":["d3d4","c6d4","f3e5","d8e7","e5d3","e7e4","e1f1","c5b6","b1c3","e4e7"]},
+        {"uci":"e1d2","eval":{"cp":-174},"pv":["e1d2","c6a5","d2e1","a5c4","d3c4","f6e4","d1d5","c5f2","e1f1"]},
+        {"uci":"f3h4","eval":{"cp":-187},"pv":["f3h4","d7d5","e4d5","f6g4","d5c6","c5f2","e1f1","d8h4","d1e2","b7c6"]},
+        {"uci":"c4f7","eval":{"cp":-257},"pv":["c4f7","e8f7","b2b4","c5b4","c2c3"]},
+        {"uci":"f3e5","eval":{"cp":-382},"pv":["f3e5","c6e5","d3d4","e5c4","d4c5","e8g8","b2b3","c4e5","b1c3","d7d6"]},
+        {"uci":"c1f4","eval":{"cp":-382},"pv":["c1f4","e5f4","e4e5","d7d5","c4b3","f6g8","b1c3","c6d4","c3d5","d4b3"]},
+        {"uci":"c1h6","eval":{"cp":-396},"pv":["c1h6","g7h6","d1d2","f6g4","b1c3","c5f2","e1f1","c6d4"]},
+        {"uci":"c4a6","eval":{"cp":-493},"pv":["c4a6","b7a6","f3e5","c5f2","e1f2","c6e5","b1c3","d7d6","d3d4","e5g6"]},
+        {"uci":"c4e6","eval":{"cp":-527},"pv":["c4e6","d7e6","e1g1","c5e7","b2b4","a7a6","c2c3"]},
+        {"uci":"f3d4","eval":{"cp":-531},"pv":["f3d4","c5d4","c2c3","d4b6","a2a4","a7a5","c1g5"]}
+      ],
+      "threats": [
+        {"uci":"d7d6","eval":{"cp":1},"pv":["d7d6","a2a4","h7h6","c2c3","a7a6","e1g1","c5a7","c1e3","a7e3","f2e3"]},
+        {"uci":"a7a6","eval":{"cp":-3},"pv":["a7a6","e1g1","d7d6","a2a4","h7h6","c1e3","c8g4","e3c5","d6c5","b1d2"]},
+        {"uci":"h7h6","eval":{"cp":-8},"pv":["h7h6","e1g1","d7d6","c2c3","a7a5","h2h3","g7g5","d3d4","c5a7","d4e5"]},
+        {"uci":"e8g8","eval":{"cp":-9},"pv":["e8g8","e1g1","d7d6","c2c3","a7a5","f1e1","c5a7","h2h3","c8e6","c4e6"]},
+        {"uci":"a7a5","eval":{"cp":-10},"pv":["a7a5","e1g1","d7d6","a2a4","h7h6","c1e3","c5e3","f2e3","e8g8","h2h3"]},
+        {"uci":"c6a5","eval":{"cp":-17},"pv":["c6a5","f3e5","a5c4","e5c4","d7d5","e4d5","c8g4","d1d2","d8e7","c4e3"]}
+      ]
+    },
+    "parsed": {
+      "about": true,
+      "move": { "said": "I'll play knight c3", "san": "Nc3" },
+      "claims": [
+        {
+          "said": "if he takes on f2 with check I just take back with my rook",
+          "kind": "line",
+          "side": "opponent",
+          "piece": "",
+          "square": "",
+          "target": "",
+          "moves": ["Bxf2+","Rxf2"],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        }
+      ]
+    },
+    "expect": {
+      "understood": true,
+      "move": { "san": "Nc3", "grade": "best" },
+      "claims": [
+        { "verdict": "wrong" }
+      ],
+      "missed": [],
+      "habits": { "threats": "none", "forcing": "none", "safety": "good" },
+      "best": null,
+      "nudge": null
+    },
+    "notes": ["Rxf2 isn't possible"]
+  },
+  {
+    "name": "giuoco piano, both castled: b4 is a good plan, Bxf7+ isn't",
+    "fen": "r1bq1rk1/ppp2ppp/2np1n2/2b1p3/2B1P3/2PP1N2/PP3PPP/RNBQ1RK1 w - - 2 7",
+    "said": "My plan is b4 to chase his bishop. Bxf7+ and Ng5 is also an idea. Long term I want a kingside attack.",
+    "typed": true,
+    "reveal": false,
+    "facts": {
+      "depth": 12,
+      "moves": [
+        {"uci":"b2b4","eval":{"cp":38},"pv":["b2b4","c5b6","a2a4","a7a5","b4b5","c6e7","b1d2","e7g6","h2h3","g6f4"]},
+        {"uci":"b1d2","eval":{"cp":23},"pv":["b1d2","c5b6","h2h3","a7a5","c4b3","c8e6","b3c2"]},
+        {"uci":"a2a4","eval":{"cp":21},"pv":["a2a4","a7a5","f1e1","c8e6","c4b3","e6b3","d1b3","f6g4","e1e2","g8h8"]},
+        {"uci":"h2h3","eval":{"cp":17},"pv":["h2h3","a7a5","a2a4","c8e6","c4b5","c6a7","d3d4","a7b5","a4b5","c5a7"]},
+        {"uci":"c4b3","eval":{"cp":17},"pv":["c4b3","a7a5","h2h3","c8e6","b3c2","d6d5","e4d5","e6d5","b1d2","h7h6"]},
+        {"uci":"f1e1","eval":{"cp":16},"pv":["f1e1","c5b6","c4b3","f6g4","e1e2","c6a5","b3c2"]},
+        {"uci":"c1g5","eval":{"cp":9},"pv":["c1g5","h7h6","g5h4","g7g5","h4g3","g8g7","f1e1","g5g4","f3h4","f6h5"]},
+        {"uci":"a2a3","eval":{"cp":2},"pv":["a2a3","h7h6","b1d2","c6e7","c4b3","e7g6","f1e1","a7a5","d2f1","c7c6"]},
+        {"uci":"d1e2","eval":{"cp":0},"pv":["d1e2","h7h6","h2h3","c5b6","a2a4","a7a5","b1a3","f6h5"]},
+        {"uci":"c4b5","eval":{"cp":-5},"pv":["c4b5","h7h6","a2a4"]},
+        {"uci":"d1c2","eval":{"cp":-6},"pv":["d1c2","a7a5","a2a4","h7h6","h2h3","c5b6","c4a2","f6h5","c1e3"]},
+        {"uci":"d1e1","eval":{"cp":-13},"pv":["d1e1","h7h6","a2a4","a7a5","h2h3","c6e7","d3d4","e5d4","c3d4","c5b4"]},
+        {"uci":"b2b3","eval":{"cp":-17},"pv":["b2b3","a7a6","a2a4","c5a7","b1d2","c6e7","f1e1","h7h6","d3d4","e7g6"]},
+        {"uci":"c1d2","eval":{"cp":-19},"pv":["c1d2","h7h6","a2a4","c5b6","d2e3","c6e7","e3b6","a7b6","b1d2","e7g6"]},
+        {"uci":"g1h1","eval":{"cp":-24},"pv":["g1h1","h7h6","a2a4","a7a5","b1d2","c5a7","c4a2","d6d5","e4d5","f6d5"]},
+        {"uci":"d1d2","eval":{"cp":-24},"pv":["d1d2","c6e7","d3d4","e5d4","c3d4","f6e4","d2e2","c5b6","e2e4","d6d5"]},
+        {"uci":"c1e3","eval":{"cp":-26},"pv":["c1e3","c6a5","c4b3","c5e3","f2e3","c7c6","d1e2","a5b3","a2b3","d8b6"]},
+        {"uci":"f3g5","eval":{"cp":-28},"pv":["f3g5","h7h6","g5f3","c6e7","h2h3","c7c6","c4b3","e7g6","d3d4","c5b6"]},
+        {"uci":"f3e1","eval":{"cp":-34},"pv":["f3e1","c6e7","e1f3","c5b6","c4b3","e7g6","f1e1","c7c6","a2a4","d6d5"]},
+        {"uci":"d1a4","eval":{"cp":-37},"pv":["d1a4","c5b6","a4d1","c6e7","c4b3","e7g6","b1d2","c7c6","f1e1","h7h6"]},
+        {"uci":"f3d2","eval":{"cp":-41},"pv":["f3d2","c6e7","a2a4","c7c6","b2b4","c5b6","a4a5","b6c7","f1e1","e7g6"]},
+        {"uci":"b1a3","eval":{"cp":-53},"pv":["b1a3","c5a3","b2a3","d6d5","c4b5","d5e4","d3e4","f6e4","b5c6","b7c6"]},
+        {"uci":"d3d4","eval":{"cp":-62},"pv":["d3d4","c5b6","d1d3","e5d4","c3d4","c8g4","b1d2","g4h5","h2h3"]},
+        {"uci":"g2g3","eval":{"cp":-73},"pv":["g2g3","c8h3","f1e1","c5b6","c1g5","h7h6","g5f6","d8f6","b1d2","c6a5"]},
+        {"uci":"d1b3","eval":{"cp":-76},"pv":["d1b3","c6a5","b3a4","a5c4","a4c4","c8e6","c4a4","h7h6","a4d1","f8e8"]},
+        {"uci":"h2h4","eval":{"cp":-82},"pv":["h2h4","h7h6","a2a4","a7a6","c1e3","c5e3","f2e3","c6e7","c4b3","c8g4"]},
+        {"uci":"c4d5","eval":{"cp":-88},"pv":["c4d5","f6d5","e4d5","c6e7","c3c4","c8g4","h2h3","g4h5","g2g4","h5g6"]},
+        {"uci":"f3h4","eval":{"cp":-205},"pv":["f3h4","f6e4","d3e4","d8h4","d1f3","g8h8","c1e3","c5e3","f2e3","c6e7"]},
+        {"uci":"g2g4","eval":{"cp":-297},"pv":["g2g4","c8g4","c1g5","h7h6","g5h4","g7g5","h4g3","g8g7","f1e1","c5b6"]},
+        {"uci":"c4f7","eval":{"cp":-399},"pv":["c4f7","f8f7","b2b4","c5b6","f3g5","f7f8","d1b3","d6d5","e4d5","f6d5"]},
+        {"uci":"f3e5","eval":{"cp":-429},"pv":["f3e5","d6e5","a2a4","a7a6","a4a5","g8h8"]},
+        {"uci":"c1f4","eval":{"cp":-461},"pv":["c1f4","e5f4","b1d2","c5b6","d3d4","a7a5","f3g5","d8e7","f1e1","h7h6"]},
+        {"uci":"c1h6","eval":{"cp":-475},"pv":["c1h6","g7h6","d1d2","g8g7","a2a4","a7a5","b1a3","c5b6","a3c2","f6g8"]},
+        {"uci":"c4a6","eval":{"cp":-518},"pv":["c4a6","b7a6","c1g5","c5b6","b1d2","c6e7","d3d4","e7g6","f3h4","c8b7"]},
+        {"uci":"f3d4","eval":{"cp":-522},"pv":["f3d4","e5d4","c1g5","c6e5","c3d4","c5d4","b1c3","c8e6","g5f6","d8f6"]},
+        {"uci":"c4e6","eval":{"cp":-550},"pv":["c4e6","f7e6","b2b4","c5b6","b1d2","d8e8"]}
+      ],
+      "threats": [
+        {"uci":"a7a5","eval":{"cp":16},"pv":["a7a5","h2h3","h7h6","f1e1","c5a7","b1a3","c6e7"]},
+        {"uci":"a7a6","eval":{"cp":6},"pv":["a7a6","h2h3","c8e6","b1d2","c5a7","c4b3","e6b3","d1b3","d6d5","e4d5"]},
+        {"uci":"c5b6","eval":{"cp":3},"pv":["c5b6","a2a4","h7h6","c4a2","a7a5","b1d2","c8e6","a2e6","f7e6","d2c4"]},
+        {"uci":"h7h6","eval":{"cp":2},"pv":["h7h6","a2a4","a7a5","f1e1","c5a7","b1a3","c6e7"]},
+        {"uci":"c8d7","eval":{"cp":-9},"pv":["c8d7","h2h3","a7a5","f1e1","c5b6","c4b5","h7h6","a2a4","c6e7","b5d7"]},
+        {"uci":"c6e7","eval":{"cp":-11},"pv":["c6e7","c1g5","c5b6","a2a4","c7c6","b1d2","d6d5","c4a2","b6c7","f3h4"]}
+      ]
+    },
+    "parsed": {
+      "about": true,
+      "move": null,
+      "claims": [
+        {
+          "said": "b4 to chase his bishop",
+          "kind": "plan",
+          "side": "me",
+          "piece": "",
+          "square": "",
+          "target": "",
+          "moves": ["b4"],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        },
+        {
+          "said": "Bxf7+ and Ng5 is also an idea",
+          "kind": "plan",
+          "side": "me",
+          "piece": "",
+          "square": "",
+          "target": "",
+          "moves": ["Bxf7+","Rxf7","Ng5"],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        },
+        {
+          "said": "long term I want a kingside attack",
+          "kind": "plan",
+          "side": "me",
+          "piece": "",
+          "square": "",
+          "target": "",
+          "moves": [],
+          "afterMove": false,
+          "eval": "",
+          "gain": ""
+        }
+      ]
+    },
+    "expect": {
+      "understood": true,
+      "move": null,
+      "claims": [
+        { "verdict": "right" },
+        { "verdict": "wrong" },
+        { "verdict": "unclear" }
+      ],
+      "missed": [],
+      "habits": { "threats": "none", "forcing": "none", "safety": "none" },
+      "best": null,
+      "nudge": "Look at your b-pawn."
+    },
+    "notes": ["After Bxf7+, Rxf7 wins a piece for a pawn."]
+  },
+  {
+    "name": "small talk: nothing about the position",
+    "fen": "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3",
+    "said": "hi Leo, how are you doing today",
+    "typed": false,
+    "reveal": false,
+    "facts": {
+      "depth": 12,
+      "moves": [
+        {"uci":"d2d4","eval":{"cp":43},"pv":["d2d4","e5d4","f3d4","f8c5","d4c6","d7c6","d1d8","e8d8","f1c4","g8f6"]},
+        {"uci":"f1b5","eval":{"cp":43},"pv":["f1b5","a7a6","b5a4","g8f6","d2d4","f6e4","d1e2","f7f5","e1g1"]},
+        {"uci":"f1c4","eval":{"cp":39},"pv":["f1c4","g8f6","f3g5","d7d5","e4d5","c6a5","c4b5","c8d7","d1e2","f8e7"]},
+        {"uci":"b1c3","eval":{"cp":35},"pv":["b1c3","g8f6","f1b5","f8d6","d2d3","e8g8","e1g1","c6d4","f3d4","e5d4"]},
+        {"uci":"f1e2","eval":{"cp":3},"pv":["f1e2","g8f6","b1c3","d7d5","e4d5","f6d5","e1g1","d5c3","d2c3","d8d1"]},
+        {"uci":"a2a3","eval":{"cp":2},"pv":["a2a3","g8f6","b1c3","d7d5","f1b5","d5d4","c3e2","f6e4","b5c6","b7c6"]},
+        {"uci":"h2h3","eval":{"cp":-2},"pv":["h2h3","g8f6","f1b5","f6e4","e1g1","e4d6","b5c6","d7c6","f3e5","f7f6"]},
+        {"uci":"d2d3","eval":{"cp":-6},"pv":["d2d3","g8f6","f1e2","d7d5","e4d5","f6d5","e1g1","f8e7","d3d4","e5e4"]},
+        {"uci":"a2a4","eval":{"cp":-6},"pv":["a2a4","g8f6","b1c3","a7a6","d2d4","c6d4","f3d4"]},
+        {"uci":"g2g3","eval":{"cp":-8},"pv":["g2g3","g8f6","f1g2","f6e4","f3e5","c6e5","d2d4","d7d5","d4e5","f8c5"]},
+        {"uci":"c2c3","eval":{"cp":-17},"pv":["c2c3","d7d5","d1a4","f7f6","d2d3","c8e6","f1e2","g8e7","e1g1"]},
+        {"uci":"f1d3","eval":{"cp":-18},"pv":["f1d3","g8f6","e1g1","f8c5","b1c3","d7d6","d3b5","e8g8","b5c6","b7c6"]},
+        {"uci":"c2c4","eval":{"cp":-29},"pv":["c2c4","f8c5","b1c3","d7d6","a2a3","c5b6","f1e2","f7f5","d2d3"]},
+        {"uci":"b2b3","eval":{"cp":-37},"pv":["b2b3","f8c5","f1b5","g8e7","e1g1","a7a6","b5c6","e7c6","d2d3","d7d6"]},
+        {"uci":"h2h4","eval":{"cp":-42},"pv":["h2h4","d7d5","e4d5","d8d5","b1c3","d5d6","f1b5","c8d7","e1g1"]},
+        {"uci":"d1e2","eval":{"cp":-48},"pv":["d1e2","g8f6","g2g3","f8e7","f1g2","d7d5","e4d5","d8d5","b1c3","d5c5"]},
+        {"uci":"b1a3","eval":{"cp":-81},"pv":["b1a3","g8f6","a3c4","d7d5","e4d5","d8d5","c4e3","d5c5","d2d3"]},
+        {"uci":"f3g1","eval":{"cp":-83},"pv":["f3g1","d7d5","e4d5","d8d5","b1c3","d5c5","g1f3"]},
+        {"uci":"h1g1","eval":{"cp":-101},"pv":["h1g1","g8f6","b1c3","d7d5","e4d5","f6d5","f1b5","f8b4","a2a3","b4a5"]},
+        {"uci":"e1e2","eval":{"cp":-128},"pv":["e1e2","d7d5","d2d3","c8g4","e2e1","d5e4","d3e4","d8d1","e1d1","g8f6"]},
+        {"uci":"b2b4","eval":{"cp":-143},"pv":["b2b4","f8b4","f1b5","g8f6","e1g1","e8g8","f1e1","a7a6","b5c6","d7c6"]},
+        {"uci":"g2g4","eval":{"cp":-150},"pv":["g2g4","g8f6","d2d4","e5d4","f3d4","f6e4","b1c3","e4c3","b2c3","f8d6"]},
+        {"uci":"f3e5","eval":{"cp":-267},"pv":["f3e5","c6e5","d2d4","e5g6","f1c4","c7c6","e1g1","f8e7","b1c3","d7d5"]},
+        {"uci":"f3g5","eval":{"cp":-414},"pv":["f3g5","d8g5","d2d4","g5d8","d4e5","c6e5","b1c3","c7c6","a2a3","e5g6"]},
+        {"uci":"f1a6","eval":{"cp":-434},"pv":["f1a6","b7a6","d2d4","d7d6","d4d5","c6e7","c2c4","e7g6","b1c3","c8d7"]},
+        {"uci":"f3h4","eval":{"cp":-490},"pv":["f3h4","d8h4","b1c3","c6d4","c3d5","d4e6","d2d4","h4e4","d5e3","e4d4"]},
+        {"uci":"f3d4","eval":{"cp":-533},"pv":["f3d4","e5d4","f1c4","d7d6","e1g1","c6e5","d2d3","e5c4","d3c4","c7c5"]}
+      ],
+      "threats": [
+        {"uci":"g8f6","eval":{"cp":22},"pv":["g8f6","b1c3","f8b4","f1d3","b4c5","e1g1","d7d6","c3d5","f6d5","e4d5"]},
+        {"uci":"f8c5","eval":{"cp":11},"pv":["f8c5","f1c4","g8f6","d2d3","d7d5","e4d5","f6d5","e1g1","e8g8","b1d2"]},
+        {"uci":"d7d5","eval":{"cp":9},"pv":["d7d5","e4d5","d8d5","b1c3","d5d6","d2d4","c8f5","d4e5","d6d1","c3d1"]},
+        {"uci":"f8e7","eval":{"cp":-13},"pv":["f8e7","f1b5","g8f6","d2d3","d7d6","e1g1","e8g8","b5a4","c8g4","c2c3"]},
+        {"uci":"f7f5","eval":{"cp":-23},"pv":["f7f5","d2d4","f5e4","f3e5","c6e5","d4e5","d7d5","e5d6","f8d6","f1c4"]},
+        {"uci":"a7a6","eval":{"cp":-23},"pv":["a7a6","d2d4","e5d4","f3d4","g8f6","d4c6","b7c6","b1c3","d7d5","c1g5"]}
+      ]
+    },
+    "parsed": {
+      "about": false,
+      "move": null,
+      "claims": []
+    },
+    "expect": {
+      "understood": false,
+      "move": null,
+      "claims": [],
+      "missed": [],
+      "habits": { "threats": "none", "forcing": "none", "safety": "none" },
+      "best": null,
+      "nudge": null
+    },
+    "notes": []
+  }
+]
