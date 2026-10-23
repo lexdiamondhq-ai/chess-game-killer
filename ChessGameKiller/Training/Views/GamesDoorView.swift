@@ -46,6 +46,7 @@ struct GamesDoorView: View {
         .fullScreenCover(item: $session) { plan in
             SessionView(plan: plan, theme: theme, startsAtOnce: true)
                 .environment(store)
+                .environment(puzzles)
         }
         .fullScreenCover(item: $rewinding) { game in
             RewindView(game: game, theme: theme)

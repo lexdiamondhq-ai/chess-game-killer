@@ -169,3 +169,42 @@ final class GameSteeredFocusTests: XCTestCase {
         XCTAssertEqual(beginner.todaysLesson?.id, "welcome")
     }
 }
+
+/// Puzzles inside a training session: the rating stays put, misses come back for review,
+/// and they earn XP without filling Coach Leo's drill records.
+@MainActor
+final class TrainingPuzzleTests: XCTestCase {
+
+    func testSessionPuzzlesFeedTheReviewQueue() throws {
+        let pack = try XCTUnwrap(PuzzleLibrary.bundled(), "lichess-puzzles.csv isn't in the app")
+        let store = PuzzleStore(library: pack)
+        let missed = pack.puzzles[10], solved = pack.puzzles[20]
+        store.recordTraining(missed.id, outcome: .missed)
+        store.recordTraining(solved.id, outcome: .firstTry)
+        XCTAssertTrue(store.progress.reviews.contains(missed.id))
+        XCTAssertFalse(store.progress.reviews.contains(solved.id))
+        XCTAssertEqual(store.progress.rating, PuzzleProgress().rating)
+        XCTAssertTrue(store.progress.recent.contains(missed.id))
+        let later = Date.now.addingTimeInterval(2 * 86_400)
+        XCTAssertEqual(store.dueReviewPuzzles(limit: 2, now: later).map(\.id), [missed.id])
+        XCTAssertEqual(missed.drill.lichessPuzzleID, missed.id)
+    }
+
+    func testPuzzleDrillsOnlyEarnXP() throws {
+        let pack = try XCTUnwrap(PuzzleLibrary.bundled())
+        let store = TrainingStore(library: try XCTUnwrap(TrainingLibrary.shared))
+        let reward = store.record(pack.puzzles[0].drill, outcome: .firstTry)
+        XCTAssertGreaterThan(reward.xp, 0)
+        XCTAssertTrue(store.progress.items.isEmpty)
+        XCTAssertNil(store.progress.skills["puzzles"])
+        XCTAssertTrue(store.trainedToday)
+    }
+
+    func testPracticeKeepsTheStreak() throws {
+        let store = TrainingStore(library: try XCTUnwrap(TrainingLibrary.shared))
+        XCTAssertFalse(store.trainedToday)
+        store.recordPractice(xp: 6)
+        XCTAssertTrue(store.trainedToday)
+        XCTAssertEqual(store.progress.xp, 6)
+    }
+}

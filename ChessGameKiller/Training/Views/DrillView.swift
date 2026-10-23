@@ -163,21 +163,32 @@ struct DrillView: View {
         }
     }
 
+    @ViewBuilder
     private var helpButtons: some View {
-        HStack(spacing: 10) {
-            Button {
-                withAnimation(.snappy) { runner.hint() }
-            } label: {
-                Label("Hint", systemImage: "lightbulb.fill")
-            }
-            .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false, tint: TrainingColor.yellow.color(on: theme)))
-            .disabled(runner.usedHint)
+        if runner.strict {
+            // Rush and Cycles give no hints. Passing counts as a miss, and says so.
             Button {
                 withAnimation(.snappy) { runner.reveal() }
             } label: {
-                Label("Show me", systemImage: "eye.fill")
+                Label("Pass (counts as a miss)", systemImage: "forward.fill")
             }
             .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false))
+        } else {
+            HStack(spacing: 10) {
+                Button {
+                    withAnimation(.snappy) { runner.hint() }
+                } label: {
+                    Label("Hint", systemImage: "lightbulb.fill")
+                }
+                .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false, tint: TrainingColor.yellow.color(on: theme)))
+                .disabled(runner.usedHint)
+                Button {
+                    withAnimation(.snappy) { runner.reveal() }
+                } label: {
+                    Label("Show me", systemImage: "eye.fill")
+                }
+                .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false))
+            }
         }
     }
 

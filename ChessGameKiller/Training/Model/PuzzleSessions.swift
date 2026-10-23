@@ -156,4 +156,7 @@ extension TrainingStore {
 extension Drill {
     /// A puzzle from the Lichess pack, rather than one of Coach Leo's drills.
     var isLichessPuzzle: Bool { id.hasPrefix("lichess-") }
+
+    /// The Lichess id behind a puzzle drill.
+    var lichessPuzzleID: String? { isLichessPuzzle ? String(id.dropFirst("lichess-".count)) : nil }
 }

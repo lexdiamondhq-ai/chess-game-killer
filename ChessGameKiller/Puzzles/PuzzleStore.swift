@@ -162,6 +162,25 @@ final class PuzzleStore {
         return change
     }
 
+    /// A puzzle played inside a training session: the rating stays put, but it counts
+    /// as seen, a miss goes into the review queue, and one already there moves on.
+    func recordTraining(_ puzzleID: String, outcome: Outcome, now: Date = .now) {
+        let clean = outcome == .firstTry
+        if progress.reviews.contains(puzzleID) {
+            progress.reviews.reviewed(puzzleID, clean: clean, now: now, calendar: calendar)
+        } else if !clean {
+            progress.reviews.missed(puzzleID, now: now, calendar: calendar)
+        }
+        remember(puzzleID)
+        save()
+    }
+
+    /// Missed puzzles due for review, ready to play in a session.
+    func dueReviewPuzzles(limit: Int, now: Date = .now) -> [LichessPuzzle] {
+        guard let library else { return [] }
+        return dueReviews(now: now).prefix(limit).compactMap { library.puzzle(id: $0.id) }
+    }
+
     /// Notes a Rush puzzle as seen, without touching the rating.
     func seen(_ puzzle: LichessPuzzle) {
         remember(puzzle.id)

@@ -16,12 +16,17 @@ struct PuzzlesView: View {
         var id: String { rawValue }
     }
 
-    @State private var mode: Mode = .rated
+    @State private var mode: Mode
     @State private var puzzle: LichessPuzzle?
     @State private var runner: DrillRunner?
     @State private var change: Int?
     @State private var showingThemes = false
     @State private var rush: RushRound?
+
+    init(theme: BoardTheme, startMode: Mode = .rated) {
+        self.theme = theme
+        _mode = State(initialValue: startMode)
+    }
 
     var body: some View {
         ZStack {
@@ -189,12 +194,6 @@ struct PuzzlesView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                     Spacer(minLength: 0)
-                    if let url = puzzle.url {
-                        Link(destination: url) {
-                            Image(systemName: "arrow.up.right.square")
-                        }
-                        .accessibilityLabel("Open on Lichess")
-                    }
                 }
                 .padding(.horizontal, 20)
             }
@@ -230,6 +229,7 @@ struct PuzzlesView: View {
         switch mode {
         case .rated:
             change = store.record(puzzle, outcome: outcome)
+            training.recordPractice(xp: outcome == .firstTry ? 6 : 2)
         case .rush:
             guard var round = rush, !round.isOver else { return }
             store.seen(puzzle)
@@ -270,6 +270,9 @@ struct PuzzlesView: View {
         runner?.cancel()
         round.isOver = true
         round.newBest = store.finishRush(score: round.score)
+        if round.score > 0 {
+            training.recordPractice(xp: 2 * round.score)
+        }
         withAnimation(.snappy) {
             rush = round
             runner = nil

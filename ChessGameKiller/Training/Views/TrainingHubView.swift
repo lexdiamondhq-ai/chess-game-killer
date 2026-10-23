@@ -77,6 +77,7 @@ struct TrainingHubView: View {
         .fullScreenCover(item: $session, onDismiss: { Task { await planToday() } }) { plan in
             SessionView(plan: plan, theme: theme, startsAtOnce: true)
                 .environment(store)
+                .environment(puzzles)
         }
         .fullScreenCover(isPresented: $showingLevelCheck, onDismiss: { Task { await planToday() } }) {
             LevelCheckView(theme: theme) { rating in

@@ -9,6 +9,8 @@ struct SessionView: View {
     /// Skips the intro, for a session started from a card that already showed what's in it.
     var startsAtOnce = false
     @Environment(TrainingStore.self) private var store
+    /// Puzzles from the Lichess pack report back to the puzzle store, for review.
+    @Environment(PuzzleStore.self) private var puzzles: PuzzleStore?
     @Environment(\.dismiss) private var dismiss
     @State private var runner: SessionRunner?
 
@@ -103,7 +105,11 @@ struct SessionView: View {
                     .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity),
                                             removal: .move(edge: .leading).combined(with: .opacity)))
                     .onChange(of: drill.outcome) { _, outcome in
-                        if let outcome { runner.record(outcome) }
+                        guard let outcome else { return }
+                        if case .drill(let played)? = runner.current?.content, let id = played.lichessPuzzleID {
+                            puzzles?.recordTraining(id, outcome: outcome)
+                        }
+                        runner.record(outcome)
                     }
                 }
                 Spacer(minLength: 0)
