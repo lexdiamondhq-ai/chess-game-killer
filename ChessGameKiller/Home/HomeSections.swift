@@ -608,19 +608,79 @@ struct HomeScoresheet: View {
 
 // MARK: - Friends
 
-/// Games with friends (filled in by the challenge feature) and the way to start one.
+/// Your games with friends still going, your move first, and the way to start one. A game
+/// that has ended is kept with your games, so it shows on the scoresheet instead.
 struct HomeFriendsCard: View {
+    let games: [FriendGame]
     let tone: HomeTone
-    let games: AnyView
+    let open: (FriendGame) -> Void
     let challenge: () -> Void
 
+    @State private var showsAll = false
+
+    /// How many games show before "Show all".
+    static let limit = 3
+
     var body: some View {
+        let shown = showsAll ? games : Array(games.prefix(Self.limit))
         VStack(spacing: 0) {
-            games
-            HomeLinkRow(glyph: "plus", title: "Challenge a friend", detail: "Send a game by text or email",
+            ForEach(shown, id: \.code) { game in
+                row(game)
+                HomeHairline(tone: tone)
+            }
+            if games.count > Self.limit {
+                Button {
+                    withAnimation(.snappy(duration: 0.3)) { showsAll.toggle() }
+                } label: {
+                    Text(showsAll ? "Show fewer" : "Show all \(games.count)")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(tone.metal)
+                        .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(HomeRowPressStyle(tone: tone))
+                HomeHairline(tone: tone)
+            }
+            HomeLinkRow(title: "Challenge a friend", detail: "Send a game by text or email",
                         tone: tone, action: challenge)
         }
         .padding(.horizontal, HomeMetrics.inset)
         .homePane(RoundedRectangle(cornerRadius: HomeMetrics.cardRadius, style: .continuous), tone: tone)
+    }
+
+    /// The friend, whose move it is (in gold when it is yours), and the clock.
+    private func row(_ game: FriendGame) -> some View {
+        let clock = game.clock?.label ?? "No clock"
+        return Button {
+            open(game)
+        } label: {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(game.title)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(tone.ink)
+                    Text(game.statusLine)
+                        .font(.subheadline.weight(game.isYourMove ? .semibold : .regular))
+                        .foregroundStyle(game.isYourMove ? tone.metal : tone.ink2)
+                }
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Text(clock)
+                    .font(.subheadline.monospacedDigit())
+                    .foregroundStyle(tone.ink3)
+                    .lineLimit(1)
+                    .fixedSize()
+                Image(systemName: "chevron.forward")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(tone.ink3)
+            }
+            .padding(.vertical, 13)
+            .frame(minHeight: 56)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(HomeRowPressStyle(tone: tone))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(game.title), \(game.statusLine), \(game.clock == nil ? "no clock" : clock)")
+        .accessibilityAddTraits(.isButton)
     }
 }

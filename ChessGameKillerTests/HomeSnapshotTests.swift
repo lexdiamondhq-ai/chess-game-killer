@@ -7,7 +7,8 @@ import simd
 
 /// The home screen at iPhone size: at rest, as the camera walks in, with the glass cards over
 /// the board, down the ladder and at the foot; pulled down and with the You panel open; on a
-/// first launch; in the real app; with a timed game under way as Black; and on other looks.
+/// first launch; in the real app; with a timed game under way as Black; with friend games;
+/// and on other looks.
 /// When SNAPSHOT_DIR is set the pictures are saved there, named to sort last so CI prints them at the log's end.
 @MainActor
 final class HomeSnapshotTests: XCTestCase {
@@ -52,6 +53,35 @@ final class HomeSnapshotTests: XCTestCase {
         scroll(window, to: 190)
         try save(window, "zz-home-6-black-closer")
         window.isHidden = true
+    }
+
+    /// Friend games still going come right under the clock, your move first; with none going,
+    /// Challenge a friend waits after the ladder.
+    func testFriendGamesUnderTheClock() throws {
+        let api = FakeChallengeAPI()
+        let now = Date().timeIntervalSince1970 * 1000
+        let yourMove = FriendGameState.sample(code: "7KQ2XM", moves: ["e2e4", "c7c5"], black: "Sam", now: now - 60_000)
+        let theirMove = FriendGameState.sample(code: "P4HRWN", moves: ["d2d4", "g8f6", "c2c4"],
+                                               clock: FriendClock(initial: 300, increment: 0), black: "Jordan",
+                                               now: now - 600_000)
+        let waiting = FriendGameState.sample(code: "M8TQ3D", status: .waiting,
+                                             clock: FriendClock(initial: 180, increment: 2), now: now - 3_600_000)
+        let states = [yourMove, theirMove, waiting]
+        for state in states {
+            api.games[state.code] = state
+        }
+        let center = ChallengeCenter(api: api, store: ChallengeStore(games: states.map { FriendGame.sample($0, seat: .white) }),
+                                     sounds: nil)
+        let window = try show(HomeSample.home().environment(center))
+        scroll(window, to: 420)
+        try save(window, "zz-home-8-friends")
+        window.isHidden = true
+
+        let none = ChallengeCenter(api: FakeChallengeAPI(), store: ChallengeStore(), sounds: nil)
+        let quiet = try show(HomeSample.home().environment(none))
+        scroll(quiet, to: 1500)
+        try save(quiet, "zz-home-8-friends-none")
+        quiet.isHidden = true
     }
 
     /// The home takes its colors from the board look.

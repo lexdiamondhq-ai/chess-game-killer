@@ -20,12 +20,8 @@ struct HomeActions {
     var openGame: (SavedGame) -> Void = { _ in }
     var army: () -> Void = {}
     var settings: () -> Void = {}
-    /// Challenge a friend by text or email. The friends section shows only once this is set.
-    var challenge: (() -> Void)? = nil
     /// The premium screen. Its rows show only once this is set.
     var premium: (() -> Void)? = nil
-    /// Games with friends, listed above "Challenge a friend".
-    var friendGames: () -> AnyView = { AnyView(EmptyView()) }
 }
 
 /// The home screen. The real 3D board is the world behind the whole page: at rest it fills
@@ -33,7 +29,9 @@ struct HomeActions {
 /// it and moves in on your king while the glass cards rise over it and it slips out of focus.
 ///
 /// The page, top to bottom: a chess clock (resume your game, or start the next one), today's
-/// puzzle and session, the ladder of rivals and the scoresheet of your games. The glass dock
+/// puzzle and session, the ladder of rivals and the scoresheet of your games. Games with
+/// friends come right under the clock while one is going; otherwise Challenge a friend
+/// follows the ladder. The glass dock
 /// holds the five doors. Your pieces and Settings are in the You panel, from the dock or by
 /// pulling the board down. Each thing has one way in, so nothing is found twice.
 struct HomeView: View {
@@ -45,6 +43,8 @@ struct HomeView: View {
     @Environment(ArmyStore.self) private var army
     @Environment(TrainingStore.self) private var training
     @Environment(PuzzleStore.self) private var puzzles
+    /// Challenge a friend, when the app provides it (pictures drawn in tests don't).
+    @Environment(ChallengeCenter.self) private var challenges: ChallengeCenter?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @AppStorage("setup.side") private var side: SideChoice = .white
@@ -221,9 +221,10 @@ struct HomeView: View {
 
     @ViewBuilder
     private func sections(upNext: HomeUpNext) -> some View {
-        if let challenge = actions.challenge {
-            HomeSectionHeader(title: "With friends", tone: tone)
-            HomeFriendsCard(tone: tone, games: actions.friendGames(), challenge: challenge)
+        let friendGames = challenges?.store.sorted.filter { !$0.isOver } ?? []
+        // A friend's game still going comes first, under the clock.
+        if !friendGames.isEmpty {
+            friends(friendGames)
         }
 
         // Dated like a newspaper's chess column; it turns over at midnight with the page open.
@@ -241,12 +242,28 @@ struct HomeView: View {
         HomeLadderCard(ladder: ladder, tone: tone, pieceTheme: pieceTheme, youColor: upNext.playerColor,
                        play: { level in choose(level, upNext) })
 
+        // With none going, the way to start one follows the rivals.
+        if friendGames.isEmpty {
+            friends([])
+        }
+
         let rows = HomeGameRow.rows(vault.games)
         if !rows.isEmpty {
             let week = HomeGameRow.thisWeek(vault.games)
             HomeSectionHeader(title: "Your games", tone: tone, note: week > 0 ? "\(week) this week" : nil)
             HomeScoresheet(rows: rows, total: vault.games.count, tone: tone,
                            open: actions.openGame, openAll: actions.rewind)
+        }
+    }
+
+    /// Your games with friends and the way to start one: Challenge a friend opens the composer,
+    /// which lists every friend game too.
+    @ViewBuilder
+    private func friends(_ games: [FriendGame]) -> some View {
+        if let challenges {
+            HomeSectionHeader(title: "With friends", tone: tone)
+            HomeFriendsCard(games: games, tone: tone, open: { challenges.play($0) }, challenge: { challenges.compose() })
+                .task { await challenges.refreshGames() }
         }
     }
 
