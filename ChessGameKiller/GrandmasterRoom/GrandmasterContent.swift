@@ -25,6 +25,8 @@ struct ClassicGame: Decodable, Identifiable, Hashable {
     var hero: Piece.Color { result == "0-1" ? .black : .white }
     var heroName: String { hero == .white ? white : black }
     var title: String { "\(white) – \(black)" }
+    /// "Tata Steel Chess 2025", or just the event when the year isn't known.
+    var playedAt: String { year > 0 ? "\(event) \(String(year))" : event }
 }
 
 /// An endgame every player must know, played against perfect defence. Built and checked

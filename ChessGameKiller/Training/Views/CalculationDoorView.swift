@@ -171,7 +171,7 @@ private struct GuessGameRow: View {
         if let opening = game.opening {
             return "\(opening.split(separator: ":").first ?? "") · \(side)"
         }
-        return "\(game.event) \(String(game.year)) · \(side)"
+        return "\(game.playedAt) · \(side)"
     }
 
     var body: some View {
@@ -182,7 +182,7 @@ private struct GuessGameRow: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 if game.isMasterGame {
-                    Text("\(game.event) \(String(game.year))")
+                    Text(game.playedAt)
                         .font(.system(.caption, design: .themed))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
