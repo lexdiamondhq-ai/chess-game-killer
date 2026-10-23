@@ -25,18 +25,13 @@ final class BoardTapTests: XCTestCase {
 
     /// The sprites' own pictures, as the game reads them.
     private func sprites(_ theme: BoardTheme) -> (Piece, CGPoint) -> Bool {
-        { piece, unit in SpriteMasks.shared.isSolid(piece, in: theme, atUnit: unit) }
+        { piece, offset in SpriteMasks.shared.isSolid(piece, in: theme, at: offset) }
     }
 
     /// A stand-in for every sprite: solid in a column up the middle, from the foot to 0.95 of
     /// a square above the square's center.
     private func column() -> (Piece, CGPoint) -> Bool {
-        let rect = PieceImage.boardRect(squareSize: 1)
-        return { _, unit in
-            let x = rect.minX + unit.x * rect.width
-            let y = rect.minY + unit.y * rect.height
-            return abs(x) < 0.15 && y > -0.95 && y < 0.15
-        }
+        { _, offset in abs(offset.x) < 0.15 && offset.y > -0.95 && offset.y < 0.15 }
     }
 
     /// Plays moves written as "e2e4" by tapping the start and end squares.

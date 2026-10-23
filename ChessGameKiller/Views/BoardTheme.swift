@@ -56,6 +56,8 @@ struct BoardTheme: Identifiable {
 
     // Screen
     let boardEdge: Color?
+    /// Shadows or glows drawn under the board. None for the boards in a glass frame:
+    /// a shadow under clear glass turns it grey, and the backdrop's light should show through.
     let boardShadows: [Color]
     let isDark: Bool
     let accent: Color?
@@ -145,7 +147,7 @@ struct BoardTheme: Identifiable {
         lastMoveRing: nil,
         hint: Color(hex: 0x5E8FFF).opacity(0.92),
         hintGlow: nil,
-        check: Color(hex: 0xFF3B4D),
+        check: Color(hex: 0xD92D3F),
         pieceSet: "gilded-",
         whiteGlow: nil,
         blackGlow: nil,
@@ -159,7 +161,7 @@ struct BoardTheme: Identifiable {
         whiteSparks: [Color.white, Color(hex: 0xF1E4C8), Color(hex: 0xF2C27A), Color(hex: 0xE39A45)],
         blackSparks: [Color.white, Color(hex: 0xF2C27A), Color(hex: 0xE39A45), Color(hex: 0xFF8A2A)],
         boardEdge: nil,
-        boardShadows: [Color.black.opacity(0.6)],
+        boardShadows: [],
         isDark: true,
         accent: Color(hex: 0x7EA6FF),
         sculptedLook: .gilded,
@@ -185,7 +187,7 @@ struct BoardTheme: Identifiable {
         lastMoveRing: nil,
         hint: Color(hex: 0x5E8FFF).opacity(0.92),
         hintGlow: nil,
-        check: Color(hex: 0xFF3B4D),
+        check: Color(hex: 0xD92D3F),
         pieceSet: "gilded-",
         whiteGlow: nil,
         blackGlow: nil,
@@ -199,7 +201,7 @@ struct BoardTheme: Identifiable {
         whiteSparks: [Color.white, Color(hex: 0xF1E4C8), Color(hex: 0xF2C27A), Color(hex: 0xE39A45)],
         blackSparks: [Color.white, Color(hex: 0xF2C27A), Color(hex: 0xE39A45), Color(hex: 0xFF8A2A)],
         boardEdge: nil,
-        boardShadows: [Color.black.opacity(0.6)],
+        boardShadows: [],
         isDark: true,
         accent: Color(hex: 0x7EA6FF),
         sculptedLook: .portoro,
@@ -225,7 +227,7 @@ struct BoardTheme: Identifiable {
         lastMoveRing: nil,
         hint: Color(hex: 0x5E8FFF).opacity(0.92),
         hintGlow: nil,
-        check: Color(hex: 0xFF3B4D),
+        check: Color(hex: 0xD92D3F),
         pieceSet: "sculpted-",
         whiteGlow: nil,
         blackGlow: nil,
@@ -239,7 +241,7 @@ struct BoardTheme: Identifiable {
         whiteSparks: [Color.white, Color(hex: 0xF4ECDD), Color(hex: 0xE0CFA8), Color(hex: 0x8FB0FF)],
         blackSparks: [Color.white, Color(hex: 0xE0CFA8), Color(hex: 0x8FB0FF), Color(hex: 0x5E8FFF)],
         boardEdge: nil,
-        boardShadows: [Color.black.opacity(0.6)],
+        boardShadows: [],
         isDark: true,
         accent: Color(hex: 0x7EA6FF),
         sculptedLook: .noir,
@@ -265,7 +267,7 @@ struct BoardTheme: Identifiable {
         lastMoveRing: nil,
         hint: Color(hex: 0xEBB357).opacity(0.92),
         hintGlow: nil,
-        check: Color(hex: 0xFF3B4D),
+        check: Color(hex: 0xD92D3F),
         pieceSet: "sculpted-",
         whiteGlow: nil,
         blackGlow: nil,
@@ -279,7 +281,7 @@ struct BoardTheme: Identifiable {
         whiteSparks: [Color.white, Color(hex: 0xF4ECDD), Color(hex: 0xF2D49A), Color(hex: 0xEBB357)],
         blackSparks: [Color.white, Color(hex: 0xF2D49A), Color(hex: 0xC0505E), Color(hex: 0xEBB357)],
         boardEdge: nil,
-        boardShadows: [Color.black.opacity(0.6)],
+        boardShadows: [],
         isDark: true,
         accent: Color(hex: 0xEBB357),
         sculptedLook: .bordeaux,
@@ -305,7 +307,7 @@ struct BoardTheme: Identifiable {
         lastMoveRing: nil,
         hint: Color(hex: 0xF2BD5C).opacity(0.92),
         hintGlow: nil,
-        check: Color(hex: 0xFF3B4D),
+        check: Color(hex: 0xD92D3F),
         pieceSet: "sculpted-",
         whiteGlow: nil,
         blackGlow: nil,
@@ -319,7 +321,7 @@ struct BoardTheme: Identifiable {
         whiteSparks: [Color.white, Color(hex: 0xF4ECDD), Color(hex: 0xF6D592), Color(hex: 0xF2BD5C)],
         blackSparks: [Color.white, Color(hex: 0xF6D592), Color(hex: 0x6F8BD0), Color(hex: 0xF2BD5C)],
         boardEdge: nil,
-        boardShadows: [Color.black.opacity(0.6)],
+        boardShadows: [],
         isDark: true,
         accent: Color(hex: 0xF2BD5C),
         sculptedLook: .midnight,
@@ -346,7 +348,7 @@ struct BoardTheme: Identifiable {
         lastMoveRing: nil,
         hint: Color(hex: 0x5E8FFF).opacity(0.92),
         hintGlow: nil,
-        check: Color(hex: 0xFF3B4D),
+        check: Color(hex: 0xD92D3F),
         pieceSet: "sculpted-",
         whiteGlow: nil,
         blackGlow: nil,
@@ -360,7 +362,7 @@ struct BoardTheme: Identifiable {
         whiteSparks: [Color.white, Color(hex: 0xF4ECDD), Color(hex: 0xD9DCE3), Color(hex: 0x8FB0FF)],
         blackSparks: [Color.white, Color(hex: 0xD9DCE3), Color(hex: 0x8FB0FF), Color(hex: 0x5E8FFF)],
         boardEdge: nil,
-        boardShadows: [Color.black.opacity(0.55)],
+        boardShadows: [],
         isDark: true,
         accent: Color(hex: 0x7EA6FF),
         sculptedLook: .classic,
@@ -386,7 +388,7 @@ struct BoardTheme: Identifiable {
         lastMoveRing: nil,
         hint: Color(hex: 0xE8BE64).opacity(0.9),
         hintGlow: nil,
-        check: Color(hex: 0xFF3B4E),
+        check: Color(hex: 0xD92D3F),
         pieceSet: "faberge-",
         whiteGlow: nil,
         blackGlow: nil,
@@ -400,7 +402,7 @@ struct BoardTheme: Identifiable {
         whiteSparks: [Color(hex: 0xFFF6E4), Color(hex: 0xFFF0C2), Color(hex: 0xE8BE64), Color(hex: 0xB8862E)],
         blackSparks: [Color(hex: 0xFFFFFF), Color(hex: 0x8FB0FF), Color(hex: 0x1236E0), Color(hex: 0xE8BE64)],
         boardEdge: nil,
-        boardShadows: [Color.black.opacity(0.6)],
+        boardShadows: [],
         isDark: true,
         accent: Color(hex: 0xE8BE64),
         boardArt: "board-faberge",
@@ -425,7 +427,7 @@ struct BoardTheme: Identifiable {
         lastMoveRing: nil,
         hint: Color(hex: 0xFFC24D).opacity(0.9),
         hintGlow: nil,
-        check: Color(hex: 0xFF4D5E),
+        check: Color(hex: 0xD92D3F),
         pieceSet: "blueprint-",
         whiteGlow: nil,
         blackGlow: nil,
@@ -439,7 +441,7 @@ struct BoardTheme: Identifiable {
         whiteSparks: [Color.white, Color(hex: 0xDCE8F7), Color(hex: 0xFFC24D), Color(hex: 0x7FB2FF)],
         blackSparks: [Color.white, Color(hex: 0x7FB2FF), Color(hex: 0x1E4275), Color(hex: 0xFFC24D)],
         boardEdge: nil,
-        boardShadows: [Color.black.opacity(0.55)],
+        boardShadows: [],
         isDark: true,
         accent: Color(hex: 0xFFC24D),
         boardArt: "board-blueprint",
@@ -464,7 +466,7 @@ struct BoardTheme: Identifiable {
         lastMoveRing: Color(hex: 0xFFD282).opacity(0.55),
         hint: Color(hex: 0x96FFFA).opacity(0.85),
         hintGlow: Color(hex: 0x6EFFF0),
-        check: Color(hex: 0xFF3B6B),
+        check: Color(hex: 0xD62A5C),
         pieceSet: "neon-",
         whiteGlow: Color(hex: 0xFFAA46),
         blackGlow: Color(hex: 0xAA6EFF),
@@ -570,7 +572,7 @@ struct BoardTheme: Identifiable {
             lastMoveRing: nil,
             hint: accent.opacity(0.9),
             hintGlow: nil,
-            check: Color(hex: 0xFF3B4E),
+            check: Color(hex: 0xD92D3F),
             pieceSet: id.rawValue + "-",
             whiteGlow: nil,
             blackGlow: nil,
@@ -584,7 +586,7 @@ struct BoardTheme: Identifiable {
             whiteSparks: whiteSparks,
             blackSparks: blackSparks,
             boardEdge: nil,
-            boardShadows: [Color.black.opacity(0.6)],
+            boardShadows: [],
             isDark: true,
             accent: accent,
             boardArt: "board-" + id.rawValue,
@@ -605,22 +607,64 @@ extension Color {
     }
 }
 
-/// The screen behind the board: the theme's radial backdrop, the Neon glow, or the grouped gray.
+/// The soft lights of a look's backdrop, so the glass over it has light to bend: a dark base in
+/// the look's own color, a key light from above that the top bar catches, the board's color
+/// glowing behind the board, and a pool of light under the dock. Nothing in it has an edge.
+struct BackdropLight {
+    /// The base, top and bottom.
+    let top: UInt32
+    let bottom: UInt32
+    let key: UInt32
+    /// The board's own color, softly behind it.
+    let fill: UInt32
+    /// Pools under the dock.
+    let floor: UInt32
+    /// How bright the lights are; the saturated rival colors are a little quieter.
+    var strength: Double = 1
+
+    /// Between the base's two colors, a little nearer the bottom one.
+    var middle: Color {
+        func channel(_ shift: UInt32) -> UInt32 {
+            let a = Double((top >> shift) & 0xFF), b = Double((bottom >> shift) & 0xFF)
+            return UInt32((a + (b - a) * 0.6).rounded()) << shift
+        }
+        return Color(hex: channel(16) | channel(8) | channel(0))
+    }
+}
+
+extension BoardTheme {
+    /// Nil for Neon, which has its own glows.
+    var backdropLight: BackdropLight? {
+        switch id {
+        case .gilded: return BackdropLight(top: 0x16120F, bottom: 0x060505, key: 0xD9A65E, fill: 0x7A4A26, floor: 0xD29A52)
+        case .portoro: return BackdropLight(top: 0x232220, bottom: 0x09090A, key: 0xD2B06A, fill: 0x4A4640, floor: 0xBC9A55)
+        case .noir: return BackdropLight(top: 0x232224, bottom: 0x08080A, key: 0xDCCBA6, fill: 0x3E3E46, floor: 0xB9A784)
+        case .sculpted: return BackdropLight(top: 0x24262A, bottom: 0x08080A, key: 0xD8CCB4, fill: 0x4A4C55, floor: 0xA9A08C)
+        case .bordeaux: return BackdropLight(top: 0x2A1E21, bottom: 0x0A0607, key: 0xEBB357, fill: 0x7A2530, floor: 0xA8404E)
+        case .midnight: return BackdropLight(top: 0x0F1424, bottom: 0x040509, key: 0xE8C27A, fill: 0x2E4AA0, floor: 0x5C7BE0)
+        case .faberge: return BackdropLight(top: 0x0A1440, bottom: 0x030515, key: 0xE8BE64, fill: 0x2348F0, floor: 0x3A64FF)
+        case .blueprint: return BackdropLight(top: 0x0F2240, bottom: 0x040A14, key: 0xCFE0F5, fill: 0x24589A, floor: 0x3D78C8)
+        case .spark: return BackdropLight(top: 0x1C0F07, bottom: 0x070403, key: 0xFFB24A, fill: 0xC05A1E, floor: 0xFF8A2A)
+        case .drift: return BackdropLight(top: 0x0E2329, bottom: 0x040A0B, key: 0x9FE6DC, fill: 0x1E5F66, floor: 0x7A6CC8)
+        case .pulse: return BackdropLight(top: 0x08203A, bottom: 0x02060C, key: 0x7FE6FF, fill: 0x1C4FA0, floor: 0x2FA8D8, strength: 0.85)
+        case .vector: return BackdropLight(top: 0x1D1036, bottom: 0x07040F, key: 0xE2D4FF, fill: 0x5A2FA0, floor: 0x9A62E8, strength: 0.9)
+        case .singularity: return BackdropLight(top: 0x1B1726, bottom: 0x060509, key: 0xE8E4FF, fill: 0x54506B, floor: 0xC04A9A, strength: 0.85)
+        case .neon: return nil
+        }
+    }
+}
+
+/// The screen behind the board: the look's softly lit backdrop, the Neon glow, or the grouped gray.
 struct ThemeBackdrop: View {
     let theme: BoardTheme
 
     var body: some View {
-        if let colors = theme.backdrop {
+        if let light = theme.backdropLight {
+            LitBackdrop(light: light)
+        } else if let colors = theme.backdrop {
             GeometryReader { geo in
-                ZStack {
-                    RadialGradient(colors: colors, center: UnitPoint(x: 0.5, y: 0.4),
-                                   startRadius: 0, endRadius: max(geo.size.width, geo.size.height) * 0.75)
-                    // The executive look keeps the theme's color but deepens it toward black.
-                    if !theme.glows {
-                        LinearGradient(colors: [.black.opacity(0.2), .black.opacity(0.5)],
-                                       startPoint: .top, endPoint: .bottom)
-                    }
-                }
+                RadialGradient(colors: colors, center: UnitPoint(x: 0.5, y: 0.4),
+                               startRadius: 0, endRadius: max(geo.size.width, geo.size.height) * 0.75)
             }
             .ignoresSafeArea()
             .accessibilityHidden(true)
@@ -632,7 +676,61 @@ struct ThemeBackdrop: View {
     }
 }
 
-/// Dark backdrop with soft colored glows and out-of-focus lights, behind the Neon board.
+/// A look's backdrop with its lights; see `BackdropLight`.
+private struct LitBackdrop: View {
+    let light: BackdropLight
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
+            let gain = 1.6 * light.strength
+            ZStack {
+                LinearGradient(stops: [
+                    .init(color: Color(hex: light.top), location: 0),
+                    .init(color: light.middle, location: 0.5),
+                    .init(color: Color(hex: light.bottom), location: 1),
+                ], startPoint: .top, endPoint: .bottom)
+                // From above, a little past the top edge.
+                pool(light.key, peak: 0.3 * gain, middle: 0.1 * gain, at: 0.45,
+                     width: w * 1.5, height: h * 0.44, x: w / 2, y: -0.04 * h)
+                // Behind the board, wider than it, so its glass frame bends the light.
+                pool(light.fill, peak: 0.36 * gain, middle: 0.12 * gain, at: 0.55,
+                     width: w * 1.6, height: h * 0.68, x: w / 2, y: 0.47 * h)
+                // Under the dock.
+                pool(light.floor, peak: 0.46 * gain, middle: 0.12 * gain, at: 0.55,
+                     width: w * 1.44, height: h * 0.26, x: w / 2, y: 1.01 * h)
+                // A quiet vignette.
+                EllipticalGradient(stops: [
+                    .init(color: .clear, location: 0.5),
+                    .init(color: .black.opacity(0.42), location: 1),
+                ], center: .center, startRadiusFraction: 0, endRadiusFraction: 0.5)
+                .frame(width: w * 2.2, height: h * 1.6)
+                .position(x: w / 2, y: h / 2)
+            }
+            .frame(width: w, height: h)
+            .clipped()
+        }
+        .ignoresSafeArea()
+        .accessibilityHidden(true)
+    }
+
+    /// A soft oval of light, brightest at its center and gone at its edge.
+    private func pool(_ hex: UInt32, peak: Double, middle: Double, at location: CGFloat,
+                      width: CGFloat, height: CGFloat, x: CGFloat, y: CGFloat) -> some View {
+        let color = Color(hex: hex)
+        return EllipticalGradient(stops: [
+            .init(color: color.opacity(peak), location: 0),
+            .init(color: color.opacity(middle), location: location),
+            .init(color: color.opacity(0), location: 1),
+        ], center: .center, startRadiusFraction: 0, endRadiusFraction: 0.5)
+        .frame(width: width, height: height)
+        .position(x: x, y: y)
+    }
+}
+
+/// Dark backdrop with soft colored glows and out-of-focus lights, behind the Neon board,
+/// and violet light pooling under the dock.
 struct NeonBackdrop: View {
     var body: some View {
         GeometryReader { geo in
@@ -640,15 +738,21 @@ struct NeonBackdrop: View {
             let h = geo.size.height
             ZStack {
                 Color(hex: 0x04050D)
-                RadialGradient(colors: [Color(hex: 0x14BEC8).opacity(0.22), .clear],
+                RadialGradient(colors: [Color(hex: 0x14BEC8).opacity(0.24), .clear],
                                center: UnitPoint(x: 0, y: 0.18), startRadius: 0, endRadius: w * 1.0)
-                RadialGradient(colors: [Color(hex: 0xC83CD2).opacity(0.22), .clear],
+                RadialGradient(colors: [Color(hex: 0xC83CD2).opacity(0.24), .clear],
                                center: UnitPoint(x: 1, y: 0.78), startRadius: 0, endRadius: w * 1.1)
+                EllipticalGradient(colors: [Color(hex: 0x7C4DFF).opacity(0.3), Color(hex: 0x7C4DFF).opacity(0)],
+                                   center: .center, startRadiusFraction: 0, endRadiusFraction: 0.5)
+                    .frame(width: w * 1.4, height: h * 0.28)
+                    .position(x: w / 2, y: h)
                 bokeh(Color(hex: 0x50F0E6), size: 26, x: w * 0.13, y: h * 0.15)
                 bokeh(Color(hex: 0xFF5AC8), size: 18, x: w * 0.84, y: h * 0.12)
                 bokeh(Color(hex: 0xA06EFF), size: 30, x: w * 0.75, y: h * 0.78)
                 bokeh(Color(hex: 0xFFBE5A), size: 16, x: w * 0.18, y: h * 0.83)
             }
+            .frame(width: w, height: h)
+            .clipped()
         }
         .ignoresSafeArea()
         .accessibilityHidden(true)

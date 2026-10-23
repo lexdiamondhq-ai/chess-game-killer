@@ -12,10 +12,12 @@ struct SettingsSheet: View {
     @AppStorage("soundEffects") private var soundOn = true
     @AppStorage("haptics") private var hapticsOn = true
     @AppStorage("rivalBanter") private var banterOn = true
-    @AppStorage("coachVoiceMuted") private var voiceMuted = false
     @AppStorage("bigBoard") private var bigBoard = false
     @AppStorage("sculpted3D") private var sculpted3D = true
     @AppStorage(HomeScreen.key) private var homeScreen = HomeScreen.defaultOn
+    /// Shared with the lessons' speaker button and the highlight reel.
+    @AppStorage("coachVoiceMuted") private var voiceMuted = false
+    @AppStorage(ReviewLevel.storageKey) private var reviewLevel = ReviewLevel.club.rawValue
 
     @Environment(\.dismiss) private var dismiss
 
@@ -29,20 +31,19 @@ struct SettingsSheet: View {
                     preview
 
                     section("Board") {
-                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
-                            ForEach(BoardTheme.all) { option in
-                                ThemeCard(option: option, isSelected: option.id == themeID, theme: theme) {
-                                    withAnimation(.easeInOut(duration: 0.35)) { themeID = option.id }
-                                }
-                            }
-                        }
+                        themeGrid(Self.looks)
+                        Text("Rival boards")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 6)
+                        themeGrid(BoardTheme.rivals)
                         SettingsGroup(theme: theme) {
                             if theme.sculptedLook != nil {
                                 ToggleRow(title: "3D pieces", subtitle: "Carved pieces that lift, glide and fall. Off draws the same set flat.",
                                           symbol: "cube", isOn: $sculpted3D, theme: theme)
                                 rule
                             }
-                            ToggleRow(title: "Rival boards", subtitle: "Each rival plays on its own board instead of the one above.",
+                            ToggleRow(title: "Match rival", subtitle: "Computer games use the rival's own board, not the one picked above.",
                                       symbol: "person.crop.circle.badge.checkmark", isOn: $matchRival, theme: theme)
                             rule
                             ToggleRow(title: "Big Board", subtitle: "The board fills the screen. Swipe up from the bottom for the tools, sideways on the board to replay moves.",
@@ -65,9 +66,14 @@ struct SettingsSheet: View {
                             ToggleRow(title: "Move grades", subtitle: "Rates each move you play, from Best to Blunder.",
                                       symbol: "star.fill", isOn: $showVerdicts, theme: theme)
                             rule
-                            ToggleRow(title: "Coach's voice", subtitle: "Leo narrates his lessons and your highlight reels.",
-                                      symbol: "waveform", isOn: Binding(get: { !voiceMuted }, set: { voiceMuted = !$0 }),
-                                      theme: theme)
+                            PickerRow(title: "Game review", subtitle: (ReviewLevel(rawValue: reviewLevel) ?? .club).blurb,
+                                      symbol: "backward.circle", theme: theme) {
+                                Picker("Game review", selection: $reviewLevel) {
+                                    ForEach(ReviewLevel.allCases) { level in
+                                        Text(level.title).tag(level.rawValue)
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -77,8 +83,11 @@ struct SettingsSheet: View {
                             rule
                             ToggleRow(title: "Haptics", symbol: "iphone.radiowaves.left.and.right", isOn: $hapticsOn, theme: theme)
                             rule
-                            ToggleRow(title: "Rival remarks", subtitle: "A word from your rival now and then, under its name.",
+                            ToggleRow(title: "Rival banter", subtitle: "Rivals talk to you during the game.",
                                       symbol: "bubble.left.fill", isOn: $banterOn, theme: theme)
+                            rule
+                            ToggleRow(title: "Coach's voice", subtitle: "Leo reads lessons and highlight reels aloud. Captions always show.",
+                                      symbol: "waveform", isOn: Binding(get: { !voiceMuted }, set: { voiceMuted = !$0 }), theme: theme)
                         }
                     }
 
@@ -149,6 +158,19 @@ struct SettingsSheet: View {
 
     private var rule: some View {
         Divider().padding(.leading, 60)
+    }
+
+    /// Every look that is not a rival's own board, in the menu's order.
+    private static let looks = BoardTheme.all.filter { look in !BoardTheme.rivals.contains { $0.id == look.id } }
+
+    private func themeGrid(_ options: [BoardTheme]) -> some View {
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+            ForEach(options) { option in
+                ThemeCard(option: option, isSelected: option.id == themeID, theme: theme) {
+                    withAnimation(.easeInOut(duration: 0.35)) { themeID = option.id }
+                }
+            }
+        }
     }
 
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
@@ -224,14 +246,20 @@ struct BoardPreview: View {
         let sq = (size - inset * 2) / 8
         let corner = RoundedRectangle(cornerRadius: sq * 0.12, style: .continuous)
         ZStack(alignment: .topLeading) {
-            if let art = theme.boardArt {
-                BoardArt(name: art, flipped: false)
-            }
-            if let surface = theme.surface {
-                LinearGradient(colors: surface, startPoint: .topLeading, endPoint: .bottomTrailing)
-            }
-            ZStack(alignment: .topLeading) {
+            ZStack {
+                if let art = theme.boardArt {
+                    BoardArt(name: art, flipped: false)
+                }
+                if let surface = theme.surface {
+                    LinearGradient(colors: surface, startPoint: .topLeading, endPoint: .bottomTrailing)
+                }
                 squares(size: sq)
+                    .padding(inset)
+            }
+            .frame(width: size, height: size)
+            .clipShape(corner)
+            // Only the picture is clipped, so a king on the far rank may rise above the frame.
+            ZStack(alignment: .topLeading) {
                 ForEach(Self.position?.pieces ?? [], id: \.square) { piece in
                     PieceImage(piece: piece, theme: theme, size: sq, onBoard: true)
                         .position(center(of: piece.square, size: sq))
@@ -243,7 +271,6 @@ struct BoardPreview: View {
             .padding(inset)
         }
         .frame(width: size, height: size)
-        .clipShape(corner)
         .overlay {
             if let edge = theme.boardEdge {
                 corner.strokeBorder(edge, lineWidth: 1)
@@ -310,7 +337,7 @@ struct BoardPreview: View {
 
 // MARK: - Rows and cards
 
-/// One board look: a four-square swatch, its name, and a check when it is the current one.
+/// One board look: a four-square swatch, its name, and a check on the swatch when it is the current one.
 private struct ThemeCard: View {
     let option: BoardTheme
     let isSelected: Bool
@@ -322,18 +349,23 @@ private struct ThemeCard: View {
         Button(action: select) {
             HStack(spacing: 12) {
                 swatch
+                    .overlay(alignment: .topTrailing) {
+                        if isSelected {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 17, weight: .semibold))
+                                .symbolRenderingMode(.palette)
+                                .foregroundStyle(Color.black, theme.accent ?? .accentColor)
+                                .background(Circle().fill(Color.black).padding(-1.5))
+                                .offset(x: 7, y: -7)
+                                .transition(.scale.combined(with: .opacity))
+                        }
+                    }
                 Text(option.name)
                     .font(.headline)
                     .foregroundStyle(Color.primary)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.5)
+                    .minimumScaleFactor(0.8)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.title3)
-                        .foregroundStyle(theme.accent ?? .accentColor)
-                        .transition(.scale.combined(with: .opacity))
-                }
             }
             .padding(.horizontal, 14)
             .frame(maxWidth: .infinity)
@@ -415,6 +447,38 @@ private struct ToggleRow: View {
     }
 }
 
+/// A choice with an icon tile, a line under the title, and a menu of options on the right.
+private struct PickerRow<Choice: View>: View {
+    let title: String
+    var subtitle: String?
+    let symbol: String
+    let theme: BoardTheme
+    @ViewBuilder let choice: Choice
+
+    var body: some View {
+        HStack(spacing: 12) {
+            IconTile(symbol: symbol, theme: theme)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.body.weight(.semibold))
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 8)
+            choice
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .tint(theme.accent ?? .accentColor)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+    }
+}
+
 /// A row that leads somewhere: icon tile, title, chevron.
 private struct LinkRowLabel: View {
     let title: String
@@ -467,7 +531,7 @@ private struct SettingsGroup<Content: View>: View {
     }
 }
 
-/// Glass on the dark themes; outlined in color when selected.
+/// The app's glass, outlined in color when selected.
 private struct SettingsCard: View {
     let theme: BoardTheme
     let selected: Bool
@@ -475,14 +539,13 @@ private struct SettingsCard: View {
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
-        shape
-            .fill(theme.isDark ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)))
+        GlassSurface(shape: shape)
             .overlay {
-                shape.strokeBorder(selected ? color : Color.primary.opacity(theme.isDark ? 0.12 : 0.08),
-                                   lineWidth: selected ? 1.5 : 1)
+                if selected {
+                    shape.strokeBorder(color, lineWidth: 1.5)
+                        .shadow(color: color.opacity(theme.glows ? 0.45 : 0.2), radius: theme.glows ? 10 : 6)
+                }
             }
-            .shadow(color: selected ? color.opacity(theme.glows ? 0.45 : 0.25) : .black.opacity(theme.glows ? 0 : 0.05),
-                    radius: selected ? 12 : 6, y: theme.glows ? 0 : 2)
     }
 }
 
@@ -528,6 +591,12 @@ struct LicensesView: View {
                url: URL(string: "https://database.lichess.org/#puzzles")!),
     ]
 
+    /// "ChessKit on GitHub", or the site's own name, such as "stockfishchess.org".
+    private func linkTitle(_ credit: Credit) -> String {
+        let host = credit.url.host ?? "Website"
+        return host == "github.com" ? "\(credit.name) on GitHub" : host
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
@@ -553,7 +622,7 @@ struct LicensesView: View {
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                         Link(destination: credit.url) {
-                            Label(credit.url.host ?? "Website", systemImage: "arrow.up.right")
+                            Label(linkTitle(credit), systemImage: "arrow.up.right")
                                 .font(.caption.weight(.semibold))
                         }
                         .padding(.top, 2)

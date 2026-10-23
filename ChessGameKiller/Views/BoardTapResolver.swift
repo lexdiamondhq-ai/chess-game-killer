@@ -17,9 +17,9 @@ enum BoardTapResolver {
     static let dotReach: CGFloat = 0.22
 
     /// The square for a tap at `point`, in points from the top left of the 8x8 squares.
-    /// `piece` tells what stands on a square. `isSolid` tells whether a piece's picture is
-    /// solid at a point given as a fraction of the picture's width and height from its top
-    /// left; nil on boards whose pieces stay inside their squares.
+    /// `piece` tells what stands on a square. `isSolid` tells whether a piece's picture, standing
+    /// on its square, is solid at a point given from that square's center in squares (down is
+    /// positive); nil on boards whose pieces stay inside their squares.
     static func square(
         at point: CGPoint,
         squareSize size: CGFloat,
@@ -51,9 +51,10 @@ enum BoardTapResolver {
             for ahead in [2, 1] where row + ahead < 8 {
                 let front = squareAt(column: column, row: row + ahead, flipped: flipped)
                 guard let standing = piece(front) else { continue }
-                let unit = pictureUnit(of: point, on: front, squareSize: size, flipped: flipped,
-                                       lifted: front == selected)
-                if let unit, isSolid(standing, unit) { return front }
+                if isSolid(standing, offset(of: point, from: front, squareSize: size, flipped: flipped,
+                                            lifted: front == selected)) {
+                    return front
+                }
             }
         }
         return squareAt(column: column, row: row, flipped: flipped)
@@ -66,19 +67,13 @@ enum BoardTapResolver {
         return CGPoint(x: (CGFloat(column) + 0.5) * size, y: (CGFloat(row) + 0.5) * size)
     }
 
-    /// Where `point` falls on the picture of the piece standing on `square`, as a fraction of
-    /// the picture's width and height from its top left; nil when it is off the picture.
-    /// A picked-up piece is drawn a little larger, about its square's center.
-    static func pictureUnit(of point: CGPoint, on square: Square, squareSize size: CGFloat, flipped: Bool,
-                            lifted: Bool) -> CGPoint? {
+    /// Where `point` is from the center of `square`, in squares, as the piece standing there
+    /// is drawn: a picked-up piece is drawn a little larger, about its square's center.
+    static func offset(of point: CGPoint, from square: Square, squareSize size: CGFloat, flipped: Bool,
+                       lifted: Bool) -> CGPoint {
         let middle = center(of: square, squareSize: size, flipped: flipped)
-        let scale = lifted ? PieceImage.liftedScale : 1
-        let rect = PieceImage.boardRect(squareSize: size)
-        let x = (point.x - middle.x) / scale
-        let y = (point.y - middle.y) / scale
-        let unit = CGPoint(x: (x - rect.minX) / rect.width, y: (y - rect.minY) / rect.height)
-        guard (0...1).contains(unit.x), (0...1).contains(unit.y) else { return nil }
-        return unit
+        let scale = size * (lifted ? PieceImage.liftedScale : 1)
+        return CGPoint(x: (point.x - middle.x) / scale, y: (point.y - middle.y) / scale)
     }
 
     private static func squareAt(column: Int, row: Int, flipped: Bool) -> Square {
@@ -144,6 +139,7 @@ struct AlphaMask {
 }
 
 /// The sprites' alpha masks, made the first time each picture is needed.
+@MainActor
 final class SpriteMasks {
     static let shared = SpriteMasks()
 
@@ -162,8 +158,13 @@ final class SpriteMasks {
         return mask
     }
 
-    /// Whether a piece's picture in `theme` is solid at a point given as a fraction of its size.
-    func isSolid(_ piece: Piece, in theme: BoardTheme, atUnit point: CGPoint) -> Bool {
-        mask(named: theme.imageName(for: piece))?.isSolid(atUnit: point) ?? false
+    /// Whether a piece's picture in `theme`, standing on its square as the board draws it, is
+    /// solid at `offset` from the square's center, in squares.
+    func isSolid(_ piece: Piece, in theme: BoardTheme, at offset: CGPoint) -> Bool {
+        let name = theme.imageName(for: piece)
+        guard let mask = mask(named: name) else { return false }
+        let rect = PieceImage.boardRect(of: name, squareSize: 1)
+        return mask.isSolid(atUnit: CGPoint(x: (offset.x - rect.minX) / rect.width,
+                                            y: (offset.y - rect.minY) / rect.height))
     }
 }
