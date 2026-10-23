@@ -18,26 +18,26 @@ enum SideChoice: String, CaseIterable, Identifiable {
 
 /// How much the coach says during a game. Two switches, shown as one choice.
 enum CoachMode: CaseIterable, Identifiable {
-    case full, arrows, verdicts, silent
+    case full, hints, verdicts, silent
 
     var id: Self { self }
 
     var name: String {
         switch self {
         case .full: return "Full coach"
-        case .arrows: return "Arrows only"
+        case .hints: return "Hints only"
         case .verdicts: return "Verdicts only"
         case .silent: return "Silent"
         }
     }
 
-    /// One line about the mode. How many arrows it promises follows the
-    /// second-best setting, so the text matches what the game draws.
-    func detail(twoArrows: Bool) -> String {
+    /// One line about the mode. How many hints it promises follows the
+    /// second-best setting, so the text matches what the game marks.
+    func detail(twoHints: Bool) -> String {
         switch self {
-        case .full: return twoArrows ? "Grades every move and shows the two best moves" : "Grades every move and shows the best move"
-        case .arrows: return twoArrows ? "Shows the two best moves, no grades" : "Shows the best move, no grades"
-        case .verdicts: return "Grades your moves, no arrows. A fair test."
+        case .full: return twoHints ? "Grades every move and marks your two best moves" : "Grades every move and marks your best move"
+        case .hints: return twoHints ? "Marks your two best moves, no grades" : "Marks your best move, no grades"
+        case .verdicts: return "Grades your moves, no hints. A fair test."
         case .silent: return "Just chess. The coach keeps quiet."
         }
     }
@@ -45,27 +45,27 @@ enum CoachMode: CaseIterable, Identifiable {
     /// A couple of words for the match card, next to the name.
     var short: String {
         switch self {
-        case .full: return "arrows + verdicts"
-        case .arrows: return "no grades"
-        case .verdicts: return "no arrows"
+        case .full: return "hints + grades"
+        case .hints: return "no grades"
+        case .verdicts: return "no hints"
         case .silent: return "just chess"
         }
     }
 
-    var showsArrows: Bool { self == .full || self == .arrows }
+    var showsHints: Bool { self == .full || self == .hints }
     var showsVerdicts: Bool { self == .full || self == .verdicts }
 
-    init(arrows: Bool, verdicts: Bool) {
-        switch (arrows, verdicts) {
+    init(hints: Bool, verdicts: Bool) {
+        switch (hints, verdicts) {
         case (true, true): self = .full
-        case (true, false): self = .arrows
+        case (true, false): self = .hints
         case (false, true): self = .verdicts
         case (false, false): self = .silent
         }
     }
 }
 
-/// Picks the opponent, the rival, the side, the clock and the coach, then starts the game.
+/// Picks the rival, the side, the clock and the coach, then starts the game.
 ///
 /// Side, clock and coach live in one card of three rows. A row shows its
 /// current choice; tapping it unfolds the options in place, and picking one
@@ -79,7 +79,6 @@ struct NewGameSheet: View {
     let theme: BoardTheme
     let start: (MatchController.Setup) -> Void
 
-    @AppStorage("setup.opponent") private var opponent: MatchController.Opponent = .computer
     @AppStorage("setup.side") private var side: SideChoice = .white
     @AppStorage("setup.level") private var level: MatchController.Level = .club
     @AppStorage("setup.clock") private var timeControl: TimeControl = .unlimited
@@ -97,39 +96,22 @@ struct NewGameSheet: View {
 
     /// The choices from last time, for when the sheet is closed without starting.
     static func savedSetup(_ defaults: UserDefaults = .standard) -> MatchController.Setup {
-        let opponent = defaults.string(forKey: "setup.opponent").flatMap { MatchController.Opponent(rawValue: $0) } ?? .computer
         let side = defaults.string(forKey: "setup.side").flatMap { SideChoice(rawValue: $0) } ?? .white
         let level = (defaults.object(forKey: "setup.level") as? Int).flatMap { MatchController.Level(rawValue: $0) } ?? .club
         let clock = defaults.string(forKey: "setup.clock").flatMap { TimeControl(rawValue: $0) } ?? TimeControl.unlimited
-        return MatchController.Setup(opponent: opponent, playerColor: side.color, level: level, timeControl: clock)
+        return MatchController.Setup(playerColor: side.color, level: level, timeControl: clock)
     }
 
     private var accent: Color { theme.accent ?? .accentColor }
-    private var coachMode: CoachMode { CoachMode(arrows: showBestMoves, verdicts: showVerdicts) }
+    private var coachMode: CoachMode { CoachMode(hints: showBestMoves, verdicts: showVerdicts) }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
-                    section("Opponent") {
-                        Picker("Opponent", selection: $opponent) {
-                            ForEach(MatchController.Opponent.allCases) { opponent in
-                                Label(opponent.title, systemImage: opponent.symbol).tag(opponent)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                    }
-
-                    if opponent == .computer {
-                        section("Your rival") {
-                            rivalCarousel
-                            dots
-                        }
-                    } else {
-                        Label("Pass the phone back and forth. The coach grades both of you.",
-                              systemImage: "person.2.fill")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                    section("Your rival") {
+                        rivalCarousel
+                        dots
                     }
 
                     section("The match") {
@@ -146,15 +128,14 @@ struct NewGameSheet: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 12)
                 .padding(.bottom, 24)
-                .animation(.snappy, value: opponent)
                 .animation(.spring(response: 0.42, dampingFraction: 0.86), value: openRow)
             }
             .sensoryFeedback(.selection, trigger: openRow) { _, _ in hapticsOn }
             .safeAreaInset(edge: .bottom) {
                 Button {
-                    start(MatchController.Setup(opponent: opponent, playerColor: side.color, level: level, timeControl: timeControl))
+                    start(MatchController.Setup(playerColor: side.color, level: level, timeControl: timeControl))
                 } label: {
-                    Label(opponent == .computer ? "Play \(level.rival.name)" : "Start Game", systemImage: "play.fill")
+                    Label("Play \(level.rival.name)", systemImage: "play.fill")
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
@@ -177,7 +158,7 @@ struct NewGameSheet: View {
                         // The coach keys reach the running game at once, so a
                         // choice that was only tried out goes back on Cancel.
                         if let coachOnOpen, coachOnOpen != coachMode {
-                            showBestMoves = coachOnOpen.showsArrows
+                            showBestMoves = coachOnOpen.showsHints
                             showVerdicts = coachOnOpen.showsVerdicts
                         }
                         dismiss()
@@ -211,24 +192,22 @@ struct NewGameSheet: View {
 
     private var matchCard: some View {
         VStack(spacing: 0) {
-            if opponent == .computer {
-                MatchRowButton(label: "Play as", value: sideName(side), detail: nil, isOpen: openRow == .side,
-                               theme: theme, icon: { sideIcon }) {
-                    toggle(.side)
-                }
-                if openRow == .side {
-                    HStack(spacing: 8) {
-                        ForEach(SideChoice.allCases) { choice in
-                            sideCard(choice)
-                        }
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.top, 4)
-                    .padding(.bottom, 12)
-                    .transition(unfold)
-                }
-                rowDivider
+            MatchRowButton(label: "Play as", value: sideName(side), detail: nil, isOpen: openRow == .side,
+                           theme: theme, icon: { sideIcon }) {
+                toggle(.side)
             }
+            if openRow == .side {
+                HStack(spacing: 8) {
+                    ForEach(SideChoice.allCases) { choice in
+                        sideCard(choice)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.top, 4)
+                .padding(.bottom, 12)
+                .transition(unfold)
+            }
+            rowDivider
 
             MatchRowButton(label: "Clock", value: timeControl.name, detail: timeControl.kind, isOpen: openRow == .clock,
                            theme: theme, icon: { Image(systemName: "stopwatch") }) {
@@ -252,9 +231,9 @@ struct NewGameSheet: View {
             if openRow == .coach {
                 optionList {
                     ForEach(CoachMode.allCases) { mode in
-                        OptionRow(title: mode.name, detail: mode.detail(twoArrows: showSecondBest), isOn: coachMode == mode, theme: theme) {
+                        OptionRow(title: mode.name, detail: mode.detail(twoHints: showSecondBest), isOn: coachMode == mode, theme: theme) {
                             choose {
-                                showBestMoves = mode.showsArrows
+                                showBestMoves = mode.showsHints
                                 showVerdicts = mode.showsVerdicts
                             }
                         }

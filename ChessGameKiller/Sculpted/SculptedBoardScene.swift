@@ -4,7 +4,8 @@ import SceneKit
 import UIKit
 import simd
 
-/// One of the best-move arrows on the 3D board.
+/// One of the coach's suggested moves on the 3D board: brackets around the piece,
+/// and a ringed dot where it goes once the piece is picked up.
 struct SculptedHint: Equatable {
     let from: Square
     let to: Square
@@ -63,6 +64,7 @@ struct SculptedBoardState: Equatable {
             selected.map { "\($0)" } ?? "-",
             checkedKing.map { "\($0)" } ?? "-",
             targets.map { "\($0)\(occupied.contains($0) ? "x" : "")" }.sorted().joined(),
+            hints.map { "\($0.from)\($0.to)\($0.isBest ? "!" : "")" }.sorted().joined(),
         ]
     }
 }
@@ -82,6 +84,7 @@ final class SculptedSceneKitView: SCNView {
 /// It owns its SceneKit view. `apply(_:animated:)` takes a copy of the game and animates
 /// whatever changed: moves glide (knights hop), captured pieces tip over and shrink away,
 /// a promoted pawn turns into its new piece, and the camera walks around the board when it flips.
+/// Legal moves and the coach's hints are marks on the stone, never arrows.
 final class SculptedBoardScene {
     static let pieceCategory = 1 << 1
 
@@ -97,7 +100,6 @@ final class SculptedBoardScene {
     private let rig = SCNNode()
     private let piecesNode = SCNNode()
     private let marksNode = SCNNode()
-    private let arrowsNode = SCNNode()
     private let labelsNode = SCNNode()
     /// Dust puffs and other passing effects.
     private let effectsNode = SCNNode()
@@ -135,7 +137,7 @@ final class SculptedBoardScene {
         buildCamera()
         buildLights()
         buildBoard()
-        for node in [piecesNode, marksNode, arrowsNode, labelsNode, effectsNode] {
+        for node in [piecesNode, marksNode, labelsNode, effectsNode] {
             scene.rootNode.addChildNode(node)
         }
         buildLabels(flipped: false)
@@ -228,9 +230,6 @@ final class SculptedBoardScene {
         updatePieces(from: old, to: new, animated: animate)
         if old.marks != new.marks || old.pieces.isEmpty {
             updateMarks(new)
-        }
-        if old.hints != new.hints {
-            updateArrows(new.hints)
         }
         if old.halos != new.halos || old.pieces != new.pieces {
             updateHalos(new)
@@ -889,8 +888,26 @@ final class SculptedBoardScene {
                 ])))
             }
         }
+        // The coach's picks: brackets around each piece it would move, best brightest.
+        var hintedPieces: [Square: Bool] = [:]
+        for hint in new.hints { hintedPieces[hint.from] = (hintedPieces[hint.from] ?? false) || hint.isBest }
+        for (square, isBest) in hintedPieces {
+            addMark(isBest ? bracketsMark : bracketsFaintMark, at: square, height: 0.0022, fade: true)
+        }
+        // Where the selected piece can go; its suggested moves get a halo.
+        var hintedTargets: [Square: Bool] = [:]
+        for hint in new.hints where hint.from == new.selected {
+            hintedTargets[hint.to] = (hintedTargets[hint.to] ?? false) || hint.isBest
+        }
         for target in new.targets {
-            addMark(occupied.contains(target) ? captureMark : dotMark, at: target, height: 0.0023, fade: true)
+            let taking = occupied.contains(target)
+            let mark: SCNGeometry
+            switch hintedTargets[target] {
+            case true?: mark = taking ? hintCaptureMark : hintDotMark
+            case false?: mark = taking ? hintCaptureFaintMark : hintDotFaintMark
+            case nil: mark = taking ? captureMark : dotMark
+            }
+            addMark(mark, at: target, height: 0.0023, fade: true)
         }
     }
 
@@ -932,96 +949,14 @@ final class SculptedBoardScene {
     private lazy var dotMark = Self.mark(size: 1, color: look.accent, alpha: 0.92, mask: MarkImages.dot)
     private lazy var dustMark = Self.mark(size: 1, color: UIColor(white: 0.93, alpha: 1), alpha: 0.5, mask: MarkImages.contact)
     private lazy var captureMark = Self.mark(size: 1, color: look.accent, alpha: 0.92, mask: MarkImages.ring)
+    private lazy var bracketsMark = Self.mark(size: 1, color: look.accent, alpha: 0.95, mask: MarkImages.brackets)
+    private lazy var bracketsFaintMark = Self.mark(size: 1, color: look.accent, alpha: 0.5, mask: MarkImages.brackets)
+    private lazy var hintDotMark = Self.mark(size: 1, color: look.accent, alpha: 0.95, mask: MarkImages.hintDot(best: true))
+    private lazy var hintDotFaintMark = Self.mark(size: 1, color: look.accent, alpha: 0.92, mask: MarkImages.hintDot(best: false))
+    private lazy var hintCaptureMark = Self.mark(size: 1, color: look.accent, alpha: 0.95, mask: MarkImages.hintRing(best: true))
+    private lazy var hintCaptureFaintMark = Self.mark(size: 1, color: look.accent, alpha: 0.92, mask: MarkImages.hintRing(best: false))
     private static let contactGeometry = mark(size: 1, color: .black, alpha: 0.5, mask: MarkImages.contact)
     private static let haloMask = MarkImages.halo
-
-    // MARK: Best-move arrows
-
-    private func updateArrows(_ hints: [SculptedHint]) {
-        for old in arrowsNode.childNodes {
-            old.runAction(.sequence([.fadeOut(duration: 0.15), .removeFromParentNode()]))
-        }
-        // The runner-up first, so the best arrow lies on top where they cross.
-        for (index, hint) in hints.sorted(by: { !$0.isBest && $1.isBest }).enumerated() {
-            let node = SCNNode(geometry: Self.arrow(hint, color: look.accent))
-            node.simdOrientation = Self.flat
-            node.simdPosition = SIMD3(0, 0.003 + 0.0004 * Float(index), 0)
-            node.renderingOrder = 12 + index
-            node.castsShadow = false
-            node.opacity = 0
-            node.runAction(.fadeIn(duration: 0.25))
-            arrowsNode.addChildNode(node)
-        }
-    }
-
-    /// A flat arrow lying on the stone: solid with a round tail for the best move,
-    /// dashed for the second best. Sizes match the flat board's arrows.
-    private static func arrow(_ hint: SculptedHint, color: UIColor) -> SCNGeometry {
-        // Path coordinates are (x, -z): the shape is drawn upright, then laid flat.
-        func point(_ v: SIMD3<Float>) -> CGPoint { CGPoint(x: CGFloat(v.x), y: CGFloat(-v.z)) }
-        let from = point(SculptedCamera.position(of: hint.from))
-        let to = point(SculptedCamera.position(of: hint.to))
-        let dx = to.x - from.x
-        let dy = to.y - from.y
-        let length = max(hypot(dx, dy), 0.001)
-        let ux = dx / length
-        let uy = dy / length
-        let nx = -uy
-        let ny = ux
-        let headLength: CGFloat = hint.isBest ? 0.42 : 0.36
-        let headHalf: CGFloat = hint.isBest ? 0.25 : 0.21
-        let shaftHalf: CGFloat = hint.isBest ? 0.085 : 0.055
-        let start = CGPoint(x: from.x + ux * 0.18, y: from.y + uy * 0.18)
-        let tip = CGPoint(x: to.x - ux * 0.08, y: to.y - uy * 0.08)
-        let base = CGPoint(x: tip.x - ux * headLength, y: tip.y - uy * headLength)
-        func offset(_ p: CGPoint, _ along: CGFloat, _ across: CGFloat) -> CGPoint {
-            CGPoint(x: p.x + ux * along + nx * across, y: p.y + uy * along + ny * across)
-        }
-
-        let path = UIBezierPath()
-        if hint.isBest {
-            path.move(to: offset(start, 0, shaftHalf))
-            path.addLine(to: offset(base, 0, shaftHalf))
-            path.addLine(to: offset(base, 0, headHalf))
-            path.addLine(to: tip)
-            path.addLine(to: offset(base, 0, -headHalf))
-            path.addLine(to: offset(base, 0, -shaftHalf))
-            path.addLine(to: offset(start, 0, -shaftHalf))
-            // The round tail.
-            let angle = atan2(ny, nx)
-            path.addArc(withCenter: start, radius: shaftHalf, startAngle: angle + .pi, endAngle: angle, clockwise: false)
-            path.close()
-        } else {
-            let shaft = hypot(base.x - start.x, base.y - start.y)
-            let dash = shaftHalf * 2 * 1.6
-            let gap = shaftHalf * 2 * 1.1
-            var along: CGFloat = 0
-            while along < shaft - 0.01 {
-                let end = min(along + dash, shaft)
-                path.move(to: offset(start, along, shaftHalf))
-                path.addLine(to: offset(start, end, shaftHalf))
-                path.addLine(to: offset(start, end, -shaftHalf))
-                path.addLine(to: offset(start, along, -shaftHalf))
-                path.close()
-                along = end + gap
-            }
-            path.move(to: tip)
-            path.addLine(to: offset(base, 0, -headHalf))
-            path.addLine(to: offset(base, 0, headHalf))
-            path.close()
-        }
-        path.flatness = 0.004
-        let shape = SCNShape(path: path, extrusionDepth: 0)
-        let material = SCNMaterial()
-        material.lightingModel = .constant
-        material.diffuse.contents = color
-        material.transparency = hint.isBest ? 0.95 : 0.75
-        material.transparencyMode = .aOne
-        material.writesToDepthBuffer = false
-        material.isDoubleSided = true
-        shape.materials = [material]
-        return shape
-    }
 
     // MARK: Camera and light
 
@@ -1248,6 +1183,65 @@ enum MarkImages {
         context.setLineWidth(line)
         context.addPath(CGPath(roundedRect: rect, cornerWidth: size * 0.1, cornerHeight: size * 0.1, transform: nil))
         context.strokePath()
+    }
+
+    /// Four brackets in the corners of a square: the piece the coach would move.
+    static let brackets = draw(256) { context, size in
+        let line = size * 0.05
+        let low = size * 0.08
+        let high = size - low
+        let arm = size * 0.2
+        context.setLineWidth(line)
+        context.setLineCap(.round)
+        context.setLineJoin(.round)
+        let corners: [(x: CGFloat, y: CGFloat, dx: CGFloat, dy: CGFloat)] = [
+            (low, low, 1, 1), (high, low, -1, 1), (high, high, -1, -1), (low, high, 1, -1),
+        ]
+        for (x, y, dx, dy) in corners {
+            context.move(to: CGPoint(x: x, y: y + arm * dy))
+            context.addLine(to: CGPoint(x: x, y: y))
+            context.addLine(to: CGPoint(x: x + arm * dx, y: y))
+        }
+        context.strokePath()
+    }
+
+    /// A move dot with a halo ring: where the coach's move goes. Fainter for its second choice.
+    static func hintDot(best: Bool) -> UIImage {
+        best ? hintDotBest : hintDotSecond
+    }
+
+    /// A capture ring, heavier, around a soft wash: the coach's capture.
+    static func hintRing(best: Bool) -> UIImage {
+        best ? hintRingBest : hintRingSecond
+    }
+
+    private static let hintDotBest = haloDot(ringAlpha: 1, ringWidth: 0.05)
+    private static let hintDotSecond = haloDot(ringAlpha: 0.55, ringWidth: 0.04)
+    private static let hintRingBest = washedRing(wash: 0.24, line: 0.1)
+    private static let hintRingSecond = washedRing(wash: 0.14, line: 0.08)
+
+    private static func haloDot(ringAlpha: CGFloat, ringWidth: CGFloat) -> UIImage {
+        draw(256) { context, size in
+            let r = size * 0.15
+            context.fillEllipse(in: CGRect(x: size / 2 - r, y: size / 2 - r, width: r * 2, height: r * 2))
+            let line = size * ringWidth
+            let halo = size * 0.33 - line / 2
+            context.setStrokeColor(UIColor(white: 1, alpha: ringAlpha).cgColor)
+            context.setLineWidth(line)
+            context.strokeEllipse(in: CGRect(x: size / 2 - halo, y: size / 2 - halo, width: halo * 2, height: halo * 2))
+        }
+    }
+
+    private static func washedRing(wash: CGFloat, line: CGFloat) -> UIImage {
+        draw(256) { context, size in
+            let width = size * line
+            let r = size * 0.48 - width / 2
+            let circle = CGRect(x: size / 2 - r, y: size / 2 - r, width: r * 2, height: r * 2)
+            context.setFillColor(UIColor(white: 1, alpha: wash).cgColor)
+            context.fillEllipse(in: circle)
+            context.setLineWidth(width)
+            context.strokeEllipse(in: circle)
+        }
     }
 
     static let glow = radial(256, stops: [(0, 1), (0.35, 0.75), (1, 0)])
