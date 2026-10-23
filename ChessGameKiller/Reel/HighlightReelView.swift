@@ -56,8 +56,13 @@ struct ReelFrame: View {
                 if let accuracy = reel.accuracy {
                     stat("\(accuracy)%", "accuracy")
                 }
-                stat("\(reel.moveCount)", "moves")
-                stat("\(reel.highlights.count)", reel.highlights.count == 1 ? "highlight" : "highlights")
+                // A zero says nothing, so it isn't shown.
+                if reel.moveCount > 0 {
+                    stat("\(reel.moveCount)", reel.moveCount == 1 ? "move" : "moves")
+                }
+                if !reel.highlights.isEmpty {
+                    stat("\(reel.highlights.count)", reel.highlights.count == 1 ? "highlight" : "highlights")
+                }
             }
         }
         .opacity(shown)
@@ -76,13 +81,13 @@ struct ReelFrame: View {
                     .tracking(1.5)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                    .background(highlight.moment.grade.color.opacity(0.22), in: Capsule())
-                    .foregroundStyle(highlight.moment.grade.color)
+                    .background(moment.grade.color(on: theme).opacity(0.22), in: Capsule())
+                    .foregroundStyle(moment.grade.color(on: theme))
                 Spacer()
                 if let piece = highlight.piece {
                     Label(piece, systemImage: "shield.lefthalf.filled")
                         .font(.system(size: 15, weight: .bold, design: design))
-                        .foregroundStyle(theme.sideColor(reel.playerColor))
+                        .foregroundStyle(theme.ink(for: reel.playerColor))
                         .lineLimit(1)
                 }
                 Text("Move \((moment.ply + 1) / 2)")
@@ -96,7 +101,7 @@ struct ReelFrame: View {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(moment.san + glyph(moment.grade))
                     .font(.system(size: 40, weight: .heavy, design: design))
-                    .foregroundStyle(landed ? moment.grade.color : .primary)
+                    .foregroundStyle(landed ? moment.grade.color(on: theme) : .primary)
                 Spacer()
                 ReelEvalBar(chances: landed ? moment.after : moment.before, theme: theme)
                     .frame(width: 120, height: 10)
@@ -142,10 +147,11 @@ struct ReelFrame: View {
         .opacity(min(1, progress * 4))
     }
 
+    /// The result as it is for the player: the accent for a win, quiet otherwise.
     private var resultBadge: some View {
         let (text, color): (String, Color) = switch reel.result {
-        case .win: ("WIN", MoveReview.Grade.best.color)
-        case .loss: ("LOSS", MoveReview.Grade.blunder.color)
+        case .win: ("WIN", accent)
+        case .loss: ("LOSS", .secondary)
         case .draw: ("DRAW", .secondary)
         }
         return Text(text)
@@ -246,6 +252,8 @@ struct HighlightReelView: View {
             .padding(.top, 4)
         }
         .onAppear {
+            // A victory theme still playing would talk over Leo.
+            SoundPlayer.shared.stopAll(fade: 0.4)
             CoachVoice.shared.beginLesson()
             started = Date()
         }

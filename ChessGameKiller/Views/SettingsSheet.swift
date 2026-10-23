@@ -1,5 +1,4 @@
 import ChessKit
-import StoreKit
 import SwiftUI
 
 /// Settings: the board's look with a live preview, how much the coach says,
@@ -21,7 +20,6 @@ struct SettingsSheet: View {
     @AppStorage(ReviewLevel.storageKey) private var reviewLevel = ReviewLevel.club.rawValue
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.requestReview) private var requestReview
 
     private var theme: BoardTheme { .named(themeID) }
     private var accent: Color { theme.accent ?? .accentColor }
@@ -65,7 +63,7 @@ struct SettingsSheet: View {
                                       symbol: "lightbulb", isOn: $showSecondBest, theme: theme)
                                 .disabled(!showBestMoves)
                             rule
-                            ToggleRow(title: "Move verdicts", subtitle: "Grades every move you make.",
+                            ToggleRow(title: "Move grades", subtitle: "Rates each move you play, from Best to Blunder.",
                                       symbol: "star.fill", isOn: $showVerdicts, theme: theme)
                             rule
                             PickerRow(title: "Game review", subtitle: (ReviewLevel(rawValue: reviewLevel) ?? .club).blurb,
@@ -95,13 +93,6 @@ struct SettingsSheet: View {
 
                     section("About") {
                         SettingsGroup(theme: theme) {
-                            Button {
-                                requestReview()
-                            } label: {
-                                LinkRowLabel(title: "Rate Chess Game Killer", symbol: "heart.fill", theme: theme)
-                            }
-                            .buttonStyle(.plain)
-                            rule
                             NavigationLink {
                                 LicensesView(theme: theme)
                             } label: {
@@ -272,7 +263,8 @@ struct BoardPreview: View {
                 ForEach(Self.position?.pieces ?? [], id: \.square) { piece in
                     PieceImage(piece: piece, theme: theme, size: sq, onBoard: true)
                         .position(center(of: piece.square, size: sq))
-                        .zIndex(Double(7 - piece.square.rankIndex))
+                        // Nearer rows in front, and left to right within a row, so overlaps never flicker.
+                        .zIndex(Double((7 - piece.square.rankIndex) * 8 + piece.square.fileIndex))
                 }
             }
             .frame(width: sq * 8, height: sq * 8)

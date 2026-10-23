@@ -52,10 +52,10 @@ enum TimeControl: String, CaseIterable, Identifiable {
     var detail: String {
         switch self {
         case .unlimited: return "Take all the time you like"
-        case .blitz3Plus2: return "Blitz · 3 minutes each, 2 seconds back per move"
+        case .blitz3Plus2: return "Blitz · 3 minutes each, plus 2 seconds per move"
         case .blitz5: return "Blitz · 5 minutes each, no time added per move"
         case .rapid10: return "Rapid · 10 minutes each, no time added per move"
-        case .rapid15Plus10: return "Rapid · 15 minutes each, 10 seconds back per move"
+        case .rapid15Plus10: return "Rapid · 15 minutes each, plus 10 seconds per move"
         }
     }
 }
@@ -146,10 +146,11 @@ final class ChessClock {
         held = true
     }
 
-    /// Lets the clock run again, for `color`.
-    func release(_ color: Piece.Color, at now: ContinuousClock.Instant = .now) {
+    /// Lets the clock run again, for `color`; with no color it stays stopped until the next
+    /// move starts it (before the first move, nobody's time runs).
+    func release(_ color: Piece.Color?, at now: ContinuousClock.Instant = .now) {
         held = false
-        start(color, at: now)
+        if let color { start(color, at: now) }
     }
 
     private func stop(at now: ContinuousClock.Instant) {

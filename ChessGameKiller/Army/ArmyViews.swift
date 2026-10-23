@@ -23,9 +23,9 @@ extension ArmyStore {
 extension ArmyRank {
     static let gold = Color(hex: 0xFFD27A)
 
-    /// The rank's color: the piece's side color, or gold for a Legend.
+    /// The rank's color: the piece's side, in a shade that reads as text, or gold for a Legend.
     func color(for piece: Piece, theme: BoardTheme) -> Color {
-        self == .legend ? Self.gold : theme.sideColor(piece.color)
+        self == .legend ? Self.gold : theme.ink(for: piece.color)
     }
 }
 
@@ -127,33 +127,6 @@ private struct ScarMark: View {
     }
 }
 
-/// The name of the selected piece, floating over it on the board.
-struct ArmyNameTag: View {
-    let name: String
-    let rank: ArmyRank
-    let color: Color
-
-    var body: some View {
-        HStack(spacing: 5) {
-            Image(systemName: rank == .legend ? "crown.fill" : "shield.lefthalf.filled")
-                .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(color)
-            Text(name)
-                .font(.system(.caption, design: .themed).weight(.bold))
-            Text(rank.title.uppercased())
-                .font(.system(size: 8, weight: .heavy, design: .themed))
-                .tracking(0.6)
-                .foregroundStyle(color)
-        }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 5)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay { Capsule().strokeBorder(color.opacity(0.7), lineWidth: 1) }
-        .shadow(color: color.opacity(0.45), radius: 8)
-        .fixedSize()
-    }
-}
-
 // MARK: After a game
 
 /// A banner at the top of the game screen when a piece earns a name, a scar or gold.
@@ -217,7 +190,7 @@ struct PieceOfTheMatchCard: View {
                 Text(hero.line)
                     .font(.system(.subheadline, design: .themed).weight(.semibold))
                     .fixedSize(horizontal: false, vertical: true)
-                Text("+\(ArmyStore.heroXP) XP · \(record.honors) \(record.honors == 1 ? "honor" : "honors")")
+                Text("+\(hero.xp) XP · \(record.honors) \(record.honors == 1 ? "honor" : "honors")")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
@@ -574,8 +547,8 @@ struct PieceDetailView: View {
                         Text(avenged ? "Old rival: \(rival.name)" : "Nemesis: \(rival.name)")
                             .font(.system(.subheadline, design: .themed).weight(.semibold))
                         Text(avenged
-                             ? "Took it \(nemesis.times) times. Revenge taken."
-                             : "Has taken it \(nemesis.times) times. Win against \(rival.name) and take something back for revenge.")
+                             ? "Took it \(ArmyNews.times(nemesis.times)). Revenge taken."
+                             : "Has taken it \(ArmyNews.times(nemesis.times)). Win against \(rival.name) and take something back for revenge.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)

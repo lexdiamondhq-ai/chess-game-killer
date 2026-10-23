@@ -80,6 +80,8 @@ struct SavedGame: Codable, Equatable, Identifiable {
     var moments: [SavedMoment]
     /// Plies the player has gone back and fixed.
     var rewritten: Set<Int> = []
+    /// The time control, like "3+2", so a rematch is the same game. Nil in games saved before it was kept.
+    var clock: String? = nil
 
     var playerColor: Piece.Color { playerIsWhite ? .white : .black }
     var finalFEN: String { positions.last ?? "" }
@@ -188,7 +190,7 @@ extension SavedGame {
     static func make(
         id: UUID, date: Date, opponent: String, level: Int?, playerColor: Piece.Color,
         winner: Piece.Color?, isOver: Bool, accuracy: Int?, positions: [String], moves: [String],
-        moments: [SavedMoment]
+        moments: [SavedMoment], clock: TimeControl? = nil
     ) -> SavedGame {
         let result: Result
         if !isOver {
@@ -200,7 +202,8 @@ extension SavedGame {
         }
         return SavedGame(
             id: id, date: date, opponent: opponent, level: level, playerIsWhite: playerColor == .white,
-            result: result, accuracy: accuracy, positions: positions, moves: moves, moments: moments
+            result: result, accuracy: accuracy, positions: positions, moves: moves, moments: moments,
+            clock: clock?.rawValue
         )
     }
 }

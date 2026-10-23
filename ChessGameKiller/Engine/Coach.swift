@@ -1,7 +1,7 @@
 import ChessKit
 import Foundation
 
-/// The coach's verdict on the move just played, shown at the bottom of the screen.
+/// The coach's verdict on the move just played.
 struct MoveReview: Equatable, Identifiable {
     enum Grade: String, CaseIterable {
         case checkmate, best, excellent, good, inaccuracy, mistake, blunder
@@ -31,7 +31,7 @@ struct MoveReview: Equatable, Identifiable {
 
     var title: String {
         switch grade {
-        case .checkmate: return "Checkmate!"
+        case .checkmate: return "Checkmate"
         case .best: return "Best move"
         case .excellent: return "Excellent"
         case .good: return "Good move"
@@ -44,11 +44,11 @@ struct MoveReview: Equatable, Identifiable {
     var detail: String {
         let better = best ?? "another move"
         switch grade {
-        case .checkmate: return "\(played) ends the game. Beautiful."
-        case .best: return "\(played) is exactly what Stockfish would play."
+        case .checkmate: return "\(played) ends it."
+        case .best: return "\(played) is the engine's first choice."
         case .excellent: return "\(played) is nearly as strong as \(better)."
         case .good: return "\(played) is fine. \(better) was a little stronger."
-        case .inaccuracy: return "\(played) lets some advantage slip. \(better) was better."
+        case .inaccuracy: return "\(played) gives a little back. \(better) was better."
         case .mistake: return "\(played) loses ground. \(better) was much better."
         case .blunder: return "\(played) gives away a lot. \(better) was the move."
         }
@@ -69,7 +69,7 @@ struct MoveReview: Equatable, Identifiable {
     }
 }
 
-/// One of the two best moves drawn as an arrow. Rank 0 is the best.
+/// One of the two best moves, marked on the board. Rank 0 is the best.
 struct MoveHint: Equatable, Identifiable {
     let rank: Int
     let from: Square

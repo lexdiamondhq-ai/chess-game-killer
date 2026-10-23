@@ -4,10 +4,14 @@ import SwiftUI
 struct GradeBadge: View {
     let grade: MoveReview.Grade
     var glows = false
+    /// The look it sits on: away from Neon the grade takes its calm color. Without one, the bright one.
+    var theme: BoardTheme? = nil
+
+    private var color: Color { theme.map { grade.color(on: $0) } ?? grade.color }
 
     var body: some View {
         ZStack {
-            Circle().fill(grade.color)
+            Circle().fill(color)
             switch grade.mark {
             case .symbol(let name):
                 Image(systemName: name)
@@ -19,7 +23,7 @@ struct GradeBadge: View {
         }
         .foregroundStyle(.black.opacity(0.8))
         .frame(width: 38, height: 38)
-        .shadow(color: glows ? grade.color.opacity(0.8) : .clear, radius: 8)
+        .shadow(color: glows ? color.opacity(0.8) : .clear, radius: 8)
         .accessibilityHidden(true)
     }
 }
@@ -56,6 +60,21 @@ extension MoveReview.Grade {
         case .inaccuracy: return Color(hex: 0xF7D046)
         case .mistake: return Color(hex: 0xFF9A3C)
         case .blunder: return Color(hex: 0xFF4D6D)
+        }
+    }
+
+    /// The grade's color on a look. Neon keeps the bright ones; every other look gets
+    /// calmer tones that sit with its wood and stone, and a mate takes the look's accent.
+    func color(on theme: BoardTheme) -> Color {
+        if theme.glows { return color }
+        switch self {
+        case .checkmate: return theme.accent ?? .accentColor
+        case .best: return Color(hex: 0x7FC8A0)
+        case .excellent: return Color(hex: 0x7CC0B2)
+        case .good: return Color(hex: 0x8AB6C8)
+        case .inaccuracy: return Color(hex: 0xD4B05C)
+        case .mistake: return Color(hex: 0xD88C52)
+        case .blunder: return Color(hex: 0xD46A6A)
         }
     }
 
