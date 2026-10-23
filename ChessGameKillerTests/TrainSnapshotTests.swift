@@ -50,8 +50,8 @@ final class TrainSnapshotTests: XCTestCase {
         window.isHidden = true
     }
 
-    /// A puzzle in Leo's session, with Hint, Talk and Show me under it: on this phone, and on
-    /// an iPhone SE-sized screen, where the three buttons have the least room.
+    /// A puzzle in Leo's session, with his microphone at the end of his card to talk it through:
+    /// on this phone, and on an iPhone SE-sized screen.
     func testASessionPuzzleOffersTalk() throws {
         let sample = TrainSample(settled: true)
         let library = try XCTUnwrap(TrainingLibrary.shared)
