@@ -176,7 +176,7 @@ struct BoardScanView: View {
                 .lineLimit(1)
                 .id(runner.exercise.id)
                 .transition(.opacity)
-            Text("\(theme.name(of: runner.exercise.player)) to move")
+            Text(runner.exercise.player == .white ? "White to move" : "Black to move")
                 .font(.system(.footnote, design: .themed).weight(.medium))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)

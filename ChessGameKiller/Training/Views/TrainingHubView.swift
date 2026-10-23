@@ -149,7 +149,11 @@ struct TrainingHubView: View {
         case .endgames:
             return "\(endgames.doneCount) of \(GrandmasterContent.shared.endgames.count) mastered"
         case .calculation:
-            return "Blindfold, vision, masters"
+            if think.progress.rounds > 0 { return "Candidates best \(think.progress.bestRound)" }
+            let vision = VisionStore.live()
+            if let scan = vision.bestScanPercent { return "Board scan best \(scan)%" }
+            if vision.bestSquares > 0 { return "Coordinates best \(vision.bestSquares)" }
+            return "See it before you play it"
         case .games:
             let open = store.openMistakes.count
             if open > 0 { return open == 1 ? "1 position to fix" : "\(open) positions to fix" }

@@ -10,6 +10,9 @@ struct CalculationDoorView: View {
     @AppStorage(CalculationView.bestStreakKey) private var calculationBest = 0
     @State private var cover: Cover?
 
+    /// The board vision drills' bests, shared with their screens.
+    private var vision: VisionStore { .live() }
+
     enum Cover: String, Identifiable {
         case blindfold, candidates, coordinates, scan
         var id: String { rawValue }
@@ -36,13 +39,13 @@ struct CalculationDoorView: View {
             Button { cover = .scan } label: {
                 TrainRow(symbol: "viewfinder", title: "Board scan",
                          detail: "Find every check, capture and threat. The Traffic Light, until it's automatic.",
-                         value: VisionStore.live().scanStatus, theme: theme)
+                         value: vision.scanStatus, theme: theme)
             }
             .buttonStyle(.plain)
             Button { cover = .coordinates } label: {
                 TrainRow(symbol: "square.grid.3x3.topleft.filled", title: "Coordinates",
                          detail: "Know every square at a glance. Thirty seconds, as many as you can.",
-                         value: VisionStore.live().coordinatesStatus, theme: theme)
+                         value: vision.coordinatesStatus, theme: theme)
             }
             .buttonStyle(.plain)
 
@@ -76,6 +79,8 @@ struct GuessTheMoveList: View {
     let theme: BoardTheme
     @Environment(TrainingStore.self) private var training
     @State private var game: ClassicGame?
+    /// Bumped when a game closes, so its new best shows at once.
+    @State private var finished = 0
 
     var body: some View {
         TrainScreen(theme: theme, title: "Guess the Move",
@@ -118,8 +123,9 @@ struct GuessTheMoveList: View {
                 }
             }
             .trainingCard(theme)
+            .id(finished)
         }
-        .fullScreenCover(item: $game) { game in
+        .fullScreenCover(item: $game, onDismiss: { finished += 1 }) { game in
             GuessTheMoveView(game: game, theme: theme)
                 .environment(training)
         }
