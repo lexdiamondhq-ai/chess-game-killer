@@ -78,11 +78,16 @@ private struct PlayerPlate: View {
                             .layoutPriority(1)
                     }
                 }
-                Text(status)
-                    .font(.caption2.weight(isActive ? .semibold : .regular))
-                    .foregroundStyle(isActive ? sideColor : Color.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
+                RivalRemark(match: match, enabled: isComputer) {
+                    HStack(spacing: 5) {
+                        if inCheck { CheckTag(color: theme.check) }
+                        Text(status)
+                            .font(.caption2.weight(isActive ? .semibold : .regular))
+                            .foregroundStyle(isActive ? sideColor : Color.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                    }
+                }
             }
         }
         .padding(.leading, 8)
@@ -93,7 +98,12 @@ private struct PlayerPlate: View {
         .animation(.snappy(duration: 0.3), value: isActive)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(spokenLabel)
-        .rivalBubble(match, theme: theme, show: isComputer, avatarWidth: 52)
+    }
+
+    /// This side's king is in check right now.
+    private var inCheck: Bool {
+        guard !match.isOver, let king = match.game.checkedKing else { return false }
+        return match.game.piece(at: king)?.color == color
     }
 
     /// Name, status and time left. The label stands in for the children's own,

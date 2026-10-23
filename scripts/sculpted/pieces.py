@@ -89,7 +89,9 @@ def group(name, objs):
     for o in objs: o.parent=e
     return e
 # ---------- pieces ----------
-# Heights follow tournament ratios: K 1.20 > Q 1.00 > B 0.90 > N 0.80 > R 0.70 > P 0.60 (square = 1).
+# Heights: K 1.33 > Q 1.08 > B 1.03 > N 0.80 > R 0.70 > P 0.56 (square = 1), steeper than tournament
+# ratios so the sizes tell the pieces apart at phone size, and each top has its own shape:
+# king a big cross, queen a spiky coronet, bishop a pointed mitre, rook battlements, pawn a ball.
 # Each piece also has its own surface so it reads at a glance:
 #   king straight flutes, queen spiral flutes, bishop fine flutes, rook masonry, pawn short flutes.
 def body_start(R): return line(R-0.12,0.153,R-0.125,0.17,2)
@@ -110,10 +112,11 @@ def king(M):
     # bold, clean cross on a small turned cushion
     objs=[body,ring]
     objs.append(lathe('Kcush',[(0.0,zt-0.005),(0.06,zt-0.005),(0.07,zt+0.012),(0.05,zt+0.03),(0.0,zt+0.03)],seg=128,mat=M['metal']))
-    objs.append(rbox('Kcv',(0.074,0.074,0.25),(0,0,zt+0.15),M['metal'],0.018))
-    objs.append(rbox('Kch',(0.2,0.074,0.074),(0,0,zt+0.2),M['metal'],0.018))
-    for y in (-0.036,0.036):
-        objs.append(uvsphere('Kgem',0.024,(0,y,zt+0.2),M['gem'],(1,0.45,1)))
+    # the cross is what says "king" at a glance, so it is big: half again the old one
+    objs.append(rbox('Kcv',(0.1,0.1,0.38),(0,0,zt+0.2),M['metal'],0.022))
+    objs.append(rbox('Kch',(0.3,0.1,0.1),(0,0,zt+0.25),M['metal'],0.022))
+    for y in (-0.05,0.05):
+        objs.append(uvsphere('Kgem',0.03,(0,y,zt+0.25),M['gem'],(1,0.45,1)))
     return group('king',objs)
 def queen(M):
     R=0.32; p=base_profile(R); p+=body_start(R)
@@ -122,43 +125,50 @@ def queen(M):
     p+=line(0.155,0.58,0.192,0.588,2); p+=bead(0.197,0.588,0.033)   # ring sits here
     p+=line(0.182,0.621,0.105,0.636,2)
     p+=cove(0.105,0.636,0.19,0.8)                # crown cup
-    p+=line(0.19,0.8,0.215,0.905,5)              # coronet wall flares out
-    p+=line(0.215,0.905,0.185,0.905,2)
-    p+=line(0.185,0.905,0.172,0.83,3)            # inner wall
-    p+=[(0.172*math.cos(t),0.83+0.035*math.sin(t)) for t in np.linspace(0,math.pi/2*0.8,10)]
+    # the coronet flares wide and tall, so the queen's top reads as a spiky crown at a glance
+    p+=line(0.19,0.8,0.25,0.975,6)
+    p+=line(0.25,0.975,0.218,0.975,2)
+    p+=line(0.218,0.975,0.17,0.85,3)            # inner wall
+    p+=[(0.17*math.cos(t),0.85+0.05*math.sin(t)) for t in np.linspace(0,math.pi/2*0.8,10)]
     top=p[-1]; p+=line(top[0],top[1],0.0,top[1],3)
     body=lathe('Q',p,mod=flutes(0.2,0.52,22,0.012,twist=0.16),mat=M['body'])
     objs=[body]
-    NPT=10
+    NPT=8
     for i in range(NPT):
         a=TAU*(i+0.5)/NPT
-        c=rbox(f'Qn{i}',(0.16,0.075,0.075),(math.cos(a)*0.2,math.sin(a)*0.2,0.92),M['body'],0.003)
+        c=rbox(f'Qn{i}',(0.2,0.13,0.13),(math.cos(a)*0.235,math.sin(a)*0.235,1.0),M['body'],0.003)
         c.rotation_mode='XYZ'; c.rotation_euler=(math.radians(45),0,a)
         cut(body,c)
     for i in range(NPT):
-        a=TAU*i/NPT; objs.append(uvsphere(f'Qp{i}',0.019,(math.cos(a)*0.2,math.sin(a)*0.2,0.905),M['pearl']))
+        a=TAU*i/NPT; objs.append(uvsphere(f'Qp{i}',0.028,(math.cos(a)*0.236,math.sin(a)*0.236,0.985),M['pearl']))
     objs.append(torus('Qring',0.207,0.0085,0.6045,M['metal']))
     zt=top[1]
-    objs.append(lathe('Qstem',[(0.0,zt-0.01),(0.03,zt-0.01),(0.018,zt+0.03),(0.0,zt+0.03)],seg=96,mat=M['metal']))
-    objs.append(uvsphere('Qball',0.04,(0,0,zt+0.065),M['metal']))
+    objs.append(lathe('Qstem',[(0.0,zt-0.01),(0.036,zt-0.01),(0.02,zt+0.08),(0.0,zt+0.08)],seg=96,mat=M['metal']))
+    objs.append(uvsphere('Qball',0.052,(0,0,zt+0.125),M['metal']))
     return group('queen',objs)
+def mitre_profile(z0=0.53,z1=0.95,rmax=0.165,n=48):
+    """The bishop's mitre: an almond that comes to a point, never a ball like the pawn's head."""
+    out=[]
+    for i in range(n+1):
+        t=i/n; z=z0+(z1-z0)*t
+        r=rmax*math.sin(math.pi*(0.18+0.82*t))**0.6*(1-t)**0.38
+        out.append((max(r,0.0),z))
+    out[-1]=(0.0,z1)
+    return out
 def bishop(M):
     R=0.3; p=base_profile(R); p+=body_start(R)
     p+=ogee(R-0.125,0.17,0.098,0.44,28)
     p+=line(0.098,0.44,0.128,0.452,2); p+=bead(0.146,0.452,0.026)
     p+=line(0.136,0.478,0.162,0.485,2); p+=bead(0.165,0.485,0.03)   # ring sits here
     p+=line(0.148,0.515,0.08,0.53,2)
-    mit=[]
-    for i in range(41):
-        t=i/40; z=0.53+0.31*t; r=0.15*math.sin(math.pi*(0.16+0.84*t))**0.85*(1-0.28*t)
-        mit.append((max(r,0.0),z))
-    mit[-1]=(0.0,mit[-1][1]); p+=mit
+    p+=mitre_profile()
     body=lathe('B',p,mod=flutes(0.2,0.42,32,0.008),mat=M['body'])
-    slot=rbox('Bslot',(0.055,0.4,0.3),(0.06,0,0.74),M['body'],0.006); slot.rotation_euler=(0,math.radians(-42),0)
+    # a wide, deep cleft, turned toward the player so it shows from the game camera
+    slot=rbox('Bslot',(0.06,0.4,0.32),(0.07,0,0.8),M['body'],0.006); slot.rotation_euler=(0,math.radians(-40),0)
     cut(body,slot)
     ring=torus('Bring',0.175,0.008,0.5,M['metal'])
-    neck=lathe('Bstem',[(0.0,0.83),(0.026,0.83),(0.014,0.855),(0.0,0.855)],seg=96,mat=M['metal'])
-    fin=uvsphere('Bfin',0.032,(0,0,0.875),M['metal'])
+    neck=lathe('Bstem',[(0.0,0.935),(0.026,0.935),(0.014,0.962),(0.0,0.962)],seg=96,mat=M['metal'])
+    fin=uvsphere('Bfin',0.036,(0,0,0.99),M['metal'])
     return group('bishop',[body,ring,neck,fin])
 def rook(M):
     R=0.3; p=base_profile(R); p+=body_start(R)
@@ -183,13 +193,14 @@ def rook(M):
     return group('rook',[body,ring])
 def pawn(M):
     R=0.27; p=base_profile(R); p+=body_start(R)
-    p+=ogee(R-0.125,0.17,0.08,0.34,22)
-    p+=line(0.08,0.34,0.11,0.35,2); p+=bead(0.12,0.35,0.026)        # ring sits here
-    p+=line(0.11,0.376,0.055,0.388,2)
-    rad=0.105; a0=math.asin(0.055/rad); cz=0.388+rad*math.cos(a0)
+    # short and plain under a big round head: the smallest piece, and the only round top
+    p+=ogee(R-0.125,0.17,0.085,0.29,20)
+    p+=line(0.085,0.29,0.115,0.3,2); p+=bead(0.125,0.3,0.026)        # ring sits here
+    p+=line(0.115,0.326,0.058,0.336,2)
+    rad=0.128; a0=math.asin(0.058/rad); cz=0.336+rad*math.cos(a0)
     p+=[(rad*math.sin(a),cz-rad*math.cos(a)) for a in np.linspace(a0,math.pi,40)]
-    body=lathe('P',p,mod=flutes(0.19,0.33,16,0.008),mat=M['body'])
-    ring=torus('Pring',0.129,0.0075,0.363,M['metal'])
+    body=lathe('P',p,mod=flutes(0.19,0.28,16,0.008),mat=M['body'])
+    ring=torus('Pring',0.134,0.0075,0.313,M['metal'])
     return group('pawn',[body,ring])
 def knight(M, verts, faces):
     R=0.3; p=base_profile(R); p+=body_start(R); p+=line(R-0.125,0.17,0.0,0.17,3)

@@ -132,8 +132,7 @@ struct TrainingBoardView: View {
                 }
             }
             if game.checkedKing == square {
-                RadialGradient(colors: [theme.check, theme.check.opacity(0.6), .clear],
-                               center: .center, startRadius: 0, endRadius: size * 0.62)
+                CheckSquareMark(color: theme.check, size: size)
             }
             if column == 0 {
                 coordinate("\(square.rankIndex + 1)", size: size, color: labelColor, alignment: .topLeading)

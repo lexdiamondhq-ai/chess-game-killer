@@ -4,7 +4,7 @@
 # The knight's head, mane and eyes come from knight_icon.py (load_knight reads them).
 import bpy, bmesh, math, numpy as np, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from pieces import arc, bead, cove, ogee, line, lathe, uvsphere, rbox, cut, group, TAU
+from pieces import arc, bead, cove, ogee, line, lathe, uvsphere, rbox, cut, group, mitre_profile, TAU
 
 FOOT = 0.118          # top of every base: the piece's body starts here
 
@@ -98,7 +98,8 @@ def knight(M, parts, fin):
 
 
 # ---------- the turned pieces ----------
-# Heights as the classic set: K 1.2 > Q 1.0 > B 0.9 > N 0.8 > R 0.7 > P 0.6. Smooth polished
+# Heights and tops as the classic set (see pieces.py): big king cross, spiky queen coronet,
+# pointed bishop, round short pawn. Smooth polished
 # bodies; the gold is a band under each piece, a few stripes on the body as on the knight's
 # mane, a band at the collar and the crown's metal.
 
@@ -159,10 +160,11 @@ def king(M):
     objs.append(flat_band('Kcrown', 0.2155, 0.832, 0.856, M))
     zt = top[1] - 0.01
     objs.append(lathe('Kcush', [(0.0, zt - 0.005), (0.06, zt - 0.005), (0.07, zt + 0.012), (0.05, zt + 0.03), (0.0, zt + 0.03)], seg=128, mat=M['metal']))
-    objs.append(rbox('Kcv', (0.074, 0.074, 0.25), (0, 0, zt + 0.15), M['metal'], 0.018))
-    objs.append(rbox('Kch', (0.2, 0.074, 0.074), (0, 0, zt + 0.2), M['metal'], 0.018))
-    for y in (-0.036, 0.036):
-        objs.append(uvsphere('Kgem', 0.026, (0, y, zt + 0.2), M['gem'], (1, 0.45, 1)))
+    # a big, bold cross: what says "king" at a glance
+    objs.append(rbox('Kcv', (0.1, 0.1, 0.38), (0, 0, zt + 0.2), M['metal'], 0.022))
+    objs.append(rbox('Kch', (0.3, 0.1, 0.1), (0, 0, zt + 0.25), M['metal'], 0.022))
+    for y in (-0.05, 0.05):
+        objs.append(uvsphere('Kgem', 0.032, (0, y, zt + 0.25), M['gem'], (1, 0.45, 1)))
     return group('king', objs)
 
 
@@ -174,26 +176,28 @@ def queen(M):
     p += line(0.155, 0.58, 0.192, 0.588, 2); p += bead(0.197, 0.588, 0.033)
     p += line(0.182, 0.621, 0.105, 0.636, 2)
     p += cove(0.105, 0.636, 0.19, 0.8)
-    p += line(0.19, 0.8, 0.215, 0.905, 5)
-    p += line(0.215, 0.905, 0.185, 0.905, 2)
-    p += line(0.185, 0.905, 0.172, 0.83, 3)
-    p += [(0.172 * math.cos(t), 0.83 + 0.035 * math.sin(t)) for t in np.linspace(0, math.pi / 2 * 0.8, 10)]
+    # a tall coronet that flares wide into eight sharp points: the queen's spiky crown
+    p += line(0.19, 0.8, 0.25, 0.975, 6)
+    p += line(0.25, 0.975, 0.218, 0.975, 2)
+    p += line(0.218, 0.975, 0.17, 0.85, 3)
+    p += [(0.17 * math.cos(t), 0.85 + 0.05 * math.sin(t)) for t in np.linspace(0, math.pi / 2 * 0.8, 10)]
     top = p[-1]; p += line(top[0], top[1], 0.0, top[1], 3)
     body = lathe('Q', p, mat=M['body'])
     objs = [body, band('Qband', R, M)]
-    NPT = 10
+    NPT = 8
     for i in range(NPT):
         a = TAU * (i + 0.5) / NPT
-        c = rbox(f'Qn{i}', (0.16, 0.075, 0.075), (math.cos(a) * 0.2, math.sin(a) * 0.2, 0.92), M['body'], 0.003)
+        c = rbox(f'Qn{i}', (0.2, 0.13, 0.13), (math.cos(a) * 0.235, math.sin(a) * 0.235, 1.0), M['body'], 0.003)
         c.rotation_mode = 'XYZ'; c.rotation_euler = (math.radians(45), 0, a)
         cut(body, c)
     for i in range(NPT):
-        a = TAU * i / NPT; objs.append(uvsphere(f'Qball{i}', 0.02, (math.cos(a) * 0.2, math.sin(a) * 0.2, 0.906), M['metal']))
+        a = TAU * i / NPT; objs.append(uvsphere(f'Qball{i}', 0.028, (math.cos(a) * 0.236, math.sin(a) * 0.236, 0.985), M['metal']))
     objs += stripes('Qst', p[:body_top], 0.515, M)
     objs.append(flat_band('Qring', 0.2155, 0.5895, 0.6195, M))
+    objs.append(sleeve('Qcrown', p, 0.81, 0.836, M))
     zt = top[1]
-    objs.append(lathe('Qstem', [(0.0, zt - 0.01), (0.03, zt - 0.01), (0.018, zt + 0.03), (0.0, zt + 0.03)], seg=96, mat=M['metal']))
-    objs.append(uvsphere('Qtopball', 0.042, (0, 0, zt + 0.067), M['metal']))
+    objs.append(lathe('Qstem', [(0.0, zt - 0.01), (0.036, zt - 0.01), (0.02, zt + 0.08), (0.0, zt + 0.08)], seg=96, mat=M['metal']))
+    objs.append(uvsphere('Qtopball', 0.052, (0, 0, zt + 0.125), M['metal']))
     return group('queen', objs)
 
 
@@ -204,22 +208,20 @@ def bishop(M):
     p += line(0.098, 0.44, 0.128, 0.452, 2); p += bead(0.146, 0.452, 0.026)
     p += line(0.136, 0.478, 0.162, 0.485, 2); p += bead(0.165, 0.485, 0.03)
     p += line(0.148, 0.515, 0.08, 0.53, 2)
-    mit = []
-    for i in range(41):
-        t = i / 40; z = 0.53 + 0.31 * t; r = 0.15 * math.sin(math.pi * (0.16 + 0.84 * t)) ** 0.85 * (1 - 0.28 * t)
-        mit.append((max(r, 0.0), z))
-    mit[-1] = (0.0, mit[-1][1]); p += mit
+    # a tall mitre that comes to a point, never round like the pawn's head
+    mit = mitre_profile()
+    p += mit
     body = lathe('B', p, mat=M['body'])
-    slot = rbox('Bslot', (0.036, 0.4, 0.3), (0.06, 0, 0.74), M['body'], 0.006); slot.rotation_euler = (0, math.radians(-42), 0)
+    slot = rbox('Bslot', (0.05, 0.4, 0.32), (0.07, 0, 0.8), M['body'], 0.006); slot.rotation_euler = (0, math.radians(-40), 0)
     cut(body, slot)
     objs = [body, band('Bband', R, M)]
     # a gold core inside the mitre: through the cut it shows as a gold line
-    objs.append(lathe('Bmitre', [(0.0, 0.53)] + [(max(r - 0.009, 0.0), z) for r, z in mit[1:-1]] + [(0.0, mit[-1][1] - 0.009)],
+    objs.append(lathe('Bmitre', [(0.0, 0.53)] + [(max(r - 0.009, 0.0), z) for r, z in mit[1:-1]] + [(0.0, mit[-1][1] - 0.012)],
                       seg=128, mat=M['metal']))
     objs += stripes('Bst', p[:body_top], 0.415, M, widths=(0.012, 0.012, 0.012), gap=0.011)
     objs.append(flat_band('Bring', 0.183, 0.486, 0.514, M))
-    objs.append(lathe('Bstem', [(0.0, 0.83), (0.026, 0.83), (0.014, 0.855), (0.0, 0.855)], seg=96, mat=M['metal']))
-    objs.append(uvsphere('Bfin', 0.034, (0, 0, 0.877), M['metal']))
+    objs.append(lathe('Bstem', [(0.0, 0.935), (0.026, 0.935), (0.014, 0.962), (0.0, 0.962)], seg=96, mat=M['metal']))
+    objs.append(uvsphere('Bfin', 0.038, (0, 0, 0.99), M['metal']))
     return group('bishop', objs)
 
 
@@ -246,13 +248,14 @@ def rook(M):
 
 def pawn(M):
     R = 0.27; p = base_profile(R) + body_start(R)
-    p += ogee(R - 0.115, 0.15, 0.08, 0.34, 22)
+    # short and plain under a big round head: the smallest piece, and the only round top
+    p += ogee(R - 0.115, 0.15, 0.085, 0.29, 20)
     body_top = len(p)
-    p += line(0.08, 0.34, 0.11, 0.35, 2); p += bead(0.12, 0.35, 0.026)
-    p += line(0.11, 0.376, 0.055, 0.388, 2)
-    rad = 0.105; a0 = math.asin(0.055 / rad); cz = 0.388 + rad * math.cos(a0)
+    p += line(0.085, 0.29, 0.115, 0.3, 2); p += bead(0.125, 0.3, 0.026)
+    p += line(0.115, 0.326, 0.058, 0.336, 2)
+    rad = 0.128; a0 = math.asin(0.058 / rad); cz = 0.336 + rad * math.cos(a0)
     p += [(rad * math.sin(a), cz - rad * math.cos(a)) for a in np.linspace(a0, math.pi, 40)]
     objs = [lathe('P', p, mat=M['body']), band('Pband', R, M)]
-    objs += stripes('Pst', p[:body_top], 0.318, M, widths=(0.012, 0.012), gap=0.011)
-    objs.append(flat_band('Pring', 0.1395, 0.351, 0.375, M))
+    objs += stripes('Pst', p[:body_top], 0.27, M, widths=(0.012, 0.012), gap=0.011)
+    objs.append(flat_band('Pring', 0.1445, 0.301, 0.325, M))
     return group('pawn', objs)

@@ -25,21 +25,26 @@ struct ExecutivePlate: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
-                HStack(spacing: 6) {
-                    if isActive {
-                        Circle()
-                            .fill(accent)
-                            .frame(width: 6, height: 6)
-                            .transition(.scale.combined(with: .opacity))
+                RivalRemark(match: match, enabled: isComputer) {
+                    HStack(spacing: 6) {
+                        if inCheck {
+                            CheckTag(color: theme.check)
+                                .transition(.scale.combined(with: .opacity))
+                        } else if isActive {
+                            Circle()
+                                .fill(accent)
+                                .frame(width: 6, height: 6)
+                                .transition(.scale.combined(with: .opacity))
+                        }
+                        Text(status)
+                            .font(.system(size: 12.5, weight: isActive ? .medium : .regular))
+                            .foregroundStyle(isActive ? Color.primary.opacity(0.8) : Color.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
+                            // The words come first; the strip of captured pieces condenses to make room.
+                            .layoutPriority(1)
+                        CapturedPieces(match: match, theme: theme, by: color)
                     }
-                    Text(status)
-                        .font(.system(size: 12.5, weight: isActive ? .medium : .regular))
-                        .foregroundStyle(isActive ? Color.primary.opacity(0.8) : Color.secondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
-                        // The words come first; the strip of captured pieces condenses to make room.
-                        .layoutPriority(1)
-                    CapturedPieces(match: match, theme: theme, by: color)
                 }
             }
             Spacer(minLength: 8)
@@ -49,9 +54,15 @@ struct ExecutivePlate: View {
         }
         .padding(.horizontal, 4)
         .animation(.snappy(duration: 0.3), value: isActive)
+        .animation(.snappy(duration: 0.3), value: inCheck)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(spokenLabel)
-        .rivalBubble(match, theme: theme, show: isComputer, avatarWidth: 54)
+    }
+
+    /// This side's king is in check right now.
+    private var inCheck: Bool {
+        guard !match.isOver, let king = match.game.checkedKing else { return false }
+        return match.game.piece(at: king)?.color == color
     }
 
     /// Name, status, time left and captures. The label stands in for the children's
@@ -98,7 +109,7 @@ struct ExecutivePlate: View {
                 if match.engineFailed, !match.game.isHumanTurn { return "Engine unavailable" }
                 return "To move"
             }
-            if match.game.checkedKing != nil { return "\(theme.name(of: color)) in check" }
+            if inCheck { return "King in check" }
             return "\(theme.name(of: color)) to move"
         }
         if isComputer {
@@ -262,5 +273,21 @@ struct DockButton: View {
         .buttonStyle(.plain)
         .accessibilityLabel(title)
         .accessibilityValue(isOn ? "On" : "")
+    }
+}
+
+/// A small red "Check" tag at the front of the player's line while their king is in check.
+struct CheckTag: View {
+    let color: Color
+
+    var body: some View {
+        Text("CHECK")
+            .font(.system(size: 9.5, weight: .heavy))
+            .tracking(0.6)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2.5)
+            .background(Capsule().fill(color))
+            .fixedSize()
     }
 }

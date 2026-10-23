@@ -111,9 +111,20 @@ final class SculptedAssets {
         return material
     }
 
-    /// The black lacquered frame.
+    /// The frame around the squares: glass on every look.
     func frameMaterial(_ look: SculptedLook) -> SCNMaterial {
-        return Self.pbr(look.lacquer, roughness: look.lacquerRoughness, coat: look.lacquerCoat, coatRoughness: 0.08)
+        Self.glass()
+    }
+
+    /// Smoked polished glass: a faint dark body that shows what is behind it, a mirror-smooth coat
+    /// that picks up the studio's light along every edge.
+    static func glass() -> SCNMaterial {
+        // Smoked: a dark body, so the polished faces show the light and never turn milky white.
+        let material = pbr(UIColor(white: 0.1, alpha: 1), roughness: 0.04, coat: 1, coatRoughness: 0.02)
+        material.transparency = 0.6
+        material.transparencyMode = .dualLayer
+        material.blendMode = .alpha
+        return material
     }
 
     /// The fine metal line around the squares: platinum, or the look's own metal.
