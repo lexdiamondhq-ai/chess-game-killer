@@ -283,6 +283,35 @@ struct TrafficLightDots: View {
     }
 }
 
+/// "White to move" with a dot in the side's color, or another short line. Instructions say
+/// White and Black, as chess notation does, whatever the look calls its sides. It sits under the board,
+/// never over the back rank, and keeps its space while hidden so nothing jumps.
+struct TurnBadge: View {
+    let theme: BoardTheme
+    let side: Piece.Color
+    var text: String?
+    var showing = true
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(theme.sideColor(side))
+                .overlay(Circle().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
+                .frame(width: 10, height: 10)
+            Text(text ?? (side == .white ? "White to move" : "Black to move"))
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(.ultraThinMaterial, in: Capsule())
+        .opacity(showing ? 1 : 0)
+        .accessibilityHidden(!showing)
+        .animation(.easeInOut(duration: 0.2), value: showing)
+        .animation(.easeInOut(duration: 0.2), value: text)
+    }
+}
+
 /// A small capsule label, like "+10 XP" or "Mixed".
 struct TrainingChip: View {
     let text: String

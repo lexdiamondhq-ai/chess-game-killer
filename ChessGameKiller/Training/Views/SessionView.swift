@@ -141,6 +141,8 @@ struct SessionView: View {
                     .font(.system(size: 15, weight: .bold))
                     .frame(width: 36, height: 36)
                     .background(.thinMaterial, in: Circle())
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("End session")
@@ -235,6 +237,8 @@ struct SessionIntro: View {
                         .font(.system(size: 15, weight: .bold))
                         .frame(width: 36, height: 36)
                         .background(.thinMaterial, in: Circle())
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Close")
@@ -322,6 +326,7 @@ struct SessionSummary: View {
 
     var body: some View {
         let accuracy = runner.accuracy
+        let days = max(runner.reward.streak, store.streak)
         let green = theme.glows ? TrainingColor.green.color(on: theme) : theme.trainingAccent
         ScrollView {
             VStack(spacing: 20) {
@@ -345,7 +350,7 @@ struct SessionSummary: View {
 
                 HStack(spacing: 10) {
                     stat("+\(runner.reward.xp)", "XP", "sparkles", theme.trainingAccent)
-                    stat("\(max(runner.reward.streak, store.streak))", runner.reward.streak == 1 ? "day" : "days", "flame.fill",
+                    stat("\(days)", days == 1 ? "day" : "days", "flame.fill",
                          TrainingColor.orange.color(on: theme))
                 }
 

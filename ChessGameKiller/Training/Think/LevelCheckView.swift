@@ -162,9 +162,11 @@ struct LevelCheckView: View {
                                 ? { (square: Square) in runner.tap(square) } : nil
                         )
                         .frame(width: boardSide, height: boardSide)
-                        .overlay(alignment: .bottom) { turnBadge(runner, drill: drill) }
                         .id(ObjectIdentifier(drill))
                         .transition(.opacity)
+                        TurnBadge(theme: theme, side: drill.learner,
+                                  showing: runner.phase == .solving && drill.phase == .solving)
+                            .padding(.top, -10)
                     }
                     RoomMessage(text: message(runner), tone: tone(runner), theme: theme)
                         .padding(.horizontal, 16)
@@ -187,25 +189,6 @@ struct LevelCheckView: View {
         }
     }
 
-    @ViewBuilder
-    private func turnBadge(_ runner: LevelCheckRunner, drill: DrillRunner) -> some View {
-        if runner.phase == .solving, drill.phase == .solving {
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(theme.sideColor(drill.learner))
-                    .overlay(Circle().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
-                    .frame(width: 10, height: 10)
-                Text("\(theme.name(of: drill.learner)) to move")
-                    .font(.caption.weight(.semibold))
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(.ultraThinMaterial, in: Capsule())
-            .offset(y: 13)
-            .transition(.opacity)
-        }
-    }
-
     private func message(_ runner: LevelCheckRunner) -> String {
         switch runner.phase {
         case .answered(let solved):
@@ -213,7 +196,7 @@ struct LevelCheckView: View {
         default:
             guard let drill = runner.drill else { return "" }
             if drill.phase == .solving, drill.game.moveCount > 1 { return "Good. Keep going." }
-            return "Find the best move for \(theme.name(of: drill.learner))."
+            return "Find the best move for \(drill.learner == .white ? "White" : "Black")."
         }
     }
 

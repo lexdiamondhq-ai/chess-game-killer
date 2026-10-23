@@ -124,6 +124,8 @@ struct LessonPlayerView: View {
                     .font(.system(size: 15, weight: .bold))
                     .frame(width: 36, height: 36)
                     .background(.thinMaterial, in: Circle())
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Close lesson")
@@ -164,6 +166,8 @@ struct LessonPlayerView: View {
                     .frame(width: 36, height: 36)
                     .background(.thinMaterial, in: Circle())
                     .contentTransition(.symbolEffect(.replace))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(muted ? "Turn the coach's voice on" : "Mute the coach's voice")
@@ -283,9 +287,10 @@ struct LessonPlayerView: View {
             .disabled(player.solved)
         } else {
             HStack(spacing: 28) {
-                roundButton("backward.end.fill", label: "Previous step", size: 46) { player.back() }
+                roundButton("backward.fill", label: "Previous step", size: 46) { player.back() }
                 roundButton(player.phase == .playing ? "pause.fill" : (player.phase == .finished ? "arrow.counterclockwise" : "play.fill"),
-                            label: player.phase == .playing ? "Pause" : "Play", size: 62, prominent: true) {
+                            label: player.phase == .playing ? "Pause" : (player.phase == .finished ? "Play again" : "Play"),
+                            size: 62, prominent: true) {
                     if player.phase == .finished {
                         finished = false
                         player.restart()
@@ -293,7 +298,7 @@ struct LessonPlayerView: View {
                         player.togglePause()
                     }
                 }
-                roundButton("forward.end.fill", label: "Next step", size: 46) { player.skip() }
+                roundButton("forward.fill", label: "Next step", size: 46) { player.skip() }
             }
             .frame(maxWidth: .infinity)
         }

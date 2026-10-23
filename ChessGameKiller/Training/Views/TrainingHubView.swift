@@ -69,7 +69,7 @@ struct TrainingHubView: View {
         }
         .task { await planToday() }
         .confirmationDialog("Start training over?", isPresented: $confirmingReset, titleVisibility: .visible) {
-            Button("Erase Training Progress", role: .destructive) {
+            Button("Erase training progress", role: .destructive) {
                 store.reset()
                 Task { await planToday() }
             }
@@ -183,19 +183,16 @@ struct TrainingHubView: View {
 
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
-        ToolbarItem(placement: .topBarLeading) {
-            Button("Done") { dismiss() }
-        }
         ToolbarItem(placement: .topBarTrailing) {
             Menu {
                 Toggle(isOn: Binding(get: { !voiceMuted }, set: { voiceMuted = !$0 })) {
-                    Label("Coach's Voice", systemImage: "speaker.wave.2.fill")
+                    Label("Coach's voice", systemImage: "speaker.wave.2.fill")
                 }
                 Button {
                     showingLevelCheck = true
                 } label: {
                     Label {
-                        Text("Find My Level")
+                        Text("Find my level")
                         if let level = think.levelStatus {
                             Text(level)
                         }
@@ -206,11 +203,14 @@ struct TrainingHubView: View {
                 Button(role: .destructive) {
                     confirmingReset = true
                 } label: {
-                    Label("Start Training Over", systemImage: "arrow.counterclockwise")
+                    Label("Start training over", systemImage: "arrow.counterclockwise")
                 }
             } label: {
-                Label("Training Settings", systemImage: "ellipsis.circle")
+                Label("Training settings", systemImage: "ellipsis.circle")
             }
+        }
+        ToolbarItem(placement: .confirmationAction) {
+            Button("Done") { dismiss() }
         }
     }
 

@@ -157,37 +157,38 @@ struct CalculationView: View {
             let side = max(200, min(geo.size.width - 24, geo.size.height * 0.52))
             VStack(spacing: 12) {
                 RoomHeader(title: "Calculation", subtitle: "See the moves in your head") { dismiss() }
-                settingsRow.padding(.horizontal, 16)
-                if let runner, runner.puzzle != nil {
-                    Text(runner.lineText)
-                        .font(.system(.title3, design: .monospaced).weight(.semibold))
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 16)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .trainingCard(theme, cornerRadius: 16)
-                        .padding(.horizontal, 16)
-                    PositionBoard(draft: runner.draft, theme: theme, flipped: runner.player == .black,
-                                  hints: runner.hints) { square in
-                        runner.tap(square)
-                    }
-                    .frame(width: side, height: side)
-                    .overlay(alignment: .bottom) {
-                        if let from = runner.from {
-                            Text("From \(from.notation). Now tap where it goes.")
-                                .font(.caption.weight(.semibold))
-                                .padding(.horizontal, 10).padding(.vertical, 5)
-                                .background(.ultraThinMaterial, in: Capsule())
-                                .offset(y: 13)
+                // Scrolls only when it must, so the buttons are never cut off on a small phone.
+                ScrollView {
+                    VStack(spacing: 12) {
+                        settingsRow.padding(.horizontal, 16)
+                        if let runner, runner.puzzle != nil {
+                            Text(runner.lineText)
+                                .font(.system(.title3, design: .monospaced).weight(.semibold))
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 16)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .trainingCard(theme, cornerRadius: 16)
+                                .padding(.horizontal, 16)
+                            PositionBoard(draft: runner.draft, theme: theme, flipped: runner.player == .black,
+                                          hints: runner.hints) { square in
+                                runner.tap(square)
+                            }
+                            .frame(width: side, height: side)
+                            TurnBadge(theme: theme, side: runner.player,
+                                      text: runner.from.map { "From \($0.notation). Now tap where it goes." },
+                                      showing: runner.from != nil)
+                                .padding(.top, -6)
+                            RoomMessage(text: message(runner), tone: tone(runner), theme: theme)
+                                .padding(.horizontal, 16)
+                            buttons(runner).padding(.horizontal, 16)
+                        } else if puzzles.library == nil {
+                            ProgressView("Loading puzzles…").padding(.top, 40)
                         }
                     }
-                    RoomMessage(text: message(runner), tone: tone(runner), theme: theme)
-                        .padding(.horizontal, 16)
-                    buttons(runner).padding(.horizontal, 16)
-                } else if puzzles.library == nil {
-                    ProgressView("Loading puzzles…").padding(.top, 40)
+                    .padding(.bottom, 12)
                 }
-                Spacer(minLength: 0)
+                .scrollBounceBehavior(.basedOnSize)
             }
             .frame(width: geo.size.width)
         }
@@ -215,10 +216,10 @@ struct CalculationView: View {
             }
             .pickerStyle(.segmented)
             Toggle(isOn: $blindfold) {
-                Image(systemName: "eye.slash.fill")
+                Label("Blindfold", systemImage: "eye.slash.fill")
+                    .font(.system(.subheadline, design: .themed).weight(.semibold))
             }
             .toggleStyle(.button)
-            .accessibilityLabel("Blindfold")
         }
     }
 

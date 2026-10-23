@@ -136,7 +136,10 @@ private struct CandidatePositionView: View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(spacing: 18) {
-                    board
+                    VStack(spacing: 6) {
+                        board
+                        turnBadge
+                    }
                     RoomMessage(text: runner.message, tone: runner.tone, theme: theme)
                         .padding(.horizontal, 16)
                     if let report = runner.report {
@@ -172,27 +175,11 @@ private struct CandidatePositionView: View {
             onTap: runner.phase == .listing ? { (square: Square) in runner.tap(square) } : nil
         )
         .frame(width: boardSide, height: boardSide)
-        .overlay(alignment: .bottom) { turnBadge }
     }
 
     /// "White to move" in the player's color, under the board while the list is made.
-    @ViewBuilder
     private var turnBadge: some View {
-        if runner.phase == .listing {
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(theme.sideColor(runner.learner))
-                    .overlay(Circle().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
-                    .frame(width: 10, height: 10)
-                Text("\(theme.name(of: runner.learner)) to move")
-                    .font(.caption.weight(.semibold))
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(.ultraThinMaterial, in: Capsule())
-            .offset(y: 13)
-            .transition(.opacity)
-        }
+        TurnBadge(theme: theme, side: runner.learner, showing: runner.phase == .listing)
     }
 
     @ViewBuilder

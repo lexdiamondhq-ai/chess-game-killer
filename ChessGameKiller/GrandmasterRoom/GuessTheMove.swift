@@ -194,9 +194,9 @@ struct GuessTheMoveView: View {
                 RoomHeader(title: game.title, subtitle: "\(game.event), \(String(game.year))") { dismiss() }
                 if let runner {
                     HStack {
-                        Label("\(runner.points) / \(runner.maxPoints)", systemImage: "star.fill")
+                        Label(runner.guesses == 0 ? "—" : "\(runner.points) / \(runner.maxPoints)", systemImage: "star.fill")
                         Spacer()
-                        Text("\(runner.percent)%")
+                        Text(runner.guesses == 0 ? "—" : "\(runner.percent)%")
                         Spacer()
                         Text("\(runner.movesLeft) moves left")
                             .foregroundStyle(.secondary)
@@ -281,6 +281,8 @@ struct RoomHeader: View {
                     .font(.system(size: 15, weight: .bold))
                     .frame(width: 36, height: 36)
                     .background(.thinMaterial, in: Circle())
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Close")

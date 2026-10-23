@@ -120,8 +120,8 @@ struct PuzzleCyclesView: View {
                                       arrows: runner.arrows, marks: runner.marks, labels: runner.labels,
                                       onTap: runner.acceptsTaps ? { (square: Square) in runner.tap(square) } : nil)
                         .frame(width: side, height: side)
-                        .overlay(alignment: .bottom) { turnBadge(runner) }
-                        .padding(.bottom, 4)
+                    TurnBadge(theme: theme, side: runner.learner, showing: runner.phase == .solving)
+                        .padding(.top, -8)
                     RoomMessage(text: runner.message, tone: runner.tone, theme: theme)
                         .frame(maxWidth: 560)
                         .padding(.horizontal, 16)
@@ -134,26 +134,6 @@ struct PuzzleCyclesView: View {
                 .frame(width: geo.size.width)
             }
             .scrollBounceBehavior(.basedOnSize)
-        }
-    }
-
-    /// "White to move", under the board, while it's the player's turn.
-    @ViewBuilder
-    private func turnBadge(_ runner: DrillRunner) -> some View {
-        if runner.phase == .solving {
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(theme.sideColor(runner.learner))
-                    .overlay(Circle().strokeBorder(Color.secondary.opacity(0.5), lineWidth: theme.isDark ? 0 : 1))
-                    .frame(width: 10, height: 10)
-                Text("\(theme.name(of: runner.learner)) to move")
-                    .font(.caption.weight(.semibold))
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(.ultraThinMaterial, in: Capsule())
-            .offset(y: 13)
-            .transition(.opacity)
         }
     }
 
