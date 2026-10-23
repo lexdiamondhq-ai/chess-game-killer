@@ -28,7 +28,23 @@ struct ChallengeGameView: View {
     /// As on the game screen: the board stops growing here, and so does the column around it.
     private static let maxBoardSide: CGFloat = 680
 
+    // The body is split in two, with the haptic conditions as functions, so the
+    // compiler can type-check it in reasonable time.
     var body: some View {
+        screen
+            .confirmationDialog(confirmTitle, isPresented: confirmingBinding, titleVisibility: .visible,
+                                presenting: confirming) { item in
+                confirmActions(item)
+            } message: { item in
+                Text(confirmMessage(item))
+            }
+            .sensoryFeedback(.warning, trigger: game.toast?.id, condition: warningBuzz)
+            .sensoryFeedback(.success, trigger: game.phase, condition: joinedBuzz)
+            .animation(.snappy(duration: 0.35), value: game.phase)
+            .onAppear { game.refreshIdleTimer() }
+    }
+
+    private var screen: some View {
         Group {
             if game.phase == .loading {
                 loading
@@ -48,20 +64,18 @@ struct ChallengeGameView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             foot
         }
-        .confirmationDialog(confirmTitle, isPresented: confirmingBinding, titleVisibility: .visible,
-                            presenting: confirming) { item in
-            confirmActions(item)
-        } message: { item in
-            Text(confirmMessage(item))
-        }
-        .sensoryFeedback(.warning, trigger: game.toast?.id) { _, _ in
-            hapticsOn && game.toast?.isWarning == true
-        }
-        .sensoryFeedback(.success, trigger: game.phase) { old, new in
-            hapticsOn && old == .waiting && new == .playing
-        }
-        .animation(.snappy(duration: 0.35), value: game.phase)
-        .onAppear { game.refreshIdleTimer() }
+    }
+
+    /// A warning buzz with a notice that matters, such as a screenshot.
+    private func warningBuzz(_ old: Int?, _ new: Int?) -> Bool {
+        guard hapticsOn, let toast = game.toast else { return false }
+        return toast.isWarning
+    }
+
+    /// A success buzz the moment the friend joins.
+    private func joinedBuzz(_ old: OnlineGame.Phase, _ new: OnlineGame.Phase) -> Bool {
+        guard hapticsOn else { return false }
+        return old == .waiting && new == .playing
     }
 
     // MARK: Layout
