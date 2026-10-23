@@ -660,7 +660,7 @@ struct BoardArt: View {
             // The picture is 9 squares wide: half a square of frame on each side.
             let inset = side / 18
             ZStack {
-                BoardGlass(side: side)
+                BoardGlass()
                 Image(name)
                     .resizable()
                     .interpolation(.high)
@@ -681,56 +681,11 @@ struct BoardArt: View {
     }
 }
 
-/// Clear glass around the board: Liquid Glass on iOS 26, a faint pane before it, with
-/// a soft sheen across it and bright edges, so it reads as glass and never as grey.
+/// Clear glass around the board: the app's own glass, as the player lines and the dock use it,
+/// only clearer, so the backdrop's light shows through the frame.
 struct BoardGlass: View {
-    let side: CGFloat
-
     var body: some View {
-        let shape = Rectangle()
-        ZStack {
-            pane(shape)
-            // Light falls across from the top left.
-            LinearGradient(
-                stops: [
-                    .init(color: .white.opacity(0.22), location: 0),
-                    .init(color: .white.opacity(0.07), location: 0.3),
-                    .init(color: .white.opacity(0.02), location: 0.6),
-                    .init(color: .white.opacity(0.1), location: 1),
-                ],
-                startPoint: .topLeading, endPoint: .bottomTrailing
-            )
-            // One soft streak of reflected light across the pane.
-            LinearGradient(
-                stops: [
-                    .init(color: .clear, location: 0.22),
-                    .init(color: .white.opacity(0.12), location: 0.3),
-                    .init(color: .clear, location: 0.38),
-                ],
-                startPoint: .topLeading, endPoint: .bottomTrailing
-            )
-            // A brighter outer edge, as polished glass catches the light.
-            shape.strokeBorder(
-                LinearGradient(colors: [.white.opacity(0.5), .white.opacity(0.1), .white.opacity(0.28)],
-                               startPoint: .topLeading, endPoint: .bottomTrailing),
-                lineWidth: 1.2
-            )
-            shape.strokeBorder(Color.black.opacity(0.35), lineWidth: 0.5).padding(1.2)
-        }
-        .allowsHitTesting(false)
-    }
-
-    @ViewBuilder
-    private func pane(_ shape: Rectangle) -> some View {
-        #if compiler(>=6.2)
-        if #available(iOS 26.0, *) {
-            Color.clear.glassEffect(.clear, in: shape)
-        } else {
-            shape.fill(Color.white.opacity(0.07))
-        }
-        #else
-        shape.fill(Color.white.opacity(0.07))
-        #endif
+        GlassSurface(shape: Rectangle(), weight: .clear)
     }
 }
 
