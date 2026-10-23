@@ -1,0 +1,120 @@
+name: Play server
+
+# Tests the "Challenge a friend" game server (play/) and deploys it to
+# Cloudflare, where it serves https://play.chess-game-killer.workers.dev.
+# Deploying needs one repository secret, CLOUDFLARE_API_TOKEN
+# (CLOUDFLARE_ACCOUNT_ID is optional; it is looked up from the token).
+# Without it, it only tests.
+on:
+  pull_request:
+    paths: ["play/**", ".github/workflows/play.yml"]
+  push:
+    # TEMPORARY: the feature branch deploys too, so the live server can be checked before merging.
+    # Remove claude/project-thread-0j84v2 from this list before the pull request is merged.
+    branches: [main, claude/project-thread-0j84v2]
+    paths: ["play/**", ".github/workflows/play.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: play/package-lock.json
+      - name: Install
+        working-directory: play
+        run: npm ci
+      - name: Unit tests
+        working-directory: play
+        run: npm test
+      - name: Integration tests (real games against wrangler dev)
+        working-directory: play
+        env:
+          WRANGLER_SEND_METRICS: "false"
+        run: npm run test:integration
+
+  deploy:
+    needs: test
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    # One deploy at a time, so two quick pushes can't overlap.
+    concurrency:
+      group: play-deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check the secret is set
+        id: secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::notice::Not deploying the play server yet. Missing secret: CLOUDFLARE_API_TOKEN"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            # Not set: use the account the token belongs to.
+            CLOUDFLARE_ACCOUNT_ID=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              "https://api.cloudflare.com/client/v4/accounts" | jq -r '.result[0].id // empty')
+          fi
+          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::Couldn't find the Cloudflare account. Check the token uses the Edit Cloudflare Workers template with your account included."
+            exit 1
+          fi
+          echo "CF_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID" >> "$GITHUB_ENV"
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+      - name: Make sure the account has a workers.dev address
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        shell: bash
+        run: |
+          api="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/workers/subdomain"
+          auth="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          current=$(curl -s -H "$auth" "$api" | jq -r '.result.subdomain // empty')
+          if [ -z "$current" ]; then
+            # A new account has none yet; pick a free name.
+            for name in chess-game-killer "chessgamekiller-$RANDOM" "chessgamekiller-$(date +%s)"; do
+              ok=$(curl -s -X PUT -H "$auth" -H "Content-Type: application/json" \
+                --data "{\"subdomain\":\"$name\"}" "$api" | jq -r '.success')
+              if [ "$ok" = "true" ]; then current="$name"; break; fi
+            done
+          fi
+          if [ -z "$current" ]; then
+            echo "::error::Couldn't set up a workers.dev address. Open Workers & Pages in the Cloudflare dashboard once, then re-run."
+            exit 1
+          fi
+          echo "workers.dev address: $current.workers.dev"
+          echo "WORKERS_SUBDOMAIN=$current" >> "$GITHUB_ENV"
+      - name: Deploy to Cloudflare
+        id: deploy
+        if: steps.secrets.outputs.ready == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CF_ACCOUNT_ID }}
+          workingDirectory: play
+          wranglerVersion: "4"
+      - name: Play a game on the live server
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          DEPLOY_URL: ${{ steps.deploy.outputs.deployment-url }}
+        shell: bash
+        run: |
+          url="${DEPLOY_URL:-https://play.$WORKERS_SUBDOMAIN.workers.dev}"
+          url="${url%/}"
+          echo "Play server is live at $url"
+          echo "### Play server: $url" >> "$GITHUB_STEP_SUMMARY"
+          node play/test/smoke.mjs "$url" | tee -a "$GITHUB_STEP_SUMMARY"
