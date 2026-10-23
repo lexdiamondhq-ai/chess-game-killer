@@ -37,11 +37,9 @@ struct ExecutivePlate: View {
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
-                    RivalRemark(match: match, enabled: isComputer) {
-                        statusRow
-                    }
-                    // The row keeps its height when it has nothing to say, so the name never jumps.
-                    .frame(height: statusHeight, alignment: .leading)
+                    statusRow
+                        // The row keeps its height when it has nothing to say, so the name never jumps.
+                        .frame(height: statusHeight, alignment: .leading)
                 }
             }
             // The clock is its own element, so VoiceOver reads its time as it stands.
@@ -81,14 +79,28 @@ struct ExecutivePlate: View {
         .animation(.snappy(duration: 0.3), value: inCheck)
     }
 
-    /// The turn dot or the CHECK tag, the status (or the selected army piece's name and rank),
-    /// and the captured pieces.
+    /// The CHECK tag, the turn dot and the status (or the selected army piece's name and rank),
+    /// and the captured pieces. For a few seconds the rival's remark, or the coach's grade of
+    /// your move, takes the place of the dot and the status; CHECK and the captures stay.
     private var statusRow: some View {
         HStack(spacing: 6) {
             if inCheck {
                 CheckTag(color: theme.check)
                     .transition(.scale.combined(with: .opacity))
-            } else if isActive {
+            }
+            PlateRemark(match: match, theme: theme, isRival: isComputer) {
+                statusWords
+            }
+            .layoutPriority(1)
+            CapturedPieces(match: match, by: color)
+        }
+        .animation(.easeInOut(duration: 0.2), value: selectedArmyPiece?.name)
+    }
+
+    /// The turn dot and the status, or the selected army piece's name and rank.
+    private var statusWords: some View {
+        HStack(spacing: 6) {
+            if isActive, !inCheck {
                 Circle()
                     .fill(glow ?? accent)
                     .frame(width: 6, height: 6)
@@ -113,13 +125,9 @@ struct ExecutivePlate: View {
                     .foregroundStyle(isActive ? Color.primary.opacity(0.86) : Color.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
-                    // The words come first; the captured pieces condense to make room.
-                    .layoutPriority(1)
                     .transition(.opacity)
             }
-            CapturedPieces(match: match, by: color)
         }
-        .animation(.easeInOut(duration: 0.2), value: selectedArmyPiece?.name)
     }
 
     /// While the player has one of their named army pieces selected: its name and rank, in the

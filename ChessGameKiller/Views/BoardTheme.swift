@@ -100,6 +100,18 @@ struct BoardTheme: Identifiable {
         color == .white ? whiteSide : blackSide
     }
 
+    /// A side's color for words and small symbols. Black's own color is near-black on
+    /// every dark look but Neon, so there it reads in a light graphite instead.
+    func ink(for color: Piece.Color) -> Color {
+        if color == .white || glows { return sideColor(color) }
+        return isDark ? Color(white: 0.7) : blackSide
+    }
+
+    /// The last move's wash, strong enough to read on light and dark squares alike: gold, or a
+    /// yellow-green on looks whose own marks are gold already, so the two never look alike.
+    static let goldWash = Color(hex: 0xD9A92B).opacity(0.38)
+    static let greenWash = Color(hex: 0xB9C24A).opacity(0.45)
+
     func sparks(for color: Piece.Color) -> [Color] {
         color == .white ? whiteSparks : blackSparks
     }
@@ -131,7 +143,7 @@ struct BoardTheme: Identifiable {
         labelOnDark: Color(hex: 0xE8DFCC).opacity(0.8),
         selected: Color(hex: 0x5E8FFF).opacity(0.28),
         selectedRing: nil,
-        lastMove: Color.white.opacity(0.15),
+        lastMove: BoardTheme.goldWash,
         lastMoveRing: nil,
         hint: Color(hex: 0x5E8FFF).opacity(0.92),
         hintGlow: nil,
@@ -171,7 +183,7 @@ struct BoardTheme: Identifiable {
         labelOnDark: Color(hex: 0xE8DFCC).opacity(0.8),
         selected: Color(hex: 0x5E8FFF).opacity(0.28),
         selectedRing: nil,
-        lastMove: Color.white.opacity(0.15),
+        lastMove: BoardTheme.goldWash,
         lastMoveRing: nil,
         hint: Color(hex: 0x5E8FFF).opacity(0.92),
         hintGlow: nil,
@@ -211,7 +223,7 @@ struct BoardTheme: Identifiable {
         labelOnDark: Color(hex: 0xE8DFCC).opacity(0.8),
         selected: Color(hex: 0x5E8FFF).opacity(0.28),
         selectedRing: nil,
-        lastMove: Color.white.opacity(0.15),
+        lastMove: BoardTheme.goldWash,
         lastMoveRing: nil,
         hint: Color(hex: 0x5E8FFF).opacity(0.92),
         hintGlow: nil,
@@ -251,7 +263,7 @@ struct BoardTheme: Identifiable {
         labelOnDark: Color(hex: 0xF2E6CF).opacity(0.8),
         selected: Color(hex: 0xEBB357).opacity(0.3),
         selectedRing: nil,
-        lastMove: Color.white.opacity(0.15),
+        lastMove: BoardTheme.greenWash,
         lastMoveRing: nil,
         hint: Color(hex: 0xEBB357).opacity(0.92),
         hintGlow: nil,
@@ -291,7 +303,7 @@ struct BoardTheme: Identifiable {
         labelOnDark: Color(hex: 0xE8E4D8).opacity(0.8),
         selected: Color(hex: 0xF2BD5C).opacity(0.3),
         selectedRing: nil,
-        lastMove: Color.white.opacity(0.15),
+        lastMove: BoardTheme.greenWash,
         lastMoveRing: nil,
         hint: Color(hex: 0xF2BD5C).opacity(0.92),
         hintGlow: nil,
@@ -332,7 +344,7 @@ struct BoardTheme: Identifiable {
         labelOnDark: Color(hex: 0xD6D9E0).opacity(0.8),
         selected: Color(hex: 0x5E8FFF).opacity(0.28),
         selectedRing: nil,
-        lastMove: Color.white.opacity(0.14),
+        lastMove: BoardTheme.goldWash,
         lastMoveRing: nil,
         hint: Color(hex: 0x5E8FFF).opacity(0.92),
         hintGlow: nil,
@@ -368,12 +380,12 @@ struct BoardTheme: Identifiable {
         dark: Color(hex: 0x1236E0),
         surface: nil,
         gridLine: nil,
-        labelOnLight: Color(hex: 0xB8862E),
+        labelOnLight: Color(hex: 0x7D5710),
         labelOnDark: Color(hex: 0xFFF0C2),
         selected: Color(hex: 0xF6D27A).opacity(0.22),
         selectedRing: Color(hex: 0xF6D27A).opacity(0.95),
-        lastMove: Color(hex: 0xFFF6E4).opacity(0.28),
-        lastMoveRing: Color(hex: 0xE8BE64).opacity(0.55),
+        lastMove: BoardTheme.greenWash,
+        lastMoveRing: nil,
         hint: Color(hex: 0xE8BE64).opacity(0.9),
         hintGlow: nil,
         check: Color(hex: 0xD92D3F),
@@ -411,8 +423,8 @@ struct BoardTheme: Identifiable {
         labelOnDark: Color.white.opacity(0.75),
         selected: Color(hex: 0xFFC24D).opacity(0.18),
         selectedRing: Color(hex: 0xFFC24D).opacity(0.95),
-        lastMove: Color.white.opacity(0.14),
-        lastMoveRing: Color.white.opacity(0.5),
+        lastMove: BoardTheme.greenWash,
+        lastMoveRing: nil,
         hint: Color(hex: 0xFFC24D).opacity(0.9),
         hintGlow: nil,
         check: Color(hex: 0xD92D3F),
@@ -484,7 +496,8 @@ struct BoardTheme: Identifiable {
         whiteSide: Color(hex: 0xFFC46A), blackSide: Color(hex: 0x1A120C), whiteName: "Ember", blackName: "Obsidian",
         whiteSparks: [Color(hex: 0xFFF4D6), Color(hex: 0xFFC24A), Color(hex: 0xFF7A1A), Color(hex: 0xFF4D1A)],
         blackSparks: [Color(hex: 0xFFC24A), Color(hex: 0xFF7A1A), Color(hex: 0x6B3A1E), Color(hex: 0xFFE2B0)],
-        backdrop: [Color(hex: 0x3A2210), Color(hex: 0x0A0604)]
+        backdrop: [Color(hex: 0x3A2210), Color(hex: 0x0A0604)],
+        lastMove: BoardTheme.greenWash
     )
 
     /// A tilted orbit of light around aqua glass, for Drift.
@@ -540,7 +553,8 @@ struct BoardTheme: Identifiable {
         id: ID, name: String, symbol: String, light: Color, dark: Color,
         labelOnLight: Color, labelOnDark: Color, accent: Color, selected: Color,
         whiteSide: Color, blackSide: Color, whiteName: String, blackName: String,
-        whiteSparks: [Color], blackSparks: [Color], backdrop: [Color]
+        whiteSparks: [Color], blackSparks: [Color], backdrop: [Color],
+        lastMove: Color = BoardTheme.goldWash
     ) -> BoardTheme {
         BoardTheme(
             id: id,
@@ -554,8 +568,8 @@ struct BoardTheme: Identifiable {
             labelOnDark: labelOnDark,
             selected: selected.opacity(0.22),
             selectedRing: selected.opacity(0.95),
-            lastMove: Color.white.opacity(0.16),
-            lastMoveRing: accent.opacity(0.55),
+            lastMove: lastMove,
+            lastMoveRing: nil,
             hint: accent.opacity(0.9),
             hintGlow: nil,
             check: Color(hex: 0xD92D3F),

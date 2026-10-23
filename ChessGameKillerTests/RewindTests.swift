@@ -134,6 +134,7 @@ final class RewindTests: XCTestCase {
         XCTAssertEqual(vault.rewrittenThisWeek(), 1)
         XCTAssertEqual(vault.leftThisWeek(), 2)
 
+        vault.waitUntilSaved()
         let reloaded = try JSONDecoder().decode([SavedGame].self, from: Data(contentsOf: url))
         XCTAssertEqual(reloaded.first?.rewritten, [11])
     }

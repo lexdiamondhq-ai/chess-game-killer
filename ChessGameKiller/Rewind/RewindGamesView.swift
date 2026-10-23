@@ -5,6 +5,10 @@ import SwiftUI
 /// how many moments are left to rewrite. Tap one to rewind it.
 struct RewindGamesView: View {
     let theme: BoardTheme
+    /// The game picked on the home screen, if this list was opened for it.
+    let opening: UUID?
+    /// The rival of a game in progress that a rematch would cost, so the person is asked first.
+    let forfeits: String?
     var onPlayAgain: ((SavedGame) -> Void)?
 
     @Environment(GameVault.self) private var vault
@@ -12,8 +16,10 @@ struct RewindGamesView: View {
     @State private var path: [UUID]
 
     /// `opening` is a game to show straight away, as when one is picked on the home screen.
-    init(theme: BoardTheme, opening: UUID? = nil, onPlayAgain: ((SavedGame) -> Void)? = nil) {
+    init(theme: BoardTheme, opening: UUID? = nil, forfeits: String? = nil, onPlayAgain: ((SavedGame) -> Void)? = nil) {
         self.theme = theme
+        self.opening = opening
+        self.forfeits = forfeits
         self.onPlayAgain = onPlayAgain
         _path = State(initialValue: opening.map { [$0] } ?? [])
     }
@@ -57,7 +63,9 @@ struct RewindGamesView: View {
             }
             .navigationDestination(for: UUID.self) { id in
                 if let game = vault.game(id) {
-                    RewindView(game: game, theme: theme) { game in
+                    // A game opened from the home screen goes straight back there.
+                    RewindView(game: game, theme: theme, forfeits: forfeits,
+                               leave: id == opening ? { dismiss() } : nil) { game in
                         dismiss()
                         onPlayAgain?(game)
                     }

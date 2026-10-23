@@ -150,7 +150,7 @@ struct PieceRecord: Codable, Equatable {
 
     init() {}
 
-    /// The rival that has taken this piece most often (at least twice), and how often.
+    /// The rival that has taken this piece most often (at least `ArmyStore.grudgeAt` times), and how often.
     var nemesis: (level: MatchController.Level, times: Int)? {
         guard let top = takenBy.filter({ $0.value >= ArmyStore.grudgeAt })
             .max(by: { ($0.value, $0.key) < ($1.value, $1.key) }),
@@ -267,7 +267,7 @@ struct ArmyNews: Identifiable, Equatable {
         case .revenge(let rival):
             return "\(name) got its revenge on \(rival)"
         case .grudge(let rival, let times):
-            return "\(rival) has taken \(name) \(times) times. Make it pay."
+            return "\(rival) has taken \(name) \(Self.times(times))."
         case .promoted:
             switch rank {
             case .veteran: return "Your \(slot.title.lowercased()) earned a name: \(name)"
@@ -286,6 +286,17 @@ struct ArmyNews: Identifiable, Equatable {
         case .promoted: return rank.rawValue * 10
         }
     }
+
+    /// How many times, in words up to ten: "once", "twice", "three times", then "11 times".
+    static func times(_ count: Int) -> String {
+        let words = ["three", "four", "five", "six", "seven", "eight", "nine", "ten"]
+        switch count {
+        case 1: return "once"
+        case 2: return "twice"
+        case 3...10: return "\(words[count - 3]) times"
+        default: return "\(count) times"
+        }
+    }
 }
 
 /// The piece that did the most in one game, and what it did.
@@ -296,6 +307,9 @@ struct MatchHero: Equatable {
     let name: String
     /// What it did, like "Kestrel took Vector's queen."
     let line: String
+    /// The bonus it earned for it, as this game counted: more against a stronger
+    /// rival, half when the game had help.
+    let xp: Int
 }
 
 /// The player's army: every piece's record, saved on this device.
@@ -308,7 +322,7 @@ final class ArmyStore {
     private(set) var lastHero: MatchHero?
 
     /// A rival has a grudge with a piece once it has taken it this many times.
-    nonisolated static let grudgeAt = 2
+    nonisolated static let grudgeAt = 3
     /// Extra experience for the Piece of the Match, and for revenge.
     static let heroXP = 5
     static let revengeXP = 15
@@ -342,9 +356,10 @@ final class ArmyStore {
         army.records[slot] ?? PieceRecord()
     }
 
-    /// The piece's name, or "Your kingside knight" when it hasn't earned one.
-    func displayName(of slot: ArmySlot) -> String {
-        record(for: slot).name ?? "Your \(slot.title.lowercased())"
+    /// The piece's name, or "Your kingside knight" when it hasn't earned one
+    /// ("your kingside knight" in the middle of a sentence).
+    func displayName(of slot: ArmySlot, capitalized: Bool = true) -> String {
+        record(for: slot).name ?? "\(capitalized ? "Your" : "your") \(slot.title.lowercased())"
     }
 
     /// The name of the player's piece that started on `start`, if it has earned one.
@@ -366,10 +381,6 @@ final class ArmyStore {
         army.records.values.map(\.games).max() ?? 0
     }
 
-    var hasVeterans: Bool {
-        army.records.values.contains { $0.rank >= .veteran }
-    }
-
     /// The piece this rival has taken most often, for a "grudge match" banner as a game starts.
     func grudge(against level: MatchController.Level) -> ArmyNews? {
         let rival = level.rival.name
@@ -379,7 +390,8 @@ final class ArmyStore {
             .max { $0.1 < $1.1 }
         guard let best else { return nil }
         let (slot, times) = best
-        return ArmyNews(slot: slot, rank: record(for: slot).rank, name: displayName(of: slot),
+        // The name sits mid-sentence: "Spark has taken your queen three times."
+        return ArmyNews(slot: slot, rank: record(for: slot).rank, name: displayName(of: slot, capitalized: false),
                         kind: .grudge(rival: rival, times: times))
     }
 
@@ -453,7 +465,8 @@ final class ArmyStore {
             let stats = ledger.stats(forPieceStartingOn: slot.square(for: playerColor))
             let name = displayName(of: slot)
             return MatchHero(gameID: ledger.gameID, slot: slot, name: name,
-                             line: Self.heroLine(name: name, stats: stats, rival: rival))
+                             line: Self.heroLine(name: name, stats: stats, rival: rival),
+                             xp: stakes.scale(Self.heroXP))
         }
         save()
         return news.sorted { $0.priority > $1.priority }
@@ -467,7 +480,8 @@ final class ArmyStore {
         army.records[slot] = record
         if lastHero?.slot == slot, let hero = lastHero {
             lastHero = MatchHero(gameID: hero.gameID, slot: slot, name: record.name ?? hero.name,
-                                 line: hero.line.replacingOccurrences(of: hero.name, with: record.name ?? hero.name))
+                                 line: hero.line.replacingOccurrences(of: hero.name, with: record.name ?? hero.name),
+                                 xp: hero.xp)
         }
         save()
     }
@@ -504,9 +518,12 @@ final class ArmyStore {
 
     // MARK: Private
 
+    /// None of them is also a side's name on some look ("Onyx wins" must never be a knight).
+    /// Never a multiple of five long: `freshName` steps through the list five at a time
+    /// and has to reach every name.
     static let names = [
-        "Vesper", "Orion", "Halcyon", "Cipher", "Lumen", "Onyx", "Talon", "Zephyr",
-        "Atlas", "Ember", "Kestrel", "Sable", "Tempest", "Umbra", "Volt", "Zenith",
+        "Vesper", "Orion", "Halcyon", "Cipher", "Lumen", "Merlin", "Talon", "Zephyr",
+        "Atlas", "Bastion", "Kestrel", "Sable", "Tempest", "Umbra", "Volt", "Zenith",
         "Aegis", "Cobalt", "Drake", "Eclipse", "Gambit", "Helix", "Iris", "Nova",
         "Raven", "Saber", "Comet", "Lyric", "Mako", "Quill", "Echo", "Flint",
     ]

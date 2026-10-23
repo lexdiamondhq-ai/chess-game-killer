@@ -205,16 +205,12 @@ def undo():
 
 
 def hints(off=False):
-    """The app's two best-move arrows fanning out of one square: the best solid,
-    the runner-up dashed."""
-    paths = [rrect(2.0, 18.4, 3.6, 3.6, 0.8),
-             arrowhead((21.4, 2.6), (1, -1), length=5.2, half=3.3),
-             arrowhead((3.8, 1.2), (0, -1), length=4.4, half=2.8)]
-    strokes = [("M6.6 17.4L17.6 6.4", 2.6)]
-    for y0, y1 in ((15.6, 12.8), (10.6, 7.8)):
-        strokes.append((f"M3.8 {y0}V{y1}", 2.3))
+    """The coach's mark for its best move: a dot in a halo ring, as on the board."""
+    paths = [circle(12, 12, 10.0) + " " + circle(12, 12, 7.9, clockwise=False),
+             circle(12, 12, 4.2)]
+    strokes = []
     if off:
-        strokes.append(("M4.4 4.4L20.4 20.4", 2.2))
+        strokes.append(("M4.4 4.4L19.6 19.6", 2.2))
     return svg(paths, strokes)
 
 

@@ -14,11 +14,13 @@ struct BoardView: View {
     var endBrowsing: (() -> Void)?
 
     @AppStorage("haptics") private var hapticsOn = true
-    /// The player's army, so veteran pieces show their glow, scar and name.
+    /// The player's army, so veteran pieces show their glow and scar.
     @Environment(ArmyStore.self) private var army: ArmyStore?
 
     /// The sculpted looks play on a real 3D board unless the player asked for them flat.
     @AppStorage("sculpted3D") private var sculpted3D = true
+    /// Bumps a moment after each game the player wins, for the haptic.
+    @State private var wins = 0
 
     private var game: GameModel { match.game }
     private var flipped: Bool { match.isBoardFlipped }
@@ -63,15 +65,22 @@ struct BoardView: View {
                 ZStack(alignment: .topLeading) {
                     squares(size: sq)
                     pieces(size: sq)
-                    nameTag(size: sq)
-                    CheckCalloutLayer(game: game, color: theme.check) { square in
-                        calloutPoint(over: square, size: sq)
+                    if theme.spritePieces {
+                        dotsOverPieces(size: sq)
                     }
+                    CheckCalloutLayer(game: game, color: calloutColor, anchor: { square in
+                        calloutPoint(over: square, size: sq)
+                    })
+                    // Each game starts with a fresh layer: the move count runs on across games.
+                    .id(match.gameNumber)
                     .frame(width: sq * 8, height: sq * 8)
                     // A flag that falls mid-promotion puts the pawn back; this just makes sure
                     // the picker never outlives the game.
                     if let promotion = game.pendingPromotion, !match.isOver {
-                        PromotionPicker(color: promotion.piece.color, theme: theme, squareSize: sq) { kind in
+                        PromotionPicker(
+                            color: promotion.piece.color, theme: theme, squareSize: sq,
+                            cancel: { withAnimation(.snappy(duration: 0.2)) { match.cancelPromotion() } }
+                        ) { kind in
                             withAnimation(.snappy(duration: 0.2)) { match.promote(to: kind) }
                         }
                         .transition(.opacity)
@@ -79,6 +88,9 @@ struct BoardView: View {
                 }
                 .frame(width: sq * 8, height: sq * 8)
                 .padding(inset)
+                if theme.boardArt != nil {
+                    FrameCoordinates(flipped: flipped, inset: inset, squareSize: sq, color: theme.labelOnDark)
+                }
             }
             .frame(width: side, height: side)
             .overlay {
@@ -98,12 +110,19 @@ struct BoardView: View {
             }
         }
         .aspectRatio(1, contentMode: .fit)
-        .sensoryFeedback(.impact(weight: .light), trigger: game.moveCount) { _, _ in hapticsOn }
-        .sensoryFeedback(.warning, trigger: game.personInCheck) { _, new in hapticsOn && new != nil }
-        // Capture events are dropped once the fall is over, which changes the
-        // trigger a second time; only a new capture should thump.
-        .sensoryFeedback(.impact(weight: .heavy, intensity: 0.9), trigger: game.captureEvents.last?.id) { _, new in
-            hapticsOn && new != nil
+        // One tap as each move lands: firmer for a capture, a sharp knock for a check against the player.
+        .sensoryFeedback(trigger: game.moveCount) { _, _ in
+            hapticsOn ? MoveFeel(of: game).feedback(heavy: false) : nil
+        }
+        .sensoryFeedback(.selection, trigger: game.selected) { _, new in hapticsOn && new != nil }
+        .sensoryFeedback(.success, trigger: wins) { _, _ in hapticsOn }
+        .onChange(of: match.winner) { _, winner in
+            guard let winner, game.humanColors.contains(winner) else { return }
+            // A moment after the end, once the player has seen it.
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(0.4))
+                wins += 1
+            }
         }
     }
 
@@ -117,8 +136,7 @@ struct BoardView: View {
     }
 
     private func center(of square: Square, size: CGFloat) -> CGPoint {
-        let cell = cell(of: square)
-        return CGPoint(x: (CGFloat(cell.column) + 0.5) * size, y: (CGFloat(cell.row) + 0.5) * size)
+        BoardTapResolver.center(of: square, squareSize: size, flipped: flipped)
     }
 
     private func square(column: Int, row: Int) -> Square {
@@ -151,6 +169,13 @@ struct BoardView: View {
                 }
             }
         }
+        // One tap for the whole board, read where the finger landed: a tall piece's head
+        // is drawn over the square behind it.
+        .contentShape(Rectangle())
+        .gesture(SpatialTapGesture().onEnded { value in
+            guard let tapped = tappedSquare(at: value.location, size: size) else { return }
+            withAnimation(.snappy(duration: 0.22)) { match.tap(tapped) }
+        })
     }
 
     private func squareView(_ square: Square, column: Int, row: Int, size: CGFloat) -> some View {
@@ -185,31 +210,34 @@ struct BoardView: View {
             }
             // The coach's pick: brackets in the corners, clear of the coordinates.
             if let isBest = hintedPieces[square] {
-                HintBrackets(color: theme.hint, size: size, skipTopLeading: column == 0, skipBottomTrailing: row == 7)
+                HintBrackets(color: theme.hint, size: size,
+                             skipTopLeading: theme.boardArt == nil && column == 0,
+                             skipBottomTrailing: theme.boardArt == nil && row == 7)
                     .opacity(isBest ? 1 : 0.5)
             }
 
-            // Coordinates in the corners, like a printed board.
-            if column == 0 {
-                coordinate("\(square.rankIndex + 1)", size: size, color: labelColor, alignment: .topLeading)
-            }
-            if row == 7 {
-                coordinate(square.file.rawValue, size: size, color: labelColor, alignment: .bottomTrailing)
+            // Coordinates in the corners, like a printed board. A board picture has them in its frame.
+            if theme.boardArt == nil {
+                if column == 0 {
+                    coordinate("\(square.rankIndex + 1)", size: size, color: labelColor, alignment: .topLeading)
+                }
+                if row == 7 {
+                    coordinate(square.file.rawValue, size: size, color: labelColor, alignment: .bottomTrailing)
+                }
             }
 
-            // Where the selected piece can go: a dot on empty squares, a ring around captures.
+            // Where the selected piece can go: a dot on empty squares, corner wedges on captures.
             if isTarget {
                 MoveDot(occupied: occupant != nil, hint: hintedTarget, color: theme.hint, glow: theme.hintGlow, size: size)
             }
         }
         .frame(width: size, height: size)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            withAnimation(.snappy(duration: 0.22)) { match.tap(square) }
-        }
         .accessibilityElement()
         .accessibilityLabel(accessibilityLabel(square, occupant: occupant, isTarget: isTarget, hinted: hintedTarget))
         .accessibilityAddTraits(.isButton)
+        .accessibilityAction {
+            withAnimation(.snappy(duration: 0.22)) { match.tap(square) }
+        }
     }
 
     private func coordinate(_ text: String, size: CGFloat, color: Color, alignment: Alignment) -> some View {
@@ -231,18 +259,34 @@ struct BoardView: View {
         return parts.joined(separator: ", ")
     }
 
+    /// The square a tap on the squares means: see `BoardTapResolver`.
+    private func tappedSquare(at point: CGPoint, size: CGFloat) -> Square? {
+        var isSolid: ((Piece, CGPoint) -> Bool)?
+        if theme.spritePieces {
+            let theme = theme
+            isSolid = { piece, offset in SpriteMasks.shared.isSolid(piece, in: theme, at: offset) }
+        }
+        return BoardTapResolver.square(
+            at: point, squareSize: size, flipped: flipped,
+            selected: game.selected, targets: game.targets,
+            piece: { game.piece(at: $0) }, isSolid: isSolid
+        )
+    }
+
     // MARK: Pieces
 
     /// Pieces sit in their own layer so they can slide between squares.
     private func pieces(size: CGFloat) -> some View {
         ZStack(alignment: .topLeading) {
             ForEach(game.pieces) { placed in
+                let place = cell(of: placed.square)
                 PieceImage(piece: placed.piece, theme: theme, size: size, onBoard: true)
                     .modifier(VeteranAura(rank: armyRank(of: placed), piece: placed.piece, theme: theme, size: size))
-                    .scaleEffect(game.selected == placed.square ? 1.08 : 1)
+                    .scaleEffect(game.selected == placed.square ? PieceImage.liftedScale : 1)
                     .position(center(of: placed.square, size: size))
-                    // Nearer rows draw last, so tall 3D pieces overlap the ones behind them.
-                    .zIndex(Double(cell(of: placed.square).row))
+                    // Nearer rows draw last, so tall 3D pieces overlap the ones behind them, and
+                    // left to right within a row, so each soft shadow falls on the board, not on a piece.
+                    .zIndex(Double(place.row) * 8 + Double(place.column))
                     .transition(.asymmetric(
                         insertion: .opacity.combined(with: .scale(scale: 0.6)),
                         removal: .opacity.animation(.easeOut(duration: 0.12))
@@ -257,6 +301,22 @@ struct BoardView: View {
         .accessibilityHidden(true)
     }
 
+    /// The move dots again, faintly over the pieces, so a dot behind a tall piece's head
+    /// still shows through it.
+    private func dotsOverPieces(size: CGFloat) -> some View {
+        ZStack(alignment: .topLeading) {
+            ForEach(Array(game.targets), id: \.self) { target in
+                MoveDot(occupied: game.piece(at: target) != nil, hint: hintedTargets[target], color: theme.hint, size: size)
+                    .frame(width: size, height: size)
+                    .position(center(of: target, size: size))
+            }
+        }
+        .frame(width: size * 8, height: size * 8)
+        .opacity(0.4)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
     // MARK: Army
 
     private func armyRank(of placed: PlacedPiece) -> ArmyRank {
@@ -264,33 +324,36 @@ struct BoardView: View {
         return army.record(for: slot).rank
     }
 
-    /// The selected piece's name, floating above it (below it on the top row).
-    @ViewBuilder
-    private func nameTag(size: CGFloat) -> some View {
-        if let army, let square = game.selected,
-           let placed = game.pieces.first(where: { $0.square == square }),
-           let slot = army.slot(of: placed, in: match),
-           let name = army.record(for: slot).name {
-            let rank = army.record(for: slot).rank
-            let center = center(of: square, size: size)
-            let onTop = cell(of: square).row == 0
-            // The board is clipped at its edge, so the capsule is kept inside it by
-            // its measured width rather than a fixed number of squares.
-            NameTagPlacement(x: center.x, y: center.y + size * (onTop ? 0.8 : (theme.spritePieces ? -1.15 : -0.75))) {
-                ArmyNameTag(name: name, rank: rank, color: rank.color(for: placed.piece, theme: theme))
-                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
-            }
-            .frame(width: size * 8, height: size * 8)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
+    // MARK: Check
+
+    /// The callout's color: the check's red, or the look's own accent when the player gave mate.
+    private var calloutColor: Color {
+        if game.isCheckmate, let winner = game.winner, game.humanColors.contains(winner) {
+            return theme.accent ?? theme.hint
         }
+        return theme.check
     }
 
-    /// Where the check callout floats: over the king's head, or under its foot on the top row.
+    /// Where the check callout floats: just over the king's head, or under its foot on the top row.
     private func calloutPoint(over square: Square, size: CGFloat) -> CGPoint {
-        let center = center(of: square, size: size)
-        let onTop = cell(of: square).row == 0
-        return CGPoint(x: center.x, y: center.y + size * (onTop ? 0.85 : (theme.spritePieces ? -1.2 : -0.8)))
+        let middle = center(of: square, size: size)
+        if cell(of: square).row == 0 {
+            return CGPoint(x: middle.x, y: middle.y + size * 0.85)
+        }
+        // The callout is about 24 points tall: its middle sits 15 points over the head.
+        return CGPoint(x: middle.x, y: pieceTop(on: square, size: size) - 15)
+    }
+
+    /// The top of the piece standing on a square: measured from its picture on the 3D sprites,
+    /// the square's top edge for the flat pieces, which stay inside their squares.
+    private func pieceTop(on square: Square, size: CGFloat) -> CGFloat {
+        let middle = center(of: square, size: size)
+        guard theme.spritePieces, let piece = game.piece(at: square),
+              let top = SpriteMasks.shared.mask(named: theme.imageName(for: piece))?.top
+        else { return middle.y - size * 0.5 }
+        let rect = PieceImage.boardRect(of: theme.imageName(for: piece), squareSize: size)
+        let scale = game.selected == square ? PieceImage.liftedScale : 1
+        return middle.y + (rect.minY + top * rect.height) * scale
     }
 
     // MARK: Captures
@@ -300,7 +363,7 @@ struct BoardView: View {
         ZStack(alignment: .topLeading) {
             ForEach(game.captureEvents) { event in
                 CaptureFall(piece: event.piece, theme: theme, size: size, seed: event.id,
-                            away: fallDirection(of: event))
+                            away: CaptureFall.direction(of: event, flipped: flipped))
                     .position(center(of: event.piece.square, size: size))
             }
         }
@@ -308,13 +371,33 @@ struct BoardView: View {
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
+}
 
-    /// Which way a taken piece falls on screen: away from the side the capture came from.
-    /// Nil for a capture straight up or down the board.
-    private func fallDirection(of event: CaptureEvent) -> CGFloat? {
-        guard let from = event.from else { return nil }
-        let dx = cell(of: event.piece.square).column - cell(of: from).column
-        return dx == 0 ? nil : (dx > 0 ? 1 : -1)
+/// How a move feels in the hand: one tap as it lands, firmer for a capture, a sharp knock
+/// for a check against the player, and on the 3D board a heavy thud as a rook or queen falls.
+enum MoveFeel: Equatable {
+    case quiet, capture, bigCapture, check
+
+    /// The move just played in `game`.
+    init(of game: GameModel) {
+        if game.personInCheck != nil {
+            self = .check
+        } else if game.lastPlayed?.isCapture == true {
+            let taken = game.captureEvents.last?.piece.kind
+            self = taken == .queen || taken == .rook ? .bigCapture : .capture
+        } else {
+            self = .quiet
+        }
+    }
+
+    /// `heavy` on the 3D board, where a big capture shakes the board; flat, it is like any capture.
+    func feedback(heavy: Bool) -> SensoryFeedback {
+        switch self {
+        case .quiet: return .impact(weight: .light)
+        case .capture: return .impact(weight: .medium)
+        case .bigCapture: return heavy ? .impact(weight: .heavy) : .impact(weight: .medium)
+        case .check: return .impact(flexibility: .rigid, intensity: 0.8)
+        }
     }
 }
 
@@ -326,7 +409,7 @@ struct NameTagPlacement: Layout {
 
     private static let margin: CGFloat = 2
 
-    /// The point animates, so the tag slides when the selection moves to another piece.
+    /// The point animates, so the child slides when it moves to another square.
     var animatableData: AnimatablePair<CGFloat, CGFloat> {
         get { AnimatablePair(x, y) }
         set { x = newValue.first; y = newValue.second }
@@ -393,9 +476,11 @@ struct MoveArrow: View {
     }
 }
 
-/// Where the selected piece can go: a dot on an empty square, a ring around a piece it
-/// can take. The coach's pick gets a halo ring (fainter for the runner-up), so it stands
-/// out among the other dots without an arrow across the board.
+/// Where the selected piece can go: a dot on an empty square, and four wedges in the
+/// corners of a square with a piece it can take, which that piece never covers. The coach's
+/// pick gets a halo ring and its capture a soft wash (fainter for the runner-up), so it
+/// stands out without an arrow across the board. A thin dark rim keeps every mark clear
+/// on light squares.
 struct MoveDot: View {
     let occupied: Bool
     /// Nil for an ordinary move; true for the coach's best move, false for its second choice.
@@ -404,25 +489,65 @@ struct MoveDot: View {
     var glow: Color? = nil
     let size: CGFloat
 
+    private static let rim = Color.black.opacity(0.32)
+
     var body: some View {
+        let rim = max(1, size * 0.03)
         ZStack {
             if occupied {
                 if let hint {
-                    Circle().fill(color.opacity(hint ? 0.24 : 0.14)).padding(size * 0.02)
+                    Circle().fill(color.opacity(hint ? 0.24 : 0.14)).padding(size * 0.08)
                 }
-                Circle().strokeBorder(color, lineWidth: size * (hint == true ? 0.1 : 0.08)).padding(size * 0.02)
+                let leg = size * (hint == nil ? 0.22 : 0.26)
+                // The rim runs along each wedge's long side; the others lie on the square's edges.
+                CaptureCorners(leg: leg, band: rim * 1.414).fill(Self.rim)
+                CaptureCorners(leg: leg).fill(color)
             } else {
                 if let hint {
-                    Circle()
-                        .strokeBorder(color.opacity(hint ? 1 : 0.55), lineWidth: size * (hint ? 0.05 : 0.04))
-                        .frame(width: size * 0.66, height: size * 0.66)
+                    let line = size * (hint ? 0.05 : 0.04)
+                    let halo = size * 0.66
+                    Circle().strokeBorder(Self.rim, lineWidth: rim)
+                        .frame(width: halo + rim * 2, height: halo + rim * 2)
+                    Circle().strokeBorder(color.opacity(hint ? 1 : 0.55), lineWidth: line)
+                        .frame(width: halo, height: halo)
+                    Circle().strokeBorder(Self.rim, lineWidth: rim)
+                        .frame(width: halo - line * 2, height: halo - line * 2)
                 }
-                Circle().fill(color).frame(width: size * 0.3, height: size * 0.3)
+                let dot = size * 0.3
+                Circle().strokeBorder(Self.rim, lineWidth: rim)
+                    .frame(width: dot + rim * 2, height: dot + rim * 2)
+                Circle().fill(color).frame(width: dot, height: dot)
             }
         }
         .shadow(color: glow ?? .clear, radius: glow == nil ? 0 : size * 0.1)
         .transition(.opacity.combined(with: .scale(scale: 0.6)))
         .accessibilityHidden(true)
+    }
+}
+
+/// Four right triangles in a square's corners, their two short sides `leg` long along the
+/// square's edges. With `band`, only the strip along each long side, from `leg` out to
+/// `leg + band` (measured along the edges): the dark rim drawn under the wedges.
+struct CaptureCorners: Shape {
+    var leg: CGFloat
+    var band: CGFloat = 0
+
+    func path(in rect: CGRect) -> Path {
+        let inner = band > 0 ? leg : 0
+        let outer = band > 0 ? leg + band : leg
+        let corners: [(x: CGFloat, y: CGFloat, dx: CGFloat, dy: CGFloat)] = [
+            (rect.minX, rect.minY, 1, 1), (rect.maxX, rect.minY, -1, 1),
+            (rect.maxX, rect.maxY, -1, -1), (rect.minX, rect.maxY, 1, -1),
+        ]
+        var path = Path()
+        for corner in corners {
+            path.move(to: CGPoint(x: corner.x + inner * corner.dx, y: corner.y))
+            path.addLine(to: CGPoint(x: corner.x + outer * corner.dx, y: corner.y))
+            path.addLine(to: CGPoint(x: corner.x, y: corner.y + outer * corner.dy))
+            path.addLine(to: CGPoint(x: corner.x, y: corner.y + inner * corner.dy))
+            path.closeSubpath()
+        }
+        return path
     }
 }
 
@@ -466,7 +591,8 @@ struct HintBrackets: View {
 
 /// A taken piece leaving the board: it tips over away from the piece that took it,
 /// slides a touch and fades, and a soft ring of dust spreads where it stood.
-/// Lessons and drills use it too.
+/// Lessons and drills use it too. Every frame is worked out from the time since it began,
+/// so a board still settling its layout never drags the fall along.
 struct CaptureFall: View {
     let piece: Piece
     let theme: BoardTheme
@@ -475,64 +601,89 @@ struct CaptureFall: View {
     let seed: Int
     /// Which way it falls on screen: 1 to the right, -1 to the left.
     var away: CGFloat? = nil
+    /// Holds the fall this many seconds in, for pictures of it; nil plays it.
+    var frozenAt: TimeInterval? = nil
 
-    /// The piece is tipping over.
-    @State private var falling = false
-    /// It has hit the board: the dust rises.
-    @State private var landed = false
-    /// The dust has spread and is settling.
-    @State private var settled = false
+    @State private var start = Date()
+    /// Set once the fall is over, so the timeline rests.
+    @State private var done = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private var turn: CGFloat { away ?? (seed % 2 == 0 ? 1 : -1) }
     /// Where the foot meets the square, as a fraction of the square: the renders stand
     /// a little below the middle, as their picture's frame says, the flat pieces at the bottom.
     private var footY: CGFloat {
         theme.spritePieces ? 0.5 + SpriteFrame.of(theme.imageName(for: piece)).lift : 0.9
     }
-    /// A rook or a queen lands harder.
-    private var heavy: Bool { piece.kind == .queen || piece.kind == .rook }
 
     var body: some View {
-        // The far edge of the foot, which the piece pivots on as it goes over.
-        let pivot = UnitPoint(x: 0.5 + 0.2 * turn, y: footY)
-        let motion = !reduceMotion
-        ZStack {
-            dust
-            PieceImage(piece: piece, theme: theme, size: size, onBoard: true)
-                .rotationEffect(.degrees(falling && motion ? 80 * turn : 0), anchor: pivot)
-                .animation(.easeIn(duration: 0.26), value: falling)
-                .offset(x: landed && motion ? turn * size * 0.12 : 0)
-                .scaleEffect(landed ? 0.86 : 1, anchor: pivot)
-                .opacity(landed ? 0 : 1)
-                .animation(.easeOut(duration: motion ? 0.26 : 0.2), value: landed)
-        }
-        .frame(width: size * 3, height: size * 3)
-        .task {
-            // After the first frame, so it moves from where it stood.
-            falling = true
-            try? await Task.sleep(for: .milliseconds(reduceMotion ? 0 : 190))
-            landed = true
-            try? await Task.sleep(for: .milliseconds(70))
-            settled = true
+        if let frozenAt {
+            pose(at: frozenAt)
+        } else {
+            TimelineView(.animation(minimumInterval: nil, paused: done)) { timeline in
+                pose(at: timeline.date.timeIntervalSince(start))
+            }
+            .task {
+                // The dust has settled 0.76 s in.
+                try? await Task.sleep(for: .seconds(reduceMotion ? 0.2 : 0.76))
+                done = true
+            }
         }
     }
 
-    /// A soft ring of dust on the board around the foot, seen at the same slant as the pieces.
-    @ViewBuilder
-    private var dust: some View {
-        if !reduceMotion {
-            let spread: CGFloat = heavy ? 2.1 : 1.7
-            Ellipse()
-                .strokeBorder(Color.white.opacity(0.55), lineWidth: size * (settled ? 0.015 : 0.06))
-                .frame(width: size * 0.8, height: size * 0.34)
-                .scaleEffect(settled ? spread : 0.75)
-                .opacity(settled ? 0 : (landed ? (heavy ? 0.75 : 0.55) : 0))
-                .blur(radius: size * 0.02)
-                .offset(y: size * (footY - 0.5))
-                .animation(settled ? .easeOut(duration: 0.5) : .easeOut(duration: 0.07), value: settled)
-                .animation(.easeOut(duration: 0.07), value: landed)
+    /// Which way a taken piece falls on screen: away from the side the capture came from.
+    /// Nil for a capture straight up or down the board.
+    static func direction(of event: CaptureEvent, flipped: Bool) -> CGFloat? {
+        guard let from = event.from else { return nil }
+        let dx = event.piece.square.fileIndex - from.fileIndex
+        guard dx != 0 else { return nil }
+        return (dx > 0) != flipped ? 1 : -1
+    }
+
+    /// The fall `t` seconds in. It tips over for 0.26 s, slow at first, and hits the board at
+    /// 0.19 s, where it slides a touch, shrinks and fades for 0.26 s. With Reduce Motion it
+    /// only fades, for 0.2 s.
+    private func pose(at t: TimeInterval) -> some View {
+        let turn = away ?? (seed % 2 == 0 ? 1 : -1)
+        // The far edge of the foot, which the piece pivots on as it goes over.
+        let pivot = UnitPoint(x: 0.5 + 0.2 * turn, y: footY)
+        let motion = !reduceMotion
+        let tip = motion ? Self.progress(.easeIn, t, from: 0, length: 0.26) : 0
+        let gone = Self.progress(.easeOut, t, from: motion ? 0.19 : 0, length: motion ? 0.26 : 0.2)
+        return ZStack {
+            if motion {
+                dust(at: t)
+            }
+            PieceImage(piece: piece, theme: theme, size: size, onBoard: true)
+                .rotationEffect(.degrees(Double(80 * turn * tip)), anchor: pivot)
+                .offset(x: motion ? turn * size * 0.12 * gone : 0)
+                .scaleEffect(motion ? 1 - 0.14 * gone : 1, anchor: pivot)
+                .opacity(Double(1 - gone))
         }
+        .frame(width: size * 3, height: size * 3)
+    }
+
+    /// A soft ring of dust on the board around the foot, seen at the same slant as the pieces.
+    /// It rises in 0.07 s as the piece hits the board, then spreads and fades for 0.5 s.
+    /// A rook or a queen lands harder.
+    private func dust(at t: TimeInterval) -> some View {
+        let heavy = piece.kind == .queen || piece.kind == .rook
+        let spread: CGFloat = heavy ? 2.1 : 1.7
+        let peak: CGFloat = heavy ? 0.75 : 0.55
+        let rise = Self.progress(.easeOut, t, from: 0.19, length: 0.07)
+        let settle = Self.progress(.easeOut, t, from: 0.26, length: 0.5)
+        return Ellipse()
+            .strokeBorder(Color.white.opacity(0.55), lineWidth: size * (0.06 - 0.045 * settle))
+            .frame(width: size * 0.8, height: size * 0.34)
+            .scaleEffect(0.75 + (spread - 0.75) * settle)
+            .opacity(Double(peak * rise * (1 - settle)))
+            .blur(radius: size * 0.02)
+            .offset(y: size * (footY - 0.5))
+    }
+
+    /// How far along a step `length` seconds long, starting `start` seconds in, is at `t`, eased.
+    private static func progress(_ curve: UnitCurve, _ t: TimeInterval, from start: TimeInterval,
+                                 length: TimeInterval) -> CGFloat {
+        CGFloat(curve.value(at: min(max((t - start) / length, 0), 1)))
     }
 }
 
@@ -544,6 +695,22 @@ struct PieceImage: View {
     let size: CGFloat
     /// On a board, a 3D sprite rises above its square; elsewhere it is fitted into `size`.
     var onBoard = false
+
+    /// How much larger a picked-up piece is drawn, about its square's center.
+    static let liftedScale: CGFloat = 1.08
+
+    /// Where the named sprite picture stands on the board, relative to its square's center, for a
+    /// square `squareSize` wide: as `sprite` draws it. The taps and the check callout take it from here.
+    static func boardRect(of name: String, squareSize size: CGFloat) -> CGRect {
+        boardRect(SpriteFrame.of(name), squareSize: size)
+    }
+
+    /// Where a picture with this frame stands on the board, relative to its square's center.
+    static func boardRect(_ frame: SpriteFrame, squareSize size: CGFloat) -> CGRect {
+        let width = size * frame.width * frame.boardScale
+        let height = size * frame.height * frame.boardScale
+        return CGRect(x: -width / 2, y: size * frame.boardOffset - height / 2, width: width, height: height)
+    }
 
     var body: some View {
         if theme.spritePieces {
@@ -686,11 +853,42 @@ struct BoardGlass: View {
     }
 }
 
-/// Lets the player choose what a pawn becomes on the last rank.
+/// Files along the bottom and ranks up the left side, printed in the glass frame around a
+/// board picture, as on the 3D board, so no piece or shadow ever sits on them.
+struct FrameCoordinates: View {
+    let flipped: Bool
+    /// The frame's width on each side.
+    let inset: CGFloat
+    let squareSize: CGFloat
+    let color: Color
+
+    private static let files = Array("abcdefgh")
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            ForEach(0..<8, id: \.self) { index in
+                // Column `index` from the left, row `index` from the top.
+                Text(String(Self.files[flipped ? 7 - index : index]))
+                    .position(x: inset + (CGFloat(index) + 0.5) * squareSize, y: inset * 1.5 + squareSize * 8)
+                Text("\(flipped ? index + 1 : 8 - index)")
+                    .position(x: inset / 2, y: inset + (CGFloat(index) + 0.5) * squareSize)
+            }
+        }
+        .font(.system(size: inset * 0.5, weight: .semibold, design: .themed))
+        .foregroundStyle(color)
+        .frame(width: inset * 2 + squareSize * 8, height: inset * 2 + squareSize * 8)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Lets the player choose what a pawn becomes on the last rank, over a dim backdrop that
+/// fills the board. Tapping the backdrop is a change of mind: `cancel` puts the pawn back.
 struct PromotionPicker: View {
     let color: Piece.Color
     let theme: BoardTheme
     let squareSize: CGFloat
+    var cancel: (() -> Void)? = nil
     let choose: (Piece.Kind) -> Void
 
     private let kinds: [Piece.Kind] = [.queen, .rook, .bishop, .knight]
@@ -698,6 +896,14 @@ struct PromotionPicker: View {
     var body: some View {
         ZStack {
             Color.black.opacity(0.35)
+                .contentShape(Rectangle())
+                .onTapGesture { cancel?() }
+                .accessibilityElement()
+                .accessibilityLabel("Cancel")
+                .accessibilityHint("Puts the pawn back")
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAction { cancel?() }
+                .accessibilityHidden(cancel == nil)
             HStack(spacing: squareSize * 0.15) {
                 ForEach(kinds, id: \.self) { kind in
                     Button { choose(kind) } label: {
@@ -708,10 +914,14 @@ struct PromotionPicker: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Promote to \(String(describing: kind))")
+                    .accessibilityAction(.escape) { cancel?() }
                 }
             }
+            // A tap between two pieces is a near miss, not a change of mind.
+            .contentShape(Rectangle())
+            .onTapGesture {}
         }
-        .frame(width: squareSize * 8, height: squareSize * 8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
