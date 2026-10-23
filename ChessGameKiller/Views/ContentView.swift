@@ -470,7 +470,11 @@ struct ContentView: View {
     /// The moves, or in Big Board while looking back, where the game was and the way back.
     @ViewBuilder
     private var ribbonRow: some View {
-        if bigBoard, let ply = browsePly {
+        if ghostVisionOn, vision.isHolding {
+            // Ghost Vision's line takes the moves' place while the board is held.
+            GhostStrip(line: match.ghostLine, focus: vision.focus, theme: theme)
+                .transition(.opacity)
+        } else if bigBoard, let ply = browsePly {
             BrowsePill(ply: ply,
                        san: ply > 0 && ply <= match.game.moves.count ? match.game.moves[ply - 1] : nil,
                        theme: theme) {

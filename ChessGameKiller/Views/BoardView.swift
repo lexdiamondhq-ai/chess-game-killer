@@ -37,16 +37,6 @@ struct BoardView: View {
             }
         }
         .modifier(GhostVisionGesture(vision: vision, match: match, enabled: browsing == nil))
-        .overlay(alignment: .top) { ghostStrip }
-    }
-
-    /// The line's moves, just above the board while Ghost Vision is up.
-    @ViewBuilder private var ghostStrip: some View {
-        if let vision, vision.isHolding {
-            GhostStrip(line: match.ghostLine, focus: vision.focus, theme: theme)
-                .alignmentGuide(.top) { dimensions in dimensions[.bottom] + 8 }
-                .transition(.opacity)
-        }
     }
 
     /// Whether this look plays on the real 3D board, given the "3D pieces" setting.
