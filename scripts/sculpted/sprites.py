@@ -32,7 +32,8 @@ LIGHT={
              card=(0.85,0.06,0.7,-0.05,-1.3,-1.7),look='AgX - Medium High Contrast'),
 }
 # the gilded ivory carries more gold and a glossier coat: a touch more light keeps it as bright
-SET_LIGHT={'gilded':{'w':dict(exposure=0.4)}}
+# classic: its ivory carries dark marks now, so a little more light keeps the whole piece as bright
+SET_LIGHT={'gilded':{'w':dict(exposure=0.4)},'classic':{'w':dict(exposure=0.55)}}
 FIN={
     'classic':dict(ivory=(0.8,0.765,0.69),ivory_rough=0.32,ivory_coat=0.35,edge=0.5,power=1.5,
                    ebony=(0.015,0.014,0.014),ebony_rough=0.42,ebony_coat=0.35,metal=(0.86,0.86,0.88),metal_rough=0.16,
