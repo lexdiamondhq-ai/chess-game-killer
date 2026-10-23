@@ -28,7 +28,7 @@ struct HomeUpNext: Equatable {
     let yourMove: Bool
     /// The move number now, from the position (1 before any move).
     let moveNumber: Int
-    /// Plies played so far; leaving a game this long counts as a loss.
+    /// Plies played so far.
     let plies: Int
 
     var rival: Rival { level.rival }
@@ -38,9 +38,6 @@ struct HomeUpNext: Equatable {
     var sideToMove: Piece.Color {
         inProgress ? (yourMove ? playerColor : playerColor.opposite) : .white
     }
-
-    /// Leaving a game this long for a new one counts it as a loss, so the home asks first.
-    var leavingCosts: Bool { inProgress && plies >= 4 }
 
     /// The game under way, or the next one from the choices saved last time.
     @MainActor

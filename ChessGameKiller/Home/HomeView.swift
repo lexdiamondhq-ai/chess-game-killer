@@ -66,9 +66,6 @@ struct HomeView: View {
     /// The clock card has scrolled out of sight; the dock carries it instead.
     @State private var clockGone = false
     @State private var clockHeight: CGFloat = 236
-    @State private var confirmingLeave = false
-    /// The rival picked on the ladder while a game is under way, waiting on the question.
-    @State private var leavingFor: MatchController.Level?
 
     enum YouOrigin { case top, bottom }
 
@@ -127,16 +124,6 @@ struct HomeView: View {
                 if let origin = you {
                     youPanel(origin, layout: layout)
                 }
-            }
-            .confirmationDialog("Leave your game against \(upNext.rival.name)?", isPresented: $confirmingLeave,
-                                titleVisibility: .visible) {
-                Button("Set up a new game", role: .destructive) {
-                    if let level = leavingFor { actions.playRival(level) } else { actions.play() }
-                    leavingFor = nil
-                }
-                Button("Keep playing", role: .cancel) { leavingFor = nil }
-            } message: {
-                Text("Starting a new game ends this one. It counts as a loss for your army.")
             }
         }
         .environment(\.colorScheme, .dark)
@@ -254,18 +241,22 @@ struct HomeView: View {
                           note: ladder.nextToBeat == nil ? "You lead every rival" : nil)
             .id("ladder")
         HomeLadderCard(ladder: ladder, tone: tone, pieceTheme: pieceTheme, youColor: upNext.playerColor,
-                       play: { level in choose(level, upNext) })
+                       play: { level in actions.playRival(level) })
 
         // With none going, the way to start one follows the rivals.
         if friendGames.isEmpty {
             friends([])
         }
 
-        let rows = HomeGameRow.rows(vault.games)
+        // The game under way is on the clock card. (A long one is also kept in Your games
+        // while the app is away, in case iOS closes it.)
+        let played = upNext.inProgress ? vault.games.filter { $0.id != match.gameID } : vault.games
+        let rows = HomeGameRow.rows(played)
         if !rows.isEmpty {
-            let week = HomeGameRow.thisWeek(vault.games)
+            let week = HomeGameRow.thisWeek(played)
             HomeSectionHeader(title: "Your games", tone: tone, note: week > 0 ? "\(week) this week" : nil)
                 .id("games")
+            // "All N games" opens Rewind, which lists every saved game.
             HomeScoresheet(rows: rows, total: vault.games.count, tone: tone,
                            open: actions.openGame, openAll: actions.rewind)
         }
@@ -301,26 +292,13 @@ struct HomeView: View {
         actions.start(upNext.setup(side: side))
     }
 
-    /// New game (asking first if leaving the game under way counts as a loss), or Change,
-    /// which opens the New Game sheet on the rival the card shows.
+    /// New game during a game, or Change before one, which opens the New Game sheet on the
+    /// rival the card shows. The sheet asks before a new game ends the one under way.
     private func secondary(_ upNext: HomeUpNext) {
-        if upNext.leavingCosts {
-            leavingFor = nil
-            confirmingLeave = true
-        } else if upNext.inProgress {
+        if upNext.inProgress {
             actions.play()
         } else {
             actions.playRival(upNext.level)
-        }
-    }
-
-    /// A rung of the ladder: set up a game against that rival, asking first in the same way.
-    private func choose(_ level: MatchController.Level, _ upNext: HomeUpNext) {
-        if upNext.leavingCosts {
-            leavingFor = level
-            confirmingLeave = true
-        } else {
-            actions.playRival(level)
         }
     }
 

@@ -17,7 +17,6 @@ final class HomeModelTests: XCTestCase {
         XCTAssertFalse(next.inProgress)
         XCTAssertTrue(next.yourMove, "White moves first")
         XCTAssertEqual(next.moveNumber, 1)
-        XCTAssertFalse(next.leavingCosts)
     }
 
     func testTheNextGameIsSetUpAsLastTime() {
@@ -59,7 +58,7 @@ final class HomeModelTests: XCTestCase {
         XCTAssertLessThanOrEqual(yours, .seconds(300))
         XCTAssertGreaterThan(yours, .seconds(290))
         XCTAssertNotNil(next.theirTime)
-        XCTAssertFalse(next.leavingCosts, "Nothing played yet, so leaving costs nothing")
+        XCTAssertFalse(match.newGameForfeits, "Nothing played yet, so leaving costs nothing")
     }
 
     func testLeavingALongerGameCountsAsALoss() {
@@ -71,7 +70,8 @@ final class HomeModelTests: XCTestCase {
         let next = HomeUpNext.make(match: match, side: .white, level: .casual, timeControl: .unlimited, hasPlayed: true)
         XCTAssertEqual(next.plies, 4)
         XCTAssertEqual(next.moveNumber, 3)
-        XCTAssertTrue(next.leavingCosts)
+        // The home sends New game and the ladder to the New Game sheet, which asks first.
+        XCTAssertTrue(match.newGameForfeits)
     }
 
     func testEveryRivalHasARatingAndAWayOfPlaying() {
