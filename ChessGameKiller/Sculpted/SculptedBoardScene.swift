@@ -187,7 +187,7 @@ final class SculptedBoardScene {
 
     /// A still picture from any camera, drawn off screen at `scale` pixels per point.
     /// The home screen's hero uses it, so the board can be faded and moved like any image.
-    func still(from camera: SculptedCamera, size: CGSize, scale: CGFloat) -> UIImage? {
+    func still(from camera: SculptedCamera, size: CGSize, scale: CGFloat, antialiased: Bool = true) -> UIImage? {
         guard size.width > 1, size.height > 1, let device = MTLCreateSystemDefaultDevice() else { return nil }
         let lens = SCNCamera()
         lens.fieldOfView = CGFloat(camera.fieldOfView * 180 / .pi)
@@ -210,7 +210,7 @@ final class SculptedBoardScene {
         renderer.pointOfView = eye
         renderer.autoenablesDefaultLighting = false
         let pixels = CGSize(width: (size.width * scale).rounded(), height: (size.height * scale).rounded())
-        let image = renderer.snapshot(atTime: 0, with: pixels, antialiasingMode: .multisampling4X)
+        let image = renderer.snapshot(atTime: 0, with: pixels, antialiasingMode: antialiased ? .multisampling4X : .none)
         guard let cgImage = image.cgImage else { return image }
         return UIImage(cgImage: cgImage, scale: scale, orientation: .up)
     }
@@ -358,6 +358,8 @@ final class SculptedBoardScene {
             if size.width > 1, size.height > 1 { held.aspect = Float(size.width / size.height) }
             // Close-ups come nearer the pieces than the game's camera ever does.
             cameraNode.camera?.zNear = 0.5
+            // The lens follows the held camera too, so the view matches its framing math and its stills.
+            cameraNode.camera?.fieldOfView = CGFloat(held.fieldOfView * 180 / .pi)
             cameraNode.removeAction(forKey: "orbit")
             camera = held
             place(held)
