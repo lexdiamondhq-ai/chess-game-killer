@@ -1,201 +1,71 @@
 import ChessKit
 import SwiftUI
 
-/// The two players above the board: who they are, their clocks, what they've
-/// captured, and whose turn it is. The side to move glows in its own color.
-struct PlayerPlates: View {
+/// Both players on one line of glass, for while the coach is open: the rival and you with your
+/// clocks between you. The side to move reads brighter.
+struct PlayersStrip: View {
     let match: MatchController
     let theme: BoardTheme
-    /// One thin line instead of two plates, for when the coach is open.
-    var compact = false
 
     /// The side drawn at the top of the board.
     private var topColor: Piece.Color { match.isBoardFlipped ? .white : .black }
 
     var body: some View {
-        Group {
-            if compact {
-                strip
-                    .transition(.opacity)
-            } else {
-                HStack(spacing: 10) {
-                    PlayerPlate(match: match, theme: theme, color: topColor)
-                    PlayerPlate(match: match, theme: theme, color: topColor.opposite)
-                }
-                .transition(.opacity)
+        HStack(spacing: 8) {
+            PlayerName(match: match, theme: theme, color: topColor)
+            if let clock = match.clock {
+                ClockLabel(clock: clock, color: topColor, owner: clockOwner(topColor), theme: theme, size: 13)
             }
+            Text("·")
+                .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
+            if let clock = match.clock {
+                ClockLabel(clock: clock, color: topColor.opposite, owner: clockOwner(topColor.opposite), theme: theme, size: 13)
+            }
+            PlayerName(match: match, theme: theme, color: topColor.opposite, pictureAfter: true)
         }
-        // The plates and the strip sit in rows of fixed height, so the type stops
-        // growing at the largest regular size instead of spilling onto the board.
-        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        .font(.system(.footnote, design: .themed).weight(.semibold))
+        .lineLimit(1)
+        .minimumScaleFactor(0.8)
+        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .glassPane(Capsule())
+        .dynamicTypeSize(...DynamicTypeSize.xxLarge)
+        .accessibilityElement(children: .combine)
     }
 
-    private var strip: some View {
-        HStack(spacing: 8) {
-            PlayerName(match: match, theme: theme, color: topColor, size: 18)
-            if let clock = match.clock {
-                ClockLabel(clock: clock, color: topColor, theme: theme, size: 13)
-            }
-            Text("·").foregroundStyle(.tertiary)
-            if let clock = match.clock {
-                ClockLabel(clock: clock, color: topColor.opposite, theme: theme, size: 13)
-            }
-            PlayerName(match: match, theme: theme, color: topColor.opposite, size: 18)
-        }
-        .font(.footnote.weight(.semibold))
-        .frame(maxWidth: .infinity)
-        .frame(height: 30)
-        .background(PlateBackground(theme: theme, glow: nil, radius: 15))
-        .accessibilityElement(children: .combine)
+    private func clockOwner(_ color: Piece.Color) -> String {
+        ExecutivePlate.spokenClockOwner(of: color, in: match, theme: theme)
     }
 }
 
-/// One player's plate.
-private struct PlayerPlate: View {
-    let match: MatchController
-    let theme: BoardTheme
-    let color: Piece.Color
-
-    private var isComputer: Bool { match.setup.opponent == .computer && !match.game.humanColors.contains(color) }
-    private var isActive: Bool { !match.isOver && match.game.activeColor == color }
-    private var sideColor: Color { theme.sideColor(color) }
-
-    var body: some View {
-        HStack(spacing: 8) {
-            avatar
-                .frame(width: 40, height: 40)
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(name)
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(isActive ? sideColor : Color.primary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                        .allowsTightening(true)
-                    Spacer(minLength: 0)
-                    if let clock = match.clock {
-                        ClockLabel(clock: clock, color: color, theme: theme, size: 14)
-                            .layoutPriority(1)
-                    }
-                }
-                RivalRemark(match: match, enabled: isComputer) {
-                    HStack(spacing: 5) {
-                        if inCheck { CheckTag(color: theme.check) }
-                        Text(status)
-                            .font(.caption2.weight(isActive ? .semibold : .regular))
-                            .foregroundStyle(isActive ? sideColor : Color.secondary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.75)
-                    }
-                }
-            }
-        }
-        .padding(.leading, 8)
-        .padding(.trailing, 10)
-        .frame(maxWidth: .infinity)
-        .frame(height: 64)
-        .background(PlateBackground(theme: theme, glow: isActive ? sideColor : nil, radius: 18))
-        .animation(.snappy(duration: 0.3), value: isActive)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(spokenLabel)
-    }
-
-    /// This side's king is in check right now.
-    private var inCheck: Bool {
-        guard !match.isOver, let king = match.game.checkedKing else { return false }
-        return match.game.piece(at: king)?.color == color
-    }
-
-    /// Name, status and time left. The label stands in for the children's own,
-    /// so the clock has to be spelled out here.
-    private var spokenLabel: String {
-        var text = "\(name), \(status)"
-        if let clock = match.clock {
-            text += ", \(clock.remaining(for: color).clockLabel) left"
-        }
-        return text
-    }
-
-    @ViewBuilder
-    private var avatar: some View {
-        if isComputer {
-            RivalSigil(rival: match.setup.level.rival, size: 40, glows: theme.glows)
-        } else {
-            PieceImage(piece: Piece(.king, color: color, square: .e1), theme: theme, size: 36)
-        }
-    }
-
-    private var name: String {
-        if isComputer { return match.setup.level.rival.name }
-        if match.setup.opponent == .computer { return "You" }
-        return theme.name(of: color)
-    }
-
-    private var status: String {
-        if match.isOver {
-            if match.winner == color { return "Winner" }
-            return match.winner == nil ? "Draw" : "Lost"
-        }
-        if isActive {
-            if isComputer {
-                if match.isComputerThinking { return "thinking" }
-                if match.engineFailed, !match.game.isHumanTurn { return "Engine unavailable" }
-                return "to move"
-            }
-            if match.game.checkedKing != nil { return "\(theme.name(of: color)) is in check" }
-            return "\(theme.name(of: color)) to move"
-        }
-        if isComputer {
-            let rival = match.setup.level.rival
-            return "\(rival.level.name) · \(rival.elo)"
-        }
-        return theme.name(of: color)
-    }
-}
-
-/// The name with a small avatar, for the compact strip.
+/// A player's name with a small picture, for the strip: the rival's portrait, or your king.
 private struct PlayerName: View {
     let match: MatchController
     let theme: BoardTheme
     let color: Piece.Color
-    let size: CGFloat
+    /// The picture after the name, for the side on the right.
+    var pictureAfter = false
 
     private var isComputer: Bool { match.setup.opponent == .computer && !match.game.humanColors.contains(color) }
+    private var isActive: Bool { !match.isOver && match.game.activeColor == color }
 
     var body: some View {
-        HStack(spacing: 4) {
-            if isComputer {
-                RivalSigil(rival: match.setup.level.rival, size: size, glows: false)
-            } else {
-                PieceImage(piece: Piece(.king, color: color, square: .e1), theme: theme, size: size)
-            }
-            Text(name).foregroundStyle(theme.sideColor(color))
+        HStack(spacing: 5) {
+            if !pictureAfter { picture }
+            Text(ExecutivePlate.displayName(of: color, in: match, theme: theme))
+                .foregroundStyle(isActive ? Color.primary : Color.secondary)
+            if pictureAfter { picture }
         }
     }
 
-    private var name: String {
-        if isComputer { return match.setup.level.rival.name }
-        if match.setup.opponent == .computer { return "You" }
-        return theme.name(of: color)
-    }
-}
-
-/// Glass on the dark themes; glowing in the side's color when it is that side's turn.
-private struct PlateBackground: View {
-    let theme: BoardTheme
-    let glow: Color?
-    let radius: CGFloat
-
-    var body: some View {
-        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
-        shape
-            .fill(theme.isDark ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)))
-            .overlay {
-                shape.strokeBorder(glow?.opacity(theme.glows ? 0.7 : 0.6) ?? Color.primary.opacity(theme.glows ? 0.1 : 0.06),
-                                   lineWidth: glow == nil ? 1 : 1.5)
-            }
-            .shadow(color: glow.map { $0.opacity(theme.glows ? 0.35 : 0.25) } ?? .black.opacity(theme.glows ? 0 : 0.06),
-                    radius: glow == nil ? 6 : 14, y: theme.glows ? 0 : 2)
+    @ViewBuilder
+    private var picture: some View {
+        if isComputer {
+            RivalPortrait(rival: match.setup.level.rival, size: 18, glows: theme.glows)
+        } else {
+            PieceImage(piece: Piece(.king, color: color, square: .e1), theme: theme, size: 18)
+        }
     }
 }
 
@@ -203,13 +73,15 @@ private struct PlateBackground: View {
 struct ClockLabel: View {
     let clock: ChessClock
     let color: Piece.Color
+    /// "Your clock" or "Pulse's clock", for VoiceOver.
+    let owner: String
     let theme: BoardTheme
     var size: CGFloat = 14
 
     private var isRunning: Bool { clock.running == color }
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: isRunning ? 0.1 : 60)) { context in
+        TimelineView(.periodic(from: .now, by: isRunning ? 0.1 : 60)) { _ in
             let remaining = clock.remaining(for: color)
             let urgent = isRunning && remaining < .seconds(10)
             Text(remaining.clockLabel)
@@ -221,143 +93,99 @@ struct ClockLabel: View {
                 .background {
                     if isRunning {
                         RoundedRectangle(cornerRadius: 7, style: .continuous)
-                            .fill(Color.primary.opacity(theme.isDark ? 0.08 : 0.05))
-                            .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1))
+                            .fill(Color.primary.opacity(theme.isDark ? 0.1 : 0.06))
                     }
                 }
                 // Inside the timeline, so VoiceOver reads the time as it stands now.
-                .accessibilityLabel("\(theme.name(of: color)) has \(remaining.clockLabel) left")
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(owner)
+                .accessibilityValue(remaining.formatted(.units(allowed: [.minutes, .seconds], width: .wide)))
         }
     }
 }
 
-/// What one side has taken, down the edge of the board: each kind of the
-/// opponent's pieces with how many are gone, biggest first, and the material
-/// lead at the bottom when there is one.
-struct CaptureRail: View {
-    let match: MatchController
-    let theme: BoardTheme
-    /// The side that did the capturing.
-    let by: Piece.Color
-    var width: CGFloat = 26
-
-    var body: some View {
-        let taken = match.game.captured(by: by)
-        let lead = match.game.materialLead(for: by)
-        let glow = theme.glows ? (by.opposite == .white ? theme.whiteGlow : theme.blackGlow) : nil
-        VStack(spacing: 6) {
-            ForEach(taken) { entry in
-                VStack(spacing: 0) {
-                    Image(theme.imageName(for: Piece(entry.kind, color: by.opposite, square: .a1)))
-                        .resizable()
-                        .interpolation(.high)
-                        .scaledToFit()
-                        .frame(width: width - 2, height: width - 2)
-                        .shadow(color: glow?.opacity(0.8) ?? .black.opacity(0.15), radius: 2)
-                    Text("\(entry.count)")
-                        .font(.system(size: 10.5, weight: .bold, design: .themed).monospacedDigit())
-                        .foregroundStyle(Color.primary.opacity(0.75))
-                }
-                .transition(.scale.combined(with: .opacity))
-            }
-            if lead > 0 {
-                Text("+\(lead)")
-                    .font(.system(size: 11, weight: .heavy, design: .themed))
-                    .foregroundStyle(theme.bestArrow)
-                    .padding(.top, 2)
-                    .transition(.opacity)
-            }
-        }
-        .frame(width: width)
-        .frame(maxHeight: .infinity, alignment: .center)
-        .animation(.snappy(duration: 0.3), value: taken)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Self.spokenCaptures(taken, lead: lead, name: theme.name(of: by)))
-    }
-
-    /// What a side has taken, in words, for VoiceOver: "Gold has captured 1 knight, 2 pawns, up 3".
-    /// The executive plate reads the same sentence, since its strip of pieces is hidden from VoiceOver.
-    static func spokenCaptures(_ taken: [CapturedCount], lead: Int, name: String) -> String {
-        guard !taken.isEmpty else { return "\(name) has captured nothing" }
-        let pieces = taken.map { "\($0.count) \(spokenName(of: $0.kind))\($0.count == 1 ? "" : "s")" }
-        var text = "\(name) has captured " + pieces.joined(separator: ", ")
-        if lead > 0 { text += ", up \(lead)" }
-        return text
-    }
-
-    private static func spokenName(of kind: Piece.Kind) -> String {
-        switch kind {
-        case .pawn: return "pawn"
-        case .knight: return "knight"
-        case .bishop: return "bishop"
-        case .rook: return "rook"
-        case .queen: return "queen"
-        case .king: return "king"
-        }
-    }
-}
-
-/// The moves so far in one scrolling line under the board, newest on the right.
+/// The moves so far in one line under the board, from the left. Once the line is full it
+/// scrolls to keep the newest move in view, and the oldest fade out at the left edge.
+/// Before the first move it says how to begin.
 struct MoveRibbon: View {
     let moves: [String]
     let theme: BoardTheme
 
+    @State private var lineWidth: CGFloat = 0
+
+    private var accent: Color { theme.accent ?? .accentColor }
+
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(Array(moves.enumerated()), id: \.offset) { index, san in
-                        let isLast = index == moves.count - 1
-                        HStack(spacing: 3) {
-                            if index % 2 == 0 {
-                                Text("\(index / 2 + 1).")
-                                    .foregroundStyle(.tertiary)
+        GeometryReader { geo in
+            if moves.isEmpty {
+                Text("Tap a piece to see where it can go")
+                    .font(.system(.footnote, design: .themed))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .frame(width: geo.size.width, height: geo.size.height, alignment: .leading)
+            } else {
+                let overflows = lineWidth > geo.size.width + 0.5
+                ScrollViewReader { proxy in
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        line
+                            .onGeometryChange(for: CGFloat.self) { proxy in
+                                proxy.size.width
+                            } action: { width in
+                                lineWidth = width
                             }
-                            Text(san)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(isLast ? Color.primary : Color.secondary)
-                                .padding(.horizontal, isLast && theme.glows ? 7 : 0)
-                                .padding(.vertical, 2)
-                                .background {
-                                    if isLast && theme.glows {
-                                        Capsule()
-                                            .fill(Color.primary.opacity(theme.isDark ? 0.1 : 0.07))
-                                            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.12), lineWidth: 1))
-                                    }
-                                }
-                                .overlay(alignment: .bottom) {
-                                    // The executive look marks the newest move with a fine accent line.
-                                    if isLast && !theme.glows {
-                                        Rectangle()
-                                            .fill(theme.accent ?? .accentColor)
-                                            .frame(height: 1.5)
-                                            .offset(y: 2)
-                                    }
-                                }
+                            // At least as wide as the row, so a short game sits at the left.
+                            .frame(minWidth: geo.size.width, minHeight: geo.size.height, alignment: .leading)
+                    }
+                    // A long game opens at its newest move, even when the screen is rebuilt mid-game.
+                    .defaultScrollAnchor(.trailing)
+                    .onChange(of: moves.count) { _, count in
+                        guard count > 0 else { return }
+                        withAnimation(.snappy(duration: 0.3)) {
+                            proxy.scrollTo(count - 1, anchor: .trailing)
                         }
-                        .id(index)
                     }
                 }
-                .padding(.horizontal, 4)
-                .frame(minWidth: 0, maxWidth: .infinity, alignment: .trailing)
-            }
-            // Short lists sit against the trailing edge and the ribbon opens at the
-            // newest move, even when the screen is rebuilt mid-game.
-            .defaultScrollAnchor(.trailing)
-            .onChange(of: moves.count) { _, count in
-                guard count > 0 else { return }
-                withAnimation(.snappy(duration: 0.3)) {
-                    proxy.scrollTo(count - 1, anchor: .trailing)
+                .mask {
+                    LinearGradient(stops: [
+                        .init(color: overflows ? .clear : .black, location: 0),
+                        .init(color: .black, location: min(1, 28 / max(geo.size.width, 1))),
+                    ], startPoint: .leading, endPoint: .trailing)
                 }
             }
         }
-        .font(theme.glows ? Font.system(.caption, design: .themed) : Font.system(.footnote).monospacedDigit())
-        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-        .frame(height: 24)
-        .mask {
-            LinearGradient(colors: [.clear, .black, .black, .black], startPoint: .leading, endPoint: .trailing)
+        .dynamicTypeSize(...DynamicTypeSize.xxLarge)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(moves.isEmpty ? "No moves yet. Tap a piece to see where it can go." : "Moves: \(moves.joined(separator: " "))")
+    }
+
+    private var line: some View {
+        HStack(spacing: 8) {
+            ForEach(Array(moves.enumerated()), id: \.offset) { index, san in
+                let isLast = index == moves.count - 1
+                HStack(spacing: 3) {
+                    if index % 2 == 0 {
+                        Text("\(index / 2 + 1).")
+                            .foregroundStyle(.tertiary)
+                    }
+                    Text(san)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(isLast ? Color.primary : Color.secondary)
+                        .overlay(alignment: .bottom) {
+                            // The newest move is marked with a fine accent line.
+                            if isLast {
+                                Rectangle()
+                                    .fill(accent)
+                                    .frame(height: 1.5)
+                                    .offset(y: 2)
+                                    .shadow(color: theme.glows ? accent.opacity(0.8) : .clear, radius: 3)
+                            }
+                        }
+                }
+                .id(index)
+            }
         }
-        .accessibilityLabel(moves.isEmpty ? "No moves yet" : "Moves: \(moves.joined(separator: " "))")
+        .font(Font.system(.footnote, design: .themed).monospacedDigit())
+        .padding(.vertical, 2)
     }
 }

@@ -14,10 +14,12 @@ final class ScreenSnapshotTests: XCTestCase {
     private var saved: [String: Any?] = [:]
 
     override func setUp() async throws {
-        for key in ["boardTheme", "matchRival", "bigBoard", "sculpted3D", "showBestMoves", "showSecondBest"] {
+        for key in ["boardTheme", "matchRival", "bigBoard", "sculpted3D", "showBestMoves", "showSecondBest", "rivalBanter"] {
             saved[key] = defaults.object(forKey: key)
         }
         defaults.set(false, forKey: "bigBoard")
+        // The rival's greeting would stand in for its line in every picture.
+        defaults.set(false, forKey: "rivalBanter")
     }
 
     override func tearDown() async throws {
@@ -97,7 +99,7 @@ final class ScreenSnapshotTests: XCTestCase {
     func testRivalBoardAfterTheNewGameSheet() throws {
         defaults.removeObject(forKey: "boardTheme")
         defaults.set(true, forKey: "matchRival")
-        try snapshot("rival-after-sheet", startsWithNewGame: true)
+        try snapshot("rival-after-sheet", startsWithNewGame: true, match: MatchController(engine: nil, sounds: nil))
     }
 
     /// A king in check against Spark, a moment after the check: the red callout over the king,
@@ -105,6 +107,7 @@ final class ScreenSnapshotTests: XCTestCase {
     /// into its own line instead of a bubble. Flat and in 3D.
     func testCheckAndRivalRemark() throws {
         defaults.set(false, forKey: "matchRival")
+        defaults.set(true, forKey: "rivalBanter")
         for (id, threeD) in [("midnight", false), ("gilded", true), ("faberge", false)] {
             defaults.set(id, forKey: "boardTheme")
             defaults.set(threeD, forKey: "sculpted3D")
@@ -143,12 +146,39 @@ final class ScreenSnapshotTests: XCTestCase {
         }
     }
 
+    /// The coach unfolded over a game in progress: the players fold into one line.
+    func testCoachOpen() throws {
+        defaults.set("gilded", forKey: "boardTheme")
+        defaults.set(false, forKey: "matchRival")
+        defaults.set(false, forKey: "sculpted3D")
+        try snapshot("coach-open-gilded", coachOpen: true)
+    }
+
+    /// A 375 by 667 point window, about an iPhone SE, still under the island's safe area: tighter than any phone.
+    func testSmallScreen() throws {
+        defaults.set("gilded", forKey: "boardTheme")
+        defaults.set(false, forKey: "matchRival")
+        defaults.set(false, forKey: "sculpted3D")
+        try snapshot("small-gilded-flat", size: CGSize(width: 375, height: 667))
+    }
+
+    /// A real game against Pulse on a 10-minute clock, seven moves in, with captures on both sides and you to move.
+    private static func gameInProgress() -> MatchController {
+        let match = MatchController(engine: nil, sounds: nil)
+        match.start(MatchController.Setup(level: .club, timeControl: .rapid10))
+        for move in Showcase.moves { _ = match.game.playEngineMove(move) }
+        return match
+    }
+
     private func snapshot(_ name: String, startsWithNewGame: Bool = false, trayOpen: Bool = false,
-                          match: MatchController? = nil, wait: TimeInterval = 3) throws {
+                          match: MatchController? = nil, coachOpen: Bool = false, size: CGSize? = nil,
+                          wait: TimeInterval = 3) throws {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let window = UIWindow(windowScene: scene)
-        window.frame = scene.coordinateSpace.bounds
-        window.rootViewController = UIHostingController(rootView: ContentView(startsWithNewGame: startsWithNewGame, trayOpen: trayOpen, startsAtHome: false, match: match))
+        window.frame = size.map { CGRect(origin: .zero, size: $0) } ?? scene.coordinateSpace.bounds
+        window.rootViewController = UIHostingController(rootView: ContentView(
+            startsWithNewGame: startsWithNewGame, trayOpen: trayOpen, startsAtHome: false,
+            match: match ?? Self.gameInProgress(), coachOpen: coachOpen))
         window.makeKeyAndVisible()
         RunLoop.main.run(until: Date().addingTimeInterval(wait))
         if startsWithNewGame {

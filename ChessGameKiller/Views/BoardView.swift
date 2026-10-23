@@ -1,5 +1,6 @@
 import ChessKit
 import SwiftUI
+import UIKit
 
 /// The interactive board: tap a piece to see its moves, tap a dot to play.
 /// With hints on, the coach's picks are marked by corner brackets on the piece and a
@@ -47,12 +48,18 @@ struct BoardView: View {
             let sq = (side - inset * 2) / 8
             let corner = RoundedRectangle(cornerRadius: sq * 0.12, style: .continuous)
             ZStack(alignment: .topLeading) {
-                if let art = theme.boardArt {
-                    BoardArt(name: art, flipped: flipped)
+                // Only the board itself is cut to its rounded corners: a tall piece on the far
+                // rank may rise a little above the frame, as it would on a real board.
+                ZStack {
+                    if let art = theme.boardArt {
+                        BoardArt(name: art, flipped: flipped)
+                    }
+                    if let surface = theme.surface {
+                        LinearGradient(colors: surface, startPoint: .topLeading, endPoint: .bottomTrailing)
+                    }
                 }
-                if let surface = theme.surface {
-                    LinearGradient(colors: surface, startPoint: .topLeading, endPoint: .bottomTrailing)
-                }
+                .frame(width: side, height: side)
+                .clipShape(corner)
                 ZStack(alignment: .topLeading) {
                     squares(size: sq)
                     pieces(size: sq)
@@ -74,7 +81,6 @@ struct BoardView: View {
                 .padding(inset)
             }
             .frame(width: side, height: side)
-            .clipShape(corner)
             .overlay {
                 if let edge = theme.boardEdge {
                     corner.strokeBorder(edge, lineWidth: 1)
@@ -480,8 +486,10 @@ struct CaptureFall: View {
 
     private var turn: CGFloat { away ?? (seed % 2 == 0 ? 1 : -1) }
     /// Where the foot meets the square, as a fraction of the square: the renders stand
-    /// a little below the middle, the flat pieces at the bottom.
-    private var footY: CGFloat { theme.spritePieces ? 0.65 : 0.9 }
+    /// a little below the middle, as their picture's frame says, the flat pieces at the bottom.
+    private var footY: CGFloat {
+        theme.spritePieces ? 0.5 + SpriteFrame.of(theme.imageName(for: piece)).lift : 0.9
+    }
     /// A rook or a queen lands harder.
     private var heavy: Bool { piece.kind == .queen || piece.kind == .rook }
 
@@ -537,10 +545,6 @@ struct PieceImage: View {
     /// On a board, a 3D sprite rises above its square; elsewhere it is fitted into `size`.
     var onBoard = false
 
-    /// How much larger than the square a sprite is drawn on the board.
-    /// Large enough that each piece's top (cross, crown, mitre, ball) reads at a glance.
-    private static let spriteScale: CGFloat = 1.22
-
     var body: some View {
         if theme.spritePieces {
             sprite
@@ -549,33 +553,23 @@ struct PieceImage: View {
         }
     }
 
-    /// The renders are 1.3 squares wide and 1.42 tall, with the piece's foot
-    /// 1.0 square below the top edge, so they are lifted to stand on the square's center.
-    @ViewBuilder
+    /// The render, set so the piece's foot stands just below the square's center (on a board)
+    /// or so a king fills the frame (anywhere else).
     private var sprite: some View {
-        let image = Image(theme.imageName(for: piece))
-            .resizable()
-            .interpolation(.high)
-            .antialiased(true)
-        if onBoard {
-            let k = Self.spriteScale
-            Color.clear
-                .frame(width: size, height: size)
-                .overlay {
-                    image
-                        .frame(width: size * 1.3 * k, height: size * 1.42 * k)
-                        .offset(y: size * (0.15 - 0.29 * k))
-                }
-        } else {
-            // Fitted so a king, the tallest piece, fills the frame.
-            Color.clear
-                .frame(width: size, height: size)
-                .overlay {
-                    image
-                        .frame(width: size * 1.08, height: size * 1.18)
-                        .offset(y: size * 0.06)
-                }
-        }
+        let name = theme.imageName(for: piece)
+        let frame = SpriteFrame.of(name)
+        let scale = onBoard ? frame.boardScale : frame.fittedScale
+        return Color.clear
+            .frame(width: size, height: size)
+            .overlay {
+                Image(name)
+                    .resizable()
+                    .interpolation(.high)
+                    .antialiased(true)
+                    .frame(width: size * frame.width * scale, height: size * frame.height * scale)
+                    .lightPieceEdge(onBoard && piece.color == .white, size: size)
+                    .offset(y: size * (onBoard ? frame.boardOffset : frame.fittedOffset))
+            }
     }
 
     @ViewBuilder
@@ -595,6 +589,62 @@ struct PieceImage: View {
     }
 }
 
+private extension View {
+    /// On a board, a fine dark edge around a light piece keeps its outline crisp on the light squares,
+    /// where ivory on cream would otherwise melt in. About half a point on a phone.
+    @ViewBuilder
+    func lightPieceEdge(_ on: Bool, size: CGFloat) -> some View {
+        if on {
+            shadow(color: .black.opacity(0.8), radius: size * 0.014)
+        } else {
+            self
+        }
+    }
+}
+
+/// Where the piece stands in a sprite picture, so it can be set on its square or fitted into a frame.
+/// Lengths are in squares, as rendered (400 pixels to a square).
+struct SpriteFrame: Equatable {
+    /// The picture's size.
+    let width: CGFloat
+    let height: CGFloat
+    /// How far below the picture's top edge the piece's foot is.
+    let foot: CGFloat
+    /// On a board: how much larger than the square the piece is drawn, and how far below the
+    /// square's center its foot stands.
+    let boardScale: CGFloat
+    let lift: CGFloat
+    /// Off the board, the tallest piece fills the frame: its reach above its foot and below it.
+    let reach: CGFloat
+    let below: CGFloat
+
+    /// The picture's center on a board, from the square's center.
+    var boardOffset: CGFloat { lift - (foot - height / 2) * boardScale }
+    /// How far the tallest piece on the far rank rises above the board's outer edge: its square's
+    /// center is a square below that edge (half a square, then the frame's half square).
+    var boardRise: CGFloat { max(0, reach * boardScale - lift - 1) }
+    /// Fitted into a frame one square tall.
+    var fittedScale: CGFloat { 1 / (reach + below) }
+    var fittedOffset: CGFloat { -fittedScale * ((foot - height / 2) + (below - reach) / 2) }
+
+    /// The side-on renders (560 x 760, seen from 28 degrees up), where every piece reads by its outline.
+    /// Every set's king, cross included, stays within 1.2 squares above its foot and 0.15 below it.
+    static let sideOn = SpriteFrame(width: 1.4, height: 1.9, foot: 1.5, boardScale: 1.2, lift: 0.24, reach: 1.2, below: 0.15)
+    /// The earlier renders (520 x 568, seen from higher up).
+    static let fromAbove = SpriteFrame(width: 1.3, height: 1.42, foot: 1.0, boardScale: 1.22, lift: 0.15, reach: 0.964, below: 0.24)
+
+    @MainActor private static var known: [String: SpriteFrame] = [:]
+
+    /// The frame of the named picture, told by its shape: the side-on renders are much taller than wide.
+    @MainActor static func of(_ name: String) -> SpriteFrame {
+        if let frame = known[name] { return frame }
+        let size = UIImage(named: name)?.size ?? .zero
+        let frame = size.width > 0 && size.height / size.width > 1.25 ? sideOn : fromAbove
+        known[name] = frame
+        return frame
+    }
+}
+
 /// The pre-rendered board picture's squares, set in a glass frame. The picture is
 /// turned around when the board is flipped, which keeps the light and dark squares where they belong.
 struct BoardArt: View {
@@ -607,7 +657,7 @@ struct BoardArt: View {
             // The picture is 9 squares wide: half a square of frame on each side.
             let inset = side / 18
             ZStack {
-                BoardGlass(side: side)
+                BoardGlass()
                 Image(name)
                     .resizable()
                     .interpolation(.high)
@@ -628,56 +678,11 @@ struct BoardArt: View {
     }
 }
 
-/// Clear glass around the board: Liquid Glass on iOS 26, a faint pane before it, with
-/// a soft sheen across it and bright edges, so it reads as glass and never as grey.
+/// Clear glass around the board: the app's own glass, as the player lines and the dock use it,
+/// only clearer, so the backdrop's light shows through the frame.
 struct BoardGlass: View {
-    let side: CGFloat
-
     var body: some View {
-        let shape = Rectangle()
-        ZStack {
-            pane(shape)
-            // Light falls across from the top left.
-            LinearGradient(
-                stops: [
-                    .init(color: .white.opacity(0.22), location: 0),
-                    .init(color: .white.opacity(0.07), location: 0.3),
-                    .init(color: .white.opacity(0.02), location: 0.6),
-                    .init(color: .white.opacity(0.1), location: 1),
-                ],
-                startPoint: .topLeading, endPoint: .bottomTrailing
-            )
-            // One soft streak of reflected light across the pane.
-            LinearGradient(
-                stops: [
-                    .init(color: .clear, location: 0.22),
-                    .init(color: .white.opacity(0.12), location: 0.3),
-                    .init(color: .clear, location: 0.38),
-                ],
-                startPoint: .topLeading, endPoint: .bottomTrailing
-            )
-            // A brighter outer edge, as polished glass catches the light.
-            shape.strokeBorder(
-                LinearGradient(colors: [.white.opacity(0.5), .white.opacity(0.1), .white.opacity(0.28)],
-                               startPoint: .topLeading, endPoint: .bottomTrailing),
-                lineWidth: 1.2
-            )
-            shape.strokeBorder(Color.black.opacity(0.35), lineWidth: 0.5).padding(1.2)
-        }
-        .allowsHitTesting(false)
-    }
-
-    @ViewBuilder
-    private func pane(_ shape: Rectangle) -> some View {
-        #if compiler(>=6.2)
-        if #available(iOS 26.0, *) {
-            Color.clear.glassEffect(.clear, in: shape)
-        } else {
-            shape.fill(Color.white.opacity(0.07))
-        }
-        #else
-        shape.fill(Color.white.opacity(0.07))
-        #endif
+        GlassSurface(shape: Rectangle(), weight: .clear)
     }
 }
 

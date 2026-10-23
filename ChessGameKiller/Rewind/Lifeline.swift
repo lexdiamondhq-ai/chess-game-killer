@@ -44,8 +44,17 @@ struct Lifeline: View {
                 }
                 .stroke(Color.primary.opacity(0.14), style: StrokeStyle(lineWidth: 1, dash: [2, 5]))
 
-                Text("YOU").position(x: inset + 14, y: 8)
-                Text(game.opponent.uppercased()).position(x: inset + 30, y: size.height - 8)
+                // Who is up and who is down, both from the same left edge.
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("YOU")
+                    Spacer(minLength: 0)
+                    Text(game.opponent.uppercased())
+                        .lineLimit(1)
+                }
+                .padding(.leading, inset)
+                .padding(.vertical, 2)
+                .frame(width: size.width, height: size.height, alignment: .leading)
+                .allowsHitTesting(false)
 
                 // The tint between the line and even.
                 Self.area(points, mid: mid)
@@ -103,9 +112,9 @@ struct Lifeline: View {
                     .position(x: playX, y: size.height / 2)
                     .allowsHitTesting(false)
             }
-            .font(.system(size: 9, weight: .semibold))
-            .tracking(2)
-            .foregroundStyle(.tertiary)
+            .font(.system(size: 10, weight: .semibold))
+            .tracking(1.8)
+            .foregroundStyle(.secondary)
             .contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 0)
@@ -116,7 +125,11 @@ struct Lifeline: View {
             )
             .animation(.snappy(duration: 0.2), value: ply)
         }
-        .accessibilityElement(children: .contain)
+        // One control for VoiceOver: swipe up or down to step through the game. The moments
+        // themselves are reached with the buttons under the board.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Game line")
+        .accessibilityValue(ply == 0 ? "The start" : "\(ply) of \(game.moves.count) moves played")
         .accessibilityAdjustableAction { direction in
             switch direction {
             case .increment: ply = min(game.moves.count, ply + 1)
