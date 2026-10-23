@@ -1,5 +1,6 @@
 import ChessKit
 import SwiftUI
+import UIKit
 
 /// The interactive board: tap a piece to see its moves, tap a dot to play.
 /// Shows the two best moves as arrows and blows up captured pieces.
@@ -46,12 +47,18 @@ struct BoardView: View {
             let sq = (side - inset * 2) / 8
             let corner = RoundedRectangle(cornerRadius: sq * 0.12, style: .continuous)
             ZStack(alignment: .topLeading) {
-                if let art = theme.boardArt {
-                    BoardArt(name: art, flipped: flipped)
+                // Only the board itself is cut to its rounded corners: a tall piece on the far
+                // rank may rise a little above the frame, as it would on a real board.
+                ZStack {
+                    if let art = theme.boardArt {
+                        BoardArt(name: art, flipped: flipped)
+                    }
+                    if let surface = theme.surface {
+                        LinearGradient(colors: surface, startPoint: .topLeading, endPoint: .bottomTrailing)
+                    }
                 }
-                if let surface = theme.surface {
-                    LinearGradient(colors: surface, startPoint: .topLeading, endPoint: .bottomTrailing)
-                }
+                .frame(width: side, height: side)
+                .clipShape(corner)
                 ZStack(alignment: .topLeading) {
                     squares(size: sq)
                     pieces(size: sq)
@@ -74,7 +81,6 @@ struct BoardView: View {
                 .padding(inset)
             }
             .frame(width: side, height: side)
-            .clipShape(corner)
             .overlay {
                 if let edge = theme.boardEdge {
                     corner.strokeBorder(edge, lineWidth: 1)
@@ -590,10 +596,6 @@ struct PieceImage: View {
     /// On a board, a 3D sprite rises above its square; elsewhere it is fitted into `size`.
     var onBoard = false
 
-    /// How much larger than the square a sprite is drawn on the board.
-    /// Large enough that each piece's top (cross, crown, mitre, ball) reads at a glance.
-    private static let spriteScale: CGFloat = 1.22
-
     var body: some View {
         if theme.spritePieces {
             sprite
@@ -602,33 +604,22 @@ struct PieceImage: View {
         }
     }
 
-    /// The renders are 1.3 squares wide and 1.42 tall, with the piece's foot
-    /// 1.0 square below the top edge, so they are lifted to stand on the square's center.
-    @ViewBuilder
+    /// The render, set so the piece's foot stands just below the square's center (on a board)
+    /// or so a king fills the frame (anywhere else).
     private var sprite: some View {
-        let image = Image(theme.imageName(for: piece))
-            .resizable()
-            .interpolation(.high)
-            .antialiased(true)
-        if onBoard {
-            let k = Self.spriteScale
-            Color.clear
-                .frame(width: size, height: size)
-                .overlay {
-                    image
-                        .frame(width: size * 1.3 * k, height: size * 1.42 * k)
-                        .offset(y: size * (0.15 - 0.29 * k))
-                }
-        } else {
-            // Fitted so a king, the tallest piece, fills the frame.
-            Color.clear
-                .frame(width: size, height: size)
-                .overlay {
-                    image
-                        .frame(width: size * 1.08, height: size * 1.18)
-                        .offset(y: size * 0.06)
-                }
-        }
+        let name = theme.imageName(for: piece)
+        let frame = SpriteFrame.of(name)
+        let scale = onBoard ? frame.boardScale : frame.fittedScale
+        return Color.clear
+            .frame(width: size, height: size)
+            .overlay {
+                Image(name)
+                    .resizable()
+                    .interpolation(.high)
+                    .antialiased(true)
+                    .frame(width: size * frame.width * scale, height: size * frame.height * scale)
+                    .offset(y: size * (onBoard ? frame.boardOffset : frame.fittedOffset))
+            }
     }
 
     @ViewBuilder
@@ -645,6 +636,45 @@ struct PieceImage: View {
                     radius: glow == nil ? size * 0.02 : size * 0.025,
                     y: glow == nil ? size * 0.02 : 0)
             .shadow(color: glow?.opacity(0.6) ?? .clear, radius: glow == nil ? 0 : size * 0.09)
+    }
+}
+
+/// Where the piece stands in a sprite picture, so it can be set on its square or fitted into a frame.
+/// Lengths are in squares, as rendered (400 pixels to a square).
+struct SpriteFrame: Equatable {
+    /// The picture's size.
+    let width: CGFloat
+    let height: CGFloat
+    /// How far below the picture's top edge the piece's foot is.
+    let foot: CGFloat
+    /// On a board: how much larger than the square the piece is drawn, and how far below the
+    /// square's center its foot stands.
+    let boardScale: CGFloat
+    let lift: CGFloat
+    /// Off the board, the tallest piece fills the frame: its reach above its foot and below it.
+    let reach: CGFloat
+    let below: CGFloat
+
+    /// The picture's center on a board, from the square's center.
+    var boardOffset: CGFloat { lift - (foot - height / 2) * boardScale }
+    /// Fitted into a frame one square tall.
+    var fittedScale: CGFloat { 1 / (reach + below) }
+    var fittedOffset: CGFloat { -fittedScale * ((foot - height / 2) + (below - reach) / 2) }
+
+    /// The side-on renders (560 x 760, seen from 28 degrees up), where every piece reads by its outline.
+    static let sideOn = SpriteFrame(width: 1.4, height: 1.9, foot: 1.5, boardScale: 1.12, lift: 0.22, reach: 1.3, below: 0.2)
+    /// The earlier renders (520 x 568, seen from higher up).
+    static let fromAbove = SpriteFrame(width: 1.3, height: 1.42, foot: 1.0, boardScale: 1.22, lift: 0.15, reach: 0.964, below: 0.24)
+
+    @MainActor private static var known: [String: SpriteFrame] = [:]
+
+    /// The frame of the named picture, told by its shape: the side-on renders are much taller than wide.
+    @MainActor static func of(_ name: String) -> SpriteFrame {
+        if let frame = known[name] { return frame }
+        let size = UIImage(named: name)?.size ?? .zero
+        let frame = size.width > 0 && size.height / size.width > 1.25 ? sideOn : fromAbove
+        known[name] = frame
+        return frame
     }
 }
 
