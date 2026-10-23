@@ -91,10 +91,11 @@ enum ReelExporter {
 
     // MARK: Sound
 
-    /// Lays Leo's recorded lines over the video. False when none of them are recorded.
+    /// Lays the coach's recorded lines over the video. False when none of them are recorded.
     private static func addVoice(_ reel: GameReel, video: URL, to url: URL) async throws -> Bool {
+        let coach = Coach.current
         let clips = reel.narration.compactMap { cue -> (Double, URL)? in
-            Bundle.main.url(forResource: CoachVoice.fileName(for: cue.text), withExtension: "mp3").map { (cue.time, $0) }
+            Bundle.main.url(forResource: CoachVoice.fileName(for: cue.text, coach: coach), withExtension: "mp3").map { (cue.time, $0) }
         }
         guard !clips.isEmpty else { return false }
 

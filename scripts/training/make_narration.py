@@ -1,17 +1,25 @@
 #!/usr/bin/env python3
-"""Records Coach Leo's voice for every line in the lessons, with ElevenLabs.
+"""Records each coach's voice for every line in the lessons, and their short
+reactions in puzzles and drills, with ElevenLabs.
+
+Two coaches teach the same course: Leo (George's voice) and Vera (Sarah's). The
+course is written in Leo's words; for Vera his name becomes hers, exactly as
+Coach.personalize does in the app. Reactions ("Nice move.", "Try again.") come
+from Training/Content/reactions.json.
 
 Runs in GitHub Actions (.github/workflows/narration.yml) with the
-ELEVENLABS_API_KEY repository secret whenever a lesson changes. Each line is
-saved as ChessGameKiller/Training/Narration/nar-<12 hex digits of its SHA-1>.mp3,
-the same name CoachVoice.fileName(for:) looks for, so a line that's already
-recorded is never paid for twice. Lines without a recording are read by the
-device's own voice, so the app works before (or without) this step.
+ELEVENLABS_API_KEY repository secret whenever a lesson or the reactions change.
+Each line is saved as ChessGameKiller/Training/Narration/<prefix><12 hex digits
+of its SHA-1>.mp3 (prefix "nar-" for Leo, "vera-" for Vera), the same name
+CoachVoice.fileName(for:coach:) looks for, so a line that's already recorded is
+never paid for twice. Lesson lines without a recording are read by the device's
+own voice, so the app works before (or without) this step.
 
 Usage:
-  python3 scripts/training/make_narration.py            # record what's missing
-  python3 scripts/training/make_narration.py --list     # just print the lines
-  python3 scripts/training/make_narration.py --prune    # also delete recordings no lesson uses
+  python3 scripts/training/make_narration.py              # record what's missing
+  python3 scripts/training/make_narration.py --list       # just print the lines
+  python3 scripts/training/make_narration.py --prune      # also delete recordings nothing uses
+  python3 scripts/training/make_narration.py --coach vera # only one coach
 """
 from __future__ import annotations
 
@@ -19,6 +27,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sys
 import time
 import urllib.error
@@ -29,19 +38,35 @@ ROOT = Path(__file__).resolve().parents[2]
 CONTENT = ROOT / "ChessGameKiller" / "Training" / "Content"
 NARRATION = ROOT / "ChessGameKiller" / "Training" / "Narration"
 
-# George: a warm, mature British storyteller. Override with ELEVENLABS_VOICE_ID.
-VOICE_ID = os.environ.get("ELEVENLABS_VOICE_ID", "JBFqnCBsd6RMkjVDRZzb")
 MODEL = "eleven_multilingual_v2"
 OUTPUT_FORMAT = "mp3_44100_64"
+# Leo's settings, from the first recordings. Changing them doesn't re-record anything.
 VOICE_SETTINGS = {"stability": 0.45, "similarity_boost": 0.8, "style": 0.25, "use_speaker_boost": True, "speed": 0.97}
+COACHES = {
+    # George: a warm, mature British storyteller. Override with ELEVENLABS_VOICE_ID.
+    "leo": {"name": "Leo", "prefix": "nar-", "voice": os.environ.get("ELEVENLABS_VOICE_ID", "JBFqnCBsd6RMkjVDRZzb"),
+            "settings": VOICE_SETTINGS},
+    # Sarah: a confident, warm young American woman. Override with ELEVENLABS_VERA_VOICE_ID.
+    # Steady and clean: high stability, no style exaggeration, recorded at 128 kbps.
+    "vera": {"name": "Vera", "prefix": "vera-", "voice": os.environ.get("ELEVENLABS_VERA_VOICE_ID", "EXAVITQu4vr4xnSDxMaL"),
+             "settings": {"stability": 0.7, "similarity_boost": 0.85, "style": 0.0, "use_speaker_boost": True, "speed": 0.98},
+             "format": "mp3_44100_128"},
+}
 # What LessonPlayer says when a task has no wrong-answer line of its own.
 DEFAULT_WRONG = "Not quite. Have another look."
 API = "https://api.elevenlabs.io/v1"
 
 
-def file_name(text: str) -> str:
-    """Matches CoachVoice.fileName(for:)."""
-    return "nar-" + hashlib.sha1(text.strip().encode("utf-8")).hexdigest()[:12] + ".mp3"
+def file_name(text: str, coach: str = "leo") -> str:
+    """Matches CoachVoice.fileName(for:coach:)."""
+    return COACHES[coach]["prefix"] + hashlib.sha1(text.strip().encode("utf-8")).hexdigest()[:12] + ".mp3"
+
+
+def personalize(text: str, coach: str) -> str:
+    """Matches Coach.personalize: the course is in Leo's words, and his name becomes the coach's."""
+    if coach == "leo":
+        return text
+    return re.sub(r"\bLeo\b", COACHES[coach]["name"], text)
 
 
 def spoken_lines(lesson: dict) -> list[str]:
@@ -89,7 +114,8 @@ REEL_LINES = [
 ]
 
 
-def all_lines() -> list[str]:
+def lesson_lines() -> list[str]:
+    """Every lesson and reel line, in Leo's words."""
     course = json.loads((CONTENT / "course.json").read_text())
     order = [lesson for unit in course["units"] for lesson in unit["lessons"]]
     lines: list[str] = []
@@ -99,6 +125,26 @@ def all_lines() -> list[str]:
             if line not in lines:
                 lines.append(line)
     for line in REEL_LINES:
+        if line not in lines:
+            lines.append(line)
+    return lines
+
+
+def reaction_lines(coach: str) -> list[str]:
+    """The coach's short reactions in puzzles and drills (Training/Content/reactions.json)."""
+    reactions = json.loads((CONTENT / "reactions.json").read_text())["coaches"].get(coach, {})
+    lines: list[str] = []
+    for moment in reactions.values():
+        for line in moment:
+            if line.strip() and line.strip() not in lines:
+                lines.append(line.strip())
+    return lines
+
+
+def all_lines(coach: str = "leo") -> list[str]:
+    """Everything the coach says: reactions first (they're short and heard most), then the lessons."""
+    lines: list[str] = []
+    for line in reaction_lines(coach) + [personalize(line, coach) for line in lesson_lines()]:
         if line not in lines:
             lines.append(line)
     return lines
@@ -137,28 +183,36 @@ def characters_left(key: str) -> int | None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--list", action="store_true", help="print the lines and their files, record nothing")
-    parser.add_argument("--prune", action="store_true", help="delete recordings that no lesson uses")
+    parser.add_argument("--prune", action="store_true", help="delete recordings that nothing uses")
+    parser.add_argument("--coach", choices=sorted(COACHES), action="append", help="only this coach (default: all)")
     parser.add_argument("--max-chars", type=int, default=60000, help="stop after recording this many characters")
     args = parser.parse_args()
 
-    lines = all_lines()
-    wanted = {file_name(line): line for line in lines}
+    coaches = args.coach or list(COACHES)
+    # (coach, line) in recording order: each coach's reactions and lessons.
+    work = [(coach, line) for coach in coaches for line in all_lines(coach)]
     NARRATION.mkdir(parents=True, exist_ok=True)
-    missing = [line for line in lines if not (NARRATION / file_name(line)).exists()]
-    print(f"{len(lines)} lines ({sum(map(len, lines))} characters); {len(missing)} not recorded yet "
-          f"({sum(map(len, missing))} characters).")
+    missing = [(coach, line) for coach, line in work if not (NARRATION / file_name(line, coach)).exists()]
+    for coach in coaches:
+        mine = [line for c, line in work if c == coach]
+        todo = [line for c, line in missing if c == coach]
+        print(f"{COACHES[coach]['name']}: {len(mine)} lines ({sum(map(len, mine))} characters); "
+              f"{len(todo)} not recorded yet ({sum(map(len, todo))} characters).")
 
     if args.list:
-        for line in lines:
-            mark = " " if (NARRATION / file_name(line)).exists() else "*"
-            print(f"{mark} {file_name(line)}  {line}")
+        for coach, line in work:
+            mark = " " if (NARRATION / file_name(line, coach)).exists() else "*"
+            print(f"{mark} {file_name(line, coach)}  {line}")
         return
 
     if args.prune:
-        for path in NARRATION.glob("nar-*.mp3"):
-            if path.name not in wanted:
-                path.unlink()
-                print(f"Removed {path.name}")
+        # Every coach's lines are wanted, even when recording only one of them.
+        wanted = {file_name(line, coach) for coach in COACHES for line in all_lines(coach)}
+        for prefix in {c["prefix"] for c in COACHES.values()}:
+            for path in NARRATION.glob(f"{prefix}*.mp3"):
+                if path.name not in wanted:
+                    path.unlink()
+                    print(f"Removed {path.name}")
 
     if not missing:
         return
@@ -173,21 +227,22 @@ def main() -> None:
 
     recorded = 0
     failure = None
-    for line in missing:
+    for coach, line in missing:
         if len(line) > budget:
             print(f"Stopping: {len(missing) - recorded} lines left for the next run (the device voice reads them meanwhile).")
             break
+        voice = COACHES[coach]
         try:
-            audio = request(f"/text-to-speech/{VOICE_ID}?output_format={OUTPUT_FORMAT}", key,
-                            {"text": line, "model_id": MODEL, "voice_settings": VOICE_SETTINGS})
+            audio = request(f"/text-to-speech/{voice['voice']}?output_format={voice.get('format', OUTPUT_FORMAT)}", key,
+                            {"text": line, "model_id": MODEL, "voice_settings": voice["settings"]})
         except RuntimeError as error:
             # Keep what's recorded so far (the workflow still commits it) and say why it stopped.
             failure = error
             break
-        (NARRATION / file_name(line)).write_bytes(audio)
+        (NARRATION / file_name(line, coach)).write_bytes(audio)
         budget -= len(line)
         recorded += 1
-        print(f"{file_name(line)} {len(audio):6} bytes  {line[:70]}")
+        print(f"{file_name(line, coach)} {len(audio):6} bytes  {line[:70]}")
     print(f"Recorded {recorded} lines.")
     if failure:
         sys.exit(f"Stopped early, {len(missing) - recorded} lines not recorded: {failure}")

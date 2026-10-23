@@ -294,7 +294,7 @@ private struct OrbFace: View {
     private var accessibilityText: String {
         if match.isComputerThinking { return "\(match.setup.level.rival.name) is thinking" }
         if match.isOver { return ResultText(match: match).title }
-        var text = match.review.map { "\($0.title). \($0.detail)" } ?? "Leo, your coach."
+        var text = match.review.map { "\($0.title). \($0.detail)" } ?? "\(Coach.current.name), your coach."
         if let evaluation = match.evaluation {
             text += " Score \(match.forPlayer(evaluation).label) for you."
         }
@@ -499,7 +499,7 @@ private struct CoachPanel: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.title3).foregroundStyle(accent).frame(width: 40, height: 40)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Leo is offline").font(.headline)
+                    Text("\(Coach.current.name) is offline").font(.headline)
                     Text("The engine didn't answer. Play on: grades and hints come back when it does.")
                         .font(.subheadline).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -521,7 +521,7 @@ private struct CoachPanel: View {
             } else {
                 CoachAvatar(theme: theme, size: 40)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Leo").font(.headline)
+                    Text("\(Coach.current.name)").font(.headline)
                     Text("Play a move and I'll tell you how it was.")
                         .font(.subheadline).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -618,7 +618,7 @@ private struct CoachPanel: View {
     private var bestMoves: some View {
         VStack(alignment: .leading, spacing: 6) {
             if showBestMoves {
-                Text("Leo's picks")
+                Text("\(Coach.current.name)'s picks")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                 if match.engineFailed {
@@ -657,7 +657,7 @@ private struct CoachPanel: View {
                 Button {
                     showBestMoves = true
                 } label: {
-                    Label("Show Leo's picks", systemImage: "lightbulb.fill")
+                    Label("Show \(Coach.current.name)'s picks", systemImage: "lightbulb.fill")
                         .font(.footnote.weight(.semibold))
                 }
                 .buttonStyle(.plain)

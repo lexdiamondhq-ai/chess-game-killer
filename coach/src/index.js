@@ -15,7 +15,7 @@
 // exported from this file.
 
 import Anthropic from "@anthropic-ai/sdk";
-import { templateAnswer, wordAnswer } from "./answer.js";
+import { coachOf, templateAnswer, wordAnswer } from "./answer.js";
 import { describePosition } from "./board.js";
 import { claudeTimeoutMs, cleanText, failureCode, parseClaims } from "./claims.js";
 import { Chess } from "./vendor/chess.js";
@@ -187,7 +187,7 @@ async function runTalk(talk, env, deps, writer) {
     const answerStarted = deps.now();
     let answer = null;
     try {
-      answer = await deps.wordAnswer(client, env, { checked, spoken });
+      answer = await deps.wordAnswer(client, env, { checked, spoken, coach: talk.coach });
     } catch {
       answer = null;
     }
@@ -205,7 +205,7 @@ async function runTalk(talk, env, deps, writer) {
     // 4. Leo's voice, when the app wants it.
     if (talk.voice) {
       const voiceStarted = deps.now();
-      const line = await voiceLine(answer.text, env, deps);
+      const line = await voiceLine(answer.text, env, deps, talk.coach);
       log.voice_ms = deps.now() - voiceStarted;
       log.voice = line.unavailable || line.format;
       if (!(await send(line))) return;
@@ -220,8 +220,8 @@ async function runTalk(talk, env, deps, writer) {
   }
 }
 
-/** The voice line: Leo's MP3, or why there's none so the app uses the device's voice. */
-async function voiceLine(text, env, deps) {
+/** The voice line: the coach's MP3, or why there's none so the app uses the device's voice. */
+async function voiceLine(text, env, deps, coach = "leo") {
   if (!voiceKey(env)) return { type: "voice", unavailable: "not_configured" };
   let allowed;
   try {
@@ -233,7 +233,7 @@ async function voiceLine(text, env, deps) {
   if (!allowed) return { type: "voice", unavailable: "budget" };
   let audio = null;
   try {
-    audio = await deps.speak(env, text);
+    audio = await deps.speak(env, text, undefined, coach);
   } catch {
     audio = null;
   }
@@ -299,6 +299,7 @@ export function checkTalk(body) {
       lastMove: lastMoveOf(body.lastMove, chess),
       voice: body.voice !== false,
       facts: cleanFacts(body.facts, legal),
+      coach: coachOf(body.coach),
     },
   };
 }

@@ -23,6 +23,8 @@ struct TalkRequest: Encodable, Equatable, Sendable {
     /// Whether to send Leo's voice.
     var voice: Bool
     var facts: TalkFacts?
+    /// Who answers: left out for Leo, "vera" for Vera (her persona and her voice).
+    var coach: String?
 }
 
 /// Where the player asked.

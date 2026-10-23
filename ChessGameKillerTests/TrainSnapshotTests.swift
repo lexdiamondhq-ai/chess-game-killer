@@ -92,6 +92,38 @@ final class TrainSnapshotTests: XCTestCase {
         }
     }
 
+    /// Coach Vera: the picker in Settings, the Train page with her portrait, and one of her
+    /// session puzzles. The pick is put back to Leo afterwards.
+    func testCoachVera() throws {
+        let choice = CoachChoice.shared
+        let before = choice.coach
+        defer { choice.coach = before }
+        choice.coach = .vera
+
+        let settings = try show(SettingsSheet(), wait: 2.5)
+        for (offset, name) in [(1250, "coaches-1-settings"), (1700, "coaches-2-settings-sound")] {
+            scroll(settings, to: CGFloat(offset))
+            try save(settings, name)
+        }
+        settings.isHidden = true
+
+        let sample = TrainSample(settled: true)
+        let hub = try show(sample.hub(theme: theme), wait: 3)
+        try save(hub, "coaches-3-train-vera")
+        hub.isHidden = true
+
+        let library = try XCTUnwrap(sample.training.library)
+        XCTAssertEqual(library.coach.name, "Vera")
+        let drills = library.drills(for: "forks").filter { $0.type == .move }.prefix(2)
+        let plan = SessionPlan(title: "Today", focus: library.skill("forks"), lesson: nil,
+                               items: drills.map { SessionItem(content: .drill($0), role: .focus) })
+        let session = try show(SessionView(plan: plan, theme: theme, startsAtOnce: true)
+            .environment(sample.training)
+            .environment(sample.puzzles), wait: 2.5)
+        try save(session, "coaches-4-session-vera")
+        session.isHidden = true
+    }
+
     // MARK: Drawing
 
     private func show(_ view: some View, wait: TimeInterval = 3, frame: CGRect? = nil) throws -> UIWindow {
