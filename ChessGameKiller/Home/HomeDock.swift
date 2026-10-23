@@ -13,6 +13,7 @@ struct HomeDock: View {
     let primary: () -> Void
 
     @ScaledMetric(relativeTo: .body) private var icon: CGFloat = 25
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private struct Door: Identifiable {
         let title: String
@@ -28,7 +29,7 @@ struct HomeDock: View {
             Door(title: "Puzzles", glyph: Glyphs.puzzles, hint: "Rated puzzles and Puzzle Rush", action: actions.puzzles),
             Door(title: "Analyze", glyph: Glyphs.analyze, hint: "Find the best move in any position", action: actions.analyze),
             Door(title: "Games", glyph: Glyphs.games, hint: "Your saved games, to replay and rewrite", action: actions.rewind),
-            Door(title: "You", glyph: Glyphs.king, hint: "Your rating, your pieces and Settings", action: openYou),
+            Door(title: "You", glyph: Glyphs.king, hint: "Your pieces and Settings", action: openYou),
         ]
     }
 
@@ -36,7 +37,7 @@ struct HomeDock: View {
         HStack(spacing: 8) {
             if compact {
                 HomeClockCapsule(upNext: upNext, tone: tone, action: primary)
-                    .transition(.move(edge: .leading).combined(with: .opacity))
+                    .transition(reduceMotion ? .opacity : .move(edge: .leading).combined(with: .opacity))
             }
             HStack(spacing: 0) {
                 ForEach(doors) { door in
@@ -51,7 +52,7 @@ struct HomeDock: View {
         .padding(.horizontal, 16)
         .padding(.bottom, 6)
         .frame(maxWidth: .infinity)
-        .animation(.spring(response: 0.42, dampingFraction: 0.86), value: compact)
+        .animation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.42, dampingFraction: 0.86), value: compact)
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 
@@ -80,15 +81,11 @@ struct HomeDock: View {
     }
 }
 
-/// Your own things in one glass panel: your puzzle rating, this week's games and your
-/// training streak, then your games, your pieces and Settings. It opens from the dock's
-/// You, or by pulling the board down, and comes from where it was asked for.
+/// Your own things in one glass panel: your pieces and Settings (and Pro, once there is one).
+/// It opens from the dock's You, or by pulling the board down, and comes from where it was
+/// asked for. Everything else has its own door, so nothing here is found twice.
 struct HomeYouPanel: View {
     let tone: HomeTone
-    let rating: Int
-    let gamesThisWeek: Int
-    let streak: Int
-    let gamesSaved: Int
     let piecesLine: String
     let actions: HomeActions
     let fromTop: Bool
@@ -98,7 +95,7 @@ struct HomeYouPanel: View {
     @State private var drag: CGFloat = 0
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .center) {
                 Text("You")
                     .font(HomeType.section)
@@ -115,29 +112,23 @@ struct HomeYouPanel: View {
                 }
                 .buttonStyle(HomePressStyle())
                 .accessibilityLabel("Close")
-            }
-            HStack(spacing: 8) {
-                stat(rating.formatted(), "Puzzle rating")
-                stat("\(gamesThisWeek)", gamesThisWeek == 1 ? "Game this week" : "Games this week")
-                stat(streak > 0 ? "\(streak)" : "–", streak == 1 ? "Day of training" : "Days in a row")
+                // The cross sits in the corner the card's inset leaves, its glyph in line with the rows' chevrons.
+                .padding(.trailing, -14)
             }
             VStack(spacing: 0) {
-                HomeLinkRow(glyph: Glyphs.games, title: "Your games", detail: gamesSaved == 0 ? "None yet" : "\(gamesSaved) saved",
-                            tone: tone) { go(actions.rewind) }
-                HomeHairline(tone: tone, inset: 46)
-                HomeLinkRow(glyph: Glyphs.army, title: "Your pieces", detail: piecesLine, tone: tone) { go(actions.army) }
-                HomeHairline(tone: tone, inset: 46)
-                HomeLinkRow(glyph: Glyphs.settings, title: "Settings", detail: "Board look, sound, hints", tone: tone) { go(actions.settings) }
+                HomeLinkRow(title: "Your pieces", detail: piecesLine, tone: tone) { go(actions.army) }
+                HomeHairline(tone: tone)
+                HomeLinkRow(title: "Settings", detail: "Board look, sound, hints", tone: tone) { go(actions.settings) }
                 if let premium = actions.premium {
-                    HomeHairline(tone: tone, inset: 46)
-                    HomeLinkRow(glyph: "crown", title: "Chess Game Killer Pro", detail: "Everything, with no limits", tone: tone) { go(premium) }
+                    HomeHairline(tone: tone)
+                    HomeLinkRow(title: "Chess Game Killer Pro", detail: "Everything, with no limits", tone: tone) { go(premium) }
                 }
             }
-            .padding(.horizontal, 12)
-            .homePane(RoundedRectangle(cornerRadius: 20, style: .continuous), tone: tone, weight: .well(lit: false))
         }
-        .padding(16)
-        .homePane(RoundedRectangle(cornerRadius: 32, style: .continuous), tone: tone)
+        .padding(.horizontal, HomeMetrics.inset)
+        .padding(.top, 8)
+        .padding(.bottom, 4)
+        .homePane(RoundedRectangle(cornerRadius: HomeMetrics.cardRadius, style: .continuous), tone: tone)
         .offset(y: fromTop ? min(drag, 0) : max(drag, 0))
         .gesture(
             DragGesture(minimumDistance: 12)
@@ -154,23 +145,6 @@ struct HomeYouPanel: View {
         .onAppear { titleFocused = true }
     }
 
-    private func stat(_ value: String, _ label: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(value)
-                .font(HomeType.number)
-                .monospacedDigit()
-                .foregroundStyle(tone.ink)
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(tone.ink2)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .homePane(RoundedRectangle(cornerRadius: 18, style: .continuous), tone: tone, weight: .well(lit: false))
-        .accessibilityElement(children: .combine)
-    }
-
     /// Closes the panel, then opens what was picked.
     private func go(_ action: @escaping () -> Void) {
         close()
@@ -178,8 +152,8 @@ struct HomeYouPanel: View {
     }
 }
 
-/// While the board is pulled down: a king in a ring that fills, under the status bar.
-/// Let go once it is full and the You panel opens.
+/// While the board is pulled down: a small glass tab under the status bar, a king in a ring
+/// that fills, and the word "You". Let go once the ring is full and the You panel opens.
 struct HomePullCue: View {
     let scroll: HomeScroll
     let tone: HomeTone
@@ -188,19 +162,28 @@ struct HomePullCue: View {
 
     var body: some View {
         let pull = min(max(-scroll.y / threshold, 0), 1)
-        ZStack {
-            Circle()
-                .stroke(tone.ink.opacity(0.22), lineWidth: 2)
-            Circle()
-                .trim(from: 0, to: pull)
-                .stroke(tone.metal, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-            Glyph(name: Glyphs.king, size: 18)
-                .foregroundStyle(pull >= 1 || armed ? tone.metal : tone.ink)
+        let full = pull >= 1 || armed
+        HStack(spacing: 7) {
+            ZStack {
+                Circle()
+                    .stroke(tone.ink.opacity(0.22), lineWidth: 1.5)
+                Circle()
+                    .trim(from: 0, to: pull)
+                    .stroke(tone.metal, style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                Glyph(name: Glyphs.king, size: 14)
+                    .foregroundStyle(full ? tone.metal : tone.ink)
+            }
+            .frame(width: 26, height: 26)
+            Text("You")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(full ? tone.metal : tone.ink)
         }
-        .frame(width: 36, height: 36)
-        .background(Circle().fill(tone.canvas.opacity(0.4)))
-        .scaleEffect(0.7 + 0.3 * pull)
+        .padding(.leading, 5)
+        .padding(.trailing, 12)
+        .padding(.vertical, 4)
+        .homePane(Capsule(), tone: tone, weight: .bar)
+        .scaleEffect(0.8 + 0.2 * pull)
         .opacity(Double(min(pull * 1.6, 1)))
         .frame(maxWidth: .infinity)
         .allowsHitTesting(false)
@@ -233,6 +216,30 @@ struct HomeTopEdge: View {
         .frame(height: height)
         .frame(maxWidth: .infinity)
         .opacity(Double(shown))
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Under the dock, and a little above it: the page dissolves into a soft frost before it
+/// reaches the dock, so no card is ever seen cut by the dock or carrying on beneath it.
+struct HomeBottomEdge: View {
+    let tone: HomeTone
+    /// How far above the dock the page starts to fade.
+    let fade: CGFloat
+
+    var body: some View {
+        ZStack {
+            Rectangle().fill(.ultraThinMaterial)
+            tone.canvas.opacity(0.8)
+        }
+        .mask {
+            VStack(spacing: 0) {
+                LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
+                    .frame(height: fade)
+                Color.black
+            }
+        }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }

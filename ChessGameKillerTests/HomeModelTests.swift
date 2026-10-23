@@ -88,6 +88,10 @@ final class HomeModelTests: XCTestCase {
         XCTAssertEqual(HomeLadder.points(0.5), "½")
         XCTAssertEqual(HomeLadder.points(2.5), "2½")
         XCTAssertEqual(HomeLadder.points(3), "3")
+        // A game's result on the scoresheet: 1 for a win, ½ for a draw, 0 for a loss.
+        XCTAssertEqual(HomeScoresheet.score(.win), "1")
+        XCTAssertEqual(HomeScoresheet.score(.draw), "½")
+        XCTAssertEqual(HomeScoresheet.score(.loss), "0")
     }
 
     func testTheLadderKeepsScoreAgainstEachRival() {

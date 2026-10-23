@@ -1,17 +1,16 @@
 import ChessKit
 import SwiftUI
 
-// The cards below the clock: today's puzzle and session, the ladder of rivals, the
-// scoresheet of your games, and the rest of the app.
+// The cards below the clock: today's puzzle and session, the ladder of rivals, and the
+// scoresheet of your games.
 
 // MARK: - Today
 
-/// A real puzzle drawn as a diagram, the way a chess column prints one, and today's
+/// A real puzzle printed as a diagram, the way a chess column prints one, and today's
 /// session with Coach Leo. Solve opens Puzzles on this very puzzle; Start starts the session.
 struct HomeTodayCard: View {
     let puzzle: HomePuzzle?
     let rating: Int
-    let solvedInARow: Int
     let plan: SessionPlan?
     let trainedToday: Bool
     let tone: HomeTone
@@ -27,8 +26,8 @@ struct HomeTodayCard: View {
                 .padding(.vertical, 16)
             coachBlock
         }
-        .padding(16)
-        .homePane(RoundedRectangle(cornerRadius: 28, style: .continuous), tone: tone)
+        .padding(HomeMetrics.inset)
+        .homePane(RoundedRectangle(cornerRadius: HomeMetrics.cardRadius, style: .continuous), tone: tone)
     }
 
     // MARK: The puzzle
@@ -37,16 +36,12 @@ struct HomeTodayCard: View {
     private var puzzleBlock: some View {
         if let puzzle, let draft = PositionDraft(fen: puzzle.fen) {
             Button(action: solve) {
-                PositionBoard(draft: draft, theme: pieceTheme, flipped: puzzle.solver == .black)
-                    .allowsHitTesting(false)
-                    .shadow(color: .black.opacity(0.35), radius: 14, y: 8)
+                HomeDiagram(draft: draft, flipped: puzzle.solver == .black, theme: pieceTheme, tone: tone)
             }
             .buttonStyle(.plain)
             .accessibilityHidden(true)
             .padding(.bottom, 16)
-            Text("Puzzle · \(puzzle.puzzle.rating.formatted())")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(tone.metal)
+            label("Puzzle · \(puzzle.puzzle.rating)")
             HStack(alignment: .center, spacing: 12) {
                 Text(puzzle.title)
                     .font(HomeType.title)
@@ -81,56 +76,151 @@ struct HomeTodayCard: View {
         }
     }
 
-    private var ratingLine: String {
-        let base = "Your rating \(rating.formatted())"
-        return solvedInARow > 1 ? "\(base) · \(solvedInARow) in a row" : base
+    /// Chess ratings are written without a thousands separator.
+    private var ratingLine: String { "Your rating \(rating)" }
+
+    /// A block's small name, over its title.
+    private func label(_ text: String) -> some View {
+        Text(text)
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(tone.ink2)
     }
 
     // MARK: Coach Leo
 
     @ViewBuilder
     private var coachBlock: some View {
-        Text("Today with Coach Leo")
-            .font(.footnote.weight(.semibold))
-            .foregroundStyle(tone.metal)
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(coachTitle)
+        label("Today with Coach Leo")
+        if trainedToday {
+            // Done: said once, with a quiet way to go on.
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text("Done for today.")
                     .font(HomeType.title)
                     .foregroundStyle(tone.ink)
-                Text(coachDetail)
-                    .font(.subheadline)
-                    .foregroundStyle(tone.ink2)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button(action: train) {
+                    HStack(spacing: 3) {
+                        Text("Train more")
+                        Image(systemName: "chevron.forward")
+                            .font(.caption.weight(.semibold))
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(tone.metal)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Opens training")
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            if !trainedToday, let plan {
-                Button("Start") { startSession(plan) }
-                    .buttonStyle(HomeIvoryButtonStyle(tone: tone, compact: true))
-                    .accessibilityLabel("Start today's session: \(coachTitle)")
-            } else {
-                Button("Train", action: train)
-                    .buttonStyle(HomeIvoryButtonStyle(tone: tone, compact: true))
-                    .accessibilityLabel("Open training")
+            .padding(.top, 2)
+        } else {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(coachTitle)
+                        .font(HomeType.title)
+                        .foregroundStyle(tone.ink)
+                    Text(coachDetail)
+                        .font(.subheadline)
+                        .foregroundStyle(tone.ink2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if let plan {
+                    Button("Start") { startSession(plan) }
+                        .buttonStyle(HomeGlassButtonStyle(tone: tone, compact: true))
+                        .accessibilityLabel("Start today's session: \(coachTitle)")
+                } else {
+                    Button("Train", action: train)
+                        .buttonStyle(HomeGlassButtonStyle(tone: tone, compact: true))
+                        .accessibilityLabel("Open training")
+                }
             }
+            .padding(.top, 4)
         }
-        .padding(.top, 4)
     }
 
     private var coachTitle: String {
-        if trainedToday { return "Done for today" }
         guard let plan else { return "Lessons and drills" }
         return "\(plan.focus?.title ?? "Today's session") · \(plan.minutes) min"
     }
 
     private var coachDetail: String {
-        if trainedToday { return "A new session waits tomorrow. Train more any time." }
         guard let plan else { return "Short lessons, then positions picked for you." }
         let count = plan.items.count
         let positions = count == 1 ? "1 position" : "\(count) positions"
         let shape = plan.lesson == nil ? "\(positions), picked for you." : "A short lesson, then \(positions)."
         if let blurb = plan.focus?.blurb { return "\(blurb) \(shape)" }
         return shape
+    }
+}
+
+/// A position printed the way a chess column prints it: flat squares in the board look's
+/// two colors, the pieces, a fine rule round the edge and the coordinates outside it. It is
+/// a picture of a position, so it stays quiet beside the real board behind the page.
+struct HomeDiagram: View {
+    let draft: PositionDraft
+    /// Black at the bottom, for a puzzle Black solves.
+    let flipped: Bool
+    let theme: BoardTheme
+    let tone: HomeTone
+
+    @ScaledMetric(relativeTo: .caption2) private var labelSize: CGFloat = 11
+
+    var body: some View {
+        GeometryReader { geo in
+            let margin = labelSize + 5
+            let side = max(min(geo.size.width, geo.size.height) - margin, 8)
+            let square = side / 8
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 5) {
+                    VStack(spacing: 0) {
+                        ForEach(0..<8, id: \.self) { row in
+                            coordinate("\(flipped ? row + 1 : 8 - row)")
+                                .frame(width: labelSize, height: square)
+                        }
+                    }
+                    board(square: square)
+                        .frame(width: side, height: side)
+                }
+                HStack(spacing: 0) {
+                    ForEach(0..<8, id: \.self) { column in
+                        coordinate(Self.files[flipped ? 7 - column : column])
+                            .frame(width: square, height: labelSize)
+                    }
+                }
+                .padding(.leading, margin)
+            }
+        }
+        .aspectRatio(1, contentMode: .fit)
+        .environment(\.layoutDirection, .leftToRight)
+    }
+
+    private static let files = ["a", "b", "c", "d", "e", "f", "g", "h"]
+
+    private func coordinate(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: labelSize, weight: .medium))
+            .foregroundStyle(tone.ink3)
+    }
+
+    private func board(square: CGFloat) -> some View {
+        VStack(spacing: 0) {
+            ForEach(0..<8, id: \.self) { row in
+                HStack(spacing: 0) {
+                    ForEach(0..<8, id: \.self) { column in
+                        let at = flipped ? Square(file: 7 - column, rank: row) : Square(file: column, rank: 7 - row)
+                        ZStack {
+                            Rectangle().fill((at.fileIndex + at.rankIndex) % 2 == 1 ? theme.light : theme.dark)
+                            if let token = draft[at] {
+                                PieceImage(piece: token.piece(at: at), theme: theme, size: square)
+                            }
+                        }
+                        .frame(width: square, height: square)
+                    }
+                }
+            }
+        }
+        .overlay { Rectangle().strokeBorder(tone.ink.opacity(0.35), lineWidth: 0.5) }
     }
 }
 
@@ -147,6 +237,12 @@ struct HomeLadderCard: View {
     let play: (MatchController.Level) -> Void
 
     @ScaledMetric(relativeTo: .body) private var portrait: CGFloat = 36
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    /// At the accessibility text sizes a rung puts the score under the name.
+    private var large: Bool { typeSize.isAccessibilitySize }
+    /// The portrait grows with the text, but stops where it would squeeze the name.
+    private var face: CGFloat { min(portrait, 52) }
 
     private enum Entry: Identifiable {
         case rung(HomeLadder.Rung)
@@ -179,7 +275,7 @@ struct HomeLadderCard: View {
         VStack(spacing: 0) {
             ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
                 if index > 0 {
-                    HomeHairline(tone: tone, inset: 26 + portrait)
+                    HomeHairline(tone: tone, inset: face + 12)
                 }
                 switch entry {
                 case .rung(let rung): rungRow(rung)
@@ -187,9 +283,9 @@ struct HomeLadderCard: View {
                 }
             }
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, HomeMetrics.inset)
         .padding(.vertical, 4)
-        .homePane(RoundedRectangle(cornerRadius: 28, style: .continuous), tone: tone)
+        .homePane(RoundedRectangle(cornerRadius: HomeMetrics.cardRadius, style: .continuous), tone: tone)
     }
 
     private func rungRow(_ rung: HomeLadder.Rung) -> some View {
@@ -199,21 +295,15 @@ struct HomeLadderCard: View {
             play(rung.level)
         } label: {
             HStack(spacing: 12) {
-                Text("\(rung.level.rawValue + 1)")
-                    .font(.footnote.weight(.medium).monospacedDigit())
-                    .foregroundStyle(tone.ink3)
-                    .frame(width: 14)
-                Image(rival.portraitName)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: portrait, height: portrait)
-                    .clipShape(Circle())
-                    .overlay { Circle().strokeBorder(tone.ink.opacity(0.16), lineWidth: 0.5) }
+                HomeRivalPortrait(rival: rival, tone: tone, size: face)
                 VStack(alignment: .leading, spacing: 2) {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    let nameLayout = large ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
+                                           : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 6))
+                    nameLayout {
                         Text(rival.name)
                             .font(.body.weight(.semibold))
                             .foregroundStyle(tone.ink)
+                            .minimumScaleFactor(0.7)
                         Text(rival.elo)
                             .font(.subheadline)
                             .foregroundStyle(tone.ink2)
@@ -221,19 +311,18 @@ struct HomeLadderCard: View {
                     Text(isNext ? "Next to beat · \(rung.level.tagline)" : rung.level.tagline)
                         .font(.footnote)
                         .foregroundStyle(isNext ? tone.metal : tone.ink2)
+                    if large {
+                        score(rung)
+                    }
                 }
-                .lineLimit(1)
+                .lineLimit(large ? 2 : 1)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(rung.score ?? "–")
-                        .font(HomeType.score)
-                        .monospacedDigit()
-                        .foregroundStyle(rung.played == 0 ? tone.ink3 : tone.ink)
-                    Text(rung.standingText)
-                        .font(.caption)
-                        .foregroundStyle(tone.ink3)
+                if !large {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        score(rung)
+                    }
+                    .lineLimit(1)
                 }
-                .lineLimit(1)
             }
             .padding(.vertical, 10)
             .frame(minHeight: 60)
@@ -242,7 +331,7 @@ struct HomeLadderCard: View {
         .buttonStyle(HomeRowPressStyle(tone: tone))
         .background {
             if isNext {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: HomeMetrics.innerRadius, style: .continuous)
                     .fill(tone.metal.opacity(0.09))
                     .padding(.horizontal, -8)
             }
@@ -251,6 +340,18 @@ struct HomeLadderCard: View {
         .accessibilityLabel(spoken(rung, isNext: isNext))
         .accessibilityHint("Sets up a game against \(rival.name)")
         .accessibilityAddTraits(.isButton)
+    }
+
+    /// The match score and where you stand: "3½–1½", "You lead".
+    @ViewBuilder
+    private func score(_ rung: HomeLadder.Rung) -> some View {
+        Text(rung.score ?? "–")
+            .font(HomeType.score)
+            .monospacedDigit()
+            .foregroundStyle(rung.played == 0 ? tone.ink3 : tone.ink)
+        Text(rung.standingText)
+            .font(.caption)
+            .foregroundStyle(tone.ink3)
     }
 
     private func spoken(_ rung: HomeLadder.Rung, isNext: Bool) -> String {
@@ -273,16 +374,15 @@ struct HomeLadderCard: View {
 
     private func youRow(_ rating: Int) -> some View {
         HStack(spacing: 12) {
-            Color.clear.frame(width: 14, height: 1)
             PieceImage(piece: Piece(.king, color: youColor, square: youColor == .white ? .e1 : .e8),
-                       theme: pieceTheme, size: portrait)
-                .frame(width: portrait, height: portrait)
+                       theme: pieceTheme, size: face)
+                .frame(width: face, height: face)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text("You")
                         .font(.body.weight(.semibold))
-                        .foregroundStyle(tone.metal)
-                    Text("~\(rating.formatted())")
+                        .foregroundStyle(tone.ink)
+                    Text("~\(rating)")
                         .font(.subheadline)
                         .foregroundStyle(tone.ink2)
                 }
@@ -300,10 +400,31 @@ struct HomeLadderCard: View {
     }
 }
 
+/// A rival's portrait, printed in the page's ivory rather than its own neon, so the ladder
+/// keeps one palette while every rival keeps the face it has across the app.
+struct HomeRivalPortrait: View {
+    let rival: Rival
+    let tone: HomeTone
+    let size: CGFloat
+
+    var body: some View {
+        Image(rival.portraitName)
+            .resizable()
+            .scaledToFill()
+            .frame(width: size, height: size)
+            .grayscale(1)
+            .colorMultiply(tone.ivory)
+            .contrast(1.08)
+            .clipShape(Circle())
+            .overlay { Circle().strokeBorder(tone.ink.opacity(0.18), lineWidth: 0.5) }
+            .accessibilityHidden(true)
+    }
+}
+
 // MARK: - Your games
 
-/// Your last games as a tournament scoresheet: the day, the rival, the result, your accuracy
-/// and the moves left to fix. A row opens that game in Rewind.
+/// Your last games as a tournament scoresheet: the day, the rival, the result as a score
+/// sheet writes it (1, ½, 0), your accuracy and the moves left to fix. A row opens that game in Rewind.
 struct HomeScoresheet: View {
     let rows: [HomeGameRow]
     let total: Int
@@ -313,15 +434,19 @@ struct HomeScoresheet: View {
 
     @Environment(\.dynamicTypeSize) private var typeSize
     @ScaledMetric(relativeTo: .subheadline) private var dayWidth: CGFloat = 48
-    @ScaledMetric(relativeTo: .subheadline) private var resultWidth: CGFloat = 58
-    @ScaledMetric(relativeTo: .subheadline) private var accuracyWidth: CGFloat = 56
-    @ScaledMetric(relativeTo: .subheadline) private var reviewWidth: CGFloat = 54
+    @ScaledMetric(relativeTo: .subheadline) private var resultWidth: CGFloat = 50
+    @ScaledMetric(relativeTo: .subheadline) private var accuracyWidth: CGFloat = 66
+    @ScaledMetric(relativeTo: .subheadline) private var fixWidth: CGFloat = 46
 
-    /// Room for the columns: false on a narrow phone, where each game takes two lines.
-    @State private var roomy = true
+    /// The width inside the card, measured, so the columns are used only where they fit.
+    @State private var width: CGFloat = 338
+
+    /// Date, result, accuracy and moves to fix at their size, the gaps between the five
+    /// columns, and room for a rival's name.
+    private var columnsNeed: CGFloat { dayWidth + resultWidth + accuracyWidth + fixWidth + 4 * 8 + 80 }
 
     /// Columns while they fit; at large text sizes or on a narrow phone each game takes two lines instead.
-    private var columns: Bool { typeSize <= .xLarge && roomy }
+    private var columns: Bool { typeSize <= .xLarge && width >= columnsNeed }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -359,30 +484,28 @@ struct HomeScoresheet: View {
             }
             .buttonStyle(HomeRowPressStyle(tone: tone))
         }
-        .onGeometryChange(for: Bool.self) { proxy in
-            // Date, result, accuracy and review take about 260 points; the rival needs the rest.
-            proxy.size.width >= 330
-        } action: { fits in
-            roomy = fits
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.width
+        } action: { measured in
+            width = measured
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, HomeMetrics.inset)
         .padding(.top, 2)
-        .homePane(RoundedRectangle(cornerRadius: 28, style: .continuous), tone: tone)
+        .homePane(RoundedRectangle(cornerRadius: HomeMetrics.cardRadius, style: .continuous), tone: tone)
     }
 
     private var header: some View {
         HStack(spacing: 8) {
             Text("Date").frame(width: dayWidth, alignment: .leading)
             Text("Rival").frame(maxWidth: .infinity, alignment: .leading)
-            Text("Result").frame(width: resultWidth, alignment: .leading)
+            Text("Result").frame(width: resultWidth, alignment: .center)
             Text("Accuracy").frame(width: accuracyWidth, alignment: .trailing)
-            Text("Review").frame(width: reviewWidth, alignment: .trailing)
+            Text("To fix").frame(width: fixWidth, alignment: .trailing)
         }
         .font(.caption2.weight(.semibold))
         .textCase(.uppercase)
-        .tracking(0.6)
+        .tracking(0.5)
         .lineLimit(1)
-        .minimumScaleFactor(0.8)
         .foregroundStyle(tone.ink3)
         .padding(.top, 12)
         .padding(.bottom, 8)
@@ -395,17 +518,19 @@ struct HomeScoresheet: View {
             HStack(spacing: 8) {
                 Text(row.day)
                     .foregroundStyle(tone.ink2)
+                    .minimumScaleFactor(0.85)
                     .frame(width: dayWidth, alignment: .leading)
-                rival(row)
+                Text(row.game.opponent)
+                    .foregroundStyle(tone.ink)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 result(row.game.result)
-                    .frame(width: resultWidth, alignment: .leading)
+                    .frame(width: resultWidth, alignment: .center)
                 Text(row.game.accuracy.map { "\($0)%" } ?? "–")
                     .monospacedDigit()
                     .foregroundStyle(tone.ink)
                     .frame(width: accuracyWidth, alignment: .trailing)
-                fix(row)
-                    .frame(width: reviewWidth, alignment: .trailing)
+                fix(row, words: false)
+                    .frame(width: fixWidth, alignment: .trailing)
             }
             .font(.subheadline)
             .lineLimit(1)
@@ -415,7 +540,8 @@ struct HomeScoresheet: View {
         } else {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
-                    rival(row)
+                    Text(row.game.opponent)
+                        .foregroundStyle(tone.ink)
                     Spacer(minLength: 8)
                     result(row.game.result)
                 }
@@ -423,7 +549,7 @@ struct HomeScoresheet: View {
                     Text(row.day)
                     Text(row.game.accuracy.map { "\($0)% accuracy" } ?? "No accuracy")
                     Spacer(minLength: 8)
-                    fix(row)
+                    fix(row, words: true)
                 }
                 .foregroundStyle(tone.ink2)
             }
@@ -433,48 +559,33 @@ struct HomeScoresheet: View {
         }
     }
 
-    private func rival(_ row: HomeGameRow) -> some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 6) {
-                if let level = row.level {
-                    Image(level.rival.portraitName)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 20, height: 20)
-                        .clipShape(Circle())
-                }
-                Text(row.game.opponent)
-            }
-            .fixedSize()
-            Text(row.game.opponent)
-                .lineLimit(1)
-        }
-        .foregroundStyle(tone.ink)
-    }
-
+    /// The result as a scoresheet writes it: 1 for a win, ½ for a draw, 0 for a loss.
     private func result(_ result: SavedGame.Result) -> some View {
-        HStack(spacing: 5) {
-            Image(systemName: Self.mark(result))
-                .font(.caption2.weight(.bold))
-                .foregroundStyle(result == .win ? tone.metal : tone.ink2)
-            Text(result.title)
-                .foregroundStyle(tone.ink)
-        }
+        Text(Self.score(result))
+            .font(HomeType.score)
+            .foregroundStyle(result == .win ? tone.ink : (result == .draw ? tone.ink2 : tone.ink3))
     }
 
-    private func fix(_ row: HomeGameRow) -> some View {
-        Text(row.toFix > 0 ? "\(row.toFix) to fix" : "–")
-            .foregroundStyle(row.toFix > 0 ? tone.metal : tone.ink3)
-    }
-
-    /// A filled disc for a win, a ring for a loss, half of each for a draw.
-    static func mark(_ result: SavedGame.Result) -> String {
+    static func score(_ result: SavedGame.Result) -> String {
         switch result {
-        case .win: return "circle.fill"
-        case .loss: return "circle"
-        case .draw: return "circle.lefthalf.filled"
-        case .unfinished: return "circle.dotted"
+        case .win: return "1"
+        case .draw: return "½"
+        case .loss: return "0"
+        case .unfinished: return "–"
         }
+    }
+
+    /// The moves left to fix in Rewind: a plain count in the column, words on two lines.
+    private func fix(_ row: HomeGameRow, words: Bool) -> some View {
+        let text: String
+        if row.toFix == 0 {
+            text = words ? "" : "–"
+        } else {
+            text = words ? "\(row.toFix) to fix" : "\(row.toFix)"
+        }
+        return Text(text)
+            .monospacedDigit()
+            .foregroundStyle(row.toFix > 0 ? tone.ink2 : tone.ink3)
     }
 
     private func spoken(_ row: HomeGameRow) -> String {
@@ -507,35 +618,7 @@ struct HomeFriendsCard: View {
             HomeLinkRow(glyph: "plus", title: "Challenge a friend", detail: "Send a game by text or email",
                         tone: tone, action: challenge)
         }
-        .padding(.horizontal, 14)
-        .homePane(RoundedRectangle(cornerRadius: 28, style: .continuous), tone: tone)
-    }
-}
-
-// MARK: - The rest
-
-/// The rest of the app, at the foot of the page: Analyze, your pieces and Settings.
-struct HomeMoreCard: View {
-    let tone: HomeTone
-    let piecesLine: String
-    let actions: HomeActions
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HomeLinkRow(glyph: Glyphs.analyze, title: "Analyze a position", detail: "Photo, screenshot or set it up",
-                        tone: tone, action: actions.analyze)
-            HomeHairline(tone: tone, inset: 46)
-            HomeLinkRow(glyph: Glyphs.army, title: "Your pieces", detail: piecesLine, tone: tone, action: actions.army)
-            HomeHairline(tone: tone, inset: 46)
-            HomeLinkRow(glyph: Glyphs.settings, title: "Settings", detail: "Board look, sound, hints",
-                        tone: tone, action: actions.settings)
-            if let premium = actions.premium {
-                HomeHairline(tone: tone, inset: 46)
-                HomeLinkRow(glyph: "crown", title: "Chess Game Killer Pro", detail: "Everything, with no limits",
-                            tone: tone, action: premium)
-            }
-        }
-        .padding(.horizontal, 14)
-        .homePane(RoundedRectangle(cornerRadius: 28, style: .continuous), tone: tone)
+        .padding(.horizontal, HomeMetrics.inset)
+        .homePane(RoundedRectangle(cornerRadius: HomeMetrics.cardRadius, style: .continuous), tone: tone)
     }
 }

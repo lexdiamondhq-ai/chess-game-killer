@@ -33,9 +33,9 @@ struct HomeActions {
 /// it and moves in on your king while the glass cards rise over it and it slips out of focus.
 ///
 /// The page, top to bottom: a chess clock (resume your game, or start the next one), today's
-/// puzzle and session, the ladder of rivals, the scoresheet of your games, and the rest of
-/// the app. The glass dock holds the five doors. Your own things (rating, games, pieces,
-/// Settings) are in the You panel, from the dock or by pulling the board down.
+/// puzzle and session, the ladder of rivals and the scoresheet of your games. The glass dock
+/// holds the five doors. Your pieces and Settings are in the You panel, from the dock or by
+/// pulling the board down. Each thing has one way in, so nothing is found twice.
 struct HomeView: View {
     let match: MatchController
     let theme: BoardTheme
@@ -100,6 +100,9 @@ struct HomeView: View {
         army.gamesPlayed == 0 ? "Every piece remembers its games" : "\(army.gamesPlayed) games together"
     }
 
+    /// How far above the dock the page starts to fade away.
+    private static let dockFade: CGFloat = 52
+
     // MARK: Body
 
     var body: some View {
@@ -108,7 +111,8 @@ struct HomeView: View {
             let upNext = self.upNext
             ZStack(alignment: .top) {
                 HomeWorld(scroll: scroll, look: look, tone: tone, pieces: match.game.pieces.map(\.piece),
-                          black: upNext.playerColor == .black, center: layout.boardCenter,
+                          black: upNext.playerColor == .black, pool: layout.boardCenter,
+                          restLook: layout.restLook, endLook: layout.crownLook,
                           walk: layout.walk, foot: layout.cardTop)
 
                 page(layout, upNext: upNext)
@@ -124,7 +128,7 @@ struct HomeView: View {
                     youPanel(origin, layout: layout)
                 }
             }
-            .confirmationDialog("Leave your game with \(upNext.rival.name)?", isPresented: $confirmingLeave,
+            .confirmationDialog("Leave your game against \(upNext.rival.name)?", isPresented: $confirmingLeave,
                                 titleVisibility: .visible) {
                 Button("Set up a new game", role: .destructive) {
                     if let level = leavingFor { actions.playRival(level) } else { actions.play() }
@@ -132,7 +136,7 @@ struct HomeView: View {
                 }
                 Button("Keep playing", role: .cancel) { leavingFor = nil }
             } message: {
-                Text("Starting a new game ends this one, and it counts as a loss.")
+                Text("Starting a new game ends this one. It counts as a loss for your army.")
             }
         }
         .environment(\.colorScheme, .dark)
@@ -184,7 +188,8 @@ struct HomeView: View {
                 sections(upNext: upNext)
             }
             .padding(.horizontal, 16)
-            .padding(.bottom, 28)
+            // The last card ends clear of the fade above the dock.
+            .padding(.bottom, Self.dockFade + 16)
             .frame(maxWidth: 640)
             .frame(maxWidth: .infinity)
         }
@@ -201,7 +206,15 @@ struct HomeView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             HomeDock(tone: tone, upNext: upNext, compact: clockGone, actions: actions,
                      openYou: { openYou(.bottom) }, primary: { primary(upNext) })
+                .background(alignment: .top) {
+                    // The page fades away just above the dock and stays hidden under it.
+                    HomeBottomEdge(tone: tone, fade: Self.dockFade)
+                        .padding(.top, -Self.dockFade)
+                        .ignoresSafeArea(edges: .bottom)
+                }
         }
+        // With the You panel open the page steps back, out of focus.
+        .blur(radius: you == nil ? 0 : 12)
         .accessibilityHidden(you != nil)
         .allowsHitTesting(you == nil)
     }
@@ -213,16 +226,18 @@ struct HomeView: View {
             HomeFriendsCard(tone: tone, games: actions.friendGames(), challenge: challenge)
         }
 
-        let streak = training.streak
-        HomeSectionHeader(title: "Today", tone: tone, note: streak > 1 ? "\(streak) days in a row" : nil)
+        // Dated like a newspaper's chess column; it turns over at midnight with the page open.
+        TimelineView(.everyMinute) { context in
+            HomeSectionHeader(title: "Today", tone: tone, note: HomeView.dateline(context.date), dateline: true)
+        }
         HomeTodayCard(puzzle: puzzles.upNext.flatMap(HomePuzzle.init), rating: puzzles.progress.rating,
-                      solvedInARow: puzzles.progress.streak, plan: plan, trainedToday: training.trainedToday,
+                      plan: plan, trainedToday: training.trainedToday,
                       tone: tone, pieceTheme: pieceTheme, solve: actions.puzzles,
                       startSession: actions.trainToday, train: actions.train)
 
         let ladder = HomeLadder(games: vault.games)
         HomeSectionHeader(title: "The ladder", tone: tone,
-                          note: ladder.nextToBeat == nil ? "You lead every rival" : "Beat the next rung to climb")
+                          note: ladder.nextToBeat == nil ? "You lead every rival" : nil)
         HomeLadderCard(ladder: ladder, tone: tone, pieceTheme: pieceTheme, youColor: upNext.playerColor,
                        play: { level in choose(level, upNext) })
 
@@ -233,9 +248,11 @@ struct HomeView: View {
             HomeScoresheet(rows: rows, total: vault.games.count, tone: tone,
                            open: actions.openGame, openAll: actions.rewind)
         }
+    }
 
-        HomeMoreCard(tone: tone, piecesLine: piecesLine, actions: actions)
-            .padding(.top, 30)
+    /// "Thursday, October 23", in the reader's own way of writing a date.
+    static func dateline(_ date: Date) -> String {
+        date.formatted(.dateTime.weekday(.wide).month(.wide).day())
     }
 
     // MARK: The clock's buttons
@@ -251,13 +268,16 @@ struct HomeView: View {
         actions.start(upNext.setup(side: side))
     }
 
-    /// New game (asking first if leaving the game under way counts as a loss), or Change.
+    /// New game (asking first if leaving the game under way counts as a loss), or Change,
+    /// which opens the New Game sheet on the rival the card shows.
     private func secondary(_ upNext: HomeUpNext) {
         if upNext.leavingCosts {
             leavingFor = nil
             confirmingLeave = true
-        } else {
+        } else if upNext.inProgress {
             actions.play()
+        } else {
+            actions.playRival(upNext.level)
         }
     }
 
@@ -305,15 +325,13 @@ struct HomeView: View {
     @ViewBuilder
     private func youPanel(_ origin: YouOrigin, layout: HomeLayout) -> some View {
         let fromTop = origin == .top
-        tone.canvas.opacity(0.55)
+        tone.canvas.opacity(0.7)
             .ignoresSafeArea()
             .onTapGesture { closeYou() }
             .transition(.opacity)
             .accessibilityHidden(true)
-        HomeYouPanel(tone: tone, rating: puzzles.progress.rating, gamesThisWeek: HomeGameRow.thisWeek(vault.games),
-                     streak: training.streak, gamesSaved: vault.games.count, piecesLine: piecesLine,
-                     actions: actions, fromTop: fromTop, close: closeYou)
-            .padding(.horizontal, 12)
+        HomeYouPanel(tone: tone, piecesLine: piecesLine, actions: actions, fromTop: fromTop, close: closeYou)
+            .padding(.horizontal, 16)
             .padding(.top, fromTop ? 6 : 0)
             .padding(.bottom, fromTop ? 0 : 10)
             .frame(maxWidth: 520)
@@ -344,8 +362,16 @@ struct HomeLayout {
     var heroFrame: CGFloat { min(max(width * 1.2, 440), 620) + safeTop * 0.3 }
     /// Where the board's middle sits at rest, from the top of the screen.
     var boardCenter: CGFloat { heroFrame / 2 }
-    /// How far the page scrolls while the camera walks in.
+    /// Where the camera's look point (the near half of the board) sits at rest: high, so the
+    /// pieces rising from it fill the top of the screen.
+    var restLook: CGFloat { heroFrame * 0.323 }
+    /// How far the page scrolls while the camera walks in and the board goes soft.
     var walk: CGFloat { heroFrame * 0.62 }
+    /// Where the king's crown sits once the camera has come in: halfway between the status
+    /// bar and the top of the clock card at that moment.
+    var crownLook: CGFloat {
+        max((safeTop + cardTop - HomeWorld.arrival * walk) / 2, safeTop + 40)
+    }
     /// The dock and the space around it.
     static let dockZone: CGFloat = 76
 

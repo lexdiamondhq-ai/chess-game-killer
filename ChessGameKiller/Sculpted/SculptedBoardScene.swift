@@ -288,6 +288,8 @@ final class SculptedBoardScene {
             if size.width > 1, size.height > 1 { held.aspect = Float(size.width / size.height) }
             // Close-ups come nearer the pieces than the game's camera ever does.
             cameraNode.camera?.zNear = 0.5
+            // The lens follows the held camera too, so the view matches its framing math and its stills.
+            cameraNode.camera?.fieldOfView = CGFloat(held.fieldOfView * 180 / .pi)
             cameraNode.removeAction(forKey: "orbit")
             camera = held
             place(held)

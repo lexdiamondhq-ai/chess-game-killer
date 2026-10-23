@@ -16,10 +16,10 @@ struct HomeTone {
     let ivory: Color
     let onIvory: Color
 
-    /// Text: warm white, then two quieter steps.
+    /// Text: warm white, then two quieter steps. The quietest still reads at small sizes.
     var ink: Color { Color(red: 0.965, green: 0.945, blue: 0.91) }
-    var ink2: Color { ink.opacity(0.7) }
-    var ink3: Color { ink.opacity(0.5) }
+    var ink2: Color { ink.opacity(0.72) }
+    var ink3: Color { ink.opacity(0.6) }
     var hairline: Color { ink.opacity(0.12) }
 
     static func of(_ look: SculptedLook) -> HomeTone {
@@ -53,7 +53,19 @@ enum HomeType {
     static let section = Font.system(.title2, design: .serif, weight: .medium)
     static let title = Font.system(.title3, design: .serif, weight: .medium)
     static let score = Font.system(.body, design: .serif, weight: .medium)
-    static let number = Font.system(.title2, design: .serif, weight: .regular)
+    /// The date over a column, the way a newspaper's chess column is dated.
+    static let dateline = Font.system(.subheadline, design: .serif).italic()
+}
+
+/// One set of measures for every card, so all their edges and insides line up.
+enum HomeMetrics {
+    /// A card's corner.
+    static let cardRadius: CGFloat = 30
+    /// What a card keeps between its edge and what it holds. With the page's own margin,
+    /// everything inside a card (and every section's name) starts 32 points from the screen's edge.
+    static let inset: CGFloat = 16
+    /// A pane inside a card, so its corner follows the card's.
+    static let innerRadius: CGFloat = cardRadius - inset
 }
 
 // MARK: - Glass
@@ -94,6 +106,13 @@ struct HomePane<S: InsettableShape>: ViewModifier {
     @ViewBuilder
     private var surface: some View {
         ZStack {
+            if !isWell {
+                // A soft shadow lifts the pane off the board. It sits under the glass rather than
+                // around it (no compositing group), so the glass still sees the board behind it.
+                shape.fill(Color.black.opacity(0.32))
+                    .blur(radius: 14)
+                    .offset(y: 8)
+            }
             if reduceTransparency {
                 shape.fill(tone.smoke)
                 if isLitWell { shape.fill(tone.ink.opacity(0.1)) }
@@ -117,8 +136,6 @@ struct HomePane<S: InsettableShape>: ViewModifier {
             }
             shape.strokeBorder(rim, lineWidth: contrast == .increased ? 1 : 0.75)
         }
-        .compositingGroup()
-        .shadow(color: .black.opacity(isWell ? 0 : 0.32), radius: 18, y: 10)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
@@ -183,33 +200,36 @@ struct HomeIvoryButtonStyle: ButtonStyle {
                     }
                     .shadow(color: .black.opacity(0.25), radius: 8, y: 4)
             }
-            .contentShape(Capsule())
+            // A compact button still answers a finger's height (44 points) around it.
+            .padding(.vertical, compact ? 2 : 0)
+            .contentShape(Rectangle())
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .opacity(configuration.isPressed ? 0.9 : 1)
             .animation(.spring(response: 0.25, dampingFraction: 0.8), value: configuration.isPressed)
-            // A compact button still answers a finger's width around it.
-            .padding(.vertical, compact ? 2 : 0)
     }
 }
 
-/// The quiet button beside it: clear glass with a fine edge.
+/// The quiet button beside it, or the second action in a card: clear glass with a fine edge.
 struct HomeGlassButtonStyle: ButtonStyle {
     let tone: HomeTone
+    var compact = false
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.headline.weight(.medium))
+            .font(compact ? .subheadline.weight(.semibold) : .headline.weight(.medium))
             .foregroundStyle(tone.ink)
             .lineLimit(1)
             .minimumScaleFactor(0.85)
-            .padding(.horizontal, 20)
-            .frame(minHeight: 52)
+            .padding(.horizontal, compact ? 18 : 20)
+            .frame(minHeight: compact ? 40 : 52)
             .background {
                 Capsule()
                     .fill(tone.ink.opacity(configuration.isPressed ? 0.14 : 0.08))
                     .overlay { Capsule().strokeBorder(tone.ink.opacity(0.18), lineWidth: 0.75) }
             }
-            .contentShape(Capsule())
+            // A compact button still answers a finger's height (44 points) around it.
+            .padding(.vertical, compact ? 2 : 0)
+            .contentShape(Rectangle())
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(.spring(response: 0.25, dampingFraction: 0.8), value: configuration.isPressed)
     }
@@ -241,11 +261,14 @@ struct HomePressStyle: ButtonStyle {
 
 // MARK: - Shared pieces
 
-/// A section's name in New York, with a quiet note or a link on the right.
+/// A section's name in New York, with a quiet note, a dateline or a link on the right.
+/// It starts where the cards' insides start, so the name lines up with what it heads.
 struct HomeSectionHeader: View {
     let title: String
     let tone: HomeTone
     var note: String? = nil
+    /// The note set as a dateline, in New York italic.
+    var dateline = false
     var link: String? = nil
     var action: (() -> Void)? = nil
 
@@ -271,20 +294,21 @@ struct HomeSectionHeader: View {
                 .buttonStyle(.plain)
             } else if let note {
                 Text(note)
-                    .font(.subheadline)
+                    .font(dateline ? HomeType.dateline : .subheadline)
                     .foregroundStyle(tone.ink2)
                     .multilineTextAlignment(.trailing)
             }
         }
-        .padding(.horizontal, 6)
+        .padding(.horizontal, HomeMetrics.inset)
         .padding(.top, 30)
         .padding(.bottom, 8)
     }
 }
 
-/// A row that opens one thing: a chess glyph, a name, a line about it, and a chevron.
+/// A row that opens one thing: a name, a line about it, and a chevron, with a glyph in
+/// front only where it says something the words don't.
 struct HomeLinkRow: View {
-    let glyph: String
+    var glyph: String? = nil
     let title: String
     let detail: String
     let tone: HomeTone
@@ -295,9 +319,11 @@ struct HomeLinkRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 14) {
-                Glyph(name: glyph, size: iconSize)
-                    .foregroundStyle(tone.metal)
-                    .frame(width: iconSize + 6)
+                if let glyph {
+                    Glyph(name: glyph, size: iconSize)
+                        .foregroundStyle(tone.ink2)
+                        .frame(width: iconSize + 6)
+                }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.body.weight(.semibold))

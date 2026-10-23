@@ -18,8 +18,12 @@ final class HomeScroll {
 ///
 /// The board fills the whole screen behind the page, so the camera is tilted down a little
 /// (`anchor`) to stand the board in the top of the screen, where the page leaves it showing.
-/// Playing Black, the same walk happens on Black's side and ends on Black's king.
+/// The walk ends looking at the king's crown. Playing Black, the same walk happens on
+/// Black's side and ends on Black's king.
 enum HomeHeroCamera {
+    /// The lens: the game board's own, a short telephoto, so the pieces keep their shape up close.
+    static let fieldOfView: Float = 22 * .pi / 180
+
     /// At rest, with the look point in the middle of the view.
     static func camera(aspect: Float) -> SculptedCamera {
         camera(aspect: aspect, progress: 0, pull: 0)
@@ -39,15 +43,15 @@ enum HomeHeroCamera {
         var camera = SculptedCamera()
         camera.elevation = (mix(20, 12, t) + 16 * lift) * .pi / 180
         camera.azimuth = (mix(-24, 36, t) + 8 * lift) * .pi / 180
-        var fieldOfView = mix(32, 30, t) * .pi / 180
+        var fieldOfView = Self.fieldOfView
         if widthScale > 1 {
             fieldOfView = 2 * atan(tan(fieldOfView / 2) * widthScale)
         }
         camera.fieldOfView = fieldOfView
-        camera.distance = mix(11, 6, t) + 3 * lift
+        camera.distance = mix(11, 7, t) + 3 * lift
         // The look point, measured as if White sat at the bottom: the board's near half
-        // at rest, the king's side of the back rank at the end of the walk.
-        camera.focus = SIMD3(mix(0, -1.52, t), mix(0, 0.3, t), mix(1.6, 2.6, t) - 0.8 * lift)
+        // at rest, the king's crown at the end of the walk.
+        camera.focus = SIMD3(mix(0, -1.66, t), mix(0, 1.1, t), mix(1.6, 2.6, t) - 0.8 * lift)
         camera.aspect = aspect
         if black {
             // The board seen in a mirror across its middle: Black's corner, ending on Black's king.
@@ -111,7 +115,8 @@ struct HomeHeroBoard: UIViewRepresentable {
 }
 
 /// The world behind the home page: the board standing in a pool of light in a dark room.
-/// It never scrolls away. As the page rises over it the camera walks in on your king, and the
+/// It never scrolls away. As the page rises over it the camera walks in until your king's
+/// crown stands between the status bar and the clock card; then, as the cards cover it, the
 /// picture slips softly out of focus and darkens, so the glass cards float over it.
 struct HomeWorld: View {
     let scroll: HomeScroll
@@ -119,12 +124,20 @@ struct HomeWorld: View {
     let tone: HomeTone
     let pieces: [Piece]
     let black: Bool
-    /// Where the board's look point sits on the screen at rest, in points from the top.
-    let center: CGFloat
-    /// How far the page scrolls while the camera walks in.
+    /// The middle of the pool of light the board stands in, in points from the top.
+    let pool: CGFloat
+    /// Where the camera's look point sits on the screen at rest, in points from the top.
+    let restLook: CGFloat
+    /// Where the king's crown sits once the camera has walked in.
+    let endLook: CGFloat
+    /// How far the page scrolls while the camera walks in and the picture goes soft.
     let walk: CGFloat
     /// Where the board fades into the room, at the top of the clock card.
     let foot: CGFloat
+
+    /// The share of the walk the camera takes to come in. It holds still for the rest,
+    /// sharp for a moment, then soft.
+    static let arrival: CGFloat = 0.65
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var stage = SculptedStage()
@@ -137,10 +150,11 @@ struct HomeWorld: View {
             let size = geo.size
             let y = scroll.y
             let scrolled = min(max(y / max(walk, 1), 0), 1)
-            let progress = reduceMotion ? 0 : scrolled
+            let progress = reduceMotion ? 0 : min(scrolled / Self.arrival, 1)
             let pull = reduceMotion ? 0 : min(max(-y / 150, 0), 1)
-            // Out of focus over the last part of the walk.
-            let frost = Self.smoothstep(0.4, 1, scrolled)
+            // Out of focus only once the camera has come in and held still a moment,
+            // so the soft picture is drawn from where the camera stands.
+            let frost = Self.smoothstep(Self.arrival + 0.07, 1, scrolled)
             ZStack(alignment: .top) {
                 room(size)
                 if SculptedAssets.shared.isLoaded {
@@ -186,16 +200,19 @@ struct HomeWorld: View {
         ZStack {
             tone.canvas
             RadialGradient(colors: [tone.pool.opacity(0.9), tone.pool.opacity(0.28), tone.canvas.opacity(0)],
-                           center: UnitPoint(x: 0.55, y: center / max(size.height, 1)),
+                           center: UnitPoint(x: 0.55, y: pool / max(size.height, 1)),
                            startRadius: 10, endRadius: max(size.width, 320) * 0.95)
         }
     }
 
     private func camera(_ size: CGSize, progress: CGFloat, pull: CGFloat) -> SculptedCamera {
         let height = max(size.height, 1)
+        // The look point rises up the screen as the camera comes in, in step with it.
+        let eased = CGFloat(Ease.smooth(Float(progress)))
+        let lookAt = restLook + (endLook - restLook) * eased
         return HomeHeroCamera.camera(
             aspect: Float(size.width / height),
-            anchor: Float(1 - 2 * center / height),
+            anchor: Float(1 - 2 * lookAt / height),
             progress: Float(progress), pull: Float(pull), black: black,
             widthScale: Float(max(size.width / 440, 1))
         )
@@ -205,10 +222,10 @@ struct HomeWorld: View {
 
     private func softKey(_ size: CGSize) -> String {
         let place = pieces.map { "\($0.color == .white ? "w" : "b")\($0.kind.rawValue)\($0.square)" }.joined()
-        return "\(look.name) \(black) \(Int(size.width))x\(Int(size.height)) \(Int(center)) \(reduceMotion) \(place)"
+        return "\(look.name) \(black) \(Int(size.width))x\(Int(size.height)) \(Int(restLook)) \(Int(endLook)) \(reduceMotion) \(place)"
     }
 
-    /// Draws the end of the walk once, a moment after the page appears, and blurs it.
+    /// Draws where the walk ends once, a moment after the page appears, and blurs it.
     @MainActor
     private func renderSoft(_ size: CGSize) async {
         guard SculptedAssets.shared.isLoaded, size.width > 1, size.height > 1 else { return }

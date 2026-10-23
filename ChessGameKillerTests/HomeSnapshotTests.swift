@@ -89,10 +89,34 @@ final class HomeSnapshotTests: XCTestCase {
         XCTAssertGreaterThan(walked.azimuth - rest.azimuth, 0.8, "The board turns as the page scrolls")
         XCTAssertLessThan(walked.distance, rest.distance * 0.7, "and the camera comes closer")
         XCTAssertGreaterThan(pulled.elevation, rest.elevation, "Pulled down, the camera rises")
-        // At the end of the walk White's king stands in the middle of the picture.
+        // At the end of the walk White's king stands in the middle of the picture, looked at by the crown.
         let king = walked.normalized(SIMD3(0.5, 0.6, 3.5))
         XCTAssertLessThan(abs(king.x), 0.35)
         XCTAssertLessThan(abs(king.y), 0.5)
+        let crown = walked.normalized(SIMD3(0.5, 1.15, 3.5))
+        XCTAssertLessThan(abs(crown.x), 0.1)
+        XCTAssertLessThan(abs(crown.y), 0.15)
+    }
+
+    /// Once the camera has come in, the whole crown, cross and all, stands between the status
+    /// bar and the clock card, in the middle of the screen; at rest the board fills the top.
+    func testTheCrownLandsBetweenTheStatusBarAndTheCard() {
+        let screen = CGSize(width: 402, height: 874)
+        let layout = HomeLayout(size: CGSize(width: 402, height: 874 - 62 - 34),
+                                insets: EdgeInsets(top: 62, leading: 0, bottom: 34, trailing: 0), cardHeight: 190)
+        let cardTopThen = layout.cardTop - HomeWorld.arrival * layout.walk
+        XCTAssertGreaterThan(layout.crownLook, layout.safeTop + 30)
+        XCTAssertLessThan(layout.crownLook, cardTopThen - 30)
+        XCTAssertLessThan(layout.restLook, layout.cardTop - 100, "At rest the board stands in the top of the screen")
+
+        let camera = HomeHeroCamera.camera(aspect: Float(screen.width / screen.height),
+                                           anchor: Float(1 - 2 * layout.crownLook / screen.height),
+                                           progress: 1, pull: 0)
+        let cross = camera.screenPoint(SIMD3(0.5, SculptedCamera.tallest, 3.5), in: screen)
+        let collar = camera.screenPoint(SIMD3(0.5, 1.0, 3.5), in: screen)
+        XCTAssertGreaterThan(cross.y, layout.safeTop + 8, "The cross clears the status bar")
+        XCTAssertLessThan(collar.y, cardTopThen - 12, "The crown is clear of the card")
+        XCTAssertEqual(cross.x, screen.width / 2, accuracy: 24, "The king stands in the middle")
     }
 
     func testTheHeroCameraLooksAtTheBoard() {
