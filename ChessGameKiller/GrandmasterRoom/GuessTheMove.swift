@@ -191,7 +191,7 @@ struct GuessTheMoveView: View {
         GeometryReader { geo in
             let side = max(200, min(geo.size.width - 24, geo.size.height * 0.58))
             VStack(spacing: 12) {
-                RoomHeader(title: game.title, subtitle: "\(game.event), \(String(game.year))") { dismiss() }
+                RoomHeader(title: game.title, subtitle: game.playedAt) { dismiss() }
                 if let runner {
                     HStack {
                         Label(runner.guesses == 0 ? "—" : "\(runner.points) / \(runner.maxPoints)", systemImage: "star.fill")

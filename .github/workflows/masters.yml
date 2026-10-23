@@ -1,0 +1,60 @@
+name: Build master games and opening stats
+
+# Runs on pushes to work branches that change the builder, and by hand.
+# Reads the Lichess broadcast and rated-game databases (CC0) and commits what the
+# Openings door and Guess the Move use. The cloud sandbox can't reach
+# database.lichess.org; Actions can.
+on:
+  push:
+    branches-ignore: [main]
+    paths: [scripts/grandmaster/build_masters.py, .github/workflows/masters.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up python-chess
+        run: pip install chess==1.10.0
+      - name: Master games from Lichess broadcasts
+        run: |
+          set +o pipefail
+          OUT=ChessGameKiller/GrandmasterRoom/Content
+          FILES=$(curl -sSfL https://database.lichess.org/broadcast/list.txt || true)
+          if [ -z "$FILES" ]; then
+            FILES=$(curl -sSfL https://database.lichess.org/ | grep -oE 'https?://[^"]*lichess_db_broadcast_[0-9]{4}-[0-9]{2}\.pgn\.zst|broadcast/lichess_db_broadcast_[0-9]{4}-[0-9]{2}\.pgn\.zst' | sort -u)
+          fi
+          FILES=$(echo "$FILES" | grep -E 'broadcast_[0-9]{4}-[0-9]{2}\.pgn\.zst' | sed -E 's#^(broadcast/)#https://database.lichess.org/\1#' | sort -r | head -24)
+          echo "$FILES"
+          [ -n "$FILES" ] || { echo "No broadcast files found"; exit 1; }
+          for url in $FILES; do curl -sSfL "$url" | zstd -dc; echo; done \
+            | python3 scripts/grandmaster/build_masters.py masters "$OUT"
+          ls -la "$OUT"
+      - name: What players at each level play, from Lichess rated games
+        run: |
+          set +o pipefail
+          OUT=ChessGameKiller/GrandmasterRoom/Content
+          LIST=$(curl -sSfL https://database.lichess.org/standard/list.txt || true)
+          # The newest month first; its first few million games are plenty.
+          URL=$(echo "$LIST" | grep -E 'standard_rated_[0-9]{4}-[0-9]{2}\.pgn\.zst' | sort -r | sed -n 1p)
+          [ -n "$URL" ] || URL=https://database.lichess.org/standard/lichess_db_standard_rated_2026-08.pgn.zst
+          echo "$URL"
+          (curl -sSfL "$URL" | zstd -dc 2>/dev/null || true) \
+            | python3 scripts/grandmaster/build_masters.py club "$OUT" --limit 4000000
+          ls -la "$OUT"
+          head -3 "$OUT/club-stats.tsv"
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ChessGameKiller/GrandmasterRoom/Content/masters-stats.tsv \
+                  ChessGameKiller/GrandmasterRoom/Content/masters-games.json \
+                  ChessGameKiller/GrandmasterRoom/Content/club-stats.tsv
+          git commit -m "Build master games and opening stats from Lichess" || echo "No changes"
+          git pull --rebase origin ${GITHUB_REF_NAME} || true
+          git push origin HEAD:${GITHUB_REF_NAME}

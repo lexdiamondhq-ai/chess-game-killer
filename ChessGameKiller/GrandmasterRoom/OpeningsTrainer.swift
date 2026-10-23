@@ -34,6 +34,9 @@ final class OpeningDrillRunner {
     func start() { advance() }
     func cancel() { pending?.cancel() }
 
+    /// The line's next move, or nil once it's played out.
+    var nextMove: String? { index < moves.count ? moves[index] : nil }
+
     func tap(_ square: Square) {
         guard !isDone, board.isHumanTurn else { return }
         let before = board.moveCount
@@ -352,12 +355,19 @@ private struct OpeningLineView: View {
     let line: OpeningLine
     let theme: BoardTheme
     @Environment(RepertoireStore.self) private var repertoire
+    @Environment(TrainingStore.self) private var training: TrainingStore?
     @State private var side: Piece.Color = .white
     @State private var runner: OpeningDrillRunner?
+    /// A master game from this line, opened in Guess the Move.
+    @State private var modelGame: ClassicGame?
+
+    /// Master games that followed this line, found once.
+    private var modelGames: [ClassicGame] { GrandmasterContent.shared.masterGames(following: line.moves, limit: 6) }
 
     var body: some View {
         GeometryReader { geo in
-            let boardSide = max(200, min(geo.size.width - 24, geo.size.height * 0.56))
+            let boardSide: CGFloat = max(200, min(geo.size.width - 24, geo.size.height * 0.56))
+            ScrollView {
             VStack(spacing: 12) {
                 Picker("Play as", selection: $side) {
                     Text("Play as White").tag(Piece.Color.white)
@@ -395,9 +405,25 @@ private struct OpeningLineView: View {
                     .disabled(repertoire.contains(line, side: side))
                 }
                 .padding(.horizontal, 16)
-                Spacer(minLength: 0)
+                // While testing, the most played move would give the answer away.
+                if let runner, runner.showsMoves || runner.isDone {
+                    OpeningStatsPanel(fen: runner.board.fen, lineMove: runner.nextMove, theme: theme)
+                        .padding(.horizontal, 16)
+                }
+                let games = modelGames
+                if !games.isEmpty {
+                    OpeningModelGames(games: games, theme: theme) { modelGame = $0 }
+                        .padding(.horizontal, 16)
+                }
             }
+            .padding(.bottom, 24)
             .frame(width: geo.size.width)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+        }
+        .fullScreenCover(item: $modelGame) { game in
+            GuessTheMoveView(game: game, theme: theme)
+                .environment(training)
         }
         .navigationTitle(line.variation)
         .navigationBarTitleDisplayMode(.inline)

@@ -65,4 +65,70 @@ final class GrandmasterRoomTests: XCTestCase {
         XCTAssertEqual(runner.hero, .white)
         XCTAssertEqual(runner.maxPoints, 0)
     }
+
+    // MARK: Master games and opening statistics
+
+    func testOpeningStatsParseAndLookUp() throws {
+        let start = Position.standard.fen
+        let key = TrainingChess.key(start)
+        let text = "key\tbook\tmoves\n\(key)\tm\te2e4 60 24 24,d2d4 40 16 20\n\(key)\t2\te2e4 900 450 50\n"
+        let stats = OpeningStats(table: OpeningStats.parse(text))
+        let masters = try XCTUnwrap(stats.entry(fen: start, book: .masters))
+        XCTAssertEqual(masters.total, 100)
+        XCTAssertEqual(masters.moves.first?.uci, "e2e4")
+        XCTAssertEqual(masters.share(of: "d2d4"), 0.4, accuracy: 0.001)
+        XCTAssertEqual(masters.share(of: "g1f3"), 0)
+        XCTAssertEqual(masters.moves[0].blackWins, 12)
+        XCTAssertEqual(masters.moves[0].score(for: .white), 0.6, accuracy: 0.001)
+        XCTAssertEqual(stats.entry(fen: start, book: .band(.to1800))?.total, 900)
+        XCTAssertNil(stats.entry(fen: start, book: .band(.over2100)))
+    }
+
+    func testRatingBands() {
+        XCTAssertEqual(OpeningStats.Band.forPuzzleRating(1000), .under1200)
+        XCTAssertEqual(OpeningStats.Band.forPuzzleRating(1800), .to1800)
+        XCTAssertEqual(OpeningStats.Band.forPuzzleRating(2600), .over2100)
+        XCTAssertEqual(OpeningStats.Band.to1500.range, "1200–1500")
+        XCTAssertEqual(OpeningStats.Book.band(.over2100).code, "4")
+    }
+
+    func testMasterGamesParse() throws {
+        let json = """
+        {"games":[{"id":"m-1","white":"Magnus Carlsen","black":"Anish Giri","event":"Tata Steel","year":2026,
+        "result":"1-0","blurb":"","opening":"Italian Game","whiteElo":2830,"blackElo":2760,"date":"2026.01.20",
+        "moves":"e2e4 e7e5 g1f3 b8c6 f1c4"}]}
+        """
+        let games = GrandmasterContent.parseMasterGames(Data(json.utf8))
+        let game = try XCTUnwrap(games.first)
+        XCTAssertTrue(game.isMasterGame)
+        XCTAssertEqual(game.moves.count, 5)
+        XCTAssertEqual(game.ratings, "2830 – 2760")
+        XCTAssertEqual(game.opening, "Italian Game")
+        XCTAssertEqual(game.hero, .white)
+        let content = GrandmasterContent(games: [], masterGames: games, endgames: [], openings: [])
+        XCTAssertEqual(content.masterGames(following: ["e2e4", "e7e5"]).count, 1)
+        XCTAssertTrue(content.masterGames(following: ["d2d4"]).isEmpty)
+    }
+
+    /// Once the data workflow has run: the master games play legally and the start position has numbers.
+    func testBundledMasterContent() throws {
+        let content = GrandmasterContent.shared
+        try XCTSkipIf(content.masterGames.isEmpty, "masters-games.json not built yet")
+        XCTAssertGreaterThan(content.masterGames.count, 200)
+        let step = max(1, content.masterGames.count / 150)
+        for game in stride(from: 0, to: content.masterGames.count, by: step).map({ content.masterGames[$0] }) {
+            XCTAssertNotNil(TrainingChess.fen(after: game.moves, from: Position.standard.fen), game.id)
+        }
+        let stats = OpeningStats.shared
+        let start = Position.standard.fen
+        let masters = try XCTUnwrap(stats.entry(fen: start, book: .masters))
+        XCTAssertTrue(masters.moves.contains { $0.uci == "e2e4" || $0.uci == "d2d4" })
+        for band in OpeningStats.Band.allCases {
+            XCTAssertNotNil(stats.entry(fen: start, book: .band(band)), band.range)
+        }
+        // Every move kept is legal where it's played.
+        for move in masters.moves {
+            XCTAssertNotNil(Notation.san(of: move.uci, fen: start), move.uci)
+        }
+    }
 }
