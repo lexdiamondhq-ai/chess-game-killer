@@ -413,11 +413,14 @@ final class SculptedBoardScene {
             case .bishop: yaw = -112 * .pi / 180
             default: yaw = 0
             }
+            // The bases' radii, at the game's 1.1 scale (scripts/sculpted/pieces.py and gilded.py),
+            // so the contact shadow ends at the foot and a falling piece tips over its rim.
             switch piece.kind {
-            case .king: baseRadius = 0.36
-            case .queen: baseRadius = 0.35
-            case .pawn: baseRadius = 0.3
-            default: baseRadius = 0.33
+            case .king: baseRadius = 0.34
+            case .queen, .rook: baseRadius = 0.33
+            case .knight: baseRadius = 0.32
+            case .bishop: baseRadius = 0.315
+            case .pawn: baseRadius = 0.285
             }
         }
     }
