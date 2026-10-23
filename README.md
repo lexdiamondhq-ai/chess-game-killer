@@ -67,3 +67,4 @@ Everything Leo teaches is data in `ChessGameKiller/Training/Content`: `course.js
 ## Credits
 - Piece artwork: "cburnett" set by Colin M.L. Burnett, licensed GPLv2+ (via Lichess). The Neon pieces are recolored from it with `scripts/make_neon_pieces.py`.
 - Stockfish, GPLv3, by the Stockfish developers. Because the app includes Stockfish, the app is open source under the GPL too.
+- Puzzles, master games and opening statistics: the Lichess open database (https://database.lichess.org), released under CC0. About 100,000 puzzles (`scripts/puzzles/build_puzzle_pack.py`, workflow `puzzles.yml`), recent broadcast games between players rated 2550+ and "how people play here" numbers for masters and five rating bands (`scripts/grandmaster/build_masters.py`, workflow `masters.yml`). Named openings from lichess-org/chess-openings (CC0).
