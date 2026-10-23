@@ -40,7 +40,7 @@ final class SculptedBoardTests: XCTestCase {
         }
         XCTAssertTrue(gilded[.king]?.contains { $0.finish == .gem } ?? false, "the king lost its amber")
         XCTAssertTrue(gilded[.knight]?.contains { $0.finish == .gem } ?? false, "the knight lost its eyes")
-        XCTAssertFalse(assets.parts[.knight]?.contains { $0.finish == .gem } ?? true, "the classic knight has no gems")
+        XCTAssertTrue(assets.parts[.knight]?.contains { $0.finish == .gem } ?? false, "the classic knight lost its eyes")
         // Loaded once, then shared.
         XCTAssertTrue(assets.parts(for: .gilded)[.knight]?.first?.geometry === gilded[.knight]?.first?.geometry)
         // Looks with the classic set get the classic meshes; Portoro shares the gilded ones.

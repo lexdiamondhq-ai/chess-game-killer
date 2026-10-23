@@ -43,6 +43,8 @@ struct SculptedBoardView: View {
     var browsing: Position?
     /// Called when the player taps the board while looking back.
     var endBrowsing: (() -> Void)?
+    /// Ghost Vision, when the player can hold the board to see ahead.
+    var vision: GhostVision?
 
     /// Width over height: the board seen at an angle is wider than it is tall.
     static let aspect: CGFloat = 1.35
@@ -168,8 +170,19 @@ struct SculptedBoardView: View {
             flipped: flipped,
             lastCapture: game.captureEvents.last,
             halos: halos,
-            finale: finale
+            finale: finale,
+            ghosts: ghosts
         )
+    }
+
+    /// Ghost Vision's steps while the player holds the board.
+    private var ghosts: [SculptedGhostStep] {
+        guard let vision, vision.isHolding, let line = match.ghostLine else { return [] }
+        let focus: Int = vision.shownFocus(steps: line.steps.count)
+        return line.steps.filter { $0.index <= focus }.map { step in
+            SculptedGhostStep(moves: step.moves, captured: step.captured?.square,
+                              opacity: Float(GhostLine.opacity(of: step.index, focus: focus)))
+        }
     }
 
     /// The player's veterans glow: ivory or platinum by side, gold for a Legend, which breathes.
@@ -191,6 +204,7 @@ struct SculptedBoardView: View {
             endBrowsing?()
             return
         }
+        if vision?.swallowsTap == true { return }
         guard let square = stage.scene(for: look).square(at: point) else { return }
         withAnimation(.snappy(duration: 0.22)) { match.tap(square) }
     }

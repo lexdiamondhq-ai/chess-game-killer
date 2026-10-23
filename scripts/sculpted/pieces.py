@@ -106,6 +106,47 @@ def cut(target, cutter):
     old=target.data; target.data=nm
     for p in nm.polygons: p.use_smooth=True
     bpy.data.objects.remove(cutter)
+
+# ---------- fine detail: beading, gadroons, arrow slits ----------
+def beads(name,r,z,n,size,mat,sub=1,phase=0.0):
+    """A ring of n small round beads (pearl beading) centred at radius r, height z: one object."""
+    bm=bmesh.new()
+    for i in range(n):
+        a=TAU*(i+phase)/n
+        bmesh.ops.create_icosphere(bm,subdivisions=sub,radius=size,matrix=Matrix.Translation((r*math.cos(a),r*math.sin(a),z)))
+    me=bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
+    for p in me.polygons: p.use_smooth=True
+    ob=bpy.data.objects.new(name,me); bpy.context.scene.collection.objects.link(ob); me.materials.append(mat)
+    return ob
+def gadroons(z0,z1,n,depth,phase=0.0):
+    """n rounded lobes standing out of the surface between z0 and z1 (a gadrooned cup), fading in and out."""
+    def m(r,z,th):
+        if z<=z0 or z>=z1: return r
+        t=(z-z0)/(z1-z0); w=math.sin(math.pi*t)**0.7
+        return r+depth*w*(abs(math.cos(n*(th+phase)/2))**0.8-0.7)
+    return m
+def compose(*mods):
+    """Several surface modifiers at once: their changes add up."""
+    def m(r,z,th):
+        return r+sum(f(r,z,th)-r for f in mods)
+    return m
+def radius_at(prof,z):
+    """The outermost radius of a profile at height z."""
+    best=0.0
+    for (r0,z0),(r1,z1) in zip(prof,prof[1:]):
+        if min(z0,z1)<=z<=max(z0,z1) and z1!=z0:
+            best=max(best,r0+(r1-r0)*(z-z0)/(z1-z0))
+    return best
+def slits(body,name,r_wall,z0,z1,width,M,angles,depth=0.026):
+    """Arrow slits cut into a tower wall, each with a dark back so it reads as an opening."""
+    zt=z1-width/2
+    pts=[(-width/2,z0),(width/2,z0),(width/2,zt)]+[(width/2*math.cos(a),zt+width/2*math.sin(a)) for a in np.linspace(0,math.pi,10)[1:-1]]+[(-width/2,zt)]
+    backs=[]
+    for i,a in enumerate(angles):
+        cut(body,prism(f'{name}c{i}',pts,r_wall-depth,r_wall+0.1,a))
+        backs.append(prism(f'{name}{i}',pts,r_wall-depth-0.004,r_wall-depth+0.0015,a,shade(M)))
+    return backs
+FRONT=-math.pi/2   # the side of every piece that faces the player
 # ---------- shared base ----------
 TOP=0.125   # the top of every base: the body starts here
 def base_profile(R):
@@ -118,6 +159,10 @@ def base_profile(R):
     p+=cove(R-0.03,0.056,R-0.085,0.1,12)        # a short cove up toward the body
     p+=bead(R-0.085,0.1,0.014,8)                # fine bead
     return p
+def base_beads(name,R,M):
+    """The plinth's fine bead turned into a row of carved beads, in the body's own stone."""
+    r=R-0.085+0.0055; n=int(TAU*r/0.0165)
+    return beads(name,r,0.107,n,0.0082,M['body'])
 def body_start(R): return line(R-0.09,0.114,R-0.095,TOP,2)
 def flutes(z0,z1,n,depth,twist=0.0):
     """n vertical flutes between z0 and z1; twist = fraction of a turn the flutes rotate over the span"""
@@ -159,10 +204,17 @@ def king(M):
     p+=line(0.195,0.824,0.183,0.828,1)
     p+=[(0.183*math.cos(t),0.828+0.085*math.sin(t)) for t in np.linspace(0,math.pi/2*0.86,16)]   # orb dome
     top=p[-1]; p+=line(top[0],top[1],0.0,top[1],3)
-    body=lathe('K',p,mod=flutes(0.19,0.54,28,0.012),mat=M['body'])
+    # a gadrooned crown cup over the fluted body
+    body=lathe('K',p,mod=compose(flutes(0.19,0.54,28,0.012),gadroons(0.668,0.792,20,0.011)),mat=M['body'])
     ring=torus('Kring',0.224,0.0095,0.628,M['metal'])
     zt=top[1]-0.008
-    objs=[body,ring]
+    objs=[body,ring,base_beads('Kbeadbase',R,M)]
+    # pearled crown rim, and four stones set round the crown, one facing the player
+    objs.append(beads('Kbeadcrown',0.2165,0.812,44,0.0112,M['metal']))
+    for i in range(4):
+        a=FRONT+i*math.pi/2; rr=radius_at(p,0.73)+0.006
+        g=uvsphere(f'Kgem{i}',0.026,(rr*math.cos(a),rr*math.sin(a),0.73),M['gem'],(1,1,1))
+        g.scale=(0.55,0.55,1.0); g.rotation_euler=(0,0,a); objs.append(g)
     objs.append(lathe('Kcush',[(0.0,zt-0.005),(0.065,zt-0.005),(0.076,zt+0.012),(0.056,zt+0.03),(0.0,zt+0.03)],seg=128,mat=M['metal']))
     # the cross is what says "king": thick bars, arms three times the bar's width
     H=1.336; bar=0.12; span=0.36
@@ -186,14 +238,15 @@ def queen(M):
     p+=line(RI,ZR,0.172,0.82,4)                 # inner wall
     p+=[(0.172*math.cos(t),0.82+0.05*math.sin(t)) for t in np.linspace(0,math.pi/2*0.8,10)]
     top=p[-1]; p+=line(top[0],top[1],0.0,top[1],3)
-    body=lathe('Q',p,mod=flutes(0.19,0.48,22,0.012,twist=0.16),mat=M['body'])
-    objs=[body]
+    body=lathe('Q',p,mod=compose(flutes(0.19,0.48,22,0.012,twist=0.16),gadroons(0.605,0.745,16,0.01)),mat=M['body'])
+    # pearls strung round the lower collar, carved beads round the plinth
+    objs=[body,base_beads('Qbeadbase',R,M),beads('Qbeadcollar',0.1715,0.526,36,0.0105,M['pearl'])]
     NPT=8; apex=0.845; hw=0.088*(ZR+0.06-apex)/(ZR-apex)
     for i in range(NPT):
         a=TAU*(i+0.5)/NPT
         cut(body,prism(f'Qn{i}',[(-hw,ZR+0.06),(hw,ZR+0.06),(0,apex)],0.12,0.36,a))
     for i in range(NPT):
-        a=TAU*i/NPT; objs.append(uvsphere(f'Qp{i}',0.036,(math.cos(a)*0.252,math.sin(a)*0.252,ZR+0.026),M['pearl']))
+        a=TAU*i/NPT; objs.append(uvsphere(f'Qp{i}',0.043,(math.cos(a)*0.252,math.sin(a)*0.252,ZR+0.026),M['pearl']))
     objs.append(torus('Qring',0.21,0.0085,0.5645,M['metal']))
     zt=top[1]; zb=1.08-0.058
     objs.append(lathe('Qstem',[(0.0,zt-0.01),(0.04,zt-0.01),(0.022,zb-0.02),(0.0,zb-0.02)],seg=96,mat=M['metal']))
@@ -210,7 +263,7 @@ def mitre_profile(z0=0.51,z1=0.935,rmax=0.178,n=48):
     return out
 # the side of the bishop that faces the player: the game and the pictures turn it -112 degrees
 BISHOP_FRONT=math.radians(22)
-def mitre_cut(body, front=BISHOP_FRONT, width=0.075, z=0.745, slope=48):
+def mitre_cut(body, front=BISHOP_FRONT, width=0.09, z=0.745, slope=48):
     """A slot through the mitre, slanting down from the upper left as the player sees it."""
     f=Vector((math.cos(front),math.sin(front),0)); s=Vector((-math.sin(front),math.cos(front),0))
     t=(math.cos(math.radians(slope))*Vector((0,0,1))-math.sin(math.radians(slope))*s).normalized()
@@ -231,9 +284,10 @@ def bishop(M):
     # a metal core inside the mitre: through the cut it shows as a bright diagonal line
     core=lathe('Bmitre',[(0.0,0.52)]+[(max(r-0.012,0.0),z) for r,z in mit[1:-1]]+[(0.0,mit[-1][1]-0.02)],seg=128,mat=M['metal'])
     ring=torus('Bring',0.178,0.008,0.48,M['metal'])
+    pearls=beads('Bbeadcollar',0.1565,0.445,30,0.0098,M['metal'])
     neck=lathe('Bstem',[(0.0,0.925),(0.028,0.925),(0.015,0.95),(0.0,0.95)],seg=96,mat=M['metal'])
     fin=uvsphere('Bfin',0.037,(0,0,1.0-0.037),M['metal'])
-    return group('bishop',[body,core,ring,neck,fin])
+    return group('bishop',[body,core,ring,neck,fin,pearls,base_beads('Bbeadbase',R,M)])
 def rook(M):
     R=0.295; p=base_profile(R); p+=body_start(R)
     # a tower: straight walls, a corbelled ledge, then a wide parapet
@@ -243,23 +297,31 @@ def rook(M):
     p+=cove(0.206,0.494,RO,0.548,10)
     p+=line(RO,0.548,RO,ZT,6)
     p+=line(RO,ZT,RI,ZT,3); p+=line(RI,ZT,RI,FLOOR,4); p+=line(RI,FLOOR,0.0,FLOOR,3)
-    def m(r,z,th):  # masonry courses engraved around the tower
-        if 0.2<z<0.46:
-            for zz in (0.24,0.32,0.4):
-                if abs(z-zz)<0.0045: return r-0.006
-        return r
-    body=lathe('R',p,mod=m,seg=384,mat=M['body'])
+    COURSES=(0.16,0.235,0.31,0.385,0.46)
+    def m(r,z,th):  # ashlar masonry: courses of stone with staggered joints, engraved round the tower
+        if not 0.15<z<0.47: return r
+        D=0.0045; W=0.0042
+        groove=max(max(0.0,1-((z-zz)/W)**2) for zz in COURSES)
+        k=sum(1 for zz in COURSES if z>zz)
+        if 0<k<len(COURSES):
+            n=12; a=(th-FRONT)*n/TAU+(0.5 if k%2 else 0.0)+0.25
+            d=abs(a-round(a))*TAU/n*r
+            groove=max(groove,max(0.0,1-(d/W)**2))
+        return r-D*groove
+    body=lathe('R',p,mod=m,seg=720,mat=M['body'])
     # five square merlons, one at the back, so the player looks through a crenel into the well;
     # the crenels' sides run to the center, so each merlon is a full block of the wall
     for i in range(5):
         a=-math.pi/2+TAU*i/5
         cut(body,crenel(f'Rc{i}',a,math.radians(31),NOTCH,ZT+0.1))
     ring=torus('Rring',0.2,0.0085,0.492,M['metal'])
+    # arrow slits on four sides, so one always faces the player
+    backs=slits(body,'Rslit',0.198,0.25,0.37,0.036,M,[FRONT+i*math.pi/2 for i in range(4)])
     # the floor of the well, darker, so the top reads as a castle and never as a ball
     well=lathe('Rwell',[(0.0,FLOOR-0.002),(RI-0.001,FLOOR-0.002),(RI-0.001,FLOOR+0.004),(0.0,FLOOR+0.004)],seg=192,mat=shade(M))
     # metal caps on the merlons: the battlements catch the light on the light and the dark squares
     caps=merlon_caps('Rcap',RI,RO,ZT,M['metal'])
-    return group('rook',[body,ring,caps,well])
+    return group('rook',[body,ring,caps,well,base_beads('Rbeadbase',R,M)]+backs)
 def pawn(M):
     R=0.26; p=base_profile(R); p+=body_start(R)
     # short and plain under a big round head: the smallest piece, and the only round top
@@ -270,7 +332,7 @@ def pawn(M):
     p+=[(rad*math.sin(a),cz-rad*math.cos(a)) for a in np.linspace(a0,math.pi,40)]
     body=lathe('P',p,mod=flutes(0.15,0.26,16,0.008),mat=M['body'])
     ring=torus('Pring',0.133,0.0075,0.293,M['metal'])
-    return group('pawn',[body,ring])
+    return group('pawn',[body,ring,base_beads('Pbeadbase',R,M)])
 KNIGHT_SCALE=0.9
 def knight(M, verts, faces):
     R=0.29; p=base_profile(R); p+=body_start(R); p+=line(R-0.095,TOP,0.0,TOP,3)
@@ -281,4 +343,17 @@ def knight(M, verts, faces):
     for f in me.polygons: f.use_smooth=True
     h=bpy.data.objects.new('Nh',me); bpy.context.scene.collection.objects.link(h); me.materials.append(M['body'])
     ring=torus('Nring',0.17,0.008,TOP+0.002,M['metal'])
-    return group('knight',[b,h,ring])
+    objs=[b,h,ring,base_beads('Nbeadbase',R,M)]
+    # a mane of metal studs down the crest of the neck and an eye set in each socket, so the
+    # head reads as a horse at a glance, as the gilded knight's gold mane does
+    crest=[(0.45,0.212),(0.53,0.199),(0.61,0.184),(0.69,0.159),(0.77,0.113),(0.81,0.077),(0.85,0.061)]
+    zs=np.linspace(0.47,0.84,12)
+    for i,z in enumerate(zs):
+        x=float(np.interp(z,[c[0] for c in crest],[c[1] for c in crest]))
+        hw=float(np.interp(z,[0.45,0.65,0.77,0.85],[0.11,0.104,0.097,0.073]))
+        # a row of studs down each side of the crest, where the gilded knight has its gold mane
+        for side in (-1,1):
+            objs.append(uvsphere(f'Nmane{i}{side+1}',0.02,((x-0.03)*s,side*(hw-0.012)*s,TOP+(z-0.17)*s),M['metal'],(1,0.6,1.15)))
+    for side in (-1,1):
+        objs.append(uvsphere(f'Ngem{side+1}',0.021,(-0.111*s,side*(0.069*s-0.007),TOP+(0.737-0.17)*s),M['gem'],(1,0.45,1)))
+    return group('knight',objs)

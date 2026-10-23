@@ -983,6 +983,57 @@ const DETAIL = {
   },
 };
 
+
+// ---------------------------------------------------------------- fine detail (every set but Blueprint)
+// What a jeweller adds once the shapes read: pearl beading round the foot and the collars, gadrooned
+// crown cups, cabochons on the king's crown, arrow slits in the rook. All small, none of it changes the
+// outline the pieces are told apart by.
+function beadRing(g, mat, r, y, n, size) {
+  const geo = new THREE.SphereGeometry(size, 12, 8);
+  for (let k = 0; k < n; k++) { const a = k / n * Math.PI * 2; const b = mesh(geo, mat); b.position.set(Math.sin(a) * r, y, Math.cos(a) * r); g.add(b); }
+}
+// lobes standing out of lathe `li` between y0 and y1
+function gadroon(g, n, y0, y1, depth, li = 0) {
+  if (TH.facets) return;
+  const geo = lathes(g)[li].geometry, pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    if (y <= y0 || y >= y1) continue;
+    const r = Math.hypot(x, z); if (r < 1e-4) continue;
+    const t = (y - y0) / (y1 - y0), w = Math.pow(Math.sin(Math.PI * t), 0.7), a = Math.atan2(x, z);
+    const k = (r + depth * w * (Math.pow(Math.abs(Math.cos(n * a / 2)), 0.8) - 0.7)) / r;
+    pos.setX(i, x * k); pos.setZ(i, z * k);
+  }
+  pos.needsUpdate = true; geo.computeVertexNormals();
+}
+function footBeads(g, M, R) { beadRing(g, M.trim, R - 0.024, 0.071, Math.round(Math.PI * 2 * (R - 0.024) / 0.019), 0.0085); }
+const FINE = {
+  pawn(g, M) { footBeads(g, M, 0.25); },
+  knight(g, M) { footBeads(g, M, 0.29); beadRing(g, M.trim, 0.229, 0.172, 44, 0.0085); },
+  bishop(g, M) { footBeads(g, M, 0.275); beadRing(g, M.trim, 0.146, 0.436, 30, 0.0085); },
+  rook(g, M) {
+    footBeads(g, M, 0.285);
+    const pts = lathes(g)[0].geometry.parameters.points, y = 0.32;
+    // two string courses in the trim round the tower
+    for (const yy of [0.19, 0.45]) g.add(torus(radiusAt(pts, yy) + 0.001, 0.0065, yy, M.trim));
+    // arrow slits front, back and sides, dark like the well
+    for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2, r = radiusAt(pts, y);
+      const slit = mesh(new RoundedBoxGeometry(0.032, 0.13, 0.03, 4, 0.0155), M.well);
+      slit.position.set(Math.sin(a) * (r - 0.008), y, Math.cos(a) * (r - 0.008)); slit.rotation.y = a; g.add(slit); }
+  },
+  queen(g, M) {
+    footBeads(g, M, 0.3); gadroon(g, 16, 0.6, 0.79, 0.009);
+    beadRing(g, M.trim, 0.168, 0.578, 34, 0.0088);
+  },
+  king(g, M) {
+    footBeads(g, M, 0.31); gadroon(g, 18, 0.652, 0.842, 0.01);
+    beadRing(g, M.trim, 0.176, 0.629, 36, 0.009);
+    const pts = lathes(g)[0].geometry.parameters.points, y = 0.76;
+    for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2, r = radiusAt(pts, y) + 0.004;
+      const c = sphere(0.022, 0, M.gem); c.scale.set(1, 1.25, 0.5); c.position.set(Math.sin(a) * r, y, Math.cos(a) * r); c.rotation.y = a; g.add(c); }
+  },
+};
+
 // ---------------------------------------------------------------- materials per side
 // Light pieces darken toward their outline, as a real ivory piece falls into shade at its edges,
 // so they keep a contour on light squares. Dark pieces keep their outline bright from the strip
@@ -1036,6 +1087,7 @@ function piece(type, side, x, z, rotY = 0) {
   const g = builders[type](MATS[side]);
   g.position.set(x, 0, z);
   if (TH.wire) DETAIL[type](g, MATS[side]);
+  else if (!Q.has('plain')) FINE[type](g, MATS[side]);
   if (type === 'knight') g.rotation.y = rotY + (KNIGHT_PROFILE ? Math.PI + P('kr', 0.3) : (side === 'w' ? P('kw', 2.25) : P('kb', -2.0)));
   else g.rotation.y = rotY;
   scene.add(g);

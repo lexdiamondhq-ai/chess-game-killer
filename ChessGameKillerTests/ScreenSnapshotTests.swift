@@ -164,6 +164,30 @@ final class ScreenSnapshotTests: XCTestCase {
         }
     }
 
+    /// Ghost Vision held on the whole game screen: Bg5 h6 Bxf6 Qxf6 as see-through pieces,
+    /// fainter each move, trails of dots and red corners on the two pieces taken. Then slid
+    /// back to the second move, flat.
+    func testGhostVisionOnTheGameScreen() throws {
+        defaults.set(false, forKey: "matchRival")
+        defaults.set(false, forKey: "showBestMoves")
+        let fen = "r1bqk2r/ppp2ppp/2np1n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQK2R w KQkq - 0 6"
+        let shots: [(id: String, threeD: Bool, focus: Int?)] = [("gilded", true, nil), ("gilded", false, nil), ("midnight", false, 1)]
+        for shot in shots {
+            defaults.set(shot.id, forKey: "boardTheme")
+            defaults.set(shot.threeD, forKey: "sculpted3D")
+            let engine = FakeEngine(scripted: [fen: [
+                EngineLine(moves: ["c1g5", "h7h6", "g5f6", "d8f6"], evaluation: .centipawns(35)),
+                EngineLine(moves: ["e1g1"], evaluation: .centipawns(25)),
+            ]])
+            let match = MatchController(engine: engine, sounds: nil)
+            let position = try XCTUnwrap(Position(fen: fen))
+            match.start(MatchController.Setup(opponent: .computer, playerColor: .white, level: .beginner), from: position)
+            let name = "ghost-\(shot.id)\(shot.threeD ? "-3d" : "-flat")\(shot.focus.map { "-step\($0 + 1)" } ?? "")"
+            try snapshot(name, match: match, wait: 2.5, vision: GhostVision(holding: true, focus: shot.focus))
+            XCTAssertEqual(match.ghostLine?.steps.count, 4)
+        }
+    }
+
     /// The coach unfolded over a game in progress: the players fold into one line.
     func testCoachOpen() throws {
         defaults.set("gilded", forKey: "boardTheme")
@@ -193,13 +217,13 @@ final class ScreenSnapshotTests: XCTestCase {
     /// waits `settle` seconds more.
     private func snapshot(_ name: String, startsWithNewGame: Bool = false, trayOpen: Bool = false,
                           match: MatchController? = nil, coachOpen: Bool = false, size: CGSize? = nil,
-                          wait: TimeInterval = 3, then play: (() -> Void)? = nil, settle: TimeInterval = 0) throws {
+                          wait: TimeInterval = 3, vision: GhostVision? = nil, then play: (() -> Void)? = nil, settle: TimeInterval = 0) throws {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let window = UIWindow(windowScene: scene)
         window.frame = size.map { CGRect(origin: .zero, size: $0) } ?? scene.coordinateSpace.bounds
         window.rootViewController = UIHostingController(rootView: ContentView(
             startsWithNewGame: startsWithNewGame, trayOpen: trayOpen, startsAtHome: false,
-            match: match ?? Self.gameInProgress(), coachOpen: coachOpen))
+            match: match ?? Self.gameInProgress(), coachOpen: coachOpen, vision: vision))
         window.makeKeyAndVisible()
         RunLoop.main.run(until: Date().addingTimeInterval(wait))
         if startsWithNewGame {

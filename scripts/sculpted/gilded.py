@@ -6,7 +6,8 @@
 import bpy, bmesh, math, numpy as np, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pieces import (arc, bead, cove, ogee, line, lathe, uvsphere, rbox, cut, group, mitre_profile, mitre_cut,
-                    prism, crenel, shade, ring_lathe, merlon_caps, TAU)
+                    prism, crenel, shade, ring_lathe, merlon_caps, TAU,
+                    beads, gadroons, compose, radius_at, slits, FRONT)
 
 FOOT = 0.118          # top of every base: the piece's body starts here
 
@@ -31,6 +32,12 @@ def base_profile(R):
     p += arc(R - 0.056, 0.102, 0.006, -math.pi / 2, 0, 4)
     p += arc(R - 0.056, 0.112, 0.006, 0, math.pi / 2, 4)
     return p
+
+
+def band_beads(name, R, M):
+    """Gold beads strung along the recessed band, so it reads as a row of pearls in gold."""
+    r = R - 0.064 + 0.001; n = int(TAU * r / 0.021)
+    return beads(name, r, 0.083, n, 0.0098, M['metal'])
 
 
 def band(name, R, M):
@@ -70,7 +77,7 @@ def knight(M, parts, fin):
     The muzzle points toward -x, like the classic knight."""
     R = 0.3
     p = base_profile(R) + line(R - 0.056, FOOT, 0.0, FOOT, 3)
-    objs = [lathe('Nb', p, mat=M['body']), band('Nband', R, M)]
+    objs = [lathe('Nb', p, mat=M['body']), band('Nband', R, M), band_beads('Nbeadband', R, M)]
     objs.append(mesh_object('Nh', *parts['k'], M['body']))
     objs.append(mesh_object('Nmane', *parts['g'], M['metal']))
     objs.append(mesh_object('Ngem', *parts['e'], M['gem']))
@@ -135,10 +142,15 @@ def king(M):
     p += line(0.195, 0.824, 0.183, 0.828, 1)
     p += [(0.183 * math.cos(t), 0.828 + 0.085 * math.sin(t)) for t in np.linspace(0, math.pi / 2 * 0.86, 16)]
     top = p[-1]; p += line(top[0], top[1], 0.0, top[1], 3)
-    objs = [lathe('K', p, mat=M['body']), band('Kband', R, M)]
+    objs = [lathe('K', p, mod=gadroons(0.668, 0.792, 20, 0.011), mat=M['body']), band('Kband', R, M), band_beads('Kbeadband', R, M)]
+    # four amber stones round the gadrooned crown, one facing the player
+    for i in range(4):
+        a = FRONT + i * math.pi / 2; rr = radius_at(p, 0.73) + 0.006
+        g = uvsphere(f'Kgem{i}', 0.026, (rr * math.cos(a), rr * math.sin(a), 0.73), M['gem'])
+        g.scale = (0.55, 0.55, 1.0); g.rotation_euler = (0, 0, a); objs.append(g)
     objs += stripes('Kst', p[:body_top], 0.535, M)
     objs.append(flat_band('Kring', 0.234, 0.612, 0.644, M))
-    objs.append(flat_band('Kcrown', 0.2215, 0.801, 0.823, M))
+    objs.append(beads('Kbeadcrown', 0.2215, 0.812, 44, 0.0118, M['metal']))
     zt = top[1] - 0.008
     objs.append(lathe('Kcush', [(0.0, zt - 0.005), (0.065, zt - 0.005), (0.076, zt + 0.012), (0.056, zt + 0.03), (0.0, zt + 0.03)], seg=128, mat=M['metal']))
     # the classic king's thick cross, in gold, an amber stone either side of its middle
@@ -166,14 +178,14 @@ def queen(M):
     p += line(RI, ZR, 0.172, 0.82, 4)
     p += [(0.172 * math.cos(t), 0.82 + 0.05 * math.sin(t)) for t in np.linspace(0, math.pi / 2 * 0.8, 10)]
     top = p[-1]; p += line(top[0], top[1], 0.0, top[1], 3)
-    body = lathe('Q', p, mat=M['body'])
-    objs = [body, band('Qband', R, M)]
+    body = lathe('Q', p, mod=gadroons(0.605, 0.745, 16, 0.01), mat=M['body'])
+    objs = [body, band('Qband', R, M), band_beads('Qbeadband', R, M), beads('Qbeadcollar', 0.1715, 0.526, 36, 0.0105, M['metal'])]
     NPT = 8; apex = 0.845; hw = 0.088 * (ZR + 0.06 - apex) / (ZR - apex)
     for i in range(NPT):
         a = TAU * (i + 0.5) / NPT
         cut(body, prism(f'Qn{i}', [(-hw, ZR + 0.06), (hw, ZR + 0.06), (0, apex)], 0.12, 0.36, a))
     for i in range(NPT):
-        a = TAU * i / NPT; objs.append(uvsphere(f'Qball{i}', 0.036, (math.cos(a) * 0.252, math.sin(a) * 0.252, ZR + 0.026), M['metal']))
+        a = TAU * i / NPT; objs.append(uvsphere(f'Qball{i}', 0.043, (math.cos(a) * 0.252, math.sin(a) * 0.252, ZR + 0.026), M['metal']))
     objs += stripes('Qst', p[:body_top], 0.475, M)
     objs.append(flat_band('Qring', 0.2195, 0.5505, 0.5785, M))
     objs.append(sleeve('Qcrown', p, 0.79, 0.816, M))
@@ -194,7 +206,7 @@ def bishop(M):
     mit = mitre_profile(); p += mit
     body = lathe('B', p, mat=M['body'])
     mitre_cut(body)
-    objs = [body, band('Bband', R, M)]
+    objs = [body, band('Bband', R, M), band_beads('Bbeadband', R, M), beads('Bbeadcollar', 0.1565, 0.445, 30, 0.0098, M['metal'])]
     objs.append(lathe('Bmitre', [(0.0, 0.52)] + [(max(r - 0.012, 0.0), z) for r, z in mit[1:-1]] + [(0.0, mit[-1][1] - 0.02)],
                       seg=128, mat=M['metal']))
     objs += stripes('Bst', p[:body_top], 0.395, M, widths=(0.012, 0.012, 0.012), gap=0.011)
@@ -219,7 +231,9 @@ def rook(M):
     for i in range(5):
         a = -math.pi / 2 + TAU * i / 5
         cut(body, crenel(f'Rc{i}', a, math.radians(31), NOTCH, ZT + 0.1))
-    objs = [body, band('Rband', R, M)]
+    objs = [body, band('Rband', R, M), band_beads('Rbeadband', R, M)]
+    # arrow slits on four sides, under the gold stripes
+    objs += slits(body, 'Rslit', 0.199, 0.19, 0.33, 0.036, M, [FRONT + i * math.pi / 2 for i in range(4)])
     objs += stripes('Rst', p[:body_top], 0.43, M)
     objs.append(flat_band('Rring', 0.209, 0.466, 0.492, M))
     # gold caps on the merlons, so the battlements catch the light on every square
@@ -238,7 +252,7 @@ def pawn(M):
     p += line(0.115, 0.306, 0.06, 0.316, 2)
     rad = 0.13; a0 = math.asin(0.06 / rad); cz = 0.316 + rad * math.cos(a0)
     p += [(rad * math.sin(a), cz - rad * math.cos(a)) for a in np.linspace(a0, math.pi, 40)]
-    objs = [lathe('P', p, mat=M['body']), band('Pband', R, M)]
+    objs = [lathe('P', p, mat=M['body']), band('Pband', R, M), band_beads('Pbeadband', R, M)]
     objs += stripes('Pst', p[:body_top], 0.25, M, widths=(0.012, 0.012), gap=0.011)
     objs.append(flat_band('Pring', 0.1445, 0.281, 0.305, M))
     return group('pawn', objs)
