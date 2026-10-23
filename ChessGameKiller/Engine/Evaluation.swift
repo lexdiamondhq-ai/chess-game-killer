@@ -27,12 +27,13 @@ enum Evaluation: Equatable, Sendable, Codable {
         }
     }
 
-    /// Short label like "+1.3", "-0.4" or "M3".
+    /// Short label like "+1.3", "-0.4" or "M3". A level position reads "0.0", never "-0.0".
     var label: String {
         switch self {
         case .centipawns(let cp):
-            let pawns = Double(cp) / 100
-            return pawns >= 0 ? String(format: "+%.1f", pawns) : String(format: "%.1f", pawns)
+            let tenths = (Double(cp) / 10).rounded()
+            if tenths == 0 { return "0.0" }
+            return String(format: tenths > 0 ? "+%.1f" : "%.1f", tenths / 10)
         case .mate(let n):
             return n > 0 ? "M\(n)" : "-M\(abs(n))"
         }

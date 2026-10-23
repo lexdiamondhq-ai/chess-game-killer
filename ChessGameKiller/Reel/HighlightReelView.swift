@@ -16,7 +16,7 @@ struct ReelFrame: View {
             ThemeBackdrop(theme: theme)
             VStack(spacing: 0) {
                 Text("CHESS GAME KILLER")
-                    .font(.system(size: 13, weight: .heavy, design: .rounded))
+                    .font(.system(size: 13, weight: .heavy, design: .themed))
                     .tracking(3)
                     .foregroundStyle(accent)
                     .padding(.top, 34)
@@ -45,15 +45,20 @@ struct ReelFrame: View {
         let shown = min(1, progress * 3)
         return VStack(spacing: 18) {
             Text("\(reel.player) vs \(reel.opponent)")
-                .font(.system(size: 34, weight: .bold, design: .rounded))
+                .font(.system(size: 34, weight: .bold, design: .themed))
                 .multilineTextAlignment(.center)
             resultBadge
             HStack(spacing: 18) {
                 if let accuracy = reel.accuracy {
                     stat("\(accuracy)%", "accuracy")
                 }
-                stat("\(reel.moveCount)", "moves")
-                stat("\(reel.highlights.count)", reel.highlights.count == 1 ? "highlight" : "highlights")
+                // A zero says nothing, so it isn't shown.
+                if reel.moveCount > 0 {
+                    stat("\(reel.moveCount)", reel.moveCount == 1 ? "move" : "moves")
+                }
+                if !reel.highlights.isEmpty {
+                    stat("\(reel.highlights.count)", reel.highlights.count == 1 ? "highlight" : "highlights")
+                }
             }
         }
         .opacity(shown)
@@ -68,21 +73,21 @@ struct ReelFrame: View {
         return VStack(spacing: 16) {
             HStack {
                 Text(highlight.kind.title.uppercased())
-                    .font(.system(size: 14, weight: .heavy, design: .rounded))
+                    .font(.system(size: 14, weight: .heavy, design: .themed))
                     .tracking(1.5)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                    .background(highlight.moment.grade.color.opacity(0.22), in: Capsule())
-                    .foregroundStyle(highlight.moment.grade.color)
+                    .background(moment.grade.color(on: theme).opacity(0.22), in: Capsule())
+                    .foregroundStyle(moment.grade.color(on: theme))
                 Spacer()
                 if let piece = highlight.piece {
                     Label(piece, systemImage: "shield.lefthalf.filled")
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundStyle(theme.sideColor(reel.playerColor))
+                        .font(.system(size: 15, weight: .bold, design: .themed))
+                        .foregroundStyle(theme.ink(for: reel.playerColor))
                         .lineLimit(1)
                 }
                 Text("Move \((moment.ply + 1) / 2)")
-                    .font(.system(size: 15, weight: .semibold, design: .rounded).monospacedDigit())
+                    .font(.system(size: 15, weight: .semibold, design: .themed).monospacedDigit())
                     .foregroundStyle(.secondary)
             }
             PositionBoard(draft: PositionDraft(fen: fen) ?? .empty, theme: theme,
@@ -91,19 +96,19 @@ struct ReelFrame: View {
                 .scaleEffect(landed ? 1 : 0.985)
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(moment.san + glyph(moment.grade))
-                    .font(.system(size: 40, weight: .heavy, design: .rounded))
-                    .foregroundStyle(landed ? moment.grade.color : .primary)
+                    .font(.system(size: 40, weight: .heavy, design: .themed))
+                    .foregroundStyle(landed ? moment.grade.color(on: theme) : .primary)
                 Spacer()
                 ReelEvalBar(chances: landed ? moment.after : moment.before, theme: theme)
                     .frame(width: 120, height: 10)
             }
             Text(highlight.line)
-                .font(.system(size: 19, weight: .semibold, design: .rounded))
+                .font(.system(size: 19, weight: .semibold, design: .themed))
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
             if highlight.kind == .blunder, let best = moment.best, landed {
                 Text("\(best) was the move.")
-                    .font(.system(size: 16, weight: .medium, design: .rounded))
+                    .font(.system(size: 16, weight: .medium, design: .themed))
                     .foregroundStyle(.secondary)
             }
         }
@@ -118,34 +123,35 @@ struct ReelFrame: View {
                 .frame(maxWidth: 260)
             resultBadge
             Text(reel.endLine)
-                .font(.system(size: 20, weight: .semibold, design: .rounded))
+                .font(.system(size: 20, weight: .semibold, design: .themed))
                 .multilineTextAlignment(.center)
             if let hero = reel.hero {
                 VStack(spacing: 4) {
                     Text("PIECE OF THE MATCH")
-                        .font(.system(size: 12, weight: .heavy, design: .rounded))
+                        .font(.system(size: 12, weight: .heavy, design: .themed))
                         .tracking(1.5)
                         .foregroundStyle(ArmyRank.gold)
                     Text(hero)
-                        .font(.system(size: 17, weight: .semibold, design: .rounded))
+                        .font(.system(size: 17, weight: .semibold, design: .themed))
                         .multilineTextAlignment(.center)
                 }
             }
             Text("Coached by Leo · Chess Game Killer")
-                .font(.system(size: 14, weight: .medium, design: .rounded))
+                .font(.system(size: 14, weight: .medium, design: .themed))
                 .foregroundStyle(.secondary)
         }
         .opacity(min(1, progress * 4))
     }
 
+    /// The result as it is for the player: the accent for a win, quiet otherwise.
     private var resultBadge: some View {
         let (text, color): (String, Color) = switch reel.result {
-        case .win: ("WIN", MoveReview.Grade.best.color)
-        case .loss: ("LOSS", MoveReview.Grade.blunder.color)
+        case .win: ("WIN", accent)
+        case .loss: ("LOSS", .secondary)
         case .draw: ("DRAW", .secondary)
         }
         return Text(text)
-            .font(.system(size: 22, weight: .black, design: .rounded))
+            .font(.system(size: 22, weight: .black, design: .themed))
             .tracking(4)
             .padding(.horizontal, 22)
             .padding(.vertical, 8)
@@ -157,9 +163,9 @@ struct ReelFrame: View {
     private func stat(_ value: String, _ label: String) -> some View {
         VStack(spacing: 2) {
             Text(value)
-                .font(.system(size: 26, weight: .bold, design: .rounded).monospacedDigit())
+                .font(.system(size: 26, weight: .bold, design: .themed).monospacedDigit())
             Text(label)
-                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .font(.system(size: 13, weight: .medium, design: .themed))
                 .foregroundStyle(.secondary)
         }
     }
@@ -245,6 +251,8 @@ struct HighlightReelView: View {
             .padding(.top, 8)
         }
         .onAppear {
+            // A victory theme still playing would talk over Leo.
+            SoundPlayer.shared.stopAll(fade: 0.4)
             CoachVoice.shared.beginLesson()
             started = Date()
         }

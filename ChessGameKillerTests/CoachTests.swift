@@ -24,7 +24,10 @@ final class CoachTests: XCTestCase {
     func testLabels() {
         XCTAssertEqual(Evaluation.centipawns(130).label, "+1.3")
         XCTAssertEqual(Evaluation.centipawns(-46).label, "-0.5")
-        XCTAssertEqual(Evaluation.centipawns(0).label, "+0.0")
+        XCTAssertEqual(Evaluation.centipawns(0).label, "0.0")
+        // A level position never flickers between "+0.0" and "-0.0".
+        XCTAssertEqual(Evaluation.centipawns(-3).label, "0.0")
+        XCTAssertEqual(Evaluation.centipawns(4).label, "0.0")
         XCTAssertEqual(Evaluation.mate(3).label, "M3")
         XCTAssertEqual(Evaluation.mate(-1).label, "-M1")
     }

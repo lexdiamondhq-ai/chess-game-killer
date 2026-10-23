@@ -317,8 +317,11 @@ struct SculptedLook {
     var accent = UIColor(red: 0.37, green: 0.56, blue: 1.0, alpha: 1)
     var check = UIColor(red: 1.0, green: 0.23, blue: 0.3, alpha: 1)
     var platinumMark = UIColor(red: 0.86, green: 0.88, blue: 0.93, alpha: 1)
-    var lastMove = UIColor.white
-    var lastMoveAlpha: CGFloat = 0.13
+    /// A gold wash on the last move's squares, strong enough to show on cream stone too.
+    var lastMove = UIColor(red: 0.851, green: 0.663, blue: 0.169, alpha: 1)
+    var lastMoveAlpha: CGFloat = 0.4
+    /// The warm glow under a fallen king.
+    var finaleGlow = UIColor(red: 0.96, green: 0.78, blue: 0.43, alpha: 1)
 }
 
 extension SculptedLook {
@@ -350,7 +353,6 @@ extension SculptedLook {
         look.stoneCoat = 0.5
         look.lacquerRoughness = 0.28
         look.lacquerCoat = 0.7
-        look.lastMoveAlpha = 0.15
         return look
     }
 
@@ -406,6 +408,9 @@ extension SculptedLook {
         look.squares = "sculpted-squares-bordeaux"
         look.lacquer = UIColor(red: 0.05, green: 0.04, blue: 0.04, alpha: 1)
         look.accent = UIColor(red: 0.92, green: 0.7, blue: 0.34, alpha: 1)
+        // Yellow-green, so the last move doesn't read as one of the gold marks.
+        look.lastMove = UIColor(red: 0.725, green: 0.761, blue: 0.29, alpha: 1)
+        look.lastMoveAlpha = 0.45
         return look
     }()
 
@@ -416,6 +421,9 @@ extension SculptedLook {
         look.squares = "sculpted-squares-midnight"
         look.lacquer = UIColor(red: 0.04, green: 0.045, blue: 0.06, alpha: 1)
         look.accent = UIColor(red: 0.95, green: 0.74, blue: 0.36, alpha: 1)
+        // Yellow-green, so the last move doesn't read as one of the gold marks.
+        look.lastMove = UIColor(red: 0.725, green: 0.761, blue: 0.29, alpha: 1)
+        look.lastMoveAlpha = 0.45
         return look
     }()
 }

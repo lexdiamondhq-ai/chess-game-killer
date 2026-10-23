@@ -25,7 +25,7 @@ struct ExecutivePlate: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
-                RivalRemark(match: match, enabled: isComputer) {
+                PlateRemark(match: match, theme: theme, isRival: isComputer) {
                     HStack(spacing: 6) {
                         if inCheck {
                             CheckTag(color: theme.check)
@@ -93,9 +93,7 @@ struct ExecutivePlate: View {
     }
 
     private var name: String {
-        if isComputer { return match.setup.level.rival.name }
-        if match.setup.opponent == .computer { return "You" }
-        return theme.name(of: color)
+        isComputer ? match.setup.level.rival.name : "You"
     }
 
     private var status: String {
@@ -231,7 +229,7 @@ struct ExecutiveMatchTitle: View {
     }
 
     private var kicker: String {
-        let opponent = match.setup.opponent == .computer ? "vs \(match.setup.level.rival.name)" : "Two players"
+        let opponent = "vs \(match.setup.level.rival.name)"
         let control = match.setup.timeControl
         guard control.isTimed else { return opponent }
         return "\(opponent) · \(control.rawValue.replacingOccurrences(of: "+", with: " + "))"

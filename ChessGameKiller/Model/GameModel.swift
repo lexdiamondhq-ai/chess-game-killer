@@ -69,6 +69,9 @@ final class GameModel {
     private(set) var ledger: PieceLedger?
     /// Colors a person moves by tapping. The computer's color is left out.
     var humanColors: Set<Piece.Color> = [.white, .black]
+    /// The check last called out over the board (by `moveCount`), and when its callout comes
+    /// and goes. It is kept with the game, so a board drawn again never calls a check twice.
+    @ObservationIgnored var checkCallout: (move: Int, from: Date, until: Date)?
 
     /// Snapshots taken before each move, for undo.
     private var history: [Snapshot] = []
@@ -360,7 +363,8 @@ final class GameModel {
         syncPieces()
     }
 
-    private func clearSelection() {
+    /// Lets go of the selected piece, so no piece is lifted and no move is marked.
+    func clearSelection() {
         selected = nil
         targets = []
     }
@@ -457,7 +461,7 @@ extension Board.State.DrawReason {
         case .agreement: return "agreement"
         case .fiftyMoves: return "the 50-move rule"
         case .insufficientMaterial: return "insufficient material"
-        case .repetition: return "repetition"
+        case .repetition: return "threefold repetition"
         case .stalemate: return "stalemate"
         }
     }

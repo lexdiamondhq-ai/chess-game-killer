@@ -13,12 +13,12 @@ struct ContentView: View {
     @State private var showingSettings = false
     @State private var showingAnalyze = false
     @State private var coachExpanded = false
-    @State private var coachPeeking = false
     @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .gilded
     @AppStorage("matchRival") private var matchRival = false
     @AppStorage("showBestMoves") private var showBestMoves = false
     @AppStorage("showSecondBest") private var showSecondBest = true
     @AppStorage("coachVerdicts") private var showVerdicts = true
+    @AppStorage("haptics") private var hapticsOn = true
     @State private var training = TrainingStore.live()
     @State private var coach = GameCoach()
     @State private var showingTraining = false
@@ -60,13 +60,28 @@ struct ContentView: View {
         }
         return .named(themeID)
     }
-    /// The orb is stretched or unfolded, so nothing else fits beside it.
-    private var coachIsWide: Bool { coachExpanded || coachPeeking }
-    /// The board is out of sight: the app is in the background, or training covers the game.
-    /// The clock waits while it is.
+    /// The orb is unfolded, so nothing else fits beside it.
+    private var coachIsWide: Bool { coachExpanded }
+    /// The board is out of sight: the app is in the background, or another screen covers the game.
+    /// The clock and the rival wait while it is.
     private var boardHidden: Bool {
         scenePhase != .active || showingHome || showingTraining || showingArmy || showingPuzzles || showingGames
+            || showingNewGame || showingSettings || showingAnalyze
             || coach.presentedLesson != nil || coach.presentedSession != nil
+    }
+    /// Starting a game now would cost the one in progress: the rival it is against, so the
+    /// screens that start games can ask first.
+    private var forfeits: String? {
+        match.newGameForfeits ? match.opponentName : nil
+    }
+    /// Who "Play from here" plays: the rival and clock of the game under way, or of the last one picked.
+    private var fromHereSetup: MatchController.Setup {
+        match.hasStarted ? match.setup : NewGameSheet.savedSetup()
+    }
+    /// While a game is under way, looking at the engine's lines for it is help, like Undo.
+    private var analyzeGame: (() -> Void)? {
+        guard match.canResign else { return nil }
+        return { [match] in match.markAssisted() }
     }
 
     private static let spacing: CGFloat = 12
@@ -99,6 +114,11 @@ struct ContentView: View {
                     army.record(ledger, playerColor: setup.playerColor, won: false,
                                 stakes: GameStakes(level: setup.level, assisted: assisted))
                 }
+                // Every grade reaches the coach, shown or not, so real mistakes are saved to practice.
+                match.onReview = { [weak match, coach, training] review, latest in
+                    guard let match else { return }
+                    coach.observe(review, in: match, store: training, quietly: !latest || !match.showVerdicts)
+                }
             }
             .task {
                 // The welcome chime as the app opens, once per launch.
@@ -126,9 +146,10 @@ struct ContentView: View {
                 recordGame()
                 if bigBoard { trayOpen = true }
                 // Let the last move land and the king fall, then open the summary.
+                let number = match.gameNumber
                 Task { @MainActor in
                     try? await Task.sleep(for: .seconds(2.6))
-                    guard match.isOver, !showingNewGame else { return }
+                    guard match.isOver, match.gameNumber == number, !showingNewGame else { return }
                     setCoach(expanded: true)
                 }
             }
@@ -147,7 +168,7 @@ struct ContentView: View {
                 if !showing { rewindOpening = nil }
             }
             .fullScreenCover(isPresented: $showingGames) {
-                RewindGamesView(theme: theme, opening: rewindOpening) { game in playAgain(game) }
+                RewindGamesView(theme: theme, opening: rewindOpening, forfeits: forfeits) { game in playAgain(game) }
                     .environment(vault).environment(training)
             }
             .fullScreenCover(isPresented: $showingArmy) {
@@ -161,7 +182,7 @@ struct ContentView: View {
             }
             .animation(.easeInOut(duration: 0.35), value: theme.id)
             .sheet(isPresented: $showingNewGame, onDismiss: startIfNeeded) {
-                NewGameSheet(theme: theme) { setup in
+                NewGameSheet(theme: theme, forfeits: forfeits) { setup in
                     withAnimation(.snappy) { match.start(setup) }
                     showingNewGame = false
                     leaveHome()
@@ -173,9 +194,13 @@ struct ContentView: View {
             .sheet(isPresented: $showingAnalyze) {
                 AnalyzeSheet(
                     theme: theme,
-                    currentFEN: match.game.fen,
+                    currentFEN: match.hasStarted ? match.game.fen : nil,
                     engine: StockfishEngine.shared,
-                    reader: CloudBoardReader.live
+                    reader: CloudBoardReader.live,
+                    rival: fromHereSetup.level.rival.name,
+                    clock: fromHereSetup.timeControl,
+                    forfeits: forfeits,
+                    onAnalyzeGame: analyzeGame
                 ) { draft in
                     play(from: draft)
                 }
@@ -198,24 +223,35 @@ struct ContentView: View {
                 // The last grades can land just after the game ends.
                 if match.isOver { recordGame() }
             }
-            .onChange(of: match.review) { _, review in
-                coach.observe(review, in: match, store: training)
-            }
             .onChange(of: match.gameNumber) { _, _ in
                 coach.gameStarted()
                 announceGrudge()
-            }
-            .onChange(of: match.game.moveCount) { _, _ in
-                // A new move brings the board back to the live position.
+                // Nothing on screen carries over from the last game.
                 browsePly = nil
                 scrubStart = nil
+                trayOpen = false
+                setCoach(expanded: false)
+            }
+            .onChange(of: match.game.plyCount) { _, _ in
+                // A move or an undo brings the board back to the live position.
+                browsePly = nil
+                scrubStart = nil
+            }
+            .onChange(of: match.game.moveCount) { _, _ in
                 // Once the learner moves on, the tip about the move before is over.
                 if let played = match.game.lastPlayed, match.game.humanColors.contains(played.color) {
                     coach.dismiss()
                 }
             }
             .onChange(of: boardHidden) { _, hidden in
-                if hidden { match.suspendClock() } else { match.resumeClock() }
+                if hidden { match.suspend() } else { match.resume() }
+            }
+            .onChange(of: scenePhase) { _, phase in
+                // iOS may end the app while it is away: the game so far is kept in Your games.
+                if phase == .background, match.hasStarted, !match.isOver { recordGame() }
+            }
+            .onChange(of: BoardView.playsIn3D(theme, setting: sculpted3D), initial: true) { _, threeD in
+                timeSounds(threeD: threeD)
             }
             .onChange(of: match.clock?.running, initial: true) { _, running in
                 // The screen stays awake while a clock runs.
@@ -259,6 +295,8 @@ struct ContentView: View {
 
     private func goHome() {
         setCoach(expanded: false)
+        // A victory theme still playing fades as the game leaves the screen.
+        SoundPlayer.shared.stopAll(fade: 0.4)
         withAnimation(.easeInOut(duration: 0.35)) { showingHome = true }
     }
 
@@ -447,7 +485,7 @@ struct ContentView: View {
                 .onChanged(scrub)
                 .onEnded { _ in scrubStart = nil }
         )
-        .sensoryFeedback(.selection, trigger: browsePly) { _, _ in true }
+        .sensoryFeedback(.selection, trigger: browsePly) { _, _ in hapticsOn }
         .accessibilityAction(named: "Previous move") { step(by: -1) }
         .accessibilityAction(named: "Next move") { step(by: 1) }
     }
@@ -542,7 +580,7 @@ struct ContentView: View {
                 Button {
                     showingAnalyze = true
                 } label: {
-                    Label("Analyze a Position", systemImage: "camera.viewfinder")
+                    Label("Analyze a position", systemImage: "camera.viewfinder")
                 }
             }
             ToolbarItem(placement: .topBarLeading) {
@@ -559,7 +597,7 @@ struct ContentView: View {
                 Button {
                     showingArmy = true
                 } label: {
-                    Label("Your Army", systemImage: "shield.lefthalf.filled")
+                    Label("Your army", systemImage: "shield.lefthalf.filled")
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
@@ -567,7 +605,7 @@ struct ContentView: View {
                     Button {
                         showingNewGame = true
                     } label: {
-                        Label("New Game", systemImage: "plus")
+                        Label("New game", systemImage: "plus")
                     }
                     bigBoardButton
                     Button {
@@ -584,12 +622,12 @@ struct ContentView: View {
                     Button {
                         showingNewGame = true
                     } label: {
-                        Label("New Game", systemImage: "plus")
+                        Label("New game", systemImage: "plus")
                     }
                     Button {
                         showingArmy = true
                     } label: {
-                        Label("Your Army", systemImage: "shield.lefthalf.filled")
+                        Label("Your army", systemImage: "shield.lefthalf.filled")
                     }
                     gamesButton
                 }
@@ -617,7 +655,7 @@ struct ContentView: View {
         Button {
             showingGames = true
         } label: {
-            Label("Your Games", systemImage: "backward.circle")
+            Label("Your games", systemImage: "backward.circle")
         }
     }
 
@@ -665,10 +703,8 @@ struct ContentView: View {
                 .opacity(coachIsWide ? 0 : 1)
                 .scaleEffect(coachIsWide ? 0.92 : 1)
                 .allowsHitTesting(!coachIsWide)
-                CoachOrb(match: match, theme: theme, isExpanded: $coachExpanded, isPeeking: $coachPeeking,
-                         expandedMaxHeight: coachHeight) {
-                    showingNewGame = true
-                }
+                CoachOrb(match: match, theme: theme, isExpanded: $coachExpanded, expandedMaxHeight: coachHeight,
+                         newGame: { showingNewGame = true }, showGames: { showingGames = true })
             }
             .padding(.top, 10)
         }
@@ -695,10 +731,8 @@ struct ContentView: View {
             .opacity(coachIsWide ? 0 : 1)
             .scaleEffect(coachIsWide ? 0.85 : 1)
             .allowsHitTesting(!coachIsWide)
-            CoachOrb(match: match, theme: theme, isExpanded: $coachExpanded, isPeeking: $coachPeeking,
-                     expandedMaxHeight: coachHeight) {
-                showingNewGame = true
-            }
+            CoachOrb(match: match, theme: theme, isExpanded: $coachExpanded, expandedMaxHeight: coachHeight,
+                     newGame: { showingNewGame = true }, showGames: { showingGames = true })
         }
         .padding(.horizontal, 16)
         .padding(.top, 10)
@@ -726,7 +760,8 @@ struct ContentView: View {
         let won = match.winner.map { $0 == match.setup.playerColor }
         guard let news = army.record(ledger, playerColor: match.setup.playerColor, won: won,
                                        stakes: match.armyStakes).first else { return }
-        show(news, after: 1.2)
+        // After the finale and the summary, so the end of the game has the stage first.
+        show(news, after: 3.4)
     }
 
     /// As a game against a rival starts: the piece that rival keeps taking.
@@ -754,26 +789,42 @@ struct ContentView: View {
         vault.record(game)
     }
 
-    /// The same rival again, from a rewound game.
+    /// The same game again, from a rewound one: the same rival, side and clock.
     private func playAgain(_ game: SavedGame) {
         var setup = NewGameSheet.savedSetup()
         if let raw = game.level, let level = MatchController.Level(rawValue: raw) {
-            setup.opponent = .computer
             setup.level = level
             setup.playerColor = game.playerColor
+        }
+        if let clock = game.clock.flatMap({ TimeControl(rawValue: $0) }) {
+            setup.timeControl = clock
         }
         withAnimation(.snappy) { match.start(setup) }
         showingNewGame = false
         leaveHome()
     }
 
-    /// Starts a game from an analyzed position, with the player moving first.
+    /// Starts a game from an analyzed position, with the player moving first, against the
+    /// rival and on the clock the Analyze screen named.
     private func play(from draft: PositionDraft) {
         guard let position = draft.position else { return }
-        var setup = NewGameSheet.savedSetup()
+        var setup = fromHereSetup
         setup.playerColor = draft.sideToMove
         withAnimation(.snappy) { match.start(setup, from: position) }
         leaveHome()
+    }
+
+    /// The move's sound and the end of a game are heard when they are seen: on the 3D board
+    /// when the piece touches down and when the mated king has settled.
+    private func timeSounds(threeD: Bool) {
+        if threeD {
+            let game = match.game
+            match.landingDelay = { move in SculptedBoardScene.landingDelay(for: move, in: game) }
+            match.finaleDelay = { move in SculptedBoardScene.finaleDelay(for: move, in: game) }
+        } else {
+            match.landingDelay = { _ in 0 }
+            match.finaleDelay = { _ in 0.4 }
+        }
     }
 
     /// Closing the sheet without starting still begins a game, with last time's choices.

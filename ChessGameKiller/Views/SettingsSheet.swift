@@ -1,5 +1,4 @@
 import ChessKit
-import StoreKit
 import SwiftUI
 
 /// Settings: the board's look with a live preview, how much the coach says,
@@ -13,12 +12,12 @@ struct SettingsSheet: View {
     @AppStorage("soundEffects") private var soundOn = true
     @AppStorage("haptics") private var hapticsOn = true
     @AppStorage("rivalBanter") private var banterOn = true
+    @AppStorage("coachVoiceMuted") private var voiceMuted = false
     @AppStorage("bigBoard") private var bigBoard = false
     @AppStorage("sculpted3D") private var sculpted3D = true
     @AppStorage(HomeScreen.key) private var homeScreen = HomeScreen.defaultOn
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.requestReview) private var requestReview
 
     private var theme: BoardTheme { .named(themeID) }
     private var accent: Color { theme.accent ?? .accentColor }
@@ -43,7 +42,7 @@ struct SettingsSheet: View {
                                           symbol: "cube", isOn: $sculpted3D, theme: theme)
                                 rule
                             }
-                            ToggleRow(title: "Match rival", subtitle: "Computer games use the rival's own board, not the one picked above",
+                            ToggleRow(title: "Rival boards", subtitle: "Each rival plays on its own board instead of the one above.",
                                       symbol: "person.crop.circle.badge.checkmark", isOn: $matchRival, theme: theme)
                             rule
                             ToggleRow(title: "Big Board", subtitle: "The board fills the screen. Swipe up from the bottom for the tools, sideways on the board to replay moves.",
@@ -63,8 +62,12 @@ struct SettingsSheet: View {
                                       symbol: "lightbulb", isOn: $showSecondBest, theme: theme)
                                 .disabled(!showBestMoves)
                             rule
-                            ToggleRow(title: "Move verdicts", subtitle: "Grades every move you make",
+                            ToggleRow(title: "Move grades", subtitle: "Rates each move you play, from Best to Blunder.",
                                       symbol: "star.fill", isOn: $showVerdicts, theme: theme)
+                            rule
+                            ToggleRow(title: "Coach's voice", subtitle: "Leo narrates his lessons and your highlight reels.",
+                                      symbol: "waveform", isOn: Binding(get: { !voiceMuted }, set: { voiceMuted = !$0 }),
+                                      theme: theme)
                         }
                     }
 
@@ -74,20 +77,13 @@ struct SettingsSheet: View {
                             rule
                             ToggleRow(title: "Haptics", symbol: "iphone.radiowaves.left.and.right", isOn: $hapticsOn, theme: theme)
                             rule
-                            ToggleRow(title: "Rival banter", subtitle: "Rivals react to your moves in a speech bubble",
+                            ToggleRow(title: "Rival remarks", subtitle: "A word from your rival now and then, under its name.",
                                       symbol: "bubble.left.fill", isOn: $banterOn, theme: theme)
                         }
                     }
 
                     section("About") {
                         SettingsGroup(theme: theme) {
-                            Button {
-                                requestReview()
-                            } label: {
-                                LinkRowLabel(title: "Rate Chess Game Killer", symbol: "heart.fill", theme: theme)
-                            }
-                            .buttonStyle(.plain)
-                            rule
                             NavigationLink {
                                 LicensesView(theme: theme)
                             } label: {
@@ -239,7 +235,8 @@ struct BoardPreview: View {
                 ForEach(Self.position?.pieces ?? [], id: \.square) { piece in
                     PieceImage(piece: piece, theme: theme, size: sq, onBoard: true)
                         .position(center(of: piece.square, size: sq))
-                        .zIndex(Double(7 - piece.square.rankIndex))
+                        // Nearer rows in front, and left to right within a row, so overlaps never flicker.
+                        .zIndex(Double((7 - piece.square.rankIndex) * 8 + piece.square.fileIndex))
                 }
             }
             .frame(width: sq * 8, height: sq * 8)

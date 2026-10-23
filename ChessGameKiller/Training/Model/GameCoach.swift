@@ -23,18 +23,24 @@ final class GameCoach {
     @ObservationIgnored private var movesSincePraise = 99
     @ObservationIgnored private var praisedCastling = false
 
-    /// Looks at the coach's latest review. Call whenever `match.review` changes.
-    func observe(_ review: MoveReview?, in match: MatchController, store: TrainingStore) {
-        guard match.setup.opponent == .computer else {
-            moment = nil
-            return
-        }
+    /// Looks at a grade of one of the person's moves (nil clears what the coach is saying).
+    /// `quietly` is for a grade nothing should be said about, like an older move graded late or
+    /// a game played with grades off: a real mistake is still saved to practice.
+    func observe(_ review: MoveReview?, in match: MatchController, store: TrainingStore, quietly: Bool = false) {
         guard let review else {
             moment = nil
             return
         }
         guard review.id != lastReviewID else { return }
         lastReviewID = review.id
+        let found = MomentFinder.find(in: review)
+        if quietly {
+            if let found, !found.kind.isPraise, let skill = found.skill {
+                store.recordGamePattern(skill: skill, found: false)
+            }
+            saveMistake(review, found: found, store: store)
+            return
+        }
         movesSincePraise += 1
 
         // The second try after "Try again".
@@ -49,9 +55,9 @@ final class GameCoach {
         }
         retrying = nil
 
-        let found = MomentFinder.find(in: review)
         if let found, found.kind.isPraise {
-            let worthSaying = found.kind == .foundMate || movesSincePraise >= 4
+            // Praise waits its turn, and the end of a game is told by the board, not by the coach.
+            let worthSaying = !match.isOver && (found.kind == .foundMate || movesSincePraise >= 4)
             let repeatCastle = found.kind == .castled && praisedCastling
             if worthSaying, !repeatCastle {
                 movesSincePraise = 0
@@ -67,15 +73,17 @@ final class GameCoach {
         } else {
             moment = nil
         }
+        saveMistake(review, found: found, store: store)
+    }
 
-        // Real mistakes go to practice, named after their pattern when there is one.
-        if review.grade == .mistake || review.grade == .blunder,
-           let fen = review.fenBefore, let best = review.bestUCI, let played = review.playedUCI {
-            let teaching = found.flatMap { $0.kind.isPraise ? nil : $0 }
-            let title = teaching == nil ? "Find the better move" : (moment?.title ?? "Find the better move")
-            if store.addMistake(fen: fen, best: best, played: played, skill: teaching?.skill ?? "", title: title) {
-                savedThisGame += 1
-            }
+    /// Real mistakes go to practice, named after their pattern when there is one.
+    private func saveMistake(_ review: MoveReview, found: MomentFinder.Found?, store: TrainingStore) {
+        guard review.grade == .mistake || review.grade == .blunder,
+              let fen = review.fenBefore, let best = review.bestUCI, let played = review.playedUCI else { return }
+        let teaching = found.flatMap { $0.kind.isPraise ? nil : $0 }
+        let title = teaching.map { Self.words(for: $0, library: store.library).title } ?? "Find the better move"
+        if store.addMistake(fen: fen, best: best, played: played, skill: teaching?.skill ?? "", title: title) {
+            savedThisGame += 1
         }
     }
 
@@ -103,11 +111,6 @@ final class GameCoach {
 
     func watchLesson(for moment: CoachMoment, store: TrainingStore) {
         presentedLesson = lesson(for: moment, in: store.library)
-    }
-
-    func practice(_ moment: CoachMoment, store: TrainingStore) {
-        guard let skillID = moment.skill, let skill = store.library?.skill(skillID) else { return }
-        presentedSession = store.practicePlan(for: skill)
     }
 
     func practiceMistakes(store: TrainingStore) {

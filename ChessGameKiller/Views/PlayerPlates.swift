@@ -68,7 +68,7 @@ private struct PlayerPlate: View {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(name)
                         .font(.subheadline.weight(.bold))
-                        .foregroundStyle(isActive ? sideColor : Color.primary)
+                        .foregroundStyle(isActive ? theme.ink(for: color) : Color.primary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
                         .allowsTightening(true)
@@ -78,12 +78,12 @@ private struct PlayerPlate: View {
                             .layoutPriority(1)
                     }
                 }
-                RivalRemark(match: match, enabled: isComputer) {
+                PlateRemark(match: match, theme: theme, isRival: isComputer) {
                     HStack(spacing: 5) {
                         if inCheck { CheckTag(color: theme.check) }
                         Text(status)
                             .font(.caption2.weight(isActive ? .semibold : .regular))
-                            .foregroundStyle(isActive ? sideColor : Color.secondary)
+                            .foregroundStyle(isActive ? theme.ink(for: color) : Color.secondary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.75)
                     }
@@ -126,9 +126,7 @@ private struct PlayerPlate: View {
     }
 
     private var name: String {
-        if isComputer { return match.setup.level.rival.name }
-        if match.setup.opponent == .computer { return "You" }
-        return theme.name(of: color)
+        isComputer ? match.setup.level.rival.name : "You"
     }
 
     private var status: String {
@@ -169,14 +167,12 @@ private struct PlayerName: View {
             } else {
                 PieceImage(piece: Piece(.king, color: color, square: .e1), theme: theme, size: size)
             }
-            Text(name).foregroundStyle(theme.sideColor(color))
+            Text(name).foregroundStyle(theme.ink(for: color))
         }
     }
 
     private var name: String {
-        if isComputer { return match.setup.level.rival.name }
-        if match.setup.opponent == .computer { return "You" }
-        return theme.name(of: color)
+        isComputer ? match.setup.level.rival.name : "You"
     }
 }
 

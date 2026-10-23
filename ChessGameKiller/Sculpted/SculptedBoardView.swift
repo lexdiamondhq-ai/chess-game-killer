@@ -35,7 +35,7 @@ struct SculptedSceneView: UIViewRepresentable {
 
 /// The game board in real 3D: tap a piece to lift it and see its moves, tap a dot to play.
 /// The same jobs as the flat `BoardView`: the coach's hints, check, promotion, the army's
-/// names and glows, haptics and a VoiceOver square for every square.
+/// glows, haptics and a VoiceOver square for every square.
 struct SculptedBoardView: View {
     let match: MatchController
     let theme: BoardTheme
@@ -50,6 +50,16 @@ struct SculptedBoardView: View {
     @AppStorage("haptics") private var hapticsOn = true
     @Environment(ArmyStore.self) private var army: ArmyStore?
     @State private var stage = SculptedStage()
+    /// The latest move's feel, set as its piece touches down, so the phone taps then.
+    @State private var touchdown: Touchdown?
+    /// Bumps once the king has fallen in each game the player wins, for the haptic.
+    @State private var wins = 0
+
+    /// A move's feel, felt as its piece touches down.
+    private struct Touchdown: Equatable {
+        let move: Int
+        let feel: MoveFeel
+    }
 
     private var game: GameModel { match.game }
     private var flipped: Bool { match.isBoardFlipped }
@@ -70,11 +80,15 @@ struct SculptedBoardView: View {
                     .accessibilityHidden(true)
                 if browsing == nil {
                     squareElements(camera: camera, size: size)
-                    nameTag(camera: camera, size: size)
-                    CheckCalloutLayer(game: game, color: theme.check) { square in
+                    // Called once the checking piece has landed, with the red under the king.
+                    CheckCalloutLayer(game: game, color: theme.check, landing: { game in
+                        game.lastPlayed.map { SculptedBoardScene.landingDelay(for: $0, in: game) } ?? 0
+                    }, anchor: { square in
                         calloutPoint(over: square, camera: camera, size: size)
-                    }
+                    })
                     .frame(width: size.width, height: size.height)
+                    // The fallen king says it all: no "Checkmate" over it.
+                    .opacity(finale == nil ? 1 : 0)
                 } else {
                     Color.clear
                         .allowsHitTesting(false)
@@ -85,7 +99,10 @@ struct SculptedBoardView: View {
                 }
                 // A flag that falls mid-promotion puts the pawn back; the picker never outlives the game.
                 if browsing == nil, let promotion = game.pendingPromotion, !match.isOver {
-                    PromotionPicker(color: promotion.piece.color, theme: theme, squareSize: size.width / 8) { kind in
+                    PromotionPicker(
+                        color: promotion.piece.color, theme: theme, squareSize: min(size.width / 8, size.height / 6),
+                        cancel: { withAnimation(.snappy(duration: 0.2)) { match.cancelPromotion() } }
+                    ) { kind in
                         withAnimation(.snappy(duration: 0.2)) { match.promote(to: kind) }
                     }
                     .frame(width: size.width, height: size.height)
@@ -94,26 +111,35 @@ struct SculptedBoardView: View {
             }
         }
         .aspectRatio(Self.aspect, contentMode: .fit)
-        .sensoryFeedback(.impact(weight: .light), trigger: game.moveCount) { _, _ in hapticsOn }
-        .sensoryFeedback(.impact(weight: .heavy, intensity: 0.7), trigger: game.captureEvents.last?.id) { _, new in
-            hapticsOn && new != nil
+        // One tap as each move's piece touches down: firmer for a capture, a heavy thud as a
+        // rook or queen falls and the board shakes, a sharp knock for a check against the player.
+        .sensoryFeedback(trigger: touchdown) { _, new in
+            guard hapticsOn, let new else { return nil }
+            return new.feel.feedback(heavy: true)
         }
-        // A rook or queen taken lands with a thud, felt as the board shakes.
-        .sensoryFeedback(.impact(weight: .heavy, intensity: 1), trigger: bigCaptureID) { _, new in
-            hapticsOn && new != nil
+        .sensoryFeedback(.selection, trigger: game.selected) { _, new in hapticsOn && new != nil }
+        .sensoryFeedback(.success, trigger: wins) { _, _ in hapticsOn }
+        .onChange(of: game.moveCount) { _, count in
+            guard let played = game.lastPlayed else { return }
+            let feel = MoveFeel(of: game)
+            let delay = SculptedBoardScene.landingDelay(for: played, in: game)
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(delay))
+                touchdown = Touchdown(move: count, feel: feel)
+            }
         }
-        .sensoryFeedback(.warning, trigger: game.personInCheck) { _, new in
-            hapticsOn && new != nil
+        .onChange(of: match.winner) { _, winner in
+            guard let winner, game.humanColors.contains(winner) else { return }
+            // Once the losing king has fallen and settled.
+            var delay = SculptedBoardScene.finaleDelay(afterLanding: 0)
+            if game.isCheckmate, let played = game.lastPlayed {
+                delay = SculptedBoardScene.finaleDelay(for: played, in: game)
+            }
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(delay))
+                wins += 1
+            }
         }
-        .sensoryFeedback(.success, trigger: finale) { _, new in
-            hapticsOn && new != nil && match.winner.map { game.humanColors.contains($0) } == true
-        }
-    }
-
-    /// The newest capture of a rook or queen.
-    private var bigCaptureID: Int? {
-        guard let last = game.captureEvents.last, last.piece.kind == .queen || last.piece.kind == .rook else { return nil }
-        return last.id
     }
 
     /// Once the game is decided on the board, the clock or by resignation: the losing king.
@@ -204,31 +230,6 @@ struct SculptedBoardView: View {
         let top = camera.screenPoint(foot + SIMD3(0, height + 0.16, 0), in: size)
         let below = camera.screenPoint(foot + SIMD3(0, 0, flipped ? -0.62 : 0.62), in: size)
         return top.y - 14 >= 14 ? CGPoint(x: top.x, y: top.y - 12) : below
-    }
-
-    // MARK: Army
-
-    /// The selected piece's name, floating above its head (below its foot on the far rank).
-    @ViewBuilder
-    private func nameTag(camera: SculptedCamera, size: CGSize) -> some View {
-        if let army, let square = game.selected,
-           let placed = game.pieces.first(where: { $0.square == square }),
-           let slot = army.slot(of: placed, in: match),
-           let name = army.record(for: slot).name {
-            let rank = army.record(for: slot).rank
-            let foot = SculptedCamera.position(of: square)
-            let height = SculptedAssets.shared.height(of: placed.piece.kind) + 0.12
-            let top = camera.screenPoint(foot + SIMD3(0, height + 0.16, 0), in: size)
-            let below = camera.screenPoint(foot + SIMD3(0, 0, flipped ? -0.62 : 0.62), in: size)
-            let y = top.y - 14 >= 14 ? top.y - 14 : below.y
-            NameTagPlacement(x: top.x, y: y) {
-                ArmyNameTag(name: name, rank: rank, color: rank.color(for: placed.piece, theme: theme))
-                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
-            }
-            .frame(width: size.width, height: size.height)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
-        }
     }
 }
 

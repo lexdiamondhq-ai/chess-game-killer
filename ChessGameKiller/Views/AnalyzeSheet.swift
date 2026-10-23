@@ -6,8 +6,16 @@ import SwiftUI
 /// current game, fix the position, then see Stockfish's two best moves.
 struct AnalyzeSheet: View {
     let theme: BoardTheme
-    let currentFEN: String
+    /// The game on the board, if one has started.
+    let currentFEN: String?
     let engine: ChessEngine?
+    /// Who "Play from here" plays, and on what clock.
+    let rival: String
+    let clock: TimeControl
+    /// The rival of a game that starting another would cost, so the person is asked first.
+    let forfeits: String?
+    /// Called when the person analyzes a game still being played: that counts as help, like Undo.
+    let onAnalyzeGame: (() -> Void)?
     let onPlay: (PositionDraft) -> Void
 
     @State private var session: ScanSession
@@ -18,14 +26,22 @@ struct AnalyzeSheet: View {
 
     init(
         theme: BoardTheme,
-        currentFEN: String,
+        currentFEN: String?,
         engine: ChessEngine?,
         reader: BoardReader,
+        rival: String,
+        clock: TimeControl,
+        forfeits: String? = nil,
+        onAnalyzeGame: (() -> Void)? = nil,
         onPlay: @escaping (PositionDraft) -> Void
     ) {
         self.theme = theme
         self.currentFEN = currentFEN
         self.engine = engine
+        self.rival = rival
+        self.clock = clock
+        self.forfeits = forfeits
+        self.onAnalyzeGame = onAnalyzeGame
         self.onPlay = onPlay
         _session = State(initialValue: ScanSession(reader: reader))
     }
@@ -62,11 +78,19 @@ struct AnalyzeSheet: View {
                                   detail: "Start from the opening position and change it", theme: theme)
                     }
                     .buttonStyle(.plain)
-                    Button { session.analyze(fen: currentFEN) } label: {
-                        StartCard(symbol: "arrow.triangle.branch", title: "This Game",
-                                  detail: "Analyze the position on your board now", theme: theme)
+                    if let currentFEN {
+                        Button {
+                            onAnalyzeGame?()
+                            session.analyze(fen: currentFEN)
+                        } label: {
+                            StartCard(symbol: "arrow.triangle.branch", title: "This Game",
+                                      detail: onAnalyzeGame == nil
+                                          ? "Analyze the position on your board now"
+                                          : "Your game as it stands. Counts as help, like Undo.",
+                                      theme: theme)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
                 .padding(20)
             }
@@ -82,7 +106,8 @@ struct AnalyzeSheet: View {
                 case .editor:
                     BoardEditorView(session: session, theme: theme)
                 case .analysis:
-                    AnalysisView(draft: session.draft, theme: theme, engine: engine) { draft in
+                    AnalysisView(draft: session.draft, theme: theme, engine: engine,
+                                 rival: rival, clock: clock, forfeits: forfeits) { draft in
                         onPlay(draft)
                         dismiss()
                     }
@@ -362,17 +387,30 @@ struct BoardEditorView: View {
 /// Stockfish's two best moves for the position, drawn as arrows, with what follows.
 struct AnalysisView: View {
     let theme: BoardTheme
+    /// Who "Play from here" plays, and on what clock.
+    var rival = "the computer"
+    var clock: TimeControl = .unlimited
+    /// The rival of a game in progress that starting this one would cost.
+    var forfeits: String?
     let onPlay: (PositionDraft) -> Void
 
     @State private var model: AnalysisModel
     @State private var flipped: Bool
+    @State private var confirmingForfeit = false
 
-    init(draft: PositionDraft, theme: BoardTheme, engine: ChessEngine?, onPlay: @escaping (PositionDraft) -> Void) {
+    init(draft: PositionDraft, theme: BoardTheme, engine: ChessEngine?, rival: String = "the computer",
+         clock: TimeControl = .unlimited, forfeits: String? = nil, onPlay: @escaping (PositionDraft) -> Void) {
         self.theme = theme
+        self.rival = rival
+        self.clock = clock
+        self.forfeits = forfeits
         self.onPlay = onPlay
         _model = State(initialValue: AnalysisModel(draft: draft, engine: engine))
         _flipped = State(initialValue: draft.sideToMove == .black)
     }
+
+    /// The side the person takes from here: the one to move.
+    private var sideName: String { model.draft.sideToMove == .white ? "White" : "Black" }
 
     private var accent: Color { theme.accent ?? .accentColor }
 
@@ -383,18 +421,32 @@ struct AnalysisView: View {
                 PositionBoard(draft: model.draft, theme: theme, flipped: flipped, hints: model.hints)
                     .animation(.snappy(duration: 0.4), value: flipped)
                 lines
-                Button {
-                    onPlay(model.draft)
-                } label: {
-                    Label("Play From Here", systemImage: "play.fill")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 4)
+                VStack(spacing: 6) {
+                    Button {
+                        if forfeits == nil { onPlay(model.draft) } else { confirmingForfeit = true }
+                    } label: {
+                        Label("Play \(rival) from here", systemImage: "play.fill")
+                            .font(.headline)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 4)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .foregroundStyle(theme.isDark ? Color.black : Color.white)
+                    .disabled(model.ending != nil || model.draft.position == nil)
+                    Text("You play \(sideName) · \(clock.isTimed ? clock.name : "no clock")")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .foregroundStyle(theme.isDark ? Color.black : Color.white)
-                .disabled(model.ending != nil || model.draft.position == nil)
+                .confirmationDialog("Leave your game against \(forfeits ?? rival)?",
+                                    isPresented: $confirmingForfeit, titleVisibility: .visible) {
+                    Button("Resign and play \(rival)", role: .destructive) { onPlay(model.draft) }
+                    Button("Keep playing", role: .cancel) {}
+                } message: {
+                    Text("It counts as a loss for your army.")
+                }
             }
             .padding(16)
             .animation(.snappy, value: model.lines)
