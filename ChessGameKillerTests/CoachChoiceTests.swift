@@ -85,7 +85,9 @@ final class CoachChoiceTests: XCTestCase {
                     XCTAssertLessThanOrEqual(line.count, 60, "\(coach.name): too long to be a reaction: \(line)")
                 }
             }
-            XCTAssertTrue(lines.lines(for: coach, .blunder).contains("Why did you do that?"))
+            // Alex didn't want it said.
+            XCTAssertFalse(ReactionMoment.allCases.flatMap { lines.lines(for: coach, $0) }
+                .contains { $0.lowercased().contains("why did you do that") })
             XCTAssertTrue(lines.lines(for: coach, .tryAgain).contains("Try again."))
         }
     }

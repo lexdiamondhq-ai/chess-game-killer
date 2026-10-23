@@ -57,7 +57,7 @@ struct ReactionPolicy {
 
     /// Seconds of quiet after a reaction before an ordinary one may follow.
     static let gap: TimeInterval = 3.5
-    /// "Why did you do that?" stings, so at most one this often; a second becomes "Try again".
+    /// Pointing out a hanging piece stings, so at most one this often; a second becomes "Try again".
     static let blunderGap: TimeInterval = 90
     /// After this long without a reaction it's a new sitting, and the first solve always gets one.
     static let newSitting: TimeInterval = 600
@@ -119,7 +119,7 @@ protocol Reacting: AnyObject {
 }
 
 /// The coach's short spoken reactions in puzzles and drills: "Nice move", "Try again",
-/// "Brilliant!", "Why did you do that?". Recorded lines only, played like the game's sound
+/// "Brilliant!", "That piece is hanging". Recorded lines only, played like the game's sound
 /// effects (they follow the silent switch and mix with music). Off with the "Voice reactions"
 /// switch, or when the coach's voice is muted; quiet while the coach is talking.
 @MainActor

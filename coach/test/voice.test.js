@@ -102,7 +102,7 @@ test("Vera's answer is read by Sarah, with her lessons' settings", async () => {
   };
   const audio = await speak({ ELEVENLABS_API_KEY: "key" }, "Castling is safe.", fetchImpl, "vera");
   assert.deepEqual([...audio], [1, 2, 3]);
-  assert.match(sent[0].url, /\/EXAVITQu4vr4xnSDxMaL\?/);
+  assert.match(sent[0].url, /\/EXAVITQu4vr4xnSDxMaL\?output_format=mp3_44100_128$/);
   assert.deepEqual(sent[0].body.voice_settings, VERA_VOICE_SETTINGS);
   // VERA_VOICE_ID swaps her voice; VOICE_ID stays Leo's.
   await speak({ ELEVENLABS_API_KEY: "key", VOICE_ID: "leoVoice", VERA_VOICE_ID: "veraVoice" }, "Hi.", fetchImpl, "vera");
@@ -114,5 +114,6 @@ test("Vera's answer is read by Sarah, with her lessons' settings", async () => {
 test("the voices match the lesson recordings in make_narration.py", () => {
   const script = readFileSync(new URL("../../scripts/training/make_narration.py", import.meta.url), "utf8");
   assert.match(script, /ELEVENLABS_VERA_VOICE_ID", "EXAVITQu4vr4xnSDxMaL"/);
-  assert.match(script, /"stability": 0\.42, "similarity_boost": 0\.8, "style": 0\.3, "use_speaker_boost": True, "speed": 1\.0/);
+  assert.match(script, /"stability": 0\.7, "similarity_boost": 0\.85, "style": 0\.0, "use_speaker_boost": True, "speed": 0\.98/);
+  assert.match(script, /"format": "mp3_44100_128"/);
 });

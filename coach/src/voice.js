@@ -20,14 +20,15 @@ export const VOICE_SETTINGS = Object.freeze({
   use_speaker_boost: true,
   speed: 0.97,
 });
-/** Vera's lesson settings (COACHES["vera"] in make_narration.py). */
+/** Vera's lesson settings (COACHES["vera"] in make_narration.py): steady and clean, at 128 kbps. */
 export const VERA_VOICE_SETTINGS = Object.freeze({
-  stability: 0.42,
-  similarity_boost: 0.8,
-  style: 0.3,
+  stability: 0.7,
+  similarity_boost: 0.85,
+  style: 0.0,
   use_speaker_boost: true,
-  speed: 1.0,
+  speed: 0.98,
 });
+const VERA_OUTPUT_FORMAT = "mp3_44100_128";
 /** A spoken answer takes ElevenLabs a second or two; past this, the device's voice is quicker. */
 const DEFAULT_TIMEOUT_MS = 8000;
 /** 320 characters of speech is about 20 seconds, about 160 KB at 64 kbps. Anything far bigger is wrong. */
@@ -56,7 +57,7 @@ export async function speak(env, text, fetchImpl = fetch, coach = "leo") {
   }
   const timeout = Number(env.VOICE_TIMEOUT_MS) > 0 ? Number(env.VOICE_TIMEOUT_MS) : DEFAULT_TIMEOUT_MS;
   try {
-    const response = await fetchImpl(`${API}/${voice}?output_format=${OUTPUT_FORMAT}`, {
+    const response = await fetchImpl(`${API}/${voice}?output_format=${vera ? VERA_OUTPUT_FORMAT : OUTPUT_FORMAT}`, {
       method: "POST",
       headers: { "xi-api-key": key, "content-type": "application/json", accept: "audio/mpeg" },
       body: JSON.stringify({

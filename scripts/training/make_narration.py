@@ -47,8 +47,10 @@ COACHES = {
     "leo": {"name": "Leo", "prefix": "nar-", "voice": os.environ.get("ELEVENLABS_VOICE_ID", "JBFqnCBsd6RMkjVDRZzb"),
             "settings": VOICE_SETTINGS},
     # Sarah: a confident, warm young American woman. Override with ELEVENLABS_VERA_VOICE_ID.
+    # Steady and clean: high stability, no style exaggeration, recorded at 128 kbps.
     "vera": {"name": "Vera", "prefix": "vera-", "voice": os.environ.get("ELEVENLABS_VERA_VOICE_ID", "EXAVITQu4vr4xnSDxMaL"),
-             "settings": {"stability": 0.42, "similarity_boost": 0.8, "style": 0.3, "use_speaker_boost": True, "speed": 1.0}},
+             "settings": {"stability": 0.7, "similarity_boost": 0.85, "style": 0.0, "use_speaker_boost": True, "speed": 0.98},
+             "format": "mp3_44100_128"},
 }
 # What LessonPlayer says when a task has no wrong-answer line of its own.
 DEFAULT_WRONG = "Not quite. Have another look."
@@ -231,7 +233,7 @@ def main() -> None:
             break
         voice = COACHES[coach]
         try:
-            audio = request(f"/text-to-speech/{voice['voice']}?output_format={OUTPUT_FORMAT}", key,
+            audio = request(f"/text-to-speech/{voice['voice']}?output_format={voice.get('format', OUTPUT_FORMAT)}", key,
                             {"text": line, "model_id": MODEL, "voice_settings": voice["settings"]})
         except RuntimeError as error:
             # Keep what's recorded so far (the workflow still commits it) and say why it stopped.
