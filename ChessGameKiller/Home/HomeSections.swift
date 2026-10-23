@@ -41,7 +41,7 @@ struct HomeTodayCard: View {
             .buttonStyle(.plain)
             .accessibilityHidden(true)
             .padding(.bottom, 16)
-            label("Puzzle · \(puzzle.puzzle.rating)")
+            label("Puzzle rated \(puzzle.puzzle.rating)")
             HStack(alignment: .center, spacing: 12) {
                 Text(puzzle.title)
                     .font(HomeType.title)
@@ -76,8 +76,9 @@ struct HomeTodayCard: View {
         }
     }
 
+    /// Your puzzle rating, said as such: the ladder shows your level in games.
     /// Chess ratings are written without a thousands separator.
-    private var ratingLine: String { "Your rating \(rating)" }
+    private var ratingLine: String { "Your puzzle rating \(rating)" }
 
     /// A block's small name, over its title.
     private func label(_ text: String) -> some View {
