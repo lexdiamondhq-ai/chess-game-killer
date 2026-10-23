@@ -96,7 +96,7 @@ struct OpeningStatsPanel: View {
 
     private func footnote(_ entry: OpeningStats.Entry) -> String {
         let games = entry.total.formatted()
-        let whose = book == .masters ? "\(games) games between players rated 2500+" : "\(games) Lichess games, players \(band.range)"
+        let whose = book == .masters ? "\(games) games between players rated 2400+" : "\(games) Lichess games, players \(band.range)"
         guard let lineMove = marked else { return whose + "." }
         let share = entry.share(of: lineMove)
         let san = Notation.san(of: lineMove, fen: fen) ?? lineMove

@@ -3,7 +3,7 @@ import Foundation
 
 /// How people really continue from each named-opening position, counted from the Lichess
 /// databases (CC0) by scripts/grandmaster/build_masters.py: top over-the-board games between
-/// players rated 2500+ (masters-stats.tsv), and Lichess rated games in five rating bands
+/// players rated 2400+ (masters-stats.tsv), and Lichess rated games in five rating bands
 /// (club-stats.tsv). Everything ships with the app, so it works offline.
 struct OpeningStats: Sendable {
     /// Whose games to count.

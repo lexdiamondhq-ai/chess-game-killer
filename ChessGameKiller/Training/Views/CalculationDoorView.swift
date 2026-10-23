@@ -113,7 +113,7 @@ struct GuessTheMoveList: View {
                 }
                 .pickerStyle(.segmented)
                 if shelf == .masters {
-                    Text("\(content.masterGames.count) recent games between players rated 2550 and up, from top tournaments.")
+                    Text("\(content.masterGames.count) recent classical games between players rated 2500 and up, from top tournaments.")
                         .font(.system(.footnote, design: .themed))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 4)

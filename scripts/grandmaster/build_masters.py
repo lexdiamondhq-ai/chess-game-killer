@@ -4,8 +4,8 @@
 Two modes, each reading PGN on stdin:
 
   masters  Lichess broadcast games (top over-the-board events, https://database.lichess.org/#broadcasts).
-           Writes masters-stats.tsv (how players rated 2500+ continue in every named
-           opening position) and masters-games.json (recent decisive master games for
+           Writes masters-stats.tsv (how players rated 2400+ continue in every named
+           opening position) and masters-games.json (recent decisive classical games between players rated 2500+, for
            Guess the Move and each opening's model games).
   club     Lichess rated games (https://database.lichess.org/#standard_games), the first
            --limit games of a month. Writes club-stats.tsv: the same statistics, split
@@ -39,10 +39,10 @@ import chess
 # Keep in step with OpeningStats.Band in ChessGameKiller/GrandmasterRoom/OpeningStats.swift.
 BAND_FLOORS = [0, 1200, 1500, 1800, 2100]
 MAX_PLY = 30
-MASTER_ELO = 2500
-GAME_ELO = 2550
+MASTER_ELO = 2400
+GAME_ELO = 2500
 MAX_GAMES = 1500
-PER_OPENING = 12
+PER_OPENING = 4
 SKIP_EVENTS = re.compile(r"blitz|bullet|rapid|armageddon|960|freestyle|fischer|blind|simul|speed|titled|bughouse|"
                          r"puzzle|online|chess\.com|lichess", re.I)
 
@@ -204,6 +204,26 @@ def tournament(headers: dict[str, str]) -> str:
     return site if site and not site.startswith("http") else "Over the board"
 
 
+ENGINES = re.compile(r"tcec|\bccc\b|engine|computer|stockfish|leela|\bbots?\b", re.I)
+
+
+def is_human(headers: dict[str, str]) -> bool:
+    """Broadcasts also relay engine events like TCEC: keep people only."""
+    if "BOT" in (headers.get("WhiteTitle", ""), headers.get("BlackTitle", "")):
+        return False
+    if max(elo(headers, "White"), elo(headers, "Black")) > 2900:
+        return False
+    names = " ".join(headers.get(t, "") for t in ("Event", "BroadcastName", "White", "Black"))
+    return not ENGINES.search(names) and not re.search(r"\d", headers.get("White", "") + headers.get("Black", ""))
+
+
+def is_classical(headers: dict[str, str]) -> bool:
+    """At least 50 minutes each, when the time control is given."""
+    control = headers.get("TimeControl", "")
+    m = re.match(r"(\d+)", control)
+    return m is None or int(m.group(1)) >= 3000
+
+
 def is_standard(headers: dict[str, str]) -> bool:
     return (headers.get("Variant", "Standard").lower() in ("standard", "")
             and "FEN" not in headers and headers.get("SetUp", "0") != "1")
@@ -215,7 +235,7 @@ def masters(root: Node, out: str) -> None:
     for headers, movetext in games(sys.stdin):
         seen += 1
         result = headers.get("Result", "*")
-        if result == "*" or not is_standard(headers):
+        if result == "*" or not is_standard(headers) or not is_human(headers):
             continue
         we, be = elo(headers, "White"), elo(headers, "Black")
         if min(we, be) < MASTER_ELO:
@@ -225,7 +245,7 @@ def masters(root: Node, out: str) -> None:
         named = walk(root, sans, "m", result)
         event = headers.get("Event", "") + " " + tournament(headers)
         if (result != "1/2-1/2" and min(we, be) >= GAME_ELO and 50 <= len(sans) <= 150
-                and not SKIP_EVENTS.search(event) and not SKIP_EVENTS.search(headers.get("TimeControl", ""))):
+                and not SKIP_EVENTS.search(event) and is_classical(headers)):
             candidates.append((headers, sans, named))
     print(f"Read {seen} broadcast games, {used} between players rated {MASTER_ELO}+, "
           f"{len(candidates)} candidates for Guess the Move.", file=sys.stderr)
@@ -243,7 +263,8 @@ def masters(root: Node, out: str) -> None:
         if len(picked) >= MAX_GAMES:
             break
         opening = named.name if named else None
-        family = opening.split(":")[0] if opening else "Other"
+        # A few games per named line, so the shelf covers many openings.
+        family = opening or "Other"
         white, black = person(headers.get("White", "?")), person(headers.get("Black", "?"))
         dedupe = (white, black, headers.get("Event", ""), headers.get("Round", ""))
         if dedupe in keys:

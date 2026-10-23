@@ -103,7 +103,7 @@ struct OpeningLine: Identifiable, Hashable {
 /// Everything in the Grandmaster Room that ships with the app.
 struct GrandmasterContent {
     let games: [ClassicGame]
-    /// Recent decisive games between players rated 2550+, from the Lichess broadcast database
+    /// Recent decisive classical games between people rated 2500+, from the Lichess broadcast database
     /// (CC0), newest first. Built by scripts/grandmaster/build_masters.py.
     var masterGames: [ClassicGame] = []
     let endgames: [EndgameStudy]
