@@ -792,11 +792,11 @@ private struct CoachPanel: View {
         .tint(.primary)
         .fullScreenCover(item: $rewind) { game in
             if let vault {
-                RewindView(game: game, theme: theme) { _ in
+                RewindView(game: game, theme: theme, onPlayAgain: { _ in
                     rewind = nil
                     collapse()
                     withAnimation(.snappy) { match.rematch() }
-                }
+                })
                 .environment(vault)
             }
         }

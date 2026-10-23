@@ -6,6 +6,49 @@ on:
   pull_request:
 
 jobs:
+  xcode-26-build:
+    # Alex builds on the newest Xcode, whose type checker gives up sooner on long
+    # SwiftUI expressions. This build flags any expression slower than 150 ms.
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache Stockfish networks
+        uses: actions/cache@v4
+        with:
+          path: .nnue-cache
+          key: nnue-1111cefa1111-37f18f62d772
+      - name: Generate Xcode project
+        run: |
+          brew install xcodegen
+          xcodegen
+      - name: Build on the newest Xcode
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          [ -n "$XCODE" ] && sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+          status=0
+          xcodebuild build \
+            -project ChessGameKiller.xcodeproj \
+            -scheme ChessGameKiller \
+            -destination "generic/platform=iOS Simulator" \
+            CODE_SIGNING_ALLOWED=NO \
+            OTHER_SWIFT_FLAGS='$(inherited) -Xfrontend -warn-long-expression-type-checking=150 -Xfrontend -warn-long-function-bodies=400' \
+            > build26.log 2>&1 || status=$?
+          grep -E "error:|\*\* " build26.log | sort -u | head -60 || true
+          echo "--- slow to type-check"
+          grep -E "type-check|unable to type-check" build26.log | sort -u | head -60 || true
+          echo "--- warnings in the app's own code"
+          grep -E "ChessGameKiller/.*warning:" build26.log | sort -u | head -80 || true
+          exit $status
+      - name: Fail on slow expressions
+        run: |
+          # Xcode gives up somewhere past a few seconds; anything near a second is a warning sign.
+          if grep -E "expression took [0-9]{4,}ms to type-check" build26.log; then
+            echo "An expression took a second or more to type-check; split it up."
+            exit 1
+          fi
+
   build-and-test:
     runs-on: macos-15
     timeout-minutes: 60

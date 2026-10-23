@@ -21,7 +21,7 @@ struct CoordinatesView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let boardSide = max(200, min(geo.size.width - 32, geo.size.height * 0.47, 560))
+            let boardSide: CGFloat = max(200, min(geo.size.width - 32, geo.size.height * 0.47, 560))
             VStack(spacing: 0) {
                 RoomHeader(title: "Coordinates", subtitle: subtitle) { close() }
                 ScrollView {

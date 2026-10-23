@@ -45,69 +45,7 @@ struct BoardView: View {
 
     private var flatBoard: some View {
         GeometryReader { geo in
-            let side = min(geo.size.width, geo.size.height)
-            let inset = theme.frameInset(side: side)
-            let sq = (side - inset * 2) / 8
-            let corner = RoundedRectangle(cornerRadius: sq * 0.12, style: .continuous)
-            ZStack(alignment: .topLeading) {
-                // Only the board itself is cut to its rounded corners: a tall piece on the far
-                // rank may rise a little above the frame, as it would on a real board.
-                ZStack {
-                    if let art = theme.boardArt {
-                        BoardArt(name: art, flipped: flipped)
-                    }
-                    if let surface = theme.surface {
-                        LinearGradient(colors: surface, startPoint: .topLeading, endPoint: .bottomTrailing)
-                    }
-                }
-                .frame(width: side, height: side)
-                .clipShape(corner)
-                ZStack(alignment: .topLeading) {
-                    squares(size: sq)
-                    pieces(size: sq)
-                    if theme.spritePieces {
-                        dotsOverPieces(size: sq)
-                    }
-                    CheckCalloutLayer(game: game, color: calloutColor, anchor: { square in
-                        calloutPoint(over: square, size: sq)
-                    })
-                    // Each game starts with a fresh layer: the move count runs on across games.
-                    .id(match.gameNumber)
-                    .frame(width: sq * 8, height: sq * 8)
-                    // A flag that falls mid-promotion puts the pawn back; this just makes sure
-                    // the picker never outlives the game.
-                    if let promotion = game.pendingPromotion, !match.isOver {
-                        PromotionPicker(
-                            color: promotion.piece.color, theme: theme, squareSize: sq,
-                            cancel: { withAnimation(.snappy(duration: 0.2)) { match.cancelPromotion() } }
-                        ) { kind in
-                            withAnimation(.snappy(duration: 0.2)) { match.promote(to: kind) }
-                        }
-                        .transition(.opacity)
-                    }
-                }
-                .frame(width: sq * 8, height: sq * 8)
-                .padding(inset)
-                if theme.boardArt != nil {
-                    FrameCoordinates(flipped: flipped, inset: inset, squareSize: sq, color: theme.labelOnDark)
-                }
-            }
-            .frame(width: side, height: side)
-            .overlay {
-                if let edge = theme.boardEdge {
-                    corner.strokeBorder(edge, lineWidth: 1)
-                }
-            }
-            // Falling pieces sit outside the clip, so one on the edge can fall past it.
-            .overlay(alignment: .topLeading) { captures(size: sq).padding(inset) }
-            .background {
-                // Soft shadow or colored glow (Neon) around the board.
-                ForEach(Array(theme.boardShadows.enumerated()), id: \.offset) { index, color in
-                    corner.fill(color)
-                        .blur(radius: sq * (theme.isDark ? 0.3 + 0.35 * CGFloat(index) : 0.25))
-                        .offset(y: theme.isDark ? 0 : sq * 0.08)
-                }
-            }
+            flatBoard(side: min(geo.size.width, geo.size.height))
         }
         .aspectRatio(1, contentMode: .fit)
         // One tap as each move lands: firmer for a capture, a sharp knock for a check against the player.
@@ -123,6 +61,97 @@ struct BoardView: View {
                 try? await Task.sleep(for: .seconds(0.4))
                 wins += 1
             }
+        }
+    }
+
+    // The flat board is built from small typed pieces: one long SwiftUI expression here is
+    // too slow for the newer Swift type checker, which then gives up.
+
+    private func flatBoard(side: CGFloat) -> some View {
+        let inset: CGFloat = theme.frameInset(side: side)
+        let sq: CGFloat = (side - inset * 2) / 8
+        let corner = RoundedRectangle(cornerRadius: sq * 0.12, style: .continuous)
+        return ZStack(alignment: .topLeading) {
+            // Only the board itself is cut to its rounded corners: a tall piece on the far
+            // rank may rise a little above the frame, as it would on a real board.
+            boardSurface
+                .frame(width: side, height: side)
+                .clipShape(corner)
+            boardContent(size: sq)
+                .frame(width: sq * 8, height: sq * 8)
+                .padding(inset)
+            if theme.boardArt != nil {
+                FrameCoordinates(flipped: flipped, inset: inset, squareSize: sq, color: theme.labelOnDark)
+            }
+        }
+        .frame(width: side, height: side)
+        .overlay { boardEdge(corner) }
+        // Falling pieces sit outside the clip, so one on the edge can fall past it.
+        .overlay(alignment: .topLeading) { captures(size: sq).padding(inset) }
+        .background { boardGlow(corner, size: sq) }
+    }
+
+    @ViewBuilder private var boardSurface: some View {
+        ZStack {
+            if let art = theme.boardArt {
+                BoardArt(name: art, flipped: flipped)
+            }
+            if let surface = theme.surface {
+                LinearGradient(colors: surface, startPoint: .topLeading, endPoint: .bottomTrailing)
+            }
+        }
+    }
+
+    private func boardContent(size sq: CGFloat) -> some View {
+        ZStack(alignment: .topLeading) {
+            squares(size: sq)
+            pieces(size: sq)
+            if theme.spritePieces {
+                dotsOverPieces(size: sq)
+            }
+            checkCallout(size: sq)
+            // A flag that falls mid-promotion puts the pawn back; this just makes sure
+            // the picker never outlives the game.
+            if let promotion = game.pendingPromotion, !match.isOver {
+                promotionPicker(color: promotion.piece.color, size: sq)
+            }
+        }
+    }
+
+    private func checkCallout(size sq: CGFloat) -> some View {
+        CheckCalloutLayer(game: game, color: calloutColor, anchor: { (square: Square) -> CGPoint in
+            calloutPoint(over: square, size: sq)
+        })
+        // Each game starts with a fresh layer: the move count runs on across games.
+        .id(match.gameNumber)
+        .frame(width: sq * 8, height: sq * 8)
+    }
+
+    private func promotionPicker(color: Piece.Color, size sq: CGFloat) -> some View {
+        PromotionPicker(
+            color: color, theme: theme, squareSize: sq,
+            cancel: { withAnimation(.snappy(duration: 0.2)) { match.cancelPromotion() } },
+            choose: { (kind: Piece.Kind) in
+                withAnimation(.snappy(duration: 0.2)) { match.promote(to: kind) }
+            }
+        )
+        .transition(.opacity)
+    }
+
+    @ViewBuilder private func boardEdge(_ corner: RoundedRectangle) -> some View {
+        if let edge = theme.boardEdge {
+            corner.strokeBorder(edge, lineWidth: 1)
+        }
+    }
+
+    /// Soft shadow or colored glow (Neon) around the board.
+    private func boardGlow(_ corner: RoundedRectangle, size sq: CGFloat) -> some View {
+        let dark: Bool = theme.isDark
+        return ForEach(Array(theme.boardShadows.enumerated()), id: \.offset) { (index: Int, color: Color) in
+            let blur: CGFloat = dark ? sq * (0.3 + 0.35 * CGFloat(index)) : sq * 0.25
+            corner.fill(color)
+                .blur(radius: blur)
+                .offset(y: dark ? 0 : sq * 0.08)
         }
     }
 
@@ -669,15 +698,20 @@ struct CaptureFall: View {
         let heavy = piece.kind == .queen || piece.kind == .rook
         let spread: CGFloat = heavy ? 2.1 : 1.7
         let peak: CGFloat = heavy ? 0.75 : 0.55
-        let rise = Self.progress(.easeOut, t, from: 0.19, length: 0.07)
-        let settle = Self.progress(.easeOut, t, from: 0.26, length: 0.5)
+        let rise: CGFloat = Self.progress(.easeOut, t, from: 0.19, length: 0.07)
+        let settle: CGFloat = Self.progress(.easeOut, t, from: 0.26, length: 0.5)
+        // Worked out one by one: as a single expression this took the type checker seconds.
+        let line: CGFloat = size * (0.06 - 0.045 * settle)
+        let scale: CGFloat = 0.75 + (spread - 0.75) * settle
+        let fade: Double = Double(peak * rise * (1 - settle))
+        let drop: CGFloat = size * (footY - 0.5)
         return Ellipse()
-            .strokeBorder(Color.white.opacity(0.55), lineWidth: size * (0.06 - 0.045 * settle))
+            .strokeBorder(Color.white.opacity(0.55), lineWidth: line)
             .frame(width: size * 0.8, height: size * 0.34)
-            .scaleEffect(0.75 + (spread - 0.75) * settle)
-            .opacity(Double(peak * rise * (1 - settle)))
+            .scaleEffect(scale)
+            .opacity(fade)
             .blur(radius: size * 0.02)
-            .offset(y: size * (footY - 0.5))
+            .offset(y: drop)
     }
 
     /// How far along a step `length` seconds long, starting `start` seconds in, is at `t`, eased.
