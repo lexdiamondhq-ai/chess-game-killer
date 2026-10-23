@@ -85,12 +85,15 @@ struct CheckSquareMark: View {
                 colors: [color.opacity(0.85), color.opacity(0.4), .clear],
                 center: .center, startRadius: 0, endRadius: size * 0.62
             )
-            RoundedRectangle(cornerRadius: size * 0.1, style: .continuous)
-                .strokeBorder(color, lineWidth: max(2, size * 0.055))
-                .padding(size * 0.035)
-                .phaseAnimator([false, true]) { ring, bright in
-                    ring.opacity(bright ? 1 : 0.55)
-                } animation: { _ in .easeInOut(duration: 0.7) }
+            // The ring breathes by the clock, not by an animation, so a board that is still
+            // settling its layout never drags the ring along from somewhere else.
+            TimelineView(.animation) { timeline in
+                let t = timeline.date.timeIntervalSinceReferenceDate
+                RoundedRectangle(cornerRadius: size * 0.1, style: .continuous)
+                    .strokeBorder(color, lineWidth: max(2, size * 0.055))
+                    .padding(size * 0.035)
+                    .opacity(0.775 + 0.225 * sin(t * .pi / 0.7))
+            }
         }
         .allowsHitTesting(false)
     }
