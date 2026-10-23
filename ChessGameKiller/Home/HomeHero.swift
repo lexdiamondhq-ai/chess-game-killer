@@ -233,12 +233,15 @@ struct HomeWorld: View {
         guard !Task.isCancelled else { return }
         let end = camera(size, progress: reduceMotion ? 0 : 1, pull: 0)
         let scene = stage.scene(for: look)
-        guard let still = scene.still(from: end, size: size, scale: 1) else { return }
-        soft = Self.blurred(still)
+        // Drawn small and plain: the blur hides both, and the picture costs the main
+        // thread a sixteenth of a full-size, smoothed one while the app is opening.
+        guard let still = scene.still(from: end, size: size, scale: 0.5, antialiased: false) else { return }
+        soft = Self.blurred(still, sigma: 8)
     }
 
     private static let context = CIContext(options: [.cacheIntermediates: false])
 
+    /// `sigma` is in the image's own pixels.
     static func blurred(_ image: UIImage, sigma: Double = 16) -> UIImage? {
         guard let cgImage = image.cgImage else { return nil }
         let input = CIImage(cgImage: cgImage)

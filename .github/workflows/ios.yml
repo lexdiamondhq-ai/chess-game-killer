@@ -137,6 +137,8 @@ jobs:
           grep -E "error:|\*\* " build.log | head -60 || true
           grep -E "Executed" build.log | tail -3 || true
           grep -E "Restarting after|Fatal error" build.log | head -20 || true
+          # How the shared engine started, when it was slow to (see StockfishEngine.startEngine).
+          grep -E "Stockfish: " build.log | head -10 || true
       - name: Repeat the failures
         if: failure()
         # The pictures above can push the test results out of the log's tail, so they come again, last.
@@ -145,3 +147,6 @@ jobs:
           grep -E "error:|Test Case .* failed|\*\* " build.log | head -80 || true
           grep -E "Executed" build.log | tail -3 || true
           grep -B4 -A24 "Fatal error" build.log | head -60 || true
+          # The engine's own account, for a failing engine test.
+          grep -E "Stockfish: " build.log | head -10 || true
+          grep -E "\] TIMING " build.log | tail -40 || true
