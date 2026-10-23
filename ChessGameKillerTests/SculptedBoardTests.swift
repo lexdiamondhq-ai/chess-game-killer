@@ -180,6 +180,27 @@ final class SculptedBoardTests: XCTestCase {
         window.isHidden = true
     }
 
+    /// With a piece picked up, a tap on a move mark plays there, even where the mark shows
+    /// through a piece standing in front of it. Elsewhere that piece is still the piece.
+    func testATapOnAMoveMarkFindsItThroughAPiece() throws {
+        let scene = SculptedBoardScene()
+        let window = try hostWindow(for: scene.view, side: 390)
+        // 1.e4 e5 2.Nf3 Nc6 and the queen picked up: e2 is right behind the king.
+        let pieces = (Position(fen: "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3")?.pieces ?? [])
+            .map { PlacedPiece(id: $0.square.rawValue, piece: $0) }
+        scene.apply(SculptedBoardState(pieces: pieces, selected: .d1, targets: [.e2]), animated: false)
+        RunLoop.main.run(until: Date().addingTimeInterval(1))
+        let size = scene.view.bounds.size
+        let e2 = scene.camera.screenPoint(SculptedCamera.position(of: .e2), in: size)
+        XCTAssertEqual(scene.square(at: e2), .e2)
+        let kingsChest = scene.camera.screenPoint(SculptedCamera.position(of: .e1) + SIMD3(0, 0.6, 0), in: size)
+        XCTAssertEqual(scene.square(at: kingsChest), .e1)
+        // With nothing picked up, the king hides the middle of e2.
+        scene.apply(SculptedBoardState(pieces: pieces), animated: false)
+        XCTAssertEqual(scene.square(at: e2), .e1)
+        window.isHidden = true
+    }
+
     /// Looking back through a game: each piece keeps its id, so it walks back rather than fading.
     func testPiecesKeepTheirIdentityWhenLookingBack() {
         var next = 1000

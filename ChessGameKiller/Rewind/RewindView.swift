@@ -8,7 +8,11 @@ import SwiftUI
 /// Stockfish, then take the move back and find it yourself.
 struct RewindView: View {
     let theme: BoardTheme
-    /// Play the same rival again, when the screen offers it.
+    /// The rival of a game in progress that a rematch would cost, so the person is asked first.
+    var forfeits: String?
+    /// What Back does once no line is open, when it isn't just going back a screen.
+    var leave: (() -> Void)?
+    /// Play the same rival again, when the screen offers it. Whoever opened the screen closes it.
     var onPlayAgain: ((SavedGame) -> Void)?
 
     @Environment(GameVault.self) private var vault
@@ -27,10 +31,14 @@ struct RewindView: View {
     private let opensLine: Bool
     @State private var chance: SecondChance?
     @State private var session: SessionPlan?
+    @State private var confirmingRematch = false
 
     init(game: SavedGame, theme: BoardTheme, startAt ply: Int? = nil, opensLine: Bool = false,
-         engine: ChessEngine? = StockfishEngine.shared, onPlayAgain: ((SavedGame) -> Void)? = nil) {
+         engine: ChessEngine? = StockfishEngine.shared, forfeits: String? = nil, leave: (() -> Void)? = nil,
+         onPlayAgain: ((SavedGame) -> Void)? = nil) {
         self.theme = theme
+        self.forfeits = forfeits
+        self.leave = leave
         self.onPlayAgain = onPlayAgain
         self.engine = engine
         self.opensLine = opensLine
@@ -104,11 +112,20 @@ struct RewindView: View {
 
     // MARK: Header
 
+    /// Both ends of the header are this wide, so the title stays centered.
+    private static let headerSide: CGFloat = 64
+
     private var header: some View {
         HStack {
             Button {
                 // Out of a line first, then out of Rewind.
-                if explorer != nil { stopGhost() } else { dismiss() }
+                if explorer != nil {
+                    stopGhost()
+                } else if let leave {
+                    leave()
+                } else {
+                    dismiss()
+                }
             } label: {
                 Image(systemName: "chevron.left")
                     .font(.title3.weight(.semibold))
@@ -116,9 +133,8 @@ struct RewindView: View {
             }
             .tint(.primary)
             .accessibilityLabel(explorer == nil ? "Back" : "Back to the game")
-            // As wide as the rematch button, so the title stays centered.
-            .frame(width: Self.sideSlot, alignment: .leading)
-            Spacer()
+            .frame(width: Self.headerSide, alignment: .leading)
+            Spacer(minLength: 0)
             if let explorer {
                 levelMenu(explorer)
             } else {
@@ -135,32 +151,32 @@ struct RewindView: View {
                         .contentTransition(.numericText())
                 }
             }
-            Spacer()
-            if let onPlayAgain, game.level != nil {
-                Button {
-                    dismiss()
-                    onPlayAgain(game)
-                } label: {
-                    VStack(spacing: 3) {
-                        Image(systemName: "play.fill")
-                            .font(.body.weight(.semibold))
-                        Text("Rematch")
-                            .font(.caption2.weight(.semibold))
+            Spacer(minLength: 0)
+            ZStack(alignment: .trailing) {
+                // A word, not a play symbol: here ▶︎ would read as "play the replay".
+                if let onPlayAgain, game.level != nil, explorer == nil {
+                    Button("Rematch") {
+                        if forfeits == nil { onPlayAgain(game) } else { confirmingRematch = true }
                     }
-                    .frame(width: Self.sideSlot, height: 44)
-                    .contentShape(Rectangle())
+                    .font(.footnote.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .frame(minHeight: 44)
+                    .tint(.primary)
+                    .accessibilityLabel("Rematch \(game.opponent)")
+                    .confirmationDialog("Leave your game against \(forfeits ?? game.opponent)?",
+                                        isPresented: $confirmingRematch, titleVisibility: .visible) {
+                        Button("Resign and play \(game.opponent)", role: .destructive) { onPlayAgain(game) }
+                        Button("Keep playing", role: .cancel) {}
+                    } message: {
+                        Text("It counts as a loss for your army.")
+                    }
                 }
-                .tint(.primary)
-                .accessibilityLabel("Rematch \(game.opponent)")
-            } else {
-                Color.clear.frame(width: Self.sideSlot, height: 44)
             }
+            .frame(width: Self.headerSide, alignment: .trailing)
         }
         .padding(.horizontal, 8)
     }
-
-    /// The width of the header's back and rematch buttons.
-    private static let sideSlot: CGFloat = 60
 
     private var positionTitle: String {
         if ply == 0 { return "The start" }

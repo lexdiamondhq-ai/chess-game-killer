@@ -45,7 +45,7 @@ final class HomeModelTests: XCTestCase {
         let match = MatchController(engine: nil, sounds: nil)
         let position = try XCTUnwrap(Position(fen: HomeSample.italianFEN))
         match.start(MatchController.Setup(playerColor: .black, level: .club, timeControl: .blitz5), from: position)
-        match.suspendClock()
+        match.suspend()
         let next = HomeUpNext.make(match: match, side: .white, level: .beginner, timeControl: .unlimited, hasPlayed: true)
         XCTAssertEqual(next.kind, .resume)
         XCTAssertTrue(next.inProgress)

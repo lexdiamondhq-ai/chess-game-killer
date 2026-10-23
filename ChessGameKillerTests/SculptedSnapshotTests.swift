@@ -6,11 +6,12 @@ import XCTest
 
 /// Pictures of the 3D board at phone size, saved to SNAPSHOT_DIR for checking by eye:
 /// a game in progress with every kind of mark, the board from Black's side, the light at
-/// three levels, a close crop at full resolution, and a capture caught mid-move.
+/// three levels, a close crop at full resolution, a move mark seen through a piece, and a
+/// capture caught mid-move.
 @MainActor
 final class SculptedSnapshotTests: XCTestCase {
 
-    /// The Italian Game, Black's bishop just out to c5, White's knight on f3 picked up.
+    /// The Italian Game, Black's knight just out to f6, White's knight on f3 picked up.
     private static let fen = "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 6 5"
 
     private static var pieces: [PlacedPiece] {
@@ -22,7 +23,8 @@ final class SculptedSnapshotTests: XCTestCase {
             pieces: pieces,
             selected: .f3,
             targets: [.e5, .g5, .h4, .d4, .g1],
-            lastMove: LastMove(from: .f8, to: .c5),
+            // One light square and one dark, so the last move is seen on both.
+            lastMove: LastMove(from: .g8, to: .f6),
             hints: [SculptedHint(from: .e1, to: .g1, isBest: true), SculptedHint(from: .d2, to: .d3, isBest: false)]
         )
     }
@@ -70,37 +72,53 @@ final class SculptedSnapshotTests: XCTestCase {
         window.isHidden = true
     }
 
-    /// A knight taken on the flat board, caught as it tips over away from the bishop
-    /// that took it, lands and fades.
+    /// A knight taken on the flat board, held at six moments: it tips over away from the
+    /// bishop that took it, hits the board in a ring of dust, slides a touch and fades.
     func testFlatCaptureFallInMotion() throws {
         let theme = BoardTheme.named(.midnight)
         let size: CGFloat = 110
-        let windowScene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
-        let window = UIWindow(windowScene: windowScene)
-        window.frame = CGRect(x: 0, y: 0, width: size * 4, height: size * 3)
-        let board = ZStack {
-            Color(red: 0.11, green: 0.115, blue: 0.125)
-            HStack(spacing: 0) {
-                ForEach(0..<4, id: \.self) { column in
-                    Rectangle().fill(theme.squareFill(isLight: column % 2 == 0)).frame(width: size, height: size)
+        let moments: [TimeInterval] = [0, 0.1, 0.18, 0.26, 0.4, 0.6]
+        for (index, time) in moments.enumerated() {
+            let board = ZStack {
+                Color(red: 0.11, green: 0.115, blue: 0.125)
+                HStack(spacing: 0) {
+                    ForEach(0..<4, id: \.self) { column in
+                        Rectangle().fill(theme.squareFill(isLight: column % 2 == 0)).frame(width: size, height: size)
+                    }
                 }
+                PieceImage(piece: Piece(.bishop, color: .white, square: .b2), theme: theme, size: size, onBoard: true)
+                    .offset(x: -size / 2)
+                CaptureFall(piece: Piece(.knight, color: .black, square: .b2), theme: theme, size: size, seed: 1,
+                            away: 1, frozenAt: time)
+                    .offset(x: -size / 2)
             }
-            PieceImage(piece: Piece(.bishop, color: .white, square: .b2), theme: theme, size: size, onBoard: true)
-                .offset(x: -size / 2)
-            CaptureFall(piece: Piece(.knight, color: .black, square: .b2), theme: theme, size: size, seed: 1, away: 1)
-                .offset(x: -size / 2)
-        }
-        let start = Date()
-        window.rootViewController = UIHostingController(rootView: board)
-        window.makeKeyAndVisible()
-        for (index, time) in [0.02, 0.12, 0.2, 0.3, 0.45, 0.9].enumerated() {
-            RunLoop.main.run(until: start.addingTimeInterval(time))
-            let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
-                window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
-            }
+            .frame(width: size * 4, height: size * 3)
+            let renderer = ImageRenderer(content: board)
+            renderer.scale = 3
+            let image = try XCTUnwrap(renderer.uiImage, "moment \(index + 1) did not draw")
             try save(image, "capture-fall-\(index + 1)")
         }
+    }
+
+    /// The queen picked up beside her king: the mark on e2 shows faintly through the king,
+    /// and in full where the king leaves it clear. Then the same from Black's side.
+    func testMoveMarksShowThroughPieces() throws {
+        var white = SculptedBoardState(pieces: Self.pieces)
+        white.selected = .d1
+        white.targets = [.e2]
+        let (scene, window) = try stage(white)
+        let image = scene.snapshot()
+        try save(image, "hints-3d-xray")
+        try save(crop(image, x: 0.4, y: 0.58, side: 0.3), "hints-3d-xray-crop")
         window.isHidden = true
+
+        var black = SculptedBoardState(pieces: Self.pieces)
+        black.flipped = true
+        black.selected = .d8
+        black.targets = [.e7]
+        let (blackScene, blackWindow) = try stage(black)
+        try save(crop(blackScene.snapshot(), x: 0.3, y: 0.58, side: 0.3), "hints-3d-xray-black")
+        blackWindow.isHidden = true
     }
 
     /// Each 3D look at the size it has on an iPhone 17 Pro, a game in progress.
@@ -132,12 +150,12 @@ final class SculptedSnapshotTests: XCTestCase {
         }
     }
 
-    /// The flat board after 1.d4 from Black's side, as the game shows it with 3D pieces off,
-    /// for every theme, at phone size.
+    /// The flat board after 1.Nf3 from Black's side, as the game shows it with 3D pieces off,
+    /// for every theme, at phone size. The knight left a dark square for a light one.
     func testFlatBoardsFromBlacksSide() throws {
-        let draft = try XCTUnwrap(PositionDraft(fen: "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1"))
+        let draft = try XCTUnwrap(PositionDraft(fen: "rnbqkbnr/pppppppp/8/8/8/5N2/PPPPPPPP/RNBQKB1R b KQkq - 1 1"))
         for theme in BoardTheme.all {
-            let board = PositionBoard(draft: draft, theme: theme, flipped: true, tints: [.d2: theme.lastMove, .d4: theme.lastMove])
+            let board = PositionBoard(draft: draft, theme: theme, flipped: true, tints: [.g1: theme.lastMove, .f3: theme.lastMove])
                 .frame(width: 370, height: 370)
                 .padding(16)
                 .background(Color(red: 0.11, green: 0.115, blue: 0.125))

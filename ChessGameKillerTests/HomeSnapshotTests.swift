@@ -47,7 +47,7 @@ final class HomeSnapshotTests: XCTestCase {
         let match = MatchController(engine: nil, sounds: nil)
         let position = try XCTUnwrap(Position(fen: HomeSample.italianFEN))
         match.start(MatchController.Setup(playerColor: .black, level: .club, timeControl: .blitz5), from: position)
-        match.suspendClock()
+        match.suspend()
         let window = try show(HomeSample.home(match: match))
         try save(window, "zz-home-6-black-timed")
         scroll(window, to: 190)

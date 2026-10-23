@@ -11,8 +11,7 @@ struct GameCoachRow: View {
 
     /// True when the row has something to show: a tip, a second try, or saved mistakes after the game.
     static func hasContent(coach: GameCoach, match: MatchController) -> Bool {
-        guard match.setup.opponent == .computer else { return false }
-        return coach.retrying != nil || coach.moment != nil || (match.isOver && coach.savedThisGame > 0)
+        coach.retrying != nil || coach.moment != nil || (match.isOver && coach.savedThisGame > 0)
     }
 
     var body: some View {
@@ -20,18 +19,17 @@ struct GameCoachRow: View {
             if let retry = coach.retrying {
                 line(title: "Your turn again", detail: "Find something better than \(sanOf(retry)).",
                      tint: TrainingColor.yellow.color(on: theme)) { EmptyView() }
-            } else if let moment = coach.moment {
-                momentView(moment)
             } else if match.isOver, coach.savedThisGame > 0 {
-                line(title: "Your mistakes become your puzzles",
-                     detail: coach.savedThisGame == 1
-                        ? "I saved 1 position from this game to practice."
-                        : "I saved \(coach.savedThisGame) positions from this game to practice.",
+                // At the end of a game the way into practice comes first: it's what the game was for.
+                line(title: coach.savedThisGame == 1 ? "1 position to practice" : "\(coach.savedThisGame) positions to practice",
+                     detail: "The moments that cost you, saved for a second try.",
                      tint: TrainingColor.pink.color(on: theme)) {
-                    smallButton("Practice them", symbol: "arrow.uturn.backward.circle.fill") {
+                    smallButton("Practice", symbol: "arrow.uturn.backward.circle.fill") {
                         coach.practiceMistakes(store: store)
                     }
                 }
+            } else if let moment = coach.moment {
+                momentView(moment)
             }
         }
         .animation(.snappy(duration: 0.3), value: coach.moment)

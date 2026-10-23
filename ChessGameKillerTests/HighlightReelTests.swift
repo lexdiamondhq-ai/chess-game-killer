@@ -32,6 +32,17 @@ final class HighlightReelTests: XCTestCase {
         XCTAssertEqual(reel.highlights.map(\.kind), [.finish])
     }
 
+    /// Nothing went far either way, so there is no reel to offer.
+    func testAQuietGameHasNoHighlights() {
+        let log = [
+            1: moment(1, .good, before: 0.05, after: 0.04),
+            3: moment(3, .good, before: 0.04, after: 0.06),
+        ]
+        let reel = GameReel.make(log: log, player: "You", opponent: "Drift", playerColor: .white, winner: nil,
+                                 isOver: true, accuracy: 90, moveCount: 4, finalFEN: Position.standard.fen)
+        XCTAssertTrue(reel.highlights.isEmpty)
+    }
+
     func testScenesFollowTheClock() {
         let reel = GameReel.make(log: [3: moment(3, .blunder, before: 0, after: -0.5)], player: "You", opponent: "X",
                                  playerColor: .black, winner: nil, isOver: true, accuracy: nil, moveCount: 3,
