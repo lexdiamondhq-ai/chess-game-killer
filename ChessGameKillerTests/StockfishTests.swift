@@ -66,7 +66,11 @@ final class StockfishTests: XCTestCase {
             let ms = Int(elapsed.components.seconds * 1000) + Int(elapsed.components.attoseconds / 1_000_000_000_000_000)
             NSLog("TIMING reply level=\(level) think=\(level.thinkTimeMs)ms total=\(ms)ms")
             XCTAssertEqual(match.game.plyCount, 2, "\(level) never answered")
-            XCTAssertLessThan(ms, level.thinkTimeMs + 2500, "\(level) took \(ms) ms to answer")
+            // Stockfish now and then never answers the stop that ends the hint search. The
+            // engine then gives that search its grace and waits out its lost answer before the
+            // reply's own search starts (see StockfishEngine.search), so that is allowed for too.
+            let recoveryMs = Int((StockfishEngine.stopGrace + StockfishEngine.lostAnswer) / .milliseconds(1))
+            XCTAssertLessThan(ms, level.thinkTimeMs + recoveryMs + 2500, "\(level) took \(ms) ms to answer")
             // Leave the engine alone for the next level: no grading or hints still running.
             await match.settleEngine()
         }
