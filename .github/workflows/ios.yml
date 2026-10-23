@@ -116,13 +116,12 @@ jobs:
             base64 -i /tmp/small.jpg | fold -w 3000
             echo "END-SCREEN"
           done
-      - name: Test results again
-        # The pictures above fill the end of the log, so the test outcome is repeated after them,
-        # where a reader of only the last lines still finds a failing test.
-        if: always()
+      - name: Repeat the failures
+        if: failure()
+        # The pictures above can push the test results out of the log's tail, so they come again, last.
         run: |
-          [ -f build.log ] || { echo "No build log"; exit 0; }
-          grep -iE "Test Case .* failed" build.log | head -40 || true
-          grep -E "error:|\*\* " build.log | head -60 || true
+          [ -f build.log ] || exit 0
+          grep -E "error:|Test Case .* failed|\*\* " build.log | head -80 || true
           grep -E "Executed" build.log | tail -3 || true
-          grep -E "Restarting after|Fatal error" build.log | head -20 || true
+          grep -E "Restarting after|Test Case '.*' started" build.log | tail -4 || true
+          grep -B4 -A24 "Fatal error" build.log | head -60 || true
