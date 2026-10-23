@@ -1,5 +1,5 @@
 # Exports a set as game-ready meshes for SceneKit: the classic carved set or the gilded one.
-# Each piece type: up to four parts (body, metal, gem, pearl), decimated, with corner normals
+# Each piece type: up to five parts (body, metal, gem, pearl, and shade for the inside of the rook), decimated, with corner normals
 # split at sharp edges, converted to SceneKit axes (y up, ranks run toward -z), scaled to squares.
 # Usage: export.py -- [classic | gilded] [sharp angle, default 60]
 #   classic -> build/sculpted/sculpted-pieces.bin, gilded -> build/sculpted/gilded-pieces.bin
@@ -8,7 +8,7 @@ sys.path.insert(0,'scripts/sculpted'); import pieces as P
 args=sys.argv[sys.argv.index('--')+1:] if '--' in sys.argv else []
 SET=args.pop(0) if args and args[0] in ('classic','gilded') else 'classic'
 bpy.ops.wm.read_factory_settings(use_empty=True)
-MATS=('body','metal','gem','pearl')
+MATS=('body','metal','gem','pearl','shade')   # the finish ids SculptedAssets.Finish reads; an older app reads 4 as body
 M={k:bpy.data.materials.new(k) for k in MATS}
 if SET=='gilded':
     import gilded as G
@@ -24,7 +24,7 @@ else:
     NAME='sculpted'
 # triangle budgets per object name prefix (body parts get the most)
 BUDGET={'K':20000,'Q':20000,'B':16000,'R':16000,'P':10000,'Nh':30000,'Nb':5000,'Nmane':18000}
-SMALL={'ring':2400,'gem':700,'p':500,'ball':700,'fin':700,'band':1600,'crown':1600,'mitre':3000,'stripe':1200}
+SMALL={'ring':2400,'gem':700,'p':500,'ball':700,'fin':700,'band':1600,'crown':1600,'mitre':3000,'stripe':1200,'cap':2000}
 if SET=='gilded':
     # more, finer metal than the classic set: the same board's worth of triangles overall
     BUDGET.update({'P':8000,'Nh':26000,'Nmane':14000})
@@ -39,7 +39,7 @@ def budget(name):
     if name.startswith('Qp'): return SMALL['p']
     if 'ball' in low: return SMALL['ball'] if name!='Qtopball' else 700
     if 'fin' in low: return SMALL['fin']
-    for key in ('band','crown','mitre'):
+    for key in ('band','crown','mitre','cap'):
         if key in low: return SMALL[key]
     if re.match(r'^[KQBRP]st\d$',name): return SMALL['stripe']
     return None

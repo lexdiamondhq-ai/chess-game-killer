@@ -16,6 +16,8 @@ final class SculptedAssets {
     /// What a part of a piece is made of.
     enum Finish: UInt8 {
         case body = 0, metal = 1, gem = 2, pearl = 3
+        /// The floor inside the rook's tower, which the studio light never reaches.
+        case shade = 4
     }
 
     struct Part {
@@ -78,9 +80,10 @@ final class SculptedAssets {
 
     // MARK: Finishes
 
-    /// Ivory or ebony for the body; the metal, gems and pearls are the same on both sides.
+    /// Ivory or ebony for the body and its shade; the metal, gems and pearls are the same on both sides.
     func material(_ finish: Finish, for color: Piece.Color, look: SculptedLook) -> SCNMaterial {
-        let key = "\(look.name)-" + (finish == .body ? "body-\(color.rawValue)" : "\(finish)")
+        let sided = finish == .body || finish == .shade
+        let key = "\(look.name)-" + (sided ? "\(finish)-\(color.rawValue)" : "\(finish)")
         if let cached = materials[key] { return cached }
         let made: SCNMaterial
         switch finish {
@@ -97,6 +100,9 @@ final class SculptedAssets {
             if let glow = look.gemGlow { made.emission.contents = glow }
         case .pearl:
             made = Self.pbr(look.pearl, roughness: 0.2, coat: 1, coatRoughness: 0.05)
+        case .shade:
+            // Matte and dark: the scene has no ambient occlusion, so the rook's well would light up like its top.
+            made = Self.pbr(color == .white ? look.ivoryShade : look.ebonyShade, roughness: 0.7)
         }
         materials[key] = made
         return made
@@ -283,6 +289,9 @@ struct SculptedLook {
     var ivoryPolish = Polish(roughness: 0.34, coat: 0.35, coatRoughness: 0.08)
     /// How much the ivory darkens toward its silhouette; 0 for none.
     var ivoryEdge: CGFloat = 0
+    /// The floor of the rook's well, in each color: dark, so its top reads as a tower, never as a ball.
+    var ivoryShade = UIColor(red: 0.24, green: 0.21, blue: 0.18, alpha: 1)
+    var ebonyShade = UIColor(white: 0.05, alpha: 1)
     /// How dark the pieces' shadows fall on the stone.
     var shadowAlpha: CGFloat = 0.62
     var ebonyPolish = Polish(roughness: 0.36, coat: 0.45, coatRoughness: 0.2)
@@ -349,6 +358,9 @@ extension SculptedLook {
         look.ivoryEdge = 0.35
         look.shadowAlpha = 0.75
         look.ebony = UIColor(red: 0.1, green: 0.095, blue: 0.09, alpha: 1)
+        // Polished platinum reflects the dark studio as near black: a faint glow of its own keeps
+        // the king's cross and the bishop's cut bright against the dark frame on the far side.
+        look.metalGlow = UIColor(red: 0.28, green: 0.28, blue: 0.29, alpha: 1)
         look.stoneRoughness = 0.22
         look.stoneCoat = 0.5
         look.lacquerRoughness = 0.28

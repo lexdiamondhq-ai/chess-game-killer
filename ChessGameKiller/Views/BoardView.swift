@@ -732,6 +732,7 @@ struct PieceImage: View {
                     .interpolation(.high)
                     .antialiased(true)
                     .frame(width: size * frame.width * scale, height: size * frame.height * scale)
+                    .lightPieceEdge(onBoard && piece.color == .white, size: size)
                     .offset(y: size * (onBoard ? frame.boardOffset : frame.fittedOffset))
             }
     }
@@ -750,6 +751,19 @@ struct PieceImage: View {
                     radius: glow == nil ? size * 0.02 : size * 0.025,
                     y: glow == nil ? size * 0.02 : 0)
             .shadow(color: glow?.opacity(0.6) ?? .clear, radius: glow == nil ? 0 : size * 0.09)
+    }
+}
+
+private extension View {
+    /// On a board, a fine dark edge around a light piece keeps its outline crisp on the light squares,
+    /// where ivory on cream would otherwise melt in. About half a point on a phone.
+    @ViewBuilder
+    func lightPieceEdge(_ on: Bool, size: CGFloat) -> some View {
+        if on {
+            shadow(color: .black.opacity(0.8), radius: size * 0.014)
+        } else {
+            self
+        }
     }
 }
 
