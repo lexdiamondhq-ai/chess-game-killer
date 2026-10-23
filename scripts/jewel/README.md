@@ -10,7 +10,7 @@ pieces; `render.mjs` drives headless Chromium.
 
 That writes the twelve sprites (`faberge-wK.png` and so on) for `Assets.xcassets/Pieces`. To use
 another port, serve the folder there and set `JEWEL_PORT` (for example `JEWEL_PORT=8791 node render.mjs ...`).
-`only=wK,bN` renders just those sprites. Other shots: `shot=board` (the flat board picture), `hero` and
+`only=wK,bN` renders just those sprites, `plain=1` without the fine detail (to compare). Set `JEWEL_CHROME` to the Chromium binary (for example `/opt/pw-browsers/chromium`). Other shots: `shot=board` (the flat board picture), `hero` and
 `lineup`. `render.mjs` points at the Chromium that Playwright installs under `/opt/pw-browsers`; change
 `executablePath` to run it elsewhere.
 
@@ -52,3 +52,10 @@ another port, serve the folder there and set `JEWEL_PORT` (for example `JEWEL_PO
 
 Tuning parameters can go on the query string for experiments, for example `ef`, `ew`, `elo` (edge
 shading), `lw`, `lf`, `ls` (contour), `kk`, `rb` (rims), `fr` (reflector) and `ff` (front fill).
+
+## Fine detail
+
+Every set but Blueprint (which has its own ink detail) gets `FINE` in `scene.js`: pearl beading round the foot and
+the collars in the set's trim, gadrooned crown cups on the king and queen, four cabochons round the king's crown,
+and on the rook two string courses and arrow slits front, back and sides. All small enough to leave the outlines alone.
+
