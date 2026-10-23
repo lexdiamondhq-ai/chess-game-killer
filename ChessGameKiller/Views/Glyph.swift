@@ -46,7 +46,25 @@ enum Glyphs {
     static let bigBoard = "glyph-big-board"
     static let king = "glyph-king"
     static let pawn = "glyph-pawn"
+    static let coach = "glyph-coach"
+    static let challenge = "glyph-challenge"
 
     static let all = [home, train, play, puzzles, analyze, army, games, undo, hints, hintsOff, flip,
-                      settings, normalView, bigBoard, king, pawn]
+                      settings, normalView, bigBoard, king, pawn, coach, challenge]
+}
+
+/// The small dark well a row's icon sits in (New Game's match card, Challenge a friend):
+/// a quiet recess with the icon in the text color, like the home dock, not an accent badge.
+struct GlyphTile<Content: View>: View {
+    let theme: BoardTheme
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        let tile = RoundedRectangle(cornerRadius: 11, style: .continuous)
+        content()
+            .foregroundStyle(Color.primary.opacity(0.86))
+            .frame(width: 34, height: 34)
+            .background(theme.isDark ? Color.black.opacity(0.3) : Color.primary.opacity(0.06), in: tile)
+            .overlay { tile.strokeBorder(Color.primary.opacity(theme.isDark ? 0.09 : 0.08), lineWidth: 1) }
+    }
 }
