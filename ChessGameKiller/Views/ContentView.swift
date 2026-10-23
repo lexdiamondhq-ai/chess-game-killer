@@ -139,7 +139,7 @@ struct ContentView: View {
                 match.onAbandon = { [army] ledger, setup, assisted in
                     // Walking away from a game counts as a loss.
                     army.record(ledger, playerColor: setup.playerColor, won: false,
-                                stakes: GameStakes(level: setup.level, assisted: assisted))
+                                stakes: GameStakes(level: setup.level, assisted: assisted, staked: setup.stake))
                 }
                 // Every grade reaches the coach, shown or not, so real mistakes are saved to practice.
                 match.onReview = { [weak match, coach, training] review, latest in
@@ -227,6 +227,7 @@ struct ContentView: View {
                     showingNewGame = false
                     challenges?.compose()
                 }
+                .environment(army)
             }
             .sheet(isPresented: $showingSettings) {
                 SettingsSheet()
@@ -741,8 +742,18 @@ struct ContentView: View {
     /// rival's greeting has had its moment, and comes once a day per rival: before every game it
     /// would be a nag.
     private func announceGrudge() {
-        guard match.setup.opponent == .computer, match.game.ledger != nil,
-              let news = army.grudge(against: match.setup.level) else { return }
+        guard match.setup.opponent == .computer, match.game.ledger != nil else { return }
+        // On the line: what this game decides comes first, every game.
+        let level = match.setup.level
+        if let slot = match.setup.stake, army.canStake(slot, against: level) {
+            show(army.stakeNews(slot, against: level), after: 4.0)
+            return
+        }
+        if let rescue = army.rescueNews(against: level) {
+            show(rescue, after: 4.0)
+            return
+        }
+        guard let news = army.grudge(against: match.setup.level) else { return }
         let key = "grudge.told.\(match.setup.level.rawValue)"
         if let told = UserDefaults.standard.object(forKey: key) as? Date, Calendar.current.isDateInToday(told) { return }
         UserDefaults.standard.set(Date(), forKey: key)
