@@ -235,8 +235,10 @@ struct BoardScanView: View {
                 Button {
                     withAnimation(.snappy) { runner.done() }
                 } label: {
-                    Text("Done")
+                    // Not "Done": that reads as closing the drill.
+                    Text("That's all")
                 }
+                .accessibilityHint("Shows what you missed in this position")
                 .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false))
                 .disabled(runner.phase != .scanning)
             }

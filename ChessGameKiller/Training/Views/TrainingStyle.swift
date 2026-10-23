@@ -63,9 +63,8 @@ struct TrainingBackdrop: View {
     }
 }
 
-/// A rounded card: glass on the dark boards (Liquid Glass on iOS 26, a frosted pane
-/// with a bright hairline before it), paper with a soft shadow on light ones.
-/// Neon keeps its colored edge and halo.
+/// A rounded card: the app's shared glass on the dark boards (see GlassPane), paper with a
+/// soft shadow on light ones. Neon keeps its colored edge and halo.
 struct TrainingCard: ViewModifier {
     let theme: BoardTheme
     var tint: Color?
@@ -75,8 +74,7 @@ struct TrainingCard: ViewModifier {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         let edge = tint ?? theme.trainingAccent
         if theme.isDark, !theme.glows {
-            content
-                .background { TrainingGlass(shape: shape, tint: tint) }
+            content.glassPane(shape, tint: tint)
         } else {
             content.background {
                 if theme.isDark {
@@ -108,60 +106,6 @@ struct TrainingCard: ViewModifier {
 extension View {
     func trainingCard(_ theme: BoardTheme, tint: Color? = nil, cornerRadius: CGFloat = 22) -> some View {
         modifier(TrainingCard(theme: theme, tint: tint, cornerRadius: cornerRadius))
-    }
-}
-
-/// The training screens' glass: Liquid Glass on iOS 26; before it a frosted pane with
-/// light falling across it from the top left and a bright hairline edge, so it reads
-/// as glass over the backdrop, never as a grey box. A tint warms the edge.
-struct TrainingGlass<S: InsettableShape>: View {
-    let shape: S
-    var tint: Color?
-
-    var body: some View {
-        ZStack {
-            pane
-            // Light falls across the pane from the top left.
-            shape.fill(
-                LinearGradient(
-                    stops: [
-                        .init(color: .white.opacity(0.09), location: 0),
-                        .init(color: .white.opacity(0.025), location: 0.45),
-                        .init(color: .white.opacity(0.01), location: 1),
-                    ],
-                    startPoint: .topLeading, endPoint: .bottomTrailing
-                )
-            )
-            shape.strokeBorder(
-                LinearGradient(
-                    colors: [(tint ?? .white).opacity(tint == nil ? 0.32 : 0.6), .white.opacity(0.06),
-                             (tint ?? .white).opacity(tint == nil ? 0.14 : 0.22)],
-                    startPoint: .topLeading, endPoint: .bottomTrailing
-                ),
-                lineWidth: 0.8
-            )
-        }
-        .shadow(color: .black.opacity(0.28), radius: 18, y: 8)
-        .allowsHitTesting(false)
-    }
-
-    @ViewBuilder
-    private var pane: some View {
-        #if compiler(>=6.2)
-        if #available(iOS 26.0, *) {
-            Color.clear.glassEffect(.regular, in: shape)
-        } else {
-            frosted
-        }
-        #else
-        frosted
-        #endif
-    }
-
-    private var frosted: some View {
-        shape
-            .fill(.ultraThinMaterial)
-            .overlay { shape.fill(Color.black.opacity(0.22)) }
     }
 }
 
@@ -304,7 +248,7 @@ struct TurnBadge: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 5)
-        .background(.ultraThinMaterial, in: Capsule())
+        .glassPane(Capsule())
         .opacity(showing ? 1 : 0)
         .accessibilityHidden(!showing)
         .animation(.easeInOut(duration: 0.2), value: showing)

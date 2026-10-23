@@ -223,7 +223,7 @@ struct StreakPill: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
-        .background { TrainingGlass(shape: Capsule()) }
+        .glassPane(Capsule())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Training streak: \(streak) \(streak == 1 ? "day" : "days")")
     }

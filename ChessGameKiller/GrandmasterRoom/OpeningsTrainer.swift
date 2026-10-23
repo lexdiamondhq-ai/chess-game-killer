@@ -105,10 +105,33 @@ struct OpeningsView: View {
     /// Grouped once: there are thousands of lines.
     static let families = GrandmasterContent.shared.openingFamilies
 
-    /// Where most players start: one or two for White, and Black's main answers.
-    static let popular = ["Italian Game", "Ruy Lopez", "Queen's Gambit", "London System", "English Opening",
-                          "Sicilian Defense", "French Defense", "Caro-Kann Defense", "Queen's Gambit Declined",
-                          "Slav Defense", "King's Indian Defense", "Scandinavian Defense"]
+    /// Where most players start: a few for White, and Black's main answers. Each holds every
+    /// line filed under it, so the Queen's Gambit has its Declined and Accepted lines too and
+    /// the London System its accelerated ones.
+    static let popular: [(name: String, lines: [OpeningLine])] = {
+        let all = GrandmasterContent.shared.openings
+        func lines(_ belongs: (OpeningLine) -> Bool) -> [OpeningLine] {
+            all.filter(belongs).sorted { ($0.moves.count, $0.name) < ($1.moves.count, $1.name) }
+        }
+        func family(_ name: String) -> (name: String, lines: [OpeningLine]) {
+            (name, lines { $0.family == name })
+        }
+        let shelf: [(name: String, lines: [OpeningLine])] = [
+            family("Italian Game"),
+            family("Ruy Lopez"),
+            ("Queen's Gambit", lines { $0.family.hasPrefix("Queen's Gambit") }),
+            ("London System", lines { $0.name.contains("London System") && !$0.name.contains("Defensive") }),
+            family("English Opening"),
+            family("Sicilian Defense"),
+            family("French Defense"),
+            family("Caro-Kann Defense"),
+            family("Queen's Gambit Declined"),
+            ("Slav Defense", lines { $0.family == "Slav Defense" || $0.family.hasPrefix("Semi-Slav Defense") }),
+            family("King's Indian Defense"),
+            family("Scandinavian Defense"),
+        ]
+        return shelf.filter { !$0.lines.isEmpty }
+    }()
 
     private var matches: [(name: String, lines: [OpeningLine])] {
         Self.families.filter { family in
@@ -123,7 +146,7 @@ struct OpeningsView: View {
             if query.isEmpty {
                 repertoireCard
                 TrainSectionTitle(text: "Where most players start")
-                familyList(Self.popular.compactMap { name in Self.families.first { $0.name == name } })
+                familyList(Self.popular)
                 NavigationLink {
                     AllOpeningsView(theme: theme)
                 } label: {

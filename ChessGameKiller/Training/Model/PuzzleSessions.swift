@@ -43,8 +43,9 @@ struct PuzzleSessionBuilder {
         }
         add(pick(.all, near: rating + 50, used: used), .mixed)
         add(pick(theme, near: rating - Self.easier, used: used), .finisher)
+        // "Fork puzzles" reads as today's plan; a bare "Opening" reads like a lesson title.
         return SessionPlan(title: "Today's training", focus: nil, lesson: nil, items: items,
-                           headline: theme.name, symbol: theme.symbol, reason: reason)
+                           headline: "\(theme.name) puzzles", symbol: theme.symbol, reason: reason)
     }
 
     /// A short run of one theme at the player's level, easier at both ends.
