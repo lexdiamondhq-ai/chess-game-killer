@@ -14,7 +14,9 @@ final class ScreenSnapshotTests: XCTestCase {
     private var saved: [String: Any?] = [:]
 
     override func setUp() async throws {
-        for key in ["boardTheme", "matchRival", "bigBoard", "sculpted3D"] { saved[key] = defaults.object(forKey: key) }
+        for key in ["boardTheme", "matchRival", "bigBoard", "sculpted3D", "showBestMoves", "showSecondBest"] {
+            saved[key] = defaults.object(forKey: key)
+        }
         defaults.set(false, forKey: "bigBoard")
     }
 
@@ -110,10 +112,34 @@ final class ScreenSnapshotTests: XCTestCase {
             match.chance = { 0 }
             // 1. f3 e5 2. Nc3 Qh4+: White blocks on g3 or walks.
             let position = try XCTUnwrap(Position(fen: "rnb1kbnr/pppp1ppp/8/4p3/7q/2N2P2/PPPPP1PP/R1BQKBNR w KQkq - 2 3"))
-            match.start(MatchController.Setup(opponent: .computer, playerColor: .white, level: .beginner), from: position, playSound: false)
+            match.start(MatchController.Setup(opponent: .computer, playerColor: .white, level: .beginner), from: position)
             XCTAssertNotNil(match.game.checkedKing)
             XCTAssertNotNil(match.rivalLine)
             try snapshot("check-\(id)\(threeD ? "-3d" : "-flat")", match: match, wait: 1.4)
+        }
+    }
+
+    /// Hints on and the king tapped, on the whole game screen: brackets on the pieces the
+    /// coach would move, dots where the king can go, and a halo on castling, its best move.
+    func testHintsOnTheGameScreen() throws {
+        defaults.set(false, forKey: "matchRival")
+        defaults.set(true, forKey: "showBestMoves")
+        defaults.set(true, forKey: "showSecondBest")
+        let fen = "r1bqk2r/ppp2ppp/2np1n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQK2R w KQkq - 0 6"
+        for (id, threeD) in [("midnight", false), ("gilded", true)] {
+            defaults.set(id, forKey: "boardTheme")
+            defaults.set(threeD, forKey: "sculpted3D")
+            let engine = FakeEngine(scripted: [fen: [
+                EngineLine(moves: ["e1g1"], evaluation: .centipawns(40)),
+                EngineLine(moves: ["c1g5"], evaluation: .centipawns(25)),
+            ]])
+            let match = MatchController(engine: engine, sounds: nil)
+            let position = try XCTUnwrap(Position(fen: fen))
+            match.start(MatchController.Setup(opponent: .computer, playerColor: .white, level: .beginner), from: position)
+            match.tap(.e1)
+            XCTAssertEqual(match.game.selected, .e1)
+            try snapshot("hints-\(id)\(threeD ? "-3d" : "-flat")", match: match, wait: 2.5)
+            XCTAssertEqual(match.hints.map(\.uci), ["e1g1", "c1g5"])
         }
     }
 

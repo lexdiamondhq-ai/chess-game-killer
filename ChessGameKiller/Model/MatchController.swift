@@ -3,16 +3,13 @@ import Foundation
 import Observation
 
 /// Runs a match: who plays which side, the computer's replies, the coach's
-/// verdict on each move, the two best-move arrows and the clock.
+/// verdict on each move, the best-move hints and the clock.
 @MainActor
 @Observable
 final class MatchController {
-    enum Opponent: String, CaseIterable, Identifiable {
-        case computer, friend
-
-        var id: Self { self }
-        var title: String { self == .computer ? "Computer" : "Friend" }
-        var symbol: String { self == .computer ? "cpu" : "person.2.fill" }
+    /// Who the person plays. Every game here is against a computer rival.
+    enum Opponent: String {
+        case computer
     }
 
     enum Level: Int, CaseIterable, Identifiable {
@@ -137,7 +134,7 @@ final class MatchController {
     /// so it can count as a loss. Short games (fewer than two moves each) don't count.
     @ObservationIgnored var onAbandon: ((_ ledger: PieceLedger, _ setup: Setup, _ assisted: Bool) -> Void)?
 
-    /// The rival's latest remark, shown in a bubble by its portrait. Nil against a friend.
+    /// The rival's latest remark, shown for a moment in its line by the board.
     private(set) var rivalLine: RivalLine?
     private var nextLineID = 0
     /// The ply of the rival's last remark, so it doesn't talk over every move.
@@ -208,7 +205,8 @@ final class MatchController {
 
     // MARK: Actions
 
-    func start(_ setup: Setup, from position: Position = .standard, playSound: Bool = true) {
+    /// Starts a game. It begins quietly: the first sound is the first move.
+    func start(_ setup: Setup, from position: Position = .standard) {
         if hasStarted, self.setup.opponent == .computer, !isOver, game.plyCount >= 4,
            let ledger = game.ledger {
             onAbandon?(ledger, self.setup, wasAssisted)
@@ -224,7 +222,7 @@ final class MatchController {
         gameNumber += 1
         resetWork()
         game.newGame(from: position)
-        game.humanColors = setup.opponent == .computer ? [setup.playerColor] : [.white, .black]
+        game.humanColors = [setup.playerColor]
         outcome = nil
         hopelessTurns = 0
         gradeLog = [:]
@@ -232,7 +230,6 @@ final class MatchController {
         isFlippedByHand = false
         evaluation = nil
         startClock()
-        if playSound { sounds?.play(.gameStart) }
         rivalLine = nil
         lastLinePly = -10
         rivalSays(.greeting)
@@ -361,11 +358,10 @@ final class MatchController {
     /// Whether the person can resign now: a game under way that isn't over.
     var canResign: Bool { hasStarted && !isOver && game.plyCount > 0 }
 
-    /// The person gives up. Against a friend, the side to move does.
+    /// The person gives up.
     func resign() {
         guard canResign else { return }
-        let loser = setup.opponent == .computer ? setup.playerColor : game.activeColor
-        end(.resigned(loser: loser))
+        end(.resigned(loser: setup.playerColor))
     }
 
     /// Ends the game off the board: work stops, the clock stops, and the right sound plays.
@@ -386,7 +382,7 @@ final class MatchController {
 
     /// The victory theme when a person wins, a quiet chime otherwise.
     private func playEndSound(winner: Piece.Color?) {
-        if let winner, setup.opponent == .friend || game.humanColors.contains(winner) {
+        if let winner, game.humanColors.contains(winner) {
             sounds?.play(.victory)
         } else {
             sounds?.play(.gameOver)
@@ -415,11 +411,17 @@ final class MatchController {
     /// The game's story for the highlight reel. `pieceName` names the player's
     /// piece that started on a square, and `hero` is the Piece of the Match line.
     func highlightReel(pieceName: (Square) -> String? = { _ in nil }, hero: String? = nil) -> GameReel {
-        let opponent = setup.opponent == .computer ? setup.level.rival.name : "Friend"
-        return GameReel.make(log: reelLog, player: "You", opponent: opponent, playerColor: setup.playerColor,
-                             winner: winner, isOver: isOver, accuracy: accuracy,
-                             moveCount: (game.plyCount + 1) / 2, finalFEN: game.fen,
-                             pieceName: pieceName, hero: hero)
+        GameReel.make(log: reelLog, player: "You", opponent: opponentName, playerColor: setup.playerColor,
+                      winner: winner, isOver: isOver, accuracy: accuracy,
+                      moveCount: (game.plyCount + 1) / 2, finalFEN: game.fen,
+                      pieceName: pieceName, hero: hero)
+    }
+
+    /// The opponent by name, for saved games and the highlight reel.
+    var opponentName: String {
+        switch setup.opponent {
+        case .computer: return setup.level.rival.name
+        }
     }
 
     /// An unfinished game this long is kept when a new one starts.
@@ -439,9 +441,9 @@ final class MatchController {
             )
         }
         return SavedGame.make(
-            id: gameID, date: startedAt, opponent: isComputer ? setup.level.rival.name : "Friend",
+            id: gameID, date: startedAt, opponent: opponentName,
             level: isComputer ? setup.level.rawValue : nil,
-            playerColor: isComputer ? setup.playerColor : .white,
+            playerColor: setup.playerColor,
             winner: winner, isOver: isOver, accuracy: accuracy,
             positions: game.positionFENs, moves: game.moves, moments: moments
         )

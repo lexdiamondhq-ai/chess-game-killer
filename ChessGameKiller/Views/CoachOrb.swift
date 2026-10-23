@@ -457,7 +457,7 @@ private struct CoachPanel: View {
                     .font(.title3).foregroundStyle(accent).frame(width: 40, height: 40)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Coach offline").font(.headline)
-                    Text("Stockfish didn't answer. Undo and try again, or play a friend.")
+                    Text("Stockfish didn't answer. Undo and try again, or start a new game.")
                         .font(.subheadline).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -510,7 +510,8 @@ private struct CoachPanel: View {
             switch outcome {
             case .timeout(let loser): return "\(theme.name(of: loser.opposite)) wins on time"
             case .timeoutDraw: return "Draw"
-            case .resigned(let loser): return "\(resignerName(loser)) resigns"
+            case .resigned(let loser):
+                return loser == match.setup.playerColor ? "You resigned" : "\(match.setup.level.rival.name) resigns"
             }
         }
         if match.game.winner != nil { return "Checkmate!" }
@@ -536,12 +537,6 @@ private struct CoachPanel: View {
             return "\(last) ends the game. \(theme.name(of: winner)) wins."
         }
         return match.game.status(white: theme.whiteName, black: theme.blackName)
-    }
-
-    /// Who resigned: the rival by name, or "You", or a colour in a game between friends.
-    private func resignerName(_ loser: Piece.Color) -> String {
-        guard match.setup.opponent == .computer else { return theme.name(of: loser) }
-        return loser == match.setup.playerColor ? "You" : match.setup.level.rival.name
     }
 
     private var scoreline: String {
@@ -815,7 +810,7 @@ private struct HintRow: View {
     var body: some View {
         Button(action: play) {
             HStack(spacing: 10) {
-                HintSwatch(color: isBest ? theme.bestArrow : theme.secondArrow, dashed: !isBest, glow: theme.glows ? theme.arrowGlow : nil)
+                HintSwatch(color: theme.hint, isBest: isBest, glow: theme.hintGlow)
                 Text(hint.san)
                     .font(.system(.body, design: .themed).weight(.bold))
                     .frame(minWidth: 46, alignment: .leading)
@@ -849,21 +844,23 @@ private struct HintRow: View {
     }
 }
 
-/// A short line in an arrow's style.
+/// The board's mark for a hint, in small: a dot in a halo, fainter for the runner-up.
 private struct HintSwatch: View {
     let color: Color
-    let dashed: Bool
+    let isBest: Bool
     let glow: Color?
 
     var body: some View {
-        Path { path in
-            path.move(to: CGPoint(x: 2, y: 5))
-            path.addLine(to: CGPoint(x: 26, y: 5))
+        ZStack {
+            Circle()
+                .strokeBorder(color.opacity(isBest ? 1 : 0.55), lineWidth: isBest ? 1.8 : 1.4)
+                .frame(width: 18, height: 18)
+            Circle()
+                .fill(color.opacity(isBest ? 1 : 0.7))
+                .frame(width: 7, height: 7)
         }
-        .stroke(color, style: StrokeStyle(lineWidth: dashed ? 3 : 4, lineCap: dashed ? .butt : .round,
-                                          dash: dashed ? [5, 3] : []))
-        .shadow(color: glow?.opacity(dashed ? 0.5 : 0.9) ?? .clear, radius: 4)
-        .frame(width: 28, height: 10)
+        .shadow(color: glow?.opacity(isBest ? 0.9 : 0.5) ?? .clear, radius: 4)
+        .frame(width: 28, height: 18)
         .accessibilityHidden(true)
     }
 }

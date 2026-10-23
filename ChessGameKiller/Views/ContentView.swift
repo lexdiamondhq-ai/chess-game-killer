@@ -780,7 +780,7 @@ struct ContentView: View {
     private func startIfNeeded() {
         // From the home screen, closing the sheet just goes back home.
         if !match.hasStarted, !showingHome {
-            match.start(NewGameSheet.savedSetup(), playSound: false)
+            match.start(NewGameSheet.savedSetup())
         }
     }
 }

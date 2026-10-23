@@ -24,10 +24,12 @@ struct LastMove: Equatable {
     let to: Square
 }
 
-/// A captured piece, so the board can blow it up where it stood.
+/// A captured piece, so the board can show it falling where it stood.
 struct CaptureEvent: Identifiable, Equatable {
     let id: Int
     let piece: Piece
+    /// Where the capturing piece came from, so the taken one falls away from it.
+    var from: Square? = nil
 }
 
 /// The move that was just completed, with what the coach and sounds need.
@@ -322,10 +324,10 @@ final class GameModel {
             isCapture = true
             let id = nextEventID
             nextEventID += 1
-            captureEvents.append(CaptureEvent(id: id, piece: captured))
+            captureEvents.append(CaptureEvent(id: id, piece: captured, from: lastMove?.from))
             if captureEvents.count > 6 { captureEvents.removeFirst(captureEvents.count - 6) }
-            // The explosion is over in under a second. After that the event only costs
-            // drawing time, and would burst again if the board were rebuilt. Ids never
+            // The fall is over in under a second. After that the event only costs
+            // drawing time, and would play again if the board were rebuilt. Ids never
             // repeat, so a removal that lands after a new game finds nothing.
             Task { @MainActor [weak self] in
                 try? await Task.sleep(for: .seconds(1.2))
