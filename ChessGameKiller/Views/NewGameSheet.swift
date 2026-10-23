@@ -142,6 +142,7 @@ struct NewGameSheet: View {
                     section("Your rival") {
                         rivalCarousel
                         dots
+                        ScoutingCard(theme: theme, rival: draftLevel.rival)
                     }
 
                     section("The match") {

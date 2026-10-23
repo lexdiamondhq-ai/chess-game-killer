@@ -20,11 +20,18 @@ enum RivalMoment: Equatable {
     case rivalWins
     case playerWins
     case draw
+    /// The rival has steered the player back to a position they got wrong before, `when`.
+    case trapSet(when: String)
+    /// The player made the same mistake again.
+    case trapFell
+    /// The player found something better this time.
+    case trapDodged
 
     /// Moments that are always worth a line; the rest wait their turn.
     var isBig: Bool {
         switch self {
-        case .greeting, .rivalResigns, .playerResigned, .rivalWins, .playerWins, .draw: return true
+        case .greeting, .rivalResigns, .playerResigned, .rivalWins, .playerWins, .draw,
+             .trapSet, .trapFell, .trapDodged: return true
         case .tookPiece(let kind), .lostPiece(let kind): return kind == .queen
         default: return false
         }
@@ -117,6 +124,23 @@ enum RivalVoice {
         case (.playerWins, .expert): return ["I underestimated you."]
         case (.playerWins, .grandmaster): return ["Well played. You earned that."]
         case (.draw, _): return ["A draw. Fair enough."]
+
+        // MARK: The Scouting Report
+        case (.trapSet(let when), .beginner): return ["Wait, we were here \(when)!", "Ooh, I remember this spot."]
+        case (.trapSet(let when), .casual): return ["Familiar? We were here \(when).", "Same spot as \(when). Funny."]
+        case (.trapSet(let when), .club): return ["There it is. Just like \(when).", "You've been here \(when). I studied it."]
+        case (.trapSet(let when), .expert): return ["This position. \(when.capitalized). Again?", "As prepared. You were here \(when)."]
+        case (.trapSet, .grandmaster): return ["You have stood here before.", "I have seen you here."]
+        case (.trapFell, .beginner): return ["Same move again! Oh!", "Ha, just like last time!"]
+        case (.trapFell, .casual): return ["Same move as last time. Thanks.", "Some habits stick, huh?"]
+        case (.trapFell, .club): return ["Same move. My notes were right.", "Again? I knew it."]
+        case (.trapFell, .expert): return ["Predicted.", "The same error. Noted twice."]
+        case (.trapFell, .grandmaster): return ["As expected."]
+        case (.trapDodged, .beginner): return ["Oh, you learned that one!", "Hey, different move!"]
+        case (.trapDodged, .casual): return ["You remembered. Nice.", "Okay, you did your homework."]
+        case (.trapDodged, .club): return ["Hm. You learned. New notes, then.", "Not this time. Well seen."]
+        case (.trapDodged, .expert): return ["Corrected. Impressive.", "You studied too."]
+        case (.trapDodged, .grandmaster): return ["You learned."]
         }
     }
 }
