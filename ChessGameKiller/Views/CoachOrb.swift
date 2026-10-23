@@ -15,11 +15,15 @@ struct CoachOrb: View {
     let newGame: () -> Void
     /// Opens the player's saved games.
     let showGames: () -> Void
+    /// Opens Talk it through for the position on the board. Nil leaves it out.
+    var talk: (() -> Void)? = nil
 
     @AppStorage("haptics") private var hapticsOn = true
     /// Counts the times the person opened or closed the panel, for a light tap each.
     /// The panel also opens by itself when a game ends, and that stays silent.
     @State private var touches = 0
+    /// Counts the holds on the closed orb that opened Talk it through, for a firmer tap each.
+    @State private var talkHolds = 0
     /// The move Leo last played for the person, by the game's move count. Moves he plays
     /// aren't graded, so the panel mustn't promise a grade for one.
     @State private var coachMove: Int?
@@ -38,7 +42,7 @@ struct CoachOrb: View {
         ZStack {
             if isExpanded {
                 CoachPanel(match: match, theme: theme, coachMove: $coachMove, newGame: newGame, showGames: showGames,
-                           close: { collapse(felt: true) }, collapse: { collapse() })
+                           talk: talk, close: { collapse(felt: true) }, collapse: { collapse() })
                     .transition(.opacity.combined(with: .scale(scale: 0.97)))
             } else {
                 OrbFace(match: match, theme: theme, open: { expand() })
@@ -59,9 +63,8 @@ struct CoachOrb: View {
             .animation(.spring(response: 0.4, dampingFraction: 0.7), value: gameCoach?.moment)
         }
         .contentShape(RoundedRectangle(cornerRadius: Self.orbSize / 2, style: .continuous))
-        .onTapGesture {
-            if !isExpanded { expand() }
-        }
+        // Only on the closed orb: the open panel's buttons and scrolling keep their own gestures.
+        .gesture(orbGesture, including: isExpanded ? .subviews : .all)
         .onChange(of: match.review?.id) { _, id in
             // Once the game is over the result is said instead, and it names the mate.
             guard id != nil, !match.isOver, let review = match.review else { return }
@@ -73,15 +76,39 @@ struct CoachOrb: View {
             announce("\(result.title). \(result.detail)")
         }
         .sensoryFeedback(.impact(weight: .light, intensity: 0.5), trigger: touches) { _, _ in hapticsOn }
+        .sensoryFeedback(.impact(weight: .medium), trigger: talkHolds) { (_: Int, _: Int) -> Bool in hapticsOn }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Coach")
         .accessibilityHint(isExpanded ? "Double-tap to close" : "Double-tap to open the coach")
         .accessibilityAction(named: isExpanded ? "Close" : "Open") {
             if isExpanded { collapse(felt: true) } else { expand() }
         }
+        .accessibilityActions {
+            if let talk, match.canTalkItThrough {
+                Button("Talk it through", action: talk)
+            }
+        }
     }
 
     // MARK: Opening and closing
+
+    /// A tap opens the panel. A hold goes straight to Talk it through on the player's turn, and
+    /// opens the panel like a tap any other time. The hold is tried first, so a tap waits for it to fail.
+    private var orbGesture: some Gesture {
+        LongPressGesture(minimumDuration: 0.45)
+            .onEnded { _ in holdToTalk() }
+            .exclusively(before: TapGesture().onEnded { _ in expand() })
+    }
+
+    private func holdToTalk() {
+        guard !isExpanded else { return }
+        guard let talk, match.canTalkItThrough else {
+            expand()
+            return
+        }
+        talkHolds += 1
+        talk()
+    }
 
     /// Opens the panel at the person's tap, with a light tap back.
     private func expand() {
@@ -366,6 +393,8 @@ private struct CoachPanel: View {
     @Binding var coachMove: Int?
     let newGame: () -> Void
     let showGames: () -> Void
+    /// Opens Talk it through. Nil leaves it out.
+    let talk: (() -> Void)?
     /// Closes the panel when the person closes it themselves, with a light tap.
     let close: () -> Void
     /// Closes the panel quietly, on the way to something else.
@@ -551,6 +580,13 @@ private struct CoachPanel: View {
                         .padding(.top, 10)
                 }
             } else {
+                if let talk, match.canTalkItThrough {
+                    TalkEntryRow(theme: theme, countsAsHelp: match.talkCountsAsHelp) {
+                        collapse()
+                        talk()
+                    }
+                    .padding(.top, 12)
+                }
                 EvalBar(share: match.playerShare, label: evalLabel, theme: theme)
                     .padding(.top, 12)
                 bestMoves.padding(.top, 12)

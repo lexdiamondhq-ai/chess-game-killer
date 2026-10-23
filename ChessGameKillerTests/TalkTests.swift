@@ -1017,6 +1017,24 @@ final class TalkTests: XCTestCase {
         XCTAssertEqual(calls.count, 2, "the moves and the threats, worked out once")
     }
 
+    func testEverySendIsCountedForTheGame() async {
+        let rig = TalkTestRig(TalkTestData.fullAnswer)
+        let session = rig.session
+        var sends = 0
+        session.onSend = { sends += 1 }
+        session.open()
+        XCTAssertEqual(sends, 0, "opening the talk isn't help")
+
+        rig.typeAndSend("his bishop eyes f2")
+        XCTAssertEqual(sends, 1)
+        await waitUntil("Leo has answered") { session.phase == .answered && !session.isSpeaking }
+        session.talkAgain()
+        XCTAssertEqual(sends, 1, "talking again counts once the words go")
+        rig.typeAndSend("h6")
+        XCTAssertEqual(sends, 2)
+        await waitUntil("Leo has answered again") { session.phase == .answered && !session.isSpeaking }
+    }
+
     func testStopSpeakingQuietsLeo() async {
         let rig = TalkTestRig(TalkTestData.fullAnswer)
         rig.speaker.holds = true

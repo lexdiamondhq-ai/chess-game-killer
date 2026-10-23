@@ -93,6 +93,9 @@ final class TalkSession: Identifiable {
     /// The verdict whose squares the board shows. Nil shows the move.
     var focus: TalkFocus?
 
+    /// Called each time the player's words go to Leo, so a game under way can count the help.
+    @ObservationIgnored var onSend: (() -> Void)?
+
     /// How long a send waits for Stockfish's numbers that aren't ready yet before going without them.
     @ObservationIgnored var factsWait: Duration = .seconds(4)
     /// How long a spoken send waits for the recognizer's last words once the button is up.
@@ -443,6 +446,7 @@ final class TalkSession: Identifiable {
         focus = nil
         level = 0
         phase = .checking
+        onSend?()
         requestTask = Task { [weak self] in
             await self?.run(typed: typed, id: id)
         }
