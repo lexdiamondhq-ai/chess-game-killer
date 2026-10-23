@@ -56,6 +56,53 @@ final class SculptedSnapshotTests: XCTestCase {
         window.isHidden = true
     }
 
+    /// Hints on and the king picked up: brackets on the pieces the coach would move (the
+    /// runner-up fainter), dots where the king can go, and a halo on its best square.
+    func testHintMarks() throws {
+        var state = SculptedBoardState(pieces: Self.pieces)
+        state.selected = .e1
+        state.targets = [.e2, .f1, .g1]
+        state.hints = [SculptedHint(from: .e1, to: .g1, isBest: true), SculptedHint(from: .d2, to: .d3, isBest: false)]
+        let (scene, window) = try stage(state)
+        let image = scene.snapshot()
+        try save(image, "hints-3d")
+        try save(crop(image, x: 0.25, y: 0.5, side: 0.5), "hints-3d-crop")
+        window.isHidden = true
+    }
+
+    /// A knight taken on the flat board, caught as it tips over away from the bishop
+    /// that took it, lands and fades.
+    func testFlatCaptureFallInMotion() throws {
+        let theme = BoardTheme.named(.midnight)
+        let size: CGFloat = 110
+        let windowScene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let window = UIWindow(windowScene: windowScene)
+        window.frame = CGRect(x: 0, y: 0, width: size * 4, height: size * 3)
+        let board = ZStack {
+            Color(red: 0.11, green: 0.115, blue: 0.125)
+            HStack(spacing: 0) {
+                ForEach(0..<4, id: \.self) { column in
+                    Rectangle().fill(theme.squareFill(isLight: column % 2 == 0)).frame(width: size, height: size)
+                }
+            }
+            PieceImage(piece: Piece(.bishop, color: .white, square: .b2), theme: theme, size: size, onBoard: true)
+                .offset(x: -size / 2)
+            CaptureFall(piece: Piece(.knight, color: .black, square: .b2), theme: theme, size: size, seed: 1, away: 1)
+                .offset(x: -size / 2)
+        }
+        let start = Date()
+        window.rootViewController = UIHostingController(rootView: board)
+        window.makeKeyAndVisible()
+        for (index, time) in [0.02, 0.12, 0.2, 0.3, 0.45, 0.9].enumerated() {
+            RunLoop.main.run(until: start.addingTimeInterval(time))
+            let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
+                window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+            }
+            try save(image, "capture-fall-\(index + 1)")
+        }
+        window.isHidden = true
+    }
+
     /// Each 3D look at the size it has on an iPhone 17 Pro, a game in progress.
     func testEveryLook() throws {
         for look in SculptedLook.all {

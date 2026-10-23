@@ -16,14 +16,22 @@ import urllib.error
 import urllib.request
 
 SOUNDS = {
-    "move": ("A single crisp click of a glass chess piece set down on a glass board, "
-             "clean and satisfying, with a faint electronic shimmer", 0.6),
-    "select": ("A very soft, subtle glassy UI tick, minimal and quiet", 0.5),
-    "capture": ("A short punchy neon energy explosion, glass shattering into sparkling "
-                "synth particles, satisfying, cinematic but not too loud", 1.2),
-    "check": ("A tense futuristic synth alert, two quick rising notes, clean", 0.8),
-    "castle": ("Two quick glass chess piece clicks in a row with a soft synth whoosh", 0.9),
-    "game-start": ("A short uplifting futuristic neon power-up swell, clean synthwave", 1.6),
+    # The pieces: weighted, felt-based pieces on a hardwood board. Close and dry,
+    # no glass, no synths, so a game sounds like a fine set on a table.
+    "move": ("A single weighted wooden chess piece with a felt base set down on a hardwood "
+             "chess board: one soft, clean, satisfying knock. Close-up, dry room, no reverb, "
+             "no music", 0.5),
+    "select": ("A very quiet, soft tap of a fingertip on a wooden chess piece, barely audible, "
+               "close-up, dry, no music", 0.5),
+    "capture": ("A wooden chess piece takes another on a hardwood board: one firm knock, then the "
+                "taken piece tips over and settles with a soft wooden clatter. Close-up, dry room, "
+                "elegant, no glass, no explosion, no music", 0.9),
+    "check": ("A weighted wooden chess piece set down firmly on a hardwood board, followed by a "
+              "single soft, clear, low bell tone that fades quickly. Elegant and understated, "
+              "not alarming, no music", 0.9),
+    "castle": ("Two weighted wooden chess pieces with felt bases set down on a hardwood board one "
+               "right after the other: two soft knocks a fraction of a second apart. Close-up, "
+               "dry room, no music", 0.7),
     "win": ("A triumphant short synthwave victory chime with sparkles", 2.5),
     "game-over": ("A calm descending synth chime signalling the end of a game", 2.2),
     "victory": ("A joyful video game level-complete victory fanfare: a bright rising "

@@ -9,7 +9,6 @@ enum GameSound: String, CaseIterable {
     case capture
     case check
     case castle
-    case gameStart = "game-start"
     case win
     case gameOver = "game-over"
     /// A short video-game "level clear" theme, when a person wins.
@@ -25,7 +24,6 @@ enum GameSound: String, CaseIterable {
         case .capture: return 0.6
         case .check: return 0.85
         case .castle: return 0.9
-        case .gameStart: return 0.5
         case .win: return 0.6
         case .gameOver: return 0.5
         case .victory: return 0.7

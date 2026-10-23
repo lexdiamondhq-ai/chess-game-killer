@@ -141,9 +141,7 @@ final class RewindTests: XCTestCase {
     @MainActor
     func testAMatchHandsOverItsGame() {
         let match = MatchController(engine: nil, sounds: nil)
-        var setup = MatchController.Setup()
-        setup.opponent = .friend
-        match.start(setup, playSound: false)
+        match.startTapping()
         XCTAssertNil(match.savedGame())
         for uci in ["e2e4", "e7e5", "g1f3"] {
             let squares = Notation.squares(of: uci)!
@@ -154,7 +152,7 @@ final class RewindTests: XCTestCase {
         XCTAssertEqual(saved?.moves, ["e4", "e5", "Nf3"])
         XCTAssertEqual(saved?.positions.count, 4)
         XCTAssertEqual(saved?.result, .unfinished)
-        XCTAssertEqual(saved?.opponent, "Friend")
+        XCTAssertEqual(saved?.opponent, MatchController.Level.club.rival.name)
     }
 }
 
