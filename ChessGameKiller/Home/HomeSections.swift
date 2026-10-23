@@ -382,7 +382,7 @@ struct HomeLadderCard: View {
                     Text("You")
                         .font(.body.weight(.semibold))
                         .foregroundStyle(tone.ink)
-                    Text("~\(rating)")
+                    Text(verbatim: "~\(rating)")
                         .font(.subheadline)
                         .foregroundStyle(tone.ink2)
                 }
@@ -412,9 +412,11 @@ struct HomeRivalPortrait: View {
             .resizable()
             .scaledToFill()
             .frame(width: size, height: size)
+            // A little closer in, so the rival's shape fills the small circle.
+            .scaleEffect(1.2)
             .grayscale(1)
             .colorMultiply(tone.ivory)
-            .contrast(1.08)
+            .contrast(1.3)
             .clipShape(Circle())
             .overlay { Circle().strokeBorder(tone.ink.opacity(0.18), lineWidth: 0.5) }
             .accessibilityHidden(true)
@@ -435,7 +437,7 @@ struct HomeScoresheet: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @ScaledMetric(relativeTo: .subheadline) private var dayWidth: CGFloat = 48
     @ScaledMetric(relativeTo: .subheadline) private var resultWidth: CGFloat = 50
-    @ScaledMetric(relativeTo: .subheadline) private var accuracyWidth: CGFloat = 66
+    @ScaledMetric(relativeTo: .subheadline) private var accuracyWidth: CGFloat = 74
     @ScaledMetric(relativeTo: .subheadline) private var fixWidth: CGFloat = 46
 
     /// The width inside the card, measured, so the columns are used only where they fit.

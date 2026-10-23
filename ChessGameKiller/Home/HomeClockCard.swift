@@ -16,8 +16,8 @@ struct HomeClockCard: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @ScaledMetric(relativeTo: .largeTitle) private var digits: CGFloat = 40
     @ScaledMetric(relativeTo: .largeTitle) private var king: CGFloat = 44
-    /// Without a clock the king takes the time's place.
-    @ScaledMetric(relativeTo: .largeTitle) private var tallKing: CGFloat = 62
+    /// Without a clock the king stands a little taller, in the time's place.
+    @ScaledMetric(relativeTo: .largeTitle) private var tallKing: CGFloat = 52
 
     private enum Side { case you, rival }
 
@@ -48,10 +48,25 @@ struct HomeClockCard: View {
         side == .you ? upNext.playerColor : upNext.playerColor.opposite
     }
 
+    /// Only the face of the side to move runs, as on a real clock; before a game neither does.
+    private func isLit(_ side: Side) -> Bool {
+        upNext.inProgress && upNext.sideToMove == color(side)
+    }
+
+    /// The clock's rule, said once on your face before a game: "No clock", "+2s per move".
+    private var clockRule: String? {
+        guard !upNext.inProgress else { return nil }
+        guard timed else { return "No clock" }
+        let increment = upNext.timeControl.increment.components.seconds
+        return increment > 0 ? "+\(increment)s per move" : nil
+    }
+
+    /// The faces keep a line for whose move it is, or for the clock's rule, when either has one.
+    private var hasFootLine: Bool { upNext.inProgress || clockRule != nil }
+
     private func face(_ side: Side) -> some View {
         let pieceColor = color(side)
-        let lit = upNext.sideToMove == pieceColor
-        let kingSize = timed ? king : min(tallKing, 96)
+        let lit = isLit(side)
         return HStack(alignment: .bottom, spacing: 4) {
             VStack(alignment: .leading, spacing: 1) {
                 Text(side == .you ? "You" : upNext.rival.name)
@@ -64,26 +79,20 @@ struct HomeClockCard: View {
                     Text(time.clockLabel)
                         .font(.system(size: digits, weight: .regular, design: .serif))
                         .monospacedDigit()
-                        .foregroundStyle(lit ? tone.ink : tone.ink2)
+                        .foregroundStyle(!upNext.inProgress || lit ? tone.ink : tone.ink2)
                         .minimumScaleFactor(0.6)
                         .padding(.top, 4)
                 }
-                // Only the side to move carries the mark, as only one face of a clock runs.
-                // The other face keeps the line's height, so the two stay level.
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(tone.metal)
-                        .frame(width: 7, height: 7)
-                    Text(lit ? toMove(side) : " ")
-                        .font(.footnote.weight(.medium))
-                        .foregroundStyle(tone.metal)
+                if hasFootLine {
+                    footLine(side, lit: lit)
+                        .padding(.top, timed ? 0 : 6)
                 }
-                .opacity(lit ? 1 : 0)
-                .padding(.top, timed ? 0 : 6)
             }
             .lineLimit(1)
+            .minimumScaleFactor(0.8)
             .frame(maxWidth: .infinity, alignment: .leading)
-            PieceImage(piece: Piece(.king, color: pieceColor, square: pieceColor == .white ? .e1 : .e8), theme: pieceTheme, size: kingSize)
+            PieceImage(piece: Piece(.king, color: pieceColor, square: pieceColor == .white ? .e1 : .e8), theme: pieceTheme,
+                       size: min(timed ? king : tallKing, 60))
                 .shadow(color: .black.opacity(0.35), radius: 6, y: 3)
                 .accessibilityHidden(true)
         }
@@ -95,18 +104,39 @@ struct HomeClockCard: View {
         .accessibilityLabel(spoken(side))
     }
 
+    /// The last line of a face: the mark of the side to move, or the clock's rule on yours.
+    /// A face with neither keeps the line's height, so the two faces stay level.
+    @ViewBuilder
+    private func footLine(_ side: Side, lit: Bool) -> some View {
+        if lit {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(tone.metal)
+                    .frame(width: 7, height: 7)
+                Text(side == .you ? "Your move" : "Their move")
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(tone.metal)
+            }
+        } else if side == .you, let clockRule {
+            Text(clockRule)
+                .font(.footnote)
+                .foregroundStyle(tone.ink3)
+        } else {
+            Text(verbatim: " ")
+                .font(.footnote.weight(.medium))
+                .accessibilityHidden(true)
+        }
+    }
+
     private func colorName(_ color: Piece.Color) -> String {
         color == .white ? "White" : "Black"
     }
 
-    /// Your side and the clock ("White · No clock", "Black · 3+2"), said once; the rival's strength.
+    /// Your side; the rival's strength.
     private func detail(_ side: Side) -> String {
         switch side {
-        case .you:
-            let playing = upNext.randomSide ? "Either side" : colorName(color(.you))
-            return "\(playing) · \(upNext.timeControl.name)"
-        case .rival:
-            return "Computer · \(upNext.rival.elo)"
+        case .you: return upNext.randomSide ? "Either side" : colorName(color(.you))
+        case .rival: return upNext.rival.elo
         }
     }
 
@@ -118,24 +148,22 @@ struct HomeClockCard: View {
         return upNext.timeControl.initial
     }
 
-    /// What the lit face says: the move, and whose it is.
-    private func toMove(_ side: Side) -> String {
-        if upNext.inProgress {
-            return side == .you ? "Your move" : "Their move"
-        }
-        return "Moves first"
-    }
-
     private func spoken(_ side: Side) -> String {
         let name = side == .you ? "You" : "\(upNext.rival.name), computer, rated \(upNext.level.spokenRating)"
         let playing = upNext.randomSide ? "either side" : colorName(color(side))
         var parts = [name, playing]
         if let time = clockTime(side) {
             parts.append(time.formatted(.units(allowed: [.minutes, .seconds], width: .wide)))
-        } else if side == .you {
-            parts.append("no clock")
         }
-        if upNext.sideToMove == color(side) { parts.append(toMove(side)) }
+        if side == .you, !upNext.inProgress {
+            if !timed {
+                parts.append("no clock")
+            } else if upNext.timeControl.increment > .zero {
+                let back = upNext.timeControl.increment.formatted(.units(allowed: [.seconds], width: .wide))
+                parts.append("\(back) back per move")
+            }
+        }
+        if isLit(side) { parts.append(side == .you ? "your move" : "their move") }
         return parts.joined(separator: ", ")
     }
 
@@ -164,69 +192,70 @@ struct HomeClockCard: View {
 }
 
 /// The clock card, folded into the dock once the card has scrolled away: one tap to resume
-/// or to start the next game, from anywhere on the page. The ivory disc is the clock card's
-/// own button, so the way to play keeps its color all the way down the page.
+/// or to start the next game, from anywhere on the page. It is the card's own ivory button,
+/// so the way to play looks the same all the way down the page.
 struct HomeClockCapsule: View {
     let upNext: HomeUpNext
     let tone: HomeTone
     let action: () -> Void
 
-    @ScaledMetric(relativeTo: .subheadline) private var disc: CGFloat = 30
-
     var body: some View {
         Button(action: action) {
+            // The longest label that fits beside the dock, down to the play mark alone.
             ViewThatFits(in: .horizontal) {
-                content(withSubtitle: true)
-                content(withSubtitle: false)
-                playDisc
-                    .frame(width: 44, height: 44)
+                label(title, subtitle)
+                label(title, shortSubtitle)
+                label(title, nil)
+                label(shortTitle, shortSubtitle)
+                label(shortTitle, nil)
+                Image(systemName: "play.fill")
+                    .font(.body.weight(.bold))
             }
-            .foregroundStyle(tone.ink)
-            .padding(.leading, 10)
-            .padding(.trailing, 16)
-            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+            .foregroundStyle(tone.onIvory)
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, minHeight: 56)
+            .background { HomeIvoryFill(tone: tone) }
             .contentShape(Capsule())
         }
         .buttonStyle(HomePressStyle())
-        .homePane(Capsule(), tone: tone, weight: .bar)
         .accessibilityLabel(upNext.inProgress ? "Resume your game against \(upNext.rival.name)" : "Play \(upNext.rival.name)")
         .accessibilityValue(subtitle)
+        .accessibilityInputLabels(inputLabels)
+    }
+
+    private var inputLabels: [String] {
+        upNext.inProgress ? ["Resume"] : ["Play", "Play \(upNext.rival.name)"]
     }
 
     private var title: String { upNext.inProgress ? "Resume" : "Play \(upNext.rival.name)" }
+    private var shortTitle: String { upNext.inProgress ? "Resume" : "Play" }
+
+    private var side: String {
+        upNext.randomSide ? "Either side" : (upNext.playerColor == .white ? "White" : "Black")
+    }
 
     /// The game in a few words: "White · No clock", "Your move · 4:12".
     private var subtitle: String {
         if upNext.inProgress {
-            let move = upNext.yourMove ? "Your move" : "Their move"
-            if let time = upNext.yourTime { return "\(move) · \(time.clockLabel)" }
-            return move
+            if let time = upNext.yourTime { return "\(shortSubtitle) · \(time.clockLabel)" }
+            return shortSubtitle
         }
-        let side = upNext.randomSide ? "Either side" : (upNext.playerColor == .white ? "White" : "Black")
         return "\(side) · \(upNext.timeControl.name)"
     }
 
-    private var playDisc: some View {
-        Image(systemName: "play.fill")
-            .font(.system(size: disc * 0.4, weight: .bold))
-            .foregroundStyle(tone.onIvory)
-            .offset(x: disc * 0.04)
-            .frame(width: disc, height: disc)
-            .background(Circle().fill(tone.ivory))
-            .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
+    /// Fewer words for a narrow capsule: whose move it is, or your side.
+    private var shortSubtitle: String {
+        upNext.inProgress ? (upNext.yourMove ? "Your move" : "Their move") : side
     }
 
-    private func content(withSubtitle: Bool) -> some View {
-        HStack(spacing: 10) {
-            playDisc
-            VStack(alignment: .leading, spacing: 0) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                if withSubtitle {
-                    Text(subtitle)
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(upNext.inProgress && upNext.yourMove ? tone.metal : tone.ink2)
-                }
+    private func label(_ title: String, _ subtitle: String?) -> some View {
+        VStack(spacing: 0) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+            if let subtitle {
+                Text(subtitle)
+                    .font(.caption.monospacedDigit())
+                    .opacity(0.68)
             }
         }
         .lineLimit(1)

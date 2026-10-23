@@ -179,6 +179,20 @@ extension View {
 
 // MARK: - Buttons
 
+/// The ivory capsule behind the one solid button, lit from above and lifted off the glass.
+struct HomeIvoryFill: View {
+    let tone: HomeTone
+
+    var body: some View {
+        Capsule()
+            .fill(tone.ivory)
+            .overlay {
+                Capsule().fill(LinearGradient(colors: [.white.opacity(0.35), .clear], startPoint: .top, endPoint: .center))
+            }
+            .shadow(color: .black.opacity(0.25), radius: 8, y: 4)
+    }
+}
+
 /// The one solid button on a card: ivory, like the white pieces, with dark type.
 struct HomeIvoryButtonStyle: ButtonStyle {
     let tone: HomeTone
@@ -192,14 +206,7 @@ struct HomeIvoryButtonStyle: ButtonStyle {
             .minimumScaleFactor(0.85)
             .padding(.horizontal, compact ? 18 : 22)
             .frame(minHeight: compact ? 40 : 52)
-            .background {
-                Capsule()
-                    .fill(tone.ivory)
-                    .overlay {
-                        Capsule().fill(LinearGradient(colors: [.white.opacity(0.35), .clear], startPoint: .top, endPoint: .center))
-                    }
-                    .shadow(color: .black.opacity(0.25), radius: 8, y: 4)
-            }
+            .background { HomeIvoryFill(tone: tone) }
             // A compact button still answers a finger's height (44 points) around it.
             .padding(.vertical, compact ? 2 : 0)
             .contentShape(Rectangle())

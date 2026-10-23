@@ -14,7 +14,8 @@ final class HomeSnapshotTests: XCTestCase {
 
     func testHomeScrolling() throws {
         let window = try show(HomeSample.home())
-        for (name, offset) in [("zz-home-0-top", 0.0), ("zz-home-1-turning", 120.0), ("zz-home-1-closer", 230.0),
+        // "Closer" is where the camera has come in: the king's head between the status bar and the card.
+        for (name, offset) in [("zz-home-0-top", 0.0), ("zz-home-1-turning", 120.0), ("zz-home-1-closer", 190.0),
                                ("zz-home-2-cards", 520.0), ("zz-home-3-ladder", 900.0), ("zz-home-3-foot", 2000.0)] {
             scroll(window, to: offset)
             try save(window, name)
@@ -48,7 +49,7 @@ final class HomeSnapshotTests: XCTestCase {
         match.suspendClock()
         let window = try show(HomeSample.home(match: match))
         try save(window, "zz-home-6-black-timed")
-        scroll(window, to: 230)
+        scroll(window, to: 190)
         try save(window, "zz-home-6-black-closer")
         window.isHidden = true
     }
@@ -87,7 +88,7 @@ final class HomeSnapshotTests: XCTestCase {
         let pulled = HomeHeroCamera.camera(aspect: 0.8, progress: 0, pull: 1)
         XCTAssertEqual(rest, HomeHeroCamera.camera(aspect: 0.8))
         XCTAssertGreaterThan(walked.azimuth - rest.azimuth, 0.8, "The board turns as the page scrolls")
-        XCTAssertLessThan(walked.distance, rest.distance * 0.7, "and the camera comes closer")
+        XCTAssertLessThan(walked.distance, rest.distance * 0.75, "and the camera comes closer")
         XCTAssertGreaterThan(pulled.elevation, rest.elevation, "Pulled down, the camera rises")
         // At the end of the walk White's king stands in the middle of the picture, looked at by the crown.
         let king = walked.normalized(SIMD3(0.5, 0.6, 3.5))
@@ -98,8 +99,8 @@ final class HomeSnapshotTests: XCTestCase {
         XCTAssertLessThan(abs(crown.y), 0.15)
     }
 
-    /// Once the camera has come in, the whole crown, cross and all, stands between the status
-    /// bar and the clock card, in the middle of the screen; at rest the board fills the top.
+    /// Once the camera has come in, the king's whole head, cross and crown, stands between the
+    /// status bar and the clock card, in the middle of the screen; at rest the board fills the top.
     func testTheCrownLandsBetweenTheStatusBarAndTheCard() {
         let screen = CGSize(width: 402, height: 874)
         let layout = HomeLayout(size: CGSize(width: 402, height: 874 - 62 - 34),
@@ -113,9 +114,10 @@ final class HomeSnapshotTests: XCTestCase {
                                            anchor: Float(1 - 2 * layout.crownLook / screen.height),
                                            progress: 1, pull: 0)
         let cross = camera.screenPoint(SIMD3(0.5, SculptedCamera.tallest, 3.5), in: screen)
-        let collar = camera.screenPoint(SIMD3(0.5, 1.0, 3.5), in: screen)
+        // The foot of the crown, where it meets the king's neck.
+        let crownFoot = camera.screenPoint(SIMD3(0.5, 0.83, 3.5), in: screen)
         XCTAssertGreaterThan(cross.y, layout.safeTop + 8, "The cross clears the status bar")
-        XCTAssertLessThan(collar.y, cardTopThen - 12, "The crown is clear of the card")
+        XCTAssertLessThan(crownFoot.y, cardTopThen - 12, "The crown is clear of the card")
         XCTAssertEqual(cross.x, screen.width / 2, accuracy: 24, "The king stands in the middle")
     }
 

@@ -367,8 +367,8 @@ struct HomeLayout {
     var restLook: CGFloat { heroFrame * 0.323 }
     /// How far the page scrolls while the camera walks in and the board goes soft.
     var walk: CGFloat { heroFrame * 0.62 }
-    /// Where the king's crown sits once the camera has come in: halfway between the status
-    /// bar and the top of the clock card at that moment.
+    /// Where the king's head sits once the camera has come in: halfway between the status
+    /// bar and the top of the clock card at that moment, so the cross and crown both show.
     var crownLook: CGFloat {
         max((safeTop + cardTop - HomeWorld.arrival * walk) / 2, safeTop + 40)
     }

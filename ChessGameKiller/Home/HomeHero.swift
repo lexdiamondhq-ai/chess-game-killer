@@ -48,10 +48,10 @@ enum HomeHeroCamera {
             fieldOfView = 2 * atan(tan(fieldOfView / 2) * widthScale)
         }
         camera.fieldOfView = fieldOfView
-        camera.distance = mix(11, 7, t) + 3 * lift
+        camera.distance = mix(11, 8, t) + 3 * lift
         // The look point, measured as if White sat at the bottom: the board's near half
-        // at rest, the king's crown at the end of the walk.
-        camera.focus = SIMD3(mix(0, -1.66, t), mix(0, 1.1, t), mix(1.6, 2.6, t) - 0.8 * lift)
+        // at rest, the king's head (crown and cross) at the end of the walk.
+        camera.focus = SIMD3(mix(0, -1.66, t), mix(0, 1.0, t), mix(1.6, 2.6, t) - 0.8 * lift)
         camera.aspect = aspect
         if black {
             // The board seen in a mirror across its middle: Black's corner, ending on Black's king.
@@ -137,7 +137,7 @@ struct HomeWorld: View {
 
     /// The share of the walk the camera takes to come in. It holds still for the rest,
     /// sharp for a moment, then soft.
-    static let arrival: CGFloat = 0.65
+    static let arrival: CGFloat = 0.6
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var stage = SculptedStage()
