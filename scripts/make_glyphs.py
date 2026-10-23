@@ -81,8 +81,10 @@ def rook(dx=0, dy=0, s=1):
 def king(dx=0, dy=0, s=1):
     p = lambda x, y: P(x, y, dx, dy, s)
     return " ".join([
-        rrect(dx + 11.2 * s, dy + 0.9 * s, 1.6 * s, 4.6 * s, 0.5 * s),
-        rrect(dx + 9.7 * s, dy + 2.2 * s, 4.6 * s, 1.6 * s, 0.5 * s),
+        # The cross as one outline: two overlapping bars would cancel out under even-odd.
+        "M" + "L".join(p(x, y) for x, y in [(11.2, 0.9), (12.8, 0.9), (12.8, 2.2), (14.3, 2.2), (14.3, 3.8),
+                                              (12.8, 3.8), (12.8, 5.5), (11.2, 5.5), (11.2, 3.8), (9.7, 3.8),
+                                              (9.7, 2.2), (11.2, 2.2)]) + "Z",
         f"M{p(7.4, 10.0)}C{p(6.2, 7.4)} {p(8.6, 6.0)} {p(12, 6.0)}C{p(15.4, 6.0)} {p(17.8, 7.4)} {p(16.6, 10.0)}Z",
         rrect(dx + 7.6 * s, dy + 10.65 * s, 8.8 * s, 1.6 * s, 0.8 * s),
         f"M{p(9.3, 12.9)}C{p(9.2, 14.8)} {p(8.5, 16.3)} {p(7.4, 17.6)}L{p(16.6, 17.6)}"
@@ -276,6 +278,36 @@ def expand():
     return svg(tile, corners)
 
 
+def scholar(dx=0, dy=0, s=1):
+    """A pawn in a graduation cap: the coach. Two parts, so the cap can sit on the head."""
+    p = lambda x, y: P(x, y, dx, dy, s)
+    cap = (f"M{p(12, 0.9)}L{p(19.4, 3.6)}L{p(12, 6.3)}L{p(4.6, 3.6)}Z "
+           + rrect(dx + 8.6 * s, dy + 4.6 * s, 6.8 * s, 2.0 * s, 0.6 * s))
+    body = " ".join([
+        f"M{p(9.2, 7.3)}L{p(14.8, 7.3)}C{p(14.8, 9.1)} {p(13.6, 10.2)} {p(12, 10.2)}"
+        f"C{p(10.4, 10.2)} {p(9.2, 9.1)} {p(9.2, 7.3)}Z",
+        rrect(dx + 8.3 * s, dy + 10.75 * s, 7.4 * s, 1.6 * s, 0.8 * s),
+        f"M{p(9.8, 12.9)}C{p(9.75, 14.8)} {p(8.7, 16.3)} {p(7.6, 17.6)}L{p(16.4, 17.6)}"
+        f"C{p(15.3, 16.3)} {p(14.25, 14.8)} {p(14.2, 12.9)}Z",
+        base(dx, dy, s),
+    ])
+    tassel = circle(dx + 18.2 * s, dy + 8.4 * s, 0.95 * s)
+    return [cap, body, tassel], [(f"M{p(18.2, 3.9)}V{p(18.2, 7.6).split()[1]}", 1.0 * s)]
+
+
+def coach():
+    paths, strokes = scholar()
+    return svg(paths, strokes)
+
+
+def challenge():
+    """A knight with a paper plane flying off: an invitation to play."""
+    rider = knight(dx=-0.9, dy=4.2, s=0.8)
+    plane = ("M22.4 1.6L13.4 5.5L16.9 6.8Z "
+             "M22.4 1.6L17.5 7.4L18.6 10.6Z")
+    return svg([rider, plane])
+
+
 GLYPHS = {
     "glyph-home": svg([rook()]),
     "glyph-train": svg([knight()]),
@@ -293,6 +325,8 @@ GLYPHS = {
     "glyph-big-board": expand(),
     "glyph-king": svg([king()]),
     "glyph-pawn": svg([pawn()]),
+    "glyph-coach": coach(),
+    "glyph-challenge": challenge(),
 }
 
 
