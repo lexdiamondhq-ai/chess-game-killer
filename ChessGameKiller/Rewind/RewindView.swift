@@ -116,6 +116,8 @@ struct RewindView: View {
             }
             .tint(.primary)
             .accessibilityLabel(explorer == nil ? "Back" : "Back to the game")
+            // As wide as the rematch button, so the title stays centered.
+            .frame(width: Self.sideSlot, alignment: .leading)
             Spacer()
             if let explorer {
                 levelMenu(explorer)
@@ -126,6 +128,8 @@ struct RewindView: View {
                         .tracking(2.5)
                         .textCase(.uppercase)
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                     Text(positionTitle)
                         .font(.system(.headline, design: .themed))
                         .contentTransition(.numericText())
@@ -137,18 +141,26 @@ struct RewindView: View {
                     dismiss()
                     onPlayAgain(game)
                 } label: {
-                    Image(systemName: "play.fill")
-                        .font(.body.weight(.semibold))
-                        .frame(width: 44, height: 44)
+                    VStack(spacing: 3) {
+                        Image(systemName: "play.fill")
+                            .font(.body.weight(.semibold))
+                        Text("Rematch")
+                            .font(.caption2.weight(.semibold))
+                    }
+                    .frame(width: Self.sideSlot, height: 44)
+                    .contentShape(Rectangle())
                 }
                 .tint(.primary)
-                .accessibilityLabel("Play \(game.opponent) again")
+                .accessibilityLabel("Rematch \(game.opponent)")
             } else {
-                Color.clear.frame(width: 44, height: 44)
+                Color.clear.frame(width: Self.sideSlot, height: 44)
             }
         }
         .padding(.horizontal, 8)
     }
+
+    /// The width of the header's back and rematch buttons.
+    private static let sideSlot: CGFloat = 60
 
     private var positionTitle: String {
         if ply == 0 { return "The start" }
@@ -289,12 +301,7 @@ struct RewindView: View {
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background {
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(theme.isDark ? Color.white.opacity(0.06) : Color.white)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 28, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-                }
+            GlassSurface(shape: RoundedRectangle(cornerRadius: 28, style: .continuous))
         }
         .padding(.horizontal, 12)
         .animation(.snappy(duration: 0.25), value: focused?.ply)
@@ -362,7 +369,7 @@ struct RewindView: View {
             if let accuracy = game.accuracy {
                 Text("Accuracy \(accuracy)%  ·  \(game.result.title)")
                     .font(.subheadline.weight(.semibold).monospacedDigit())
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
                     .padding(.top, 4)
             }
         }
@@ -389,7 +396,7 @@ struct RewindView: View {
             .disabled(previous == nil)
             Spacer()
             Text(moments.isEmpty ? "No moments" : index.map { "\($0 + 1) of \(moments.count) moments" } ?? "\(moments.count) moments")
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.secondary)
             Spacer()
             Button {
                 if let next { jump(to: next) }
@@ -574,7 +581,7 @@ private struct ExplorerCard: View {
                     if explorer.ownMoveAt == nil {
                         Text("Tap a piece on the board to try a move of your own.")
                             .font(.footnote)
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(.secondary)
                             .padding(.top, 12)
                     }
                 }
@@ -652,7 +659,7 @@ private struct ExplorerCard: View {
             .font(.subheadline)
             .foregroundStyle(.secondary)
         } else if explorer.isThinking {
-            Text("Stockfish is looking…").font(.subheadline).foregroundStyle(.tertiary)
+            Text("Stockfish is looking…").font(.subheadline).foregroundStyle(.secondary)
         }
     }
 
@@ -663,7 +670,7 @@ private struct ExplorerCard: View {
                 .font(.caption.weight(.semibold))
                 .tracking(1.5)
                 .textCase(.uppercase)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.secondary)
             ForEach(explorer.branches) { branch in
                 Button {
                     onTouch()

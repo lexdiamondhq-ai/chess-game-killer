@@ -124,19 +124,25 @@ struct CoachOrb: View {
 
     // MARK: Background
 
+    /// The orb sits on the dock's glass, so it has no glass of its own (glass on glass turns
+    /// muddy): a faint well while it is round or stretched for a verdict, and nothing once it
+    /// unfolds, when the dock's glass grows to hold the panel.
+    @ViewBuilder
     private var orbBackground: some View {
-        let shape = RoundedRectangle(cornerRadius: isExpanded ? 30 : Self.orbSize / 2, style: .continuous)
-        return shape
-            .fill(theme.isDark ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)))
-            .overlay {
-                shape.strokeBorder(
-                    LinearGradient(colors: [tint.opacity(theme.glows ? 0.9 : 0.45), tint.opacity(0.15)],
-                                   startPoint: .topLeading, endPoint: .bottomTrailing),
-                    lineWidth: 1
-                )
-            }
-            .shadow(color: theme.glows ? tint.opacity(0.35) : .black.opacity(0.12),
-                    radius: theme.glows ? 16 : 10, y: theme.glows ? 0 : 3)
+        if !isExpanded {
+            let shape = RoundedRectangle(cornerRadius: Self.orbSize / 2, style: .continuous)
+            shape
+                .fill(Color.primary.opacity(theme.isDark ? 0.055 : 0.04))
+                .overlay {
+                    shape.strokeBorder(
+                        LinearGradient(colors: [tint.opacity(theme.glows ? 0.9 : 0.35), Color.primary.opacity(0.08)],
+                                       startPoint: .topLeading, endPoint: .bottomTrailing),
+                        lineWidth: 0.75
+                    )
+                }
+                .shadow(color: theme.glows ? tint.opacity(0.35) : .clear, radius: 16)
+                .transition(.opacity)
+        }
     }
 }
 
@@ -615,7 +621,8 @@ private struct CoachPanel: View {
     // MARK: Actions
 
     private var actions: some View {
-        HStack(spacing: 6) {
+        // Top-aligned, so every circle sits on one line whatever its label does.
+        HStack(alignment: .top, spacing: 6) {
             ActionButton(title: "Undo", symbol: Glyphs.undo, theme: theme) {
                 withAnimation(.snappy(duration: 0.22)) { match.undo() }
             }
@@ -891,6 +898,9 @@ private struct ActionButton: View {
                     .shadow(color: lit && theme.glows ? accent.opacity(0.25) : .clear, radius: 10)
                 Text(title)
                     .font(.caption2.weight(.semibold))
+                    // Six to a row: "New game" shrinks a little rather than break onto two lines.
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
             }
             .foregroundStyle(lit ? accent : Color.primary.opacity(0.85))
             .frame(maxWidth: .infinity)

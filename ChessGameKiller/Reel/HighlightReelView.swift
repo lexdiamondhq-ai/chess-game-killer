@@ -8,18 +8,22 @@ struct ReelFrame: View {
     let reel: GameReel
     let theme: BoardTheme
     let time: Double
+    /// Where the wordmark sits from the top. On the phone it clears the island and the buttons.
+    var wordmarkTop: CGFloat = 34
 
     private var accent: Color { theme.accent ?? .accentColor }
+    /// Rounded type on Neon, plain SF Pro on every other look, as in the game.
+    private var design: Font.Design { theme.glows ? .rounded : .default }
 
     var body: some View {
         ZStack {
             ThemeBackdrop(theme: theme)
             VStack(spacing: 0) {
                 Text("CHESS GAME KILLER")
-                    .font(.system(size: 13, weight: .heavy, design: .rounded))
+                    .font(.system(size: 13, weight: .heavy, design: design))
                     .tracking(3)
                     .foregroundStyle(accent)
-                    .padding(.top, 34)
+                    .padding(.top, wordmarkTop)
                 Spacer(minLength: 0)
                 content
                 Spacer(minLength: 0)
@@ -45,7 +49,7 @@ struct ReelFrame: View {
         let shown = min(1, progress * 3)
         return VStack(spacing: 18) {
             Text("\(reel.player) vs \(reel.opponent)")
-                .font(.system(size: 34, weight: .bold, design: .rounded))
+                .font(.system(size: 34, weight: .bold, design: design))
                 .multilineTextAlignment(.center)
             resultBadge
             HStack(spacing: 18) {
@@ -68,7 +72,7 @@ struct ReelFrame: View {
         return VStack(spacing: 16) {
             HStack {
                 Text(highlight.kind.title.uppercased())
-                    .font(.system(size: 14, weight: .heavy, design: .rounded))
+                    .font(.system(size: 14, weight: .heavy, design: design))
                     .tracking(1.5)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
@@ -77,12 +81,12 @@ struct ReelFrame: View {
                 Spacer()
                 if let piece = highlight.piece {
                     Label(piece, systemImage: "shield.lefthalf.filled")
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .font(.system(size: 15, weight: .bold, design: design))
                         .foregroundStyle(theme.sideColor(reel.playerColor))
                         .lineLimit(1)
                 }
                 Text("Move \((moment.ply + 1) / 2)")
-                    .font(.system(size: 15, weight: .semibold, design: .rounded).monospacedDigit())
+                    .font(.system(size: 15, weight: .semibold, design: design).monospacedDigit())
                     .foregroundStyle(.secondary)
             }
             PositionBoard(draft: PositionDraft(fen: fen) ?? .empty, theme: theme,
@@ -91,19 +95,19 @@ struct ReelFrame: View {
                 .scaleEffect(landed ? 1 : 0.985)
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(moment.san + glyph(moment.grade))
-                    .font(.system(size: 40, weight: .heavy, design: .rounded))
+                    .font(.system(size: 40, weight: .heavy, design: design))
                     .foregroundStyle(landed ? moment.grade.color : .primary)
                 Spacer()
                 ReelEvalBar(chances: landed ? moment.after : moment.before, theme: theme)
                     .frame(width: 120, height: 10)
             }
             Text(highlight.line)
-                .font(.system(size: 19, weight: .semibold, design: .rounded))
+                .font(.system(size: 19, weight: .semibold, design: design))
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
             if highlight.kind == .blunder, let best = moment.best, landed {
                 Text("\(best) was the move.")
-                    .font(.system(size: 16, weight: .medium, design: .rounded))
+                    .font(.system(size: 16, weight: .medium, design: design))
                     .foregroundStyle(.secondary)
             }
         }
@@ -118,21 +122,21 @@ struct ReelFrame: View {
                 .frame(maxWidth: 260)
             resultBadge
             Text(reel.endLine)
-                .font(.system(size: 20, weight: .semibold, design: .rounded))
+                .font(.system(size: 20, weight: .semibold, design: design))
                 .multilineTextAlignment(.center)
             if let hero = reel.hero {
                 VStack(spacing: 4) {
                     Text("PIECE OF THE MATCH")
-                        .font(.system(size: 12, weight: .heavy, design: .rounded))
+                        .font(.system(size: 12, weight: .heavy, design: design))
                         .tracking(1.5)
                         .foregroundStyle(ArmyRank.gold)
                     Text(hero)
-                        .font(.system(size: 17, weight: .semibold, design: .rounded))
+                        .font(.system(size: 17, weight: .semibold, design: design))
                         .multilineTextAlignment(.center)
                 }
             }
             Text("Coached by Leo · Chess Game Killer")
-                .font(.system(size: 14, weight: .medium, design: .rounded))
+                .font(.system(size: 14, weight: .medium, design: design))
                 .foregroundStyle(.secondary)
         }
         .opacity(min(1, progress * 4))
@@ -145,7 +149,7 @@ struct ReelFrame: View {
         case .draw: ("DRAW", .secondary)
         }
         return Text(text)
-            .font(.system(size: 22, weight: .black, design: .rounded))
+            .font(.system(size: 22, weight: .black, design: design))
             .tracking(4)
             .padding(.horizontal, 22)
             .padding(.vertical, 8)
@@ -157,9 +161,9 @@ struct ReelFrame: View {
     private func stat(_ value: String, _ label: String) -> some View {
         VStack(spacing: 2) {
             Text(value)
-                .font(.system(size: 26, weight: .bold, design: .rounded).monospacedDigit())
+                .font(.system(size: 26, weight: .bold, design: design).monospacedDigit())
             Text(label)
-                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .font(.system(size: 13, weight: .medium, design: design))
                 .foregroundStyle(.secondary)
         }
     }
@@ -212,18 +216,18 @@ struct HighlightReelView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            TimelineView(.animation) { context in
-                let t = min(reel.length, context.date.timeIntervalSince(started))
-                ReelFrame(reel: reel, theme: theme, time: t)
-                    .onChange(of: cueIndex(at: t)) { _, index in speak(index) }
+            GeometryReader { geo in
+                TimelineView(.animation) { context in
+                    let t = min(reel.length, context.date.timeIntervalSince(started))
+                    // The picture runs edge to edge; the wordmark waits below the island and the buttons.
+                    ReelFrame(reel: reel, theme: theme, time: t, wordmarkTop: geo.safeAreaInsets.top + 62)
+                        .onChange(of: cueIndex(at: t)) { _, index in speak(index) }
+                }
+                .ignoresSafeArea()
             }
-            .ignoresSafeArea()
-            HStack {
+            HStack(spacing: 4) {
                 Button { stopVoice(); dismiss() } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 15, weight: .bold))
-                        .frame(width: 36, height: 36)
-                        .background(.thinMaterial, in: Circle())
+                    roundIcon("xmark")
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Close")
@@ -232,17 +236,14 @@ struct HighlightReelView: View {
                     started = Date()
                     spoken = -1
                 } label: {
-                    Image(systemName: "arrow.counterclockwise")
-                        .font(.system(size: 15, weight: .bold))
-                        .frame(width: 36, height: 36)
-                        .background(.thinMaterial, in: Circle())
+                    roundIcon("arrow.counterclockwise")
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Play again")
                 shareButton
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
+            .padding(.horizontal, 12)
+            .padding(.top, 4)
         }
         .onAppear {
             CoachVoice.shared.beginLesson()
@@ -250,8 +251,21 @@ struct HighlightReelView: View {
         }
         .onDisappear { stopVoice() }
         .alert("Couldn't make the video", isPresented: $exportFailed) {
-            Button("OK", role: .cancel) {}
+            Button("Try again") { Task { await export() } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Something went wrong while making it. The reel still plays here.")
         }
+    }
+
+    /// A 36 pt glass circle with a full 44 pt place to tap.
+    private func roundIcon(_ symbol: String) -> some View {
+        Image(systemName: symbol)
+            .font(.system(size: 15, weight: .bold))
+            .frame(width: 36, height: 36)
+            .glassPane(Circle())
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
     }
 
     @ViewBuilder
@@ -264,6 +278,8 @@ struct HighlightReelView: View {
                     .frame(height: 36)
                     .background(theme.accent ?? .accentColor, in: Capsule())
                     .foregroundStyle(theme.isDark ? Color.black : Color.white)
+                    .frame(height: 44)
+                    .contentShape(Rectangle())
             }
         } else {
             Button {
@@ -276,7 +292,9 @@ struct HighlightReelView: View {
                 .font(.system(size: 15, weight: .bold))
                 .padding(.horizontal, 14)
                 .frame(height: 36)
-                .background(.thinMaterial, in: Capsule())
+                .glassPane(Capsule())
+                .frame(height: 44)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .disabled(exporting)

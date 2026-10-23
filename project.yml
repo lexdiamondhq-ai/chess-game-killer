@@ -43,6 +43,8 @@ targets:
         CURRENT_PROJECT_VERSION: "1"
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        # Every look is dark, so the launch screen and system sheets are too (no white flash at launch).
+        INFOPLIST_KEY_UIUserInterfaceStyle: Dark
         INFOPLIST_KEY_CFBundleDisplayName: Chess Game Killer
         INFOPLIST_KEY_NSCameraUsageDescription: Take a photo of a chess board to find the best move.
         # The game and lesson screens are laid out for portrait; iPad keeps every orientation.

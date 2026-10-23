@@ -74,6 +74,17 @@ final class ScanSession {
 
     // MARK: Reading
 
+    /// Gives up on a slow read and leaves the editor to fill in by hand, with the photo still there to copy from.
+    func stopReading() {
+        guard isReading else { return }
+        readTask?.cancel()
+        readTask = nil
+        readID += 1
+        isReading = false
+        readingFailed = false
+        readingNote = "Stopped. Set up the pieces by hand (tap the photo to see it), or go back and pick another."
+    }
+
     private func finishReading(_ reading: BoardReading, id: Int) {
         guard isReading, id == readID else { return }
         isReading = false
