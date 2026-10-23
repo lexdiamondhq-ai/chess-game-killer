@@ -104,8 +104,9 @@ instead of the Authorization header, so a browser can report `away` with `naviga
 | `POST /api/games/{code}/action` | `{ "type" }` + Bearer | `200 { "game" }` |
 
 - `url` is the https invite link, `appUrl` the `chessgamekiller://c/{CODE}` link.
-- `join`: takes the open seat. With a valid Bearer token for this game it just returns that seat (re-join is harmless);
-  a token that isn't for this game is `unauthorized`. Both seats taken: `seat_taken`; game over: `game_over`.
+- `join`: takes the open seat. With a valid Bearer token for this game it just returns that seat, even after the game
+  is over (re-join is harmless); a token that isn't for this game is `unauthorized`. Without a token: game over is
+  `game_over`, and otherwise both seats taken is `seat_taken`.
 - `move`: `ply` is the number of half-moves already played (the index this move will have). A different `ply` is
   `409 stale` with the current game, so the client can catch up. A missing promotion letter promotes to a queen.
 - `action` types:
@@ -135,6 +136,13 @@ Server → client:
 Client → server: the text `ping` (the server answers `pong` without waking the game). Clients send one every 20 s.
 Moves and actions always go through REST, so a reply tells the client whether they worked.
 
+- A refused upgrade is an HTTP error (401 for a token that isn't for this game, 404 for no game, 429 for a full game).
+  A browser can't read that status: it only sees the socket fail to open. So a client whose socket fails to open
+  twice in a row checks its seat with `join` (a 401 there means: forget the token and watch), and otherwise keeps up
+  by polling `GET /api/games/{code}` every 3 s while it retries the socket.
+- Close codes 4000–4999 are final: don't reconnect after one. 4001 means the seat's game is open somewhere newer;
+  4002 means a player took this spectator's place.
+
 ## Pages
 
 - `GET /c/{code}`: the invite page. Its `<head>` carries Open Graph tags naming the challenger, so Messages and
@@ -146,7 +154,9 @@ Moves and actions always go through REST, so a reply tells the client whether th
 ## Limits
 
 - Per address: 20 new games a minute (asking for a rematch counts as one), 30 joins a minute, 240 moves and
-  actions a minute. Over a limit: `rate_limited` 429 with `Retry-After`.
+  actions a minute. Over a limit: `rate_limited` 429 with `Retry-After`. Reading a game (`GET /api/games/{code}`)
+  has no limit, because clients poll it every 3 s when their WebSocket can't connect; any future limit must stay
+  well above 20 a minute per page.
 - At most 8 WebSockets per game, and 3 per seat: a seat's 4th socket closes that seat's oldest with close code
   4001 (don't reconnect on 4001: the game is open somewhere newer). When 8 are open, a player's socket takes the
   oldest spectator's place (closed with 4002) and a new spectator is refused (429).
