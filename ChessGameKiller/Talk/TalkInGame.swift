@@ -33,8 +33,6 @@ struct TalkEntryRow: View {
     let countsAsHelp: Bool
     let open: () -> Void
 
-    @ScaledMetric(relativeTo: .subheadline) private var scaledMic: CGFloat = 34
-
     private var detail: String {
         countsAsHelp
             ? "Tell Leo your plan. He checks every part. Counts as help, like Undo."
@@ -45,7 +43,7 @@ struct TalkEntryRow: View {
         let shape = RoundedRectangle(cornerRadius: 13, style: .continuous)
         Button(action: open) {
             HStack(spacing: 12) {
-                mic
+                TalkMic(theme: theme)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Talk it through")
                         .font(.subheadline.weight(.semibold))
@@ -74,12 +72,19 @@ struct TalkEntryRow: View {
         .accessibilityLabel("Talk it through")
         .accessibilityHint(detail)
     }
+}
 
-    /// The talk button of the Talk screen, in small.
-    private var mic: some View {
+/// Leo's microphone: the talk button of the Talk screen, in small. It marks every way into
+/// Talk it through, in the coach and on a training puzzle.
+struct TalkMic: View {
+    let theme: BoardTheme
+
+    @ScaledMetric(relativeTo: .subheadline) private var scaled: CGFloat = 34
+
+    var body: some View {
         let accent: Color = theme.challengeAccent
-        let side: CGFloat = min(max(scaledMic, 30), 42)
-        return ZStack {
+        let side: CGFloat = min(max(scaled, 30), 42)
+        ZStack {
             Circle()
                 .fill(LinearGradient(colors: [accent, accent.opacity(0.8)], startPoint: .top, endPoint: .bottom))
             Circle()

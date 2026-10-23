@@ -6,6 +6,13 @@ struct DrillView: View {
     let runner: DrillRunner
     let theme: BoardTheme
     let boardSide: CGFloat
+    /// Offers Talk it through on find-the-move puzzles. Rush and Cycles never do: they give no help.
+    var talks = false
+
+    /// The talk open over the puzzle.
+    @State private var talk: TalkSession?
+    /// The move Play picked in the talk, made once the talk has closed.
+    @State private var talkMove: DrillTalkMove?
 
     var body: some View {
         VStack(spacing: 14) {
@@ -31,6 +38,14 @@ struct DrillView: View {
                 .padding(.horizontal, 16)
         }
         .animation(.snappy(duration: 0.25), value: runner.phase)
+        .fullScreenCover(item: $talk, onDismiss: playTalkMove) { (session: TalkSession) in
+            TalkPanel(session: session, theme: theme, play: { (uci: String) in
+                talkMove = DrillTalkMove(fen: session.fen, uci: uci)
+                talk = nil
+            }, close: {
+                talk = nil
+            })
+        }
     }
 
     // MARK: Pieces of the screen
@@ -44,24 +59,31 @@ struct DrillView: View {
     private var messageCard: some View {
         let tint = runner.tone == .coach ? nil : theme.trainingTone(runner.tone)
         return HStack(alignment: .top, spacing: 12) {
-            CoachAvatar(theme: theme, size: 40, tint: tint)
-            VStack(alignment: .leading, spacing: 6) {
-                if let chip = roleChip {
-                    TrainingChip(text: chip.text, symbol: chip.symbol, color: chip.color)
+            HStack(alignment: .top, spacing: 12) {
+                CoachAvatar(theme: theme, size: 40, tint: tint)
+                VStack(alignment: .leading, spacing: 6) {
+                    if let chip = roleChip {
+                        TrainingChip(text: chip.text, symbol: chip.symbol, color: chip.color)
+                    }
+                    Text(runner.message)
+                        .font(.system(.body, design: .themed).weight(.medium))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .id(runner.message)
+                        .transition(.opacity)
                 }
-                Text(runner.message)
-                    .font(.system(.body, design: .themed).weight(.medium))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .id(runner.message)
-                    .transition(.opacity)
+            }
+            .accessibilityElement(children: .combine)
+            if showsTalk {
+                talkButton
+                    .transition(.scale(scale: 0.6).combined(with: .opacity))
             }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .trainingCard(theme, tint: tint)
         .animation(.easeInOut(duration: 0.2), value: runner.message)
-        .accessibilityElement(children: .combine)
+        .animation(.snappy(duration: 0.25), value: showsTalk)
     }
 
     private var roleChip: (text: String, symbol: String, color: Color)? {
@@ -185,6 +207,46 @@ struct DrillView: View {
         }
     }
 
+    // MARK: Talk it through
+
+    /// Leo's microphone sits in his card for the whole of a find-the-move puzzle, so the words
+    /// never jump; it only works on the learner's turn.
+    private var showsTalk: Bool {
+        talks && runner.kind == .move && !runner.strict && !runner.isDone
+    }
+
+    /// Answer Leo out loud: his microphone, at the end of what he just asked.
+    private var talkButton: some View {
+        let ready = runner.canTalkItThrough && talk == nil
+        return Button(action: openTalk) {
+            TalkMic(theme: theme)
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        // Lined up with Leo's 40-point face, so the card keeps its height; still a 44-point target.
+        .padding(.vertical, -2)
+        .disabled(!ready)
+        .opacity(ready ? 1 : 0.4)
+        .animation(.easeInOut(duration: 0.2), value: ready)
+        .accessibilityLabel("Talk it through")
+        .accessibilityHint("Tell Leo your plan. He checks every part. Counts as a hint.")
+    }
+
+    private func openTalk() {
+        guard talk == nil, let session = runner.talkSession() else { return }
+        talkMove = nil
+        talk = session
+    }
+
+    /// Makes the move Play picked, on the position the talk was about.
+    private func playTalkMove() {
+        guard let pending = talkMove else { return }
+        talkMove = nil
+        guard runner.game.fen == pending.fen else { return }
+        withAnimation(.snappy) { _ = runner.playLearnerMove(pending.uci) }
+    }
+
     private func optionButton(_ option: ChoiceOption, index: Int) -> some View {
         let tried = runner.tried.contains(index)
         let revealed = runner.isDone && option.correct
@@ -219,4 +281,10 @@ struct DrillView: View {
         .buttonStyle(.plain)
         .disabled(tried || runner.isDone || runner.phase != .solving)
     }
+}
+
+/// A move picked with Play in a talk over a puzzle, and the position it was for.
+private struct DrillTalkMove: Equatable {
+    let fen: String
+    let uci: String
 }

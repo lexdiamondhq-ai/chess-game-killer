@@ -132,7 +132,7 @@ jobs:
         # The screens being worked on, once more at the very end and small, so a short tail of the log holds them.
         run: |
           [ -d snapshots ] || exit 0
-          for f in snapshots/talk-*.png snapshots/coach-open-*.png; do
+          for f in snapshots/talk-*.png snapshots/coach-open-*.png snapshots/train-session-*.png; do
             [ -e "$f" ] || continue
             sips -s format jpeg -s formatOptions 50 -Z 360 "$f" --out /tmp/tiny.jpg >/dev/null
             echo "BEGIN-SCREEN $(basename "$f")"
