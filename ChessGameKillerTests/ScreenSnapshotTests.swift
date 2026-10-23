@@ -1,3 +1,4 @@
+import ChessKit
 import SceneKit
 import SwiftUI
 import UIKit
