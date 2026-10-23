@@ -1,0 +1,38 @@
+name: Check the endgame studies
+
+# Runs on pushes to work branches that change the Perfect Endgames studies, and by hand.
+# Checks every study's goal against the Lichess tablebase (and deep Stockfish, which must
+# find the win on its own beyond seven pieces) and that endgames.json matches endgames.py.
+# It commits nothing.
+on:
+  push:
+    branches-ignore: [main]
+    paths:
+      - scripts/grandmaster/endgames.py
+      - scripts/grandmaster/build_endgames.py
+      - ChessGameKiller/GrandmasterRoom/Content/endgames.json
+      - .github/workflows/endgames.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install python-chess and Stockfish
+        run: |
+          pip install chess==1.11.2
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq stockfish
+      - name: Check every study
+        run: |
+          python3 scripts/grandmaster/build_endgames.py --check --lichess \
+            --stockfish /usr/games/stockfish --depth 30 | tee -a "$GITHUB_STEP_SUMMARY"
+          exit ${PIPESTATUS[0]}
