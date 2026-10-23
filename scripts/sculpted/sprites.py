@@ -35,7 +35,8 @@ LIGHT={
 SET_LIGHT={'gilded':{'w':dict(exposure=0.4)}}
 FIN={
     'classic':dict(ivory=(0.8,0.765,0.69),ivory_rough=0.32,ivory_coat=0.35,edge=0.5,power=1.5,
-                   ebony=(0.015,0.014,0.014),ebony_rough=0.42,ebony_coat=0.35,metal=(0.86,0.86,0.88),metal_rough=0.16),
+                   ebony=(0.015,0.014,0.014),ebony_rough=0.42,ebony_coat=0.35,metal=(0.86,0.86,0.88),metal_rough=0.16,
+                   ivory_metal=(0.09,0.09,0.1)),
     'gilded':dict(ivory=(0.8,0.765,0.69),ivory_rough=0.3,ivory_coat=0.6,edge=0.5,power=1.5,
                   ebony=(0.006,0.006,0.007),ebony_rough=0.22,ebony_coat=1.0,metal=(1.0,0.6,0.26),metal_rough=0.2),
 }
@@ -75,9 +76,16 @@ def finishes(side):
         pearl=metal
     else:
         black=mat('ebony',tuple(f['ebony']),f['ebony_rough'],coat=f['ebony_coat'],coat_rough=0.06,spec=0.25)
-        metal=mat('metal',tuple(f['metal']),f['metal_rough'],metal=1)
         gem=mat('sapph',(0.05,0.12,0.6),0.02,trans=1,ior=1.77)
-        pearl=mat('pearl',(0.93,0.9,0.86),0.18,coat=1,sss=0.2)
+        if side=='w':
+            # Ivory takes the ebony's colour for its marks: blackened silver and onyx beads, so the
+            # cross, crown, mitre cut, battlements and mane stand out dark on the white pieces, as
+            # the platinum does light on the black ones.
+            metal=mat('blacksilver',tuple(f['ivory_metal']),0.28,metal=1,coat=0.6,coat_rough=0.05)
+            pearl=mat('onyx',(0.012,0.012,0.014),0.15,coat=1,coat_rough=0.03)
+        else:
+            metal=mat('metal',tuple(f['metal']),f['metal_rough'],metal=1)
+            pearl=mat('pearl',(0.93,0.9,0.86),0.18,coat=1,sss=0.2)
     shade=mat('well',(0.09,0.075,0.06) if side=='w' else (0.004,0.004,0.004),0.6)
     return {'body':white if side=='w' else black,'metal':metal,'gem':gem,'pearl':pearl,'shade':shade}
 if SET=='classic': kv=np.load('scripts/sculpted/kv.npy'); kf=np.load('scripts/sculpted/kf.npy')

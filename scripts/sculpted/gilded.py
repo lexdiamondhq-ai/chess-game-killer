@@ -185,7 +185,7 @@ def queen(M):
         a = TAU * (i + 0.5) / NPT
         cut(body, prism(f'Qn{i}', [(-hw, ZR + 0.06), (hw, ZR + 0.06), (0, apex)], 0.12, 0.36, a))
     for i in range(NPT):
-        a = TAU * i / NPT; objs.append(uvsphere(f'Qball{i}', 0.036, (math.cos(a) * 0.252, math.sin(a) * 0.252, ZR + 0.026), M['metal']))
+        a = TAU * i / NPT; objs.append(uvsphere(f'Qball{i}', 0.043, (math.cos(a) * 0.252, math.sin(a) * 0.252, ZR + 0.026), M['metal']))
     objs += stripes('Qst', p[:body_top], 0.475, M)
     objs.append(flat_band('Qring', 0.2195, 0.5505, 0.5785, M))
     objs.append(sleeve('Qcrown', p, 0.79, 0.816, M))

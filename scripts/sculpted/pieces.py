@@ -246,7 +246,7 @@ def queen(M):
         a=TAU*(i+0.5)/NPT
         cut(body,prism(f'Qn{i}',[(-hw,ZR+0.06),(hw,ZR+0.06),(0,apex)],0.12,0.36,a))
     for i in range(NPT):
-        a=TAU*i/NPT; objs.append(uvsphere(f'Qp{i}',0.036,(math.cos(a)*0.252,math.sin(a)*0.252,ZR+0.026),M['pearl']))
+        a=TAU*i/NPT; objs.append(uvsphere(f'Qp{i}',0.043,(math.cos(a)*0.252,math.sin(a)*0.252,ZR+0.026),M['pearl']))
     objs.append(torus('Qring',0.21,0.0085,0.5645,M['metal']))
     zt=top[1]; zb=1.08-0.058
     objs.append(lathe('Qstem',[(0.0,zt-0.01),(0.04,zt-0.01),(0.022,zb-0.02),(0.0,zb-0.02)],seg=96,mat=M['metal']))
@@ -263,7 +263,7 @@ def mitre_profile(z0=0.51,z1=0.935,rmax=0.178,n=48):
     return out
 # the side of the bishop that faces the player: the game and the pictures turn it -112 degrees
 BISHOP_FRONT=math.radians(22)
-def mitre_cut(body, front=BISHOP_FRONT, width=0.075, z=0.745, slope=48):
+def mitre_cut(body, front=BISHOP_FRONT, width=0.09, z=0.745, slope=48):
     """A slot through the mitre, slanting down from the upper left as the player sees it."""
     f=Vector((math.cos(front),math.sin(front),0)); s=Vector((-math.sin(front),math.cos(front),0))
     t=(math.cos(math.radians(slope))*Vector((0,0,1))-math.sin(math.radians(slope))*s).normalized()
@@ -343,4 +343,17 @@ def knight(M, verts, faces):
     for f in me.polygons: f.use_smooth=True
     h=bpy.data.objects.new('Nh',me); bpy.context.scene.collection.objects.link(h); me.materials.append(M['body'])
     ring=torus('Nring',0.17,0.008,TOP+0.002,M['metal'])
-    return group('knight',[b,h,ring,base_beads('Nbeadbase',R,M)])
+    objs=[b,h,ring,base_beads('Nbeadbase',R,M)]
+    # a mane of metal studs down the crest of the neck and an eye set in each socket, so the
+    # head reads as a horse at a glance, as the gilded knight's gold mane does
+    crest=[(0.45,0.212),(0.53,0.199),(0.61,0.184),(0.69,0.159),(0.77,0.113),(0.81,0.077),(0.85,0.061)]
+    zs=np.linspace(0.47,0.84,12)
+    for i,z in enumerate(zs):
+        x=float(np.interp(z,[c[0] for c in crest],[c[1] for c in crest]))
+        hw=float(np.interp(z,[0.45,0.65,0.77,0.85],[0.11,0.104,0.097,0.073]))
+        # a row of studs down each side of the crest, where the gilded knight has its gold mane
+        for side in (-1,1):
+            objs.append(uvsphere(f'Nmane{i}{side+1}',0.02,((x-0.03)*s,side*(hw-0.012)*s,TOP+(z-0.17)*s),M['metal'],(1,0.6,1.15)))
+    for side in (-1,1):
+        objs.append(uvsphere(f'Ngem{side+1}',0.021,(-0.111*s,side*(0.069*s-0.007),TOP+(0.737-0.17)*s),M['gem'],(1,0.45,1)))
+    return group('knight',objs)

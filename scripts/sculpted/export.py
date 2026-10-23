@@ -38,6 +38,7 @@ def budget(name):
     if 'ring' in low: return SMALL['ring']
     if 'gem' in low: return SMALL['gem']
     if name.startswith('Qp'): return SMALL['p']
+    if name.startswith('Nmane') and name!='Nmane': return 300
     if 'ball' in low: return SMALL['ball'] if name!='Qtopball' else 700
     if 'fin' in low: return SMALL['fin']
     for key in ('band','crown','mitre','cap'):
