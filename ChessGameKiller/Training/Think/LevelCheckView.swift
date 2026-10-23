@@ -196,7 +196,7 @@ struct LevelCheckView: View {
         default:
             guard let drill = runner.drill else { return "" }
             if drill.phase == .solving, drill.game.moveCount > 1 { return "Good. Keep going." }
-            return "Find the best move for \(drill.learner == .white ? "White" : "Black")."
+            return "Find the best move for \(drill.learner.displayName)."
         }
     }
 

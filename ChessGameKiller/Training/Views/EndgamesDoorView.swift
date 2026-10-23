@@ -7,41 +7,26 @@ struct EndgamesDoorView: View {
     @Environment(EndgameProgress.self) private var progress
     @State private var study: EndgameStudy?
 
-    private var studies: [EndgameStudy] { GrandmasterContent.shared.endgames }
-
-    /// The studies by group, in the order the content lists them.
-    private var groups: [(name: String, studies: [EndgameStudy])] {
-        var order: [String] = []
-        var byGroup: [String: [EndgameStudy]] = [:]
-        for study in studies {
-            if byGroup[study.group] == nil { order.append(study.group) }
-            byGroup[study.group, default: []].append(study)
+    /// The shelves that have studies on them, in the order to learn them.
+    private var groups: [(group: EndgameStudy.Group, studies: [EndgameStudy])] {
+        EndgameStudy.Group.allCases.compactMap { group in
+            let studies = progress.studies(in: group)
+            return studies.isEmpty ? nil : (group, studies)
         }
-        return order.map { (name: $0, studies: byGroup[$0] ?? []) }
     }
 
-    private var next: EndgameStudy? { studies.first { !progress.isDone($0.id) } }
-
     var body: some View {
+        let due = progress.dueForReview()
         TrainScreen(theme: theme, title: "Endgames",
                     intro: "Close games are decided here. Learn the positions every player must know, against a defender who never slips.") {
             nextCard
-            ForEach(groups, id: \.name) { group in
-                TrainSectionTitle(text: group.name)
-                VStack(spacing: 0) {
-                    ForEach(Array(group.studies.enumerated()), id: \.element.id) { index, study in
-                        Button {
-                            self.study = study
-                        } label: {
-                            row(study)
-                        }
-                        .buttonStyle(.plain)
-                        if index < group.studies.count - 1 {
-                            Divider().opacity(0.4).padding(.leading, 60)
-                        }
-                    }
-                }
-                .trainingCard(theme)
+            if !due.isEmpty {
+                TrainSectionTitle(text: "Due for review")
+                list(due)
+            }
+            ForEach(groups, id: \.group) { entry in
+                TrainSectionTitle(text: "\(entry.group.rawValue) · \(progress.doneCount(in: entry.group)) of \(entry.studies.count)")
+                list(entry.studies)
             }
             Text("Online, every move is judged by the Lichess tablebase, which knows the perfect result. Offline, Stockfish judges.")
                 .font(.system(.footnote, design: .themed))
@@ -52,21 +37,37 @@ struct EndgamesDoorView: View {
         }
         .fullScreenCover(item: $study) { study in
             EndgameView(study: study, theme: theme)
-                .environment(progress)
         }
+    }
+
+    private func list(_ studies: [EndgameStudy]) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(studies.enumerated()), id: \.element.id) { index, study in
+                Button {
+                    self.study = study
+                } label: {
+                    row(study)
+                }
+                .buttonStyle(.plain)
+                if index < studies.count - 1 {
+                    Divider().opacity(0.4).padding(.leading, 60)
+                }
+            }
+        }
+        .trainingCard(theme)
     }
 
     /// How far along the player is, and the next endgame to learn.
     private var nextCard: some View {
-        let done = studies.filter { progress.isDone($0.id) }.count
+        let next = progress.nextUp
         return VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline) {
-                Text(done == studies.count ? "ALL MASTERED" : "NEXT UP")
+                Text(next == nil ? "ALL LEARNED" : "NEXT UP")
                     .font(.system(.caption, design: .themed).weight(.bold))
                     .tracking(1)
                     .foregroundStyle(theme.trainingAccent)
                 Spacer()
-                Text("\(done) of \(studies.count)")
+                Text("\(progress.doneCount) of \(progress.total)")
                     .font(.system(.footnote, design: .themed).weight(.semibold).monospacedDigit())
                     .foregroundStyle(.secondary)
             }
@@ -74,19 +75,23 @@ struct EndgamesDoorView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(next.title)
                         .font(.system(.title3, design: .themed).weight(.bold))
+                    Text(next.goalText)
+                        .font(.system(.footnote, design: .themed).weight(.semibold))
+                        .foregroundStyle(theme.trainingAccent)
                     Text(next.idea)
                         .font(.system(.subheadline, design: .themed))
                         .foregroundStyle(.secondary)
                         .lineLimit(3)
                         .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 2)
                 }
             } else {
-                Text("You've mastered every endgame here. Play them again any time to keep them sharp.")
+                Text("You've learned every endgame here. They come back for review now and then, so they stay sharp.")
                     .font(.system(.subheadline, design: .themed))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            ProgressView(value: Double(done), total: Double(max(studies.count, 1)))
+            ProgressView(value: Double(progress.doneCount), total: Double(max(progress.total, 1)))
                 .tint(theme.trainingAccent)
                 .accessibilityHidden(true)
             if let next {
@@ -105,10 +110,11 @@ struct EndgamesDoorView: View {
 
     private func row(_ study: EndgameStudy) -> some View {
         let isDone = progress.isDone(study.id)
+        let isClean = progress.isClean(study.id)
         return HStack(spacing: 14) {
             ZStack {
                 if isDone {
-                    Image(systemName: "checkmark.circle.fill")
+                    Image(systemName: isClean ? "checkmark.seal.fill" : "checkmark.circle.fill")
                         .font(.system(size: 24))
                         .foregroundStyle(theme.trainingAccent)
                 } else {
@@ -120,10 +126,10 @@ struct EndgamesDoorView: View {
                 Text(study.title)
                     .font(.system(.subheadline, design: .themed).weight(.semibold))
                     .foregroundStyle(.primary)
-                Text(study.idea)
+                Text(study.goalText)
                     .font(.system(.caption, design: .themed))
                     .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                    .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Image(systemName: "chevron.right")
@@ -135,9 +141,14 @@ struct EndgamesDoorView: View {
         .padding(.vertical, 13)
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(study.title), \(EndgameLevelBars.name(study.level))\(isDone ? ", mastered" : "")")
+        .accessibilityLabel(rowLabel(study, isDone: isDone, isClean: isClean))
         .accessibilityHint(study.idea)
         .accessibilityAddTraits(.isButton)
+    }
+
+    private func rowLabel(_ study: EndgameStudy, isDone: Bool, isClean: Bool) -> String {
+        let state = isClean ? ", learned with no slips" : isDone ? ", learned" : ""
+        return "\(study.title). \(study.goalText). \(study.levelName)\(state)"
     }
 }
 
@@ -145,14 +156,6 @@ struct EndgamesDoorView: View {
 struct EndgameLevelBars: View {
     let level: Int
     let color: Color
-
-    static func name(_ level: Int) -> String {
-        switch level {
-        case ...1: return "easy"
-        case 2: return "medium"
-        default: return "hard"
-        }
-    }
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 2.5) {

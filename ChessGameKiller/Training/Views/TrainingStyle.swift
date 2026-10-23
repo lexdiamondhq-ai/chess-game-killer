@@ -298,7 +298,7 @@ struct TurnBadge: View {
                 .fill(theme.sideColor(side))
                 .overlay(Circle().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
                 .frame(width: 10, height: 10)
-            Text(text ?? (side == .white ? "White to move" : "Black to move"))
+            Text(text ?? "\(side.displayName) to move")
                 .font(.caption.weight(.semibold))
                 .lineLimit(1)
         }

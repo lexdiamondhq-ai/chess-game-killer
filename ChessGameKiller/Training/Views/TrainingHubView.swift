@@ -13,7 +13,8 @@ struct TrainingHubView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("coachVoiceMuted") private var voiceMuted = false
     @State private var repertoire = RepertoireStore.live()
-    @State private var endgames = EndgameProgress.live()
+    /// The endgame record the whole app shares, so a study finished anywhere shows here.
+    private var endgames: EndgameProgress { .shared }
     @State private var think = ThinkStore.live()
     @State private var path: [TrainDoor] = []
     /// Today's session, made once so the card shows exactly what Start plays.
@@ -147,7 +148,8 @@ struct TrainingHubView: View {
             if !repertoire.due.isEmpty { return "\(repertoire.due.count) to review" }
             return repertoire.entries.isEmpty ? "Build your repertoire" : "\(repertoire.entries.count) lines learned"
         case .endgames:
-            return "\(endgames.doneCount) of \(GrandmasterContent.shared.endgames.count) mastered"
+            if endgames.allDone { return "All \(endgames.total) learned" }
+            return endgames.doneCount == 0 ? "\(endgames.total) must-know endings" : "\(endgames.doneCount) of \(endgames.total) learned"
         case .calculation:
             if think.progress.rounds > 0 { return "Candidates best \(think.progress.bestRound)" }
             let vision = VisionStore.live()
@@ -167,6 +169,7 @@ struct TrainingHubView: View {
         case .puzzles: return puzzles.reviewsDue
         case .openings: return repertoire.due.count
         case .games: return store.dueMistakeCount
+        case .endgames: return endgames.dueForReview().count
         default: return 0
         }
     }

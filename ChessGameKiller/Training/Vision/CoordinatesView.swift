@@ -64,9 +64,7 @@ struct CoordinatesView: View {
     // MARK: Pieces of the screen
 
     /// White or Black, as notation says, whatever the look calls its sides.
-    private var sideName: String { Self.name(of: drill.side) }
-
-    private static func name(of side: Piece.Color) -> String { side == .white ? "White" : "Black" }
+    private var sideName: String { drill.side.displayName }
 
     private var subtitle: String {
         switch drill.phase {
@@ -203,7 +201,7 @@ struct CoordinatesView: View {
             HStack(spacing: 10) {
                 PieceImage(piece: Piece(.king, color: side, square: side == .white ? .e1 : .e8), theme: theme, size: 30)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(Self.name(of: side))
+                    Text(side.displayName)
                         .font(.system(.subheadline, design: .themed).weight(.semibold))
                         .lineLimit(1)
                     Text(record)
@@ -222,7 +220,7 @@ struct CoordinatesView: View {
             .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Play as \(Self.name(of: side)). \(record)")
+        .accessibilityLabel("Play as \(side.displayName). \(record)")
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 

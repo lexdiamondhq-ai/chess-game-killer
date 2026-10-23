@@ -140,7 +140,16 @@ struct TrainSample {
         puzzles = PuzzleStore(progress: puzzleProgress)
         vault = GameVault(games: settled ? Self.games() : [])
         repertoire = RepertoireStore(entries: entries)
-        endgames = EndgameProgress()
+        // A few weeks in: the first endgames learned, one of them clean.
+        let studies = GrandmasterContent.shared.endgames
+        var records: [String: EndgameRecord] = [:]
+        if settled {
+            for (index, study) in studies.prefix(3).enumerated() {
+                records[study.id] = EndgameRecord(date: .now.addingTimeInterval(-Double(index + 1) * day),
+                                                  moves: 12, clean: index == 0)
+            }
+        }
+        endgames = EndgameProgress(studies: studies, records: records)
         var thinking = ThinkProgress()
         if settled {
             thinking.positions = 15
