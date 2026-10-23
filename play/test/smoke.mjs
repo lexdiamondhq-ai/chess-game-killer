@@ -52,7 +52,26 @@ try {
 
   const page = await api(base, "GET", `/c/${code}`);
   check(page.status === 200 && /^text\/html/.test(page.headers.get("content-type") || ""), `the invite page: HTTP ${page.status}`);
+  check(page.text.includes('src="/app.js"'), "the invite page loads the browser board");
   done("the invite page is up");
+
+  // The browser board's files, as the invite page and the link preview load them.
+  const files = [
+    ["/app.js", /javascript/],
+    ["/board.js", /javascript/],
+    ["/vendor/chess.js", /javascript/],
+    ["/app.css", /^text\/css/],
+    ["/pieces/wN.svg", /^image\/svg\+xml/],
+    ["/sounds/move.mp3", /^audio\/mpeg/],
+    ["/og-invite.png", /^image\/png/],
+  ];
+  for (const [path, type] of files) {
+    const file = await fetch(`${base}${path}`, { signal: AbortSignal.timeout(10000) });
+    const kind = file.headers.get("content-type") || "";
+    await file.arrayBuffer();
+    check(file.status === 200 && type.test(kind), `${path}: HTTP ${file.status} ${kind}`);
+  }
+  done(`the browser board's ${files.length} files are served`);
 
   const joined = await api(base, "POST", `/api/games/${code}/join`, { body: { name: "Smoke friend" } });
   check(joined.status === 200 && joined.json.seat === "black", `joining: HTTP ${joined.status} ${joined.text}`);
