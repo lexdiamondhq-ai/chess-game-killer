@@ -261,8 +261,13 @@ struct ContentView: View {
                 if hidden { match.suspend() } else { match.resume() }
             }
             .onChange(of: scenePhase) { _, phase in
-                // iOS may end the app while it is away: the game so far is kept in Your games.
-                if phase == .background, match.hasStarted, !match.isOver { recordGame() }
+                // iOS may end the app while it is away: a game long enough to keep is kept in
+                // Your games, on disk before the app is put to sleep.
+                if phase == .background, match.hasStarted, !match.isOver,
+                   match.game.plyCount >= MatchController.pliesWorthKeeping {
+                    recordGame()
+                    vault.waitUntilSaved()
+                }
             }
             .onChange(of: BoardView.playsIn3D(theme, setting: sculpted3D), initial: true) { _, threeD in
                 timeSounds(threeD: threeD)
@@ -666,10 +671,14 @@ struct ContentView: View {
     }
 
     /// As a game against a rival starts: the piece that rival keeps taking. It waits until the
-    /// rival's greeting has had its moment.
+    /// rival's greeting has had its moment, and comes once a day per rival: before every game it
+    /// would be a nag.
     private func announceGrudge() {
         guard match.setup.opponent == .computer, match.game.ledger != nil,
               let news = army.grudge(against: match.setup.level) else { return }
+        let key = "grudge.told.\(match.setup.level.rawValue)"
+        if let told = UserDefaults.standard.object(forKey: key) as? Date, Calendar.current.isDateInToday(told) { return }
+        UserDefaults.standard.set(Date(), forKey: key)
         show(news, after: 4.0)
     }
 

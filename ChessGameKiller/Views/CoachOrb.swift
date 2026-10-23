@@ -471,7 +471,7 @@ private struct CoachPanel: View {
                     .font(.title3).foregroundStyle(accent).frame(width: 40, height: 40)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Leo is offline").font(.headline)
-                    Text("The engine didn't answer. Undo and try again, or start a new game.")
+                    Text("The engine didn't answer. Play on: grades and hints come back when it does.")
                         .font(.subheadline).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }

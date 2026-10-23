@@ -5,7 +5,8 @@ import Foundation
 /// which are generated with ElevenLabs by scripts/make_sounds.py.
 enum GameSound: String, CaseIterable {
     case move
-    /// No longer played: picking up a piece is felt (a haptic), not heard.
+    /// Training's soft click: a piece picked up, a square found. In a game, picking up a
+    /// piece is felt (a haptic), not heard.
     case select
     case capture
     case check
