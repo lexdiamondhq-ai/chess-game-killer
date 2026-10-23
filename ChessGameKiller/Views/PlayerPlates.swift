@@ -35,7 +35,7 @@ struct PlayersStrip: View {
     }
 
     private func clockOwner(_ color: Piece.Color) -> String {
-        PlayerName.isComputer(color, in: match) ? "\(match.setup.level.rival.name)'s clock" : "Your clock"
+        ExecutivePlate.spokenClockOwner(of: color, in: match, theme: theme)
     }
 }
 
@@ -47,17 +47,13 @@ private struct PlayerName: View {
     /// The picture after the name, for the side on the right.
     var pictureAfter = false
 
-    static func isComputer(_ color: Piece.Color, in match: MatchController) -> Bool {
-        match.setup.opponent == .computer && !match.game.humanColors.contains(color)
-    }
-
-    private var isComputer: Bool { Self.isComputer(color, in: match) }
+    private var isComputer: Bool { match.setup.opponent == .computer && !match.game.humanColors.contains(color) }
     private var isActive: Bool { !match.isOver && match.game.activeColor == color }
 
     var body: some View {
         HStack(spacing: 5) {
             if !pictureAfter { picture }
-            Text(isComputer ? match.setup.level.rival.name : "You")
+            Text(ExecutivePlate.displayName(of: color, in: match, theme: theme))
                 .foregroundStyle(isActive ? Color.primary : Color.secondary)
             if pictureAfter { picture }
         }

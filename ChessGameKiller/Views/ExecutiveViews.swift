@@ -160,7 +160,19 @@ struct ExecutivePlate: View {
     }
 
     private var clockOwner: String {
-        isComputer ? "\(match.setup.level.rival.name)'s clock" : "Your clock"
+        Self.spokenClockOwner(of: color, in: match, theme: theme)
+    }
+
+    /// How a line names a side: the rival's name or "You"; in a game between two people, the side's color.
+    static func displayName(of color: Piece.Color, in match: MatchController, theme: BoardTheme) -> String {
+        guard match.setup.opponent == .computer else { return theme.name(of: color) }
+        return match.game.humanColors.contains(color) ? "You" : match.setup.level.rival.name
+    }
+
+    /// For VoiceOver: "Your clock", or "Pulse's clock".
+    static func spokenClockOwner(of color: Piece.Color, in match: MatchController, theme: BoardTheme) -> String {
+        if match.setup.opponent == .computer, match.game.humanColors.contains(color) { return "Your clock" }
+        return "\(displayName(of: color, in: match, theme: theme))'s clock"
     }
 
     @ViewBuilder
@@ -177,7 +189,7 @@ struct ExecutivePlate: View {
     }
 
     private var name: String {
-        isComputer ? match.setup.level.rival.name : "You"
+        Self.displayName(of: color, in: match, theme: theme)
     }
 
     /// The rival's level while it waits, "Thinking…" on its turn; "Your move" on yours, and
