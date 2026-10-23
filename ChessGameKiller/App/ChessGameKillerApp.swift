@@ -2,6 +2,9 @@ import SwiftUI
 
 @main
 struct ChessGameKillerApp: App {
+    /// Challenge a friend: the links, the live games and the screens they open.
+    @State private var challenges = ChallengeCenter.live()
+
     init() {
         LookIntroduction.applyOnce()
         HintsIntroduction.applyOnce()
@@ -10,6 +13,8 @@ struct ChessGameKillerApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .challengeHost()
+                .environment(challenges)
         }
     }
 }
