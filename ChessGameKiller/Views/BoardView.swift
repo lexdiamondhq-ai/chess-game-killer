@@ -57,6 +57,10 @@ struct BoardView: View {
                     pieces(size: sq)
                     arrows(size: sq)
                     nameTag(size: sq)
+                    CheckCalloutLayer(game: game, color: theme.check) { square in
+                        calloutPoint(over: square, size: sq)
+                    }
+                    .frame(width: sq * 8, height: sq * 8)
                     // A flag that falls mid-promotion puts the pawn back; this just makes sure
                     // the picker never outlives the game.
                     if let promotion = game.pendingPromotion, !match.isOver {
@@ -89,6 +93,7 @@ struct BoardView: View {
         }
         .aspectRatio(1, contentMode: .fit)
         .sensoryFeedback(.impact(weight: .light), trigger: game.moveCount) { _, _ in hapticsOn }
+        .sensoryFeedback(.warning, trigger: game.personInCheck) { _, new in hapticsOn && new != nil }
         // Capture events are dropped once the explosion is over, which changes the
         // trigger a second time; only a new capture should thump.
         .sensoryFeedback(.impact(weight: .heavy, intensity: 0.9), trigger: game.captureEvents.last?.id) { _, new in
@@ -157,10 +162,7 @@ struct BoardView: View {
                 }
             }
             if game.checkedKing == square {
-                RadialGradient(
-                    colors: [theme.check, theme.check.opacity(0.6), .clear],
-                    center: .center, startRadius: 0, endRadius: size * 0.62
-                )
+                CheckSquareMark(color: theme.check, size: size)
             }
 
             // Coordinates in the corners, like a printed board.
@@ -256,7 +258,7 @@ struct BoardView: View {
             let onTop = cell(of: square).row == 0
             // The board is clipped at its edge, so the capsule is kept inside it by
             // its measured width rather than a fixed number of squares.
-            NameTagPlacement(x: center.x, y: center.y + size * (onTop ? 0.8 : (theme.spritePieces ? -1.0 : -0.75))) {
+            NameTagPlacement(x: center.x, y: center.y + size * (onTop ? 0.8 : (theme.spritePieces ? -1.15 : -0.75))) {
                 ArmyNameTag(name: name, rank: rank, color: rank.color(for: placed.piece, theme: theme))
                     .transition(.opacity.combined(with: .scale(scale: 0.9)))
             }
@@ -264,6 +266,13 @@ struct BoardView: View {
             .allowsHitTesting(false)
             .accessibilityHidden(true)
         }
+    }
+
+    /// Where the check callout floats: over the king's head, or under its foot on the top row.
+    private func calloutPoint(over square: Square, size: CGFloat) -> CGPoint {
+        let center = center(of: square, size: size)
+        let onTop = cell(of: square).row == 0
+        return CGPoint(x: center.x, y: center.y + size * (onTop ? 0.85 : (theme.spritePieces ? -1.2 : -0.8)))
     }
 
     // MARK: Best-move arrows
@@ -582,7 +591,8 @@ struct PieceImage: View {
     var onBoard = false
 
     /// How much larger than the square a sprite is drawn on the board.
-    private static let spriteScale: CGFloat = 1.12
+    /// Large enough that each piece's top (cross, crown, mitre, ball) reads at a glance.
+    private static let spriteScale: CGFloat = 1.22
 
     var body: some View {
         if theme.spritePieces {
@@ -638,19 +648,80 @@ struct PieceImage: View {
     }
 }
 
-/// The pre-rendered board picture. Turned around when the board is flipped,
-/// which keeps the light and dark squares where they belong.
+/// The pre-rendered board picture's squares, set in a glass frame. The picture is
+/// turned around when the board is flipped, which keeps the light and dark squares where they belong.
 struct BoardArt: View {
     let name: String
     let flipped: Bool
 
     var body: some View {
-        Image(name)
-            .resizable()
-            .interpolation(.high)
-            .antialiased(true)
-            .rotationEffect(.degrees(flipped ? 180 : 0))
-            .accessibilityHidden(true)
+        GeometryReader { geo in
+            let side = min(geo.size.width, geo.size.height)
+            // The picture is 9 squares wide: half a square of frame on each side.
+            let inset = side / 18
+            ZStack {
+                BoardGlass(side: side)
+                Image(name)
+                    .resizable()
+                    .interpolation(.high)
+                    .antialiased(true)
+                    .rotationEffect(.degrees(flipped ? 180 : 0))
+                    .frame(width: side, height: side)
+                    .mask { Rectangle().padding(inset) }
+                    // The stone sits in the glass, a little below its surface.
+                    .shadow(color: .black.opacity(0.5), radius: side * 0.012, y: side * 0.004)
+                // A fine bright line where the glass meets the stone.
+                Rectangle()
+                    .strokeBorder(Color.white.opacity(0.28), lineWidth: 0.75)
+                    .padding(inset - side * 0.007)
+            }
+            .frame(width: side, height: side)
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// Clear glass around the board: Liquid Glass on iOS 26, a faint pane before it, with
+/// a soft sheen across it and bright edges, so it reads as glass and never as grey.
+struct BoardGlass: View {
+    let side: CGFloat
+
+    var body: some View {
+        let shape = Rectangle()
+        ZStack {
+            pane(shape)
+            // Light falls across from the top left.
+            LinearGradient(
+                stops: [
+                    .init(color: .white.opacity(0.16), location: 0),
+                    .init(color: .white.opacity(0.05), location: 0.35),
+                    .init(color: .white.opacity(0.015), location: 0.6),
+                    .init(color: .white.opacity(0.07), location: 1),
+                ],
+                startPoint: .topLeading, endPoint: .bottomTrailing
+            )
+            // A brighter outer edge, as polished glass catches the light.
+            shape.strokeBorder(
+                LinearGradient(colors: [.white.opacity(0.5), .white.opacity(0.1), .white.opacity(0.28)],
+                               startPoint: .topLeading, endPoint: .bottomTrailing),
+                lineWidth: 1.2
+            )
+            shape.strokeBorder(Color.black.opacity(0.35), lineWidth: 0.5).padding(1.2)
+        }
+        .allowsHitTesting(false)
+    }
+
+    @ViewBuilder
+    private func pane(_ shape: Rectangle) -> some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) {
+            Color.clear.glassEffect(.clear, in: shape)
+        } else {
+            shape.fill(Color.white.opacity(0.05))
+        }
+        #else
+        shape.fill(Color.white.opacity(0.05))
+        #endif
     }
 }
 

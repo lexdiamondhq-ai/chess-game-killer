@@ -45,7 +45,8 @@ struct ContentView: View {
 
     /// The app opens on the home screen when it is on, otherwise on the New Game sheet;
     /// tests that picture the game screen skip both.
-    init(startsWithNewGame: Bool = true, trayOpen: Bool = false, startsAtHome: Bool? = nil) {
+    init(startsWithNewGame: Bool = true, trayOpen: Bool = false, startsAtHome: Bool? = nil, match: MatchController? = nil) {
+        if let match { _match = State(initialValue: match) }
         let home = startsAtHome ?? (startsWithNewGame && HomeScreen.isOn())
         _showingHome = State(initialValue: home)
         _showingNewGame = State(initialValue: startsWithNewGame && !home)

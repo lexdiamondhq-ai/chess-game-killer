@@ -101,7 +101,7 @@ struct SculptedCamera: Equatable {
     /// Half the board's width including its frame.
     static let boardHalfWidth: Float = 4.55
     /// The tallest piece, the king, with its cross.
-    static let tallest: Float = 1.36
+    static let tallest: Float = 1.47
 
     /// What must stay in the picture: the frame's corners (its top and the bottom of its
     /// near face) and the tops of the tallest pieces on the far rank.

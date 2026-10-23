@@ -97,13 +97,33 @@ final class ScreenSnapshotTests: XCTestCase {
         try snapshot("rival-after-sheet", startsWithNewGame: true)
     }
 
-    private func snapshot(_ name: String, startsWithNewGame: Bool = false, trayOpen: Bool = false) throws {
+    /// A king in check against Spark, a moment after the check: the red callout over the king,
+    /// the ring on its square, the CHECK tag in the player's line, and Spark's remark written
+    /// into its own line instead of a bubble. Flat and in 3D.
+    func testCheckAndRivalRemark() throws {
+        defaults.set(false, forKey: "matchRival")
+        for (id, threeD) in [("midnight", false), ("gilded", true), ("faberge", false)] {
+            defaults.set(id, forKey: "boardTheme")
+            defaults.set(threeD, forKey: "sculpted3D")
+            let match = MatchController(engine: nil, sounds: nil)
+            match.chance = { 0 }
+            // 1. f3 e5 2. Nc3 Qh4+: White blocks on g3 or walks.
+            let position = try XCTUnwrap(Position(fen: "rnb1kbnr/pppp1ppp/8/4p3/7q/2N2P2/PPPPP1PP/R1BQKBNR w KQkq - 2 3"))
+            match.start(MatchController.Setup(opponent: .computer, playerColor: .white, level: .beginner), from: position, playSound: false)
+            XCTAssertNotNil(match.game.checkedKing)
+            XCTAssertNotNil(match.rivalLine)
+            try snapshot("check-\(id)\(threeD ? "-3d" : "-flat")", match: match, wait: 1.4)
+        }
+    }
+
+    private func snapshot(_ name: String, startsWithNewGame: Bool = false, trayOpen: Bool = false,
+                          match: MatchController? = nil, wait: TimeInterval = 3) throws {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let window = UIWindow(windowScene: scene)
         window.frame = scene.coordinateSpace.bounds
-        window.rootViewController = UIHostingController(rootView: ContentView(startsWithNewGame: startsWithNewGame, trayOpen: trayOpen, startsAtHome: false))
+        window.rootViewController = UIHostingController(rootView: ContentView(startsWithNewGame: startsWithNewGame, trayOpen: trayOpen, startsAtHome: false, match: match))
         window.makeKeyAndVisible()
-        RunLoop.main.run(until: Date().addingTimeInterval(3))
+        RunLoop.main.run(until: Date().addingTimeInterval(wait))
         if startsWithNewGame {
             window.rootViewController?.presentedViewController?.dismiss(animated: true)
             RunLoop.main.run(until: Date().addingTimeInterval(3))

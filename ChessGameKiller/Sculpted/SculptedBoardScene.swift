@@ -875,11 +875,17 @@ final class SculptedBoardScene {
         }
         if let king = new.checkedKing {
             let mark = addMark(checkMark, at: king, height: 0.0019)
+            // A crisp red ring around the square, so the check reads at a glance.
+            let ring = addMark(checkRingMark, at: king, height: 0.0021)
             // The square under a king in check throbs.
             if !UIAccessibility.isReduceMotionEnabled {
                 mark.runAction(.repeatForever(.sequence([
                     .fadeOpacity(to: 0.35, duration: 0.42),
                     .fadeOpacity(to: 1, duration: 0.42),
+                ])))
+                ring.runAction(.repeatForever(.sequence([
+                    .fadeOpacity(to: 0.55, duration: 0.7),
+                    .fadeOpacity(to: 1, duration: 0.7),
                 ])))
             }
         }
@@ -922,6 +928,7 @@ final class SculptedBoardScene {
     private lazy var lastMoveMark = Self.mark(size: 1, color: look.lastMove, alpha: look.lastMoveAlpha, mask: nil)
     private lazy var selectedMark = Self.mark(size: 1, color: look.accent, alpha: 0.3, mask: nil)
     private lazy var checkMark = Self.mark(size: 1.5, color: look.check, alpha: 0.9, mask: MarkImages.glow)
+    private lazy var checkRingMark = Self.mark(size: 1, color: look.check, alpha: 1, mask: MarkImages.squareRing)
     private lazy var dotMark = Self.mark(size: 1, color: look.accent, alpha: 0.92, mask: MarkImages.dot)
     private lazy var dustMark = Self.mark(size: 1, color: UIColor(white: 0.93, alpha: 1), alpha: 0.5, mask: MarkImages.contact)
     private lazy var captureMark = Self.mark(size: 1, color: look.accent, alpha: 0.92, mask: MarkImages.ring)
@@ -1141,7 +1148,7 @@ final class SculptedBoardScene {
         squares.simdOrientation = Self.flat
         board.addChildNode(squares)
 
-        // Four lacquered rails with softened edges, standing a hair above the stone.
+        // Four glass rails with rounded edges that catch the light, standing a hair above the stone.
         let frame = assets.frameMaterial(look)
         let width: Float = 0.55
         let height: Float = 0.14
@@ -1152,7 +1159,8 @@ final class SculptedBoardScene {
             (-4 - width / 2, 0, width, 8),
         ]
         for rail in rails {
-            let box = SCNBox(width: CGFloat(rail.width), height: CGFloat(height), length: CGFloat(rail.length), chamferRadius: 0.012)
+            let box = SCNBox(width: CGFloat(rail.width), height: CGFloat(height), length: CGFloat(rail.length), chamferRadius: 0.045)
+            box.chamferSegmentCount = 6
             box.materials = [frame]
             let node = SCNNode(geometry: box)
             node.simdPosition = SIMD3(rail.x, 0.005 - height / 2, rail.z)
@@ -1231,6 +1239,15 @@ enum MarkImages {
         let r = size * 0.45 - line / 2
         context.setLineWidth(line)
         context.strokeEllipse(in: CGRect(x: size / 2 - r, y: size / 2 - r, width: r * 2, height: r * 2))
+    }
+
+    /// A rounded square outline just inside a square's edge.
+    static let squareRing = draw(256) { context, size in
+        let line = size * 0.06
+        let rect = CGRect(x: 0, y: 0, width: size, height: size).insetBy(dx: size * 0.04 + line / 2, dy: size * 0.04 + line / 2)
+        context.setLineWidth(line)
+        context.addPath(CGPath(roundedRect: rect, cornerWidth: size * 0.1, cornerHeight: size * 0.1, transform: nil))
+        context.strokePath()
     }
 
     static let glow = radial(256, stops: [(0, 1), (0.35, 0.75), (1, 0)])

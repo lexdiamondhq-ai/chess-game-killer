@@ -71,6 +71,10 @@ struct SculptedBoardView: View {
                 if browsing == nil {
                     squareElements(camera: camera, size: size)
                     nameTag(camera: camera, size: size)
+                    CheckCalloutLayer(game: game, color: theme.check) { square in
+                        calloutPoint(over: square, camera: camera, size: size)
+                    }
+                    .frame(width: size.width, height: size.height)
                 } else {
                     Color.clear
                         .allowsHitTesting(false)
@@ -96,6 +100,9 @@ struct SculptedBoardView: View {
         }
         // A rook or queen taken lands with a thud, felt as the board shakes.
         .sensoryFeedback(.impact(weight: .heavy, intensity: 1), trigger: bigCaptureID) { _, new in
+            hapticsOn && new != nil
+        }
+        .sensoryFeedback(.warning, trigger: game.personInCheck) { _, new in
             hapticsOn && new != nil
         }
         .sensoryFeedback(.success, trigger: finale) { _, new in
@@ -187,6 +194,16 @@ struct SculptedBoardView: View {
             parts.append(hint.rank == 0 ? "best move \(hint.san)" : "second best move \(hint.san)")
         }
         return parts.joined(separator: ", ")
+    }
+
+    /// Where the check callout floats: over the king's cross, or in front of its foot
+    /// when the far edge of the view is too close.
+    private func calloutPoint(over square: Square, camera: SculptedCamera, size: CGSize) -> CGPoint {
+        let foot = SculptedCamera.position(of: square)
+        let height = SculptedAssets.shared.height(of: .king) + 0.2
+        let top = camera.screenPoint(foot + SIMD3(0, height + 0.16, 0), in: size)
+        let below = camera.screenPoint(foot + SIMD3(0, 0, flipped ? -0.62 : 0.62), in: size)
+        return top.y - 14 >= 14 ? CGPoint(x: top.x, y: top.y - 12) : below
     }
 
     // MARK: Army
