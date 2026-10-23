@@ -172,7 +172,7 @@ struct CoachOrbBadge: View {
         let tint = moment.isPraise ? TrainingColor.green.color(on: theme) : TrainingColor.orange.color(on: theme)
         CoachAvatar(theme: theme, size: 26, tint: tint)
             .accessibilityElement()
-            .accessibilityLabel(moment.isPraise ? "Coach Leo liked that move" : "Coach Leo has a tip")
+            .accessibilityLabel(moment.isPraise ? "\(Coach.current.title) liked that move" : "\(Coach.current.title) has a tip")
     }
 }
 

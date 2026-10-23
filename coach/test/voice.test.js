@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { VOICE_SETTINGS, speak, toBase64, voiceKey } from "../src/voice.js";
+import { VERA_VOICE_SETTINGS, VOICE_SETTINGS, speak, toBase64, voiceKey } from "../src/voice.js";
 
 const env = { ELEVENLABS_API_KEY: " xi-test\n", VOICE_ID: "JBFqnCBsd6RMkjVDRZzb", VOICE_MODEL: "eleven_multilingual_v2" };
 const MP3 = new Uint8Array([0xff, 0xfb, 0x90, 0x64, 1, 2, 3]);
@@ -92,4 +92,28 @@ test("base64 matches Node's, also for recordings bigger than one chunk", () => {
   const bytes = new Uint8Array(200_000).map((_, i) => (i * 7) % 256);
   assert.equal(toBase64(bytes), Buffer.from(bytes).toString("base64"));
   assert.equal(toBase64(new Uint8Array(0)), "");
+});
+
+test("Vera's answer is read by Sarah, with her lessons' settings", async () => {
+  const sent = [];
+  const fetchImpl = async (url, init) => {
+    sent.push({ url, body: JSON.parse(init.body) });
+    return new Response(new Uint8Array([1, 2, 3]), { headers: { "content-type": "audio/mpeg" } });
+  };
+  const audio = await speak({ ELEVENLABS_API_KEY: "key" }, "Castling is safe.", fetchImpl, "vera");
+  assert.deepEqual([...audio], [1, 2, 3]);
+  assert.match(sent[0].url, /\/EXAVITQu4vr4xnSDxMaL\?output_format=mp3_44100_128$/);
+  assert.deepEqual(sent[0].body.voice_settings, VERA_VOICE_SETTINGS);
+  // VERA_VOICE_ID swaps her voice; VOICE_ID stays Leo's.
+  await speak({ ELEVENLABS_API_KEY: "key", VOICE_ID: "leoVoice", VERA_VOICE_ID: "veraVoice" }, "Hi.", fetchImpl, "vera");
+  assert.match(sent[1].url, /\/veraVoice\?/);
+  await speak({ ELEVENLABS_API_KEY: "key", VOICE_ID: "leoVoice", VERA_VOICE_ID: "veraVoice" }, "Hi.", fetchImpl);
+  assert.match(sent[2].url, /\/leoVoice\?/);
+});
+
+test("the voices match the lesson recordings in make_narration.py", () => {
+  const script = readFileSync(new URL("../../scripts/training/make_narration.py", import.meta.url), "utf8");
+  assert.match(script, /ELEVENLABS_VERA_VOICE_ID", "EXAVITQu4vr4xnSDxMaL"/);
+  assert.match(script, /"stability": 0\.7, "similarity_boost": 0\.85, "style": 0\.0, "use_speaker_boost": True, "speed": 0\.98/);
+  assert.match(script, /"format": "mp3_44100_128"/);
 });

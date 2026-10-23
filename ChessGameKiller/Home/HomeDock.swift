@@ -25,7 +25,7 @@ struct HomeDock: View {
 
     private var doors: [Door] {
         [
-            Door(title: "Train", glyph: Glyphs.train, hint: "Lessons with Coach Leo and the Grandmaster Room", action: actions.train),
+            Door(title: "Train", glyph: Glyphs.train, hint: "Lessons with \(Coach.current.title) and the Grandmaster Room", action: actions.train),
             Door(title: "Puzzles", glyph: Glyphs.puzzles, hint: "Rated puzzles and Puzzle Rush", action: actions.puzzles),
             Door(title: "Analyze", glyph: Glyphs.analyze, hint: "Find the best move in any position", action: actions.analyze),
             Door(title: "Games", glyph: Glyphs.games, hint: "Your saved games, to replay and rewrite", action: actions.rewind),

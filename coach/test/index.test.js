@@ -224,7 +224,7 @@ test("a talk streams checked, answer, voice and done, in that order", async (t) 
     { client: { fake: "client" }, input: { fen: FEN, said: BODY.said, typed: false, lastMove: "f8c5", context: "game", position: POSITION } },
   ]);
   assert.deepEqual(calls.verifyTalk, [{ fen: FEN, facts: FACTS, parsed: PARSED, reveal: false, said: BODY.said }]);
-  assert.deepEqual(calls.wordAnswer, [{ checked: CHECKED, spoken: SPOKEN }]);
+  assert.deepEqual(calls.wordAnswer, [{ checked: CHECKED, spoken: SPOKEN, coach: "leo" }]);
   assert.deepEqual(calls.speak, [ANSWER]);
   assert.deepEqual(calls.limiter, ["203.0.113.9"]);
   // One talk and the answer's characters came off today's allowances.
@@ -599,8 +599,13 @@ test("the request's other fields are cleaned and defaulted", () => {
   const talk = (fields) => checkTalk({ ...BODY, ...fields }).talk;
   assert.deepEqual(
     { ...talk({ typed: undefined, reveal: undefined, context: undefined, voice: undefined, lastMove: undefined }), facts: null, said: null },
-    { fen: FEN, said: null, typed: false, reveal: false, context: "game", lastMove: null, voice: true, facts: null },
+    { fen: FEN, said: null, typed: false, reveal: false, context: "game", lastMove: null, voice: true, facts: null, coach: "leo" },
   );
+  // Vera when asked for, Leo otherwise.
+  assert.equal(talk({ coach: "vera" }).coach, "vera");
+  assert.equal(talk({ coach: "Vera " }).coach, "leo");
+  assert.equal(talk({ coach: "toString" }).coach, "leo");
+  assert.equal(talk({ coach: 7 }).coach, "leo");
   assert.equal(talk({ typed: "yes" }).typed, false);
   assert.equal(talk({ typed: true }).typed, true);
   assert.equal(talk({ reveal: true }).reveal, true);

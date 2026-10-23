@@ -49,6 +49,9 @@ final class DrillRunner {
     let moveLimit: Int
     /// One wrong move ends it and shows the answer, as in Puzzle Rush.
     @ObservationIgnored var strict = false
+    /// Hears right and wrong answers, for the coach's spoken reactions ("Nice move", "Try again").
+    /// Nil when the drill plays no sound, and in the level check, which is a test.
+    @ObservationIgnored var reactions: Reacting?
 
     private let startFEN: String
     private let setup: String?
@@ -116,6 +119,7 @@ final class DrillRunner {
         self.item = item
         self.engine = engine
         sounds = playsSounds ? (SoundPlayer.shared as SoundPlaying) : nil
+        reactions = playsSounds ? (CoachReactions.shared as Reacting) : nil
         lines = library?.course.lines
         startFEN = position.fen
         setup = setupMove
@@ -212,6 +216,7 @@ final class DrillRunner {
         tone = right ? .success : .wrong
         let opener = right ? pick(lines?.correct, or: "Exactly.") : "Not this time."
         message = [opener, explain].compactMap { $0 }.joined(separator: " ")
+        react(right ? .nice : .missed)
         phase = .waiting
         // Show what happens: the move, then their reply if it punishes it.
         pending = Task { [weak self] in
@@ -245,10 +250,12 @@ final class DrillRunner {
             tone = .success
             message = option.why ?? pick(lines?.correct, or: "Exactly.")
             phase = .done(mistakes == 0 ? .firstTry : .afterMistake)
+            react(mistakes == 0 ? .nice : .afterHelp)
         } else {
             mistakes += 1
             tone = .wrong
             message = option.why ?? pick(lines?.wrong, or: "Not that one. Try another.")
+            if mistakes == 1 { react(.tryAgain) }
         }
     }
 
@@ -373,6 +380,7 @@ final class DrillRunner {
             game.humanColors = []
             tone = .success
             message = pick(lines?.keepGoing, or: "Good. Keep going.")
+            react(.keepGoing)
             pending = Task { [weak self] in
                 try? await Task.sleep(for: .milliseconds(550))
                 guard let self, !Task.isCancelled else { return }
@@ -400,11 +408,11 @@ final class DrillRunner {
                 if fine {
                     self.solved(note: "That works too!")
                 } else {
-                    self.wrong()
+                    self.wrong(played)
                 }
             }
         } else {
-            wrong()
+            wrong(played)
         }
     }
 
@@ -423,12 +431,21 @@ final class DrillRunner {
         let praise = outcome == .firstTry ? pick(lines?.correct, or: "Yes!") : pick(lines?.correctAfterHint, or: "There it is.")
         message = [note, praise].compactMap { $0 }.joined(separator: " ")
         phase = .done(outcome)
+        // Every move of a longer puzzle right the first time deserves more than "nice".
+        react(outcome == .firstTry ? (solution.count >= 3 ? .brilliant : .nice) : .afterHelp)
     }
 
-    private func wrong() {
+    private func wrong(_ played: PlayedMove) {
         mistakes += 1
         tone = .wrong
         message = pick(lines?.wrong, or: "Not quite. Have another look.")
+        if Self.givesPieceAway(played) {
+            react(.blunder)
+        } else if strict || mistakes >= 3 {
+            react(.missed)
+        } else if mistakes == 1 {
+            react(.tryAgain)
+        }
         phase = .waiting
         game.humanColors = []
         pending = Task { [weak self] in
@@ -514,10 +531,12 @@ final class DrillRunner {
                 message = [opener, explain].compactMap { $0 }.joined(separator: " ")
                 arrows = threatArrows()
                 phase = .done(mistakes > 0 ? .afterMistake : (usedHint ? .withHint : .firstTry))
+                react(mistakes == 0 && !usedHint ? .nice : .afterHelp)
             }
         } else {
             mistakes += 1
             tone = .wrong
+            if mistakes == 1 { react(.tryAgain) }
             message = game.piece(at: square)?.color == learner
                 ? "That one's safe. Look at what their pieces can reach now."
                 : "Tap your piece that's in danger."
@@ -561,6 +580,7 @@ final class DrillRunner {
             tone = .success
             message = pick(lines?.correct, or: "Checkmate!") + (movesMade == 1 ? " Checkmate in 1 move." : " Checkmate in \(movesMade) moves.")
             phase = .done(mistakes == 0 ? .firstTry : .afterMistake)
+            react(mistakes == 0 ? .brilliant : .afterHelp)
             return
         }
         if game.isGameOver {
@@ -598,6 +618,7 @@ final class DrillRunner {
         mistakes += 1
         tone = .wrong
         message = text
+        react(.missed)
         game.humanColors = []
         phase = .stuck
     }
@@ -626,6 +647,22 @@ final class DrillRunner {
     }
 
     // MARK: Helpers
+
+    private func react(_ moment: ReactionMoment) {
+        reactions?.react(moment, strict: strict)
+    }
+
+    /// A move that just gives a piece away: a knight or more lands where they can take it for
+    /// nothing (or with something cheaper), and it didn't capture anything as good on the way.
+    static func givesPieceAway(_ played: PlayedMove) -> Bool {
+        guard let squares = Notation.squares(of: played.uci), let before = BoardGeometry(fen: played.fenBefore)
+        else { return false }
+        let after = before.applying(uci: played.uci)
+        guard let moved = after.piece(at: squares.to), BoardGeometry.value(moved.kind) >= 3 else { return false }
+        let taken = before.piece(at: squares.to).map { BoardGeometry.value($0.kind) } ?? 0
+        guard taken < BoardGeometry.value(moved.kind) else { return false }
+        return after.isHanging(squares.to)
+    }
 
     private func playMove(_ uci: String) {
         guard game.playEngineMove(uci), let played = game.lastPlayed else { return }

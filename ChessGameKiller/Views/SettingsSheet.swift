@@ -18,6 +18,8 @@ struct SettingsSheet: View {
     @AppStorage(HomeScreen.key) private var homeScreen = HomeScreen.defaultOn
     /// Shared with the lessons' speaker button and the highlight reel.
     @AppStorage("coachVoiceMuted") private var voiceMuted = false
+    /// "Nice move", "Try again" and the like in puzzles and drills. Read by CoachReactions.
+    @AppStorage(CoachReactions.storageKey) private var reactionsOn = true
     @AppStorage(ReviewLevel.storageKey) private var reviewLevel = ReviewLevel.club.rawValue
 
     @Environment(\.dismiss) private var dismiss
@@ -56,6 +58,8 @@ struct SettingsSheet: View {
                     }
 
                     section("Coach") {
+                        CoachPicker(theme: theme)
+                            .padding(.bottom, 4)
                         SettingsGroup(theme: theme) {
                             ToggleRow(title: "Move hints", subtitle: "Marks the piece the coach would move. Tap it and its best square glows. Off for a fair game.",
                                       symbol: "sparkles", isOn: $showBestMoves, theme: theme)
@@ -90,8 +94,12 @@ struct SettingsSheet: View {
                             ToggleRow(title: "Rival banter", subtitle: "Rivals talk to you during the game.",
                                       symbol: "bubble.left.fill", isOn: $banterOn, theme: theme)
                             rule
-                            ToggleRow(title: "Coach's voice", subtitle: "Leo reads lessons and highlight reels aloud. Captions always show.",
+                            ToggleRow(title: "Coach's voice", subtitle: "\(Coach.current.name) reads lessons and highlight reels aloud. Captions always show.",
                                       symbol: "waveform", isOn: Binding(get: { !voiceMuted }, set: { voiceMuted = !$0 }), theme: theme)
+                            rule
+                            ToggleRow(title: "Voice reactions", subtitle: reactionsSubtitle,
+                                      symbol: "bubble.left.and.text.bubble.right.fill", isOn: $reactionsOn, theme: theme)
+                                .disabled(voiceMuted)
                         }
                     }
 
@@ -158,6 +166,10 @@ struct SettingsSheet: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 18)
         .background(SettingsCard(theme: theme, selected: false, color: accent))
+    }
+
+    private var reactionsSubtitle: String {
+        "Now and then in puzzles and drills, \(Coach.current.name) says \"Nice move\", \"Try again\" or \"Brilliant!\""
     }
 
     private var rule: some View {

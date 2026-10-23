@@ -30,8 +30,8 @@ struct TalkPanel: View {
     /// A press shorter than this is a tap: it starts listening, and the next tap sends.
     private static let tapLength: TimeInterval = 0.3
 
-    private static let holdHint = "Hold and tell Leo what you see: their threats, your idea, your move."
-    private static let typeOnlyHint = "Tell Leo what you see: their threats, your idea, your move."
+    private static var holdHint: String { "Hold and tell \(Coach.current.name) what you see: their threats, your idea, your move." }
+    private static var typeOnlyHint: String { "Tell \(Coach.current.name) what you see: their threats, your idea, your move." }
 
     var body: some View {
         withHaptics(withLifecycle(screen))
@@ -145,9 +145,9 @@ struct TalkPanel: View {
     /// What Leo is doing, under the title. While he checks, the dock says so.
     private var status: String {
         switch session.phase {
-        case .ready, .typing, .checking, .failed: return "Coach Leo"
+        case .ready, .typing, .checking, .failed: return Coach.current.title
         case .listening: return "Listening…"
-        case .answered: return session.isSpeaking ? "Speaking…" : "Coach Leo"
+        case .answered: return session.isSpeaking ? "Speaking…" : Coach.current.title
         }
     }
 
@@ -305,7 +305,7 @@ struct TalkPanel: View {
                 }
             }
             .accessibilityElement()
-            .accessibilityLabel(listening ? "Send to Leo" : "Talk to Leo")
+            .accessibilityLabel(listening ? "Send to \(Coach.current.name)" : "Talk to \(Coach.current.name)")
             .accessibilityHint(listening ? "Sends what you said." : "Starts listening. Activate again to send.")
             .accessibilityAddTraits(.isButton)
             .accessibilityAction {
@@ -386,7 +386,7 @@ struct TalkPanel: View {
     private var field: some View {
         let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
         let edge: Double = fieldFocused ? 0.24 : 0.13
-        return TextField("Your plan", text: draftBinding, prompt: Text("Tell Leo what you see"), axis: .vertical)
+        return TextField("Your plan", text: draftBinding, prompt: Text("Tell \(Coach.current.name) what you see"), axis: .vertical)
             .font(theme.talkFont(.body))
             .lineLimit(1...4)
             .submitLabel(.send)
@@ -424,7 +424,7 @@ struct TalkPanel: View {
         .buttonStyle(ChallengePressStyle())
         .disabled(!ready)
         .opacity(ready ? 1 : 0.4)
-        .accessibilityLabel("Send to Leo")
+        .accessibilityLabel("Send to \(Coach.current.name)")
     }
 
     private var canSend: Bool {
@@ -461,7 +461,7 @@ struct TalkPanel: View {
             ProgressView()
                 .controlSize(.small)
                 .tint(theme.challengeAccent)
-            Text("Leo is checking…")
+            Text("\(Coach.current.name) is checking…")
                 .font(theme.talkFont(.subheadline, .semibold))
                 .foregroundStyle(.secondary)
         }

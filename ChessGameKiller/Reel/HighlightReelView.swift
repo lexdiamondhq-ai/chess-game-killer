@@ -140,7 +140,7 @@ struct ReelFrame: View {
                         .multilineTextAlignment(.center)
                 }
             }
-            Text("Coached by Leo · Chess Game Killer")
+            Text("Coached by \(Coach.current.name) · Chess Game Killer")
                 .font(.system(size: 14, weight: .medium, design: design))
                 .foregroundStyle(.secondary)
         }

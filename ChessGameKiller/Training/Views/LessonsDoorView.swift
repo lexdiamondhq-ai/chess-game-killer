@@ -12,7 +12,7 @@ struct LessonsDoorView: View {
 
     var body: some View {
         TrainScreen(theme: theme, title: "Lessons",
-                    intro: "Coach Leo's course, from your first moves to winning endgames. Watch a lesson, then practice it at your level.") {
+                    intro: "\(Coach.current.title)'s course, from your first moves to winning endgames. Watch a lesson, then practice it at your level.") {
             if let library = store.library {
                 HabitCard(library: library, theme: theme) { lesson = $0 }
                 TrainSectionTitle(text: "The course")

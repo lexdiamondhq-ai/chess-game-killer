@@ -7,6 +7,12 @@ final class TrainingLibrary {
     let lessons: [Lesson]
     let drills: [Drill]
 
+    /// Where the content came from, so another coach's copy can be read from the same files.
+    private var bundle: Bundle?
+    /// The course in each other coach's words, made the first time it's asked for.
+    private var variants: [Coach: TrainingLibrary] = [:]
+    private let variantLock = NSLock()
+
     private let lessonsByID: [String: Lesson]
     private let skillsByID: [String: Skill]
     private let drillsBySkill: [String: [Drill]]
@@ -47,21 +53,51 @@ final class TrainingLibrary {
     }()
 
     static func load(from bundle: Bundle = .main) throws -> TrainingLibrary {
-        let course: Course = try decode("course", from: bundle)
-        var lessons: [Lesson] = []
-        for id in course.units.flatMap(\.lessons) {
-            lessons.append(try decode("lesson-\(id)", from: bundle))
-        }
         let drills: DrillFile = try decode("drills", from: bundle)
-        return TrainingLibrary(course: course, lessons: lessons, drills: drills.drills)
+        let library = try load(from: bundle, coach: .leo, drills: drills.drills)
+        return library
     }
 
-    private static func decode<T: Decodable>(_ name: String, from bundle: Bundle) throws -> T {
+    /// The course and lessons in `coach`'s words (Leo's name becomes theirs), with drills that are
+    /// the same for every coach.
+    private static func load(from bundle: Bundle, coach: Coach, drills: [Drill]) throws -> TrainingLibrary {
+        let course: Course = try decode("course", from: bundle, coach: coach)
+        var lessons: [Lesson] = []
+        for id in course.units.flatMap(\.lessons) {
+            lessons.append(try decode("lesson-\(id)", from: bundle, coach: coach))
+        }
+        let library = TrainingLibrary(course: course, lessons: lessons, drills: drills)
+        library.bundle = bundle
+        return library
+    }
+
+    /// This content as `coach` teaches it. Leo wrote it, so his is this library itself; a library
+    /// not read from a bundle (in tests) has no other copy and answers itself too.
+    func taught(by coach: Coach) -> TrainingLibrary {
+        guard coach != .leo, let bundle else { return self }
+        variantLock.lock()
+        defer { variantLock.unlock() }
+        if let made = variants[coach] { return made }
+        do {
+            let made = try Self.load(from: bundle, coach: coach, drills: drills)
+            variants[coach] = made
+            return made
+        } catch {
+            NSLog("Training content for %@ failed to load: %@", coach.name, "\(error)")
+            return self
+        }
+    }
+
+    private static func decode<T: Decodable>(_ name: String, from bundle: Bundle, coach: Coach = .leo) throws -> T {
         guard let url = bundle.url(forResource: name, withExtension: "json") else {
             throw LoadError.missing("\(name).json")
         }
         do {
-            return try JSONDecoder().decode(T.self, from: Data(contentsOf: url))
+            var data = try Data(contentsOf: url)
+            if coach != .leo, let text = String(data: data, encoding: .utf8) {
+                data = Data(coach.personalize(text).utf8)
+            }
+            return try JSONDecoder().decode(T.self, from: data)
         } catch {
             throw LoadError.unreadable("\(name).json", error)
         }

@@ -18,7 +18,7 @@ struct GamesDoorView: View {
 
     var body: some View {
         TrainScreen(theme: theme, title: "Your games",
-                    intro: "Coach Leo reads every move of your recent games and finds where the points go.") {
+                    intro: "\(Coach.current.title) reads every move of your recent games and finds where the points go.") {
             if let report {
                 if report.hasEnough {
                     CoachReportCard(report: report, theme: theme)

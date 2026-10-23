@@ -19,12 +19,15 @@ final class OpeningDrillRunner {
     /// Learn mode shows every move with an arrow first.
     let showsMoves: Bool
     @ObservationIgnored private var pending: Task<Void, Never>?
+    /// The coach's spoken reactions: "Try again" on a slip, a cheer for a line played from memory.
+    @ObservationIgnored var reactions: Reacting?
 
     init(moves: [String], side: Piece.Color, name: String, showsMoves: Bool) {
         self.moves = moves
         self.side = side
         self.name = name
         self.showsMoves = showsMoves
+        reactions = CoachReactions.shared
         board.humanColors = []
     }
 
@@ -49,6 +52,7 @@ final class OpeningDrillRunner {
             tone = .wrong
             let right = Notation.san(of: moves[index], fen: played.fenBefore) ?? moves[index]
             message = "Not in this line. It's \(right)."
+            if mistakes == 1 { reactions?.react(.tryAgain, strict: false) }
             pending = Task { [weak self] in
                 try? await Task.sleep(for: .milliseconds(700))
                 guard let self, !Task.isCancelled else { return }
@@ -81,6 +85,10 @@ final class OpeningDrillRunner {
                 self.tone = self.mistakes == 0 ? .success : .hint
                 self.message = self.mistakes == 0 ? "Perfect. \(self.name) is in your fingers."
                     : "Done, with \(self.mistakes) slip\(self.mistakes == 1 ? "" : "s"). It'll come back sooner."
+                // Following the arrows is no feat; playing the whole line from memory is.
+                if !self.showsMoves {
+                    self.reactions?.react(self.mistakes == 0 ? .nice : .afterHelp, strict: false)
+                }
             } else {
                 if self.showsMoves { self.showArrow() }
                 if self.tone != .success || self.index == 0 {
@@ -142,7 +150,7 @@ struct OpeningsView: View {
 
     var body: some View {
         TrainScreen(theme: theme, title: "Openings",
-                    intro: query.isEmpty ? "Pick a few lines you like and learn them. Leo brings each one back just before you'd forget it." : nil) {
+                    intro: query.isEmpty ? "Pick a few lines you like and learn them. \(Coach.current.name) brings each one back just before you'd forget it." : nil) {
             if query.isEmpty {
                 repertoireCard
                 TrainSectionTitle(text: "Where most players start")
