@@ -27,6 +27,13 @@ actor StockfishEngine: ChessEngine {
 
     private let engine = Engine(type: .stockfish)
     private var startTask: Task<Bool, Never>?
+    /// Whether Stockfish was asked to start. It starts once a session: a second start would
+    /// run a second engine on the same pipes.
+    private var launched = false
+    /// Reading the engine's replies and setting it up, once it runs.
+    private var attachTask: Task<Bool, Never>?
+    /// The first start stopped waiting before Stockfish reported in.
+    private var startGaveUp = false
     private var readyCount = 0
     private var listener: Task<Void, Never>?
     private var pending: PendingSearch?
@@ -197,25 +204,56 @@ actor StockfishEngine: ChessEngine {
 
     /// Starts the engine once. Searches that arrive meanwhile wait for the same start.
     private func startIfNeeded() async -> Bool {
-        if let startTask { return await startTask.value }
-        let task = Task { await self.startEngine() }
-        startTask = task
-        return await task.value
+        let task: Task<Bool, Never>
+        if let startTask {
+            task = startTask
+        } else {
+            task = Task { await self.startEngine() }
+            startTask = task
+        }
+        if await task.value { return true }
+        // That start gave up waiting for Stockfish to report in, but it can still come up:
+        // its replies are read on the main thread, which a busy app (or a test run) can hold
+        // up for a while. Look again, so a slow start never leaves it out for the session.
+        return await attachWhenRunning(within: Self.lateStartWait)
     }
+
+    /// How long a search waits for an engine that was slow to start, before going without.
+    static let lateStartWait = Duration.seconds(2)
 
     private func startEngine() async -> Bool {
         guard Self.hasNetworks else { return false }
 
+        launched = true
         await engine.start()
-        var attempts = 0
-        while !(await engine.isRunning), attempts < 200 {
-            attempts += 1
+        if await attachWhenRunning(within: .seconds(15)) { return true }
+        startGaveUp = true
+        NSLog("Stockfish: not running 15 s after starting; each search will look again")
+        return false
+    }
+
+    /// Waits up to `limit` for Stockfish to run, then starts reading its replies and sets it
+    /// up, the first time only. Says whether it is ready for searches. It never starts the
+    /// engine itself.
+    private func attachWhenRunning(within limit: Duration) async -> Bool {
+        guard launched else { return false }
+        if let attachTask { return await attachTask.value }
+        let waitStart = ContinuousClock.now
+        while !(await engine.isRunning) {
+            if ContinuousClock.now - waitStart > limit { return false }
             try? await Task.sleep(for: .milliseconds(50))
         }
-        guard await engine.isRunning, let responses = await engine.responseStream else {
-            return false
-        }
+        // Another search may have attached it while this one waited.
+        if let attachTask { return await attachTask.value }
+        guard let responses = await engine.responseStream else { return false }
+        if let attachTask { return await attachTask.value }
+        if startGaveUp { NSLog("Stockfish: running after a slow start") }
+        let task = Task { await self.attach(to: responses) }
+        attachTask = task
+        return await task.value
+    }
 
+    private func attach(to responses: AsyncStream<EngineResponse>) async -> Bool {
         listener = Task { [weak self] in
             for await response in responses {
                 await self?.handle(response)
@@ -224,7 +262,7 @@ actor StockfishEngine: ChessEngine {
 
         // The engine passes on its own "readyok" once its setup (which points
         // Stockfish at the network files) is done.
-        attempts = 0
+        var attempts = 0
         while readyCount == 0, attempts < 50 {
             attempts += 1
             try? await Task.sleep(for: .milliseconds(20))

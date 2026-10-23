@@ -82,6 +82,17 @@ jobs:
           shoot neon -showcaseLook neon
           shoot spark -showcaseLook spark -showcaseRival spark -showcaseClock 3+2
           shoot coach -showcaseLook gilded -showcase3D NO -showcaseCoach open
+          # The home screen as the app opens on it (in the look the last shot left), then at its sections.
+          home() {
+            name=$1; shift
+            xcrun simctl terminate "$UDID" $BUNDLE 2>/dev/null || true
+            xcrun simctl launch "$UDID" $BUNDLE "$@" >/dev/null || { echo "Could not launch for $name"; return 0; }
+            sleep 12
+            xcrun simctl io "$UDID" screenshot "snapshots/device-$name.png" >/dev/null && echo "device-$name.png" || echo "No screenshot for $name"
+          }
+          home home
+          home home-today -showcaseHomeAt today
+          home home-ladder -showcaseHomeAt ladder
           xcrun simctl terminate "$UDID" $BUNDLE 2>/dev/null || true
       - name: Upload build log
         if: always()
@@ -138,6 +149,8 @@ jobs:
           grep -E "error:|\*\* " build.log | head -60 || true
           grep -E "Executed" build.log | tail -3 || true
           grep -E "Restarting after|Fatal error" build.log | head -20 || true
+          # How the shared engine started, when it was slow to (see StockfishEngine.startEngine).
+          grep -E "Stockfish: " build.log | head -10 || true
       - name: Repeat the failures
         if: failure()
         # The pictures above can push the test results out of the log's tail, so they come again, last.
@@ -146,3 +159,6 @@ jobs:
           grep -E "error:|Test Case .* failed|\*\* " build.log | head -80 || true
           grep -E "Executed" build.log | tail -3 || true
           grep -B4 -A24 "Fatal error" build.log | head -60 || true
+          # The engine's own account, for a failing engine test.
+          grep -E "Stockfish: " build.log | head -10 || true
+          grep -E "\] TIMING " build.log | tail -40 || true
