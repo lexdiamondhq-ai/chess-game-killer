@@ -621,7 +621,8 @@ private struct CoachPanel: View {
     // MARK: Actions
 
     private var actions: some View {
-        HStack(spacing: 6) {
+        // Top-aligned, so every circle sits on one line whatever its label does.
+        HStack(alignment: .top, spacing: 6) {
             ActionButton(title: "Undo", symbol: Glyphs.undo, theme: theme) {
                 withAnimation(.snappy(duration: 0.22)) { match.undo() }
             }
@@ -897,6 +898,9 @@ private struct ActionButton: View {
                     .shadow(color: lit && theme.glows ? accent.opacity(0.25) : .clear, radius: 10)
                 Text(title)
                     .font(.caption2.weight(.semibold))
+                    // Six to a row: "New game" shrinks a little rather than break onto two lines.
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
             }
             .foregroundStyle(lit ? accent : Color.primary.opacity(0.85))
             .frame(maxWidth: .infinity)
