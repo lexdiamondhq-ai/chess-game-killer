@@ -73,6 +73,25 @@ final class TrainSnapshotTests: XCTestCase {
         }
     }
 
+    /// A puzzle on the looks from Settings, and on Drift, the rival's board that training used
+    /// to borrow when "match the rival's board" was on.
+    func testAPuzzleOnEachLook() throws {
+        let sample = TrainSample(settled: true)
+        let library = try XCTUnwrap(TrainingLibrary.shared)
+        let drills = library.drills(for: "forks").filter { $0.type == .move }.prefix(1)
+        let plan = SessionPlan(title: "Today", focus: library.skill("forks"), lesson: nil,
+                               items: drills.map { SessionItem(content: .drill($0), role: .focus) })
+        let looks: [BoardTheme.ID] = [.gilded, .midnight, .noir, .faberge, .neon, .drift]
+        for look in looks {
+            let view = SessionView(plan: plan, theme: .named(look), startsAtOnce: true)
+                .environment(sample.training)
+                .environment(sample.puzzles)
+            let window = try show(view, wait: 2.5)
+            try save(window, "study-puzzle-\(look.rawValue)")
+            window.isHidden = true
+        }
+    }
+
     /// Coach Vera: the picker in Settings, the Train page with her portrait, and one of her
     /// session puzzles. The pick is put back to Leo afterwards.
     func testCoachVera() throws {

@@ -71,6 +71,10 @@ struct ContentView: View {
         }
         return .named(themeID)
     }
+
+    /// The look picked in Settings. Training, puzzles, lessons and the other screens away from the
+    /// game always use it: a rival's board belongs to the game against that rival.
+    private var chosenTheme: BoardTheme { .named(themeID) }
     /// The orb is unfolded, so nothing else fits beside it.
     private var coachIsWide: Bool { coachExpanded }
     /// The board is out of sight: the app is in the background, or another screen covers the game.
@@ -186,28 +190,28 @@ struct ContentView: View {
     private var presented: some View {
         observed
             .fullScreenCover(isPresented: $showingTraining) {
-                TrainingHubView(theme: theme).environment(training).environment(puzzles).environment(vault)
+                TrainingHubView(theme: chosenTheme).environment(training).environment(puzzles).environment(vault)
             }
             .fullScreenCover(isPresented: $showingPuzzles) {
-                PuzzlesView(theme: theme).environment(puzzles).environment(training)
+                PuzzlesView(theme: chosenTheme).environment(puzzles).environment(training)
             }
             .onChange(of: showingGames) { _, showing in
                 if !showing { rewindOpening = nil }
             }
             .fullScreenCover(isPresented: $showingGames) {
-                RewindGamesView(theme: theme, opening: rewindOpening, forfeits: forfeits) { game in playAgain(game) }
+                RewindGamesView(theme: chosenTheme, opening: rewindOpening, forfeits: forfeits) { game in playAgain(game) }
                     .environment(vault).environment(training)
             }
             .fullScreenCover(isPresented: $showingArmy) {
-                ArmyView(theme: theme, color: match.setup.playerColor).environment(army)
+                ArmyView(theme: chosenTheme, color: match.setup.playerColor).environment(army)
             }
             .fullScreenCover(item: $coach.presentedLesson) { lesson in
-                LessonScreen(lesson: lesson, theme: theme).environment(training)
+                LessonScreen(lesson: lesson, theme: chosenTheme).environment(training)
             }
             .fullScreenCover(item: $coach.presentedSession) { plan in
                 // Asked for with one tap, so it starts at once. The puzzle store lets a missed
                 // puzzle in the session come back for review.
-                SessionView(plan: plan, theme: theme, startsAtOnce: true)
+                SessionView(plan: plan, theme: chosenTheme, startsAtOnce: true)
                     .environment(training)
                     .environment(puzzles)
             }
