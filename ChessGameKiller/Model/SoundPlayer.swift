@@ -9,7 +9,6 @@ enum GameSound: String, CaseIterable {
     case capture
     case check
     case castle
-    case gameStart = "game-start"
     case win
     case gameOver = "game-over"
     /// A short video-game "level clear" theme, when a person wins.
@@ -17,15 +16,15 @@ enum GameSound: String, CaseIterable {
     /// The chime as the app opens.
     case welcome
 
-    /// Evens out the generated files, which come out at different loudness.
+    /// Evens out the generated files, which come out at different loudness. The wooden
+    /// knocks sit a little under full volume; a capture lands slightly harder than a move.
     var volume: Float {
         switch self {
-        case .move: return 1.0
-        case .select: return 0.35
-        case .capture: return 0.6
-        case .check: return 0.85
-        case .castle: return 0.9
-        case .gameStart: return 0.5
+        case .move: return 0.75
+        case .select: return 0.3
+        case .capture: return 0.9
+        case .check: return 0.9
+        case .castle: return 0.75
         case .win: return 0.6
         case .gameOver: return 0.5
         case .victory: return 0.7

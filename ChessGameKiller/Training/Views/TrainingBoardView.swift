@@ -305,7 +305,7 @@ struct TrainingBoardView: View {
     private func explosions(size: CGFloat) -> some View {
         ZStack(alignment: .topLeading) {
             ForEach(game.captureEvents) { event in
-                CaptureExplosion(piece: event.piece, theme: theme, size: size, seed: event.id)
+                CaptureFall(piece: event.piece, theme: theme, size: size, seed: event.id)
                     .position(center(of: event.piece.square, size: size))
             }
         }
