@@ -15,9 +15,9 @@ struct LessonScreen: View {
         if let practice {
             SessionView(plan: practice, theme: theme)
         } else {
-            LessonPlayerView(lesson: lesson, theme: theme) {
+            LessonPlayerView(lesson: lesson, theme: theme, onFinish: {
                 reward = store.completeLesson(lesson.id)
-            }
+            })
             .overlay {
                 if let reward {
                     LessonDoneCard(lesson: lesson, theme: theme, reward: reward, line: store.library?.course.lines.lessonDone.randomElement()) {
