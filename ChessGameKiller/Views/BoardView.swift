@@ -693,10 +693,19 @@ struct BoardGlass: View {
             // Light falls across from the top left.
             LinearGradient(
                 stops: [
-                    .init(color: .white.opacity(0.16), location: 0),
-                    .init(color: .white.opacity(0.05), location: 0.35),
-                    .init(color: .white.opacity(0.015), location: 0.6),
-                    .init(color: .white.opacity(0.07), location: 1),
+                    .init(color: .white.opacity(0.22), location: 0),
+                    .init(color: .white.opacity(0.07), location: 0.3),
+                    .init(color: .white.opacity(0.02), location: 0.6),
+                    .init(color: .white.opacity(0.1), location: 1),
+                ],
+                startPoint: .topLeading, endPoint: .bottomTrailing
+            )
+            // One soft streak of reflected light across the pane.
+            LinearGradient(
+                stops: [
+                    .init(color: .clear, location: 0.22),
+                    .init(color: .white.opacity(0.12), location: 0.3),
+                    .init(color: .clear, location: 0.38),
                 ],
                 startPoint: .topLeading, endPoint: .bottomTrailing
             )
@@ -717,10 +726,10 @@ struct BoardGlass: View {
         if #available(iOS 26.0, *) {
             Color.clear.glassEffect(.clear, in: shape)
         } else {
-            shape.fill(Color.white.opacity(0.05))
+            shape.fill(Color.white.opacity(0.07))
         }
         #else
-        shape.fill(Color.white.opacity(0.05))
+        shape.fill(Color.white.opacity(0.07))
         #endif
     }
 }

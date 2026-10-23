@@ -116,11 +116,12 @@ final class SculptedAssets {
         Self.glass()
     }
 
-    /// Clear polished glass: a faint body that shows what is behind it, a mirror-smooth coat
+    /// Smoked polished glass: a faint dark body that shows what is behind it, a mirror-smooth coat
     /// that picks up the studio's light along every edge.
     static func glass() -> SCNMaterial {
-        let material = pbr(UIColor(white: 0.92, alpha: 1), roughness: 0.05, coat: 1, coatRoughness: 0.02)
-        material.transparency = 0.2
+        // Smoked: a dark body, so the polished faces show the light and never turn milky white.
+        let material = pbr(UIColor(white: 0.1, alpha: 1), roughness: 0.04, coat: 1, coatRoughness: 0.02)
+        material.transparency = 0.6
         material.transparencyMode = .dualLayer
         material.blendMode = .alpha
         return material
