@@ -46,7 +46,7 @@ struct ContentView: View {
     /// Talk it through, open over the game.
     @State private var talk: TalkSession?
     /// The move the player pressed Play on in Talk it through, made once the talk has slid away.
-    @State private var talkMove: TalkMove?
+    @State private var talkMove: PendingTalkMove?
 
     /// The app opens on the home screen when it is on, otherwise on the New Game sheet;
     /// tests and screenshots that picture the game screen skip both, and may open the coach.
@@ -205,7 +205,7 @@ struct ContentView: View {
             }
             .fullScreenCover(item: $talk, onDismiss: playTalkMove) { (session: TalkSession) in
                 TalkPanel(session: session, theme: theme, play: { (uci: String) in
-                    talkMove = TalkMove(fen: session.fen, uci: uci)
+                    talkMove = PendingTalkMove(fen: session.fen, uci: uci)
                     talk = nil
                 }, close: { talk = nil })
             }
@@ -808,7 +808,7 @@ private extension Array {
 }
 
 /// A move picked in Talk it through, and the position it was picked in.
-private struct TalkMove: Equatable {
+private struct PendingTalkMove: Equatable {
     let fen: String
     let uci: String
 }
