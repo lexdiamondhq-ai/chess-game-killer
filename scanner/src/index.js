@@ -41,7 +41,9 @@ export const SCHEMA = {
   additionalProperties: false,
 };
 
-export const PROMPT = `Read the chess position in this picture. It may be a photo of a real board or a screenshot of a chess app or website.
+// Not exported: once the worker has a Durable Object, the Workers runtime only accepts
+// handlers, classes and functions as exports from this file, and refuses a plain string.
+const PROMPT = `Read the chess position in this picture. It may be a photo of a real board or a screenshot of a chess app or website.
 
 Go square by square and report the board exactly as it appears in the picture, without turning it around: the top row of squares first, each row from left to right. If the photo is taken at an angle, follow the board's own rows and columns, not the edges of the picture, and report only the 64 squares of the board. Captured pieces lying beside the board are not on it.
 
@@ -80,6 +82,10 @@ export default {
     if (bytes.length > MAX_BYTES) return json({ error: "too_large" }, 413);
 
     if (!apiKey(env)) return json({ error: "not_configured" }, 503);
+
+    // The whole app shares a daily allowance, so the bill has a ceiling even if
+    // someone scripts requests against this public address from many addresses.
+    if (!(await withinDailyBudget(env))) return json({ error: "daily_limit" }, 429);
 
     try {
       return json(await readBoard(bytes, type, env));
@@ -174,6 +180,41 @@ export function toBase64(bytes) {
     binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
   }
   return btoa(binary);
+}
+
+/** Scans allowed per day across every player when DAILY_LIMIT isn't set. */
+const DEFAULT_DAILY_LIMIT = 300;
+
+/** Takes one scan from today's allowance. True when there was one left (or no budget is set up). */
+export async function withinDailyBudget(env) {
+  if (!env.BUDGET) return true;
+  const limit = Number(env.DAILY_LIMIT) > 0 ? Math.floor(Number(env.DAILY_LIMIT)) : DEFAULT_DAILY_LIMIT;
+  const budget = env.BUDGET.get(env.BUDGET.idFromName("global"));
+  const answer = await budget.fetch(`https://budget/take?limit=${limit}`, { method: "POST" });
+  return answer.status === 200;
+}
+
+/** Counts today's scans (days in UTC). One instance serves the whole app, so the count is exact. */
+export class ScanBudget {
+  constructor(ctx) {
+    this.ctx = ctx;
+  }
+
+  async fetch(request) {
+    const limit = Number(new URL(request.url).searchParams.get("limit")) || DEFAULT_DAILY_LIMIT;
+    const ok = await this.take(limit);
+    return new Response(ok ? "ok" : "spent", { status: ok ? 200 : 429 });
+  }
+
+  /** One scan, if today's count is still under `limit`. */
+  async take(limit, now = Date.now()) {
+    const day = new Date(now).toISOString().slice(0, 10);
+    const saved = (await this.ctx.storage.get("today")) || { day, count: 0 };
+    const today = saved.day === day ? saved : { day, count: 0 };
+    if (today.count >= limit) return false;
+    await this.ctx.storage.put("today", { day, count: today.count + 1 });
+    return true;
+  }
 }
 
 function json(body, status = 200) {
