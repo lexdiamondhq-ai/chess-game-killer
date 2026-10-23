@@ -42,7 +42,7 @@ MAX_PLY = 30
 MASTER_ELO = 2500
 GAME_ELO = 2550
 MAX_GAMES = 1500
-PER_OPENING = 6
+PER_OPENING = 12
 SKIP_EVENTS = re.compile(r"blitz|bullet|rapid|armageddon|960|freestyle|fischer|blind|simul|speed|titled|bughouse|"
                          r"puzzle|online|chess\.com|lichess", re.I)
 
@@ -193,6 +193,17 @@ def person(name: str) -> str:
     return name.strip()
 
 
+def tournament(headers: dict[str, str]) -> str:
+    """The event's name. Broadcast games may carry it in BroadcastName, with Event naming the round."""
+    for tag in ("BroadcastName", "Tournament", "Event"):
+        name = headers.get(tag, "").strip()
+        # "Round 8: Wang, Hao - Salem" names a game, not an event.
+        if name and not re.match(r"(round|game|board)\s*\d", name, re.I) and " - " not in name:
+            return name.split(" | ")[0].strip()
+    site = headers.get("Site", "").strip()
+    return site if site and not site.startswith("http") else "Over the board"
+
+
 def is_standard(headers: dict[str, str]) -> bool:
     return (headers.get("Variant", "Standard").lower() in ("standard", "")
             and "FEN" not in headers and headers.get("SetUp", "0") != "1")
@@ -212,7 +223,7 @@ def masters(root: Node, out: str) -> None:
         used += 1
         sans = tokens(movetext, None)
         named = walk(root, sans, "m", result)
-        event = headers.get("Event", "")
+        event = headers.get("Event", "") + " " + tournament(headers)
         if (result != "1/2-1/2" and min(we, be) >= GAME_ELO and 50 <= len(sans) <= 150
                 and not SKIP_EVENTS.search(event) and not SKIP_EVENTS.search(headers.get("TimeControl", ""))):
             candidates.append((headers, sans, named))
@@ -224,7 +235,10 @@ def masters(root: Node, out: str) -> None:
 
     # Best-rated, newest first; a few per opening so every family has examples.
     candidates.sort(key=lambda c: (-(elo(c[0], "White") + elo(c[0], "Black")), c[0].get("Date", "")), reverse=False)
+    if candidates:
+        print("Sample broadcast headers:", candidates[0][0], file=sys.stderr)
     picked, per_opening, keys = [], defaultdict(int), set()
+    skipped = defaultdict(int)
     for headers, sans, named in candidates:
         if len(picked) >= MAX_GAMES:
             break
@@ -232,24 +246,33 @@ def masters(root: Node, out: str) -> None:
         family = opening.split(":")[0] if opening else "Other"
         white, black = person(headers.get("White", "?")), person(headers.get("Black", "?"))
         dedupe = (white, black, headers.get("Event", ""), headers.get("Round", ""))
-        if dedupe in keys or per_opening[family] >= PER_OPENING:
+        if dedupe in keys:
+            skipped["repeat"] += 1
+            continue
+        if per_opening[family] >= PER_OPENING:
+            skipped["opening full"] += 1
             continue
         board = chess.Board()
         uci = []
         try:
             for san in sans:
-                move = board.parse_san(san)
+                move = board.parse_san(clean(san))
                 uci.append(move.uci())
                 board.push(move)
-        except ValueError:
+        except ValueError as error:
+            skipped["unreadable"] += 1
+            if skipped["unreadable"] <= 3:
+                print(f"Unreadable game: {error}", file=sys.stderr)
             continue
         keys.add(dedupe)
         per_opening[family] += 1
-        date = headers.get("Date", "????")
+        date = headers.get("Date", "")
+        if not date[:4].isdigit():
+            date = headers.get("UTCDate", "")
         year = int(date[:4]) if date[:4].isdigit() else 0
         result = headers["Result"]
         winner = white if result == "1-0" else black
-        event = headers.get("Event", "").strip() or "Over the board"
+        event = tournament(headers)
         moves_count = (len(uci) + 1) // 2
         blurb = f"{winner} won in {moves_count} moves" + (f", from the {opening}." if opening else ".")
         gid = "m-" + hashlib.sha1(f"{white}|{black}|{event}|{headers.get('Round', '')}|{date}".encode()).hexdigest()[:10]
@@ -261,7 +284,8 @@ def masters(root: Node, out: str) -> None:
     picked.sort(key=lambda g: (g["date"] or "", g["id"]), reverse=True)
     with open(os.path.join(out, "masters-games.json"), "w") as f:
         json.dump({"games": picked}, f, separators=(",", ":"), ensure_ascii=False)
-    print(f"masters-games.json: {len(picked)} games across {len(per_opening)} openings", file=sys.stderr)
+    print(f"masters-games.json: {len(picked)} games across {len(per_opening)} openings; skipped {dict(skipped)}",
+          file=sys.stderr)
 
 
 def club(root: Node, out: str, limit: int) -> None:
