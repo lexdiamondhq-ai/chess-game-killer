@@ -362,11 +362,11 @@ struct ContentView: View {
         .frame(maxWidth: .infinity)
     }
 
-    /// Room kept over a flat board of standing pieces, as a share of the board's width: the far
-    /// rank's tallest pieces rise up to about 0.36 of a square above its frame (the board with its
-    /// frame is 9 squares wide). The 3D board and Neon's flat pieces stay within the board.
+    /// Room kept over a flat board of standing pieces, as a share of the board's width (the board
+    /// with its frame is 9 squares wide): the far rank's kings rise a little above its frame.
+    /// The 3D board and Neon's flat pieces stay within the board.
     private var headroom: CGFloat {
-        theme.spritePieces && !BoardView.playsIn3D(theme, setting: sculpted3D) ? 0.36 / 9 : 0
+        theme.spritePieces && !BoardView.playsIn3D(theme, setting: sculpted3D) ? SpriteFrame.sideOn.boardRise / 9 : 0
     }
 
     /// The live board; in Big Board it can be swiped to look back through the game.

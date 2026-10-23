@@ -486,8 +486,10 @@ struct CaptureFall: View {
 
     private var turn: CGFloat { away ?? (seed % 2 == 0 ? 1 : -1) }
     /// Where the foot meets the square, as a fraction of the square: the renders stand
-    /// a little below the middle, the flat pieces at the bottom.
-    private var footY: CGFloat { theme.spritePieces ? 0.65 : 0.9 }
+    /// a little below the middle, as their picture's frame says, the flat pieces at the bottom.
+    private var footY: CGFloat {
+        theme.spritePieces ? 0.5 + SpriteFrame.of(theme.imageName(for: piece)).lift : 0.9
+    }
     /// A rook or a queen lands harder.
     private var heavy: Bool { piece.kind == .queen || piece.kind == .rook }
 
@@ -604,12 +606,16 @@ struct SpriteFrame: Equatable {
 
     /// The picture's center on a board, from the square's center.
     var boardOffset: CGFloat { lift - (foot - height / 2) * boardScale }
+    /// How far the tallest piece on the far rank rises above the board's outer edge: its square's
+    /// center is a square below that edge (half a square, then the frame's half square).
+    var boardRise: CGFloat { max(0, reach * boardScale - lift - 1) }
     /// Fitted into a frame one square tall.
     var fittedScale: CGFloat { 1 / (reach + below) }
     var fittedOffset: CGFloat { -fittedScale * ((foot - height / 2) + (below - reach) / 2) }
 
     /// The side-on renders (560 x 760, seen from 28 degrees up), where every piece reads by its outline.
-    static let sideOn = SpriteFrame(width: 1.4, height: 1.9, foot: 1.5, boardScale: 1.12, lift: 0.22, reach: 1.3, below: 0.2)
+    /// Every set's king, cross included, stays within 1.2 squares above its foot and 0.15 below it.
+    static let sideOn = SpriteFrame(width: 1.4, height: 1.9, foot: 1.5, boardScale: 1.2, lift: 0.24, reach: 1.2, below: 0.15)
     /// The earlier renders (520 x 568, seen from higher up).
     static let fromAbove = SpriteFrame(width: 1.3, height: 1.42, foot: 1.0, boardScale: 1.22, lift: 0.15, reach: 0.964, below: 0.24)
 
