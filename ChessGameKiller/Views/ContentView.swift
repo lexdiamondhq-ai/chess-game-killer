@@ -34,6 +34,8 @@ struct ContentView: View {
     @State private var showingHome: Bool
     @AppStorage(HomeScreen.key) private var homeScreenOn = HomeScreen.defaultOn
     @Environment(\.scenePhase) private var scenePhase
+    /// Challenge a friend, when the app provides it (tests that draw this screen don't).
+    @Environment(ChallengeCenter.self) private var challenges: ChallengeCenter?
     /// Big Board: the board edge to edge with everything else tucked into a pull-up tray.
     @AppStorage("bigBoard") private var bigBoard = false
     @AppStorage("sculpted3D") private var sculpted3D = true
@@ -69,6 +71,7 @@ struct ContentView: View {
         scenePhase != .active || showingHome || showingTraining || showingArmy || showingPuzzles || showingGames
             || showingNewGame || showingSettings || showingAnalyze
             || coach.presentedLesson != nil || coach.presentedSession != nil
+            || challenges?.isPresenting == true
     }
     /// Starting a game now would cost the one in progress: the rival it is against, so the
     /// screens that start games can ask first.
@@ -123,6 +126,8 @@ struct ContentView: View {
                 syncCoachSettings()
                 // A game left unfinished when a new one starts is still kept.
                 match.onArchive = { [vault] game in vault.record(game) }
+                // So is a finished friend game.
+                challenges?.onGameFinished = { [vault] game in vault.record(game) }
                 match.onAbandon = { [army] ledger, setup, assisted in
                     // Walking away from a game counts as a loss.
                     army.record(ledger, playerColor: setup.playerColor, won: false,
@@ -200,6 +205,9 @@ struct ContentView: View {
                     withAnimation(.snappy) { match.start(setup) }
                     showingNewGame = false
                     leaveHome()
+                } challenge: {
+                    showingNewGame = false
+                    challenges?.compose()
                 }
             }
             .sheet(isPresented: $showingSettings) {
@@ -271,6 +279,14 @@ struct ContentView: View {
             }
             .onChange(of: BoardView.playsIn3D(theme, setting: sculpted3D), initial: true) { _, threeD in
                 timeSounds(threeD: threeD)
+            }
+            .onChange(of: challenges?.isPresenting == true) { _, presenting in
+                // Challenge a friend takes the New Game sheet's place; with no game under way, the sheet comes back after.
+                if presenting {
+                    showingNewGame = false
+                } else if !match.hasStarted, !showingHome {
+                    showingNewGame = true
+                }
             }
             .onChange(of: match.clock?.running, initial: true) { _, running in
                 // The screen stays awake while a clock runs.
@@ -740,6 +756,8 @@ struct ContentView: View {
 
     /// Closing the sheet without starting still begins a game, with last time's choices.
     private func startIfNeeded() {
+        // Closed for Challenge a friend: no game starts behind it.
+        if challenges?.isPresenting == true { return }
         // From the home screen, closing the sheet just goes back home.
         if !match.hasStarted, !showingHome {
             match.start(NewGameSheet.savedSetup())

@@ -72,6 +72,8 @@ struct NewGameSheet: View {
     /// The rival of a game in progress that starting a new one would cost, so the person is asked first.
     let forfeits: String?
     let start: (MatchController.Setup) -> Void
+    /// Opens Challenge a friend instead. Nil hides the row.
+    var challenge: (() -> Void)? = nil
 
     @AppStorage("setup.side") private var side: SideChoice = .white
     @AppStorage("setup.level") private var level: MatchController.Level = .club
@@ -93,10 +95,11 @@ struct NewGameSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     init(theme: BoardTheme, forfeits: String? = nil, defaults: UserDefaults = .standard,
-         start: @escaping (MatchController.Setup) -> Void) {
+         start: @escaping (MatchController.Setup) -> Void, challenge: (() -> Void)? = nil) {
         self.theme = theme
         self.forfeits = forfeits
         self.start = start
+        self.challenge = challenge
         let level = (defaults.object(forKey: "setup.level") as? Int).flatMap { MatchController.Level(rawValue: $0) } ?? .club
         _draftSide = State(initialValue: defaults.string(forKey: "setup.side").flatMap { SideChoice(rawValue: $0) } ?? .white)
         _draftLevel = State(initialValue: level)
@@ -132,6 +135,10 @@ struct NewGameSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
+                    if let challenge {
+                        ChallengeEntryRow(theme: theme, action: challenge)
+                    }
+
                     section("Your rival") {
                         rivalCarousel
                         dots

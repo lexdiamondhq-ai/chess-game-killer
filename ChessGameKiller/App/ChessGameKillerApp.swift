@@ -4,6 +4,8 @@ import SwiftUI
 struct ChessGameKillerApp: App {
     /// Set only when CI launches the app for screenshots; see `Showcase`.
     private let showcase: Showcase?
+    /// Challenge a friend: the links, the live games and the screens they open.
+    @State private var challenges = ChallengeCenter.live()
 
     init() {
         LookIntroduction.applyOnce()
@@ -13,12 +15,16 @@ struct ChessGameKillerApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if let showcase {
-                ContentView(startsWithNewGame: false, startsAtHome: false,
-                            match: showcase.match, coachOpen: showcase.coachOpen)
-            } else {
-                ContentView()
+            Group {
+                if let showcase {
+                    ContentView(startsWithNewGame: false, startsAtHome: false,
+                                match: showcase.match, coachOpen: showcase.coachOpen)
+                } else {
+                    ContentView()
+                }
             }
+            .challengeHost()
+            .environment(challenges)
         }
     }
 }

@@ -1,0 +1,53 @@
+# The "Challenge a friend" game server. Deployed by .github/workflows/play.yml
+# to https://play.chess-game-killer.workers.dev. The protocol is in PROTOCOL.md.
+name = "play"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+workers_dev = true
+
+# The browser board's files (scripts, styles, pieces, sounds, the preview image)
+# are served straight from ./public without running any code. Requests for the
+# API and the pages always reach the worker first, even if a file in ./public
+# has the same name (an index.html there can't hide the home page).
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = ["/", "/c/*", "/api/*", "/.well-known/*"]
+
+# Each game is one Durable Object (GameRoom in src/room.js), found by its code.
+[[durable_objects.bindings]]
+name = "GAMES"
+class_name = "GameRoom"
+
+# Durable Objects on the Workers Free plan must keep their data in SQLite.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["GameRoom"]
+
+[vars]
+# How long a player in a timed game may be away before losing by leaving.
+LEAVE_GRACE_MS = "20000"
+# The shortest clock a game may have, in seconds. Tests lower both of these
+# with `wrangler dev --var LEAVE_GRACE_MS:1500 --var MIN_CLOCK_SECONDS:1`.
+MIN_CLOCK_SECONDS = "60"
+# Set APPLE_TEAM_ID (the 10-character Apple team ID) to serve
+# /.well-known/apple-app-site-association for universal links.
+
+# Limits per address, so a leaked script can't flood the server.
+# New games a minute (a rematch counts as a new game too).
+[[ratelimits]]
+name = "CREATE_LIMITER"
+namespace_id = "2001"
+simple = { limit = 20, period = 60 }
+
+# Joins a minute.
+[[ratelimits]]
+name = "JOIN_LIMITER"
+namespace_id = "2002"
+simple = { limit = 30, period = 60 }
+
+# Moves and actions a minute.
+[[ratelimits]]
+name = "MOVE_LIMITER"
+namespace_id = "2003"
+simple = { limit = 240, period = 60 }

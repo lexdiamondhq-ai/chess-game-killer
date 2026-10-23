@@ -126,3 +126,11 @@ jobs:
           grep -E "error:|\*\* " build.log | head -60 || true
           grep -E "Executed" build.log | tail -3 || true
           grep -E "Restarting after|Fatal error" build.log | head -20 || true
+      - name: Repeat the failures
+        if: failure()
+        # The pictures above can push the test results out of the log's tail, so they come again, last.
+        run: |
+          [ -f build.log ] || exit 0
+          grep -E "error:|Test Case .* failed|\*\* " build.log | head -80 || true
+          grep -E "Executed" build.log | tail -3 || true
+          grep -B4 -A24 "Fatal error" build.log | head -60 || true
