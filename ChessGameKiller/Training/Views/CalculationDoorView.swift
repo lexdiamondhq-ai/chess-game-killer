@@ -6,6 +6,7 @@ struct CalculationDoorView: View {
     let theme: BoardTheme
     @Environment(PuzzleStore.self) private var puzzles
     @Environment(TrainingStore.self) private var training
+    @Environment(ThinkStore.self) private var think
     @AppStorage(CalculationView.bestStreakKey) private var calculationBest = 0
     @State private var cover: Cover?
 
@@ -21,7 +22,7 @@ struct CalculationDoorView: View {
             Button { cover = .candidates } label: {
                 TrainRow(symbol: "list.number", title: "Candidate moves",
                          detail: "Name your best two or three moves before you choose. Leo shows what you missed.",
-                         value: CandidateStats.live().status, theme: theme)
+                         value: think.progress.rounds > 0 ? "Best \(think.progress.bestRound)" : nil, theme: theme)
             }
             .buttonStyle(.plain)
             Button { cover = .blindfold } label: {
@@ -60,7 +61,7 @@ struct CalculationDoorView: View {
             case .blindfold:
                 CalculationView(theme: theme).environment(puzzles).environment(training)
             case .candidates:
-                CandidateMovesView(theme: theme).environment(puzzles)
+                CandidateMovesView(theme: theme).environment(puzzles).environment(think)
             case .coordinates:
                 CoordinatesView(theme: theme)
             case .scan:

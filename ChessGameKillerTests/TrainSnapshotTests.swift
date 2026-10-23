@@ -94,6 +94,7 @@ struct TrainSample {
     let vault: GameVault
     let repertoire: RepertoireStore
     let endgames: EndgameProgress
+    let think: ThinkStore
 
     init(settled: Bool) {
         let day: TimeInterval = 86_400
@@ -140,6 +141,14 @@ struct TrainSample {
         vault = GameVault(games: settled ? Self.games() : [])
         repertoire = RepertoireStore(entries: entries)
         endgames = EndgameProgress()
+        var thinking = ThinkProgress()
+        if settled {
+            thinking.positions = 15
+            thinking.found = 11
+            thinking.rounds = 3
+            thinking.bestRound = 19
+        }
+        think = ThinkStore(progress: thinking)
     }
 
     func hub(theme: BoardTheme) -> some View {
@@ -170,6 +179,7 @@ struct TrainSample {
         .environment(vault)
         .environment(repertoire)
         .environment(endgames)
+        .environment(think)
     }
 
     /// A few weeks of games against the rivals.

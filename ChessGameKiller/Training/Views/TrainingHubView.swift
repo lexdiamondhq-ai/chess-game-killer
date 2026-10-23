@@ -14,6 +14,7 @@ struct TrainingHubView: View {
     @AppStorage("coachVoiceMuted") private var voiceMuted = false
     @State private var repertoire = RepertoireStore.live()
     @State private var endgames = EndgameProgress.live()
+    @State private var think = ThinkStore.live()
     @State private var path: [TrainDoor] = []
     /// Today's session, made once so the card shows exactly what Start plays.
     @State private var today: SessionPlan?
@@ -56,6 +57,7 @@ struct TrainingHubView: View {
         .preferredColorScheme(theme.isDark ? .dark : nil)
         .environment(repertoire)
         .environment(endgames)
+        .environment(think)
         .onAppear {
             if greeting.isEmpty {
                 greeting = store.library?.course.lines.greeting.randomElement() ?? "Ready when you are."
@@ -81,11 +83,14 @@ struct TrainingHubView: View {
         }
         .fullScreenCover(isPresented: $showingLevelCheck, onDismiss: { Task { await planToday() } }) {
             LevelCheckView(theme: theme) { rating in
-                store.applyLevel(rating)
-                puzzles.calibrate(rating: rating)
+                if let rating {
+                    store.applyLevel(rating)
+                    puzzles.calibrate(rating: rating)
+                }
                 showingLevelCheck = false
             }
             .environment(puzzles)
+            .environment(think)
         }
     }
 
@@ -189,7 +194,14 @@ struct TrainingHubView: View {
                 Button {
                     showingLevelCheck = true
                 } label: {
-                    Label("Find My Level", systemImage: "gauge.with.dots.needle.67percent")
+                    Label {
+                        Text("Find My Level")
+                        if let level = think.levelStatus {
+                            Text(level)
+                        }
+                    } icon: {
+                        Image(systemName: "gauge.with.dots.needle.67percent")
+                    }
                 }
                 Button(role: .destructive) {
                     confirmingReset = true
