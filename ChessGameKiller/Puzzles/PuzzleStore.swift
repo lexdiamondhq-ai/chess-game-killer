@@ -24,6 +24,10 @@ final class PuzzleStore {
     private(set) var progress: PuzzleProgress
     /// Nil until the pack has loaded (it reads in the background).
     private(set) var library: PuzzleLibrary?
+    /// The puzzle the home screen shows. Puzzles serves it first, so Solve opens the one shown.
+    private(set) var upNext: LichessPuzzle?
+    /// The last puzzle served, so the next one picked is a different one even before it is played.
+    @ObservationIgnored private var lastServed: String?
 
     private let fileURL: URL?
     @ObservationIgnored private var generator = SystemRandomNumberGenerator()
@@ -56,14 +60,40 @@ final class PuzzleStore {
 
     var theme: PuzzleTheme {
         get { PuzzleTheme.named(progress.themeID) }
-        set { progress.themeID = newValue.id; save() }
+        set {
+            // The puzzle waiting was picked for the old theme.
+            if newValue.id != progress.themeID { upNext = nil }
+            progress.themeID = newValue.id
+            save()
+        }
     }
 
     // MARK: Picking
 
-    /// The next rated puzzle: near the player's rating, in the chosen theme.
+    /// The next rated puzzle: the one the home screen is showing, else one near the player's
+    /// rating, in the chosen theme.
     func nextRated() -> LichessPuzzle? {
-        library?.pick(near: progress.rating, theme: theme, avoid: Set(progress.recent), using: &generator)
+        let puzzle: LichessPuzzle?
+        if let waiting = upNext, !progress.recent.contains(waiting.id) {
+            puzzle = waiting
+        } else {
+            puzzle = pickRated()
+        }
+        upNext = nil
+        lastServed = puzzle?.id
+        return puzzle
+    }
+
+    /// Picks the puzzle the home screen shows, unless one is already waiting.
+    func prepareUpNext() {
+        guard upNext == nil else { return }
+        upNext = pickRated()
+    }
+
+    private func pickRated() -> LichessPuzzle? {
+        var avoid = Set(progress.recent)
+        if let lastServed { avoid.insert(lastServed) }
+        return library?.pick(near: progress.rating, theme: theme, avoid: avoid, using: &generator)
     }
 
     /// A Puzzle Rush puzzle: they start easy and climb with every one solved.

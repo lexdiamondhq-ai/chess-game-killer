@@ -298,7 +298,8 @@ struct ContentView: View {
     @ViewBuilder
     private var screens: some View {
         if showingHome {
-            HomeView(match: match, theme: theme, actions: homeActions)
+            // The home is dressed in the player's own look, not a rival's board.
+            HomeView(match: match, theme: .named(themeID), actions: homeActions)
                 .transition(.opacity)
         } else {
             gameScreen
@@ -309,9 +310,19 @@ struct ContentView: View {
     private var homeActions: HomeActions {
         HomeActions(
             play: { showingNewGame = true },
+            start: { setup in
+                withAnimation(.snappy) { match.start(setup) }
+                leaveHome()
+            },
+            playRival: { level in
+                // The New Game sheet opens on this rival.
+                UserDefaults.standard.set(level.rawValue, forKey: "setup.level")
+                showingNewGame = true
+            },
             resume: { leaveHome() },
             analyze: { showingAnalyze = true },
             train: { showingTraining = true },
+            trainToday: { plan in coach.presentedSession = plan },
             puzzles: { showingPuzzles = true },
             rewind: { showingGames = true },
             openGame: { game in
