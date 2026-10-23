@@ -39,6 +39,9 @@ struct ContentView: View {
     /// Big Board: the board edge to edge with everything else tucked into a pull-up tray.
     @AppStorage("bigBoard") private var bigBoard = false
     @AppStorage("sculpted3D") private var sculpted3D = true
+    /// Hold the board to see the engine's line ahead (counts as help).
+    @AppStorage(GhostVision.storageKey) private var ghostVisionOn = true
+    @State private var vision = GhostVision()
     @State private var trayOpen = false
     /// The position being looked at while the player swipes back through the game; nil is live.
     @State private var browsePly: Int?
@@ -51,8 +54,9 @@ struct ContentView: View {
     /// The app opens on the home screen when it is on, otherwise on the New Game sheet;
     /// tests and screenshots that picture the game screen skip both, and may open the coach.
     init(startsWithNewGame: Bool = true, trayOpen: Bool = false, startsAtHome: Bool? = nil,
-         match: MatchController? = nil, coachOpen: Bool = false) {
+         match: MatchController? = nil, coachOpen: Bool = false, vision: GhostVision? = nil) {
         if let match { _match = State(initialValue: match) }
+        if let vision { _vision = State(initialValue: vision) }
         let home = startsAtHome ?? (startsWithNewGame && HomeScreen.isOn())
         _showingHome = State(initialValue: home)
         _showingNewGame = State(initialValue: startsWithNewGame && !home)
@@ -459,7 +463,7 @@ struct ContentView: View {
         if bigBoard {
             browsableBoard
         } else {
-            BoardView(match: match, theme: theme)
+            BoardView(match: match, theme: theme, vision: ghostVisionOn ? vision : nil)
         }
     }
 
@@ -483,9 +487,9 @@ struct ContentView: View {
         ZStack {
             // The 3D board walks its own pieces back through the game; the flat board has
             // the earlier position laid over it.
-            BoardView(match: match, theme: theme, browsing: browsedPosition) {
+            BoardView(match: match, theme: theme, browsing: browsedPosition, endBrowsing: {
                 withAnimation(.snappy) { browsePly = nil }
-            }
+            }, vision: ghostVisionOn ? vision : nil)
             if !BoardView.playsIn3D(theme, setting: sculpted3D), let ply = browsePly,
                let fen = match.game.positionFENs[safe: ply], let draft = PositionDraft(fen: fen) {
                 PositionBoard(draft: draft, theme: theme, flipped: match.isBoardFlipped) { _ in
@@ -517,8 +521,9 @@ struct ContentView: View {
 
     /// One position for every ~34 points of sideways drag.
     private func scrub(_ value: DragGesture.Value) {
+        // While Ghost Vision is up, sliding sideways steps through its line instead.
         guard abs(value.translation.width) > abs(value.translation.height) * 1.5,
-              match.game.pendingPromotion == nil else { return }
+              match.game.pendingPromotion == nil, !vision.isHolding else { return }
         let live = match.game.positionFENs.count - 1
         let start = scrubStart ?? (browsePly ?? live)
         scrubStart = start
