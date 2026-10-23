@@ -103,7 +103,7 @@ jobs:
           [ -d snapshots ] || exit 0
           cat snapshots/device.txt || true
           # The newest effects print last, so the end of the log shows them; the simulator's own screenshots after all.
-          LAST="sculpted-finale sculpted-big-capture check hints capture-fall device"
+          LAST="sculpted-finale sculpted-big-capture check hints capture-fall game-end device"
           ORDERED=$(ls snapshots/*.png | grep -v -E "$(echo $LAST | tr ' ' '|')"; for p in $LAST; do ls snapshots/$p-*.png 2>/dev/null; done)
           for f in $ORDERED; do
             [ -e "$f" ] || continue
@@ -116,6 +116,16 @@ jobs:
             base64 -i /tmp/small.jpg | fold -w 3000
             echo "END-SCREEN"
           done
+      - name: Test results again
+        # The pictures above fill the end of the log, so the test outcome is repeated after them,
+        # where a reader of only the last lines still finds a failing test.
+        if: always()
+        run: |
+          [ -f build.log ] || { echo "No build log"; exit 0; }
+          grep -iE "Test Case .* failed" build.log | head -40 || true
+          grep -E "error:|\*\* " build.log | head -60 || true
+          grep -E "Executed" build.log | tail -3 || true
+          grep -E "Restarting after|Fatal error" build.log | head -20 || true
       - name: Repeat the failures
         if: failure()
         # The pictures above can push the test results out of the log's tail, so they come again, last.
@@ -123,5 +133,4 @@ jobs:
           [ -f build.log ] || exit 0
           grep -E "error:|Test Case .* failed|\*\* " build.log | head -80 || true
           grep -E "Executed" build.log | tail -3 || true
-          grep -E "Restarting after|Test Case '.*' started" build.log | tail -4 || true
           grep -B4 -A24 "Fatal error" build.log | head -60 || true

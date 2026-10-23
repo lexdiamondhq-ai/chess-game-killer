@@ -2,10 +2,10 @@ import SwiftUI
 
 @main
 struct ChessGameKillerApp: App {
-    /// Challenge a friend: the links, the live games and the screens they open.
-    @State private var challenges = ChallengeCenter.live()
     /// Set only when CI launches the app for screenshots; see `Showcase`.
     private let showcase: Showcase?
+    /// Challenge a friend: the links, the live games and the screens they open.
+    @State private var challenges = ChallengeCenter.live()
 
     init() {
         LookIntroduction.applyOnce()
