@@ -32,6 +32,10 @@ struct AnalyzeSheet: View {
 
     private var accent: Color { theme.accent ?? .accentColor }
     private var hasCamera: Bool { UIImagePickerController.isSourceTypeAvailable(.camera) }
+    /// A game with moves on the board, so "This game" has something to look at (opened from Home there may be none).
+    private var hasGame: Bool {
+        currentFEN.split(separator: " ").first != Position.standard.fen.split(separator: " ").first
+    }
 
     var body: some View {
         NavigationStack(path: $session.path) {
@@ -62,11 +66,13 @@ struct AnalyzeSheet: View {
                                   detail: "Start from the opening position and change it", theme: theme)
                     }
                     .buttonStyle(.plain)
-                    Button { session.analyze(fen: currentFEN) } label: {
-                        StartCard(symbol: Glyphs.analyze, title: "This game",
-                                  detail: "Analyze the position on your board now", theme: theme)
+                    if hasGame {
+                        Button { session.analyze(fen: currentFEN) } label: {
+                            StartCard(symbol: Glyphs.analyze, title: "This game",
+                                      detail: "The position in your game right now", theme: theme)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
                 .padding(20)
             }

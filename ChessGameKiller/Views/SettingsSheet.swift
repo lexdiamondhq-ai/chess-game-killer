@@ -16,6 +16,9 @@ struct SettingsSheet: View {
     @AppStorage("bigBoard") private var bigBoard = false
     @AppStorage("sculpted3D") private var sculpted3D = true
     @AppStorage(HomeScreen.key) private var homeScreen = HomeScreen.defaultOn
+    /// Shared with the lessons' speaker button and the highlight reel.
+    @AppStorage("coachVoiceMuted") private var voiceMuted = false
+    @AppStorage(ReviewLevel.storageKey) private var reviewLevel = ReviewLevel.club.rawValue
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.requestReview) private var requestReview
@@ -64,6 +67,15 @@ struct SettingsSheet: View {
                             rule
                             ToggleRow(title: "Move verdicts", subtitle: "Grades every move you make.",
                                       symbol: "star.fill", isOn: $showVerdicts, theme: theme)
+                            rule
+                            PickerRow(title: "Game review", subtitle: (ReviewLevel(rawValue: reviewLevel) ?? .club).blurb,
+                                      symbol: "backward.circle", theme: theme) {
+                                Picker("Game review", selection: $reviewLevel) {
+                                    ForEach(ReviewLevel.allCases) { level in
+                                        Text(level.title).tag(level.rawValue)
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -75,6 +87,9 @@ struct SettingsSheet: View {
                             rule
                             ToggleRow(title: "Rival banter", subtitle: "Rivals talk to you during the game.",
                                       symbol: "bubble.left.fill", isOn: $banterOn, theme: theme)
+                            rule
+                            ToggleRow(title: "Coach's voice", subtitle: "Leo reads lessons and highlight reels aloud. Captions always show.",
+                                      symbol: "waveform", isOn: Binding(get: { !voiceMuted }, set: { voiceMuted = !$0 }), theme: theme)
                         }
                     }
 
@@ -435,6 +450,38 @@ private struct ToggleRow: View {
             .opacity(isEnabled ? 1 : 0.4)
         }
         .tint(theme.accent ?? .accentColor)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+    }
+}
+
+/// A choice with an icon tile, a line under the title, and a menu of options on the right.
+private struct PickerRow<Choice: View>: View {
+    let title: String
+    var subtitle: String?
+    let symbol: String
+    let theme: BoardTheme
+    @ViewBuilder let choice: Choice
+
+    var body: some View {
+        HStack(spacing: 12) {
+            IconTile(symbol: symbol, theme: theme)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.body.weight(.semibold))
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 8)
+            choice
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .tint(theme.accent ?? .accentColor)
+        }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
     }
