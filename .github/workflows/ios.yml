@@ -52,6 +52,37 @@ jobs:
             grep -B4 -A24 "Fatal error" build.log | head -60 || true
           fi
           exit $status
+      - name: Screenshots on the simulator
+        # The tests draw their pictures in-process, which leaves out the system's glass.
+        # These are the screen itself, as a phone shows it. A picture that fails never fails the run.
+        if: always()
+        continue-on-error: true
+        run: |
+          UDID="${{ steps.sim.outputs.udid }}"
+          APP=$(find ~/Library/Developer/Xcode/DerivedData -type d -name ChessGameKiller.app -path "*Debug-iphonesimulator*" 2>/dev/null | head -1)
+          if [ -z "$APP" ]; then echo "No app was built"; exit 0; fi
+          xcrun simctl boot "$UDID" 2>/dev/null || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" "$APP"
+          xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3 || true
+          mkdir -p snapshots
+          BUNDLE=com.chessgamekiller.app
+          # Each launch opens straight on a game in progress (see Showcase in ChessGameKillerApp.swift).
+          shoot() {
+            name=$1; shift
+            xcrun simctl terminate "$UDID" $BUNDLE 2>/dev/null || true
+            xcrun simctl launch "$UDID" $BUNDLE -showcase game "$@" >/dev/null || { echo "Could not launch for $name"; return 0; }
+            sleep 10
+            xcrun simctl io "$UDID" screenshot "snapshots/device-$name.png" >/dev/null && echo "device-$name.png" || echo "No screenshot for $name"
+          }
+          shoot gilded-3d -showcaseLook gilded -showcase3D YES
+          shoot gilded-flat -showcaseLook gilded -showcase3D NO
+          shoot midnight-flat -showcaseLook midnight -showcase3D NO
+          shoot faberge -showcaseLook faberge
+          shoot neon -showcaseLook neon
+          shoot spark -showcaseLook spark -showcaseRival spark -showcaseClock 3+2
+          shoot coach -showcaseLook gilded -showcase3D NO -showcaseCoach open
+          xcrun simctl terminate "$UDID" $BUNDLE 2>/dev/null || true
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4
@@ -71,17 +102,35 @@ jobs:
         run: |
           [ -d snapshots ] || exit 0
           cat snapshots/device.txt || true
-          # The newest effects print last, so the end of the log shows them.
-          LAST="sculpted-finale sculpted-big-capture check hints capture-fall"
+          # The newest effects print last, so the end of the log shows them; the simulator's own screenshots after all.
+          LAST="sculpted-finale sculpted-big-capture check hints capture-fall game-end device"
           ORDERED=$(ls snapshots/*.png | grep -v -E "$(echo $LAST | tr ' ' '|')"; for p in $LAST; do ls snapshots/$p-*.png 2>/dev/null; done)
           for f in $ORDERED; do
             [ -e "$f" ] || continue
-            # Look studies are printed near full size, so they can be judged as on the phone.
+            # Look studies and the simulator's screenshots are printed near full size, so they can be judged as on the phone.
             case "$(basename "$f")" in
-              study-*) sips -s format jpeg -s formatOptions 80 -Z 1300 "$f" --out /tmp/small.jpg >/dev/null ;;
+              study-*|device-*) sips -s format jpeg -s formatOptions 80 -Z 1300 "$f" --out /tmp/small.jpg >/dev/null ;;
               *) sips -s format jpeg -s formatOptions 60 -Z 700 "$f" --out /tmp/small.jpg >/dev/null ;;
             esac
             echo "BEGIN-SCREEN $(basename "$f")"
             base64 -i /tmp/small.jpg | fold -w 3000
             echo "END-SCREEN"
           done
+      - name: Test results again
+        # The pictures above fill the end of the log, so the test outcome is repeated after them,
+        # where a reader of only the last lines still finds a failing test.
+        if: always()
+        run: |
+          [ -f build.log ] || { echo "No build log"; exit 0; }
+          grep -iE "Test Case .* failed" build.log | head -40 || true
+          grep -E "error:|\*\* " build.log | head -60 || true
+          grep -E "Executed" build.log | tail -3 || true
+          grep -E "Restarting after|Fatal error" build.log | head -20 || true
+      - name: Repeat the failures
+        if: failure()
+        # The pictures above can push the test results out of the log's tail, so they come again, last.
+        run: |
+          [ -f build.log ] || exit 0
+          grep -E "error:|Test Case .* failed|\*\* " build.log | head -80 || true
+          grep -E "Executed" build.log | tail -3 || true
+          grep -B4 -A24 "Fatal error" build.log | head -60 || true

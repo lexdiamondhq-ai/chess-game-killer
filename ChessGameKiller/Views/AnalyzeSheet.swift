@@ -32,6 +32,10 @@ struct AnalyzeSheet: View {
 
     private var accent: Color { theme.accent ?? .accentColor }
     private var hasCamera: Bool { UIImagePickerController.isSourceTypeAvailable(.camera) }
+    /// A game with moves on the board, so "This game" has something to look at (opened from Home there may be none).
+    private var hasGame: Bool {
+        currentFEN.split(separator: " ").first != Position.standard.fen.split(separator: " ").first
+    }
 
     var body: some View {
         NavigationStack(path: $session.path) {
@@ -45,36 +49,39 @@ struct AnalyzeSheet: View {
 
                     if hasCamera {
                         Button { showingCamera = true } label: {
-                            StartCard(symbol: "camera.fill", title: "Take a Photo",
+                            StartCard(symbol: "camera.fill", title: "Take a photo",
                                       detail: "Point your camera at a real board", theme: theme)
                         }
                         .buttonStyle(.plain)
                     }
                     PhotosPicker(selection: $photoItem, matching: .images) {
-                        StartCard(symbol: "photo.on.rectangle.angled", title: "Choose a Photo",
+                        StartCard(symbol: "photo.on.rectangle.angled", title: "Choose a photo",
                                   detail: "A picture or a screenshot of a board", theme: theme,
                                   isLoading: isLoadingPhoto)
                     }
                     .buttonStyle(.plain)
                     .disabled(isLoadingPhoto)
                     Button { session.setUpByHand() } label: {
-                        StartCard(symbol: "square.grid.3x3.fill", title: "Set Up a Board",
+                        StartCard(symbol: "square.grid.3x3.fill", title: "Set up a board",
                                   detail: "Start from the opening position and change it", theme: theme)
                     }
                     .buttonStyle(.plain)
-                    Button { session.analyze(fen: currentFEN) } label: {
-                        StartCard(symbol: "arrow.triangle.branch", title: "This Game",
-                                  detail: "Analyze the position on your board now", theme: theme)
+                    if hasGame {
+                        Button { session.analyze(fen: currentFEN) } label: {
+                            StartCard(symbol: Glyphs.analyze, title: "This game",
+                                      detail: "The position in your game right now", theme: theme)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
                 .padding(20)
             }
             .navigationTitle("Analyze")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                        .fontWeight(.semibold)
                 }
             }
             .navigationDestination(for: ScanSession.Step.self) { step in
@@ -125,8 +132,7 @@ private struct StartCard: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            Image(systemName: symbol)
-                .font(.title2)
+            Glyph(name: symbol, size: 28)
                 .foregroundStyle(theme.accent ?? .accentColor)
                 .frame(width: 44, height: 44)
                 .background((theme.accent ?? .accentColor).opacity(0.15), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -149,21 +155,20 @@ private struct StartCard: View {
     }
 }
 
-/// The rounded glass panel used across the analyzer.
+/// The rounded glass panel used across the analyzer, outlined in color to draw the eye.
 struct Panel: View {
     let theme: BoardTheme
     var highlight: Color?
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
-        shape
-            .fill(theme.isDark ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)))
+        GlassSurface(shape: shape)
             .overlay {
-                shape.strokeBorder(highlight ?? Color.secondary.opacity(theme.isDark ? 0.25 : 0.12),
-                                   lineWidth: highlight == nil ? 1 : 2)
+                if let highlight {
+                    shape.strokeBorder(highlight, lineWidth: 1.5)
+                        .shadow(color: highlight.opacity(theme.glows ? 0.45 : 0), radius: 10)
+                }
             }
-            .shadow(color: theme.glows ? (highlight ?? .clear).opacity(0.45) : .black.opacity(0.06),
-                    radius: theme.glows ? 10 : 6, y: theme.glows ? 0 : 2)
     }
 }
 
@@ -184,7 +189,7 @@ struct BoardEditorView: View {
 
     private var accent: Color { theme.accent ?? .accentColor }
     private var problem: String? {
-        session.draft.problems.first?.message(white: theme.whiteName, black: theme.blackName)
+        session.draft.problems.first?.message(white: "White", black: "Black")
     }
 
     var body: some View {
@@ -210,20 +215,24 @@ struct BoardEditorView: View {
 
                 // What the reader finds replaces the whole draft, so hold edits until it's done.
                 Picker("Turn", selection: $session.draft.sideToMove) {
-                    Text("\(theme.whiteName) to move").tag(Piece.Color.white)
-                    Text("\(theme.blackName) to move").tag(Piece.Color.black)
+                    Text("White to move").tag(Piece.Color.white)
+                    Text("Black to move").tag(Piece.Color.black)
                 }
                 .pickerStyle(.segmented)
                 .disabled(session.isReading)
 
                 HStack(spacing: 10) {
-                    editButton("Swap Sides", symbol: "arrow.left.arrow.right") { session.draft.rotate() }
+                    // Turns the pieces around, for a photo taken from the other side of the board.
+                    editButton("Rotate", symbol: "rotate.right") { session.draft.rotate() }
+                        .accessibilityLabel("Rotate the board")
                     editButton("Clear", symbol: "trash") { session.draft.clear() }
-                    editButton("Start", symbol: "arrow.counterclockwise") {
+                        .accessibilityLabel("Clear the board")
+                    editButton("Reset", symbol: "arrow.counterclockwise") {
                         let turn = session.draft.sideToMove
                         session.draft = .standard
                         session.draft.sideToMove = turn
                     }
+                    .accessibilityLabel("Reset to the starting position")
                 }
                 .disabled(session.isReading)
 
@@ -238,7 +247,7 @@ struct BoardEditorView: View {
             .padding(16)
             .animation(.snappy, value: problem)
         }
-        .navigationTitle("Set Up Position")
+        .navigationTitle("Set up position")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
@@ -280,6 +289,12 @@ struct BoardEditorView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
+            if session.isReading {
+                Button("Stop") { withAnimation(.snappy) { session.stopReading() } }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .accessibilityLabel("Stop reading the photo")
+            }
         }
         .padding(12)
         .background(Panel(theme: theme, highlight: session.readingFailed ? Color(hex: 0xFF9A3C) : nil))
@@ -294,7 +309,7 @@ struct BoardEditorView: View {
                         toolButton(.piece(token)) {
                             PieceImage(piece: token.piece(at: .a1), theme: theme, size: 36)
                         }
-                        .accessibilityLabel("\(color == .white ? theme.whiteName : theme.blackName) \(String(describing: kind))")
+                        .accessibilityLabel("\(color == .white ? "White" : "Black") \(String(describing: kind))")
                     }
                     if color == .white {
                         toolButton(.eraser) {
@@ -386,7 +401,7 @@ struct AnalysisView: View {
                 Button {
                     onPlay(model.draft)
                 } label: {
-                    Label("Play From Here", systemImage: "play.fill")
+                    Label("Play from here", systemImage: "play.fill")
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 4)
@@ -399,12 +414,16 @@ struct AnalysisView: View {
             .padding(16)
             .animation(.snappy, value: model.lines)
         }
-        .navigationTitle("Best Moves")
+        .navigationTitle("Best moves")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button { flipped.toggle() } label: {
-                    Label("Flip Board", systemImage: "arrow.up.arrow.down")
+                    Label {
+                        Text("Flip board")
+                    } icon: {
+                        Glyph(name: Glyphs.flip, size: 24)
+                    }
                 }
             }
         }
@@ -439,10 +458,10 @@ struct AnalysisView: View {
     /// The verdict, or why there isn't one.
     private var headline: String {
         if model.evaluationForWhite != nil {
-            return model.verdict(white: theme.whiteName, black: theme.blackName)
+            return model.verdict(white: "White", black: "Black")
         }
         if model.failed {
-            return model.draft.problems.first?.message(white: theme.whiteName, black: theme.blackName) ?? "No verdict"
+            return model.draft.problems.first?.message(white: "White", black: "Black") ?? "Couldn't evaluate this position"
         }
         return "Thinking"
     }
@@ -482,7 +501,7 @@ struct AnalysisView: View {
                         Text(model.depth == 0 ? "Stockfish is thinking" : "Looking deeper")
                     } else if model.failed {
                         Image(systemName: "exclamationmark.triangle.fill")
-                        Text("Stockfish couldn't look at this position.")
+                        Text("The engine didn't answer. Go back and try again.")
                     } else if model.depth > 0 {
                         Image(systemName: "checkmark.seal.fill").foregroundStyle(accent)
                         Text("Checked by Stockfish 17")

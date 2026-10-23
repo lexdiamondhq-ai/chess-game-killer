@@ -1,62 +1,139 @@
 import ChessKit
 import SwiftUI
 
-// The quiet "executive" game screen used by every theme except Neon:
-// one player above the board and one below, plain type, fine lines, no glow,
-// and a labeled row of controls around the coach orb.
+// The game screen's chrome, the same on every look: one player above the board and one below,
+// each on its own glass, a labeled row of controls around the coach orb, and plain type.
+// Neon keeps its colors and glows on the same glass.
 
-/// One player's line above or below the board: avatar, name, status with
-/// what they have captured, and their clock.
+/// One player's line above or below the board, on glass: avatar, name, a status that says only
+/// what the name and the picture don't (whose move it is, check, the result), what they have
+/// captured, and their clock.
 struct ExecutivePlate: View {
     let match: MatchController
     let theme: BoardTheme
     let color: Piece.Color
 
+    @ScaledMetric(relativeTo: .footnote) private var scaledStatusHeight: CGFloat = 16
+    /// The status row's height. It stops growing where the line's type does.
+    private var statusHeight: CGFloat { min(scaledStatusHeight, 21) }
+    /// The player's army, so a selected named piece shows its name here.
+    @Environment(ArmyStore.self) private var army: ArmyStore?
+
     private var isComputer: Bool { match.setup.opponent == .computer && !match.game.humanColors.contains(color) }
     private var isActive: Bool { !match.isOver && match.game.activeColor == color }
     private var accent: Color { theme.accent ?? .accentColor }
+    /// On Neon the line of the side to move lights up in that side's color.
+    private var glow: Color? { theme.glows && isActive ? theme.sideColor(color) : nil }
 
     var body: some View {
-        HStack(spacing: 12) {
-            avatar
-                .frame(width: 38, height: 38)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(name)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                RivalRemark(match: match, enabled: isComputer) {
-                    HStack(spacing: 6) {
-                        if inCheck {
-                            CheckTag(color: theme.check)
-                                .transition(.scale.combined(with: .opacity))
-                        } else if isActive {
-                            Circle()
-                                .fill(accent)
-                                .frame(width: 6, height: 6)
-                                .transition(.scale.combined(with: .opacity))
-                        }
-                        Text(status)
-                            .font(.system(size: 12.5, weight: isActive ? .medium : .regular))
-                            .foregroundStyle(isActive ? Color.primary.opacity(0.8) : Color.secondary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.85)
-                            // The words come first; the strip of captured pieces condenses to make room.
-                            .layoutPriority(1)
-                        CapturedPieces(match: match, theme: theme, by: color)
+        let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+        HStack(spacing: 10) {
+            HStack(spacing: 10) {
+                avatar
+                    .frame(width: 40, height: 40)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(name)
+                        .font(.system(.headline, design: .themed))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    RivalRemark(match: match, enabled: isComputer) {
+                        statusRow
                     }
+                    // The row keeps its height when it has nothing to say, so the name never jumps.
+                    .frame(height: statusHeight, alignment: .leading)
                 }
             }
+            // The clock is its own element, so VoiceOver reads its time as it stands.
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(spokenLabel)
             Spacer(minLength: 8)
             if let clock = match.clock {
-                ExecutiveClock(clock: clock, color: color, theme: theme)
+                ExecutiveClock(clock: clock, color: color, owner: clockOwner, theme: theme)
+                    .fixedSize()
+                    .layoutPriority(2)
             }
         }
-        .padding(.horizontal, 4)
+        .padding(.leading, 9)
+        .padding(.trailing, 10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .glassPane(shape)
+        .overlay {
+            if let glow {
+                shape.strokeBorder(
+                    LinearGradient(colors: [glow.opacity(0.95), glow.opacity(0.3), glow.opacity(0.25), glow.opacity(0.8)],
+                                   startPoint: .topLeading, endPoint: .bottomTrailing),
+                    lineWidth: 1.2
+                )
+                .transition(.opacity)
+            }
+        }
+        .background {
+            if let glow {
+                // Behind the glass, so the glass carries the color and the glow spills past its edge.
+                shape.stroke(glow.opacity(0.55), lineWidth: 3)
+                    .blur(radius: 9)
+                    .transition(.opacity)
+            }
+        }
+        .dynamicTypeSize(...DynamicTypeSize.xxLarge)
         .animation(.snappy(duration: 0.3), value: isActive)
         .animation(.snappy(duration: 0.3), value: inCheck)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(spokenLabel)
+    }
+
+    /// The turn dot or the CHECK tag, the status (or the selected army piece's name and rank),
+    /// and the captured pieces.
+    private var statusRow: some View {
+        HStack(spacing: 6) {
+            if inCheck {
+                CheckTag(color: theme.check)
+                    .transition(.scale.combined(with: .opacity))
+            } else if isActive {
+                Circle()
+                    .fill(glow ?? accent)
+                    .frame(width: 6, height: 6)
+                    .transition(.scale.combined(with: .opacity))
+            }
+            if let piece = selectedArmyPiece {
+                HStack(spacing: 4) {
+                    Image(systemName: piece.rank == .legend ? "crown.fill" : "shield.lefthalf.filled")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(piece.color)
+                    Text("\(piece.name) · \(piece.rank.title)")
+                        .font(.system(.footnote, design: .themed).weight(.medium))
+                        .foregroundStyle(Color.primary.opacity(0.86))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                }
+                .layoutPriority(1)
+                .transition(.opacity)
+            } else if !status.isEmpty {
+                Text(status)
+                    .font(.system(.footnote, design: .themed).weight(isActive ? .medium : .regular))
+                    .foregroundStyle(isActive ? Color.primary.opacity(0.86) : Color.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                    // The words come first; the captured pieces condense to make room.
+                    .layoutPriority(1)
+                    .transition(.opacity)
+            }
+            CapturedPieces(match: match, by: color)
+        }
+        .animation(.easeInOut(duration: 0.2), value: selectedArmyPiece?.name)
+    }
+
+    /// While the player has one of their named army pieces selected: its name and rank, in the
+    /// rank's color. It is shown here rather than over the board, where it hid the move dots.
+    private var selectedArmyPiece: (name: String, rank: ArmyRank, color: Color)? {
+        guard !isComputer, let army, let square = match.game.selected,
+              let placed = match.game.pieces.first(where: { $0.square == square }),
+              placed.piece.color == color,
+              let slot = army.slot(of: placed, in: match),
+              let name = army.record(for: slot).name else { return nil }
+        let rank = army.record(for: slot).rank
+        // Black's own color is near black on every look but Neon, and would vanish on the glass.
+        let readable = rank == .legend || placed.piece.color == .white || theme.glows
+        return (name, rank, readable ? rank.color(for: placed.piece, theme: theme) : Color.secondary)
     }
 
     /// This side's king is in check right now.
@@ -65,70 +142,81 @@ struct ExecutivePlate: View {
         return match.game.piece(at: king)?.color == color
     }
 
-    /// Name, status, time left and captures. The label stands in for the children's
-    /// own, and the strip of pieces is hidden from VoiceOver, so both are spelled out here.
+    /// Name, status and captures. The captured pieces are hidden from VoiceOver, so they are
+    /// spelled out here; the clock speaks for itself.
     private var spokenLabel: String {
-        var text = "\(name), \(status)"
-        if let clock = match.clock {
-            text += ", \(clock.remaining(for: color).clockLabel) left"
+        var parts = [name]
+        if inCheck { parts.append("in check") }
+        if let piece = selectedArmyPiece {
+            parts.append("\(piece.name), \(piece.rank.title)")
+        } else if !status.isEmpty {
+            parts.append(status)
         }
         let taken = match.game.captured(by: color)
         if !taken.isEmpty {
-            text += ", " + CaptureRail.spokenCaptures(taken, lead: match.game.materialLead(for: color), name: theme.name(of: color))
+            parts.append(CapturedPieces.spoken(taken, lead: match.game.materialLead(for: color)))
         }
-        return text
+        return parts.joined(separator: ", ")
+    }
+
+    private var clockOwner: String {
+        Self.spokenClockOwner(of: color, in: match, theme: theme)
+    }
+
+    /// How a line names a side: the rival's name or "You"; in a game between two people, the side's color.
+    static func displayName(of color: Piece.Color, in match: MatchController, theme: BoardTheme) -> String {
+        guard match.setup.opponent == .computer else { return theme.name(of: color) }
+        return match.game.humanColors.contains(color) ? "You" : match.setup.level.rival.name
+    }
+
+    /// For VoiceOver: "Your clock", or "Pulse's clock".
+    static func spokenClockOwner(of color: Piece.Color, in match: MatchController, theme: BoardTheme) -> String {
+        if match.setup.opponent == .computer, match.game.humanColors.contains(color) { return "Your clock" }
+        return "\(displayName(of: color, in: match, theme: theme))'s clock"
     }
 
     @ViewBuilder
     private var avatar: some View {
         if isComputer {
-            RivalPortrait(rival: match.setup.level.rival, size: 38, glows: false)
+            RivalPortrait(rival: match.setup.level.rival, size: 40, glows: theme.glows)
         } else {
-            PieceImage(piece: Piece(.king, color: color, square: .e1), theme: theme, size: 30)
-                .frame(width: 38, height: 38)
-                .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
+            let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
+            PieceImage(piece: Piece(.king, color: color, square: .e1), theme: theme, size: 32)
+                .frame(width: 40, height: 40)
+                .background(Color.primary.opacity(0.06), in: shape)
+                .overlay(shape.strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5))
         }
     }
 
     private var name: String {
-        if isComputer { return match.setup.level.rival.name }
-        if match.setup.opponent == .computer { return "You" }
-        return theme.name(of: color)
+        Self.displayName(of: color, in: match, theme: theme)
     }
 
+    /// The rival's level while it waits, "Thinking…" on its turn; "Your move" on yours, and
+    /// nothing while you wait (your captures say enough). The result once the game is over.
     private var status: String {
         if match.isOver {
-            if match.winner == color { return "Winner" }
+            if match.winner == color { return "Won" }
             return match.winner == nil ? "Draw" : "Lost"
         }
-        if isActive {
-            if isComputer {
-                if match.isComputerThinking { return "Thinking" }
-                if match.engineFailed, !match.game.isHumanTurn { return "Engine unavailable" }
-                return "To move"
-            }
-            if inCheck { return "King in check" }
-            return "\(theme.name(of: color)) to move"
-        }
         if isComputer {
+            if isActive { return match.engineFailed ? "Coach offline" : "Thinking…" }
             let rival = match.setup.level.rival
-            return "\(rival.level.name) · \(rival.elo)"
+            return "\(rival.level.name) · \(rival.elo.replacingOccurrences(of: "~", with: ""))"
         }
-        return theme.name(of: color)
+        return isActive ? "Your move" : ""
     }
 }
 
-/// The pieces a side has taken, small and overlapping, with the material lead.
-/// When the line runs short of room, one piece of each kind with its count instead.
+/// The pieces a side has taken, as small crisp silhouettes: they are the other side's, so their
+/// color goes without saying. They overlap within a kind, with the material lead after them.
+/// When the line runs short of room, one of each kind with a count; then only the lead.
 private struct CapturedPieces: View {
     let match: MatchController
-    let theme: BoardTheme
     /// The side that did the capturing.
     let by: Piece.Color
 
-    private static let size: CGFloat = 15
+    @ScaledMetric(relativeTo: .footnote) private var size: CGFloat = 14
 
     var body: some View {
         let taken = match.game.captured(by: by)
@@ -136,46 +224,60 @@ private struct CapturedPieces: View {
         ViewThatFits(in: .horizontal) {
             strip(taken, lead: lead, stacked: true)
             strip(taken, lead: lead, stacked: false)
+            leadLabel(lead)
         }
+        .foregroundStyle(.secondary)
         .animation(.snappy(duration: 0.3), value: taken)
         .accessibilityHidden(true)
     }
 
-    /// Every piece taken, overlapping within its kind; or, condensed, one of each kind with a count.
     private func strip(_ taken: [CapturedCount], lead: Int, stacked: Bool) -> some View {
-        HStack(spacing: stacked ? 4 : 3) {
+        HStack(spacing: 3) {
             ForEach(taken) { entry in
                 if stacked {
-                    HStack(spacing: -Self.size * 0.55) {
+                    HStack(spacing: -size * 0.43) {
                         ForEach(0..<entry.count, id: \.self) { _ in
-                            image(of: entry.kind)
+                            silhouette(of: entry.kind)
                         }
                     }
                 } else {
-                    HStack(spacing: 0) {
-                        image(of: entry.kind)
+                    HStack(spacing: 1) {
+                        silhouette(of: entry.kind)
                         if entry.count > 1 {
                             Text("\(entry.count)")
-                                .font(.system(size: 9.5, weight: .semibold).monospacedDigit())
-                                .foregroundStyle(.secondary)
+                                .font(.caption2.weight(.semibold).monospacedDigit())
                         }
                     }
                 }
             }
-            if lead > 0 {
-                Text("+\(lead)")
-                    .font(.system(size: 11.5, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(.secondary)
-            }
+            leadLabel(lead)
         }
     }
 
-    private func image(of kind: Piece.Kind) -> some View {
-        Image(theme.imageName(for: Piece(kind, color: by.opposite, square: .a1)))
+    @ViewBuilder
+    private func leadLabel(_ lead: Int) -> some View {
+        if lead > 0 {
+            Text("+\(lead)")
+                .font(.footnote.weight(.semibold).monospacedDigit())
+        }
+    }
+
+    /// The flat vector set, drawn as a one-color shape so it stays sharp at this size on any glass.
+    private func silhouette(of kind: Piece.Kind) -> some View {
+        Image(Piece(kind, color: .white, square: .a1).assetName)
+            .renderingMode(.template)
             .resizable()
             .interpolation(.high)
             .scaledToFit()
-            .frame(width: Self.size, height: Self.size)
+            .frame(width: size, height: size)
+    }
+
+    /// For VoiceOver: "captured 1 knight and 2 pawns, up 2".
+    static func spoken(_ taken: [CapturedCount], lead: Int) -> String {
+        let pieces = taken.map { "\($0.count) \(String(describing: $0.kind))\($0.count == 1 ? "" : "s")" }
+        var text = "captured " + (ListFormatter.localizedString(byJoining: pieces))
+        if lead > 0 { text += ", up \(lead)" }
+        return text
     }
 }
 
@@ -183,6 +285,8 @@ private struct CapturedPieces: View {
 private struct ExecutiveClock: View {
     let clock: ChessClock
     let color: Piece.Color
+    /// "Your clock" or "Pulse's clock", for VoiceOver.
+    let owner: String
     let theme: BoardTheme
 
     private var isRunning: Bool { clock.running == color }
@@ -193,48 +297,62 @@ private struct ExecutiveClock: View {
             let urgent = isRunning && remaining < .seconds(10)
             let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
             Text(remaining.clockLabel)
-                .font(.system(size: 21, weight: .medium).monospacedDigit())
+                .font(.system(.title3, design: .themed).weight(.medium).monospacedDigit())
                 .foregroundStyle(isRunning ? Color.black.opacity(0.88) : Color.secondary)
                 .lineLimit(1)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 5)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 4)
                 .background {
                     if isRunning {
                         shape.fill(urgent ? Color(hex: 0xFF4D6D) : Color.white.opacity(0.92))
                     } else {
-                        shape.fill(Color.primary.opacity(0.04))
-                            .overlay(shape.strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
+                        shape.fill(Color.primary.opacity(0.05))
+                            .overlay(shape.strokeBorder(Color.primary.opacity(0.14), lineWidth: 0.5))
                     }
                 }
                 // Inside the timeline, so VoiceOver reads the time as it stands now.
-                .accessibilityLabel("\(theme.name(of: color)) has \(remaining.clockLabel) left")
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(owner)
+                .accessibilityValue(remaining.formatted(.units(allowed: [.minutes, .seconds], width: .wide)))
         }
         .animation(.snappy(duration: 0.25), value: isRunning)
     }
 }
 
-/// The middle of the top bar: the opponent and clock in small capitals over the move number.
+/// The middle of the top bar: the time control in small capitals over the game's progress.
+/// An untimed game shows the progress alone. The players are named on their own lines below.
 struct ExecutiveMatchTitle: View {
     let match: MatchController
 
+    @ScaledMetric(relativeTo: .caption2) private var scaledKickerSize: CGFloat = 10
+    /// It stops growing where the headline's type does, so both fit the bar.
+    private var kickerSize: CGFloat { min(scaledKickerSize, 13.5) }
+
     var body: some View {
         VStack(spacing: 1) {
-            Text(kicker.uppercased())
-                .font(.system(size: 10, weight: .medium))
-                .tracking(1.6)
-                .foregroundStyle(.secondary)
+            if let kicker {
+                Text(kicker)
+                    .font(.system(size: kickerSize, weight: .medium, design: .themed))
+                    .tracking(1.2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
             Text(headline)
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(.subheadline, design: .themed).weight(.semibold))
                 .monospacedDigit()
+                .lineLimit(1)
         }
+        .minimumScaleFactor(0.85)
+        .dynamicTypeSize(...DynamicTypeSize.xxLarge)
         .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
     }
 
-    private var kicker: String {
-        let opponent = match.setup.opponent == .computer ? "vs \(match.setup.level.rival.name)" : "Two players"
+    /// "RAPID · 15+10".
+    private var kicker: String? {
         let control = match.setup.timeControl
-        guard control.isTimed else { return opponent }
-        return "\(opponent) · \(control.rawValue.replacingOccurrences(of: "+", with: " + "))"
+        guard control.isTimed, let kind = control.kind else { return nil }
+        return "\(kind) · \(control.rawValue)".uppercased()
     }
 
     private var headline: String {
@@ -248,31 +366,50 @@ struct ExecutiveMatchTitle: View {
 struct DockButton: View {
     let title: String
     let symbol: String
-    var isOn = false
+    /// Set for a toggle: it lights in the accent while on, and VoiceOver says which way it is.
+    var isOn: Bool? = nil
     let theme: BoardTheme
     let action: () -> Void
 
-    @Environment(\.isEnabled) private var isEnabled
-
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 5) {
-                Glyph(name: symbol, size: Glyph.isGlyph(symbol) ? 25 : 24, weight: .regular)
-                    .frame(height: 25)
-                    .contentTransition(.symbolEffect(.replace))
-                Text(title)
-                    .font(.system(size: 10.5, weight: .medium))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
-            .foregroundStyle(isOn ? (theme.accent ?? .accentColor) : Color.primary.opacity(0.7))
-            .opacity(isEnabled ? 1 : 0.35)
-            .frame(maxWidth: .infinity, minHeight: 48)
-            .contentShape(Rectangle())
+            DockLabel(title: title, symbol: symbol, lit: isOn == true, theme: theme)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title)
-        .accessibilityValue(isOn ? "On" : "")
+        .accessibilityValue(isOn.map { $0 ? "On" : "Off" } ?? "")
+        .accessibilityAddTraits(isOn == nil ? [] : .isToggle)
+        // The dock's type stops growing at large sizes; a long press shows the name big instead.
+        .accessibilityShowsLargeContentViewer()
+    }
+}
+
+/// What a dock control looks like: its icon with its name under it, in the accent while lit.
+struct DockLabel: View {
+    let title: String
+    let symbol: String
+    var lit = false
+    let theme: BoardTheme
+
+    @Environment(\.isEnabled) private var isEnabled
+
+    private var accent: Color { theme.accent ?? .accentColor }
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Glyph(name: symbol, size: Glyph.isGlyph(symbol) ? 25 : 24, weight: .regular)
+                .frame(height: 25)
+                .contentTransition(.symbolEffect(.replace))
+                .shadow(color: theme.glows && lit ? accent.opacity(0.7) : .clear, radius: 6)
+            Text(title)
+                .font(.system(.caption2, design: .themed).weight(.medium))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .foregroundStyle(lit ? accent : Color.primary.opacity(0.78))
+        .opacity(isEnabled ? 1 : 0.5)
+        .frame(maxWidth: .infinity, minHeight: 48)
+        .contentShape(Rectangle())
     }
 }
 
@@ -280,9 +417,11 @@ struct DockButton: View {
 struct CheckTag: View {
     let color: Color
 
+    @ScaledMetric(relativeTo: .caption2) private var size: CGFloat = 9.5
+
     var body: some View {
         Text("CHECK")
-            .font(.system(size: 9.5, weight: .heavy))
+            .font(.system(size: size, weight: .heavy, design: .themed))
             .tracking(0.6)
             .foregroundStyle(.white)
             .padding(.horizontal, 6)

@@ -22,12 +22,18 @@ struct PositionBoard: View {
             let sq = (side - inset * 2) / 8
             let corner = RoundedRectangle(cornerRadius: sq * 0.12, style: .continuous)
             ZStack(alignment: .topLeading) {
-                if let art = theme.boardArt {
-                    BoardArt(name: art, flipped: flipped)
+                // Only the board is cut to its rounded corners, so a tall piece on the far rank
+                // may rise a little above the frame.
+                ZStack {
+                    if let art = theme.boardArt {
+                        BoardArt(name: art, flipped: flipped)
+                    }
+                    if let surface = theme.surface {
+                        LinearGradient(colors: surface, startPoint: .topLeading, endPoint: .bottomTrailing)
+                    }
                 }
-                if let surface = theme.surface {
-                    LinearGradient(colors: surface, startPoint: .topLeading, endPoint: .bottomTrailing)
-                }
+                .frame(width: side, height: side)
+                .clipShape(corner)
                 ZStack(alignment: .topLeading) {
                     VStack(spacing: 0) {
                         ForEach(0..<8, id: \.self) { row in
@@ -60,7 +66,6 @@ struct PositionBoard: View {
                 .padding(inset)
             }
             .frame(width: side, height: side)
-            .clipShape(corner)
             .overlay {
                 if let edge = theme.boardEdge {
                     corner.strokeBorder(edge, lineWidth: 1)

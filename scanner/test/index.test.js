@@ -152,3 +152,62 @@ test("an unknown turn comes back as null", () => {
   const answer = normalize({ found: true, rows: ROWS, white_side: "top", side_to_move: "unknown", confidence: "low" });
   assert.equal(answer.side_to_move, null);
 });
+
+// The daily allowance shared by everyone.
+import { ScanBudget, withinDailyBudget } from "../src/index.js";
+
+function memoryStorage() {
+  const saved = new Map();
+  return { get: async (key) => saved.get(key), put: async (key, value) => void saved.set(key, value) };
+}
+
+test("the daily allowance runs out, and comes back the next day", async () => {
+  const budget = new ScanBudget({ storage: memoryStorage() });
+  const lateMonday = Date.UTC(2026, 9, 19, 23, 50);
+  assert.equal(await budget.take(2, lateMonday), true);
+  assert.equal(await budget.take(2, lateMonday), true);
+  assert.equal(await budget.take(2, lateMonday), false);
+  const earlyTuesday = Date.UTC(2026, 9, 20, 0, 5);
+  assert.equal(await budget.take(2, earlyTuesday), true);
+
+  // Over fetch, as the worker asks it.
+  const fresh = new ScanBudget({ storage: memoryStorage() });
+  const take = () => fresh.fetch(new Request("https://budget/take?limit=1", { method: "POST" }));
+  assert.equal((await take()).status, 200);
+  assert.equal((await take()).status, 429);
+});
+
+test("a spent allowance turns scans away before Claude is asked", async () => {
+  let asked = false;
+  globalThis.fetch = async () => {
+    asked = true;
+    throw new Error("Claude should not be asked");
+  };
+  const spent = {
+    ...env,
+    BUDGET: { idFromName: () => "global", get: () => ({ fetch: async () => new Response("spent", { status: 429 }) }) },
+  };
+  const response = await worker.fetch(post(), spent);
+  assert.equal(response.status, 429);
+  assert.deepEqual(await response.json(), { error: "daily_limit" });
+  assert.equal(asked, false);
+});
+
+test("the allowance follows DAILY_LIMIT, or the default without it", async () => {
+  const limits = [];
+  const namespace = {
+    idFromName: () => "global",
+    get: () => ({
+      fetch: async (url) => {
+        limits.push(new URL(url).searchParams.get("limit"));
+        return new Response("ok");
+      },
+    }),
+  };
+  assert.equal(await withinDailyBudget({ BUDGET: namespace, DAILY_LIMIT: "25" }), true);
+  assert.equal(await withinDailyBudget({ BUDGET: namespace }), true);
+  // Without DAILY_LIMIT the default of 300 applies.
+  assert.deepEqual(limits, ["25", "300"]);
+  // Without the binding (local tests, an older deploy) scans are not blocked.
+  assert.equal(await withinDailyBudget({}), true);
+});
