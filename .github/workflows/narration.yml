@@ -1,8 +1,8 @@
 name: Record lesson narration with ElevenLabs
 
-# Records Coach Leo's voice for any lesson line that doesn't have a recording
-# yet (scripts/training/make_narration.py) and commits the new files to the
-# branch that changed the lessons. Lines already recorded are skipped, so a
+# Records each coach's voice (Leo and Vera) for any lesson line or reaction that
+# doesn't have a recording yet (scripts/training/make_narration.py) and commits
+# the new files to the branch that changed them. Lines already recorded are skipped, so a
 # run with nothing new costs nothing.
 on:
   push:
@@ -10,6 +10,7 @@ on:
     paths:
       - "ChessGameKiller/Training/Content/lesson-*.json"
       - "ChessGameKiller/Training/Content/course.json"
+      - "ChessGameKiller/Training/Content/reactions.json"
       - "scripts/training/make_narration.py"
   workflow_dispatch:
 

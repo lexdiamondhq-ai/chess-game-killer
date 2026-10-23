@@ -24,7 +24,7 @@ struct CalculationDoorView: View {
             TrainSectionTitle(text: "In your head")
             Button { cover = .candidates } label: {
                 TrainRow(symbol: "list.number", title: "Candidate moves",
-                         detail: "Name your best two or three moves before you choose. Leo shows what you missed.",
+                         detail: "Name your best two or three moves before you choose. \(Coach.current.name) shows what you missed.",
                          value: think.progress.rounds > 0 ? "Best \(think.progress.bestRound)" : nil, theme: theme)
             }
             .buttonStyle(.plain)

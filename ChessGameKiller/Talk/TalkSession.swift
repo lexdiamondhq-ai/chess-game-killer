@@ -470,7 +470,8 @@ final class TalkSession: Identifiable {
         let wantsVoice = !CoachVoice.shared.isMuted
         speaksAloud = wantsVoice
         let request = TalkRequest(fen: fen, said: said, typed: typed, reveal: reveal, context: context,
-                                  lastMove: lastMove, voice: wantsVoice, facts: facts)
+                                  lastMove: lastMove, voice: wantsVoice, facts: facts,
+                                  coach: Coach.current == .leo ? nil : Coach.current.rawValue)
 
         var serverError: String?
         var failure: Error?
@@ -573,13 +574,13 @@ final class TalkSession: Identifiable {
     static func problem(forCode code: String) -> String {
         switch code {
         case "rate_limited":
-            return "Leo needs a moment. Try again in a minute."
+            return "\(Coach.current.name) needs a moment. Try again in a minute."
         case "daily_limit":
-            return "Leo has checked a lot of plans today. Try again tomorrow."
+            return "\(Coach.current.name) has checked a lot of plans today. Try again tomorrow."
         case "bad_request":
-            return "Leo didn't catch that. Try again."
+            return "\(Coach.current.name) didn't catch that. Try again."
         default:
-            return "Leo couldn't check that one. Try again."
+            return "\(Coach.current.name) couldn't check that one. Try again."
         }
     }
 
@@ -588,7 +589,7 @@ final class TalkSession: Identifiable {
         if let failure = error as? TalkFailure {
             switch failure {
             case .offline:
-                return "Leo needs the internet to check your plan."
+                return "\(Coach.current.name) needs the internet to check your plan."
             case .server(let code):
                 return problem(forCode: code)
             case .badResponse:
@@ -596,7 +597,7 @@ final class TalkSession: Identifiable {
             }
         }
         if error is CancellationError { return problem(forCode: "internal") }
-        return "Leo needs the internet to check your plan."
+        return "\(Coach.current.name) needs the internet to check your plan."
     }
 
     /// Something short to say when the verdicts came but Leo's own words didn't.

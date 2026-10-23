@@ -91,7 +91,7 @@ struct HomeTodayCard: View {
 
     @ViewBuilder
     private var coachBlock: some View {
-        label("Today with Coach Leo")
+        label("Today with \(Coach.current.title)")
         if trainedToday {
             // Done: said once, with a quiet way to go on.
             HStack(alignment: .firstTextBaseline, spacing: 12) {

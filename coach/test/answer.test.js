@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import Anthropic from "@anthropic-ai/sdk";
-import { MAX_ANSWER, buildAnswerRequest, guardAnswer, templateAnswer, wordAnswer } from "../src/answer.js";
+import { MAX_ANSWER, buildAnswerRequest, coachPrompt, guardAnswer, templateAnswer, wordAnswer } from "../src/answer.js";
 
 // The checked facts in plain words, as verify.js writes them. The player is
 // Black: White's bishop on d3 aims at h7, and the knight on f6 isn't safe.
@@ -266,4 +266,20 @@ test("when nothing was understood, Claude isn't asked", async () => {
   assert.deepEqual(await wordAnswer(client, {}, { checked: { understood: false }, spoken: {} }), { text: DIDNT_CATCH, source: "template" });
   assert.deepEqual(await wordAnswer(null, {}, { checked, spoken }), { text: templateAnswer(checked, spoken), source: "template" });
   assert.equal(client.calls.length, 0);
+});
+
+test("Vera answers as Vera, by the same rules as Leo", () => {
+  const leo = coachPrompt("leo");
+  const vera = coachPrompt("vera");
+  assert.match(leo, /^You are Leo,/);
+  assert.match(vera, /^You are Vera,/);
+  assert.doesNotMatch(vera, /\bLeo\b/);
+  // Everything after the persona is the same rules, word for word.
+  const rules = (prompt) => prompt.slice(prompt.indexOf("Before moving"));
+  assert.equal(rules(vera), rules(leo));
+  assert.equal(coachPrompt("someone"), leo);
+  const request = buildAnswerRequest({ understood: true }, { said: "castle" }, {}, "vera");
+  assert.equal(request.system[0].text, vera);
+  assert.match(request.messages[0].content, /Say Vera's answer\.$/);
+  assert.equal(guardAnswer("Vera: Castling is safe.", {}), "Castling is safe.");
 });

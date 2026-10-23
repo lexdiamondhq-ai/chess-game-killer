@@ -35,8 +35,8 @@ struct TalkEntryRow: View {
 
     private var detail: String {
         countsAsHelp
-            ? "Tell Leo your plan. He checks every part. Counts as help, like Undo."
-            : "Tell Leo your plan. He checks every part."
+            ? "Tell \(Coach.current.name) your plan. \(Coach.current.subjectCapitalized) checks every part. Counts as help, like Undo."
+            : "Tell \(Coach.current.name) your plan. \(Coach.current.subjectCapitalized) checks every part."
     }
 
     var body: some View {

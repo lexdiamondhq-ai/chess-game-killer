@@ -22,15 +22,21 @@ struct TrainingReward: Equatable {
 @MainActor
 @Observable
 final class TrainingStore {
-    let library: TrainingLibrary?
+    /// The content in the picked coach's words: the lessons, their lines and the course.
+    var library: TrainingLibrary? { baseLibrary?.taught(by: coach.coach) }
     private(set) var progress: TrainingProgress
+
+    /// The content as written, in Leo's words.
+    private let baseLibrary: TrainingLibrary?
+    @ObservationIgnored private let coach: CoachChoice
 
     private let fileURL: URL?
     private let calendar: Calendar
 
     init(library: TrainingLibrary?, progress: TrainingProgress = TrainingProgress(), fileURL: URL? = nil,
-         calendar: Calendar = .current) {
-        self.library = library
+         calendar: Calendar = .current, coach: CoachChoice = .shared) {
+        baseLibrary = library
+        self.coach = coach
         self.progress = progress
         self.fileURL = fileURL
         self.calendar = calendar

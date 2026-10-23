@@ -150,12 +150,14 @@ struct TrainingButtonStyle: ButtonStyle {
     }
 }
 
-/// Coach Leo: a knight from the board's own piece set, in a ring.
+/// The coach's portrait: a piece from the board's own set in a ring, the knight for Leo and the queen for Vera.
 struct CoachAvatar: View {
     let theme: BoardTheme
     var size: CGFloat = 44
     /// The ring's color, to react to answers.
     var tint: Color?
+    /// Whose portrait: the picked coach unless one is named (the picker shows both).
+    var coach: Coach?
 
     /// Leo's ring when he isn't reacting: Neon's glass gradient, or the board's own
     /// accent (gold on Fabergé, amber on Blueprint).
@@ -176,7 +178,8 @@ struct CoachAvatar: View {
         let ring = tint.map { [$0, $0.opacity(0.6), $0] } ?? restingRing
         ZStack {
             Circle().fill(face)
-            PieceImage(piece: Piece(.knight, color: .white, square: .g1), theme: theme, size: size * 0.78)
+            // Leo is the knight, Vera the queen.
+            PieceImage(piece: Piece((coach ?? Coach.current).piece, color: .white, square: .g1), theme: theme, size: size * 0.78)
             Circle().strokeBorder(AngularGradient(colors: ring, center: .center), lineWidth: max(2, size * 0.06))
         }
         .frame(width: size, height: size)

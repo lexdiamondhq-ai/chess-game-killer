@@ -95,6 +95,8 @@ final class LevelCheckRunner {
         }
         used.insert(item.id)
         made.strict = true
+        // A test, not practice: the coach keeps quiet.
+        made.reactions = nil
         puzzle = item
         drill = made
         phase = .solving

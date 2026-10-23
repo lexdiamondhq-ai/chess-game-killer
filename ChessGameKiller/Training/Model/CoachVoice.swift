@@ -2,8 +2,8 @@ import AVFoundation
 import CryptoKit
 import Foundation
 
-/// The coach's voice. Plays the line recorded for a piece of text (made with
-/// ElevenLabs by scripts/training/make_narration.py, named by a hash of the
+/// The coach's voice. Plays the line the picked coach recorded for a piece of text (made with
+/// ElevenLabs by scripts/training/make_narration.py, named by the coach and a hash of the
 /// text) and falls back to the device's own voice for anything not recorded.
 @MainActor
 final class CoachVoice: NSObject {
@@ -35,16 +35,24 @@ final class CoachVoice: NSObject {
         }
     }
 
-    /// The recorded file for a line: "nar-" and the first 12 hex digits of its SHA-1.
-    static func fileName(for text: String) -> String {
+    /// The recorded file for a line: the coach's prefix ("nar-" for Leo, "vera-" for Vera)
+    /// and the first 12 hex digits of its SHA-1.
+    static func fileName(for text: String, coach: Coach = .leo) -> String {
         let digest = Insecure.SHA1.hash(data: Data(text.utf8))
         let hex = digest.map { String(format: "%02x", $0) }.joined()
-        return "nar-" + hex.prefix(12)
+        return coach.filePrefix + hex.prefix(12)
     }
 
-    static func hasRecording(for text: String) -> Bool {
-        Bundle.main.url(forResource: fileName(for: text), withExtension: "mp3") != nil
+    static func recording(for text: String, coach: Coach) -> URL? {
+        Bundle.main.url(forResource: fileName(for: text, coach: coach), withExtension: "mp3")
     }
+
+    static func hasRecording(for text: String, coach: Coach = .leo) -> Bool {
+        recording(for: text, coach: coach) != nil
+    }
+
+    /// Talking right now: a recording or the device's voice.
+    var isSpeaking: Bool { player?.isPlaying == true || synthesizer.isSpeaking }
 
     /// Says a line and returns when it's finished, stopped or cancelled.
     /// Muted, it waits about as long as reading the line takes.
@@ -105,7 +113,7 @@ final class CoachVoice: NSObject {
 
     private func play(recordingFor text: String) -> Bool {
         guard
-            let url = Bundle.main.url(forResource: Self.fileName(for: text), withExtension: "mp3"),
+            let url = Self.recording(for: text, coach: Coach.current),
             let player = try? AVAudioPlayer(contentsOf: url)
         else { return false }
         player.delegate = self
@@ -115,9 +123,10 @@ final class CoachVoice: NSObject {
 
     private func speak(_ text: String) {
         let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = Self.deviceVoice
+        let coach = Coach.current
+        utterance.voice = Self.deviceVoice(for: coach)
         utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 1.02
-        utterance.pitchMultiplier = 0.95
+        utterance.pitchMultiplier = coach == .leo ? 0.95 : 1.02
         utterance.postUtteranceDelay = 0.1
         self.utterance = utterance
         synthesizer.delegate = self
@@ -130,15 +139,25 @@ final class CoachVoice: NSObject {
         continuation?.resume()
     }
 
-    /// The nicest English voice on the device.
-    private static let deviceVoice: AVSpeechSynthesisVoice? = {
+    /// The nicest English voice on the device for the coach: a man's for Leo (British first),
+    /// a woman's for Vera (American first).
+    private static func deviceVoice(for coach: Coach) -> AVSpeechSynthesisVoice? {
+        if let voice = deviceVoices[coach] { return voice }
         let english = AVSpeechSynthesisVoice.speechVoices().filter { $0.language.hasPrefix("en") }
-        let preferred = english.filter { $0.language == "en-GB" || $0.language == "en-US" }
-        return preferred.first { $0.quality == .premium }
-            ?? preferred.first { $0.quality == .enhanced }
+        let gender: AVSpeechSynthesisVoiceGender = coach == .leo ? .male : .female
+        let first = coach == .leo ? "en-GB" : "en-US"
+        let matching = english.filter { $0.gender == gender }
+        let ranked = matching.filter { $0.language == first } + matching.filter { $0.language != first }
+        let voice = ranked.first { $0.quality == .premium }
+            ?? ranked.first { $0.quality == .enhanced }
+            ?? ranked.first
             ?? english.first { $0.quality == .enhanced }
-            ?? AVSpeechSynthesisVoice(language: "en-GB")
-    }()
+            ?? AVSpeechSynthesisVoice(language: first)
+        deviceVoices[coach] = voice
+        return voice
+    }
+
+    private static var deviceVoices: [Coach: AVSpeechSynthesisVoice] = [:]
 
     fileprivate func playerFinished(_ finished: ObjectIdentifier) {
         guard let player, ObjectIdentifier(player) == finished else { return }

@@ -1,7 +1,7 @@
 import ChessKit
 import SwiftUI
 
-/// The Train screen: one thing to do today, picked by Coach Leo from the player's own
+/// The Train screen: one thing to do today, picked by the coach from the player's own
 /// games and progress, and six doors to everything else. It fits on one screen; each
 /// door opens its own short page.
 struct TrainingHubView: View {
@@ -12,6 +12,8 @@ struct TrainingHubView: View {
     @Environment(GameVault.self) private var vault
     @Environment(\.dismiss) private var dismiss
     @AppStorage("coachVoiceMuted") private var voiceMuted = false
+    @AppStorage(CoachReactions.storageKey) private var reactionsOn = true
+    @State private var coachChoice = CoachChoice.shared
     @State private var repertoire = RepertoireStore.live()
     /// The endgame record the whole app shares, so a study finished anywhere shows here.
     private var endgames: EndgameProgress { .shared }
@@ -113,7 +115,7 @@ struct TrainingHubView: View {
 
     private var coachLine: some View {
         HStack(alignment: .center, spacing: 12) {
-            CoachAvatar(theme: theme, size: 34)
+            coachMenu
             Text(greeting)
                 .font(.system(.subheadline, design: .themed))
                 .foregroundStyle(.secondary)
@@ -122,6 +124,30 @@ struct TrainingHubView: View {
             StreakPill(streak: store.streak, theme: theme)
         }
         .padding(.top, 2)
+    }
+
+    /// The coach's portrait; tap it to switch between Leo and Vera.
+    private var coachMenu: some View {
+        Menu {
+            Picker("Your coach", selection: coachBinding) {
+                ForEach(Coach.allCases) { coach in
+                    Text(coach.title).tag(coach)
+                }
+            }
+        } label: {
+            CoachAvatar(theme: theme, size: 34)
+        }
+        .accessibilityLabel("Your coach: \(coachChoice.coach.title)")
+        .accessibilityHint("Switch between Coach Leo and Coach Vera.")
+    }
+
+    private var coachBinding: Binding<Coach> {
+        Binding {
+            coachChoice.coach
+        } set: { coach in
+            coachChoice.coach = coach
+            CoachReactions.shared.preview(coach)
+        }
     }
 
     // MARK: Doors
@@ -195,6 +221,10 @@ struct TrainingHubView: View {
                 Toggle(isOn: Binding(get: { !voiceMuted }, set: { voiceMuted = !$0 })) {
                     Label("Coach's voice", systemImage: "speaker.wave.2.fill")
                 }
+                Toggle(isOn: $reactionsOn) {
+                    Label("Voice reactions", systemImage: "bubble.left.and.text.bubble.right.fill")
+                }
+                .disabled(voiceMuted)
                 Button {
                     showingLevelCheck = true
                 } label: {
@@ -310,7 +340,7 @@ struct TodayCard: View {
         if let reason = plan?.reason { return reason }
         switch store.todaysFocusReason {
         case .firstDay?:
-            return "Meet Coach Leo and the one habit that wins more games than any opening."
+            return "Meet \(Coach.current.title) and the one habit that wins more games than any opening."
         case .fromGames(let count)?:
             return "You missed this \(count == 2 ? "twice" : "\(count) times") in your games lately. Let's make it automatic."
         case .struggling?:

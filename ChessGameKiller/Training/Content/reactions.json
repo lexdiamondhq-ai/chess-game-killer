@@ -1,0 +1,115 @@
+{
+  "about": "Short spoken reactions in puzzles and drills, for each coach. CoachReactions picks one, never the same twice in a row, and only now and then (see ReactionPolicy). make_narration.py records every line in the coach's voice. Keep them short: a reaction should be over before the next move.",
+  "coaches": {
+    "leo": {
+      "hello": [
+        "Leo here. Let's get to work."
+      ],
+      "nice": [
+        "Nice move.",
+        "Good.",
+        "That's the one.",
+        "Well played.",
+        "Lovely.",
+        "Yes. Very nice.",
+        "Clean.",
+        "Exactly right."
+      ],
+      "brilliant": [
+        "Brilliant move!",
+        "Oh, that's brilliant.",
+        "Now that is a move.",
+        "Beautiful. Absolutely beautiful.",
+        "Brilliant. I'd frame that one."
+      ],
+      "streak": [
+        "Three in a row. You're flying.",
+        "You're on a roll.",
+        "Another one. Keep them coming."
+      ],
+      "keepGoing": [
+        "Good. Keep going.",
+        "Yes. And now?",
+        "Right. Next move."
+      ],
+      "afterHelp": [
+        "There it is.",
+        "Got there.",
+        "That's it. Next time, on your own."
+      ],
+      "tryAgain": [
+        "Try again.",
+        "Not quite. Have another look.",
+        "Hmm. Look again.",
+        "Close. Try again.",
+        "Not that one."
+      ],
+      "blunder": [
+        "Why did you do that?",
+        "Oh no. Why did you do that?",
+        "Wait. That piece just hangs.",
+        "Hmm. What's protecting that?"
+      ],
+      "missed": [
+        "We'll get the next one.",
+        "That's a tricky one.",
+        "Learn it, and move on."
+      ]
+    },
+    "vera": {
+      "hello": [
+        "Hi, I'm Vera. Let's make you dangerous."
+      ],
+      "nice": [
+        "Nice move!",
+        "Yes!",
+        "Good eye.",
+        "That's it.",
+        "Sharp.",
+        "Love it.",
+        "Exactly.",
+        "Nicely done."
+      ],
+      "brilliant": [
+        "Brilliant move!",
+        "Oh, that's brilliant!",
+        "Wow. That's a grandmaster move.",
+        "Stunning. Do that again.",
+        "That was gorgeous."
+      ],
+      "streak": [
+        "Three in a row! You're on fire.",
+        "Look at you go.",
+        "Another one. Keep it up!"
+      ],
+      "keepGoing": [
+        "Good. Keep going.",
+        "Yes, now finish it.",
+        "And next?"
+      ],
+      "afterHelp": [
+        "There you go.",
+        "Got it. Next time, solo.",
+        "That's the one."
+      ],
+      "tryAgain": [
+        "Try again.",
+        "Not quite. Look again.",
+        "Mm, not that one.",
+        "Close! Try again.",
+        "Nope. Have another look."
+      ],
+      "blunder": [
+        "Why did you do that?",
+        "Wait, why did you do that?",
+        "Hey! That piece is hanging.",
+        "Ooh. Check what's guarding that."
+      ],
+      "missed": [
+        "We'll get the next one.",
+        "Tough one. Moving on.",
+        "Now you know the trick."
+      ]
+    }
+  }
+}

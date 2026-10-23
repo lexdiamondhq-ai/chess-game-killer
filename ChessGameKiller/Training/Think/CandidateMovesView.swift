@@ -198,7 +198,7 @@ private struct CandidatePositionView: View {
         case .checking:
             HStack(spacing: 10) {
                 ProgressView()
-                Text("Leo is checking…")
+                Text("\(Coach.current.name) is checking…")
                     .font(.system(.subheadline, design: .themed).weight(.semibold))
                     .foregroundStyle(.secondary)
             }
@@ -339,7 +339,7 @@ private struct CandidateVerdictCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Leo's verdict")
+                Text("\(Coach.current.name)'s verdict")
                     .font(.system(.headline, design: .themed))
                 Spacer()
                 TrainingChip(text: "+\(report.points)", symbol: "star.fill", color: theme.trainingAccent)
@@ -365,7 +365,7 @@ private struct CandidateVerdictCard: View {
         var parts: [String] = []
         if report.foundAt != nil { parts.append("Winner on your list +2") }
         if report.foundAt == 0 { parts.append("first idea +1") }
-        if report.otherMatches > 0 { parts.append("Leo's top three +\(report.otherMatches)") }
+        if report.otherMatches > 0 { parts.append("\(Coach.current.name)'s top three +\(report.otherMatches)") }
         return parts.isEmpty ? "No points this time. The winner is on the board in green." : parts.joined(separator: " · ")
     }
 }
@@ -455,7 +455,7 @@ private struct VerdictRow: View {
         if let listed = row.listed {
             parts.append("your candidate \(listed + 1)")
         } else if let rank = row.leoRank {
-            parts.append("Leo's choice \(rank + 1)")
+            parts.append("\(Coach.current.name)'s choice \(rank + 1)")
         }
         if row.isMatch { parts.append("counted") }
         return parts.joined(separator: ", ")
