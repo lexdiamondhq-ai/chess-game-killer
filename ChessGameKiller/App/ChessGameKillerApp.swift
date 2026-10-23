@@ -18,7 +18,7 @@ struct ChessGameKillerApp: App {
             Group {
                 if let showcase {
                     ContentView(startsWithNewGame: false, startsAtHome: false,
-                                match: showcase.match, coachOpen: showcase.coachOpen)
+                                match: showcase.match, coachOpen: showcase.coachOpen, vision: showcase.vision)
                 } else {
                     ContentView()
                 }
@@ -67,11 +67,14 @@ enum HintsIntroduction {
 /// both sides and you to move. A normal launch never passes it, and then nothing here runs.
 ///
 /// Other arguments: `-showcaseLook midnight` (any look's id), `-showcase3D NO`,
-/// `-showcaseRival spark` (a rival's name), `-showcaseClock 15+10` (or `none`), `-showcaseCoach open`.
+/// `-showcaseRival spark` (a rival's name), `-showcaseClock 15+10` (or `none`), `-showcaseCoach open`,
+/// `-showcaseGhost all` (Ghost Vision held, the whole line) or `-showcaseGhost 1` (held, slid back to its second move).
 /// The look and the 3D switch are saved as settings, so the screen draws exactly as it would for a player.
 struct Showcase {
     let match: MatchController
     let coachOpen: Bool
+    /// Ghost Vision, already held, when asked for.
+    var vision: GhostVision?
 
     /// 1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. Ng5 d5 5. exd5 Nxd5 6. Nxf7 Kxf7 7. Qf3+ Ke6.
     static let moves = ["e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "g8f6", "f3g5", "d7d5",
@@ -95,7 +98,12 @@ struct Showcase {
         for move in moves {
             _ = match.game.playEngineMove(move)
         }
-        return Showcase(match: match, coachOpen: defaults.string(forKey: "showcaseCoach") == "open")
+        var vision: GhostVision?
+        if let ghost = defaults.string(forKey: "showcaseGhost") {
+            defaults.set(true, forKey: GhostVision.storageKey)
+            vision = GhostVision(holding: true, focus: Int(ghost))
+        }
+        return Showcase(match: match, coachOpen: defaults.string(forKey: "showcaseCoach") == "open", vision: vision)
     }
 
     /// A YES/NO launch argument. Arguments arrive as text, which a Bool setting won't read.

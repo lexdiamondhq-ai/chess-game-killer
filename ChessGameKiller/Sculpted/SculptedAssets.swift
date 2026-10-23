@@ -80,9 +80,11 @@ final class SculptedAssets {
 
     // MARK: Finishes
 
-    /// Ivory or ebony for the body and its shade; the metal, gems and pearls are the same on both sides.
+    /// Ivory or ebony for the body and its shade. The gems are the same on both sides; the metal and
+    /// pearls too, unless the look darkens them on the ivory (`ivoryMetal`, `ivoryPearl`).
     func material(_ finish: Finish, for color: Piece.Color, look: SculptedLook) -> SCNMaterial {
-        let sided = finish == .body || finish == .shade
+        let darkMarks = color == .white && ((finish == .metal && look.ivoryMetal != nil) || (finish == .pearl && look.ivoryPearl != nil))
+        let sided = finish == .body || finish == .shade || darkMarks
         let key = "\(look.name)-" + (sided ? "\(finish)-\(color.rawValue)" : "\(finish)")
         if let cached = materials[key] { return cached }
         let made: SCNMaterial
@@ -92,6 +94,10 @@ final class SculptedAssets {
             if look.ivoryEdge > 0 { made.shaderModifiers = [.surface: Self.edgeShading(look.ivoryEdge)] }
         case .body:
             made = Self.pbr(look.ebony, polish: look.ebonyPolish)
+        case .metal where darkMarks:
+            made = Self.pbr(look.ivoryMetal ?? look.platinum, roughness: 0.28, metalness: 1, coat: 0.6, coatRoughness: 0.05)
+        case .pearl where darkMarks:
+            made = Self.pbr(look.ivoryPearl ?? look.pearl, roughness: 0.15, coat: 1, coatRoughness: 0.03)
         case .metal:
             made = Self.pbr(look.platinum, roughness: look.metalRoughness, metalness: 1)
             if let glow = look.metalGlow { made.emission.contents = glow }
@@ -135,7 +141,7 @@ final class SculptedAssets {
 
     /// The fine metal line around the squares: platinum, or the look's own metal.
     func inlayMaterial(_ look: SculptedLook) -> SCNMaterial {
-        guard let inlay = look.inlay else { return material(.metal, for: .white, look: look) }
+        guard let inlay = look.inlay else { return material(.metal, for: .black, look: look) }
         return Self.pbr(inlay, roughness: 0.2, metalness: 1)
     }
 
@@ -304,6 +310,11 @@ struct SculptedLook {
     /// A glow of the gems' own, such as the gilded knight's amber eyes; nil for none.
     var gemGlow: UIColor?
     var pearl = UIColor(red: 0.965, green: 0.95, blue: 0.93, alpha: 1)
+    /// The marks on the ivory pieces (cross, crown, mitre core, merlon caps, mane) in a dark metal
+    /// and onyx, so they read against the white as the platinum does on the black; nil keeps the
+    /// look's metal on both sides (the gilded set's gold).
+    var ivoryMetal: UIColor? = UIColor(red: 0.09, green: 0.09, blue: 0.1, alpha: 1)
+    var ivoryPearl: UIColor? = UIColor(red: 0.02, green: 0.02, blue: 0.024, alpha: 1)
     var lacquer = UIColor(red: 0.07, green: 0.07, blue: 0.08, alpha: 1)
     var lacquerRoughness: CGFloat = 0.42
     var lacquerCoat: CGFloat = 0.18
@@ -389,6 +400,8 @@ extension SculptedLook {
         look.sapphire = UIColor(red: 1, green: 0.62, blue: 0.22, alpha: 1)
         look.gemGlow = UIColor(red: 1, green: 0.5, blue: 0.1, alpha: 1)
         look.pearl = look.platinum
+        look.ivoryMetal = nil
+        look.ivoryPearl = nil
         look.inlay = UIColor(red: 0.95, green: 0.74, blue: 0.45, alpha: 1)
         look.platinumMark = UIColor(red: 0.95, green: 0.8, blue: 0.58, alpha: 1)
         return look

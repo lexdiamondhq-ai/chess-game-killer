@@ -125,6 +125,10 @@ jobs:
           shoot neon -showcaseLook neon
           shoot spark -showcaseLook spark -showcaseRival spark -showcaseClock 3+2
           shoot coach -showcaseLook gilded -showcase3D NO -showcaseCoach open
+          # Ghost Vision held: the engine's line ahead as see-through pieces, then slid back a step.
+          shoot ghost-3d -showcaseLook gilded -showcase3D YES -showcaseGhost all
+          shoot ghost-flat -showcaseLook gilded -showcase3D NO -showcaseGhost all
+          shoot ghost-step -showcaseLook midnight -showcase3D NO -showcaseGhost 1
           # The home screen as the app opens on it (in the look the last shot left), then at its sections.
           home() {
             name=$1; shift
@@ -175,7 +179,7 @@ jobs:
         # The screens being worked on, once more at the very end and small, so a short tail of the log holds them.
         run: |
           [ -d snapshots ] || exit 0
-          for f in snapshots/talk-*.png snapshots/coach-open-*.png snapshots/train-session-*.png snapshots/coaches-*.png; do
+          for f in snapshots/ghost-*.png snapshots/device-ghost-*.png snapshots/coaches-*.png; do
             [ -e "$f" ] || continue
             sips -s format jpeg -s formatOptions 50 -Z 360 "$f" --out /tmp/tiny.jpg >/dev/null
             echo "BEGIN-SCREEN $(basename "$f")"
