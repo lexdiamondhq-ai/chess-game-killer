@@ -34,7 +34,7 @@ struct SculptedSceneView: UIViewRepresentable {
 }
 
 /// The game board in real 3D: tap a piece to lift it and see its moves, tap a dot to play.
-/// The same jobs as the flat `BoardView`: best-move arrows, check, promotion, the army's
+/// The same jobs as the flat `BoardView`: the coach's hints, check, promotion, the army's
 /// names and glows, haptics and a VoiceOver square for every square.
 struct SculptedBoardView: View {
     let match: MatchController
@@ -232,11 +232,14 @@ struct SculptedBoardView: View {
     }
 }
 
-/// A 3D board that is not for playing, such as the Settings preview: a position and arrows.
+/// A 3D board that is not for playing, such as the Settings preview: a position, a piece
+/// shown as tapped with its moves, and the coach's hints.
 struct SculptedStillBoard: View {
     let position: Position
     var look: SculptedLook = .gilded
     var hints: [SculptedHint] = []
+    var selected: Square?
+    var targets: Set<Square> = []
 
     @State private var stage = SculptedStage()
 
@@ -250,6 +253,8 @@ struct SculptedStillBoard: View {
     private var state: SculptedBoardState {
         SculptedBoardState(
             pieces: position.pieces.map { PlacedPiece(id: 0, piece: $0) },
+            selected: selected,
+            targets: targets,
             hints: hints,
             matchesPieces: true
         )

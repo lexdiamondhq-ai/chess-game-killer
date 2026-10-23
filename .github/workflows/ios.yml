@@ -72,7 +72,7 @@ jobs:
           [ -d snapshots ] || exit 0
           cat snapshots/device.txt || true
           # The newest effects print last, so the end of the log shows them.
-          LAST="sculpted-finale sculpted-big-capture check"
+          LAST="sculpted-finale sculpted-big-capture check hints capture-fall"
           ORDERED=$(ls snapshots/*.png | grep -v -E "$(echo $LAST | tr ' ' '|')"; for p in $LAST; do ls snapshots/$p-*.png 2>/dev/null; done)
           for f in $ORDERED; do
             [ -e "$f" ] || continue

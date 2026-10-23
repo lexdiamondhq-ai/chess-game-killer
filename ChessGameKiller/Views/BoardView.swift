@@ -2,7 +2,8 @@ import ChessKit
 import SwiftUI
 
 /// The interactive board: tap a piece to see its moves, tap a dot to play.
-/// Shows the two best moves as arrows and blows up captured pieces.
+/// With hints on, the coach's picks are marked by corner brackets on the piece and a
+/// ringed dot where it should go. A taken piece tips over and falls away.
 struct BoardView: View {
     let match: MatchController
     var theme: BoardTheme = .neon
@@ -55,7 +56,6 @@ struct BoardView: View {
                 ZStack(alignment: .topLeading) {
                     squares(size: sq)
                     pieces(size: sq)
-                    arrows(size: sq)
                     nameTag(size: sq)
                     CheckCalloutLayer(game: game, color: theme.check) { square in
                         calloutPoint(over: square, size: sq)
@@ -80,8 +80,8 @@ struct BoardView: View {
                     corner.strokeBorder(edge, lineWidth: 1)
                 }
             }
-            // Explosions sit outside the clip so shards can fly past the edge.
-            .overlay(alignment: .topLeading) { explosions(size: sq).padding(inset) }
+            // Falling pieces sit outside the clip, so one on the edge can fall past it.
+            .overlay(alignment: .topLeading) { captures(size: sq).padding(inset) }
             .background {
                 // Soft shadow or colored glow (Neon) around the board.
                 ForEach(Array(theme.boardShadows.enumerated()), id: \.offset) { index, color in
@@ -94,7 +94,7 @@ struct BoardView: View {
         .aspectRatio(1, contentMode: .fit)
         .sensoryFeedback(.impact(weight: .light), trigger: game.moveCount) { _, _ in hapticsOn }
         .sensoryFeedback(.warning, trigger: game.personInCheck) { _, new in hapticsOn && new != nil }
-        // Capture events are dropped once the explosion is over, which changes the
+        // Capture events are dropped once the fall is over, which changes the
         // trigger a second time; only a new capture should thump.
         .sensoryFeedback(.impact(weight: .heavy, intensity: 0.9), trigger: game.captureEvents.last?.id) { _, new in
             hapticsOn && new != nil
@@ -123,6 +123,18 @@ struct BoardView: View {
 
     // MARK: Squares, highlights and hints
 
+    /// The pieces the coach suggests moving, true for the best move's piece.
+    private var hintedPieces: [Square: Bool] {
+        match.hints.reduce(into: [:]) { result, hint in result[hint.from] = (result[hint.from] ?? false) || hint.rank == 0 }
+    }
+
+    /// Where the selected piece's suggested moves land, true for the best one.
+    private var hintedTargets: [Square: Bool] {
+        guard let selected = game.selected else { return [:] }
+        return match.hints.filter { $0.from == selected }
+            .reduce(into: [:]) { result, hint in result[hint.to] = (result[hint.to] ?? false) || hint.rank == 0 }
+    }
+
     private func squares(size: CGFloat) -> some View {
         VStack(spacing: 0) {
             ForEach(0..<8, id: \.self) { row in
@@ -140,6 +152,7 @@ struct BoardView: View {
         let labelColor = isLight ? theme.labelOnLight : theme.labelOnDark
         let occupant = game.piece(at: square)
         let isTarget = game.targets.contains(square)
+        let hintedTarget = isTarget ? hintedTargets[square] : nil
         let ringWidth = size * 0.035
 
         return ZStack {
@@ -164,6 +177,11 @@ struct BoardView: View {
             if game.checkedKing == square {
                 CheckSquareMark(color: theme.check, size: size)
             }
+            // The coach's pick: brackets in the corners, clear of the coordinates.
+            if let isBest = hintedPieces[square] {
+                HintBrackets(color: theme.hint, size: size, skipTopLeading: column == 0, skipBottomTrailing: row == 7)
+                    .opacity(isBest ? 1 : 0.5)
+            }
 
             // Coordinates in the corners, like a printed board.
             if column == 0 {
@@ -173,16 +191,9 @@ struct BoardView: View {
                 coordinate(square.file.rawValue, size: size, color: labelColor, alignment: .bottomTrailing)
             }
 
-            // Legal-move hints: a dot on empty squares, a ring around captures.
+            // Where the selected piece can go: a dot on empty squares, a ring around captures.
             if isTarget {
-                Group {
-                    if occupant == nil {
-                        Circle().fill(theme.hint).frame(width: size * 0.3, height: size * 0.3)
-                    } else {
-                        Circle().strokeBorder(theme.hint, lineWidth: size * 0.08).padding(size * 0.02)
-                    }
-                }
-                .shadow(color: theme.hintGlow ?? .clear, radius: theme.hintGlow == nil ? 0 : size * 0.1)
+                MoveDot(occupied: occupant != nil, hint: hintedTarget, color: theme.hint, glow: theme.hintGlow, size: size)
             }
         }
         .frame(width: size, height: size)
@@ -191,7 +202,7 @@ struct BoardView: View {
             withAnimation(.snappy(duration: 0.22)) { match.tap(square) }
         }
         .accessibilityElement()
-        .accessibilityLabel(accessibilityLabel(square, occupant: occupant, isTarget: isTarget))
+        .accessibilityLabel(accessibilityLabel(square, occupant: occupant, isTarget: isTarget, hinted: hintedTarget))
         .accessibilityAddTraits(.isButton)
     }
 
@@ -203,10 +214,11 @@ struct BoardView: View {
             .padding(size * 0.05)
     }
 
-    private func accessibilityLabel(_ square: Square, occupant: Piece?, isTarget: Bool) -> String {
+    private func accessibilityLabel(_ square: Square, occupant: Piece?, isTarget: Bool, hinted: Bool?) -> String {
         var parts = [square.notation]
         if let occupant { parts.append(occupant.spokenName) }
         if isTarget { parts.append(occupant == nil ? "move here" : "capture") }
+        if let hinted { parts.append(hinted ? "the coach's best move" : "the coach's second choice") }
         if let hint = match.hints.first(where: { $0.from == square }) {
             parts.append(hint.rank == 0 ? "best move \(hint.san)" : "second best move \(hint.san)")
         }
@@ -275,46 +287,28 @@ struct BoardView: View {
         return CGPoint(x: center.x, y: center.y + size * (onTop ? 0.85 : (theme.spritePieces ? -1.2 : -0.8)))
     }
 
-    // MARK: Best-move arrows
+    // MARK: Captures
 
-    /// The best move as a solid arrow, the second best as a dashed one.
-    private func arrows(size: CGFloat) -> some View {
-        ZStack {
-            ForEach(Array(match.hints.reversed())) { hint in
-                MoveArrow(
-                    from: center(of: hint.from, size: size),
-                    to: center(of: hint.to, size: size),
-                    squareSize: size,
-                    isBest: hint.rank == 0,
-                    color: hint.rank == 0 ? theme.bestArrow : theme.secondArrow,
-                    glow: theme.arrowGlow
-                )
-                .transition(.opacity)
+    /// Each taken piece falls where it stood, away from the piece that took it.
+    private func captures(size: CGFloat) -> some View {
+        ZStack(alignment: .topLeading) {
+            ForEach(game.captureEvents) { event in
+                CaptureFall(piece: event.piece, theme: theme, size: size, seed: event.id,
+                            away: fallDirection(of: event))
+                    .position(center(of: event.piece.square, size: size))
             }
         }
         .frame(width: size * 8, height: size * 8)
-        .animation(.easeInOut(duration: 0.25), value: match.hints)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
 
-    // MARK: Captures
-
-    private func explosions(size: CGFloat) -> some View {
-        ZStack(alignment: .topLeading) {
-            ForEach(game.captureEvents) { event in
-                CaptureExplosion(
-                    piece: event.piece,
-                    theme: theme,
-                    size: size,
-                    seed: event.id
-                )
-                .position(center(of: event.piece.square, size: size))
-            }
-        }
-        .frame(width: size * 8, height: size * 8)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
+    /// Which way a taken piece falls on screen: away from the side the capture came from.
+    /// Nil for a capture straight up or down the board.
+    private func fallDirection(of event: CaptureEvent) -> CGFloat? {
+        guard let from = event.from else { return nil }
+        let dx = cell(of: event.piece.square).column - cell(of: from).column
+        return dx == 0 ? nil : (dx > 0 ? 1 : -1)
     }
 }
 
@@ -393,191 +387,144 @@ struct MoveArrow: View {
     }
 }
 
-/// A captured piece bursting apart: a flash, a shockwave, the piece breaking
-/// into shards and a spray of sparks in the theme's colors. Lessons and drills use it too.
-struct CaptureExplosion: View {
-    let piece: Piece
-    let theme: BoardTheme
+/// Where the selected piece can go: a dot on an empty square, a ring around a piece it
+/// can take. The coach's pick gets a halo ring (fainter for the runner-up), so it stands
+/// out among the other dots without an arrow across the board.
+struct MoveDot: View {
+    let occupied: Bool
+    /// Nil for an ordinary move; true for the coach's best move, false for its second choice.
+    var hint: Bool? = nil
+    let color: Color
+    var glow: Color? = nil
     let size: CGFloat
-    let seed: Int
-
-    @State private var burst = false
-    /// With Reduce Motion on, nothing flies or grows: the flash and shockwave only fade.
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private struct Shard: Identifiable {
-        let id: Int
-        let start: Angle
-        let end: Angle
-        let distance: CGFloat
-        let spin: Double
-    }
-
-    private struct Spark: Identifiable {
-        let id: Int
-        let angle: Double
-        let distance: CGFloat
-        let radius: CGFloat
-        let colorIndex: Int
-        let delay: Double
-    }
-
-    private var colors: [Color] { theme.sparks(for: piece.color) }
 
     var body: some View {
-        let canvas = size * 4.2
         ZStack {
-            // Flash
-            Circle()
-                .fill(RadialGradient(
-                    colors: [Color.white, colors[1 % colors.count], colors[1 % colors.count].opacity(0)],
-                    center: .center, startRadius: 0, endRadius: size * 0.6
-                ))
-                .frame(width: size * 1.2, height: size * 1.2)
-                .scaleEffect(flashScale)
-                .opacity(burst ? 0 : 0.95)
-                .animation(.easeOut(duration: 0.45), value: burst)
-
-            // Shockwave
-            Circle()
-                .strokeBorder(colors[0], lineWidth: size * (burst ? 0.02 : 0.12))
-                .frame(width: size, height: size)
-                .scaleEffect(waveScale)
-                .opacity(burst ? 0 : 0.9)
-                .shadow(color: colors[1 % colors.count], radius: size * 0.1)
-                .animation(.easeOut(duration: 0.6), value: burst)
-
-            if !reduceMotion {
-                // The piece, broken into wedges that fly apart.
-                ForEach(shards) { shard in
-                    PieceShardImage(piece: piece, theme: theme, size: size)
-                        .clipShape(Wedge(start: shard.start, end: shard.end))
-                        .shadow(color: colors[1 % colors.count], radius: size * 0.06)
-                        .shadow(color: colors[0], radius: size * 0.02)
-                        .rotationEffect(.degrees(burst ? shard.spin : 0))
-                        .offset(flight(of: shard))
-                        .scaleEffect(burst ? 0.7 : 1)
-                        .opacity(burst ? 0 : 1)
-                        .animation(.easeOut(duration: 0.8), value: burst)
+            if occupied {
+                if let hint {
+                    Circle().fill(color.opacity(hint ? 0.24 : 0.14)).padding(size * 0.02)
                 }
-
-                // Sparks
-                ForEach(sparks) { spark in
-                    let color = colors[spark.colorIndex % colors.count]
+                Circle().strokeBorder(color, lineWidth: size * (hint == true ? 0.1 : 0.08)).padding(size * 0.02)
+            } else {
+                if let hint {
                     Circle()
-                        .fill(color)
-                        .frame(width: spark.radius * 2, height: spark.radius * 2)
-                        .shadow(color: color, radius: spark.radius * 1.5)
-                        .offset(x: burst ? CGFloat(cos(spark.angle)) * spark.distance : 0,
-                                y: burst ? CGFloat(sin(spark.angle)) * spark.distance : 0)
-                        .scaleEffect(burst ? 0.2 : 1)
-                        .opacity(burst ? 0 : 1)
-                        .animation(.easeOut(duration: 0.85).delay(spark.delay), value: burst)
+                        .strokeBorder(color.opacity(hint ? 1 : 0.55), lineWidth: size * (hint ? 0.05 : 0.04))
+                        .frame(width: size * 0.66, height: size * 0.66)
                 }
+                Circle().fill(color).frame(width: size * 0.3, height: size * 0.3)
             }
         }
-        .frame(width: canvas, height: canvas)
-        .blendMode(theme.isDark ? .plusLighter : .normal)
-        .onAppear {
-            // On the next frame, so the burst animates from its starting state.
-            Task { @MainActor in burst = true }
-        }
-    }
-
-    private var flashScale: CGFloat {
-        if reduceMotion { return 1.2 }
-        return burst ? 1.9 : 0.3
-    }
-
-    private var waveScale: CGFloat {
-        if reduceMotion { return 1.6 }
-        return burst ? 2.8 : 0.4
-    }
-
-    /// How far a shard has flown: outward through the middle of its wedge.
-    private func flight(of shard: Shard) -> CGSize {
-        guard burst else { return .zero }
-        let middle = (shard.start.radians + shard.end.radians) / 2
-        return CGSize(width: CGFloat(cos(middle)) * shard.distance, height: CGFloat(sin(middle)) * shard.distance)
-    }
-
-    /// Shapes and paths that vary from capture to capture but stay put while one plays.
-    private var shards: [Shard] {
-        var random = SeededRandom(seed: seed)
-        let count = 6
-        let turn = 360.0 / Double(count)
-        let first = random.next() * turn
-        return (0..<count).map { i in
-            let start = first + Double(i) * turn
-            return Shard(
-                id: i,
-                start: .degrees(start),
-                end: .degrees(start + turn),
-                distance: size * CGFloat(0.7 + random.next() * 0.6),
-                spin: (random.next() - 0.5) * 400
-            )
-        }
-    }
-
-    private var sparks: [Spark] {
-        var random = SeededRandom(seed: seed &* 31 &+ 7)
-        return (0..<26).map { i in
-            Spark(
-                id: i,
-                angle: random.next() * 2 * .pi,
-                distance: size * CGFloat(0.7 + random.next() * 1.2),
-                radius: size * CGFloat(0.04 + random.next() * 0.05),
-                colorIndex: Int(random.next() * 4),
-                delay: random.next() * 0.06
-            )
-        }
+        .shadow(color: glow ?? .clear, radius: glow == nil ? 0 : size * 0.1)
+        .transition(.opacity.combined(with: .scale(scale: 0.6)))
+        .accessibilityHidden(true)
     }
 }
 
-/// The piece image for a shard, without the board's glow (the explosion has its own).
-private struct PieceShardImage: View {
+/// Four brackets in a square's corners: the piece the coach would move.
+struct HintBrackets: View {
+    let color: Color
+    let size: CGFloat
+    /// The corners where the board prints its coordinates.
+    var skipTopLeading = false
+    var skipBottomTrailing = false
+
+    var body: some View {
+        let line = size * 0.05
+        let inset = size * 0.08
+        let arm = size * 0.2
+        Path { path in
+            let low = inset, high = size - inset
+            if !skipTopLeading {
+                path.move(to: CGPoint(x: low, y: low + arm))
+                path.addLine(to: CGPoint(x: low, y: low))
+                path.addLine(to: CGPoint(x: low + arm, y: low))
+            }
+            path.move(to: CGPoint(x: high - arm, y: low))
+            path.addLine(to: CGPoint(x: high, y: low))
+            path.addLine(to: CGPoint(x: high, y: low + arm))
+            if !skipBottomTrailing {
+                path.move(to: CGPoint(x: high, y: high - arm))
+                path.addLine(to: CGPoint(x: high, y: high))
+                path.addLine(to: CGPoint(x: high - arm, y: high))
+            }
+            path.move(to: CGPoint(x: low + arm, y: high))
+            path.addLine(to: CGPoint(x: low, y: high))
+            path.addLine(to: CGPoint(x: low, y: high - arm))
+        }
+        .stroke(color, style: StrokeStyle(lineWidth: line, lineCap: .round, lineJoin: .round))
+        .frame(width: size, height: size)
+        .transition(.opacity)
+        .accessibilityHidden(true)
+    }
+}
+
+/// A taken piece leaving the board: it tips over away from the piece that took it,
+/// slides a touch and fades, and a soft ring of dust spreads where it stood.
+/// Lessons and drills use it too.
+struct CaptureFall: View {
     let piece: Piece
     let theme: BoardTheme
     let size: CGFloat
+    /// Picks the side it falls to when `away` doesn't say.
+    let seed: Int
+    /// Which way it falls on screen: 1 to the right, -1 to the left.
+    var away: CGFloat? = nil
+
+    /// The piece is tipping over.
+    @State private var falling = false
+    /// It has hit the board: the dust rises.
+    @State private var landed = false
+    /// The dust has spread and is settling.
+    @State private var settled = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var turn: CGFloat { away ?? (seed % 2 == 0 ? 1 : -1) }
+    /// Where the foot meets the square, as a fraction of the square: the renders stand
+    /// a little below the middle, the flat pieces at the bottom.
+    private var footY: CGFloat { theme.spritePieces ? 0.65 : 0.9 }
+    /// A rook or a queen lands harder.
+    private var heavy: Bool { piece.kind == .queen || piece.kind == .rook }
 
     var body: some View {
-        Image(theme.imageName(for: piece))
-            .resizable()
-            .interpolation(.high)
-            .scaledToFit()
-            .padding(size * 0.04)
-            .frame(width: size, height: size)
-    }
-}
-
-/// A pie slice from the center, used to cut a piece into shards.
-private struct Wedge: Shape {
-    let start: Angle
-    let end: Angle
-
-    func path(in rect: CGRect) -> Path {
-        let center = CGPoint(x: rect.midX, y: rect.midY)
-        let radius = max(rect.width, rect.height)
-        var path = Path()
-        path.move(to: center)
-        path.addArc(center: center, radius: radius, startAngle: start, endAngle: end, clockwise: false)
-        path.closeSubpath()
-        return path
-    }
-}
-
-/// Small repeatable random numbers, so each explosion looks different but stays stable.
-private struct SeededRandom {
-    private var state: UInt64
-
-    init(seed: Int) {
-        state = UInt64(truncatingIfNeeded: seed) &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+        // The far edge of the foot, which the piece pivots on as it goes over.
+        let pivot = UnitPoint(x: 0.5 + 0.2 * turn, y: footY)
+        let motion = !reduceMotion
+        ZStack {
+            dust
+            PieceImage(piece: piece, theme: theme, size: size, onBoard: true)
+                .rotationEffect(.degrees(falling && motion ? 80 * turn : 0), anchor: pivot)
+                .animation(.easeIn(duration: 0.26), value: falling)
+                .offset(x: landed && motion ? turn * size * 0.12 : 0)
+                .scaleEffect(landed ? 0.86 : 1, anchor: pivot)
+                .opacity(landed ? 0 : 1)
+                .animation(.easeOut(duration: motion ? 0.26 : 0.2), value: landed)
+        }
+        .frame(width: size * 3, height: size * 3)
+        .task {
+            // After the first frame, so it moves from where it stood.
+            falling = true
+            try? await Task.sleep(for: .milliseconds(reduceMotion ? 0 : 190))
+            landed = true
+            try? await Task.sleep(for: .milliseconds(70))
+            settled = true
+        }
     }
 
-    /// A number from 0 up to (not including) 1.
-    mutating func next() -> Double {
-        state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
-        return Double(state >> 11) / Double(UInt64(1) << 53)
+    /// A soft ring of dust on the board around the foot, seen at the same slant as the pieces.
+    @ViewBuilder
+    private var dust: some View {
+        if !reduceMotion {
+            let spread: CGFloat = heavy ? 2.1 : 1.7
+            Ellipse()
+                .strokeBorder(Color.white.opacity(0.55), lineWidth: size * (settled ? 0.015 : 0.06))
+                .frame(width: size * 0.8, height: size * 0.34)
+                .scaleEffect(settled ? spread : 0.75)
+                .opacity(settled ? 0 : (landed ? (heavy ? 0.75 : 0.55) : 0))
+                .blur(radius: size * 0.02)
+                .offset(y: size * (footY - 0.5))
+                .animation(settled ? .easeOut(duration: 0.5) : .easeOut(duration: 0.07), value: settled)
+                .animation(.easeOut(duration: 0.07), value: landed)
+        }
     }
 }
 

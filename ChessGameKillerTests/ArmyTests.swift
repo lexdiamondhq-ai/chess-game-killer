@@ -193,26 +193,26 @@ final class ArmyTests: XCTestCase {
             store.record(ledger, playerColor: setup.playerColor, won: false,
                          stakes: GameStakes(level: setup.level, assisted: assisted))
         }
-        match.start(.init(opponent: .computer, playerColor: .white), playSound: false)
+        match.start(.init(opponent: .computer, playerColor: .white))
         for move in ["e2e4", "e7e5", "g1f3", "b8c6"] { XCTAssertTrue(match.game.playEngineMove(move)) }
-        match.start(.init(opponent: .computer, playerColor: .white), playSound: false)
+        match.start(.init(opponent: .computer, playerColor: .white))
         XCTAssertEqual(abandoned, 1)
         XCTAssertEqual(store.record(for: .king).games, 1)
         XCTAssertEqual(store.record(for: .king).wins, 0)
 
         // Starting again straight away, before any moves, doesn't count.
-        match.start(.init(opponent: .computer, playerColor: .white), playSound: false)
+        match.start(.init(opponent: .computer, playerColor: .white))
         XCTAssertEqual(abandoned, 1)
     }
 
     func testUndoMarksTheGameAssisted() {
         let match = MatchController(engine: nil, sounds: nil)
-        match.start(.init(opponent: .friend), playSound: false)
+        match.startTapping()
         XCTAssertFalse(match.wasAssisted)
         XCTAssertTrue(match.game.playEngineMove("e2e4"))
         match.undo()
         XCTAssertTrue(match.wasAssisted)
-        match.start(.init(opponent: .friend), playSound: false)
+        match.startTapping()
         XCTAssertFalse(match.wasAssisted)
     }
 
