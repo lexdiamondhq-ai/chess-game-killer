@@ -698,15 +698,20 @@ struct CaptureFall: View {
         let heavy = piece.kind == .queen || piece.kind == .rook
         let spread: CGFloat = heavy ? 2.1 : 1.7
         let peak: CGFloat = heavy ? 0.75 : 0.55
-        let rise = Self.progress(.easeOut, t, from: 0.19, length: 0.07)
-        let settle = Self.progress(.easeOut, t, from: 0.26, length: 0.5)
+        let rise: CGFloat = Self.progress(.easeOut, t, from: 0.19, length: 0.07)
+        let settle: CGFloat = Self.progress(.easeOut, t, from: 0.26, length: 0.5)
+        // Worked out one by one: as a single expression this took the type checker seconds.
+        let line: CGFloat = size * (0.06 - 0.045 * settle)
+        let scale: CGFloat = 0.75 + (spread - 0.75) * settle
+        let fade: Double = Double(peak * rise * (1 - settle))
+        let drop: CGFloat = size * (footY - 0.5)
         return Ellipse()
-            .strokeBorder(Color.white.opacity(0.55), lineWidth: size * (0.06 - 0.045 * settle))
+            .strokeBorder(Color.white.opacity(0.55), lineWidth: line)
             .frame(width: size * 0.8, height: size * 0.34)
-            .scaleEffect(0.75 + (spread - 0.75) * settle)
-            .opacity(Double(peak * rise * (1 - settle)))
+            .scaleEffect(scale)
+            .opacity(fade)
             .blur(radius: size * 0.02)
-            .offset(y: size * (footY - 0.5))
+            .offset(y: drop)
     }
 
     /// How far along a step `length` seconds long, starting `start` seconds in, is at `t`, eased.
