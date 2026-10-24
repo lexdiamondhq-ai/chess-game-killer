@@ -825,7 +825,7 @@ private extension View {
         if let heirloom, !heirloom.isEmpty {
             overlay {
                 HeirloomOverlay(heirloom: heirloom, imageName: imageName, piece: piece)
-                    .mask { Image(imageName).resizable() }
+                    .mask { BoardSprite.image(imageName, onBoard: true).resizable() }
             }
         } else {
             self
