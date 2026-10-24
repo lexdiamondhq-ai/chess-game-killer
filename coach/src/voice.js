@@ -1,4 +1,4 @@
-// The coach's voice: Leo's answer read aloud by George on ElevenLabs, Vera's by
+// The coach's voice: Leo's answer read aloud by Monolith on ElevenLabs, Vera's by
 // Sarah, with the same model and settings as their recorded lessons
 // (scripts/training/make_narration.py), so the coach in a game sounds like the
 // coach in the lessons. When there's no
@@ -6,19 +6,20 @@
 // device's voice instead.
 
 const API = "https://api.elevenlabs.io/v1/text-to-speech";
-/** George: a warm, mature British storyteller. */
-const DEFAULT_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb";
+/** Monolith: a deep, dark American bass, designed for Leo. */
+const DEFAULT_VOICE_ID = "1b0g3hQZNdyIitkZW5BL";
 /** Sarah: a confident, warm young American woman. Vera's voice. */
 const DEFAULT_VERA_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
 const DEFAULT_VOICE_MODEL = "eleven_multilingual_v2";
-const OUTPUT_FORMAT = "mp3_44100_64";
+/** Leo's lessons are recorded at 128 kbps too (COACHES["leo"] in make_narration.py). */
+const OUTPUT_FORMAT = "mp3_44100_128";
 /** Exactly the lessons' settings (VOICE_SETTINGS in make_narration.py). */
 export const VOICE_SETTINGS = Object.freeze({
-  stability: 0.45,
-  similarity_boost: 0.8,
-  style: 0.25,
+  stability: 0.65,
+  similarity_boost: 0.9,
+  style: 0.0,
   use_speaker_boost: true,
-  speed: 0.97,
+  speed: 0.95,
 });
 /** Vera's lesson settings (COACHES["vera"] in make_narration.py): steady and clean, at 128 kbps. */
 export const VERA_VOICE_SETTINGS = Object.freeze({

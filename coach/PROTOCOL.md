@@ -23,7 +23,7 @@ release ──── POST /talk ───────────────→
          ←── line: checked ─────────────
                                           Claude: verdicts → Leo's answer       ─→ Anthropic
          ←── line: answer ──────────────
-                                          Leo's voice (George)                  ─→ ElevenLabs
+                                          Leo's voice (Monolith)                  ─→ ElevenLabs
          ←── line: voice ───────────────
          ←── line: done ────────────────
 ```
@@ -77,7 +77,7 @@ release ──── POST /talk ───────────────→
 | `lastMove` | Optional. The opponent's last move in engine notation (`f8c5`), for "he just…" claims. |
 | `voice` | Optional, default true. False skips the voice line (muted coach). |
 | `facts` | Optional but expected. Without it, engine-dependent claims come back `unclear`. |
-| `coach` | Optional: `"vera"` for Coach Vera (her persona, Sarah's voice). Anything else, or left out, is Leo (George's voice). |
+| `coach` | Optional: `"vera"` for Coach Vera (her persona, Sarah's voice). Anything else, or left out, is Leo (Monolith's voice). |
 | `facts.depth` | The search depth used. |
 | `facts.moves` | The player's legal moves, scored by Stockfish in P (MultiPV), **from the player's view**, best first. Ideally every legal move (the app asks for up to 40 lines). `pv` is the line from that move, at most 10 moves, engine notation. |
 | `facts.threats` | Stockfish's best moves for the opponent in N (MultiPV 6), **from the opponent's view**, best first. Empty or missing when the player is in check. |

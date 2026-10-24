@@ -2,7 +2,7 @@
 """Records each coach's voice for every line in the lessons, and their short
 reactions in puzzles and drills, with ElevenLabs.
 
-Two coaches teach the same course: Leo (George's voice) and Vera (Sarah's). The
+Two coaches teach the same course: Leo (Monolith's voice) and Vera (Sarah's). The
 course is written in Leo's words; for Vera his name becomes hers, exactly as
 Coach.personalize does in the app. Reactions ("Nice move.", "Try again.") come
 from Training/Content/reactions.json.
@@ -28,6 +28,8 @@ import hashlib
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 import time
 import urllib.error
@@ -40,12 +42,13 @@ NARRATION = ROOT / "ChessGameKiller" / "Training" / "Narration"
 
 MODEL = "eleven_multilingual_v2"
 OUTPUT_FORMAT = "mp3_44100_64"
-# Leo's settings, from the first recordings. Changing them doesn't re-record anything.
-VOICE_SETTINGS = {"stability": 0.45, "similarity_boost": 0.8, "style": 0.25, "use_speaker_boost": True, "speed": 0.97}
+# Leo's settings: steady and clean, no style exaggeration. Changing them doesn't re-record anything.
+VOICE_SETTINGS = {"stability": 0.65, "similarity_boost": 0.9, "style": 0.0, "use_speaker_boost": True, "speed": 0.95}
 COACHES = {
-    # George: a warm, mature British storyteller. Override with ELEVENLABS_VOICE_ID.
-    "leo": {"name": "Leo", "prefix": "nar-", "voice": os.environ.get("ELEVENLABS_VOICE_ID", "JBFqnCBsd6RMkjVDRZzb"),
-            "settings": VOICE_SETTINGS},
+    # Monolith: a deep, dark American bass, designed for Leo with ElevenLabs Voice Design.
+    # Override with ELEVENLABS_VOICE_ID. Recorded at 128 kbps, then mastered (MASTER).
+    "leo": {"name": "Leo", "prefix": "nar-", "voice": os.environ.get("ELEVENLABS_VOICE_ID", "1b0g3hQZNdyIitkZW5BL"),
+            "settings": VOICE_SETTINGS, "format": "mp3_44100_128", "master": True},
     # Sarah: a confident, warm young American woman. Override with ELEVENLABS_VERA_VOICE_ID.
     # Steady and clean: high stability, no style exaggeration, recorded at 128 kbps.
     "vera": {"name": "Vera", "prefix": "vera-", "voice": os.environ.get("ELEVENLABS_VERA_VOICE_ID", "EXAVITQu4vr4xnSDxMaL"),
@@ -55,6 +58,27 @@ COACHES = {
 # What LessonPlayer says when a task has no wrong-answer line of its own.
 DEFAULT_WRONG = "Not quite. Have another look."
 API = "https://api.elevenlabs.io/v1"
+# Leo's polish, with ffmpeg: a little more chest and less mud, softer "s", gentle
+# compression, the silence trimmed off both ends and every line at the same loudness.
+MASTER = ("highpass=f=45,equalizer=f=110:t=q:w=1:g=2.5,equalizer=f=320:t=q:w=1.2:g=-2,"
+          "equalizer=f=3500:t=q:w=1.5:g=1.5,deesser=i=0.4,"
+          "acompressor=threshold=-20dB:ratio=2.5:attack=8:release=120:makeup=2,"
+          "silenceremove=start_periods=1:start_threshold=-50dB,areverse,"
+          "silenceremove=start_periods=1:start_threshold=-50dB,areverse,apad=pad_dur=0.15,"
+          "loudnorm=I=-16:TP=-1.5:LRA=9")
+
+
+def master(audio: bytes) -> bytes:
+    """Leo's recording through MASTER; the raw recording when ffmpeg isn't installed or fails."""
+    if not shutil.which("ffmpeg"):
+        return audio
+    result = subprocess.run(["ffmpeg", "-loglevel", "error", "-f", "mp3", "-i", "pipe:0", "-af", MASTER,
+                             "-ar", "44100", "-b:a", "128k", "-f", "mp3", "pipe:1"],
+                            input=audio, capture_output=True)
+    if result.returncode != 0 or not result.stdout:
+        print(f"ffmpeg couldn't master a line, keeping it raw: {result.stderr.decode(errors='replace')[:200]}")
+        return audio
+    return result.stdout
 
 
 def file_name(text: str, coach: str = "leo") -> str:
@@ -239,6 +263,8 @@ def main() -> None:
             # Keep what's recorded so far (the workflow still commits it) and say why it stopped.
             failure = error
             break
+        if voice.get("master"):
+            audio = master(audio)
         (NARRATION / file_name(line, coach)).write_bytes(audio)
         budget -= len(line)
         recorded += 1
