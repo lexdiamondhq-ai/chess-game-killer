@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The glass dock at the foot of the home: the five ways into the app, the same every day.
+/// The glass dock at the foot of the home: the four ways into the app, the same every day.
 /// It never lights one up: it is a row of doors, not tabs. Once the clock card has scrolled
 /// away, the dock folds to its icons and the clock rides along at its side.
 struct HomeDock: View {
@@ -28,8 +28,7 @@ struct HomeDock: View {
             Door(title: "Train", glyph: Glyphs.train, hint: "Lessons with \(Coach.current.title) and the Grandmaster Room", action: actions.train),
             Door(title: "Puzzles", glyph: Glyphs.puzzles, hint: "Rated puzzles and Puzzle Rush", action: actions.puzzles),
             Door(title: "Analyze", glyph: Glyphs.analyze, hint: "Find the best move in any position", action: actions.analyze),
-            Door(title: "Games", glyph: Glyphs.games, hint: "Your saved games, to replay and rewrite", action: actions.rewind),
-            Door(title: "You", glyph: Glyphs.king, hint: "Your pieces and Settings", action: openYou),
+            Door(title: "You", glyph: Glyphs.king, hint: "Your pieces, your games and Settings", action: openYou),
         ]
     }
 
@@ -81,12 +80,13 @@ struct HomeDock: View {
     }
 }
 
-/// Your own things in one glass panel: your pieces and Settings (and Pro, once there is one).
+/// Your own things in one glass panel: your pieces, your games and Settings (and Pro, once there is one).
 /// It opens from the dock's You, or by pulling the board down, and comes from where it was
 /// asked for. Everything else has its own door, so nothing here is found twice.
 struct HomeYouPanel: View {
     let tone: HomeTone
     let piecesLine: String
+    let gamesLine: String
     let actions: HomeActions
     let fromTop: Bool
     let close: () -> Void
@@ -117,6 +117,8 @@ struct HomeYouPanel: View {
             }
             VStack(spacing: 0) {
                 HomeLinkRow(title: "Your pieces", detail: piecesLine, tone: tone) { go(actions.army) }
+                HomeHairline(tone: tone)
+                HomeLinkRow(title: "Your games", detail: gamesLine, tone: tone) { go(actions.rewind) }
                 HomeHairline(tone: tone)
                 HomeLinkRow(title: "Settings", detail: "Board look, sound, hints", tone: tone) { go(actions.settings) }
                 if let premium = actions.premium {

@@ -55,8 +55,8 @@ final class HomeSnapshotTests: XCTestCase {
         window.isHidden = true
     }
 
-    /// Friend games still going come right under the clock, your move first; with none going,
-    /// Challenge a friend waits after the ladder.
+    /// Challenge a friend, a sealed envelope, sits right under the clock, with friend games
+    /// still going under it, your move first.
     func testFriendGamesUnderTheClock() throws {
         let api = FakeChallengeAPI()
         let now = Date().timeIntervalSince1970 * 1000
@@ -73,13 +73,14 @@ final class HomeSnapshotTests: XCTestCase {
         let center = ChallengeCenter(api: api, store: ChallengeStore(games: states.map { FriendGame.sample($0, seat: .white) }),
                                      sounds: nil)
         let window = try show(HomeSample.home().environment(center))
-        scroll(window, to: 420)
+        scroll(window, to: 300)
         try save(window, "zz-home-8-friends")
         window.isHidden = true
 
         let none = ChallengeCenter(api: FakeChallengeAPI(), store: ChallengeStore(), sounds: nil)
         let quiet = try show(HomeSample.home().environment(none))
-        scroll(quiet, to: 1500)
+        try save(quiet, "zz-home-8-friends-none-rest")
+        scroll(quiet, to: 260)
         try save(quiet, "zz-home-8-friends-none")
         quiet.isHidden = true
     }
