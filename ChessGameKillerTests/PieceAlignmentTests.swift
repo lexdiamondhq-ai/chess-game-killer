@@ -25,10 +25,12 @@ final class PieceAlignmentTests: XCTestCase {
                 let black = try outline(theme.imageName(for: Piece(kind, color: .black, square: .a1)))
                 for (name, box) in [("white \(kind)", white), ("black \(kind)", black)] {
                     let label = "\(theme.name) \(name) at \(box)"
-                    XCTAssertGreaterThanOrEqual(box.minY, -0.48, "\(label) reaches out of the top of its square")
+                    XCTAssertGreaterThanOrEqual(box.minY, -0.475, "\(label) reaches out of the top of its square")
                     XCTAssertLessThanOrEqual(box.maxY, 0.48, "\(label) hangs out of the bottom of its square")
                     XCTAssertLessThanOrEqual(abs(box.midX), 0.02, "\(label) is off center sideways")
-                    XCTAssertLessThanOrEqual(abs(box.midY), 0.02, "\(label) is off center up or down")
+                    // Centered by eye: lifted a little from the box's middle, never dropped below it.
+                    XCTAssertLessThanOrEqual(box.midY, 0.005, "\(label) sits low in its square")
+                    XCTAssertGreaterThanOrEqual(box.midY, -0.13, "\(label) sits high in its square")
                     XCTAssertGreaterThanOrEqual(box.height, 0.5, "\(label) is too small to read")
                 }
                 XCTAssertEqual(white.height, black.height, accuracy: 0.04, "\(theme.name) \(kind)s differ in height")

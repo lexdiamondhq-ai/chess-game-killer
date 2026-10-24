@@ -914,15 +914,24 @@ struct SpriteFrame: Equatable {
     /// No piece is drawn wider than this, in squares.
     static let widest: CGFloat = 0.84
 
+    /// How far above its square's center a piece may reach, in squares: a hair inside the square.
+    static let topRoom: CGFloat = 0.47
+    /// A lift every piece gets, in squares: the eye takes a piece's middle a touch above its box's.
+    static let opticalLift: CGFloat = 0.03
+
     /// This frame set on a board by the piece's own outline (`solid`, as fractions of the picture):
-    /// scaled to its kind's height and set dead center in its square, up and down and side to side.
-    func placed(solid: CGRect, kind: Character) -> SpriteFrame {
+    /// scaled to its kind's height and centered in its square by the eye, not the ruler. Its weight
+    /// (`weight`, the body's average row) goes on the square's center, plus a small optical lift,
+    /// as far as the square's top allows: a broad base would otherwise make a piece look low.
+    func placed(solid: CGRect, weight: CGFloat? = nil, kind: Character) -> SpriteFrame {
         let tall = solid.height * height
         let wide = solid.width * width
         guard tall > 0, wide > 0 else { return self }
         let target = Self.standingHeight[kind] ?? 0.8
         let scale = min(target / tall, Self.widest / wide)
-        let lift = (foot - solid.midY * height) * scale
+        let heavy = max(0, ((weight ?? solid.midY) - solid.midY) * height * scale)
+        let up = min(heavy + Self.opticalLift, max(0, Self.topRoom - tall * scale / 2))
+        let lift = (foot - solid.midY * height) * scale - up
         let shift = (0.5 - solid.midX) * width * scale
         return SpriteFrame(width: width, height: height, foot: foot, boardScale: scale, lift: lift,
                            reach: reach, below: below, shift: shift)
@@ -936,8 +945,8 @@ struct SpriteFrame: Equatable {
         if let frame = known[name] { return frame }
         let size = UIImage(named: name)?.size ?? .zero
         var frame = size.width > 0 && size.height / size.width > 1.25 ? sideOn : fromAbove
-        if let solid = SpriteMasks.shared.mask(named: name)?.solid, let kind = name.last {
-            frame = frame.placed(solid: solid, kind: kind)
+        if let mask = SpriteMasks.shared.mask(named: name), let solid = mask.solid, let kind = name.last {
+            frame = frame.placed(solid: solid, weight: mask.weight, kind: kind)
         }
         known[name] = frame
         return frame
