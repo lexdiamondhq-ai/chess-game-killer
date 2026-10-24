@@ -7,6 +7,7 @@ struct PuzzlesDoorView: View {
     @Environment(PuzzleStore.self) private var puzzles
     @Environment(TrainingStore.self) private var training
     @State private var cover: Cover?
+    @State private var offer: PremiumFeature?
 
     enum Cover: String, Identifiable {
         case rated, rush, cycles, review
@@ -24,17 +25,17 @@ struct PuzzlesDoorView: View {
                          value: puzzles.progress.rushBest > 0 ? "Best \(puzzles.progress.rushBest)" : nil, theme: theme)
             }
             .buttonStyle(.plain)
-            Button { cover = .cycles } label: {
+            Button { open(.cycles, needs: .puzzleCycles) } label: {
                 TrainRow(symbol: "arrow.triangle.2.circlepath", title: "Cycles",
                          detail: "The Woodpecker method: the same puzzles, faster every round, until the patterns are instant.",
-                         value: puzzles.cycleStatus, theme: theme)
+                         value: Premium.shared.opens(.puzzleCycles) ? puzzles.cycleStatus : "Premium", theme: theme)
             }
             .buttonStyle(.plain)
-            Button { cover = .review } label: {
+            Button { open(.review, needs: .puzzleReview) } label: {
                 TrainRow(symbol: "clock.arrow.circlepath", title: "Review",
                          detail: "Puzzles you missed come back just before you'd forget them.",
-                         value: puzzles.reviewsDue == 0 ? "All caught up" : nil,
-                         badge: puzzles.reviewsDue, theme: theme)
+                         value: reviewValue,
+                         badge: Premium.shared.opens(.puzzleReview) ? puzzles.reviewsDue : 0, theme: theme)
             }
             .buttonStyle(.plain)
             Text("Puzzles come from the Lichess database, free for everyone.")
@@ -43,6 +44,7 @@ struct PuzzlesDoorView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 6)
         }
+        .premiumOffer($offer)
         .fullScreenCover(item: $cover) { cover in
             switch cover {
             case .rated:
@@ -55,6 +57,16 @@ struct PuzzlesDoorView: View {
                 PuzzleReviewView(theme: theme).environment(puzzles)
             }
         }
+    }
+
+    private var reviewValue: String? {
+        guard Premium.shared.opens(.puzzleReview) else { return "Premium" }
+        return puzzles.reviewsDue == 0 ? "All caught up" : nil
+    }
+
+    /// Opens a way to play, or the Premium offer when it's Premium's.
+    private func open(_ next: Cover, needs feature: PremiumFeature) {
+        if Premium.shared.opens(feature) { cover = next } else { offer = feature }
     }
 
     /// Rated puzzles: the rating, the streak, the theme in use, and Play.

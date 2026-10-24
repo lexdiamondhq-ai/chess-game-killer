@@ -24,6 +24,9 @@ struct PuzzlesView: View {
     @State private var rush: RushRound?
     /// Asking before a Rush under way is thrown away: by End, or by closing.
     @State private var confirmingEnd: EndChoice?
+    /// Today's free puzzles (or Rush) are used up.
+    @State private var limit: PremiumFeature?
+    @State private var offer: PremiumFeature?
 
     enum EndChoice: Identifiable {
         case end, close
@@ -47,6 +50,11 @@ struct PuzzlesView: View {
                     if store.library == nil {
                         Spacer()
                         ProgressView("Loading puzzles…")
+                        Spacer()
+                    } else if let limit {
+                        Spacer()
+                        PremiumLimitCard(feature: limit, accent: theme.trainingAccent)
+                            .padding(.horizontal, 16)
                         Spacer()
                     } else if mode == .rush, rush == nil || rush?.isOver == true {
                         RushCard(theme: theme, best: store.progress.rushBest, last: rush) { startRush() }
@@ -102,8 +110,10 @@ struct PuzzlesView: View {
             runner = nil
             puzzle = nil
             change = nil
+            limit = nil
             if mode == .rated { rush = nil; nextRated() }
         }
+        .premiumOffer($offer)
         .onDisappear { runner?.cancel() }
         .confirmationDialog("End this Rush?", isPresented: Binding(get: { confirmingEnd != nil },
                                                                    set: { if !$0 { confirmingEnd = nil } }),
@@ -248,6 +258,15 @@ struct PuzzlesView: View {
 
     private func nextRated() {
         change = nil
+        // Free players get 15 rated puzzles a day; each counts once it's played.
+        guard Premium.shared.canUse(.ratedPuzzle) else {
+            runner?.cancel()
+            runner = nil
+            puzzle = nil
+            limit = .ratedPuzzle
+            return
+        }
+        limit = nil
         show(store.nextRated(), strict: false)
     }
 
@@ -265,6 +284,7 @@ struct PuzzlesView: View {
     private func finished(_ puzzle: LichessPuzzle, outcome: Outcome) {
         switch mode {
         case .rated:
+            Premium.shared.use(.ratedPuzzle, key: puzzle.id)
             change = store.record(puzzle, outcome: outcome)
             training.recordPractice(xp: outcome == .firstTry ? 6 : 2)
         case .rush:
@@ -291,6 +311,11 @@ struct PuzzlesView: View {
     // MARK: Rush
 
     private func startRush() {
+        // One free Rush a day.
+        guard Premium.shared.use(.puzzleRush) else {
+            offer = .puzzleRush
+            return
+        }
         let round = RushRound(endsAt: .now.addingTimeInterval(RushRound.duration))
         rush = round
         withAnimation(.snappy) {

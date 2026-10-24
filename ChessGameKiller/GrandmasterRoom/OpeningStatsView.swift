@@ -22,7 +22,11 @@ struct OpeningStatsPanel: View {
         return OpeningStats.Band.forPuzzleRating(puzzles?.progress.rating ?? 1300)
     }
 
-    private var book: OpeningStats.Book { bookCode == "m" ? .masters : .band(band) }
+    /// "Your level" is Premium's; free players see the masters.
+    private var levelOpen: Bool { Premium.shared.opens(.masterGames) }
+    @State private var offer: PremiumFeature?
+
+    private var book: OpeningStats.Book { bookCode == "m" || !levelOpen ? .masters : .band(band) }
 
     private var mover: Piece.Color { TrainingChess.sideToMove(fen) ?? .white }
 
@@ -56,6 +60,13 @@ struct OpeningStatsPanel: View {
         }
         .padding(14)
         .trainingCard(theme)
+        .onChange(of: bookCode) { _, code in
+            if code != "m", !levelOpen {
+                bookCode = "m"
+                offer = .masterGames
+            }
+        }
+        .premiumOffer($offer)
     }
 
     private var header: some View {
@@ -66,7 +77,7 @@ struct OpeningStatsPanel: View {
                     .tracking(0.9)
                     .foregroundStyle(theme.trainingAccent)
                 Spacer(minLength: 4)
-                if bookCode != "m" {
+                if bookCode != "m", levelOpen {
                     bandMenu
                 }
             }

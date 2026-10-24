@@ -21,9 +21,15 @@ struct GamesDoorView: View {
                     intro: "\(Coach.current.title) reads every move of your recent games and finds where the points go.") {
             if let report {
                 if report.hasEnough {
-                    CoachReportCard(report: report, theme: theme)
+                    // The top weakness is free; the whole six-area profile is Premium's.
+                    if Premium.shared.opens(.coachProfile) {
+                        CoachReportCard(report: report, theme: theme)
+                    }
                     if let leak = report.leak {
                         leakCard(leak)
+                    }
+                    if !Premium.shared.opens(.coachProfile) {
+                        PremiumLimitCard(feature: .coachProfile, accent: theme.trainingAccent)
                     }
                 } else {
                     waitingCard(gamesRead: report.gamesRead)
