@@ -15,6 +15,10 @@ CoachVoice.fileName(for:coach:) looks for, so a line that's already recorded is
 never paid for twice. Lesson lines without a recording are read by the device's
 own voice, so the app works before (or without) this step.
 
+To give a coach a new voice: change its "voice" in COACHES (and VOICE_ID in
+coach/wrangler.toml and coach/src/voice.js for Leo), delete that coach's
+recordings (nar-*.mp3 or vera-*.mp3) and push; the workflow records them all again.
+
 Usage:
   python3 scripts/training/make_narration.py              # record what's missing
   python3 scripts/training/make_narration.py --list       # just print the lines
