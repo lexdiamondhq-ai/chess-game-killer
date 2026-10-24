@@ -106,6 +106,8 @@ final class GameCoach {
     /// The lesson behind the current moment.
     func lesson(for moment: CoachMoment, in library: TrainingLibrary?) -> Lesson? {
         guard let library, let skillID = moment.skill, let skill = library.skill(skillID) else { return nil }
+        // Past the first five, lessons are Premium's: the coach doesn't offer one a free player can't watch.
+        guard Premium.shared.opens(.lessons) || library.isFreeLesson(skill.lesson) else { return nil }
         return library.lesson(skill.lesson)
     }
 

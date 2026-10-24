@@ -22,6 +22,7 @@ final class GameVault {
             .url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
             .appendingPathComponent("games.json")
         let games = url.map { Self.load(from: $0) } ?? []
+        RivalBoardsEarned.note(games)
         return GameVault(games: games, fileURL: url)
     }
 
@@ -48,6 +49,8 @@ final class GameVault {
     /// What the player already rewrote is kept.
     func record(_ game: SavedGame) {
         guard !game.moves.isEmpty else { return }
+        // Beating a rival opens that rival's board for free players.
+        if fileURL != nil, game.result == .win { RivalBoardsEarned.note([game]) }
         if let index = games.firstIndex(where: { $0.id == game.id }) {
             var updated = game
             updated.rewritten = games[index].rewritten

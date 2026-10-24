@@ -6,6 +6,7 @@ struct EndgamesDoorView: View {
     let theme: BoardTheme
     @Environment(EndgameProgress.self) private var progress
     @State private var study: EndgameStudy?
+    @State private var offer: PremiumFeature?
 
     /// The shelves that have studies on them, in the order to learn them.
     private var groups: [(group: EndgameStudy.Group, studies: [EndgameStudy])] {
@@ -38,13 +39,19 @@ struct EndgamesDoorView: View {
         .fullScreenCover(item: $study) { study in
             EndgameView(study: study, theme: theme)
         }
+        .premiumOffer($offer)
+    }
+
+    /// One endgame a day free (playing it again that day is free too); Premium plays them all.
+    private func play(_ next: EndgameStudy) {
+        if Premium.shared.use(.endgameDrill, key: next.id) { study = next } else { offer = .endgameDrill }
     }
 
     private func list(_ studies: [EndgameStudy]) -> some View {
         VStack(spacing: 0) {
             ForEach(Array(studies.enumerated()), id: \.element.id) { index, study in
                 Button {
-                    self.study = study
+                    play(study)
                 } label: {
                     row(study)
                 }
@@ -96,7 +103,7 @@ struct EndgamesDoorView: View {
                 .accessibilityHidden(true)
             if let next {
                 Button {
-                    study = next
+                    play(next)
                 } label: {
                     Label("Play", systemImage: "play.fill")
                 }

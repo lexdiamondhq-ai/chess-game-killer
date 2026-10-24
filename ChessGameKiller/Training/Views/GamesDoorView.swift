@@ -20,7 +20,8 @@ struct GamesDoorView: View {
     var body: some View {
         TrainScreen(theme: theme, title: "Your games",
                     intro: "\(Coach.current.title) reads every move of your recent games and finds where the points go.") {
-            if let dna, dna.gamesRead > 0 {
+            // The full Chess DNA is Premium's; the top weakness below stays free.
+            if let dna, dna.gamesRead > 0, Premium.shared.opens(.coachProfile) {
                 NavigationLink {
                     ChessDNAView(dna: dna, theme: theme)
                 } label: {
@@ -30,11 +31,17 @@ struct GamesDoorView: View {
             }
             if let report {
                 if report.hasEnough {
-                    CoachReportCard(report: report, theme: theme)
+                    // The top weakness is free; the whole six-area profile is Premium's.
+                    if Premium.shared.opens(.coachProfile) {
+                        CoachReportCard(report: report, theme: theme)
+                    }
                     if let leak = report.leak {
                         leakCard(leak)
                     }
-                } else if (dna?.gamesRead ?? 0) == 0 {
+                    if !Premium.shared.opens(.coachProfile) {
+                        PremiumLimitCard(feature: .coachProfile, accent: theme.trainingAccent)
+                    }
+                } else if (dna?.gamesRead ?? 0) == 0 || !Premium.shared.opens(.coachProfile) {
                     waitingCard(gamesRead: report.gamesRead)
                 }
             }

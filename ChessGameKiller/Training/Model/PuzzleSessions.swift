@@ -174,7 +174,9 @@ extension TrainingStore {
             ChessDNA.make(games: games, puzzleStats: stats, puzzlesPlayed: played)
         }.value
         return todayPlan(puzzles: puzzles.library, rating: puzzles.progress.rating, played: puzzles.progress.played,
-                         recent: puzzles.progress.recent, report: dna.report, dna: dna,
+                         recent: puzzles.progress.recent, report: dna.report,
+                         // Built around the player's style and weapon with Premium; the leak focus is free.
+                         dna: Premium.shared.opens(.coachProfile) ? dna : nil,
                          reviews: puzzles.dueReviewPuzzles(limit: 2), now: now)
     }
 }

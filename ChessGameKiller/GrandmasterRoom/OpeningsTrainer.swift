@@ -112,6 +112,9 @@ struct OpeningsView: View {
     @Environment(TrainingStore.self) private var training: TrainingStore?
     @State private var query = ""
     @State private var reviewing: [RepertoireEntry] = []
+    @State private var offer: PremiumFeature?
+
+    private var allOpen: Bool { Premium.shared.opens(.allOpenings) }
 
     /// Grouped once: there are thousands of lines.
     static let families = GrandmasterContent.shared.openingFamilies
@@ -158,15 +161,11 @@ struct OpeningsView: View {
                 repertoireCard
                 TrainSectionTitle(text: "Where most players start")
                 familyList(Self.popular)
-                NavigationLink {
-                    AllOpeningsView(theme: theme)
-                } label: {
-                    TrainRow(symbol: "books.vertical.fill", title: "Every opening",
-                             detail: "All \(GrandmasterContent.shared.openings.count) named lines, A to Z, with their ECO codes.",
-                             theme: theme)
-                }
-                .buttonStyle(.plain)
-                .padding(.top, 8)
+                everyOpening
+                    .padding(.top, 8)
+            } else if !allOpen {
+                PremiumLimitCard(feature: .allOpenings, accent: theme.trainingAccent)
+                    .padding(.top, 20)
             } else if matches.isEmpty {
                 Text("No opening matches \u{201C}\(query)\u{201D}.")
                     .font(.system(.subheadline, design: .themed))
@@ -182,6 +181,25 @@ struct OpeningsView: View {
             RepertoireReview(entries: reviewing, theme: theme)
                 .environment(repertoire)
                 .environment(training)
+        }
+        .premiumOffer($offer)
+    }
+
+    @ViewBuilder
+    private var everyOpening: some View {
+        let row = TrainRow(symbol: "books.vertical.fill", title: "Every opening",
+                           detail: "All \(GrandmasterContent.shared.openings.count) named lines, A to Z, with their ECO codes.",
+                           value: allOpen ? nil : "Premium", theme: theme)
+        if allOpen {
+            NavigationLink {
+                AllOpeningsView(theme: theme)
+            } label: {
+                row
+            }
+            .buttonStyle(.plain)
+        } else {
+            Button { offer = .allOpenings } label: { row }
+                .buttonStyle(.plain)
         }
     }
 
@@ -214,7 +232,8 @@ struct OpeningsView: View {
                 .fixedSize(horizontal: false, vertical: true)
             if !due.isEmpty {
                 Button {
-                    reviewing = due
+                    // A review counts as the day's free opening drill.
+                    if Premium.shared.use(.openingDrill, key: "review") { reviewing = due } else { offer = .openingDrill }
                 } label: {
                     Label("Review", systemImage: "arrow.triangle.2.circlepath")
                 }
@@ -360,6 +379,7 @@ struct OpeningLineView: View {
     @State private var runner: OpeningDrillRunner?
     /// A master game from this line, opened in Guess the Move.
     @State private var modelGame: ClassicGame?
+    @State private var offer: PremiumFeature?
 
     /// Master games that followed this line, found once.
     private var modelGames: [ClassicGame] { GrandmasterContent.shared.masterGames(following: line.moves, limit: 6) }
@@ -390,7 +410,8 @@ struct OpeningLineView: View {
                     }
                     .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false))
                     Button {
-                        restart(learn: false)
+                        // Testing a line is the day's free opening drill; the same line again is free.
+                        if Premium.shared.use(.openingDrill, key: line.id) { restart(learn: false) } else { offer = .openingDrill }
                     } label: {
                         Label("Test me", systemImage: "brain.head.profile")
                     }
@@ -412,7 +433,9 @@ struct OpeningLineView: View {
                 }
                 let games = modelGames
                 if !games.isEmpty {
-                    OpeningModelGames(games: games, theme: theme) { modelGame = $0 }
+                    OpeningModelGames(games: games, theme: theme) { game in
+                        if Premium.shared.opens(.masterGames) { modelGame = game } else { offer = .masterGames }
+                    }
                         .padding(.horizontal, 16)
                 }
             }
@@ -425,6 +448,7 @@ struct OpeningLineView: View {
             GuessTheMoveView(game: game, theme: theme)
                 .environment(training)
         }
+        .premiumOffer($offer)
         .navigationTitle(line.variation)
         .navigationBarTitleDisplayMode(.inline)
         .background { TrainingBackdrop(theme: theme) }

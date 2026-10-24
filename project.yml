@@ -75,5 +75,7 @@ schemes:
     # A Debug build runs the engine unoptimized: much weaker in the same think time.
     run:
       config: Release
+      # Sells the Premium plans in the Simulator before App Store Connect has them.
+      storeKitConfiguration: Support/Premium.storekit
     test:
       targets: [ChessGameKillerTests]
