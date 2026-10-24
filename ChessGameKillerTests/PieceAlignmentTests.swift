@@ -3,9 +3,10 @@ import UIKit
 import XCTest
 @testable import ChessGameKiller
 
-/// Every sprite piece on a flat board stands inside its own square, dead center, at its
-/// kind's height, and white and black pieces of a kind stand alike: on the home puzzle card the
-/// kings used to reach into the square above while the pawns sat small at the bottom of theirs.
+/// Every sprite piece on a flat board stands the way the game board shows it: centered across its
+/// square, its base a little above the square's bottom edge, on one line with every other piece of
+/// its set. The home puzzle card used to fit each piece into its square instead, so kings filled
+/// theirs while pawns sat small at the bottom.
 @MainActor
 final class PieceAlignmentTests: XCTestCase {
 
@@ -17,24 +18,23 @@ final class PieceAlignmentTests: XCTestCase {
                       width: solid.width * rect.width, height: solid.height * rect.height)
     }
 
-    func testEveryPieceStandsCenteredInItsSquare() throws {
+    func testEveryPieceStandsCenteredOnOneLine() throws {
         var sets: Set<String> = []
         for theme in BoardTheme.all where theme.spritePieces && sets.insert(theme.pieceSet).inserted {
+            var bases: [CGFloat] = []
             for kind in Piece.Kind.allCases {
-                let white = try outline(theme.imageName(for: Piece(kind, color: .white, square: .a1)))
-                let black = try outline(theme.imageName(for: Piece(kind, color: .black, square: .a1)))
-                for (name, box) in [("white \(kind)", white), ("black \(kind)", black)] {
-                    let label = "\(theme.name) \(name) at \(box)"
-                    XCTAssertGreaterThanOrEqual(box.minY, -0.475, "\(label) reaches out of the top of its square")
+                for color in [Piece.Color.white, .black] {
+                    let box = try outline(theme.imageName(for: Piece(kind, color: color, square: .a1)))
+                    let label = "\(theme.name) \(color) \(kind) at \(box)"
+                    XCTAssertLessThanOrEqual(abs(box.midX), 0.02, "\(label) is off center across its square")
+                    XCTAssertGreaterThan(box.maxY, 0.3, "\(label) floats above its square's bottom")
                     XCTAssertLessThanOrEqual(box.maxY, 0.48, "\(label) hangs out of the bottom of its square")
-                    XCTAssertLessThanOrEqual(abs(box.midX), 0.02, "\(label) is off center sideways")
-                    // Centered by eye: lifted a little from the box's middle, never dropped below it.
-                    XCTAssertLessThanOrEqual(box.midY, 0.005, "\(label) sits low in its square")
-                    XCTAssertGreaterThanOrEqual(box.midY, -0.13, "\(label) sits high in its square")
-                    XCTAssertGreaterThanOrEqual(box.height, 0.5, "\(label) is too small to read")
+                    XCTAssertLessThanOrEqual(box.width, 1, "\(label) is wider than its square")
+                    bases.append(box.maxY)
                 }
-                XCTAssertEqual(white.height, black.height, accuracy: 0.04, "\(theme.name) \(kind)s differ in height")
             }
+            let spread = (bases.max() ?? 0) - (bases.min() ?? 0)
+            XCTAssertLessThanOrEqual(spread, 0.05, "\(theme.name) pieces stand on different lines")
         }
         XCTAssertFalse(sets.isEmpty)
     }

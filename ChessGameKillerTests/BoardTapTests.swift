@@ -3,9 +3,8 @@ import CoreGraphics
 import XCTest
 @testable import ChessGameKiller
 
-/// Where a tap on the flat board lands. The game's sprites now stand centered inside their own
-/// squares; the resolver still lets a piece drawn over the square behind it (the column stand-in
-/// here) claim a tap on its head, should a look ever draw one that tall.
+/// Where a tap on the flat board lands. The sprites stand taller than their squares, so a
+/// piece's head is drawn over the square behind it, and a tap there means that piece.
 @MainActor
 final class BoardTapTests: XCTestCase {
     private let size: CGFloat = 40
@@ -43,16 +42,14 @@ final class BoardTapTests: XCTestCase {
         }
     }
 
-    /// At the start, 0.75 of a square above d1's center is inside d2's square. A piece tall enough
-    /// to reach there (the column) takes the tap; the game's centered sprites leave it to d2.
+    /// At the start, 0.75 of a square above d1's center is inside d2's square but on the
+    /// queen's crown: the queen.
     func testATapOnAPiecesHeadPicksThatPiece() {
         let game = GameModel()
         let crown = point(above: .d1, by: 0.75)
+        XCTAssertEqual(tap(crown, on: game, isSolid: sprites(.gilded)), .d1)
+        XCTAssertEqual(tap(crown, on: game, isSolid: sprites(.faberge)), .d1)
         XCTAssertEqual(tap(crown, on: game, isSolid: column()), .d1)
-        XCTAssertEqual(tap(crown, on: game, isSolid: sprites(.gilded)), .d2)
-        XCTAssertEqual(tap(crown, on: game, isSolid: sprites(.faberge)), .d2)
-        // The queen's own crown, inside its square, is the queen.
-        XCTAssertEqual(tap(point(above: .d1, by: 0.3), on: game, isSolid: sprites(.gilded)), .d1)
         // Beside the crown it is the pawn's square.
         XCTAssertEqual(tap(point(above: .d1, by: 0.75, right: 0.4), on: game, isSolid: column()), .d2)
         // Where the pieces stay inside their squares, it is the square under the finger.
@@ -67,11 +64,9 @@ final class BoardTapTests: XCTestCase {
         game.tap(.d1)
         XCTAssertEqual(game.selected, .d1)
         XCTAssertTrue(game.targets.contains(.e2))
-        XCTAssertEqual(tap(point(above: .e1, by: 0.85), on: game, isSolid: column()), .e2)
-        XCTAssertEqual(tap(point(above: .e1, by: 0.72), on: game, isSolid: column()), .e1)
-        for isSolid in [sprites(.gilded), sprites(.faberge)] {
-            XCTAssertEqual(tap(point(above: .e1, by: 0.72), on: game, isSolid: isSolid), .e2)
-            XCTAssertEqual(tap(point(above: .e1, by: 0.3), on: game, isSolid: isSolid), .e1)
+        for isSolid in [sprites(.gilded), sprites(.faberge), column()] {
+            XCTAssertEqual(tap(point(above: .e1, by: 0.85), on: game, isSolid: isSolid), .e2)
+            XCTAssertEqual(tap(point(above: .e1, by: 0.72), on: game, isSolid: isSolid), .e1)
         }
     }
 

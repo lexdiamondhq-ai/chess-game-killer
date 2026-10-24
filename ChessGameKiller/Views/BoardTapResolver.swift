@@ -94,9 +94,6 @@ struct AlphaMask {
     /// from its top left: nearly opaque pixels only, so the soft shadow baked in beside the piece is
     /// left out. Nil for a picture with no body in it.
     let solid: CGRect?
-    /// How far down the picture the body's weight sits on average, as a fraction of its height:
-    /// lower than the box's middle for a piece with a broad base. Nil with no body.
-    let weight: CGFloat?
 
     init(width: Int, height: Int, alpha: [UInt8]) {
         self.width = width
@@ -104,7 +101,6 @@ struct AlphaMask {
         self.alpha = alpha
         top = Self.firstSolidRow(width: width, height: height, alpha: alpha).map { CGFloat($0) / CGFloat(max(height, 1)) }
         solid = Self.solidBox(width: width, height: height, alpha: alpha)
-        weight = Self.weightRow(width: width, height: height, alpha: alpha)
     }
 
     /// The picture's alpha at `scale` of its size: an eighth is plenty for a fingertip.
@@ -139,18 +135,6 @@ struct AlphaMask {
     /// Solid enough that a finger there is on the piece, not on its soft shadow.
     func isSolid(atUnit point: CGPoint) -> Bool {
         value(atUnit: point) > 127
-    }
-
-    private static func weightRow(width: Int, height: Int, alpha: [UInt8]) -> CGFloat? {
-        guard alpha.count == width * height, height > 0 else { return nil }
-        var rows = 0.0, count = 0.0
-        for y in 0..<height {
-            for x in 0..<width where alpha[y * width + x] > BoardSprite.shadowAlpha {
-                rows += Double(y) + 0.5
-                count += 1
-            }
-        }
-        return count > 0 ? CGFloat(rows / count) / CGFloat(height) : nil
     }
 
     private static func solidBox(width: Int, height: Int, alpha: [UInt8]) -> CGRect? {

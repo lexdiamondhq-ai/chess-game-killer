@@ -750,7 +750,7 @@ struct PieceImage: View {
     let piece: Piece
     let theme: BoardTheme
     let size: CGFloat
-    /// On a board, a 3D sprite stands in the middle of its square; elsewhere it is fitted into `size`.
+    /// On a board, a 3D sprite stands on its square, centered across it; elsewhere it is fitted into `size`.
     var onBoard = false
     /// The marks of an army piece's history (the Heirloom Set), drawn on the piece itself.
     var heirloom: Heirloom? = nil
@@ -780,8 +780,8 @@ struct PieceImage: View {
         }
     }
 
-    /// The render, set in the middle of its square at its kind's height (on a board)
-    /// or so a king fills the frame (anywhere else).
+    /// The render, set so the piece's foot stands just below the square's center, centered across
+    /// the square (on a board), or so a king fills the frame (anywhere else).
     private var sprite: some View {
         let name = theme.imageName(for: piece)
         let frame = SpriteFrame.of(name)
@@ -925,51 +925,30 @@ struct SpriteFrame: Equatable {
 
     /// The side-on renders (560 x 760, seen from 28 degrees up), where every piece reads by its outline.
     /// Every set's king, cross included, stays within 1.2 squares above its foot and 0.15 below it.
-    /// The board placement here is only a fallback: `of` sets each picture by its own outline.
-    static let sideOn = SpriteFrame(width: 1.4, height: 1.9, foot: 1.5, boardScale: 0.62, lift: 0.36, reach: 1.2, below: 0.15)
+    static let sideOn = SpriteFrame(width: 1.4, height: 1.9, foot: 1.5, boardScale: 1.2, lift: 0.24, reach: 1.2, below: 0.15)
     /// The earlier renders (520 x 568, seen from higher up).
-    static let fromAbove = SpriteFrame(width: 1.3, height: 1.42, foot: 1.0, boardScale: 0.7, lift: 0.3, reach: 0.964, below: 0.24)
+    static let fromAbove = SpriteFrame(width: 1.3, height: 1.42, foot: 1.0, boardScale: 1.22, lift: 0.15, reach: 0.964, below: 0.24)
 
-    /// How tall each kind of piece stands on a board, in squares, by the last letter of its picture's
-    /// name: a king nearly fills its square, a pawn a little over half of it, so every piece reads at a
-    /// glance and none reaches into the square above.
-    static let standingHeight: [Character: CGFloat] = ["K": 0.84, "Q": 0.8, "B": 0.76, "N": 0.72, "R": 0.68, "P": 0.6]
-    /// No piece is drawn wider than this, in squares.
-    static let widest: CGFloat = 0.84
-
-    /// How far above its square's center a piece may reach, in squares: a hair inside the square.
-    static let topRoom: CGFloat = 0.47
-    /// A lift every piece gets, in squares: the eye takes a piece's middle a touch above its box's.
-    static let opticalLift: CGFloat = 0.03
-
-    /// This frame set on a board by the piece's own outline (`solid`, as fractions of the picture):
-    /// scaled to its kind's height and centered in its square by the eye, not the ruler. Its weight
-    /// (`weight`, the body's average row) goes on the square's center, plus a small optical lift,
-    /// as far as the square's top allows: a broad base would otherwise make a piece look low.
-    func placed(solid: CGRect, weight: CGFloat? = nil, kind: Character) -> SpriteFrame {
-        let tall = solid.height * height
-        let wide = solid.width * width
-        guard tall > 0, wide > 0 else { return self }
-        let target = Self.standingHeight[kind] ?? 0.8
-        let scale = min(target / tall, Self.widest / wide)
-        let heavy = max(0, ((weight ?? solid.midY) - solid.midY) * height * scale)
-        let up = min(heavy + Self.opticalLift, max(0, Self.topRoom - tall * scale / 2))
-        let lift = (foot - solid.midY * height) * scale - up
-        let shift = (0.5 - solid.midX) * width * scale
-        return SpriteFrame(width: width, height: height, foot: foot, boardScale: scale, lift: lift,
+    /// This frame with the piece's body (`solid`, as fractions of the picture) centered across its
+    /// square. Every piece keeps the set's size and stands on the set's one line, a little above the
+    /// square's bottom edge, so a row of pieces is level and the tall ones rise above their squares.
+    func placed(solid: CGRect) -> SpriteFrame {
+        guard solid.width > 0 else { return self }
+        let shift = (0.5 - solid.midX) * width * boardScale
+        return SpriteFrame(width: width, height: height, foot: foot, boardScale: boardScale, lift: lift,
                            reach: reach, below: below, shift: shift)
     }
 
     @MainActor private static var known: [String: SpriteFrame] = [:]
 
     /// The frame of the named picture, told by its shape: the side-on renders are much taller than
-    /// wide. On a board it is set by the piece's outline in the picture.
+    /// wide. On a board the piece's body is centered across its square.
     @MainActor static func of(_ name: String) -> SpriteFrame {
         if let frame = known[name] { return frame }
         let size = UIImage(named: name)?.size ?? .zero
         var frame = size.width > 0 && size.height / size.width > 1.25 ? sideOn : fromAbove
-        if let mask = SpriteMasks.shared.mask(named: name), let solid = mask.solid, let kind = name.last {
-            frame = frame.placed(solid: solid, weight: mask.weight, kind: kind)
+        if let solid = SpriteMasks.shared.mask(named: name)?.solid {
+            frame = frame.placed(solid: solid)
         }
         known[name] = frame
         return frame
