@@ -15,6 +15,7 @@ struct SettingsSheet: View {
     @AppStorage("rivalBanter") private var banterOn = true
     @AppStorage("bigBoard") private var bigBoard = false
     @AppStorage("sculpted3D") private var sculpted3D = true
+    @AppStorage(Heirloom.settingKey) private var heirloomOn = true
     @AppStorage(HomeScreen.key) private var homeScreen = HomeScreen.defaultOn
     /// Shared with the lessons' speaker button and the highlight reel.
     @AppStorage("coachVoiceMuted") private var voiceMuted = false
@@ -52,6 +53,9 @@ struct SettingsSheet: View {
                             }
                             ToggleRow(title: "Match rival", subtitle: "Computer games use the rival's own board, not the one picked above.",
                                       symbol: "person.crop.circle.badge.checkmark", isOn: $matchRival, theme: theme)
+                            rule
+                            ToggleRow(title: "Piece history", subtitle: "Your pieces wear what they've been through: gold seams, a promoted pawn's collar, notches, patina.",
+                                      symbol: "seal", isOn: $heirloomOn, theme: theme)
                             rule
                             ToggleRow(title: "Big Board", subtitle: "The board fills the screen. Swipe up from the bottom for the tools, sideways on the board to replay moves.",
                                       symbol: "arrow.up.left.and.arrow.down.right", isOn: $bigBoard, theme: theme)

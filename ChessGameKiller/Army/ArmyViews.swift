@@ -179,7 +179,7 @@ struct PieceOfTheMatchCard: View {
         let piece = Piece(hero.slot.kind, color: color, square: .a1)
         let tint = record.rank == .recruit ? ArmyRank.gold : record.rank.color(for: piece, theme: theme)
         HStack(spacing: 12) {
-            PieceImage(piece: piece, theme: theme, size: 40)
+            PieceImage(piece: piece, theme: theme, size: 40, heirloom: store.heirloom(for: hero.slot))
                 .modifier(VeteranAura(rank: max(record.rank, .veteran), piece: piece, theme: theme,
                                       size: 40, onBoard: false))
             VStack(alignment: .leading, spacing: 2) {
@@ -324,7 +324,7 @@ struct ArmyView: View {
         let captor = store.captor(of: slot)
         let heldBy: String = captor.map { ", held by \($0.rival.name)" } ?? ""
         return VStack(spacing: 4) {
-            PieceImage(piece: piece, theme: theme, size: 36)
+            PieceImage(piece: piece, theme: theme, size: 36, heirloom: store.heirloom(for: slot))
                 .modifier(VeteranAura(rank: record.rank, piece: piece, theme: theme, size: 36, onBoard: false))
                 .opacity(captor == nil ? 1 : 0.35)
                 .overlay(alignment: .bottomTrailing) {
@@ -375,7 +375,7 @@ struct ArmyView: View {
         let piece = Piece(slot.kind, color: color, square: .a1)
         let tint = record.rank.color(for: piece, theme: theme)
         return HStack(spacing: 12) {
-            PieceImage(piece: piece, theme: theme, size: 34)
+            PieceImage(piece: piece, theme: theme, size: 34, heirloom: store.heirloom(for: slot))
                 .modifier(VeteranAura(rank: record.rank, piece: piece, theme: theme, size: 34, onBoard: false))
             VStack(alignment: .leading, spacing: 1) {
                 Text(record.name ?? slot.title)
@@ -471,7 +471,7 @@ struct PieceDetailView: View {
         let tint = record.rank.color(for: piece, theme: theme)
         ScrollView {
             VStack(spacing: 18) {
-                PieceImage(piece: piece, theme: theme, size: 110)
+                PieceImage(piece: piece, theme: theme, size: 110, heirloom: store.heirloom(for: slot))
                     .modifier(VeteranAura(rank: record.rank, piece: piece, theme: theme, size: 110, onBoard: false))
                     .padding(.top, 24)
                 VStack(spacing: 4) {
@@ -500,6 +500,9 @@ struct PieceDetailView: View {
                 }
                 if record.nemesis != nil || !record.revenge.isEmpty {
                     rivals(record, tint: tint)
+                }
+                if !store.heirloom(for: slot).isEmpty {
+                    history(record, tint: tint)
                 }
                 stats(record)
             }
@@ -588,6 +591,30 @@ struct PieceDetailView: View {
                 Text("Escaped \(ArmyNews.times(record.escapes)).")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .trainingCard(theme, tint: tint, cornerRadius: 16)
+    }
+
+    /// The Heirloom marks on the piece, and what each one is for.
+    private func history(_ record: PieceRecord, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("ITS HISTORY, ON THE PIECE")
+                .font(.caption2.weight(.semibold))
+                .tracking(1)
+                .foregroundStyle(.secondary)
+            ForEach(store.heirloom(for: slot).story(for: record), id: \.self) { line in
+                Label {
+                    Text(line)
+                        .font(.system(.subheadline, design: .themed))
+                        .fixedSize(horizontal: false, vertical: true)
+                } icon: {
+                    Image(systemName: "seal.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(HeirloomOverlay.gold)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

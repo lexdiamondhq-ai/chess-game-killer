@@ -254,6 +254,27 @@ final class SculptedSnapshotTests: XCTestCase {
         window.isHidden = true
     }
 
+    /// The Heirloom Set on the 3D board: white pieces wearing gold seams, a patina, a promoted
+    /// pawn's collar and base notches, so the marks can be judged on the carved pieces.
+    func testHeirloomSet() throws {
+        let heirlooms: [Int: Heirloom] = [
+            Square.c4.rawValue: Heirloom(seams: 3, notches: 4, patina: 1, seed: 3),   // bishop, a legend's seams
+            Square.f3.rawValue: Heirloom(seams: 1, notches: 2, patina: 0.6, seed: 6), // knight
+            Square.e1.rawValue: Heirloom(seams: 2, notches: 5, patina: 0.8, seed: 4), // king
+            Square.d1.rawValue: Heirloom(seams: 1, notches: 3, patina: 0.5, seed: 3), // queen
+            Square.d2.rawValue: Heirloom(seams: 1, collar: true, patina: 0.7, seed: 8), // a promoted pawn
+            Square.a1.rawValue: Heirloom(notches: 2, patina: 1, seed: 0),             // rook
+        ]
+        var state = SculptedBoardState(pieces: Self.pieces)
+        state.heirlooms = heirlooms
+        let (scene, window) = try stage(state)
+        let image = scene.snapshot()
+        try save(image, "study-heirloom")
+        try save(crop(image, x: 0.0, y: 0.5, side: 0.5), "study-heirloom-pawn")
+        try save(crop(image, x: 0.45, y: 0.5, side: 0.4), "study-heirloom-king")
+        window.isHidden = true
+    }
+
     // MARK: Helpers
 
     private func stage(
