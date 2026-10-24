@@ -28,10 +28,11 @@ final class PieceAlignmentTests: XCTestCase {
                     XCTAssertGreaterThanOrEqual(box.minY, -0.48, "\(label) reaches out of the top of its square")
                     XCTAssertLessThanOrEqual(box.maxY, 0.48, "\(label) hangs out of the bottom of its square")
                     XCTAssertLessThanOrEqual(abs(box.midX), 0.08, "\(label) is off center sideways")
-                    XCTAssertLessThanOrEqual(abs(box.midY), 0.1, "\(label) is off center up or down")
+                    XCTAssertLessThanOrEqual(abs(box.midY), 0.14, "\(label) is off center up or down")
                     XCTAssertGreaterThanOrEqual(box.height, 0.5, "\(label) is too small to read")
                 }
-                XCTAssertEqual(white.maxY, black.maxY, accuracy: 0.03, "\(theme.name) \(kind)s stand on different lines")
+                XCTAssertEqual(white.maxY, SpriteFrame.baseline, accuracy: 0.03, "\(theme.name) white \(kind) is off the set's baseline")
+                XCTAssertEqual(black.maxY, SpriteFrame.baseline, accuracy: 0.03, "\(theme.name) black \(kind) is off the set's baseline")
                 XCTAssertEqual(white.height, black.height, accuracy: 0.04, "\(theme.name) \(kind)s differ in height")
             }
         }

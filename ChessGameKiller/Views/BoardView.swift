@@ -854,23 +854,22 @@ struct SpriteFrame: Equatable {
     /// How tall each kind of piece stands on a board, in squares, by the last letter of its picture's
     /// name: a king nearly fills its square, a pawn a little over half of it, so every piece reads at a
     /// glance and none reaches into the square above.
-    static let standingHeight: [Character: CGFloat] = ["K": 0.86, "Q": 0.82, "B": 0.78, "N": 0.74, "R": 0.68, "P": 0.56]
+    static let standingHeight: [Character: CGFloat] = ["K": 0.84, "Q": 0.8, "B": 0.76, "N": 0.72, "R": 0.66, "P": 0.58]
     /// No piece is drawn wider than this, in squares.
     static let widest: CGFloat = 0.84
-    /// Where a king's foot rests, below its square's center, in squares.
-    static let baseline: CGFloat = 0.43
+    /// Where every piece's base rests, below its square's center, in squares: one line for the
+    /// whole set, so a row of mixed pieces stands level.
+    static let baseline: CGFloat = 0.4
 
     /// This frame set on a board by the piece's own outline (`solid`, as fractions of the picture):
-    /// scaled to its kind's height and stood in the middle of its square. A shorter piece sits a touch
-    /// lower, halfway between centered and standing on the king's line, so a row of mixed pieces
-    /// still stands on nearly one line.
+    /// scaled to its kind's height and centered across its square, its base on the set's one baseline.
     func placed(solid: CGRect, kind: Character) -> SpriteFrame {
         let tall = solid.height * height
         let wide = solid.width * width
         guard tall > 0, wide > 0 else { return self }
         let target = Self.standingHeight[kind] ?? 0.8
         let scale = min(target / tall, Self.widest / wide)
-        let middle = (Self.baseline - tall * scale / 2) / 2
+        let middle = Self.baseline - tall * scale / 2
         let lift = middle + (foot - solid.midY * height) * scale
         return SpriteFrame(width: width, height: height, foot: foot, boardScale: scale, lift: lift,
                            reach: reach, below: below)
