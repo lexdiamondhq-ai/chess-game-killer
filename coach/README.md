@@ -76,7 +76,7 @@ talk with the live server (`test/smoke.mjs`). It needs `ANTHROPIC_API_KEY` and `
 
 Settings (`[vars]` in `wrangler.toml`): `MODEL` (`claude-opus-5-5`), `PARSE_EFFORT` and `ANSWER_EFFORT` (`low`),
 `CLAUDE_TIMEOUT_MS` (12000, for each Claude call), `DAILY_TALKS` (400) and `DAILY_VOICE_CHARS` (40000) across
-everyone per UTC day, `VOICE_ID` (George) and `VOICE_MODEL` (`eleven_multilingual_v2`). Each address can start 12
+everyone per UTC day, `VOICE_ID` (George, Leo's voice), `VERA_VOICE_ID` (Sarah, Vera's voice; requests with `coach: "vera"`) and `VOICE_MODEL` (`eleven_multilingual_v2`). Each address can start 12
 talks a minute.
 
 ## What a talk costs

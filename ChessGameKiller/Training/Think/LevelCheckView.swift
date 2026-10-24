@@ -91,7 +91,7 @@ struct LevelCheckView: View {
                     VStack(spacing: 8) {
                         Text("Find your level")
                             .font(.system(.title2, design: .themed).weight(.bold))
-                        Text("A quick check so Leo starts you in the right place, and you skip what you already know.")
+                        Text("A quick check so \(Coach.current.name) starts you in the right place, and you skip what you already know.")
                             .font(.system(.subheadline, design: .themed))
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)

@@ -22,6 +22,7 @@ struct BoardView: View {
 
     /// The sculpted looks play on a real 3D board unless the player asked for them flat.
     @AppStorage("sculpted3D") private var sculpted3D = true
+    @AppStorage(Heirloom.settingKey) private var showsHeirloom = true
     /// Bumps a moment after each game the player wins, for the haptic.
     @State private var wins = 0
 
@@ -325,7 +326,7 @@ struct BoardView: View {
         ZStack(alignment: .topLeading) {
             ForEach(game.pieces) { placed in
                 let place = cell(of: placed.square)
-                PieceImage(piece: placed.piece, theme: theme, size: size, onBoard: true)
+                PieceImage(piece: placed.piece, theme: theme, size: size, onBoard: true, heirloom: heirloom(of: placed))
                     .modifier(VeteranAura(rank: armyRank(of: placed), piece: placed.piece, theme: theme, size: size))
                     .scaleEffect(game.selected == placed.square ? PieceImage.liftedScale : 1)
                     .position(center(of: placed.square, size: size))
@@ -363,6 +364,12 @@ struct BoardView: View {
     }
 
     // MARK: Army
+
+    /// The piece's history on it, when the player keeps "Piece history" on.
+    private func heirloom(of placed: PlacedPiece) -> Heirloom? {
+        guard showsHeirloom, let army, let slot = army.slot(of: placed, in: match) else { return nil }
+        return army.heirloom(for: slot)
+    }
 
     private func armyRank(of placed: PlacedPiece) -> ArmyRank {
         guard let army, let slot = army.slot(of: placed, in: match) else { return .recruit }
@@ -745,6 +752,8 @@ struct PieceImage: View {
     let size: CGFloat
     /// On a board, a 3D sprite rises above its square; elsewhere it is fitted into `size`.
     var onBoard = false
+    /// The marks of an army piece's history (the Heirloom Set), drawn on the piece itself.
+    var heirloom: Heirloom? = nil
 
     /// How much larger a picked-up piece is drawn, about its square's center.
     static let liftedScale: CGFloat = 1.08
@@ -784,6 +793,7 @@ struct PieceImage: View {
                     .interpolation(.high)
                     .antialiased(true)
                     .frame(width: size * frame.width * scale, height: size * frame.height * scale)
+                    .heirloomMarks(heirloom, imageName: name, piece: piece)
                     .lightPieceEdge(onBoard && piece.color == .white, size: size)
                     .offset(y: size * (onBoard ? frame.boardOffset : frame.fittedOffset))
             }
@@ -807,6 +817,19 @@ struct PieceImage: View {
 }
 
 private extension View {
+    /// The Heirloom marks over a piece picture, cut to the piece's own outline.
+    @ViewBuilder
+    func heirloomMarks(_ heirloom: Heirloom?, imageName: String, piece: Piece) -> some View {
+        if let heirloom, !heirloom.isEmpty {
+            overlay {
+                HeirloomOverlay(heirloom: heirloom, imageName: imageName, piece: piece)
+                    .mask { Image(imageName).resizable() }
+            }
+        } else {
+            self
+        }
+    }
+
     /// On a board, a fine dark edge around a light piece keeps its outline crisp on the light squares,
     /// where ivory on cream would otherwise melt in. About half a point on a phone.
     @ViewBuilder

@@ -88,6 +88,8 @@ final class TalkSession: Identifiable {
     private(set) var factsReady = false
     /// Why it failed, in plain words, like "Leo needs the internet to check your plan."
     private(set) var problem: String?
+    /// The free talks are used up: the panel shows the way to Premium instead of an error.
+    private(set) var outOfTalks = false
     /// False when speech can't be used (no permission, no recognizer): the panel offers typing only.
     private(set) var canListen = true
     /// The verdict whose squares the board shows. Nil shows the move.
@@ -434,6 +436,14 @@ final class TalkSession: Identifiable {
     // MARK: Asking Leo
 
     private func send(typed: Bool) {
+        // Out of talks: say so before anything counts as help in the game.
+        guard Premium.shared.canUse(.talk) else {
+            listener.cancel()
+            outOfTalks = true
+            problem = PremiumFeature.talk.limitLine
+            phase = .failed
+            return
+        }
         requestTask?.cancel()
         requestID += 1
         let id = requestID
@@ -467,10 +477,19 @@ final class TalkSession: Identifiable {
             phase = .ready
             return
         }
+        // Each talk costs a server call: free players get 3 a week, Premium 10 a day.
+        guard Premium.shared.use(.talk) else {
+            outOfTalks = true
+            problem = PremiumFeature.talk.limitLine
+            phase = .failed
+            return
+        }
+        outOfTalks = false
         let wantsVoice = !CoachVoice.shared.isMuted
         speaksAloud = wantsVoice
         let request = TalkRequest(fen: fen, said: said, typed: typed, reveal: reveal, context: context,
-                                  lastMove: lastMove, voice: wantsVoice, facts: facts)
+                                  lastMove: lastMove, voice: wantsVoice, facts: facts,
+                                  coach: Coach.current == .leo ? nil : Coach.current.rawValue)
 
         var serverError: String?
         var failure: Error?
@@ -573,13 +592,13 @@ final class TalkSession: Identifiable {
     static func problem(forCode code: String) -> String {
         switch code {
         case "rate_limited":
-            return "Leo needs a moment. Try again in a minute."
+            return "\(Coach.current.name) needs a moment. Try again in a minute."
         case "daily_limit":
-            return "Leo has checked a lot of plans today. Try again tomorrow."
+            return "\(Coach.current.name) has checked a lot of plans today. Try again tomorrow."
         case "bad_request":
-            return "Leo didn't catch that. Try again."
+            return "\(Coach.current.name) didn't catch that. Try again."
         default:
-            return "Leo couldn't check that one. Try again."
+            return "\(Coach.current.name) couldn't check that one. Try again."
         }
     }
 
@@ -588,7 +607,7 @@ final class TalkSession: Identifiable {
         if let failure = error as? TalkFailure {
             switch failure {
             case .offline:
-                return "Leo needs the internet to check your plan."
+                return "\(Coach.current.name) needs the internet to check your plan."
             case .server(let code):
                 return problem(forCode: code)
             case .badResponse:
@@ -596,7 +615,7 @@ final class TalkSession: Identifiable {
             }
         }
         if error is CancellationError { return problem(forCode: "internal") }
-        return "Leo needs the internet to check your plan."
+        return "\(Coach.current.name) needs the internet to check your plan."
     }
 
     /// Something short to say when the verdicts came but Leo's own words didn't.

@@ -9,10 +9,11 @@ struct LessonsDoorView: View {
     @State private var lesson: Lesson?
     @State private var session: SessionPlan?
     @State private var open: Set<String> = []
+    @State private var offer: PremiumFeature?
 
     var body: some View {
         TrainScreen(theme: theme, title: "Lessons",
-                    intro: "Coach Leo's course, from your first moves to winning endgames. Watch a lesson, then practice it at your level.") {
+                    intro: "\(Coach.current.title)'s course, from your first moves to winning endgames. Watch a lesson, then practice it at your level.") {
             if let library = store.library {
                 HabitCard(library: library, theme: theme) { lesson = $0 }
                 TrainSectionTitle(text: "The course")
@@ -22,7 +23,12 @@ struct LessonsDoorView: View {
                             if open.contains(unit.id) { open.remove(unit.id) } else { open.insert(unit.id) }
                         }
                     } watch: { lesson in
-                        self.lesson = lesson
+                        // The first five lessons are free; Premium opens the rest.
+                        if Premium.shared.opens(.lessons) || library.isFreeLesson(lesson.id) {
+                            self.lesson = lesson
+                        } else {
+                            offer = .lessons
+                        }
                     } practice: { skill in
                         session = store.practicePlan(for: skill)
                     }
@@ -43,6 +49,7 @@ struct LessonsDoorView: View {
             LessonScreen(lesson: lesson, theme: theme)
                 .environment(store)
         }
+        .premiumOffer($offer)
         .fullScreenCover(item: $session) { plan in
             SessionView(plan: plan, theme: theme, startsAtOnce: true)
                 .environment(store)
@@ -197,8 +204,10 @@ struct UnitCard: View {
 
     private func lessonRow(_ lesson: Lesson, color: Color) -> some View {
         let isDone = store.isDone(lesson.id)
+        let locked: Bool = !Premium.shared.opens(.lessons) && !library.isFreeLesson(lesson.id)
+        let symbol: String = isDone ? "checkmark.circle.fill" : locked ? "crown.fill" : "play.circle.fill"
         return HStack(spacing: 12) {
-            Image(systemName: isDone ? "checkmark.circle.fill" : "play.circle.fill")
+            Image(systemName: symbol)
                 .font(.system(size: 26))
                 .foregroundStyle(isDone ? color.opacity(0.7) : color)
                 .frame(width: 34)
@@ -217,7 +226,7 @@ struct UnitCard: View {
         }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(lesson.title), lesson\(isDone ? ", watched" : "")")
+        .accessibilityLabel("\(lesson.title), lesson\(isDone ? ", watched" : "")\(locked ? ", Premium" : "")")
     }
 
     private func skillRow(_ skill: Skill, color: Color) -> some View {

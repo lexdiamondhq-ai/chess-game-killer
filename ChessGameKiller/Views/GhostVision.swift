@@ -84,6 +84,10 @@ struct GhostVisionGesture: ViewModifier {
 
     @AppStorage("haptics") private var hapticsOn = true
     @GestureState private var held = false
+    /// Free players see ahead 3 times a day; past that the hold opens the Premium offer.
+    @State private var offer: PremiumFeature?
+    /// This hold already asked, so it doesn't ask again while the thumb stays down.
+    @State private var refused = false
 
     func body(content: Content) -> some View {
         let active: Bool = vision != nil && enabled
@@ -91,8 +95,12 @@ struct GhostVisionGesture: ViewModifier {
             // Always attached, so the board never changes identity; masked off when it can't be used.
             .simultaneousGesture(gesture, including: active ? .all : .subviews)
             .onChange(of: held) { _, isHeld in
-                if !isHeld { vision?.end() }
+                if !isHeld {
+                    vision?.end()
+                    refused = false
+                }
             }
+            .premiumOffer($offer)
             .onChange(of: match.canPeekAhead) { _, can in
                 if !can { vision?.end() }
             }
@@ -112,7 +120,13 @@ struct GhostVisionGesture: ViewModifier {
             .onChanged { value in
                 guard case .second(true, let drag) = value, let vision else { return }
                 if !vision.isHolding {
-                    guard enabled, match.canPeekAhead else { return }
+                    guard enabled, match.canPeekAhead, !refused else { return }
+                    // Holding again on the same position doesn't count twice.
+                    guard Premium.shared.use(.ghostVision, key: match.game.fen) else {
+                        refused = true
+                        offer = .ghostVision
+                        return
+                    }
                     withAnimation(.easeOut(duration: 0.18)) { vision.begin() }
                     if match.ghostLine != nil { match.markAssisted() }
                 }

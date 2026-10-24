@@ -13,11 +13,20 @@ struct ClassicGame: Decodable, Identifiable, Hashable {
     let blurb: String
     /// Every move, in UCI.
     let moves: [String]
+    /// The named opening it starts with, for master games from the Lichess broadcasts.
+    var opening: String? = nil
+    /// "2830 – 2760", for master games.
+    var ratings: String? = nil
+
+    /// A game from the Lichess broadcasts, not one of the hand-picked classics.
+    var isMasterGame: Bool { id.hasPrefix("m-") }
 
     /// The side the player guesses for: the winner's.
     var hero: Piece.Color { result == "0-1" ? .black : .white }
     var heroName: String { hero == .white ? white : black }
     var title: String { "\(white) – \(black)" }
+    /// "Tata Steel Chess 2025", or just the event when the year isn't known.
+    var playedAt: String { year > 0 ? "\(event) \(String(year))" : event }
 }
 
 /// An endgame every player must know, played against perfect defence. Built and checked
@@ -96,6 +105,9 @@ struct OpeningLine: Identifiable, Hashable {
 /// Everything in the Grandmaster Room that ships with the app.
 struct GrandmasterContent {
     let games: [ClassicGame]
+    /// Recent decisive classical games between people rated 2500+, from the Lichess broadcast database
+    /// (CC0), newest first. Built by scripts/grandmaster/build_masters.py.
+    var masterGames: [ClassicGame] = []
     let endgames: [EndgameStudy]
     let openings: [OpeningLine]
 
@@ -113,7 +125,35 @@ struct GrandmasterContent {
             .flatMap { try? decoder.decode(Endgames.self, from: $0).endgames } ?? []
         let text = bundle.url(forResource: "openings", withExtension: "tsv")
             .flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
-        return GrandmasterContent(games: games, endgames: endgames, openings: parseOpenings(text))
+        let masters = bundle.url(forResource: "masters-games", withExtension: "json")
+            .flatMap { try? Data(contentsOf: $0) }
+            .map(parseMasterGames) ?? []
+        return GrandmasterContent(games: games, masterGames: masters, endgames: endgames, openings: parseOpenings(text))
+    }
+
+    /// masters-games.json keeps each game's moves as one string, to stay small.
+    static func parseMasterGames(_ data: Data) -> [ClassicGame] {
+        struct Record: Decodable {
+            let id, white, black, event, result, blurb, moves: String
+            let year: Int
+            let opening: String?
+            let whiteElo, blackElo: Int?
+        }
+        struct File: Decodable { let games: [Record] }
+        guard let file = try? JSONDecoder().decode(File.self, from: data) else { return [] }
+        return file.games.compactMap { record in
+            let moves = record.moves.split(separator: " ").map(String.init)
+            guard !moves.isEmpty else { return nil }
+            let ratings = record.whiteElo.flatMap { white in record.blackElo.map { "\(white) – \($0)" } }
+            return ClassicGame(id: record.id, white: record.white, black: record.black, event: record.event,
+                               year: record.year, result: record.result, blurb: record.blurb, moves: moves,
+                               opening: record.opening, ratings: ratings)
+        }
+    }
+
+    /// Master games that follow a line from the start, newest first, as model games for it.
+    func masterGames(following moves: [String], limit: Int = 8) -> [ClassicGame] {
+        Array(masterGames.lazy.filter { $0.moves.starts(with: moves) }.prefix(limit))
     }
 
     static func parseOpenings(_ text: String) -> [OpeningLine] {

@@ -230,7 +230,7 @@ struct DrillView: View {
         .opacity(ready ? 1 : 0.4)
         .animation(.easeInOut(duration: 0.2), value: ready)
         .accessibilityLabel("Talk it through")
-        .accessibilityHint("Tell Leo your plan. He checks every part. Counts as a hint.")
+        .accessibilityHint("Tell \(Coach.current.name) your plan. \(Coach.current.subjectCapitalized) checks every part. Counts as a hint.")
     }
 
     private func openTalk() {

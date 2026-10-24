@@ -179,7 +179,7 @@ struct PieceOfTheMatchCard: View {
         let piece = Piece(hero.slot.kind, color: color, square: .a1)
         let tint = record.rank == .recruit ? ArmyRank.gold : record.rank.color(for: piece, theme: theme)
         HStack(spacing: 12) {
-            PieceImage(piece: piece, theme: theme, size: 40)
+            PieceImage(piece: piece, theme: theme, size: 40, heirloom: store.heirloom(for: hero.slot))
                 .modifier(VeteranAura(rank: max(record.rank, .veteran), piece: piece, theme: theme,
                                       size: 40, onBoard: false))
             VStack(alignment: .leading, spacing: 2) {
@@ -231,6 +231,7 @@ struct ArmyView: View {
         "Games with Undo or a played hint earn half.",
         "Leaving a game unfinished counts as a loss.",
         "Piece of the Match earns 5 more; revenge on a rival that keeps taking a piece earns 15.",
+        "On the line: a named piece staked in New Game earns double on a win; on a loss the rival holds it, earning nothing, until you beat that rival.",
     ]
 
     var body: some View {
@@ -320,9 +321,21 @@ struct ArmyView: View {
     private func cell(_ slot: ArmySlot) -> some View {
         let record = store.record(for: slot)
         let piece = Piece(slot.kind, color: color, square: .a1)
+        let captor = store.captor(of: slot)
+        let heldBy: String = captor.map { ", held by \($0.rival.name)" } ?? ""
         return VStack(spacing: 4) {
-            PieceImage(piece: piece, theme: theme, size: 36)
+            PieceImage(piece: piece, theme: theme, size: 36, heirloom: store.heirloom(for: slot))
                 .modifier(VeteranAura(rank: record.rank, piece: piece, theme: theme, size: 36, onBoard: false))
+                .opacity(captor == nil ? 1 : 0.35)
+                .overlay(alignment: .bottomTrailing) {
+                    if let captor {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(captor.rival.hue)
+                            .padding(3)
+                            .background(.ultraThinMaterial, in: Circle())
+                    }
+                }
             Text(record.name ?? " ")
                 .font(.system(.caption2, design: .themed).weight(.bold))
                 .lineLimit(1)
@@ -331,7 +344,7 @@ struct ArmyView: View {
             RankPips(rank: record.rank, color: record.rank.color(for: piece, theme: theme))
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(record.name ?? slot.title), \(slot.title), \(record.rank.title), \(record.wins) wins")
+        .accessibilityLabel("\(record.name ?? slot.title), \(slot.title), \(record.rank.title), \(record.wins) wins\(heldBy)")
     }
 
     /// The pieces with the most experience.
@@ -362,7 +375,7 @@ struct ArmyView: View {
         let piece = Piece(slot.kind, color: color, square: .a1)
         let tint = record.rank.color(for: piece, theme: theme)
         return HStack(spacing: 12) {
-            PieceImage(piece: piece, theme: theme, size: 34)
+            PieceImage(piece: piece, theme: theme, size: 34, heirloom: store.heirloom(for: slot))
                 .modifier(VeteranAura(rank: record.rank, piece: piece, theme: theme, size: 34, onBoard: false))
             VStack(alignment: .leading, spacing: 1) {
                 Text(record.name ?? slot.title)
@@ -458,7 +471,7 @@ struct PieceDetailView: View {
         let tint = record.rank.color(for: piece, theme: theme)
         ScrollView {
             VStack(spacing: 18) {
-                PieceImage(piece: piece, theme: theme, size: 110)
+                PieceImage(piece: piece, theme: theme, size: 110, heirloom: store.heirloom(for: slot))
                     .modifier(VeteranAura(rank: record.rank, piece: piece, theme: theme, size: 110, onBoard: false))
                     .padding(.top, 24)
                 VStack(spacing: 4) {
@@ -482,8 +495,14 @@ struct PieceDetailView: View {
                         .foregroundStyle(tint)
                 }
                 progress(record, tint: tint)
+                if store.captor(of: slot) != nil || !record.trophies.isEmpty || record.escapes > 0 {
+                    onTheLine(record, tint: tint)
+                }
                 if record.nemesis != nil || !record.revenge.isEmpty {
                     rivals(record, tint: tint)
+                }
+                if !store.heirloom(for: slot).isEmpty {
+                    history(record, tint: tint)
                 }
                 stats(record)
             }
@@ -533,6 +552,74 @@ struct PieceDetailView: View {
                 .font(.system(.subheadline, design: .themed).weight(.semibold))
                 .foregroundStyle(tint)
         }
+    }
+
+    /// On the line: the rival holding this piece, and the trophies it has won.
+    private func onTheLine(_ record: PieceRecord, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let captor = store.captor(of: slot) {
+                HStack(spacing: 10) {
+                    RivalSigil(rival: captor.rival, size: 30, glows: theme.glows)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Held by \(captor.rival.name)")
+                            .font(.system(.subheadline, design: .themed).weight(.semibold))
+                        Text("Lost while on the line. It earns nothing until you beat \(captor.rival.name) and win it back.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            if !record.trophies.isEmpty {
+                HStack(spacing: 6) {
+                    Text("Trophies from")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    ForEach(record.trophies.sorted(), id: \.self) { raw in
+                        if let level = MatchController.Level(rawValue: raw) {
+                            Label(level.rival.name, systemImage: "crown.fill")
+                                .font(.caption.weight(.bold))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(level.rival.hue.opacity(0.2), in: Capsule())
+                                .foregroundStyle(level.rival.hue)
+                        }
+                    }
+                }
+            }
+            if record.escapes > 0 {
+                Text("Escaped \(ArmyNews.times(record.escapes)).")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .trainingCard(theme, tint: tint, cornerRadius: 16)
+    }
+
+    /// The Heirloom marks on the piece, and what each one is for.
+    private func history(_ record: PieceRecord, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("ITS HISTORY, ON THE PIECE")
+                .font(.caption2.weight(.semibold))
+                .tracking(1)
+                .foregroundStyle(.secondary)
+            ForEach(store.heirloom(for: slot).story(for: record), id: \.self) { line in
+                Label {
+                    Text(line)
+                        .font(.system(.subheadline, design: .themed))
+                        .fixedSize(horizontal: false, vertical: true)
+                } icon: {
+                    Image(systemName: "seal.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(HeirloomOverlay.gold)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .trainingCard(theme, tint: tint, cornerRadius: 16)
     }
 
     /// Which rival keeps taking this piece, and the rivals it has beaten back.

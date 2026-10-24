@@ -145,6 +145,10 @@ struct PieceRecord: Codable, Equatable {
     var takenBy: [Int: Int] = [:]
     /// Rivals this piece has had its revenge on, by level.
     var revenge: Set<Int> = []
+    /// Rivals it beat while it was on the line, by level: a trophy from each.
+    var trophies: Set<Int> = []
+    /// Times it was taken prisoner while on the line and won back.
+    var escapes = 0
 
     var rank: ArmyRank { .forXP(xp) }
 
@@ -171,7 +175,7 @@ struct PieceRecord: Codable, Equatable {
 
     private enum CodingKeys: String, CodingKey {
         case name, games, wins, survivedWins, captures, captureValue, mates, promotions, falls, xp
-        case honors, takenBy, revenge
+        case honors, takenBy, revenge, trophies, escapes
     }
 
     init(from decoder: Decoder) throws {
@@ -191,6 +195,8 @@ struct PieceRecord: Codable, Equatable {
         honors = try c.decodeIfPresent(Int.self, forKey: .honors) ?? 0
         takenBy = try c.decodeIfPresent([Int: Int].self, forKey: .takenBy) ?? [:]
         revenge = try c.decodeIfPresent(Set<Int>.self, forKey: .revenge) ?? []
+        trophies = try c.decodeIfPresent(Set<Int>.self, forKey: .trophies) ?? []
+        escapes = try c.decodeIfPresent(Int.self, forKey: .escapes) ?? 0
     }
 }
 
@@ -202,6 +208,8 @@ struct GameStakes: Equatable {
     var assisted = false
     /// The rival played, for grudges and revenge. Nil in tests that don't care.
     var level: MatchController.Level?
+    /// The piece the player put on the line for this game, if any.
+    var staked: ArmySlot?
 
     static let standard = GameStakes()
 
@@ -210,9 +218,10 @@ struct GameStakes: Equatable {
         self.assisted = assisted
     }
 
-    init(level: MatchController.Level, assisted: Bool) {
+    init(level: MatchController.Level, assisted: Bool, staked: ArmySlot? = nil) {
         self.init(multiplier: level.armyMultiplier, assisted: assisted)
         self.level = level
+        self.staked = staked
     }
 
     func scale(_ xp: Int) -> Int {
@@ -243,6 +252,14 @@ struct ArmyNews: Identifiable, Equatable {
         case revenge(rival: String)
         /// Before a game: this rival has taken the piece this many times.
         case grudge(rival: String, times: Int)
+        /// Before a game: the piece is on the line.
+        case staked(rival: String)
+        /// Won a game it was on the line for: double experience and a trophy.
+        case wonStake(rival: String)
+        /// Lost a game it was on the line for: the rival holds it.
+        case captured(rival: String)
+        /// A win against the rival holding it set it free.
+        case rescued(rival: String)
     }
 
     let slot: ArmySlot
@@ -259,6 +276,10 @@ struct ArmyNews: Identifiable, Equatable {
         case .promoted: return rank.title.uppercased()
         case .revenge: return "REVENGE"
         case .grudge: return "GRUDGE MATCH"
+        case .staked: return "ON THE LINE"
+        case .wonStake: return "TROPHY"
+        case .captured: return "TAKEN PRISONER"
+        case .rescued: return "RESCUED"
         }
     }
 
@@ -268,6 +289,14 @@ struct ArmyNews: Identifiable, Equatable {
             return "\(name) got its revenge on \(rival)"
         case .grudge(let rival, let times):
             return "\(rival) has taken \(name) \(Self.times(times))."
+        case .staked(let rival):
+            return "\(name) is on the line against \(rival)."
+        case .wonStake(let rival):
+            return "\(name) took \(rival)'s crown. Double XP."
+        case .captured(let rival):
+            return "\(rival) is holding \(name). Beat \(rival) to get it back."
+        case .rescued(let rival):
+            return "\(name) escaped from \(rival)."
         case .promoted:
             switch rank {
             case .veteran: return "Your \(slot.title.lowercased()) earned a name: \(name)"
@@ -281,8 +310,11 @@ struct ArmyNews: Identifiable, Equatable {
     /// Bigger news first: a Legend, then revenge, then the other ranks.
     fileprivate var priority: Int {
         switch kind {
+        case .captured: return 40
+        case .rescued: return 35
+        case .wonStake: return 30
         case .revenge: return 25
-        case .grudge: return 0
+        case .grudge, .staked: return 0
         case .promoted: return rank.rawValue * 10
         }
     }
@@ -330,6 +362,24 @@ final class ArmyStore {
     struct Army: Codable, Equatable {
         var records: [ArmySlot: PieceRecord] = [:]
         var lastGameID: UUID?
+        /// Pieces lost while on the line, and the rival (by level) holding each one.
+        var captives: [ArmySlot: Int] = [:]
+
+        init(records: [ArmySlot: PieceRecord] = [:], lastGameID: UUID? = nil, captives: [ArmySlot: Int] = [:]) {
+            self.records = records
+            self.lastGameID = lastGameID
+            self.captives = captives
+        }
+
+        private enum CodingKeys: String, CodingKey { case records, lastGameID, captives }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            records = try c.decodeIfPresent([ArmySlot: PieceRecord].self, forKey: .records) ?? [:]
+            lastGameID = try c.decodeIfPresent(UUID.self, forKey: .lastGameID)
+            // Armies saved before pieces could be put on the line hold no prisoners.
+            captives = try c.decodeIfPresent([ArmySlot: Int].self, forKey: .captives) ?? [:]
+        }
     }
 
     private let fileURL: URL?
@@ -409,7 +459,22 @@ final class ArmyStore {
         let heroSlot = Self.heroSlot(in: ledger, playerColor: playerColor)
         var news: [ArmyNews] = []
 
+        // The stake as the game began: checked before a win can free a prisoner.
+        let staked = stakes.level.flatMap { canStake(stakes.staked, against: $0) ? stakes.staked : nil }
+        // A win against a rival frees the piece it holds, in time to earn from this game.
+        if let level = stakes.level, won == true,
+           let freed = army.captives.first(where: { $0.value == level.rawValue })?.key {
+            army.captives[freed] = nil
+            var record = record(for: freed)
+            record.escapes += 1
+            army.records[freed] = record
+            news.append(ArmyNews(slot: freed, rank: record.rank, name: displayName(of: freed),
+                                 kind: .rescued(rival: rival)))
+        }
+
         for slot in ArmySlot.allCases {
+            // A prisoner sits out: it earns nothing until it is won back.
+            if army.captives[slot] != nil { continue }
             let start = slot.square(for: playerColor)
             let game = ledger.stats(forPieceStartingOn: start)
             var record = record(for: slot)
@@ -441,7 +506,8 @@ final class ArmyStore {
                 record.wins += 1
                 if survived { record.survivedWins += 1 }
             }
-            record.xp += stakes.scale(earned)
+            let onTheLine = slot == staked
+            record.xp += stakes.scale(earned) * (onTheLine && won == true ? 2 : 1)
             record.captures += game.captures
             record.captureValue += game.captureValue
             if game.gaveMate { record.mates += 1 }
@@ -458,6 +524,18 @@ final class ArmyStore {
             if tookRevenge {
                 news.append(ArmyNews(slot: slot, rank: record.rank, name: displayName(of: slot),
                                      kind: .revenge(rival: rival)))
+            }
+            if onTheLine, let level = stakes.level {
+                if won == true {
+                    record.trophies.insert(level.rawValue)
+                    army.records[slot] = record
+                    news.append(ArmyNews(slot: slot, rank: record.rank, name: displayName(of: slot),
+                                         kind: .wonStake(rival: rival)))
+                } else if won == false {
+                    army.captives[slot] = level.rawValue
+                    news.append(ArmyNews(slot: slot, rank: record.rank, name: displayName(of: slot),
+                                         kind: .captured(rival: rival)))
+                }
             }
         }
 

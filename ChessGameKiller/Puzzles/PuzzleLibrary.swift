@@ -29,6 +29,12 @@ struct PuzzleTheme: Identifiable, Hashable {
         PuzzleTheme(id: "mateIn4", name: "Mate in 4+", symbol: "4.circle.fill", group: .mates, alsoMatches: ["mateIn5"]),
         PuzzleTheme(id: "backRankMate", name: "Back-rank mate", symbol: "rectangle.bottomhalf.filled", group: .mates),
         PuzzleTheme(id: "smotheredMate", name: "Smothered mate", symbol: "square.stack.3d.down.forward.fill", group: .mates),
+        PuzzleTheme(id: "anastasiaMate", name: "Anastasia's mate", symbol: "a.circle.fill", group: .mates),
+        PuzzleTheme(id: "arabianMate", name: "Arabian mate", symbol: "moon.stars.fill", group: .mates),
+        PuzzleTheme(id: "hookMate", name: "Hook mate", symbol: "arrow.turn.down.right", group: .mates),
+        PuzzleTheme(id: "bodenMate", name: "Boden's mate", symbol: "xmark.diamond.fill", group: .mates),
+        PuzzleTheme(id: "doubleBishopMate", name: "Two-bishop mate", symbol: "rhombus.fill", group: .mates),
+        PuzzleTheme(id: "dovetailMate", name: "Dovetail mate", symbol: "bird.fill", group: .mates),
 
         PuzzleTheme(id: "fork", name: "Fork", symbol: "arrow.triangle.branch", group: .tactics),
         PuzzleTheme(id: "pin", name: "Pin", symbol: "pin.fill", group: .tactics),
@@ -41,6 +47,9 @@ struct PuzzleTheme: Identifiable, Hashable {
         PuzzleTheme(id: "advancedPawn", name: "Advanced pawn", symbol: "arrow.up.circle.fill", group: .tactics),
         PuzzleTheme(id: "kingsideAttack", name: "Kingside attack", symbol: "flame.fill", group: .tactics),
         PuzzleTheme(id: "queensideAttack", name: "Queenside attack", symbol: "flame", group: .tactics),
+        PuzzleTheme(id: "capturingDefender", name: "Remove the defender", symbol: "shield.slash.fill", group: .tactics),
+        PuzzleTheme(id: "exposedKing", name: "Exposed king", symbol: "exclamationmark.shield.fill", group: .tactics),
+        PuzzleTheme(id: "attackingF2F7", name: "Attack on f2/f7", symbol: "target", group: .tactics),
 
         PuzzleTheme(id: "sacrifice", name: "Sacrifice", symbol: "bolt.heart.fill", group: .advanced),
         PuzzleTheme(id: "deflection", name: "Deflection", symbol: "arrow.uturn.right", group: .advanced),
@@ -53,6 +62,11 @@ struct PuzzleTheme: Identifiable, Hashable {
         PuzzleTheme(id: "defensiveMove", name: "Defense", symbol: "shield.fill", group: .advanced),
         PuzzleTheme(id: "zugzwang", name: "Zugzwang", symbol: "hourglass", group: .advanced),
         PuzzleTheme(id: "veryLong", name: "Long combination", symbol: "list.number", group: .advanced),
+        PuzzleTheme(id: "equality", name: "Save the game", symbol: "equal.circle.fill", group: .advanced),
+        PuzzleTheme(id: "underPromotion", name: "Underpromotion", symbol: "crown", group: .advanced),
+        PuzzleTheme(id: "enPassant", name: "En passant", symbol: "arrow.down.forward", group: .advanced),
+        PuzzleTheme(id: "castling", name: "Castling", symbol: "arrow.left.arrow.right", group: .advanced),
+        PuzzleTheme(id: "masterVsMaster", name: "From master games", symbol: "star.fill", group: .advanced),
 
         PuzzleTheme(id: "opening", name: "Opening", symbol: "door.left.hand.open", group: .phases),
         PuzzleTheme(id: "middlegame", name: "Middlegame", symbol: "circle.grid.cross.fill", group: .phases),
@@ -140,10 +154,26 @@ struct PuzzleLibrary {
     /// Where each puzzle is in `puzzles`, by id.
     private let positions: [String: Int]
 
+    /// Where the puzzles with each Lichess tag are in `puzzles`, in rating order.
+    private let byTag: [String: [Int]]
+
     init(puzzles: [LichessPuzzle]) {
         let sorted = puzzles.sorted { $0.rating < $1.rating }
         self.puzzles = sorted
         positions = Dictionary(sorted.enumerated().map { ($0.element.id, $0.offset) }, uniquingKeysWith: { first, _ in first })
+        var tags: [String: [Int]] = [:]
+        for (index, puzzle) in sorted.enumerated() {
+            for tag in puzzle.themes { tags[tag, default: []].append(index) }
+        }
+        byTag = tags
+    }
+
+    /// The puzzles in a theme, in rating order. With 100,000 puzzles a scan per question is too slow.
+    private func pool(_ theme: PuzzleTheme) -> [LichessPuzzle] {
+        if theme.id.isEmpty { return puzzles }
+        let tags = theme.tags.sorted()
+        if tags.count == 1 { return (byTag[tags[0]] ?? []).map { puzzles[$0] } }
+        return Set(tags.flatMap { byTag[$0] ?? [] }).sorted().map { puzzles[$0] }
     }
 
     /// The puzzle with this Lichess id, if the pack has it.
@@ -151,8 +181,15 @@ struct PuzzleLibrary {
         positions[id].map { puzzles[$0] }
     }
 
-    /// Reads the pack. Nil when it isn't in the bundle.
+    /// Reads the pack: lichess-puzzles.pack (the CSV, DEFLATE-compressed by
+    /// scripts/puzzles/build_puzzle_pack.py), or a plain lichess-puzzles.csv. Nil when neither is in the bundle.
     static func bundled(_ bundle: Bundle = .main) -> PuzzleLibrary? {
+        if let url = bundle.url(forResource: "lichess-puzzles", withExtension: "pack"),
+           let packed = try? Data(contentsOf: url),
+           let data = try? (packed as NSData).decompressed(using: .zlib) as Data,
+           let text = String(data: data, encoding: .utf8) {
+            return PuzzleLibrary(csv: text)
+        }
         guard let url = bundle.url(forResource: "lichess-puzzles", withExtension: "csv"),
               let text = try? String(contentsOf: url, encoding: .utf8) else { return nil }
         return PuzzleLibrary(csv: text)
@@ -163,13 +200,15 @@ struct PuzzleLibrary {
     }
 
     func count(of theme: PuzzleTheme) -> Int {
-        theme.id.isEmpty ? puzzles.count : puzzles.filter { $0.themes.contains(where: theme.tags.contains) }.count
+        if theme.id.isEmpty { return puzzles.count }
+        if theme.tags.count == 1 { return byTag[theme.id]?.count ?? 0 }
+        return Set(theme.tags.flatMap { byTag[$0] ?? [] }).count
     }
 
     /// A puzzle near `rating` in the theme, not one of `avoid`. The window widens until something fits.
     func pick(near rating: Int, theme: PuzzleTheme, avoid: Set<String>,
               using generator: inout some RandomNumberGenerator) -> LichessPuzzle? {
-        let pool = theme.id.isEmpty ? puzzles : puzzles.filter { $0.themes.contains(where: theme.tags.contains) }
+        let pool = pool(theme)
         guard !pool.isEmpty else { return nil }
         for window in [75, 150, 300, 600, 3000] {
             let near = pool.filter { abs($0.rating - rating) <= window && !avoid.contains($0.id) }

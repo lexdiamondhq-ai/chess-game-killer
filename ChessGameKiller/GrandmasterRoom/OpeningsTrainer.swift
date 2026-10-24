@@ -19,17 +19,23 @@ final class OpeningDrillRunner {
     /// Learn mode shows every move with an arrow first.
     let showsMoves: Bool
     @ObservationIgnored private var pending: Task<Void, Never>?
+    /// The coach's spoken reactions: "Try again" on a slip, a cheer for a line played from memory.
+    @ObservationIgnored var reactions: Reacting?
 
     init(moves: [String], side: Piece.Color, name: String, showsMoves: Bool) {
         self.moves = moves
         self.side = side
         self.name = name
         self.showsMoves = showsMoves
+        reactions = CoachReactions.shared
         board.humanColors = []
     }
 
     func start() { advance() }
     func cancel() { pending?.cancel() }
+
+    /// The line's next move, or nil once it's played out.
+    var nextMove: String? { index < moves.count ? moves[index] : nil }
 
     func tap(_ square: Square) {
         guard !isDone, board.isHumanTurn else { return }
@@ -49,6 +55,7 @@ final class OpeningDrillRunner {
             tone = .wrong
             let right = Notation.san(of: moves[index], fen: played.fenBefore) ?? moves[index]
             message = "Not in this line. It's \(right)."
+            if mistakes == 1 { reactions?.react(.tryAgain, strict: false) }
             pending = Task { [weak self] in
                 try? await Task.sleep(for: .milliseconds(700))
                 guard let self, !Task.isCancelled else { return }
@@ -81,6 +88,10 @@ final class OpeningDrillRunner {
                 self.tone = self.mistakes == 0 ? .success : .hint
                 self.message = self.mistakes == 0 ? "Perfect. \(self.name) is in your fingers."
                     : "Done, with \(self.mistakes) slip\(self.mistakes == 1 ? "" : "s"). It'll come back sooner."
+                // Following the arrows is no feat; playing the whole line from memory is.
+                if !self.showsMoves {
+                    self.reactions?.react(self.mistakes == 0 ? .nice : .afterHelp, strict: false)
+                }
             } else {
                 if self.showsMoves { self.showArrow() }
                 if self.tone != .success || self.index == 0 {
@@ -101,6 +112,9 @@ struct OpeningsView: View {
     @Environment(TrainingStore.self) private var training: TrainingStore?
     @State private var query = ""
     @State private var reviewing: [RepertoireEntry] = []
+    @State private var offer: PremiumFeature?
+
+    private var allOpen: Bool { Premium.shared.opens(.allOpenings) }
 
     /// Grouped once: there are thousands of lines.
     static let families = GrandmasterContent.shared.openingFamilies
@@ -142,20 +156,16 @@ struct OpeningsView: View {
 
     var body: some View {
         TrainScreen(theme: theme, title: "Openings",
-                    intro: query.isEmpty ? "Pick a few lines you like and learn them. Leo brings each one back just before you'd forget it." : nil) {
+                    intro: query.isEmpty ? "Pick a few lines you like and learn them. \(Coach.current.name) brings each one back just before you'd forget it." : nil) {
             if query.isEmpty {
                 repertoireCard
                 TrainSectionTitle(text: "Where most players start")
                 familyList(Self.popular)
-                NavigationLink {
-                    AllOpeningsView(theme: theme)
-                } label: {
-                    TrainRow(symbol: "books.vertical.fill", title: "Every opening",
-                             detail: "All \(GrandmasterContent.shared.openings.count) named lines, A to Z, with their ECO codes.",
-                             theme: theme)
-                }
-                .buttonStyle(.plain)
-                .padding(.top, 8)
+                everyOpening
+                    .padding(.top, 8)
+            } else if !allOpen {
+                PremiumLimitCard(feature: .allOpenings, accent: theme.trainingAccent)
+                    .padding(.top, 20)
             } else if matches.isEmpty {
                 Text("No opening matches \u{201C}\(query)\u{201D}.")
                     .font(.system(.subheadline, design: .themed))
@@ -171,6 +181,25 @@ struct OpeningsView: View {
             RepertoireReview(entries: reviewing, theme: theme)
                 .environment(repertoire)
                 .environment(training)
+        }
+        .premiumOffer($offer)
+    }
+
+    @ViewBuilder
+    private var everyOpening: some View {
+        let row = TrainRow(symbol: "books.vertical.fill", title: "Every opening",
+                           detail: "All \(GrandmasterContent.shared.openings.count) named lines, A to Z, with their ECO codes.",
+                           value: allOpen ? nil : "Premium", theme: theme)
+        if allOpen {
+            NavigationLink {
+                AllOpeningsView(theme: theme)
+            } label: {
+                row
+            }
+            .buttonStyle(.plain)
+        } else {
+            Button { offer = .allOpenings } label: { row }
+                .buttonStyle(.plain)
         }
     }
 
@@ -203,7 +232,8 @@ struct OpeningsView: View {
                 .fixedSize(horizontal: false, vertical: true)
             if !due.isEmpty {
                 Button {
-                    reviewing = due
+                    // A review counts as the day's free opening drill.
+                    if Premium.shared.use(.openingDrill, key: "review") { reviewing = due } else { offer = .openingDrill }
                 } label: {
                     Label("Review", systemImage: "arrow.triangle.2.circlepath")
                 }
@@ -340,16 +370,24 @@ private struct OpeningFamilyView: View {
 }
 
 /// One line: watch it, practice it, add it to the repertoire.
-private struct OpeningLineView: View {
+struct OpeningLineView: View {
     let line: OpeningLine
     let theme: BoardTheme
     @Environment(RepertoireStore.self) private var repertoire
+    @Environment(TrainingStore.self) private var training: TrainingStore?
     @State private var side: Piece.Color = .white
     @State private var runner: OpeningDrillRunner?
+    /// A master game from this line, opened in Guess the Move.
+    @State private var modelGame: ClassicGame?
+    @State private var offer: PremiumFeature?
+
+    /// Master games that followed this line, found once.
+    private var modelGames: [ClassicGame] { GrandmasterContent.shared.masterGames(following: line.moves, limit: 6) }
 
     var body: some View {
         GeometryReader { geo in
-            let boardSide = max(200, min(geo.size.width - 24, geo.size.height * 0.56))
+            let boardSide: CGFloat = max(200, min(geo.size.width - 24, geo.size.height * 0.56))
+            ScrollView {
             VStack(spacing: 12) {
                 Picker("Play as", selection: $side) {
                     Text("Play as White").tag(Piece.Color.white)
@@ -372,7 +410,8 @@ private struct OpeningLineView: View {
                     }
                     .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false))
                     Button {
-                        restart(learn: false)
+                        // Testing a line is the day's free opening drill; the same line again is free.
+                        if Premium.shared.use(.openingDrill, key: line.id) { restart(learn: false) } else { offer = .openingDrill }
                     } label: {
                         Label("Test me", systemImage: "brain.head.profile")
                     }
@@ -387,10 +426,29 @@ private struct OpeningLineView: View {
                     .disabled(repertoire.contains(line, side: side))
                 }
                 .padding(.horizontal, 16)
-                Spacer(minLength: 0)
+                // While testing, the most played move would give the answer away.
+                if let runner, runner.showsMoves || runner.isDone {
+                    OpeningStatsPanel(fen: runner.board.fen, lineMove: runner.nextMove, theme: theme)
+                        .padding(.horizontal, 16)
+                }
+                let games = modelGames
+                if !games.isEmpty {
+                    OpeningModelGames(games: games, theme: theme) { game in
+                        if Premium.shared.opens(.masterGames) { modelGame = game } else { offer = .masterGames }
+                    }
+                        .padding(.horizontal, 16)
+                }
             }
+            .padding(.bottom, 24)
             .frame(width: geo.size.width)
+            }
+            .scrollBounceBehavior(.basedOnSize)
         }
+        .fullScreenCover(item: $modelGame) { game in
+            GuessTheMoveView(game: game, theme: theme)
+                .environment(training)
+        }
+        .premiumOffer($offer)
         .navigationTitle(line.variation)
         .navigationBarTitleDisplayMode(.inline)
         .background { TrainingBackdrop(theme: theme) }

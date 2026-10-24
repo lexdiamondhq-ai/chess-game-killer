@@ -182,7 +182,11 @@ struct TalkPanelConversation: View {
                                   theme: theme, select: select)
                     .transition(arrival)
             }
-            if session.phase == .failed {
+            if session.phase == .failed, session.outOfTalks {
+                PremiumLimitCard(feature: .talk, accent: theme.challengeAccent)
+                    .id(Self.problemID)
+                    .transition(arrival)
+            } else if session.phase == .failed {
                 TalkPanelProblemCard(text: problemText, theme: theme)
                     .id(Self.problemID)
                     .transition(arrival)
@@ -323,12 +327,12 @@ private struct TalkPanelLeoBubble: View {
                 Text(text)
                     .font(theme.talkFont(.body))
                     .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityLabel("Leo: \(text)")
+                    .accessibilityLabel("\(Coach.current.name): \(text)")
             } else {
                 TalkPanelTypingDots(color: Color.secondary)
                     .frame(height: 22)
                     .accessibilityElement()
-                    .accessibilityLabel("Leo is answering")
+                    .accessibilityLabel("\(Coach.current.name) is answering")
             }
             if speaking, let stop {
                 stopButton(stop)
@@ -358,7 +362,7 @@ private struct TalkPanelLeoBubble: View {
             .contentShape(Capsule())
         }
         .buttonStyle(ChallengePressStyle())
-        .accessibilityLabel("Stop Leo")
+        .accessibilityLabel("Stop \(Coach.current.name)")
         .transition(.opacity)
     }
 }
@@ -891,7 +895,7 @@ private struct TalkPanelCheckingCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassPane(RoundedRectangle(cornerRadius: 26, style: .continuous))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Leo is checking your ideas")
+        .accessibilityLabel("\(Coach.current.name) is checking your ideas")
     }
 
     /// A mark and two lines; the numbers are how much room each line leaves at its end.
