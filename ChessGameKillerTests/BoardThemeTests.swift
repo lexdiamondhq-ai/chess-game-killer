@@ -25,6 +25,20 @@ final class BoardThemeTests: XCTestCase {
         }
     }
 
+    /// Hiding the coordinates trades the half-square frame for a thin rim, so the squares grow;
+    /// boards drawn without a picture have no frame either way.
+    func testHidingCoordinatesGrowsTheSquares() {
+        let side: CGFloat = 360
+        let framed = BoardTheme.gilded.frameInset(side: side)
+        let rim = BoardTheme.gilded.frameInset(side: side, coordinates: false)
+        XCTAssertEqual(framed, side / 18, accuracy: 0.001)
+        XCTAssertGreaterThan(rim, 0)
+        XCTAssertLessThan(rim, framed / 2)
+        XCTAssertEqual(BoardTheme.gilded.squaresAcross(), 9, accuracy: 0.001)
+        XCTAssertLessThan(BoardTheme.gilded.squaresAcross(coordinates: false), 8.4)
+        XCTAssertEqual(BoardTheme.neon.frameInset(side: side, coordinates: false), 0)
+    }
+
     func testGildedIsTheDefaultLook() {
         XCTAssertEqual(BoardTheme.all.first?.id, .gilded)
         XCTAssertEqual(BoardTheme.named(.gilded).pieceSet, "gilded-")

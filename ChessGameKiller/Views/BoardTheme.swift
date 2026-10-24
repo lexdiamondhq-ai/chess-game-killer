@@ -79,9 +79,23 @@ struct BoardTheme: Identifiable {
     /// quiet "executive" look: no glows, plain type, fine lines, one accent.
     var glows: Bool { id == .neon }
 
-    func frameInset(side: CGFloat) -> CGFloat {
-        boardArt == nil ? 0 : side / 18
+    /// With coordinates the frame is half a square wide, room for the letters and numbers;
+    /// without them it is a fine glass rim, so the squares grow.
+    func frameInset(side: CGFloat, coordinates: Bool = true) -> CGFloat {
+        guard boardArt != nil else { return 0 }
+        return side * (coordinates ? 1 / 18 : Self.thinRim)
     }
+
+    /// The glass rim's width, as a share of the board, when coordinates are hidden.
+    static let thinRim: CGFloat = 1 / 64
+
+    /// How many squares wide the whole board is, frame included.
+    func squaresAcross(coordinates: Bool = true) -> CGFloat {
+        8 / (1 - 2 * frameInset(side: 1, coordinates: coordinates))
+    }
+
+    /// The Settings switch for the letters and numbers around every board.
+    static let coordinatesKey = "showCoordinates"
 
     /// The fill for a square: clear when the board picture already shows it.
     func squareFill(isLight: Bool) -> Color {

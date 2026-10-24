@@ -80,6 +80,7 @@ struct TalkPanelBoard: View {
     let theme: BoardTheme
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage(BoardTheme.coordinatesKey) private var showsCoordinates = true
 
     var body: some View {
         PositionBoard(draft: draft, theme: theme, flipped: flipped, tints: tints)
@@ -119,7 +120,7 @@ struct TalkPanelBoard: View {
     private var arrowLayer: some View {
         GeometryReader { geo in
             let side: CGFloat = min(geo.size.width, geo.size.height)
-            let inset: CGFloat = theme.frameInset(side: side)
+            let inset: CGFloat = theme.frameInset(side: side, coordinates: showsCoordinates)
             let cell: CGFloat = (side - inset * 2) / 8
             ZStack {
                 ForEach(light.arrows, id: \.self) { arrow in

@@ -14,11 +14,12 @@ struct PositionBoard: View {
     /// Pieces drawn as ghosts: moves that could have been, not moves that were.
     var ghosts: Set<Square> = []
     var ghostColor: Color = .yellow
+    @AppStorage(BoardTheme.coordinatesKey) private var showsCoordinates = true
 
     var body: some View {
         GeometryReader { geo in
             let side = min(geo.size.width, geo.size.height)
-            let inset = theme.frameInset(side: side)
+            let inset = theme.frameInset(side: side, coordinates: showsCoordinates)
             let sq = (side - inset * 2) / 8
             let corner = RoundedRectangle(cornerRadius: sq * 0.12, style: .continuous)
             ZStack(alignment: .topLeading) {
@@ -26,7 +27,7 @@ struct PositionBoard: View {
                 // may rise a little above the frame.
                 ZStack {
                     if let art = theme.boardArt {
-                        BoardArt(name: art, flipped: flipped)
+                        BoardArt(name: art, flipped: flipped, coordinates: showsCoordinates)
                     }
                     if let surface = theme.surface {
                         LinearGradient(colors: surface, startPoint: .topLeading, endPoint: .bottomTrailing)
@@ -71,7 +72,7 @@ struct PositionBoard: View {
                 }
                 .frame(width: sq * 8, height: sq * 8)
                 .padding(inset)
-                if theme.boardArt != nil {
+                if theme.boardArt != nil, showsCoordinates {
                     FrameCoordinates(flipped: flipped, inset: inset, squareSize: sq, color: theme.labelOnDark)
                 }
             }
@@ -129,7 +130,7 @@ struct PositionBoard: View {
                 Rectangle().strokeBorder(gridLine, lineWidth: 0.5)
             }
             // Coordinates in the corners, like a printed board. A board picture has them in its frame.
-            if theme.boardArt == nil {
+            if theme.boardArt == nil, showsCoordinates {
                 if column == 0 {
                     label("\(square.rankIndex + 1)", size: size, color: labelColor, alignment: .topLeading)
                 }

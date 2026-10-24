@@ -39,6 +39,7 @@ struct ContentView: View {
     /// Big Board: the board edge to edge with everything else tucked into a pull-up tray.
     @AppStorage("bigBoard") private var bigBoard = false
     @AppStorage("sculpted3D") private var sculpted3D = true
+    @AppStorage(BoardTheme.coordinatesKey) private var showsCoordinates = true
     /// Hold the board to see the engine's line ahead (counts as help).
     @AppStorage(GhostVision.storageKey) private var ghostVisionOn = true
     @State private var vision = GhostVision()
@@ -456,10 +457,10 @@ struct ContentView: View {
     }
 
     /// Room kept over a flat board of standing pieces, as a share of the board's width (the board
-    /// with its frame is 9 squares wide): the far rank's kings rise a little above its frame.
+    /// with its frame is 9 squares wide, a little over 8 with coordinates off): the far rank's kings rise a little above its frame.
     /// The 3D board and Neon's flat pieces stay within the board.
     private var headroom: CGFloat {
-        theme.spritePieces && !BoardView.playsIn3D(theme, setting: sculpted3D) ? SpriteFrame.sideOn.boardRise / 9 : 0
+        theme.spritePieces && !BoardView.playsIn3D(theme, setting: sculpted3D) ? SpriteFrame.sideOn.boardRise / theme.squaresAcross(coordinates: showsCoordinates) : 0
     }
 
     /// The live board; in Big Board it can be swiped to look back through the game.
