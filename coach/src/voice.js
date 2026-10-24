@@ -1,4 +1,4 @@
-// The coach's voice: Leo's answer read aloud by Monolith on ElevenLabs, Vera's by
+// The coach's voice: Leo's answer read aloud by Liam on ElevenLabs, Vera's by
 // Sarah, with the same model and settings as their recorded lessons
 // (scripts/training/make_narration.py), so the coach in a game sounds like the
 // coach in the lessons. When there's no
@@ -6,8 +6,8 @@
 // device's voice instead.
 
 const API = "https://api.elevenlabs.io/v1/text-to-speech";
-/** Monolith: a deep, dark American bass, designed for Leo. */
-const DEFAULT_VOICE_ID = "1b0g3hQZNdyIitkZW5BL";
+/** Liam: a young, articulate American man. */
+const DEFAULT_VOICE_ID = "TX3LPaxmHKxFdv7VOQHJ";
 /** Sarah: a confident, warm young American woman. Vera's voice. */
 const DEFAULT_VERA_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
 const DEFAULT_VOICE_MODEL = "eleven_multilingual_v2";

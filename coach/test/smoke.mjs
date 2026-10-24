@@ -5,7 +5,7 @@
 //
 // It checks that the server answers, that it turns a broken request down,
 // and that one real talk streams `checked`, then `answer`, then `voice`
-// (Monolith's MP3, or why not), then `done`. The talk is the first case of
+// (Liam's MP3, or why not), then `done`. The talk is the first case of
 // test/fixtures/talks.json, or the protocol's own example without it. It
 // costs two Claude calls and one short voice reading, and counts toward the
 // day's budget. Exits with 1 on any failure.
@@ -183,7 +183,7 @@ try {
     const audio = Buffer.from(voice.audio, "base64");
     const mp3 = audio.subarray(0, 3).toString("latin1") === "ID3" || (audio[0] === 0xff && (audio[1] & 0xe0) === 0xe0);
     check(audio.length > 1000 && mp3, `the voice isn't an MP3 (${audio.length} bytes)`);
-    done(`Monolith read it: ${Math.round(audio.length / 1024)} KB of MP3`);
+    done(`Liam read it: ${Math.round(audio.length / 1024)} KB of MP3`);
   }
 
   const timing = lines.map(({ line, at }) => `${line.type} ${(at / 1000).toFixed(1)} s`).join(", ");

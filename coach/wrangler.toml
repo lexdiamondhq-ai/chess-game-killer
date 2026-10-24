@@ -21,8 +21,8 @@ CLAUDE_TIMEOUT_MS = "12000"
 # The address is public, so these cap the bill.
 DAILY_TALKS = "400"
 DAILY_VOICE_CHARS = "40000"
-# Leo's voice on ElevenLabs: Monolith (a deep American bass), with the lessons' model, so he sounds the same.
-VOICE_ID = "1b0g3hQZNdyIitkZW5BL"
+# Leo's voice on ElevenLabs: Liam (a young, articulate American), with the lessons' model, so he sounds the same.
+VOICE_ID = "TX3LPaxmHKxFdv7VOQHJ"
 VOICE_MODEL = "eleven_multilingual_v2"
 
 # At most 12 talks a minute from one address, so a leaked URL can't run up the bill.

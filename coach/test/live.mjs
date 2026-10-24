@@ -1,7 +1,7 @@
 // The real thing, end to end, but in Node instead of Workers: for every case
 // in test/fixtures/talks.json, Claude hears the player's words (claims.js),
 // the rules and Stockfish's numbers check them (verify.js), Claude words
-// Leo's answer (answer.js), and Monolith reads one of the answers aloud
+// Leo's answer (answer.js), and Liam reads one of the answers aloud
 // (voice.js) when there's an ElevenLabs key. It prints a Markdown table, which
 // the workflow adds to the pull request's checks.
 //
@@ -315,7 +315,7 @@ async function runCase(fixture, env) {
   return row;
 }
 
-/** One reading by Monolith, timed. Never fatal: without a voice the app speaks with the device's. */
+/** One reading by Liam, timed. Never fatal: without a voice the app speaks with the device's. */
 async function tryVoice(env, text, audioPath) {
   if (!env.ELEVENLABS_API_KEY) return "Voice: not tried (no ELEVENLABS_API_KEY).";
   let status = "no answer";
@@ -327,10 +327,10 @@ async function tryVoice(env, text, audioPath) {
   const started = Date.now();
   const audio = await speak(env, text, recordingFetch);
   const ms = Date.now() - started;
-  if (!audio) return `Voice: ⚠️ Monolith didn't read it (${status}, ${(ms / 1000).toFixed(1)} s); the app would use the device's voice.`;
+  if (!audio) return `Voice: ⚠️ Liam didn't read it (${status}, ${(ms / 1000).toFixed(1)} s); the app would use the device's voice.`;
   const mp3 = (audio[0] === 0x49 && audio[1] === 0x44 && audio[2] === 0x33) || (audio[0] === 0xff && (audio[1] & 0xe0) === 0xe0);
   if (audioPath) writeFileSync(audioPath, audio);
-  return `Voice: Monolith read ${text.length} characters in ${(ms / 1000).toFixed(1)} s: ${k(audio.length)}B of ${mp3 ? "MP3" : "audio that doesn't look like MP3 ⚠️"}${audioPath ? `, saved to ${audioPath}` : ""}.`;
+  return `Voice: Liam read ${text.length} characters in ${(ms / 1000).toFixed(1)} s: ${k(audio.length)}B of ${mp3 ? "MP3" : "audio that doesn't look like MP3 ⚠️"}${audioPath ? `, saved to ${audioPath}` : ""}.`;
 }
 
 function report(rows, env, voiceLine) {

@@ -126,7 +126,7 @@ final class CoachVoice: NSObject {
         let coach = Coach.current
         utterance.voice = Self.deviceVoice(for: coach)
         utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 1.02
-        utterance.pitchMultiplier = coach == .leo ? 0.8 : 1.02
+        utterance.pitchMultiplier = coach == .leo ? 0.95 : 1.02
         utterance.postUtteranceDelay = 0.1
         self.utterance = utterance
         synthesizer.delegate = self

@@ -2,7 +2,7 @@
 
 Before a move, the player tells Coach Leo what they see and what they'll play, out loud or typed. This server
 checks every claim against the rules and Stockfish's numbers (worked out on the iPhone and sent along), then has
-Claude word Leo's answer, and ElevenLabs reads it in Monolith's voice, the voice of the recorded lessons.
+Claude word Leo's answer, and ElevenLabs reads it in Liam's voice, the voice of the recorded lessons.
 Claude never decides what's true: it turns the words into claims, and words the verdict the rules reached.
 
 The workflow deploys it to **https://coach.chess-game-killer.workers.dev**. [PROTOCOL.md](PROTOCOL.md) is the contract with the app:
@@ -18,7 +18,7 @@ the request, the stream, the claim kinds, the grades and the limits.
   are right, grade the move, and find what was missed. No AI in here.
 - `src/answer.js`: Claude call 2. The checked facts go in; Leo's spoken answer comes out. A guard turns down
   wording with move notation or a square the facts don't name, and the server's own template answers instead.
-- `src/voice.js`: Monolith on ElevenLabs, with the lessons' model and settings (`scripts/training/make_narration.py`).
+- `src/voice.js`: Liam on ElevenLabs, with the lessons' model and settings (`scripts/training/make_narration.py`).
 - `src/vendor/chess.js`: [chess.js](https://github.com/jhlywa/chess.js) 1.4.0 (BSD-2-Clause), the same copy as `play/`.
 
 A talk streams `checked`, `answer`, `voice` and `done`, one JSON line each, so the app can light up the board
@@ -59,7 +59,7 @@ The live check runs the real pipeline in Node against the real APIs for every ca
 `test/fixtures/talks.json`, and prints a table of what Claude heard, the verdicts, Leo's words, timings and tokens:
 
 ```sh
-ANTHROPIC_API_KEY=… node test/live.mjs                      # ELEVENLABS_API_KEY=… adds one reading by Monolith
+ANTHROPIC_API_KEY=… node test/live.mjs                      # ELEVENLABS_API_KEY=… adds one reading by Liam
 ANTHROPIC_API_KEY=… node test/live.mjs --only castle --audio leo.mp3
 ```
 
@@ -76,7 +76,7 @@ talk with the live server (`test/smoke.mjs`). It needs `ANTHROPIC_API_KEY` and `
 
 Settings (`[vars]` in `wrangler.toml`): `MODEL` (`claude-opus-5-5`), `PARSE_EFFORT` and `ANSWER_EFFORT` (`low`),
 `CLAUDE_TIMEOUT_MS` (12000, for each Claude call), `DAILY_TALKS` (400) and `DAILY_VOICE_CHARS` (40000) across
-everyone per UTC day, `VOICE_ID` (Monolith, Leo's voice), `VERA_VOICE_ID` (Sarah, Vera's voice; requests with `coach: "vera"`) and `VOICE_MODEL` (`eleven_multilingual_v2`). Each address can start 12
+everyone per UTC day, `VOICE_ID` (Liam, Leo's voice), `VERA_VOICE_ID` (Sarah, Vera's voice; requests with `coach: "vera"`) and `VOICE_MODEL` (`eleven_multilingual_v2`). Each address can start 12
 talks a minute.
 
 ## What a talk costs

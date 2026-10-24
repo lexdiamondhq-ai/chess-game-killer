@@ -2,7 +2,7 @@
 """Records each coach's voice for every line in the lessons, and their short
 reactions in puzzles and drills, with ElevenLabs.
 
-Two coaches teach the same course: Leo (Monolith's voice) and Vera (Sarah's). The
+Two coaches teach the same course: Leo (Liam's voice) and Vera (Sarah's). The
 course is written in Leo's words; for Vera his name becomes hers, exactly as
 Coach.personalize does in the app. Reactions ("Nice move.", "Try again.") come
 from Training/Content/reactions.json.
@@ -45,9 +45,9 @@ OUTPUT_FORMAT = "mp3_44100_64"
 # Leo's settings: steady and clean, no style exaggeration. Changing them doesn't re-record anything.
 VOICE_SETTINGS = {"stability": 0.65, "similarity_boost": 0.9, "style": 0.0, "use_speaker_boost": True, "speed": 0.95}
 COACHES = {
-    # Monolith: a deep, dark American bass, designed for Leo with ElevenLabs Voice Design.
+    # Liam: a young, articulate American man (an ElevenLabs premade voice).
     # Override with ELEVENLABS_VOICE_ID. Recorded at 128 kbps, then mastered (MASTER).
-    "leo": {"name": "Leo", "prefix": "nar-", "voice": os.environ.get("ELEVENLABS_VOICE_ID", "1b0g3hQZNdyIitkZW5BL"),
+    "leo": {"name": "Leo", "prefix": "nar-", "voice": os.environ.get("ELEVENLABS_VOICE_ID", "TX3LPaxmHKxFdv7VOQHJ"),
             "settings": VOICE_SETTINGS, "format": "mp3_44100_128", "master": True},
     # Sarah: a confident, warm young American woman. Override with ELEVENLABS_VERA_VOICE_ID.
     # Steady and clean: high stability, no style exaggeration, recorded at 128 kbps.

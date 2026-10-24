@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { VERA_VOICE_SETTINGS, VOICE_SETTINGS, speak, toBase64, voiceKey } from "../src/voice.js";
 
-const env = { ELEVENLABS_API_KEY: " xi-test\n", VOICE_ID: "1b0g3hQZNdyIitkZW5BL", VOICE_MODEL: "eleven_multilingual_v2" };
+const env = { ELEVENLABS_API_KEY: " xi-test\n", VOICE_ID: "TX3LPaxmHKxFdv7VOQHJ", VOICE_MODEL: "eleven_multilingual_v2" };
 const MP3 = new Uint8Array([0xff, 0xfb, 0x90, 0x64, 1, 2, 3]);
 
 /** A stand-in for fetch that records the call and answers with `reply`. */
@@ -16,13 +16,13 @@ function fakeFetch(reply = () => new Response(MP3, { headers: { "content-type": 
   return { fetchImpl, calls };
 }
 
-test("Leo's answer comes back as MP3 bytes, read by Monolith with the lessons' settings", async () => {
+test("Leo's answer comes back as MP3 bytes, read by Liam with the lessons' settings", async () => {
   const { fetchImpl, calls } = fakeFetch();
   const audio = await speak(env, "  Right about the bishop.  ", fetchImpl);
   assert.deepEqual(audio, MP3);
   assert.equal(calls.length, 1);
   const [{ url, options, body }] = calls;
-  assert.equal(url, "https://api.elevenlabs.io/v1/text-to-speech/1b0g3hQZNdyIitkZW5BL?output_format=mp3_44100_128");
+  assert.equal(url, "https://api.elevenlabs.io/v1/text-to-speech/TX3LPaxmHKxFdv7VOQHJ?output_format=mp3_44100_128");
   assert.equal(options.method, "POST");
   assert.equal(options.headers["xi-api-key"], "xi-test");
   assert.equal(options.headers["content-type"], "application/json");
@@ -30,10 +30,10 @@ test("Leo's answer comes back as MP3 bytes, read by Monolith with the lessons' s
   assert.deepEqual(body, { text: "Right about the bishop.", model_id: "eleven_multilingual_v2", voice_settings: VOICE_SETTINGS });
 });
 
-test("without VOICE_ID or VOICE_MODEL it's still Monolith on the lessons' model", async () => {
+test("without VOICE_ID or VOICE_MODEL it's still Liam on the lessons' model", async () => {
   const { fetchImpl, calls } = fakeFetch();
   await speak({ ELEVENLABS_API_KEY: "k" }, "Hello.", fetchImpl);
-  assert.match(calls[0].url, /\/text-to-speech\/1b0g3hQZNdyIitkZW5BL\?/);
+  assert.match(calls[0].url, /\/text-to-speech\/TX3LPaxmHKxFdv7VOQHJ\?/);
   assert.equal(calls[0].body.model_id, "eleven_multilingual_v2");
 });
 
@@ -43,9 +43,9 @@ test("the voice settings, voice and model are the ones the recorded lessons use"
   assert.deepEqual(JSON.parse(settings), { ...VOICE_SETTINGS });
   assert.match(script, /^MODEL = "eleven_multilingual_v2"$/m);
   assert.match(script, /"leo":.*\n.*"format": "mp3_44100_128"/);
-  assert.match(script, /"1b0g3hQZNdyIitkZW5BL"/);
+  assert.match(script, /"TX3LPaxmHKxFdv7VOQHJ"/);
   const toml = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8");
-  assert.match(toml, /^VOICE_ID = "1b0g3hQZNdyIitkZW5BL"$/m);
+  assert.match(toml, /^VOICE_ID = "TX3LPaxmHKxFdv7VOQHJ"$/m);
   assert.match(toml, /^VOICE_MODEL = "eleven_multilingual_v2"$/m);
 });
 

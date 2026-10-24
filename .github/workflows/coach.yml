@@ -8,7 +8,7 @@ name: Coach server
 # Secrets: ANTHROPIC_API_KEY and CLOUDFLARE_API_TOKEN to deploy
 # (CLOUDFLARE_ACCOUNT_ID is optional; it is looked up from the token).
 # ELEVENLABS_API_KEY is optional: without it Leo's answers come without
-# Monolith's voice and the app reads them with the device's. Without the
+# Liam's voice and the app reads them with the device's. Without the
 # secrets it only tests.
 on:
   pull_request:
@@ -116,7 +116,7 @@ jobs:
           if [ -n "$ELEVENLABS_API_KEY" ]; then
             echo "voice=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::notice::No ELEVENLABS_API_KEY: Leo's answers will come without Monolith's voice."
+            echo "::notice::No ELEVENLABS_API_KEY: Leo's answers will come without Liam's voice."
             echo "voice=false" >> "$GITHUB_OUTPUT"
           fi
           if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
@@ -155,7 +155,7 @@ jobs:
           echo "WORKERS_SUBDOMAIN=$current" >> "$GITHUB_ENV"
       # wrangler-action turns down a secret with no value, so there's one
       # deploy with the voice key and one without it.
-      - name: Deploy to Cloudflare (with Monolith's voice)
+      - name: Deploy to Cloudflare (with Liam's voice)
         id: deploy_voice
         if: steps.secrets.outputs.ready == 'true' && steps.secrets.outputs.voice == 'true'
         uses: cloudflare/wrangler-action@v3
