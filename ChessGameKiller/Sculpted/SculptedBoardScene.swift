@@ -58,6 +58,8 @@ struct SculptedBoardState: Equatable {
     var lastCapture: CaptureEvent?
     /// Veteran glows by piece id.
     var halos: [Int: SculptedHalo] = [:]
+    /// The Heirloom Set: each army piece's history on the piece itself, by piece id.
+    var heirlooms: [Int: Heirloom] = [:]
     /// Set once the game is decided.
     var finale: SculptedFinale?
     /// Ghost Vision's line, nearest step first, while the player holds the board.
@@ -276,6 +278,9 @@ final class SculptedBoardScene {
         if old.halos != new.halos || old.pieces != new.pieces {
             updateHalos(new)
         }
+        if old.heirlooms != new.heirlooms || old.pieces != new.pieces {
+            updateHeirlooms(new)
+        }
         if old.ghosts != new.ghosts || old.flipped != new.flipped {
             updateGhosts(new)
         }
@@ -418,6 +423,10 @@ final class SculptedBoardScene {
         /// A soft shadow on the stone, darkest right under the foot.
         let contact: SCNNode
         var halo: SCNNode?
+        /// The history it shows now, and the parts of the model it changed for it.
+        var heirloom: Heirloom?
+        var heirloomUndo: [(node: SCNNode, geometry: SCNGeometry?)] = []
+        var heirloomParts: [SCNNode] = []
         let yaw: Float
         let baseRadius: Float
         /// Raised for the selection.
@@ -1107,6 +1116,38 @@ final class SculptedBoardScene {
             }
             node.root.addChildNode(halo)
             node.halo = halo
+        }
+    }
+
+    // MARK: Heirloom Set
+
+    /// Dresses each army piece in its history (and undresses one that no longer should be).
+    private func updateHeirlooms(_ new: SculptedBoardState) {
+        for (id, node) in nodes {
+            let wanted = new.heirlooms[id].flatMap { $0.isEmpty ? nil : $0 }
+            guard node.heirloom != wanted else { continue }
+            for undo in node.heirloomUndo { undo.node.geometry = undo.geometry }
+            node.heirloomUndo = []
+            node.heirloomParts.forEach { $0.removeFromParentNode() }
+            node.heirloomParts = []
+            node.heirloom = wanted
+            guard let wanted else { continue }
+            let kind = node.piece.kind, color = node.piece.color
+            let body = assets.material(.body, for: color, look: look)
+            if wanted.seams > 0 || wanted.patina >= 0.05 {
+                let dressed = assets.heirloomMaterial(wanted, kind: kind, color: color, look: look)
+                for child in node.model.childNodes where child.geometry?.firstMaterial === body {
+                    // The geometry is shared with every other piece of its kind: this one gets its own copy.
+                    guard let own = child.geometry?.copy() as? SCNGeometry else { continue }
+                    node.heirloomUndo.append((child, child.geometry))
+                    own.materials = [dressed]
+                    child.geometry = own
+                }
+            }
+            for part in assets.heirloomParts(wanted, kind: kind, look: look) {
+                node.model.addChildNode(part)
+                node.heirloomParts.append(part)
+            }
         }
     }
 

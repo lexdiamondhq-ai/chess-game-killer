@@ -51,6 +51,7 @@ struct SculptedBoardView: View {
 
     @AppStorage("haptics") private var hapticsOn = true
     @Environment(ArmyStore.self) private var army: ArmyStore?
+    @AppStorage(Heirloom.settingKey) private var showsHeirloom = true
     @State private var stage = SculptedStage()
     /// The latest move's feel, set as its piece touches down, so the phone taps then.
     @State private var touchdown: Touchdown?
@@ -170,6 +171,7 @@ struct SculptedBoardView: View {
             flipped: flipped,
             lastCapture: game.captureEvents.last,
             halos: halos,
+            heirlooms: heirlooms,
             finale: finale,
             ghosts: ghosts
         )
@@ -183,6 +185,18 @@ struct SculptedBoardView: View {
             SculptedGhostStep(moves: step.moves, captured: step.captured?.square,
                               opacity: Float(GhostLine.opacity(of: step.index, focus: focus)))
         }
+    }
+
+    /// Each army piece's history on the piece, when the player keeps "Piece history" on.
+    private var heirlooms: [Int: Heirloom] {
+        guard showsHeirloom, let army else { return [:] }
+        var result: [Int: Heirloom] = [:]
+        for placed in game.pieces {
+            guard let slot = army.slot(of: placed, in: match) else { continue }
+            let heirloom = army.heirloom(for: slot)
+            if !heirloom.isEmpty { result[placed.id] = heirloom }
+        }
+        return result
     }
 
     /// The player's veterans glow: ivory or platinum by side, gold for a Legend, which breathes.
