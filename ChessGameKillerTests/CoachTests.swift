@@ -6,6 +6,19 @@ final class CoachTests: XCTestCase {
 
     // MARK: Evaluation
 
+    /// The spotlight's words under the board.
+    func testHintWords() {
+        XCTAssertEqual(HintWords.phrase(san: "Nxe4", mover: .knight, taken: .queen), "Knight takes the queen")
+        XCTAssertEqual(HintWords.phrase(san: "e4", mover: .pawn, taken: nil), "Pawn to e4")
+        XCTAssertEqual(HintWords.phrase(san: "Qh7#", mover: .queen, taken: nil), "Queen to h7, checkmate")
+        XCTAssertEqual(HintWords.phrase(san: "Bb5+", mover: .bishop, taken: nil), "Bishop to b5, check")
+        XCTAssertEqual(HintWords.phrase(san: "O-O", mover: .king, taken: nil), "Castle kingside")
+        XCTAssertEqual(HintWords.phrase(san: "O-O-O+", mover: .king, taken: nil), "Castle queenside, check")
+        XCTAssertEqual(HintWords.phrase(san: "exd6", mover: .pawn, taken: nil), "Pawn takes the pawn", "En passant")
+        XCTAssertEqual(HintWords.phrase(san: "e8=Q", mover: .pawn, taken: nil), "Pawn to e8, becomes a queen")
+        XCTAssertEqual(HintWords.phrase(san: "dxc8=N+", mover: .pawn, taken: .rook), "Pawn takes the rook, becomes a knight, check")
+    }
+
     func testWinningChancesFollowTheLichessCurve() {
         XCTAssertEqual(Evaluation.centipawns(0).winningChances, 0, accuracy: 0.0001)
         XCTAssertEqual(Evaluation.centipawns(100).winningChances, 0.182, accuracy: 0.001)
