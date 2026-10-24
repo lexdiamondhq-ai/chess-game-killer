@@ -182,7 +182,11 @@ struct TalkPanelConversation: View {
                                   theme: theme, select: select)
                     .transition(arrival)
             }
-            if session.phase == .failed {
+            if session.phase == .failed, session.outOfTalks {
+                PremiumLimitCard(feature: .talk, accent: theme.challengeAccent)
+                    .id(Self.problemID)
+                    .transition(arrival)
+            } else if session.phase == .failed {
                 TalkPanelProblemCard(text: problemText, theme: theme)
                     .id(Self.problemID)
                     .transition(arrival)

@@ -95,13 +95,13 @@ final class TrainingStore {
     /// The skill today's session will work on.
     var todaysFocus: Skill? {
         guard let library else { return nil }
-        return TrainingPlanner(library: library, progress: progress).todaysFocus()
+        return makePlanner(library).todaysFocus()
     }
 
     /// Why today's skill was picked, for the Today card.
     var todaysFocusReason: TrainingPlanner.FocusReason? {
         guard let library else { return nil }
-        return TrainingPlanner(library: library, progress: progress).focusChoice()?.reason
+        return makePlanner(library).focusChoice()?.reason
     }
 
     /// Positions from the learner's games that are due for another try.
@@ -122,7 +122,7 @@ final class TrainingStore {
     /// The lesson today's session opens with, if any: the same rule the plan uses.
     var todaysLesson: Lesson? {
         guard let library else { return nil }
-        let planner = TrainingPlanner(library: library, progress: progress)
+        let planner = makePlanner(library)
         return planner.todaysLesson(focus: planner.todaysFocus())
     }
 
@@ -151,30 +151,37 @@ final class TrainingStore {
 
     // MARK: Plans
 
+    /// A planner for this learner, with the lessons their plan opens.
+    private func makePlanner(_ library: TrainingLibrary, now: Date = .now) -> TrainingPlanner {
+        var planner = TrainingPlanner(library: library, progress: progress, now: now)
+        planner.lessonsOpen = Premium.shared.opens(.lessons)
+        return planner
+    }
+
     func dailyPlan(now: Date = .now) -> SessionPlan? {
         guard let library else { return nil }
-        var planner = TrainingPlanner(library: library, progress: progress, now: now)
+        var planner = makePlanner(library, now: now)
         let plan = planner.dailySession()
         return plan.isEmpty ? nil : plan
     }
 
     func practicePlan(for skill: Skill, now: Date = .now) -> SessionPlan? {
         guard let library else { return nil }
-        var planner = TrainingPlanner(library: library, progress: progress, now: now)
+        var planner = makePlanner(library, now: now)
         let plan = planner.practice(skill)
         return plan.isEmpty ? nil : plan
     }
 
     func mistakesPlan(now: Date = .now) -> SessionPlan? {
         guard let library else { return nil }
-        let plan = TrainingPlanner(library: library, progress: progress, now: now).mistakesSession()
+        let plan = makePlanner(library, now: now).mistakesSession()
         return plan.isEmpty ? nil : plan
     }
 
     /// An easy drill to rebuild confidence after a couple of misses.
     func easierDrill(for skill: String, excluding used: Set<String>) -> Drill? {
         guard let library else { return nil }
-        var planner = TrainingPlanner(library: library, progress: progress)
+        var planner = makePlanner(library)
         var used = used
         return planner.pick(from: [skill], target: TrainingPlanner.easyTarget, used: &used)
     }

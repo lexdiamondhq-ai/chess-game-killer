@@ -179,7 +179,7 @@ jobs:
         # The screens being worked on, once more at the very end and small, so a short tail of the log holds them.
         run: |
           [ -d snapshots ] || exit 0
-          for f in snapshots/ghost-*.png snapshots/device-ghost-*.png snapshots/coaches-*.png; do
+          for f in snapshots/dna-*.png snapshots/premium-*.png; do
             [ -e "$f" ] || continue
             sips -s format jpeg -s formatOptions 50 -Z 360 "$f" --out /tmp/tiny.jpg >/dev/null
             echo "BEGIN-SCREEN $(basename "$f")"

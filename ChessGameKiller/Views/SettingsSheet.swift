@@ -15,6 +15,7 @@ struct SettingsSheet: View {
     @AppStorage("rivalBanter") private var banterOn = true
     @AppStorage("bigBoard") private var bigBoard = false
     @AppStorage("sculpted3D") private var sculpted3D = true
+    @AppStorage(Heirloom.settingKey) private var heirloomOn = true
     @AppStorage(HomeScreen.key) private var homeScreen = HomeScreen.defaultOn
     /// Shared with the lessons' speaker button and the highlight reel.
     @AppStorage("coachVoiceMuted") private var voiceMuted = false
@@ -23,6 +24,8 @@ struct SettingsSheet: View {
     @AppStorage(ReviewLevel.storageKey) private var reviewLevel = ReviewLevel.club.rawValue
 
     @Environment(\.dismiss) private var dismiss
+    @State private var offer: PremiumFeature?
+    @State private var showingPremium = false
 
     private var theme: BoardTheme { .named(themeID) }
     private var accent: Color { theme.accent ?? .accentColor }
@@ -32,6 +35,8 @@ struct SettingsSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     preview
+
+                    PremiumSettingsCard(theme: theme) { showingPremium = true }
 
                     section("Board") {
                         themeGrid(Self.looks)
@@ -48,6 +53,9 @@ struct SettingsSheet: View {
                             }
                             ToggleRow(title: "Match rival", subtitle: "Computer games use the rival's own board, not the one picked above.",
                                       symbol: "person.crop.circle.badge.checkmark", isOn: $matchRival, theme: theme)
+                            rule
+                            ToggleRow(title: "Piece history", subtitle: "Your pieces wear what they've been through: gold seams, a promoted pawn's collar, notches, patina.",
+                                      symbol: "seal", isOn: $heirloomOn, theme: theme)
                             rule
                             ToggleRow(title: "Big Board", subtitle: "The board fills the screen. Swipe up from the bottom for the tools, sideways on the board to replay moves.",
                                       symbol: "arrow.up.left.and.arrow.down.right", isOn: $bigBoard, theme: theme)
@@ -112,6 +120,12 @@ struct SettingsSheet: View {
                             }
                             .buttonStyle(.plain)
                             rule
+                            // The GPL, which Stockfish comes under, gives every player the source.
+                            Link(destination: URL(string: "https://github.com/lexdiamondhq-ai/chess-game-killer")!) {
+                                LinkRowLabel(title: "Source code", symbol: "chevron.left.forwardslash.chevron.right", theme: theme)
+                            }
+                            .buttonStyle(.plain)
+                            rule
                             HStack(spacing: 12) {
                                 IconTile(symbol: "info.circle", theme: theme)
                                 Text("Version")
@@ -144,6 +158,10 @@ struct SettingsSheet: View {
         .presentationDetents([.large])
         .presentationBackground {
             SheetBackdrop(theme: theme)
+        }
+        .premiumOffer($offer)
+        .sheet(isPresented: $showingPremium) {
+            PremiumOfferView(feature: nil)
         }
         .tint(accent)
         .preferredColorScheme(theme.isDark ? .dark : nil)
@@ -182,8 +200,13 @@ struct SettingsSheet: View {
     private func themeGrid(_ options: [BoardTheme]) -> some View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
             ForEach(options) { option in
-                ThemeCard(option: option, isSelected: option.id == themeID, theme: theme) {
-                    withAnimation(.easeInOut(duration: 0.35)) { themeID = option.id }
+                let open: Bool = RivalBoardsEarned.opens(option)
+                ThemeCard(option: option, isSelected: option.id == themeID, theme: theme, locked: !open) {
+                    if open {
+                        withAnimation(.easeInOut(duration: 0.35)) { themeID = option.id }
+                    } else {
+                        offer = .boardLooks
+                    }
                 }
             }
         }
@@ -359,6 +382,8 @@ private struct ThemeCard: View {
     let isSelected: Bool
     /// The current theme, for the accent color.
     let theme: BoardTheme
+    /// Premium's, or a rival's not yet beaten: a crown in place of the check.
+    var locked = false
     let select: () -> Void
 
     var body: some View {
@@ -378,10 +403,16 @@ private struct ThemeCard: View {
                     }
                 Text(option.name)
                     .font(.headline)
-                    .foregroundStyle(Color.primary)
+                    .foregroundStyle(locked ? Color.secondary : Color.primary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                if locked {
+                    Image(systemName: "crown.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(theme.accent ?? .accentColor)
+                        .accessibilityHidden(true)
+                }
             }
             .padding(.horizontal, 14)
             .frame(maxWidth: .infinity)
@@ -391,7 +422,7 @@ private struct ThemeCard: View {
         }
         .buttonStyle(.plain)
         .animation(.snappy, value: isSelected)
-        .accessibilityLabel("\(option.name) board")
+        .accessibilityLabel(locked ? "\(option.name) board, Premium" : "\(option.name) board")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 

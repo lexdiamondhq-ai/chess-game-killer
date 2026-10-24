@@ -579,6 +579,7 @@ private struct CoachPanel: View {
                     PieceOfTheMatchCard(hero: hero, color: match.setup.playerColor, theme: theme)
                         .padding(.top, 10)
                 }
+                LearnedAboutYouRow(gameID: match.gameID, theme: theme)
             } else {
                 if let talk, match.canTalkItThrough {
                     TalkEntryRow(theme: theme, countsAsHelp: match.talkCountsAsHelp) {

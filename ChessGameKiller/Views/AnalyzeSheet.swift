@@ -22,6 +22,8 @@ struct AnalyzeSheet: View {
     @State private var photoItem: PhotosPickerItem?
     @State private var isLoadingPhoto = false
     @State private var showingCamera = false
+    /// Photo scans run out (3 a week free, 3 a day with Premium): then the offer shows.
+    @State private var offer: PremiumFeature?
     @Environment(\.dismiss) private var dismiss
 
     init(
@@ -55,6 +57,25 @@ struct AnalyzeSheet: View {
         return currentFEN
     }
 
+    private var canScan: Bool { Premium.shared.canUse(.scan) }
+
+    /// The card's line, with the scans left when there's a limit.
+    private func scanDetail(_ line: String) -> String {
+        guard let left = Premium.shared.remaining(.scan),
+              let allowance = Premium.shared.allowance(.scan) else { return line }
+        let when: String = allowance.period == .day ? "today" : "this week"
+        return left == 0 ? "\(line). No scans left \(when)" : "\(line). \(left) left \(when)"
+    }
+
+    /// Reads a picture, if a scan is left; otherwise the offer.
+    private func scan(_ image: UIImage) {
+        guard Premium.shared.use(.scan) else {
+            offer = .scan
+            return
+        }
+        session.read(image)
+    }
+
     var body: some View {
         NavigationStack(path: $session.path) {
             ScrollView {
@@ -66,19 +87,29 @@ struct AnalyzeSheet: View {
                         .padding(.bottom, 8)
 
                     if hasCamera {
-                        Button { showingCamera = true } label: {
+                        Button {
+                            if canScan { showingCamera = true } else { offer = .scan }
+                        } label: {
                             StartCard(symbol: "camera.fill", title: "Take a photo",
-                                      detail: "Point your camera at a real board", theme: theme)
+                                      detail: scanDetail("Point your camera at a real board"), theme: theme)
                         }
                         .buttonStyle(.plain)
                     }
-                    PhotosPicker(selection: $photoItem, matching: .images) {
-                        StartCard(symbol: "photo.on.rectangle.angled", title: "Choose a photo",
-                                  detail: "A picture or a screenshot of a board", theme: theme,
-                                  isLoading: isLoadingPhoto)
+                    if canScan {
+                        PhotosPicker(selection: $photoItem, matching: .images) {
+                            StartCard(symbol: "photo.on.rectangle.angled", title: "Choose a photo",
+                                      detail: scanDetail("A picture or a screenshot of a board"), theme: theme,
+                                      isLoading: isLoadingPhoto)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isLoadingPhoto)
+                    } else {
+                        Button { offer = .scan } label: {
+                            StartCard(symbol: "photo.on.rectangle.angled", title: "Choose a photo",
+                                      detail: scanDetail("A picture or a screenshot of a board"), theme: theme)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
-                    .disabled(isLoadingPhoto)
                     Button { session.setUpByHand() } label: {
                         StartCard(symbol: "square.grid.3x3.fill", title: "Set up a board",
                                   detail: "Start from the opening position and change it", theme: theme)
@@ -127,7 +158,7 @@ struct AnalyzeSheet: View {
                 // Loading can mean an iCloud download, so show that something is happening.
                 isLoadingPhoto = true
                 if let data = try? await item.loadTransferable(type: Data.self), let image = UIImage(data: data) {
-                    session.read(image)
+                    scan(image)
                 } else {
                     session.failToLoadPhoto()
                 }
@@ -136,9 +167,10 @@ struct AnalyzeSheet: View {
             }
         }
         .fullScreenCover(isPresented: $showingCamera) {
-            CameraPicker { image in session.read(image) }
+            CameraPicker { image in scan(image) }
                 .ignoresSafeArea()
         }
+        .premiumOffer($offer)
         .tint(accent)
         .presentationBackground {
             ThemeBackdrop(theme: theme)

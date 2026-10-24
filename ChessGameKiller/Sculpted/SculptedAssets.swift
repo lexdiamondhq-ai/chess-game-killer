@@ -34,6 +34,9 @@ final class SculptedAssets {
     private var sets: [String: [Piece.Kind: [Part]]] = [:]
     private var templates: [String: SCNNode] = [:]
     private var materials: [String: SCNMaterial] = [:]
+    /// The Heirloom Set's bodies and the measurements its parts are placed by (SculptedHeirloom.swift).
+    var heirloomMaterials: [String: SCNMaterial] = [:]
+    var silhouettes: [String: PieceSilhouette] = [:]
 
     init(assetName: String = "sculpted-pieces") {
         let parts = Self.loadMeshes(named: assetName) ?? [:]
