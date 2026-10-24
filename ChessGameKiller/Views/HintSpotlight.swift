@@ -11,6 +11,8 @@ enum HintSpotlight {
     static let uiGold = UIColor(red: 1, green: 0.84, blue: 0.47, alpha: 1)
     /// How dark the unlit squares get.
     static let dim: Double = 0.5
+    /// The 3D board's lit stone reads brighter, so it dims a little more.
+    static let dim3D: Double = 0.62
     /// One beat of the target's breathing, in seconds.
     static let beat: Double = 0.9
 }

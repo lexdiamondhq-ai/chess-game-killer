@@ -1177,7 +1177,8 @@ final class SculptedBoardScene {
             }
             addMark(spotlightGlowMark, at: best.from, height: 0.00165, fade: spotlightIsNew, fadeTime: 0.35)
             addMark(spotlightGlowMark, at: best.to, height: 0.00165, fade: spotlightIsNew, fadeTime: 0.35)
-            let ring = addMark(spotlightRingMark, at: best.to, height: 0.0018)
+            // Over the move marks, so the best capture's ring wins over the plain capture corners.
+            let ring = addMark(spotlightRingMark, at: best.to, height: 0.0025, order: 16)
             if !UIAccessibility.isReduceMotionEnabled {
                 ring.runAction(.repeatForever(.sequence([
                     .fadeOpacity(to: 0.55, duration: 0.9),
@@ -1303,9 +1304,9 @@ final class SculptedBoardScene {
     private lazy var checkMark = Self.mark(size: 1.5, color: look.check, alpha: 0.9, mask: MarkImages.glow)
     private lazy var checkRingMark = Self.mark(size: 1, color: look.check, alpha: 1, mask: MarkImages.squareRing)
     private lazy var dustMark = Self.mark(size: 1, color: UIColor(white: 0.93, alpha: 1), alpha: 0.5, mask: MarkImages.contact)
-    private lazy var spotlightDimMark = Self.mark(size: 1, color: .black, alpha: CGFloat(HintSpotlight.dim), mask: nil)
-    private lazy var spotlightGlowMark = Self.mark(size: 1, color: HintSpotlight.uiGold, alpha: 0.5, mask: MarkImages.squareGlow)
-    private lazy var spotlightRingMark = Self.mark(size: 1, color: HintSpotlight.uiGold, alpha: 1, mask: MarkImages.squareRing)
+    private lazy var spotlightDimMark = Self.mark(size: 1, color: .black, alpha: CGFloat(HintSpotlight.dim3D), mask: nil)
+    private lazy var spotlightGlowMark = Self.mark(size: 1, color: HintSpotlight.uiGold, alpha: 0.7, mask: MarkImages.squareGlow)
+    private lazy var spotlightRingMark = Self.mark(size: 1, color: HintSpotlight.uiGold, alpha: 1, mask: MarkImages.spotlightRing)
     /// The squares lit last time the marks were drawn, so a lit board only fades in once.
     private var shownSpotlight: String?
     private static let contactGeometry = mark(size: 1, color: .black, alpha: 0.5, mask: MarkImages.contact)
@@ -1526,6 +1527,15 @@ enum MarkImages {
         let rect = CGRect(x: 0, y: 0, width: size, height: size).insetBy(dx: size * 0.04 + line / 2, dy: size * 0.04 + line / 2)
         context.setLineWidth(line)
         context.addPath(CGPath(roundedRect: rect, cornerWidth: size * 0.1, cornerHeight: size * 0.1, transform: nil))
+        context.strokePath()
+    }
+
+    /// The hint spotlight's ring around its target square: bolder than the check's.
+    static let spotlightRing = draw(256) { context, size in
+        let line = size * 0.09
+        let rect = CGRect(x: 0, y: 0, width: size, height: size).insetBy(dx: size * 0.03 + line / 2, dy: size * 0.03 + line / 2)
+        context.setLineWidth(line)
+        context.addPath(CGPath(roundedRect: rect, cornerWidth: size * 0.12, cornerHeight: size * 0.12, transform: nil))
         context.strokePath()
     }
 
