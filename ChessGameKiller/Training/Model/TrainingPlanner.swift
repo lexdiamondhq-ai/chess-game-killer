@@ -68,6 +68,9 @@ struct TrainingPlanner {
     let progress: TrainingProgress
     let now: Date
     private var random: TrainingRandom
+    /// False for a free player: only the course's first `TrainingLibrary.freeLessonCount`
+    /// lessons open, so sessions skip the others' videos (their drills still come).
+    var lessonsOpen = true
 
     /// Why today's skill was picked, so the Today card can say so.
     enum FocusReason: Equatable {
@@ -154,7 +157,7 @@ struct TrainingPlanner {
                 items.append(SessionItem(content: .drill(drill), role: index == 0 ? .warmUp : (index == count - 1 ? .finisher : .focus)))
             }
         }
-        let lesson = progress.lessonsDone[skill.lesson] == nil ? library.lesson(skill.lesson) : nil
+        let lesson = progress.lessonsDone[skill.lesson] == nil ? opened(library.lesson(skill.lesson)) : nil
         return SessionPlan(title: skill.title, focus: skill, lesson: lesson, items: items)
     }
 
@@ -182,8 +185,14 @@ struct TrainingPlanner {
     /// learner, otherwise the focus skill's when it hasn't been watched yet.
     func todaysLesson(focus: Skill?) -> Lesson? {
         openingLesson ?? focus.flatMap { skill in
-            progress.lessonsDone[skill.lesson] == nil ? library.lesson(skill.lesson) : nil
+            progress.lessonsDone[skill.lesson] == nil ? opened(library.lesson(skill.lesson)) : nil
         }
+    }
+
+    /// The lesson, if this player can watch it.
+    private func opened(_ lesson: Lesson?) -> Lesson? {
+        guard let lesson, !lessonsOpen else { return lesson }
+        return library.isFreeLesson(lesson.id) ? lesson : nil
     }
 
     /// Today's skill: the first lesson's on day one, then the next one on the journey.

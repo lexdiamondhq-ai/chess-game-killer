@@ -25,6 +25,8 @@ struct ChessGameKillerApp: App {
             }
             .challengeHost()
             .environment(challenges)
+            // Loads the Premium plans and the player's subscription, and listens for renewals.
+            .task { Premium.shared.start() }
         }
     }
 }

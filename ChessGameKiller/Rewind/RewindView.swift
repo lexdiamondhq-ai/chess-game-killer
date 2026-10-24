@@ -32,6 +32,8 @@ struct RewindView: View {
     @State private var chance: SecondChance?
     @State private var session: SessionPlan?
     @State private var confirmingRematch = false
+    /// Ghost lines and second chances are the full Rewind: free once a day, any game with Premium.
+    @State private var offer: PremiumFeature?
 
     init(game: SavedGame, theme: BoardTheme, startAt ply: Int? = nil, opensLine: Bool = false,
          engine: ChessEngine? = StockfishEngine.shared, forfeits: String? = nil, leave: (() -> Void)? = nil,
@@ -91,7 +93,10 @@ struct RewindView: View {
         }
         .onChange(of: levelID) { _, _ in explorer?.setLevel(level) }
         .onAppear {
-            if opensLine, explorer == nil { startGhost(autoplays: false) }
+            // Opened on the better line: only when today's full Rewind allows it, without asking.
+            if opensLine, explorer == nil, Premium.shared.use(.fullRewind, key: game.id.uuidString) {
+                startGhost(autoplays: false)
+            }
         }
         .onDisappear { stopGhost() }
         .sensoryFeedback(.selection, trigger: ply)
@@ -108,6 +113,14 @@ struct RewindView: View {
                 SessionView(plan: plan, theme: theme).environment(training)
             }
         }
+        .premiumOffer($offer)
+    }
+
+    /// Takes today's free full Rewind for this game (this game again today is free).
+    private func fullRewind() -> Bool {
+        if Premium.shared.use(.fullRewind, key: game.id.uuidString) { return true }
+        offer = .fullRewind
+        return false
     }
 
     // MARK: Header
@@ -355,10 +368,12 @@ struct RewindView: View {
         if canFix || skill != nil {
             HStack(spacing: 10) {
                 if canFix {
-                    CardButton(title: "Show me", symbol: "circle.dashed") { startGhost() }
+                    CardButton(title: "Show me", symbol: "circle.dashed") {
+                        if fullRewind() { startGhost() }
+                    }
                     if !rewritten {
                         CardButton(title: "Take it back", symbol: "arrow.counterclockwise", prominent: true, accent: accent) {
-                            takeBack(moment, note: note)
+                            if fullRewind() { takeBack(moment, note: note) }
                         }
                     }
                 }

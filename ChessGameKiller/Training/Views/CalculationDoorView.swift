@@ -9,6 +9,7 @@ struct CalculationDoorView: View {
     @Environment(ThinkStore.self) private var think
     @AppStorage(CalculationView.bestStreakKey) private var calculationBest = 0
     @State private var cover: Cover?
+    @State private var offer: PremiumFeature?
 
     /// The board vision drills' bests, shared with their screens.
     private var vision: VisionStore { .live() }
@@ -22,13 +23,13 @@ struct CalculationDoorView: View {
         TrainScreen(theme: theme, title: "Calculation",
                     intro: "Strong players see further and miss less. These train exactly that.") {
             TrainSectionTitle(text: "In your head")
-            Button { cover = .candidates } label: {
+            Button { open(.candidates) } label: {
                 TrainRow(symbol: "list.number", title: "Candidate moves",
                          detail: "Name your best two or three moves before you choose. \(Coach.current.name) shows what you missed.",
-                         value: think.progress.rounds > 0 ? "Best \(think.progress.bestRound)" : nil, theme: theme)
+                         value: roomsOpen ? (think.progress.rounds > 0 ? "Best \(think.progress.bestRound)" : nil) : "Premium", theme: theme)
             }
             .buttonStyle(.plain)
-            Button { cover = .blindfold } label: {
+            Button { open(.blindfold) } label: {
                 TrainRow(symbol: "eye.slash.fill", title: "See ahead",
                          detail: "The moves are read out but the pieces stay still. Play them in your head, then find the winner. Blindfold hides the pieces too.",
                          value: calculationBest > 1 ? "Best \(calculationBest)" : nil, theme: theme)
@@ -50,16 +51,19 @@ struct CalculationDoorView: View {
             .buttonStyle(.plain)
 
             TrainSectionTitle(text: "Like a grandmaster")
-            NavigationLink {
-                GuessTheMoveList(theme: theme)
-            } label: {
-                TrainRow(symbol: "person.fill.questionmark", title: "Guess the Move",
-                         detail: "Sit in a grandmaster's chair. Guess every move of a famous classic or a recent top game and get scored against the master.",
-                         value: "\(GrandmasterContent.shared.games.count + GrandmasterContent.shared.masterGames.count) games",
-                         theme: theme)
+            if roomsOpen {
+                NavigationLink {
+                    GuessTheMoveList(theme: theme)
+                } label: {
+                    guessRow
+                }
+                .buttonStyle(.plain)
+            } else {
+                Button { offer = .trainingRooms } label: { guessRow }
+                    .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
+        .premiumOffer($offer)
         .fullScreenCover(item: $cover) { cover in
             switch cover {
             case .blindfold:
@@ -71,6 +75,27 @@ struct CalculationDoorView: View {
             case .scan:
                 BoardScanView(theme: theme).environment(puzzles)
             }
+        }
+    }
+
+    /// Candidate moves and Guess the Move are Premium's; free players get one See ahead a day.
+    private var roomsOpen: Bool { Premium.shared.opens(.trainingRooms) }
+
+    private var guessRow: some View {
+        TrainRow(symbol: "person.fill.questionmark", title: "Guess the Move",
+                 detail: "Sit in a grandmaster's chair. Guess every move of a famous classic or a recent top game and get scored against the master.",
+                 value: roomsOpen ? "\(GrandmasterContent.shared.games.count + GrandmasterContent.shared.masterGames.count) games" : "Premium",
+                 theme: theme)
+    }
+
+    private func open(_ next: Cover) {
+        switch next {
+        case .candidates:
+            if roomsOpen { cover = next } else { offer = .trainingRooms }
+        case .blindfold:
+            if Premium.shared.use(.calculationDrill) { cover = next } else { offer = .calculationDrill }
+        case .scan, .coordinates:
+            cover = next
         }
     }
 }

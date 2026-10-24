@@ -88,6 +88,8 @@ final class TalkSession: Identifiable {
     private(set) var factsReady = false
     /// Why it failed, in plain words, like "Leo needs the internet to check your plan."
     private(set) var problem: String?
+    /// The free talks are used up: the panel shows the way to Premium instead of an error.
+    private(set) var outOfTalks = false
     /// False when speech can't be used (no permission, no recognizer): the panel offers typing only.
     private(set) var canListen = true
     /// The verdict whose squares the board shows. Nil shows the move.
@@ -434,6 +436,14 @@ final class TalkSession: Identifiable {
     // MARK: Asking Leo
 
     private func send(typed: Bool) {
+        // Out of talks: say so before anything counts as help in the game.
+        guard Premium.shared.canUse(.talk) else {
+            listener.cancel()
+            outOfTalks = true
+            problem = PremiumFeature.talk.limitLine
+            phase = .failed
+            return
+        }
         requestTask?.cancel()
         requestID += 1
         let id = requestID
@@ -467,6 +477,14 @@ final class TalkSession: Identifiable {
             phase = .ready
             return
         }
+        // Each talk costs a server call: free players get 3 a week, Premium 10 a day.
+        guard Premium.shared.use(.talk) else {
+            outOfTalks = true
+            problem = PremiumFeature.talk.limitLine
+            phase = .failed
+            return
+        }
+        outOfTalks = false
         let wantsVoice = !CoachVoice.shared.isMuted
         speaksAloud = wantsVoice
         let request = TalkRequest(fen: fen, said: said, typed: typed, reveal: reveal, context: context,
