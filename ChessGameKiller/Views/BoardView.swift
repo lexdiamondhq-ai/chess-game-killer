@@ -655,7 +655,7 @@ struct CaptureFall: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Where the foot meets the square, as a fraction of the square: the renders stand
-    /// a little below the middle, as their picture's frame says, the flat pieces at the bottom.
+    /// below the middle, as their picture's frame says, the flat pieces at the bottom.
     private var footY: CGFloat {
         theme.spritePieces ? 0.5 + SpriteFrame.of(theme.imageName(for: piece)).lift : 0.9
     }
@@ -743,7 +743,7 @@ struct PieceImage: View {
     let piece: Piece
     let theme: BoardTheme
     let size: CGFloat
-    /// On a board, a 3D sprite rises above its square; elsewhere it is fitted into `size`.
+    /// On a board, a 3D sprite stands in the middle of its square; elsewhere it is fitted into `size`.
     var onBoard = false
 
     /// How much larger a picked-up piece is drawn, about its square's center.
@@ -770,7 +770,7 @@ struct PieceImage: View {
         }
     }
 
-    /// The render, set so the piece's foot stands just below the square's center (on a board)
+    /// The render, set in the middle of its square at its kind's height (on a board)
     /// or so a king fills the frame (anywhere else).
     private var sprite: some View {
         let name = theme.imageName(for: piece)
@@ -846,17 +846,47 @@ struct SpriteFrame: Equatable {
 
     /// The side-on renders (560 x 760, seen from 28 degrees up), where every piece reads by its outline.
     /// Every set's king, cross included, stays within 1.2 squares above its foot and 0.15 below it.
-    static let sideOn = SpriteFrame(width: 1.4, height: 1.9, foot: 1.5, boardScale: 1.2, lift: 0.24, reach: 1.2, below: 0.15)
+    /// The board placement here is only a fallback: `of` sets each picture by its own outline.
+    static let sideOn = SpriteFrame(width: 1.4, height: 1.9, foot: 1.5, boardScale: 0.62, lift: 0.36, reach: 1.2, below: 0.15)
     /// The earlier renders (520 x 568, seen from higher up).
-    static let fromAbove = SpriteFrame(width: 1.3, height: 1.42, foot: 1.0, boardScale: 1.22, lift: 0.15, reach: 0.964, below: 0.24)
+    static let fromAbove = SpriteFrame(width: 1.3, height: 1.42, foot: 1.0, boardScale: 0.7, lift: 0.3, reach: 0.964, below: 0.24)
+
+    /// How tall each kind of piece stands on a board, in squares, by the last letter of its picture's
+    /// name: a king nearly fills its square, a pawn about two thirds of it, so every piece reads at a
+    /// glance and none reaches into the square above.
+    static let standingHeight: [Character: CGFloat] = ["K": 0.86, "Q": 0.82, "B": 0.78, "N": 0.74, "R": 0.7, "P": 0.62]
+    /// No piece is drawn wider than this, in squares.
+    static let widest: CGFloat = 0.84
+    /// Where a king's foot rests, below its square's center, in squares.
+    static let baseline: CGFloat = 0.43
+
+    /// This frame set on a board by the piece's own outline (`solid`, as fractions of the picture):
+    /// scaled to its kind's height and stood in the middle of its square. A shorter piece sits a touch
+    /// lower, halfway between centered and standing on the king's line, so a row of mixed pieces
+    /// still stands on nearly one line.
+    func placed(solid: CGRect, kind: Character) -> SpriteFrame {
+        let tall = solid.height * height
+        let wide = solid.width * width
+        guard tall > 0, wide > 0 else { return self }
+        let target = Self.standingHeight[kind] ?? 0.8
+        let scale = min(target / tall, Self.widest / wide)
+        let middle = (Self.baseline - tall * scale / 2) / 2
+        let lift = middle + (foot - solid.midY * height) * scale
+        return SpriteFrame(width: width, height: height, foot: foot, boardScale: scale, lift: lift,
+                           reach: reach, below: below)
+    }
 
     @MainActor private static var known: [String: SpriteFrame] = [:]
 
-    /// The frame of the named picture, told by its shape: the side-on renders are much taller than wide.
+    /// The frame of the named picture, told by its shape: the side-on renders are much taller than
+    /// wide. On a board it is set by the piece's outline in the picture.
     @MainActor static func of(_ name: String) -> SpriteFrame {
         if let frame = known[name] { return frame }
         let size = UIImage(named: name)?.size ?? .zero
-        let frame = size.width > 0 && size.height / size.width > 1.25 ? sideOn : fromAbove
+        var frame = size.width > 0 && size.height / size.width > 1.25 ? sideOn : fromAbove
+        if let solid = SpriteMasks.shared.mask(named: name)?.solid, let kind = name.last {
+            frame = frame.placed(solid: solid, kind: kind)
+        }
         known[name] = frame
         return frame
     }

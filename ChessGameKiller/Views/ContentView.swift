@@ -456,8 +456,8 @@ struct ContentView: View {
     }
 
     /// Room kept over a flat board of standing pieces, as a share of the board's width (the board
-    /// with its frame is 9 squares wide): the far rank's kings rise a little above its frame.
-    /// The 3D board and Neon's flat pieces stay within the board.
+    /// with its frame is 9 squares wide), should the far rank's kings rise above its frame. Every
+    /// piece now stands within its square, so this is 0; the 3D board and Neon stay within it too.
     private var headroom: CGFloat {
         theme.spritePieces && !BoardView.playsIn3D(theme, setting: sculpted3D) ? SpriteFrame.sideOn.boardRise / 9 : 0
     }

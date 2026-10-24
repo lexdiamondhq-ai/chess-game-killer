@@ -90,12 +90,16 @@ struct AlphaMask {
     /// How far down the picture its first solid row is, as a fraction of its height:
     /// the top of the piece. Nil for a picture with nothing solid in it.
     let top: CGFloat?
+    /// The smallest box holding every solid pixel, as fractions of the picture's width and height
+    /// from its top left: the piece without its soft shadow. Nil for a picture with nothing solid in it.
+    let solid: CGRect?
 
     init(width: Int, height: Int, alpha: [UInt8]) {
         self.width = width
         self.height = height
         self.alpha = alpha
         top = Self.firstSolidRow(width: width, height: height, alpha: alpha).map { CGFloat($0) / CGFloat(max(height, 1)) }
+        solid = Self.solidBox(width: width, height: height, alpha: alpha)
     }
 
     /// The picture's alpha at `scale` of its size: an eighth is plenty for a fingertip.
@@ -130,6 +134,23 @@ struct AlphaMask {
     /// Solid enough that a finger there is on the piece, not on its soft shadow.
     func isSolid(atUnit point: CGPoint) -> Bool {
         value(atUnit: point) > 127
+    }
+
+    private static func solidBox(width: Int, height: Int, alpha: [UInt8]) -> CGRect? {
+        guard alpha.count == width * height, width > 0, height > 0 else { return nil }
+        var left = width, right = -1, top = height, bottom = -1
+        for y in 0..<height {
+            for x in 0..<width where alpha[y * width + x] > 127 {
+                left = min(left, x)
+                right = max(right, x)
+                top = min(top, y)
+                bottom = max(bottom, y)
+            }
+        }
+        guard right >= left, bottom >= top else { return nil }
+        let w = CGFloat(width), h = CGFloat(height)
+        return CGRect(x: CGFloat(left) / w, y: CGFloat(top) / h,
+                      width: CGFloat(right - left + 1) / w, height: CGFloat(bottom - top + 1) / h)
     }
 
     private static func firstSolidRow(width: Int, height: Int, alpha: [UInt8]) -> Int? {
