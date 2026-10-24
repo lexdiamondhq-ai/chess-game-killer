@@ -370,7 +370,7 @@ private struct OpeningFamilyView: View {
 }
 
 /// One line: watch it, practice it, add it to the repertoire.
-private struct OpeningLineView: View {
+struct OpeningLineView: View {
     let line: OpeningLine
     let theme: BoardTheme
     @Environment(RepertoireStore.self) private var repertoire

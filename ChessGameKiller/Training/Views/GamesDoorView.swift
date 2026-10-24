@@ -9,6 +9,7 @@ struct GamesDoorView: View {
     @Environment(PuzzleStore.self) private var puzzles
     @Environment(GameVault.self) private var vault
     @State private var report: CoachReport?
+    @State private var dna: ChessDNA?
     @State private var session: SessionPlan?
     @State private var rewinding: SavedGame?
     @State private var showingAllGames = false
@@ -19,6 +20,15 @@ struct GamesDoorView: View {
     var body: some View {
         TrainScreen(theme: theme, title: "Your games",
                     intro: "\(Coach.current.title) reads every move of your recent games and finds where the points go.") {
+            // The full Chess DNA is Premium's; the top weakness below stays free.
+            if let dna, dna.gamesRead > 0, Premium.shared.opens(.coachProfile) {
+                NavigationLink {
+                    ChessDNAView(dna: dna, theme: theme)
+                } label: {
+                    ChessDNACard(dna: dna, theme: theme)
+                }
+                .buttonStyle(.plain)
+            }
             if let report {
                 if report.hasEnough {
                     // The top weakness is free; the whole six-area profile is Premium's.
@@ -31,7 +41,7 @@ struct GamesDoorView: View {
                     if !Premium.shared.opens(.coachProfile) {
                         PremiumLimitCard(feature: .coachProfile, accent: theme.trainingAccent)
                     }
-                } else {
+                } else if (dna?.gamesRead ?? 0) == 0 || !Premium.shared.opens(.coachProfile) {
                     waitingCard(gamesRead: report.gamesRead)
                 }
             }
@@ -46,7 +56,13 @@ struct GamesDoorView: View {
         }
         .task(id: vault.games.count) {
             let games = vault.games
-            report = await Task.detached(priority: .userInitiated) { CoachReport.make(games: games) }.value
+            let stats = puzzles.themeStats
+            let played = puzzles.progress.played
+            let profile = await Task.detached(priority: .userInitiated) {
+                ChessDNA.make(games: games, puzzleStats: stats, puzzlesPlayed: played)
+            }.value
+            dna = profile
+            report = profile.report
             await puzzles.load()
         }
         .fullScreenCover(item: $session) { plan in

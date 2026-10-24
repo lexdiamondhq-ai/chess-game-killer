@@ -124,6 +124,64 @@ final class TrainSnapshotTests: XCTestCase {
         session.isHidden = true
     }
 
+    /// Your Chess DNA: the card on the Your games door, the profile itself (top and openings),
+    /// and the line the coach adds at the end of a game.
+    func testChessDNA() throws {
+        let sample = TrainSample(settled: true)
+        var games: [SavedGame] = []
+        let slip: [Int: MoveReview.Grade] = [21: .mistake, 25: .blunder]
+        for day in 0..<8 {
+            // Attacking games as White, the older ones with a slip or two, two of the newest lost.
+            games.append(ChessDNATests.game(ChessDNATests.friedLiver, result: day == 1 || day == 6 ? .loss : .win,
+                                            accuracy: day < 4 ? 86 : 71, daysAgo: Double(day * 2),
+                                            grades: day < 4 ? [:] : slip))
+        }
+        for day in 0..<3 {
+            games.append(ChessDNATests.game(ChessDNATests.quietLondon, white: false, result: day == 0 ? .draw : .loss,
+                                            accuracy: 78, daysAgo: Double(day * 2 + 1)))
+        }
+        let vault = GameVault(games: games.sorted { $0.date > $1.date })
+        var progress = sample.puzzles.progress
+        progress.themeStats = ["fork": ThemeRecord(attempts: 40, clean: 34), "pin": ThemeRecord(attempts: 30, clean: 14),
+                               "mateIn2": ThemeRecord(attempts: 25, clean: 17)]
+        let puzzles = PuzzleStore(progress: progress)
+        let dna = ChessDNA.make(games: vault.games, puzzleStats: progress.themeStats, puzzlesPlayed: progress.played)
+        XCTAssertNotNil(dna.style)
+
+        func environment(_ view: some View) -> some View {
+            view
+                .tint(theme.trainingAccent)
+                .preferredColorScheme(.dark)
+                .environment(sample.training)
+                .environment(puzzles)
+                .environment(vault)
+                .environment(sample.repertoire)
+                .environment(sample.endgames)
+                .environment(sample.think)
+        }
+        let door = try show(environment(NavigationStack { GamesDoorView(theme: theme) }), wait: 3)
+        try save(door, "dna-0-door")
+        door.isHidden = true
+
+        let profile = try show(environment(NavigationStack { ChessDNAView(dna: dna, theme: theme) }), wait: 2.5)
+        try save(profile, "dna-1-top")
+        scroll(profile, to: 760)
+        try save(profile, "dna-2-growth")
+        scroll(profile, to: 1_500)
+        try save(profile, "dna-3-openings")
+        profile.isHidden = true
+
+        let learned = environment(
+            VStack { LearnedAboutYouRow(gameID: vault.games[0].id, theme: theme) }
+                .padding(16)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .background { TrainingBackdrop(theme: theme) }
+        )
+        let end = try show(learned, wait: 3)
+        try save(end, "dna-4-learned")
+        end.isHidden = true
+    }
+
     // MARK: Drawing
 
     private func show(_ view: some View, wait: TimeInterval = 3, frame: CGRect? = nil) throws -> UIWindow {
