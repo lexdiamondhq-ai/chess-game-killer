@@ -23,6 +23,7 @@ struct BoardView: View {
     /// The sculpted looks play on a real 3D board unless the player asked for them flat.
     @AppStorage("sculpted3D") private var sculpted3D = true
     @AppStorage(Heirloom.settingKey) private var showsHeirloom = true
+    @AppStorage(BoardTheme.coordinatesKey) private var showsCoordinates = true
     /// Bumps a moment after each game the player wins, for the haptic.
     @State private var wins = 0
 
@@ -75,7 +76,7 @@ struct BoardView: View {
     // too slow for the newer Swift type checker, which then gives up.
 
     private func flatBoard(side: CGFloat) -> some View {
-        let inset: CGFloat = theme.frameInset(side: side)
+        let inset: CGFloat = theme.frameInset(side: side, coordinates: showsCoordinates)
         let sq: CGFloat = (side - inset * 2) / 8
         let corner = RoundedRectangle(cornerRadius: sq * 0.12, style: .continuous)
         return ZStack(alignment: .topLeading) {
@@ -87,7 +88,7 @@ struct BoardView: View {
             boardContent(size: sq)
                 .frame(width: sq * 8, height: sq * 8)
                 .padding(inset)
-            if theme.boardArt != nil {
+            if theme.boardArt != nil, showsCoordinates {
                 FrameCoordinates(flipped: flipped, inset: inset, squareSize: sq, color: theme.labelOnDark)
             }
         }
@@ -101,7 +102,7 @@ struct BoardView: View {
     @ViewBuilder private var boardSurface: some View {
         ZStack {
             if let art = theme.boardArt {
-                BoardArt(name: art, flipped: flipped)
+                BoardArt(name: art, flipped: flipped, coordinates: showsCoordinates)
             }
             if let surface = theme.surface {
                 LinearGradient(colors: surface, startPoint: .topLeading, endPoint: .bottomTrailing)
@@ -257,13 +258,13 @@ struct BoardView: View {
             // The coach's pick: brackets in the corners, clear of the coordinates.
             if let isBest = hintedPieces[square] {
                 HintBrackets(color: theme.hint, size: size,
-                             skipTopLeading: theme.boardArt == nil && column == 0,
-                             skipBottomTrailing: theme.boardArt == nil && row == 7)
+                             skipTopLeading: theme.boardArt == nil && showsCoordinates && column == 0,
+                             skipBottomTrailing: theme.boardArt == nil && showsCoordinates && row == 7)
                     .opacity(isBest ? 1 : 0.5)
             }
 
             // Coordinates in the corners, like a printed board. A board picture has them in its frame.
-            if theme.boardArt == nil {
+            if theme.boardArt == nil, showsCoordinates {
                 if column == 0 {
                     coordinate("\(square.rankIndex + 1)", size: size, color: labelColor, alignment: .topLeading)
                 }
@@ -890,12 +891,16 @@ struct SpriteFrame: Equatable {
 struct BoardArt: View {
     let name: String
     let flipped: Bool
+    /// Whether the frame holds the coordinates (half a square wide) or is a thin rim.
+    var coordinates = true
 
     var body: some View {
         GeometryReader { geo in
             let side = min(geo.size.width, geo.size.height)
-            // The picture is 9 squares wide: half a square of frame on each side.
-            let inset = side / 18
+            let inset = side * (coordinates ? 1 / 18 : BoardTheme.thinRim)
+            // The picture is 9 squares wide: half a square of frame on each side. It is
+            // scaled so its squares fill the space inside the frame, whatever its width.
+            let picture = (side - inset * 2) * 9 / 8
             ZStack {
                 BoardGlass()
                 Image(name)
@@ -903,6 +908,7 @@ struct BoardArt: View {
                     .interpolation(.high)
                     .antialiased(true)
                     .rotationEffect(.degrees(flipped ? 180 : 0))
+                    .frame(width: picture, height: picture)
                     .frame(width: side, height: side)
                     .mask { Rectangle().padding(inset) }
                     // The stone sits in the glass, a little below its surface.
@@ -910,7 +916,7 @@ struct BoardArt: View {
                 // A fine bright line where the glass meets the stone.
                 Rectangle()
                     .strokeBorder(Color.white.opacity(0.28), lineWidth: 0.75)
-                    .padding(inset - side * 0.007)
+                    .padding(max(0, inset - min(side * 0.007, inset * 0.4)))
             }
             .frame(width: side, height: side)
         }

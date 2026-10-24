@@ -54,6 +54,8 @@ struct SculptedBoardState: Equatable {
     var checkedKing: Square?
     var hints: [SculptedHint] = []
     var flipped = false
+    /// The files and ranks engraved in the frame (the Coordinates setting).
+    var showsCoordinates = true
     /// The newest capture, so a piece that leaves the board can tip over rather than fade.
     var lastCapture: CaptureEvent?
     /// Veteran glows by piece id.
@@ -260,6 +262,7 @@ final class SculptedBoardScene {
             // A board about to turn around walks the camera itself.
             endFinale(animated: animate && old.flipped == new.flipped)
         }
+        labelsNode.isHidden = !new.showsCoordinates
         if old.flipped != new.flipped {
             orbit(flipped: new.flipped, animated: animate && old.flipped != new.flipped)
         }

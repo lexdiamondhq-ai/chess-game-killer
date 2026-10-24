@@ -22,14 +22,23 @@ struct SculptedSceneView: UIViewRepresentable {
     let look: SculptedLook
     let state: SculptedBoardState
 
+    @AppStorage(BoardTheme.coordinatesKey) private var showsCoordinates = true
+
+    /// The state with the Coordinates setting, which every 3D board follows.
+    private var shown: SculptedBoardState {
+        var shown = state
+        shown.showsCoordinates = showsCoordinates
+        return shown
+    }
+
     func makeUIView(context: Context) -> SculptedSceneKitView {
         let scene = stage.scene(for: look)
-        scene.apply(state, animated: false)
+        scene.apply(shown, animated: false)
         return scene.view
     }
 
     func updateUIView(_ view: SculptedSceneKitView, context: Context) {
-        stage.scene(for: look).apply(state, animated: !context.transaction.disablesAnimations)
+        stage.scene(for: look).apply(shown, animated: !context.transaction.disablesAnimations)
     }
 }
 

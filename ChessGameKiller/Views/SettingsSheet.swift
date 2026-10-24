@@ -16,6 +16,7 @@ struct SettingsSheet: View {
     @AppStorage("bigBoard") private var bigBoard = false
     @AppStorage("sculpted3D") private var sculpted3D = true
     @AppStorage(Heirloom.settingKey) private var heirloomOn = true
+    @AppStorage(BoardTheme.coordinatesKey) private var coordinatesOn = true
     @AppStorage(HomeScreen.key) private var homeScreen = HomeScreen.defaultOn
     /// Shared with the lessons' speaker button and the highlight reel.
     @AppStorage("coachVoiceMuted") private var voiceMuted = false
@@ -51,6 +52,9 @@ struct SettingsSheet: View {
                                           symbol: "cube", isOn: $sculpted3D, theme: theme)
                                 rule
                             }
+                            ToggleRow(title: "Coordinates", subtitle: "Letters and numbers around the board. Off gives the squares more room.",
+                                      symbol: "textformat.abc", isOn: $coordinatesOn, theme: theme)
+                            rule
                             ToggleRow(title: "Match rival", subtitle: "Computer games use the rival's own board, not the one picked above.",
                                       symbol: "person.crop.circle.badge.checkmark", isOn: $matchRival, theme: theme)
                             rule
@@ -244,6 +248,8 @@ struct BoardPreview: View {
     /// The look's real 3D board, with the same position and marks.
     var threeD = false
 
+    @AppStorage(BoardTheme.coordinatesKey) private var showsCoordinates = true
+
     private static let position = Position(fen: "r1bqk2r/ppp2ppp/2np1n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQK2R w KQkq - 0 6")
     private static let best = (from: Square.e1, to: Square.g1)
     private static let second = (from: Square.c1, to: Square.g5)
@@ -281,13 +287,13 @@ struct BoardPreview: View {
 
     @ViewBuilder
     private var flatPreview: some View {
-        let inset = theme.frameInset(side: size)
+        let inset = theme.frameInset(side: size, coordinates: showsCoordinates)
         let sq = (size - inset * 2) / 8
         let corner = RoundedRectangle(cornerRadius: sq * 0.12, style: .continuous)
         ZStack(alignment: .topLeading) {
             ZStack {
                 if let art = theme.boardArt {
-                    BoardArt(name: art, flipped: false)
+                    BoardArt(name: art, flipped: false, coordinates: showsCoordinates)
                 }
                 if let surface = theme.surface {
                     LinearGradient(colors: surface, startPoint: .topLeading, endPoint: .bottomTrailing)
