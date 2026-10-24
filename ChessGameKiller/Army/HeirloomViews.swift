@@ -16,7 +16,7 @@ struct PieceOutline {
         var first: Int?, last: Int?
         for y in 0..<mask.height {
             var left: Int?, right: Int?
-            for x in 0..<mask.width where mask.alpha[y * mask.width + x] > 128 {
+            for x in 0..<mask.width where mask.alpha[y * mask.width + x] > BoardSprite.shadowAlpha {
                 if left == nil { left = x }
                 right = x
             }

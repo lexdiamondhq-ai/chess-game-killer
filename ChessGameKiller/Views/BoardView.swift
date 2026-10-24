@@ -663,7 +663,7 @@ struct CaptureFall: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Where the foot meets the square, as a fraction of the square: the renders stand
-    /// a little below the middle, as their picture's frame says, the flat pieces at the bottom.
+    /// below the middle, as their picture's frame says, the flat pieces at the bottom.
     private var footY: CGFloat {
         theme.spritePieces ? 0.5 + SpriteFrame.of(theme.imageName(for: piece)).lift : 0.9
     }
@@ -751,7 +751,7 @@ struct PieceImage: View {
     let piece: Piece
     let theme: BoardTheme
     let size: CGFloat
-    /// On a board, a 3D sprite rises above its square; elsewhere it is fitted into `size`.
+    /// On a board, a 3D sprite stands on its square, centered across it; elsewhere it is fitted into `size`.
     var onBoard = false
     /// The marks of an army piece's history (the Heirloom Set), drawn on the piece itself.
     var heirloom: Heirloom? = nil
@@ -769,7 +769,8 @@ struct PieceImage: View {
     static func boardRect(_ frame: SpriteFrame, squareSize size: CGFloat) -> CGRect {
         let width = size * frame.width * frame.boardScale
         let height = size * frame.height * frame.boardScale
-        return CGRect(x: -width / 2, y: size * frame.boardOffset - height / 2, width: width, height: height)
+        return CGRect(x: size * frame.shift - width / 2, y: size * frame.boardOffset - height / 2,
+                      width: width, height: height)
     }
 
     var body: some View {
@@ -780,8 +781,8 @@ struct PieceImage: View {
         }
     }
 
-    /// The render, set so the piece's foot stands just below the square's center (on a board)
-    /// or so a king fills the frame (anywhere else).
+    /// The render, set so the piece's foot stands just below the square's center, centered across
+    /// the square (on a board), or so a king fills the frame (anywhere else).
     private var sprite: some View {
         let name = theme.imageName(for: piece)
         let frame = SpriteFrame.of(name)
@@ -789,14 +790,15 @@ struct PieceImage: View {
         return Color.clear
             .frame(width: size, height: size)
             .overlay {
-                Image(name)
+                BoardSprite.image(name, onBoard: onBoard)
                     .resizable()
                     .interpolation(.high)
                     .antialiased(true)
                     .frame(width: size * frame.width * scale, height: size * frame.height * scale)
                     .heirloomMarks(heirloom, imageName: name, piece: piece)
                     .lightPieceEdge(onBoard && piece.color == .white, size: size)
-                    .offset(y: size * (onBoard ? frame.boardOffset : frame.fittedOffset))
+                    .offset(x: onBoard ? size * frame.shift : 0,
+                            y: size * (onBoard ? frame.boardOffset : frame.fittedOffset))
             }
     }
 
@@ -824,7 +826,7 @@ private extension View {
         if let heirloom, !heirloom.isEmpty {
             overlay {
                 HeirloomOverlay(heirloom: heirloom, imageName: imageName, piece: piece)
-                    .mask { Image(imageName).resizable() }
+                    .mask { BoardSprite.image(imageName, onBoard: true).resizable() }
             }
         } else {
             self
@@ -843,6 +845,57 @@ private extension View {
     }
 }
 
+/// A sprite as a board draws it: without the soft shadow baked in down and to the right of the
+/// piece, which made a piece set dead center in its square still look low and off to one side.
+@MainActor
+enum BoardSprite {
+    /// The baked shadow is never more opaque than this (out of 255); the piece's body is, all but
+    /// its very edge.
+    nonisolated static let shadowAlpha: UInt8 = 215
+
+    private static var clean: [String: UIImage] = [:]
+
+    /// The named picture; on a board, with its shadow taken out.
+    static func image(_ name: String, onBoard: Bool) -> Image {
+        guard onBoard else { return Image(name) }
+        if let image = clean[name] { return Image(uiImage: image) }
+        guard let source = UIImage(named: name), let image = withoutShadow(source) else { return Image(name) }
+        clean[name] = image
+        return Image(uiImage: image)
+    }
+
+    /// The picture with every pixel no more opaque than the shadow cleared, and the body's edge
+    /// stretched back to full range so it stays smooth.
+    static func withoutShadow(_ source: UIImage) -> UIImage? {
+        guard let cg = source.cgImage else { return nil }
+        let width = cg.width, height = cg.height
+        guard let context = CGContext(
+            data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ), let data = context.data else { return nil }
+        context.draw(cg, in: CGRect(x: 0, y: 0, width: width, height: height))
+        let pixels = data.bindMemory(to: UInt8.self, capacity: width * height * 4)
+        let floor = Int(shadowAlpha)
+        let span = 255 - floor
+        for i in stride(from: 0, to: width * height * 4, by: 4) {
+            let alpha = Int(pixels[i + 3])
+            guard alpha < 255 else { continue }
+            guard alpha > floor else {
+                pixels[i] = 0; pixels[i + 1] = 0; pixels[i + 2] = 0; pixels[i + 3] = 0
+                continue
+            }
+            // Premultiplied: the color scales with the new alpha.
+            let kept = (alpha - floor) * 255 / span
+            for c in 0..<3 {
+                pixels[i + c] = UInt8(min(255, Int(pixels[i + c]) * kept / alpha))
+            }
+            pixels[i + 3] = UInt8(kept)
+        }
+        guard let out = context.makeImage() else { return nil }
+        return UIImage(cgImage: out, scale: source.scale, orientation: .up)
+    }
+}
+
 /// Where the piece stands in a sprite picture, so it can be set on its square or fitted into a frame.
 /// Lengths are in squares, as rendered (400 pixels to a square).
 struct SpriteFrame: Equatable {
@@ -858,6 +911,9 @@ struct SpriteFrame: Equatable {
     /// Off the board, the tallest piece fills the frame: its reach above its foot and below it.
     let reach: CGFloat
     let below: CGFloat
+    /// On a board: how far right of the square's center the picture's center is, in squares, so the
+    /// piece itself (not its picture) is centered across the square.
+    var shift: CGFloat = 0
 
     /// The picture's center on a board, from the square's center.
     var boardOffset: CGFloat { lift - (foot - height / 2) * boardScale }
@@ -874,13 +930,27 @@ struct SpriteFrame: Equatable {
     /// The earlier renders (520 x 568, seen from higher up).
     static let fromAbove = SpriteFrame(width: 1.3, height: 1.42, foot: 1.0, boardScale: 1.22, lift: 0.15, reach: 0.964, below: 0.24)
 
+    /// This frame with the piece's body (`solid`, as fractions of the picture) centered across its
+    /// square. Every piece keeps the set's size and stands on the set's one line, a little above the
+    /// square's bottom edge, so a row of pieces is level and the tall ones rise above their squares.
+    func placed(solid: CGRect) -> SpriteFrame {
+        guard solid.width > 0 else { return self }
+        let shift = (0.5 - solid.midX) * width * boardScale
+        return SpriteFrame(width: width, height: height, foot: foot, boardScale: boardScale, lift: lift,
+                           reach: reach, below: below, shift: shift)
+    }
+
     @MainActor private static var known: [String: SpriteFrame] = [:]
 
-    /// The frame of the named picture, told by its shape: the side-on renders are much taller than wide.
+    /// The frame of the named picture, told by its shape: the side-on renders are much taller than
+    /// wide. On a board the piece's body is centered across its square.
     @MainActor static func of(_ name: String) -> SpriteFrame {
         if let frame = known[name] { return frame }
         let size = UIImage(named: name)?.size ?? .zero
-        let frame = size.width > 0 && size.height / size.width > 1.25 ? sideOn : fromAbove
+        var frame = size.width > 0 && size.height / size.width > 1.25 ? sideOn : fromAbove
+        if let solid = SpriteMasks.shared.mask(named: name)?.solid {
+            frame = frame.placed(solid: solid)
+        }
         known[name] = frame
         return frame
     }

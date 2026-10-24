@@ -215,7 +215,7 @@ struct HomeDiagram: View {
                         ZStack {
                             Rectangle().fill((at.fileIndex + at.rankIndex) % 2 == 1 ? theme.light : theme.dark)
                             if let token = draft[at] {
-                                PieceImage(piece: token.piece(at: at), theme: theme, size: square)
+                                PieceImage(piece: token.piece(at: at), theme: theme, size: square, onBoard: true)
                             }
                         }
                         .frame(width: square, height: square)
