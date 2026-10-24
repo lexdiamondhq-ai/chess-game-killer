@@ -23,9 +23,11 @@ struct PuzzleSessionBuilder {
         random = TrainingRandom(seed: seed)
     }
 
-    /// Today's session, aimed at `theme`.
+    /// Today's session, aimed at `theme`. The warm-up can come from the player's weapon (a
+    /// win to start on) and the unlabeled puzzle from their style; both default to any theme.
     mutating func daily(theme: PuzzleTheme, reason: String, mistakes: [GameMistake],
-                        reviews: [LichessPuzzle] = []) -> SessionPlan {
+                        reviews: [LichessPuzzle] = [], warmUp: PuzzleTheme = .all,
+                        mixed: PuzzleTheme = .all) -> SessionPlan {
         var used = Set<String>()
         var items: [SessionItem] = []
         func add(_ puzzle: LichessPuzzle?, _ role: SessionItem.Role) {
@@ -33,7 +35,7 @@ struct PuzzleSessionBuilder {
             used.insert(puzzle.id)
             items.append(SessionItem(content: .drill(puzzle.drill), role: role))
         }
-        add(pick(.all, near: rating - Self.easier, used: used), .warmUp)
+        add(pickEither(warmUp, near: rating - Self.easier, used: used), .warmUp)
         for _ in 0..<Self.focusCount {
             add(pick(theme, near: rating, used: used), .focus)
         }
@@ -41,7 +43,7 @@ struct PuzzleSessionBuilder {
         for puzzle in reviews.prefix(2) where !used.contains(puzzle.id) {
             add(puzzle, .review)
         }
-        add(pick(.all, near: rating + 50, used: used), .mixed)
+        add(pickEither(mixed, near: rating + 50, used: used), .mixed)
         add(pick(theme, near: rating - Self.easier, used: used), .finisher)
         // "Fork puzzles" reads as today's plan; a bare "Opening" reads like a lesson title.
         return SessionPlan(title: "Today's training", focus: nil, lesson: nil, items: items,
@@ -67,6 +69,12 @@ struct PuzzleSessionBuilder {
 
     private mutating func pick(_ theme: PuzzleTheme, near target: Int, used: Set<String>) -> LichessPuzzle? {
         library.pick(near: target, theme: theme, avoid: avoid.union(used), using: &random)
+    }
+
+    /// A puzzle in `theme`, or in any theme when that one has nothing new.
+    private mutating func pickEither(_ theme: PuzzleTheme, near target: Int, used: Set<String>) -> LichessPuzzle? {
+        if let puzzle = pick(theme, near: target, used: used), !used.contains(puzzle.id) { return puzzle }
+        return pick(.all, near: target, used: used)
     }
 
     // MARK: Choosing the theme
@@ -117,24 +125,37 @@ extension TrainingStore {
     /// Today's session: Coach Leo's course while there's course left, then real puzzles
     /// at the player's level aimed at the leak their games show.
     func todayPlan(puzzles: PuzzleLibrary?, rating: Int, played: Int, recent: [String],
-                   report: CoachReport?, reviews: [LichessPuzzle] = [], now: Date = .now) -> SessionPlan? {
+                   report: CoachReport?, dna: ChessDNA? = nil, reviews: [LichessPuzzle] = [],
+                   now: Date = .now) -> SessionPlan? {
         guard let puzzles, !puzzles.puzzles.isEmpty, isPastTheCourse(puzzleRating: rating, puzzlesPlayed: played),
               let library else {
             return dailyPlan(now: now)
         }
         let planner = TrainingPlanner(library: library, progress: progress, now: now)
         let theme: PuzzleTheme
-        let reason: String
-        if let leak = report?.leak {
+        var reason: String
+        if let leak = (dna?.report ?? report)?.leak {
             theme = PuzzleSessionBuilder.theme(for: leak)
             reason = "Your games say: \(leak.headline.lowercased()). Today's puzzles work on it."
         } else {
-            theme = PuzzleSessionBuilder.themeOfTheDay(now)
+            // The theme of the day, unless it's the player's weapon: then the next day's.
+            let day = PuzzleSessionBuilder.themeOfTheDay(now)
+            theme = day.id == dna?.weapon?.theme ? PuzzleSessionBuilder.themeOfTheDay(now.addingTimeInterval(86_400)) : day
             reason = "Today's theme, at your level. Your own mistakes come back too."
+        }
+        // Built around the player: warm up on their weapon, and one puzzle for their style.
+        let weapon = dna?.weaponTheme.flatMap { $0.id.isEmpty || $0.id == theme.id ? nil : $0 }
+        let style = dna?.styleTheme(on: now, excluding: [theme.id, weapon?.id ?? ""]).flatMap { $0.id.isEmpty ? nil : $0 }
+        if let weapon, let name = dna?.weapon?.title {
+            reason += " Warm-up on \(name.lowercased()), your weapon."
+        }
+        if style != nil, let title = dna?.style?.title {
+            reason += " One puzzle for \(ChessDNA.article(title)) \(title.lowercased())."
         }
         var builder = PuzzleSessionBuilder(library: puzzles, rating: rating, avoid: Set(recent),
                                            seed: UInt64(truncatingIfNeeded: Int(now.timeIntervalSince1970 * 1000)))
-        let plan = builder.daily(theme: theme, reason: reason, mistakes: planner.dueMistakes(), reviews: reviews)
+        let plan = builder.daily(theme: theme, reason: reason, mistakes: planner.dueMistakes(), reviews: reviews,
+                                 warmUp: weapon ?? .all, mixed: style ?? .all)
         return plan.isEmpty ? dailyPlan(now: now) : plan
     }
 }
@@ -147,9 +168,13 @@ extension TrainingStore {
             return dailyPlan(now: now)
         }
         await puzzles.load()
-        let report = await Task.detached(priority: .userInitiated) { CoachReport.make(games: games) }.value
+        let stats = puzzles.themeStats
+        let played = puzzles.progress.played
+        let dna = await Task.detached(priority: .userInitiated) {
+            ChessDNA.make(games: games, puzzleStats: stats, puzzlesPlayed: played)
+        }.value
         return todayPlan(puzzles: puzzles.library, rating: puzzles.progress.rating, played: puzzles.progress.played,
-                         recent: puzzles.progress.recent, report: report,
+                         recent: puzzles.progress.recent, report: dna.report, dna: dna,
                          reviews: puzzles.dueReviewPuzzles(limit: 2), now: now)
     }
 }

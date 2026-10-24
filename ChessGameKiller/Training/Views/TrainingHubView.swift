@@ -185,7 +185,7 @@ struct TrainingHubView: View {
         case .games:
             let open = store.openMistakes.count
             if open > 0 { return open == 1 ? "1 position to fix" : "\(open) positions to fix" }
-            return vault.games.isEmpty ? "Play a game first" : "What's costing you games"
+            return vault.games.isEmpty ? "Play a game first" : "Your Chess DNA and what to fix"
         }
     }
 
