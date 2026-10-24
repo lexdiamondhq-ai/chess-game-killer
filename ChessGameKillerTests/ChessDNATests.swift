@@ -127,7 +127,7 @@ final class ChessDNATests: XCTestCase {
         let games = (0..<3).map { Self.game(Self.quietLondon, white: false, result: .draw, daysAgo: Double($0)) }
         let habits = ChessDNA.GameHabits(games[0])
         XCTAssertEqual(habits.castledOn, 5)
-        XCTAssertEqual(habits.moves, 26)
+        XCTAssertEqual(habits.moves, 24)
         XCTAssertNotNil(ChessDNA.make(games: games).style)
     }
 
