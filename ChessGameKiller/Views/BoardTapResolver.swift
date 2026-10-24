@@ -90,8 +90,9 @@ struct AlphaMask {
     /// How far down the picture its first solid row is, as a fraction of its height:
     /// the top of the piece. Nil for a picture with nothing solid in it.
     let top: CGFloat?
-    /// The smallest box holding every solid pixel, as fractions of the picture's width and height
-    /// from its top left: the piece without its soft shadow. Nil for a picture with nothing solid in it.
+    /// The smallest box holding the piece's body, as fractions of the picture's width and height
+    /// from its top left: nearly opaque pixels only, so the soft shadow baked in beside the piece is
+    /// left out. Nil for a picture with no body in it.
     let solid: CGRect?
 
     init(width: Int, height: Int, alpha: [UInt8]) {
@@ -140,7 +141,7 @@ struct AlphaMask {
         guard alpha.count == width * height, width > 0, height > 0 else { return nil }
         var left = width, right = -1, top = height, bottom = -1
         for y in 0..<height {
-            for x in 0..<width where alpha[y * width + x] > 127 {
+            for x in 0..<width where alpha[y * width + x] > BoardSprite.shadowAlpha {
                 left = min(left, x)
                 right = max(right, x)
                 top = min(top, y)

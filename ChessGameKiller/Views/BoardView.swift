@@ -780,7 +780,7 @@ struct PieceImage: View {
         return Color.clear
             .frame(width: size, height: size)
             .overlay {
-                Image(name)
+                BoardSprite.image(name, onBoard: onBoard)
                     .resizable()
                     .interpolation(.high)
                     .antialiased(true)
@@ -818,6 +818,57 @@ private extension View {
         } else {
             self
         }
+    }
+}
+
+/// A sprite as a board draws it: without the soft shadow baked in down and to the right of the
+/// piece, which made a piece set dead center in its square still look low and off to one side.
+@MainActor
+enum BoardSprite {
+    /// The baked shadow is never more opaque than this (out of 255); the piece's body is, all but
+    /// its very edge.
+    nonisolated static let shadowAlpha: UInt8 = 215
+
+    private static var clean: [String: UIImage] = [:]
+
+    /// The named picture; on a board, with its shadow taken out.
+    static func image(_ name: String, onBoard: Bool) -> Image {
+        guard onBoard else { return Image(name) }
+        if let image = clean[name] { return Image(uiImage: image) }
+        guard let source = UIImage(named: name), let image = withoutShadow(source) else { return Image(name) }
+        clean[name] = image
+        return Image(uiImage: image)
+    }
+
+    /// The picture with every pixel no more opaque than the shadow cleared, and the body's edge
+    /// stretched back to full range so it stays smooth.
+    static func withoutShadow(_ source: UIImage) -> UIImage? {
+        guard let cg = source.cgImage else { return nil }
+        let width = cg.width, height = cg.height
+        guard let context = CGContext(
+            data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ), let data = context.data else { return nil }
+        context.draw(cg, in: CGRect(x: 0, y: 0, width: width, height: height))
+        let pixels = data.bindMemory(to: UInt8.self, capacity: width * height * 4)
+        let floor = Int(shadowAlpha)
+        let span = 255 - floor
+        for i in stride(from: 0, to: width * height * 4, by: 4) {
+            let alpha = Int(pixels[i + 3])
+            guard alpha < 255 else { continue }
+            guard alpha > floor else {
+                pixels[i] = 0; pixels[i + 1] = 0; pixels[i + 2] = 0; pixels[i + 3] = 0
+                continue
+            }
+            // Premultiplied: the color scales with the new alpha.
+            let kept = (alpha - floor) * 255 / span
+            for c in 0..<3 {
+                pixels[i + c] = UInt8(min(255, Int(pixels[i + c]) * kept / alpha))
+            }
+            pixels[i + 3] = UInt8(kept)
+        }
+        guard let out = context.makeImage() else { return nil }
+        return UIImage(cgImage: out, scale: source.scale, orientation: .up)
     }
 }
 
