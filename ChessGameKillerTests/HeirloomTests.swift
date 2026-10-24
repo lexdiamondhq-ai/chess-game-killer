@@ -64,6 +64,7 @@ final class HeirloomTests: XCTestCase {
         XCTAssertTrue(lines.contains { $0.contains("Patina") })
     }
 
+    @MainActor
     func testTheStoreReadsTheHeirloomFromTheRecord() {
         var army = ArmyStore.Army()
         army.records[.queen] = record(captures: 10)
