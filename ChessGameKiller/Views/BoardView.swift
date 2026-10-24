@@ -759,7 +759,8 @@ struct PieceImage: View {
     static func boardRect(_ frame: SpriteFrame, squareSize size: CGFloat) -> CGRect {
         let width = size * frame.width * frame.boardScale
         let height = size * frame.height * frame.boardScale
-        return CGRect(x: -width / 2, y: size * frame.boardOffset - height / 2, width: width, height: height)
+        return CGRect(x: size * frame.shift - width / 2, y: size * frame.boardOffset - height / 2,
+                      width: width, height: height)
     }
 
     var body: some View {
@@ -785,7 +786,8 @@ struct PieceImage: View {
                     .antialiased(true)
                     .frame(width: size * frame.width * scale, height: size * frame.height * scale)
                     .lightPieceEdge(onBoard && piece.color == .white, size: size)
-                    .offset(y: size * (onBoard ? frame.boardOffset : frame.fittedOffset))
+                    .offset(x: onBoard ? size * frame.shift : 0,
+                            y: size * (onBoard ? frame.boardOffset : frame.fittedOffset))
             }
     }
 
@@ -834,6 +836,9 @@ struct SpriteFrame: Equatable {
     /// Off the board, the tallest piece fills the frame: its reach above its foot and below it.
     let reach: CGFloat
     let below: CGFloat
+    /// On a board: how far right of the square's center the picture's center is, in squares, so the
+    /// piece itself (not its picture) is centered across the square.
+    var shift: CGFloat = 0
 
     /// The picture's center on a board, from the square's center.
     var boardOffset: CGFloat { lift - (foot - height / 2) * boardScale }
@@ -854,25 +859,22 @@ struct SpriteFrame: Equatable {
     /// How tall each kind of piece stands on a board, in squares, by the last letter of its picture's
     /// name: a king nearly fills its square, a pawn a little over half of it, so every piece reads at a
     /// glance and none reaches into the square above.
-    static let standingHeight: [Character: CGFloat] = ["K": 0.84, "Q": 0.8, "B": 0.76, "N": 0.72, "R": 0.66, "P": 0.58]
+    static let standingHeight: [Character: CGFloat] = ["K": 0.84, "Q": 0.8, "B": 0.76, "N": 0.72, "R": 0.68, "P": 0.6]
     /// No piece is drawn wider than this, in squares.
     static let widest: CGFloat = 0.84
-    /// Where every piece's base rests, below its square's center, in squares: one line for the
-    /// whole set, so a row of mixed pieces stands level.
-    static let baseline: CGFloat = 0.4
 
     /// This frame set on a board by the piece's own outline (`solid`, as fractions of the picture):
-    /// scaled to its kind's height and centered across its square, its base on the set's one baseline.
+    /// scaled to its kind's height and set dead center in its square, up and down and side to side.
     func placed(solid: CGRect, kind: Character) -> SpriteFrame {
         let tall = solid.height * height
         let wide = solid.width * width
         guard tall > 0, wide > 0 else { return self }
         let target = Self.standingHeight[kind] ?? 0.8
         let scale = min(target / tall, Self.widest / wide)
-        let middle = Self.baseline - tall * scale / 2
-        let lift = middle + (foot - solid.midY * height) * scale
+        let lift = (foot - solid.midY * height) * scale
+        let shift = (0.5 - solid.midX) * width * scale
         return SpriteFrame(width: width, height: height, foot: foot, boardScale: scale, lift: lift,
-                           reach: reach, below: below)
+                           reach: reach, below: below, shift: shift)
     }
 
     @MainActor private static var known: [String: SpriteFrame] = [:]
