@@ -852,9 +852,9 @@ struct SpriteFrame: Equatable {
     static let fromAbove = SpriteFrame(width: 1.3, height: 1.42, foot: 1.0, boardScale: 0.7, lift: 0.3, reach: 0.964, below: 0.24)
 
     /// How tall each kind of piece stands on a board, in squares, by the last letter of its picture's
-    /// name: a king nearly fills its square, a pawn about two thirds of it, so every piece reads at a
+    /// name: a king nearly fills its square, a pawn a little over half of it, so every piece reads at a
     /// glance and none reaches into the square above.
-    static let standingHeight: [Character: CGFloat] = ["K": 0.86, "Q": 0.82, "B": 0.78, "N": 0.74, "R": 0.7, "P": 0.62]
+    static let standingHeight: [Character: CGFloat] = ["K": 0.86, "Q": 0.82, "B": 0.78, "N": 0.74, "R": 0.68, "P": 0.56]
     /// No piece is drawn wider than this, in squares.
     static let widest: CGFloat = 0.84
     /// Where a king's foot rests, below its square's center, in squares.

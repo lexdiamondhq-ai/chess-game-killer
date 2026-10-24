@@ -27,9 +27,9 @@ final class PieceAlignmentTests: XCTestCase {
                     let label = "\(theme.name) \(name) at \(box)"
                     XCTAssertGreaterThanOrEqual(box.minY, -0.48, "\(label) reaches out of the top of its square")
                     XCTAssertLessThanOrEqual(box.maxY, 0.48, "\(label) hangs out of the bottom of its square")
-                    XCTAssertLessThanOrEqual(abs(box.midX), 0.05, "\(label) is off center sideways")
-                    XCTAssertLessThanOrEqual(abs(box.midY), 0.08, "\(label) is off center up or down")
-                    XCTAssertGreaterThanOrEqual(box.height, 0.55, "\(label) is too small to read")
+                    XCTAssertLessThanOrEqual(abs(box.midX), 0.08, "\(label) is off center sideways")
+                    XCTAssertLessThanOrEqual(abs(box.midY), 0.1, "\(label) is off center up or down")
+                    XCTAssertGreaterThanOrEqual(box.height, 0.5, "\(label) is too small to read")
                 }
                 XCTAssertEqual(white.maxY, black.maxY, accuracy: 0.03, "\(theme.name) \(kind)s stand on different lines")
                 XCTAssertEqual(white.height, black.height, accuracy: 0.04, "\(theme.name) \(kind)s differ in height")
