@@ -139,13 +139,13 @@ final class CoachVoice: NSObject {
         continuation?.resume()
     }
 
-    /// The nicest English voice on the device for the coach: a man's for Leo (British first),
+    /// The nicest English voice on the device for the coach: a man's for Leo (American first),
     /// a woman's for Vera (American first).
     private static func deviceVoice(for coach: Coach) -> AVSpeechSynthesisVoice? {
         if let voice = deviceVoices[coach] { return voice }
         let english = AVSpeechSynthesisVoice.speechVoices().filter { $0.language.hasPrefix("en") }
         let gender: AVSpeechSynthesisVoiceGender = coach == .leo ? .male : .female
-        let first = coach == .leo ? "en-GB" : "en-US"
+        let first = "en-US"
         let matching = english.filter { $0.gender == gender }
         let ranked = matching.filter { $0.language == first } + matching.filter { $0.language != first }
         let voice = ranked.first { $0.quality == .premium }
