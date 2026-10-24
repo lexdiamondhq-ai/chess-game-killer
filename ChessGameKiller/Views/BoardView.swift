@@ -3,8 +3,8 @@ import SwiftUI
 import UIKit
 
 /// The interactive board: tap a piece to see its moves, tap a dot to play.
-/// With hints on, the coach's picks are marked by corner brackets on the piece and a
-/// ringed dot where it should go. A taken piece tips over and falls away.
+/// With hints on, the coach's best move is in a spotlight: the rest of the board dims and
+/// the piece and its square stay lit (`HintSpotlight`). A taken piece tips over and falls away.
 struct BoardView: View {
     let match: MatchController
     var theme: BoardTheme = .neon
@@ -193,16 +193,10 @@ struct BoardView: View {
 
     // MARK: Squares, highlights and hints
 
-    /// The pieces the coach suggests moving, true for the best move's piece.
-    private var hintedPieces: [Square: Bool] {
-        match.hints.reduce(into: [:]) { result, hint in result[hint.from] = (result[hint.from] ?? false) || hint.rank == 0 }
-    }
-
-    /// Where the selected piece's suggested moves land, true for the best one.
+    /// Where the selected piece's best move lands, if the coach's best move is that piece's.
     private var hintedTargets: [Square: Bool] {
-        guard let selected = game.selected else { return [:] }
-        return match.hints.filter { $0.from == selected }
-            .reduce(into: [:]) { result, hint in result[hint.to] = (result[hint.to] ?? false) || hint.rank == 0 }
+        guard let best = match.bestHint, best.from == game.selected else { return [:] }
+        return [best.to: true]
     }
 
     private func squares(size: CGFloat) -> some View {
@@ -232,6 +226,7 @@ struct BoardView: View {
         let isTarget = game.targets.contains(square)
         let hintedTarget = isTarget ? hintedTargets[square] : nil
         let ringWidth = size * 0.035
+        let best = match.bestHint
 
         return ZStack {
             Rectangle().fill(theme.squareFill(isLight: isLight))
@@ -245,6 +240,11 @@ struct BoardView: View {
                     Rectangle().strokeBorder(ring, lineWidth: ringWidth)
                 }
             }
+            // ...and every other square dims, under the selection, dots and check.
+            if let best, square != best.from, square != best.to {
+                Rectangle().fill(Color.black.opacity(HintSpotlight.dim))
+                    .transition(.opacity)
+            }
             if game.selected == square {
                 Rectangle().fill(theme.selected)
                 if let ring = theme.selectedRing {
@@ -255,12 +255,10 @@ struct BoardView: View {
             if game.checkedKing == square {
                 CheckSquareMark(color: theme.check, size: size)
             }
-            // The coach's pick: brackets in the corners, clear of the coordinates.
-            if let isBest = hintedPieces[square] {
-                HintBrackets(color: theme.hint, size: size,
-                             skipTopLeading: theme.boardArt == nil && showsCoordinates && column == 0,
-                             skipBottomTrailing: theme.boardArt == nil && showsCoordinates && row == 7)
-                    .opacity(isBest ? 1 : 0.5)
+            // The coach's best move in a spotlight: its two squares glow.
+            if let best, square == best.from || square == best.to {
+                SpotlightMark(size: size, isTarget: square == best.to)
+                    .transition(.opacity)
             }
 
             // Coordinates in the corners, like a printed board. A board picture has them in its frame.
@@ -279,6 +277,7 @@ struct BoardView: View {
             }
         }
         .frame(width: size, height: size)
+        .animation(.easeInOut(duration: 0.35), value: best)
         .accessibilityElement()
         .accessibilityLabel(accessibilityLabel(square, occupant: occupant, isTarget: isTarget, hinted: hintedTarget))
         .accessibilityAddTraits(.isButton)
@@ -299,9 +298,9 @@ struct BoardView: View {
         var parts = [square.notation]
         if let occupant { parts.append(occupant.spokenName) }
         if isTarget { parts.append(occupant == nil ? "move here" : "capture") }
-        if let hinted { parts.append(hinted ? "the coach's best move" : "the coach's second choice") }
-        if let hint = match.hints.first(where: { $0.from == square }) {
-            parts.append(hint.rank == 0 ? "best move \(hint.san)" : "second best move \(hint.san)")
+        if hinted != nil { parts.append("the coach's best move") }
+        if let best = match.bestHint, best.from == square {
+            parts.append("hint: \(HintWords.phrase(for: best, in: game))")
         }
         return parts.joined(separator: ", ")
     }
@@ -601,44 +600,6 @@ struct CaptureCorners: Shape {
             path.closeSubpath()
         }
         return path
-    }
-}
-
-/// Four brackets in a square's corners: the piece the coach would move.
-struct HintBrackets: View {
-    let color: Color
-    let size: CGFloat
-    /// The corners where the board prints its coordinates.
-    var skipTopLeading = false
-    var skipBottomTrailing = false
-
-    var body: some View {
-        let line = size * 0.05
-        let inset = size * 0.08
-        let arm = size * 0.2
-        Path { path in
-            let low = inset, high = size - inset
-            if !skipTopLeading {
-                path.move(to: CGPoint(x: low, y: low + arm))
-                path.addLine(to: CGPoint(x: low, y: low))
-                path.addLine(to: CGPoint(x: low + arm, y: low))
-            }
-            path.move(to: CGPoint(x: high - arm, y: low))
-            path.addLine(to: CGPoint(x: high, y: low))
-            path.addLine(to: CGPoint(x: high, y: low + arm))
-            if !skipBottomTrailing {
-                path.move(to: CGPoint(x: high, y: high - arm))
-                path.addLine(to: CGPoint(x: high, y: high))
-                path.addLine(to: CGPoint(x: high - arm, y: high))
-            }
-            path.move(to: CGPoint(x: low + arm, y: high))
-            path.addLine(to: CGPoint(x: low, y: high))
-            path.addLine(to: CGPoint(x: low, y: high - arm))
-        }
-        .stroke(color, style: StrokeStyle(lineWidth: line, lineCap: .round, lineJoin: .round))
-        .frame(width: size, height: size)
-        .transition(.opacity)
-        .accessibilityHidden(true)
     }
 }
 

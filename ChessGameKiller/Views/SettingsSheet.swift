@@ -73,10 +73,10 @@ struct SettingsSheet: View {
                         CoachPicker(theme: theme)
                             .padding(.bottom, 4)
                         SettingsGroup(theme: theme) {
-                            ToggleRow(title: "Move hints", subtitle: "Marks the piece the coach would move. Tap it and its best square glows. Off for a fair game.",
+                            ToggleRow(title: "Move hints", subtitle: "Spotlights the coach's best move and says it under the board. Off for a fair game.",
                                       symbol: "sparkles", isOn: $showBestMoves, theme: theme)
                             rule
-                            ToggleRow(title: "Second-best hint", subtitle: "Also marks the runner-up, more faintly. Off leaves just the best.",
+                            ToggleRow(title: "Runner-up in the coach", subtitle: "The coach panel lists a second choice too. The board only ever lights the best.",
                                       symbol: "lightbulb", isOn: $showSecondBest, theme: theme)
                                 .disabled(!showBestMoves)
                             rule
@@ -176,7 +176,7 @@ struct SettingsSheet: View {
     /// The chosen board with a piece tapped, its moves and hints as they look in a game.
     private var preview: some View {
         VStack(spacing: 14) {
-            BoardPreview(theme: theme, showBest: showBestMoves, showSecond: showBestMoves && showSecondBest, size: 172,
+            BoardPreview(theme: theme, showBest: showBestMoves, size: 172,
                          threeD: theme.sculptedLook != nil && sculpted3D)
                 .padding(.top, 6)
             Text("Live preview")
@@ -238,12 +238,11 @@ struct SettingsSheet: View {
 // MARK: - The live preview
 
 /// A small board that is not for playing: it shows a theme the way a game draws it,
-/// with the king tapped and its moves dotted. White is about to castle, the coach's
-/// pick; Bg5 is the runner-up.
+/// with the king tapped and its moves dotted. With hints on, castling, the coach's pick,
+/// is in the spotlight.
 struct BoardPreview: View {
     let theme: BoardTheme
     let showBest: Bool
-    let showSecond: Bool
     var size: CGFloat = 160
     /// The look's real 3D board, with the same position and marks.
     var threeD = false
@@ -252,7 +251,6 @@ struct BoardPreview: View {
 
     private static let position = Position(fen: "r1bqk2r/ppp2ppp/2np1n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQK2R w KQkq - 0 6")
     private static let best = (from: Square.e1, to: Square.g1)
-    private static let second = (from: Square.c1, to: Square.g5)
     /// The tapped king and where it can go.
     private static let selected = Square.e1
     private static let targets: Set<Square> = [.d2, .e2, .f1, .g1]
@@ -270,19 +268,8 @@ struct BoardPreview: View {
         }
     }
 
-    /// The pieces the coach would move, true for the best move's piece.
-    private var hintedPieces: [Square: Bool] {
-        var pieces: [Square: Bool] = [:]
-        if showBest, showSecond { pieces[Self.second.from] = false }
-        if showBest { pieces[Self.best.from] = true }
-        return pieces
-    }
-
     private var stillHints: [SculptedHint] {
-        var hints: [SculptedHint] = []
-        if showBest { hints.append(SculptedHint(from: Self.best.from, to: Self.best.to, isBest: true)) }
-        if showBest, showSecond { hints.append(SculptedHint(from: Self.second.from, to: Self.second.to, isBest: false)) }
-        return hints
+        showBest ? [SculptedHint(from: Self.best.from, to: Self.best.to, isBest: true)] : []
     }
 
     @ViewBuilder
@@ -329,7 +316,6 @@ struct BoardPreview: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: showBest)
-        .animation(.easeInOut(duration: 0.25), value: showSecond)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Preview of the \(theme.name) board")
     }
@@ -346,7 +332,7 @@ struct BoardPreview: View {
         }
     }
 
-    /// One square as the game draws it: the tapped king's square, the coach's brackets,
+    /// One square as the game draws it: the tapped king's square, the hint spotlight,
     /// and a dot (or a ring around a piece) where the king can go.
     private func squareView(_ square: Square, size: CGFloat) -> some View {
         let isLight = (square.fileIndex + square.rankIndex) % 2 == 1
@@ -356,15 +342,18 @@ struct BoardPreview: View {
             if let gridLine = theme.gridLine {
                 Rectangle().strokeBorder(gridLine, lineWidth: 0.5)
             }
+            let lit = square == Self.best.from || square == Self.best.to
+            if showBest, !lit {
+                Rectangle().fill(Color.black.opacity(HintSpotlight.dim))
+            }
             if square == Self.selected {
                 Rectangle().fill(theme.selected)
                 if let ring = theme.selectedRing {
                     Rectangle().strokeBorder(ring, lineWidth: size * 0.035)
                 }
             }
-            if let isBest = hintedPieces[square] {
-                HintBrackets(color: theme.hint, size: size)
-                    .opacity(isBest ? 1 : 0.5)
+            if showBest, lit {
+                SpotlightMark(size: size, isTarget: square == Self.best.to)
             }
             if isTarget {
                 MoveDot(occupied: Self.position?.piece(at: square) != nil,

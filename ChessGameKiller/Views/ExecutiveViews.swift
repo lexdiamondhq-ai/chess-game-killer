@@ -106,7 +106,7 @@ struct ExecutivePlate: View {
                     .frame(width: 6, height: 6)
                     .transition(.scale.combined(with: .opacity))
             }
-            if let piece = selectedArmyPiece {
+            if hintWords == nil, let piece = selectedArmyPiece {
                 HStack(spacing: 4) {
                     Image(systemName: piece.rank == .legend ? "crown.fill" : "shield.lefthalf.filled")
                         .font(.caption2.weight(.bold))
@@ -119,6 +119,14 @@ struct ExecutivePlate: View {
                 }
                 .layoutPriority(1)
                 .transition(.opacity)
+            } else if let hintWords {
+                // The spotlit move in words, in the spotlight's gold.
+                Text(hintWords)
+                    .font(.system(.footnote, design: .themed).weight(.semibold))
+                    .foregroundStyle(theme.isDark ? HintSpotlight.gold : Color(red: 0.6, green: 0.43, blue: 0.06))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .transition(.opacity)
             } else if !status.isEmpty {
                 Text(status)
                     .font(.system(.footnote, design: .themed).weight(isActive ? .medium : .regular))
@@ -198,6 +206,12 @@ struct ExecutivePlate: View {
 
     private var name: String {
         Self.displayName(of: color, in: match, theme: theme)
+    }
+
+    /// With hints on, your turn's best move in words: "Hint · Knight takes the queen".
+    private var hintWords: String? {
+        guard !isComputer, isActive, !match.isOver, let best = match.bestHint else { return nil }
+        return "Hint · " + HintWords.phrase(for: best, in: match.game)
     }
 
     /// The rival's level while it waits, "Thinking…" on its turn; "Your move" on yours, and

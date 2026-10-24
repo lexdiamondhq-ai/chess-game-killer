@@ -100,6 +100,11 @@ final class MatchController {
     private(set) var setup = Setup()
     /// The two best moves for the player to move, best first. Empty when hidden.
     private(set) var hints: [MoveHint] = []
+    /// The one move the board lights up: the coach's best, on the player's own turn.
+    var bestHint: MoveHint? {
+        guard !isOver, game.humanColors.contains(game.sideToMove) else { return nil }
+        return hints.first { $0.rank == 0 }
+    }
     /// Ghost Vision: the engine's best line from the position on the board, a few moves ahead.
     /// Found with the hints, whether or not they are shown; nil until the search reports.
     private(set) var lookahead: GhostLine?
