@@ -21,6 +21,7 @@ export const ERROR_STATUS = {
   stale: 409,
   game_over: 409,
   cannot_claim: 409,
+  pairing: 409,
   illegal_move: 422,
   rate_limited: 429,
   server_error: 500,

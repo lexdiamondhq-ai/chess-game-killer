@@ -14,6 +14,8 @@ final class ChallengeCenter {
         case invite(ChallengeInvite)
         /// A game: the lobby while nobody has joined, then the board.
         case game(OnlineGame)
+        /// Play online: players waiting now, and finding a game.
+        case online(OnlineLobby)
 
         /// Tells the screens apart, so moving between them is animated and each starts fresh.
         var key: String {
@@ -21,6 +23,7 @@ final class ChallengeCenter {
             case .composer: return "composer"
             case .invite(let invite): return "invite-\(invite.code)"
             case .game(let game): return "game-\(ObjectIdentifier(game).hashValue)"
+            case .online: return "online"
             }
         }
     }
@@ -74,6 +77,14 @@ final class ChallengeCenter {
     func compose() {
         leaveScreen(keeping: nil)
         screen = .composer(ChallengeComposer(center: self))
+    }
+
+    /// Opens Play online: players waiting now, and finding a game with one.
+    func playOnline() {
+        if case .online? = screen { return }
+        leaveScreen(keeping: nil)
+        // The screen starts it checking the lobby once it shows.
+        screen = .online(OnlineLobby(center: self, defaults: defaults))
     }
 
     /// Opens a challenge link: `https://play.chess-game-killer.workers.dev/c/CODE` or `chessgamekiller://c/CODE`.
@@ -160,12 +171,25 @@ final class ChallengeCenter {
             game.deactivate()
         case .composer(let composer)?:
             if let waiting = composer.game, waiting !== kept { waiting.deactivate() }
+        case .online(let lobby)?:
+            lobby.stop()
         default:
             break
         }
     }
 
     // MARK: The list
+
+    /// How many players wait in the online lobby, for the home card; nil until asked (or offline).
+    private(set) var onlineWaiting: Int? = nil
+    @ObservationIgnored private var lastLobbyCount: Date?
+
+    /// Asks the lobby how many players are waiting, at most every 20 seconds.
+    func refreshOnlineCount() async {
+        if let lastLobbyCount, Date.now.timeIntervalSince(lastLobbyCount) < 20 { return }
+        lastLobbyCount = .now
+        onlineWaiting = (try? await api.lobby())?.waiting
+    }
 
     /// Brings the unfinished games up to date: whose move it is, and which ended meanwhile.
     /// At most every 15 seconds unless `force`d.

@@ -229,8 +229,8 @@ struct HomeView: View {
 
     @ViewBuilder
     private func sections(upNext: HomeUpNext) -> some View {
-        // Challenge a friend, sealed like an adjourned move, right under the clock; friend
-        // games still going follow it, your move first.
+        // Challenge a friend, sealed like an adjourned move, right under the clock, then Play
+        // online; friend games still going follow them, your move first.
         friends(challenges?.store.sorted.filter { !$0.isOver } ?? [])
 
         // Dated like a newspaper's chess column; it turns over at midnight with the page open.
@@ -271,13 +271,19 @@ struct HomeView: View {
         if let challenges {
             VStack(spacing: 10) {
                 HomeChallengeCard(tone: tone) { challenges.compose() }
+                HomeOnlineCard(tone: tone, pieceTheme: pieceTheme, waiting: challenges.onlineWaiting) {
+                    challenges.playOnline()
+                }
                 if !games.isEmpty {
                     HomeFriendsCard(games: games, tone: tone, open: { challenges.play($0) })
                 }
             }
             .padding(.top, 12)
             .id("friends")
-            .task { await challenges.refreshGames() }
+            .task {
+                await challenges.refreshGames()
+                await challenges.refreshOnlineCount()
+            }
         }
     }
 

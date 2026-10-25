@@ -228,10 +228,38 @@ struct FriendGameState: Codable, Equatable, Sendable {
     var leaveGraceMs: Double = 60_000
     /// The server's time when it sent this, in milliseconds since 1970.
     var now: Double = 0
+    /// Paired online with someone from the lobby: rated, and not a friend's game.
+    var rated = false
+    /// Each side's rating in a rated game; nil otherwise.
+    var ratings: Ratings?
+
+    /// A rated game's ratings: as the game began, and once it is over and counted, after.
+    struct Ratings: Codable, Equatable, Sendable {
+        struct Side: Codable, Equatable, Sendable {
+            var rating: Int
+            var provisional = false
+            var after: Int?
+            var change: Int?
+
+            enum CodingKeys: String, CodingKey {
+                case rating, provisional, after, change
+            }
+
+            /// "1200", or "1200?" while it is still settling.
+            var label: String { "\(rating)\(provisional ? "?" : "")" }
+        }
+
+        var white: Side
+        var black: Side
+
+        subscript(seat: FriendSeat) -> Side {
+            seat == .white ? white : black
+        }
+    }
 
     enum CodingKeys: String, CodingKey {
         case code, status, createdAt, updatedAt, clock, creator, white, black, moves, san, fen, turn
-        case clocks, drawOffer, rematch, result, leaveGraceMs, now
+        case clocks, drawOffer, rematch, result, leaveGraceMs, now, rated, ratings
     }
 
     subscript(seat: FriendSeat) -> Player {
@@ -263,6 +291,19 @@ extension FriendGameState {
         result = try c.decodeIfPresent(Result.self, forKey: .result)
         leaveGraceMs = try c.decodeIfPresent(Double.self, forKey: .leaveGraceMs) ?? 60_000
         now = try c.decodeIfPresent(Double.self, forKey: .now) ?? 0
+        rated = try c.decodeIfPresent(Bool.self, forKey: .rated) ?? false
+        // Ratings the app can't read never hide the game itself.
+        ratings = (try? c.decodeIfPresent(Ratings.self, forKey: .ratings)) ?? nil
+    }
+}
+
+extension FriendGameState.Ratings.Side {
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        rating = try c.decode(Int.self, forKey: .rating)
+        provisional = try c.decodeIfPresent(Bool.self, forKey: .provisional) ?? false
+        after = try c.decodeIfPresent(Int.self, forKey: .after)
+        change = try c.decodeIfPresent(Int.self, forKey: .change)
     }
 }
 

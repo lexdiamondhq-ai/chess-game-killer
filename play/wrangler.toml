@@ -24,10 +24,19 @@ enabled = true
 name = "GAMES"
 class_name = "GameRoom"
 
+# Play online: one object, named "lobby", where players wait to be paired (src/lobbyroom.js).
+[[durable_objects.bindings]]
+name = "LOBBY"
+class_name = "Lobby"
+
 # Durable Objects on the Workers Free plan must keep their data in SQLite.
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["GameRoom"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["Lobby"]
 
 [vars]
 # How long a player in a timed game may be away before the other side may

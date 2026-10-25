@@ -97,6 +97,11 @@ try {
   check(final.result.winner === "black" && final.result.reason === "checkmate", `the result was ${JSON.stringify(final.result)}`);
   done("fool's mate: Black wins by checkmate, seen over the WebSocket");
 
+  // Play online: the lobby answers (no seek is made, so nobody real sees a smoke test waiting).
+  const lobby = await api(base, "GET", "/api/lobby");
+  check(lobby.status === 200 && Array.isArray(lobby.json.players), `the lobby: HTTP ${lobby.status} ${lobby.text}`);
+  done(`the online lobby answers (${lobby.json.waiting} waiting)`);
+
   console.log(`\nSmoke test passed (${steps.length} steps).`);
   socket.close();
   process.exit(0);
