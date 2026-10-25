@@ -211,7 +211,7 @@ final class ChallengeTests: XCTestCase {
         XCTAssertEqual(words(.timeout, .black, me: .black), "Sam ran out of time. You win")
         XCTAssertEqual(words(.timeout, .black, me: .white), "You lost on time")
         XCTAssertEqual(words(.left, .white, me: .white), "Sam left the game. You win")
-        XCTAssertEqual(words(.left, .white, me: .black), "You left the game. Sam wins")
+        XCTAssertEqual(words(.left, .white, me: .black), "You were away too long. Sam wins")
         for me in FriendSeat.allCases {
             XCTAssertEqual(words(.stalemate, nil, me: me), "Draw by stalemate")
             XCTAssertEqual(words(.repetition, nil, me: me), "Draw by repetition")
