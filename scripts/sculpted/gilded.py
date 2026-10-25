@@ -8,7 +8,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pieces import (arc, bead, cove, ogee, line, lathe, uvsphere, rbox, cut, group, mitre_profile, mitre_cut,
                     prism, crenel, shade, ring_lathe, merlon_caps, TAU,
                     beads, gadroons, compose, radius_at, slits, FRONT,
-                    pattee, squash_above, cross_finish, crown_gems, KING_H, LATIN_TOP, QUEEN_TOP, QUEEN_H)
+                    pattee, squash_above, cross_finish, crown_gems, KING_H, LATIN_TOP,
+                    queen_crown_profile, queen_crown)
 
 FOOT = 0.118          # top of every base: the piece's body starts here
 
@@ -155,25 +156,20 @@ def king(M):
 
 
 def queen(M):
-    """The short queen (see pieces.py) in the gilded finish: a low coronet ringed with twelve gold balls."""
+    """The queen (see pieces.py) in the gilded finish: a slim neck under a crown of eight gold points
+    tipped with gold balls round a gold ball, the only all-gold crown on the board."""
     R = 0.30; p = base_profile(R) + body_start(R)
-    p += ogee(R - 0.115, 0.15, 0.12, 0.5, 32)
+    p += ogee(R - 0.115, 0.15, 0.105, 0.44, 32)
     body_top = len(p)
-    p += line(0.12, 0.5, 0.145, 0.512, 2); p += bead(0.162, 0.512, 0.028)
-    p += line(0.157, 0.54, 0.195, 0.548, 2); p += bead(0.2, 0.548, 0.033)
-    p += line(0.185, 0.581, 0.105, 0.596, 2)
-    ZR = 0.80
-    p += cove(0.105, 0.596, 0.25, ZR - 0.02); p += line(0.25, ZR - 0.02, 0.262, ZR, 2); p += line(0.262, ZR, 0.23, ZR, 2)
-    p += line(0.23, ZR, 0.15, 0.74, 4)
-    p += [(0.15 * math.cos(t), 0.74 + 0.035 * math.sin(t)) for t in np.linspace(0, math.pi / 2 * 0.8, 8)]
-    top = p[-1]; p += line(top[0], top[1], 0.0, top[1], 3)
-    body = lathe('Q', p, mod=gadroons(0.62, 0.77, 18, 0.012), mat=M['body'])
-    objs = [body, band('Qband', R, M), band_beads('Qbeadband', R, M), beads('Qbeadcollar', 0.1715, 0.526, 36, 0.0105, M['metal'])]
-    for i in range(12):
-        a = TAU * i / 12; objs.append(uvsphere(f'Qball{i}', 0.036, (math.cos(a) * 0.247, math.sin(a) * 0.247, ZR + 0.03), M['metal']))
-    objs += stripes('Qst', p[:body_top], 0.475, M)
-    objs.append(flat_band('Qring', 0.2195, 0.5505, 0.5785, M))
-    squash_above(objs, 0.2, (QUEEN_H - 0.2) / (QUEEN_TOP - 0.2))
+    p += line(0.105, 0.44, 0.13, 0.452, 2); p += bead(0.148, 0.452, 0.026)
+    p += line(0.143, 0.478, 0.178, 0.486, 2); p += bead(0.183, 0.486, 0.03)
+    p += line(0.17, 0.516, 0.095, 0.53, 2)
+    p += queen_crown_profile(0.095, 0.53)
+    body = lathe('Q', p, mod=gadroons(0.55, 0.66, 16, 0.01), mat=M['body'])
+    objs = [body, band('Qband', R, M), band_beads('Qbeadband', R, M), beads('Qbeadcollar', 0.1575, 0.465, 34, 0.0098, M['metal'])]
+    objs += queen_crown('Q', M, M['metal'], M['metal'], M['metal'])   # the only gold crown on the board
+    objs += stripes('Qst', p[:body_top], 0.415, M)
+    objs.append(flat_band('Qring', 0.2015, 0.488, 0.514, M))
     return group('queen', objs)
 
 

@@ -42,16 +42,16 @@ final class BoardTapTests: XCTestCase {
         }
     }
 
-    /// At the start, 0.75 of a square above d1's center is inside d2's square but on the
+    /// At the start, 0.65 of a square above d1's center is inside d2's square but on the
     /// queen's crown: the queen.
     func testATapOnAPiecesHeadPicksThatPiece() {
         let game = GameModel()
-        let crown = point(above: .d1, by: 0.75)
+        let crown = point(above: .d1, by: 0.65)
         XCTAssertEqual(tap(crown, on: game, isSolid: sprites(.gilded)), .d1)
         XCTAssertEqual(tap(crown, on: game, isSolid: sprites(.faberge)), .d1)
         XCTAssertEqual(tap(crown, on: game, isSolid: column()), .d1)
         // Beside the crown it is the pawn's square.
-        XCTAssertEqual(tap(point(above: .d1, by: 0.75, right: 0.4), on: game, isSolid: column()), .d2)
+        XCTAssertEqual(tap(point(above: .d1, by: 0.65, right: 0.4), on: game, isSolid: column()), .d2)
         // Where the pieces stay inside their squares, it is the square under the finger.
         XCTAssertEqual(tap(crown, on: game, isSolid: nil), .d2)
     }
