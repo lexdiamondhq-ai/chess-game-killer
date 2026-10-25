@@ -188,7 +188,7 @@ def merlon_caps(name,ri,ro,z,mat,count=5,notch=math.radians(31),t=0.012,e=0.004)
 # ---------- pieces ----------
 # Heights (squares, before the game's 1.1 scale): K 1.336 > B 1.0 > Q 0.92 > N 0.83 > R 0.742 > P 0.56.
 # Every piece is told by its top, made big enough to read on a phone, over a low base:
-#   king a long Latin cross, queen a low coronet ringed with twelve pearls (and far shorter),
+#   king a long Latin cross, queen a crown of eight ball-tipped points round a ball (and far shorter),
 #   bishop a tall pointed mitre with a diagonal cut showing its metal core, rook a tower with
 #   five square merlons capped in metal round a dark well, knight a horse's head, pawn one ball on a collar.
 # The surfaces differ too: king straight flutes, queen spiral flutes, bishop fine flutes,
@@ -233,8 +233,33 @@ def crown_gems(name,p,z,M,size=0.024):
     return out
 KING_H=1.336     # the king's height, cross included: every set's frame is fitted to it
 LATIN_TOP=1.46   # the Latin king as drawn, before it is brought down to KING_H
-QUEEN_TOP=0.866  # the queen as drawn (her pearls' tops) and the height she is brought to: under the
-QUEEN_H=0.92     # bishop, over the knight, far under the king
+QUEEN_H=0.92     # the queen's height, her ball's top: under the bishop, over the knight, far under the king
+# The queen's crown, shared by both sets: a slim neck flaring into a cup whose rim carries eight
+# points tipped with balls, round a dome under a ball on a stem. From the side a spiked crown under
+# a ball, from the 3D camera above a star round a bright ball: never a rook's open ring of merlons.
+QRIM=0.665; QRIM_R=0.232; QDOME=0.765; QBALL_R=0.056
+def queen_crown_profile(r0,z0):
+    """From the neck (r0, z0): the flaring cup, the rim and the dome inside it; ends on the axis."""
+    p=cove(r0,z0,QRIM_R-0.012,QRIM-0.012,14); p+=line(QRIM_R-0.012,QRIM-0.012,QRIM_R,QRIM,2)
+    p+=line(QRIM_R,QRIM,QRIM_R-0.03,QRIM+0.006,2)
+    rd=QRIM_R-0.03
+    p+=[(rd*math.cos(t),QRIM+0.006+(QDOME-QRIM-0.006)*math.sin(t)) for t in np.linspace(0,math.pi/2,18)[1:]]
+    return p
+def queen_crown(name,M,point_mat,tip_mat,ball_mat,n=8):
+    """The eight points round the rim, leaning out, each tipped with a ball, and the ball on top."""
+    out=[]; L=0.15; lean=math.radians(20)
+    for i in range(n):
+        a=FRONT+math.pi/n+TAU*i/n
+        foot=Vector((QRIM_R*0.9*math.cos(a),QRIM_R*0.9*math.sin(a),QRIM-0.02))
+        turn=Matrix.Rotation(a,4,'Z')@Matrix.Rotation(lean,4,'Y')
+        o=lathe(f'{name}pt{i}',[(0.0,0.0),(0.036,0.0),(0.03,0.035),(0.009,L),(0.0,L)],seg=48,mat=point_mat)
+        o.matrix_world=Matrix.Translation(foot)@turn
+        tip=foot+(turn.to_3x3()@Vector((0,0,L)))
+        out+=[o,uvsphere(f'{name}tip{i}',0.03,tuple(tip),tip_mat)]
+    zc=QUEEN_H-QBALL_R
+    out.append(lathe(f'{name}stem',[(0.0,QDOME-0.01),(0.05,QDOME-0.01),(0.034,QDOME+0.01),(0.022,zc-QBALL_R+0.012),(0.0,zc-QBALL_R+0.012)],seg=96,mat=ball_mat))
+    out.append(uvsphere(f'{name}topball',QBALL_R,(0,0,zc),ball_mat))
+    return out
 def king(M):
     """A tall king under a long Latin cross: the cross alone says king."""
     R=0.31; p=base_profile(R); p+=body_start(R)
@@ -253,23 +278,18 @@ def king(M):
     squash_above(objs,0.2,(KING_H-0.2)/(LATIN_TOP-0.2))
     return group('king',objs)
 def queen(M):
-    """A short queen, well below the king, wearing a low coronet ringed with twelve pearls."""
+    """A queen well below the king: a slim neck under a crown of eight ball-tipped points round a ball."""
     R=0.30; p=base_profile(R); p+=body_start(R)
-    p+=ogee(R-0.095,TOP,0.12,0.5,32)
-    p+=line(0.12,0.5,0.145,0.512,2); p+=bead(0.162,0.512,0.028)
-    p+=line(0.157,0.54,0.195,0.548,2); p+=bead(0.2,0.548,0.033)     # ring sits here
-    p+=line(0.185,0.581,0.105,0.596,2)
-    ZR=0.80
-    p+=cove(0.105,0.596,0.25,ZR-0.02); p+=line(0.25,ZR-0.02,0.262,ZR,2); p+=line(0.262,ZR,0.23,ZR,2)
-    p+=line(0.23,ZR,0.15,0.74,4); p+=[(0.15*math.cos(t),0.74+0.035*math.sin(t)) for t in np.linspace(0,math.pi/2*0.8,8)]
-    top=p[-1]; p+=line(top[0],top[1],0.0,top[1],3)
-    body=lathe('Q',p,mod=compose(flutes(0.19,0.48,22,0.012,twist=0.16),gadroons(0.62,0.77,18,0.012)),mat=M['body'])
-    objs=[body,base_beads('Qbeadbase',R,M),beads('Qbeadcollar',0.1715,0.526,36,0.0105,M['pearl']),torus('Qring',0.21,0.0085,0.5645,M['metal'])]
-    for i in range(12):
-        a=TAU*i/12; objs.append(uvsphere(f'Qp{i}',0.036,(math.cos(a)*0.247,math.sin(a)*0.247,ZR+0.03),M['pearl']))
-    squash_above(objs,0.2,(QUEEN_H-0.2)/(QUEEN_TOP-0.2))
+    p+=ogee(R-0.095,TOP,0.105,0.44,32)
+    p+=line(0.105,0.44,0.13,0.452,2); p+=bead(0.148,0.452,0.026)
+    p+=line(0.143,0.478,0.178,0.486,2); p+=bead(0.183,0.486,0.03)     # ring sits here
+    p+=line(0.17,0.516,0.095,0.53,2)
+    p+=queen_crown_profile(0.095,0.53)
+    body=lathe('Q',p,mod=compose(flutes(0.19,0.42,22,0.012,twist=0.16),gadroons(0.55,0.66,16,0.01)),mat=M['body'])
+    objs=[body,base_beads('Qbeadbase',R,M),beads('Qbeadcollar',0.1575,0.465,34,0.0098,M['pearl']),torus('Qring',0.192,0.0085,0.501,M['metal'])]
+    objs+=queen_crown('Q',M,M['metal'],M['pearl'],M['pearl'])   # metal points: the only metal crown on the board
     return group('queen',objs)
-def mitre_profile(z0=0.51,z1=0.935,rmax=0.178,n=48):
+def mitre_profile(z0=0.51,z1=0.935,rmax=0.19,n=48):
     """The bishop's mitre: an almond that comes to a point, never a ball like the pawn's head."""
     out=[]
     for i in range(n+1):
@@ -280,7 +300,7 @@ def mitre_profile(z0=0.51,z1=0.935,rmax=0.178,n=48):
     return out
 # the side of the bishop that faces the player: the game and the pictures turn it -112 degrees
 BISHOP_FRONT=math.radians(22)
-def mitre_cut(body, front=BISHOP_FRONT, width=0.09, z=0.745, slope=48):
+def mitre_cut(body, front=BISHOP_FRONT, width=0.105, z=0.745, slope=48):
     """A slot through the mitre, slanting down from the upper left as the player sees it."""
     f=Vector((math.cos(front),math.sin(front),0)); s=Vector((-math.sin(front),math.cos(front),0))
     t=(math.cos(math.radians(slope))*Vector((0,0,1))-math.sin(math.radians(slope))*s).normalized()
