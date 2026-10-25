@@ -135,6 +135,9 @@ jobs:
           # Big Board on the 3D look: each piece seated in its own square.
           shoot bigboard-3d -showcaseLook gilded -showcase3D YES -showcaseBigBoard YES
           shoot bigboard-noir -showcaseLook noir -showcase3D YES -showcaseBigBoard YES
+          # The Board view setting: flat on the usual screen, tilted on Big Board.
+          shoot flat-3d -showcaseLook gilded -showcase3D YES -boardTilt flat
+          shoot bigboard-tilted -showcaseLook gilded -showcase3D YES -showcaseBigBoard YES -boardTilt tilted
           # The home screen as the app opens on it (in the look the last shot left), then at its sections.
           home() {
             name=$1; shift
@@ -193,7 +196,7 @@ jobs:
         # The screens being worked on, once more at the very end and small, so a short tail of the log holds them.
         run: |
           [ -d snapshots ] || exit 0
-          for f in snapshots/device-bigboard-*.png snapshots/device-gilded-3d.png; do
+          for f in snapshots/device-bigboard-*.png snapshots/device-flat-3d.png; do
             [ -e "$f" ] || continue
             sips -s format jpeg -s formatOptions 60 -Z 700 "$f" --out /tmp/tiny.jpg >/dev/null
             echo "BEGIN-SCREEN $(basename "$f")"

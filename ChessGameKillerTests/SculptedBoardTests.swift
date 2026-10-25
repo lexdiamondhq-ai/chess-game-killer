@@ -146,41 +146,47 @@ final class SculptedBoardTests: XCTestCase {
         }
     }
 
-    /// Big Board looks from above: every piece, even a king on the far rank, stays inside its
-    /// own square, its cross below the square's far edge and its foot clear of the near one.
-    func testSeatedPiecesStayInsideTheirSquares() {
+    /// Flat from above: a lying king, end to end and as high as its foot's rim,
+    /// stays inside its own square on every square, from both sides.
+    func testLyingPiecesStayInsideTheirSquares() {
         let framing = SculptedCamera.Framing.seated
         let size = CGSize(width: 402, height: 402 / framing.aspect)
-        let tallest = SculptedAssets.shared.height(of: .king) * framing.pieceScale
-        let foot = 0.34 * framing.pieceScale
         for flipped in [false, true] {
             let camera = SculptedCamera.fitted(aspect: Float(size.width / size.height), flipped: flipped, framing: framing)
-            // Toward the top of the screen is away from the player.
-            let away: Float = flipped ? 1 : -1
             for index in 0..<64 {
                 let square = Square(file: index % 8, rank: index / 8)
                 let center = SculptedCamera.position(of: square)
-                let top = camera.screenPoint(center + SIMD3(0, tallest, 0), in: size).y
-                let farEdge = camera.screenPoint(center + SIMD3(0, 0, 0.5 * away), in: size).y
-                let nearFoot = camera.screenPoint(center + SIMD3(0, 0, -foot * away), in: size).y
-                let nearEdge = camera.screenPoint(center + SIMD3(0, 0, -0.5 * away), in: size).y
-                XCTAssertGreaterThan(top, farEdge, "\(square) king rises out of its square, flipped \(flipped)")
-                XCTAssertLessThan(nearFoot, nearEdge, "\(square) foot spills forward, flipped \(flipped)")
+                let outline = camera.frame(of: square, in: size).insetBy(dx: -0.5, dy: -0.5)
+                // The head, away from the player, is low and slim; the foot's rim stands higher.
+                let away: Float = flipped ? 1 : -1
+                for (dz, height) in [(0.43 * away, Float(0.25)), (-0.43 * away, Float(0.42))] {
+                    for dx: Float in [-0.2, 0.2] {
+                        let point = camera.screenPoint(center + SIMD3(dx, height, dz), in: size)
+                        XCTAssertTrue(outline.contains(point), "\(square) flipped \(flipped)")
+                    }
+                }
             }
         }
     }
 
-    func testTheSeatedBoardFillsItsViewAndStaysInside() {
+    func testTheFlatBoardFillsItsViewAndStaysInside() {
         let framing = SculptedCamera.Framing.seated
         for flipped in [false, true] {
             let camera = SculptedCamera.fitted(aspect: Float(framing.aspect), flipped: flipped, framing: framing)
-            let points = SculptedCamera.keyPoints(tallest: SculptedCamera.tallest * framing.pieceScale)
+            let points = SculptedCamera.keyPoints(tallest: framing.tallest)
                 .map { flipped ? SIMD3($0.x * -1, $0.y, $0.z * -1) : $0 }
                 .map(camera.normalized)
             XCTAssertTrue(points.allSatisfy { abs($0.x) <= 1 && abs($0.y) <= 1 })
             XCTAssertGreaterThan(points.map { abs($0.x) }.max() ?? 0, 0.95, "edge to edge")
             XCTAssertGreaterThan(points.map { abs($0.y) }.max() ?? 0, 0.9, "top to bottom, nothing wasted")
         }
+    }
+
+    func testBoardViewSetting() {
+        XCTAssertEqual(BoardTilt.auto.framing(bigBoard: false), .standing)
+        XCTAssertEqual(BoardTilt.auto.framing(bigBoard: true), .seated)
+        XCTAssertEqual(BoardTilt.tilted.framing(bigBoard: true), .standing)
+        XCTAssertEqual(BoardTilt.flat.framing(bigBoard: false), .seated)
     }
 
     func testEverySquareIsFoundUnderItsOwnCenter() {

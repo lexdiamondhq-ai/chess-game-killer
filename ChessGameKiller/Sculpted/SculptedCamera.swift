@@ -127,7 +127,7 @@ struct SculptedCamera: Equatable {
     // MARK: Framing
 
     /// How the board is seen: from the player's chair, pieces standing tall, or from high
-    /// above (Big Board), each piece sitting inside its own square.
+    /// above (Big Board), each piece lying flat inside its own square.
     enum Framing: Equatable {
         case standing
         case seated
@@ -136,7 +136,7 @@ struct SculptedCamera: Equatable {
         var elevation: Float {
             switch self {
             case .standing: return 50 * .pi / 180
-            case .seated: return 76 * .pi / 180
+            case .seated: return 80 * .pi / 180
             }
         }
 
@@ -148,11 +148,14 @@ struct SculptedCamera: Equatable {
             }
         }
 
-        /// The pieces' size against the game's: seated, a little smaller, so even a king's cross stays in its square.
-        var pieceScale: Float {
+        /// The pieces lie on their sides, head away from the player, each inside its square.
+        var lying: Bool { self == .seated }
+
+        /// How high the pieces reach above the board: a standing king's cross, or a piece lying down.
+        var tallest: Float {
             switch self {
-            case .standing: return 1
-            case .seated: return 0.9
+            case .standing: return SculptedCamera.tallest
+            case .seated: return 0.5
             }
         }
 
@@ -160,7 +163,7 @@ struct SculptedCamera: Equatable {
         var aspect: CGFloat {
             switch self {
             case .standing: return 1.35
-            case .seated: return 1.05
+            case .seated: return 1.01
             }
         }
     }
@@ -206,7 +209,7 @@ struct SculptedCamera: Equatable {
     }
 
     private func fits() -> Bool {
-        Self.keyPoints(tallest: Self.tallest * framing.pieceScale).allSatisfy { point in
+        Self.keyPoints(tallest: framing.tallest).allSatisfy { point in
             let n = normalized(point)
             return abs(n.x) <= 1 - Self.margin.x && abs(n.y) <= 1 - Self.margin.y
         }
@@ -214,7 +217,41 @@ struct SculptedCamera: Equatable {
 
     /// How far the picture's middle sits above the view's middle, from -1 to 1.
     private func verticalOffset() -> Float {
-        let ys = Self.keyPoints(tallest: Self.tallest * framing.pieceScale).map { normalized($0).y }
+        let ys = Self.keyPoints(tallest: framing.tallest).map { normalized($0).y }
         return (ys.max()! + ys.min()!) / 2
+    }
+}
+
+/// The "Board view" setting for the 3D board: tilted with the pieces standing, or flat from
+/// above with each piece lying in its square. Auto tilts the usual board and lays Big Board flat.
+enum BoardTilt: String, CaseIterable, Identifiable {
+    case auto, tilted, flat
+
+    static let storageKey = "boardTilt"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .auto: return "Auto"
+        case .tilted: return "Tilted"
+        case .flat: return "Flat"
+        }
+    }
+
+    var blurb: String {
+        switch self {
+        case .auto: return "Tilted, with the pieces standing. Flat on Big Board, each piece lying in its square."
+        case .tilted: return "Always tilted, with the pieces standing, Big Board too."
+        case .flat: return "Always flat from above, each piece lying in its square."
+        }
+    }
+
+    func framing(bigBoard: Bool) -> SculptedCamera.Framing {
+        switch self {
+        case .auto: return bigBoard ? .seated : .standing
+        case .tilted: return .standing
+        case .flat: return .seated
+        }
     }
 }

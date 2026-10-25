@@ -12,6 +12,7 @@ struct ChallengeGameView: View {
 
     @Environment(ChallengeCenter.self) private var center
     @AppStorage("sculpted3D") private var sculpted3D = true
+    @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.auto
     @AppStorage("haptics") private var hapticsOn = true
     @State private var confirming: Confirmation?
     @State private var copied = false
@@ -84,14 +85,14 @@ struct ChallengeGameView: View {
     private var topSeat: FriendSeat { game.match.isBoardFlipped ? .white : .black }
 
     private func layout(in size: CGSize) -> some View {
-        let aspect = BoardView.aspect(theme, setting: sculpted3D)
+        let aspect = BoardView.aspect(theme, setting: sculpted3D, framing: tilt.framing(bigBoard: false))
         let spare = size.height - Self.plateHeight * 2 - Self.ribbonHeight - Self.spacing * 5
         let width = max(0, min(size.width, spare * aspect, Self.maxBoardSide))
         return VStack(spacing: Self.spacing) {
             Spacer(minLength: 0)
             FriendPlate(game: game, seat: topSeat, theme: theme)
                 .frame(height: Self.plateHeight)
-            BoardView(match: game.match, theme: theme)
+            BoardView(match: game.match, theme: theme, framing: tilt.framing(bigBoard: false))
                 .frame(width: width, height: width / aspect)
             FriendPlate(game: game, seat: topSeat.opposite, theme: theme)
                 .frame(height: Self.plateHeight)

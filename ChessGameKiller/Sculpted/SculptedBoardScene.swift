@@ -459,7 +459,13 @@ final class SculptedBoardScene {
         var heirloom: Heirloom?
         var heirloomUndo: [(node: SCNNode, geometry: SCNGeometry?)] = []
         var heirloomParts: [SCNNode] = []
+        /// Turned about its own axis so it reads best (the knight nearly side-on).
         let yaw: Float
+        /// The piece at rest in its own frame: turned by `yaw`, and on Big Board laid down
+        /// on its side. Every pose of the model ends with it.
+        var rest: simd_float4x4
+        /// Laid down on its side (Big Board, flat).
+        var lies = false
         let baseRadius: Float
         /// Raised for the selection.
         var lifted = false
@@ -475,6 +481,7 @@ final class SculptedBoardScene {
             case .bishop: yaw = -112 * .pi / 180
             default: yaw = 0
             }
+            rest = matrix_identity_float4x4
             // The bases' radii, at the game's 1.1 scale (scripts/sculpted/pieces.py and gilded.py),
             // so the contact shadow ends at the foot and a falling piece tips over its rim.
             switch piece.kind {
@@ -503,9 +510,7 @@ final class SculptedBoardScene {
         node.root.addChildNode(model)
         node.root.simdPosition = SculptedCamera.position(of: placed.square)
         node.root.simdOrientation = simd_quatf(angle: (state?.flipped ?? false) ? .pi : 0, axis: SculptedCamera.up)
-        node.root.simdScale = SIMD3(repeating: framing.pieceScale)
-        // The blob is a plane laid flat, so its own x and y are the board's x and z.
-        node.contact.scale = SCNVector3(node.baseRadius / 0.33, node.baseRadius / 0.33, 1)
+        layDown(node, framing: framing)
         setPose(node, y: 0)
         piecesNode.addChildNode(node.root)
         nodes[placed.id] = node
@@ -697,7 +702,7 @@ final class SculptedBoardScene {
         let direction = simd_length(flat) > 0.001 ? simd_normalize(flat) : SIMD3<Float>(0, 0, -1)
         // Leaning into the move: the top runs ahead along the way it travels.
         let axis = local(simd_cross(SculptedCamera.up, direction), in: node)
-        let yaw = node.yaw
+        let yaw = node.rest
         let model = node.model
         let lift = Self.travelLift
         let t = timing
@@ -798,17 +803,19 @@ final class SculptedBoardScene {
         let direction = local(away, in: node)
         let axis = local(simd_cross(SculptedCamera.up, away), in: node)
         let pivot = direction * node.baseRadius
-        let yaw = node.yaw
+        let yaw = node.rest
+        // A king already lying flat stays down rather than tipping up off the board.
+        let reach: Float = node.lies ? 0 : 84 * .pi / 180
         let model = node.model
         let fall = SCNAction.customAction(duration: fallTime) { _, elapsed in
             let u = Float(Double(elapsed) / fallTime)
             // Slow to start, then down, with a small bounce as it hits the stone.
             let drop = Ease.slowStart(min(u / 0.82, 1))
             let bounce: Float = u > 0.82 ? 0.06 * sin(.pi * (u - 0.82) / 0.18) : 0
-            let angle = (84 * .pi / 180) * (drop - bounce)
+            let angle = reach * (drop - bounce)
             let turn = simd_quatf(angle: angle, axis: axis)
             model.simdTransform = Self.translation(pivot) * simd_float4x4(turn) * Self.translation(-pivot)
-                * simd_float4x4(simd_quatf(angle: yaw, axis: SculptedCamera.up))
+                * yaw
         }
         node.root.runAction(.sequence([.wait(duration: delay), fall]), forKey: "pose")
         node.contact.runAction(.sequence([.wait(duration: delay), .fadeOpacity(to: 0.4, duration: fallTime)]), forKey: "contact")
@@ -914,7 +921,7 @@ final class SculptedBoardScene {
         let direction = local(away, in: node)
         let axis = local(simd_cross(SculptedCamera.up, away), in: node)
         let pivot = direction * node.baseRadius
-        let yaw = node.yaw
+        let yaw = node.rest
         let model = node.model
         let start = timing.lift + timing.travel * 0.12
         let tip = max(timing.travel * 0.55, 0.16)
@@ -932,7 +939,7 @@ final class SculptedBoardScene {
             var transform = matrix_identity_float4x4
             transform = Self.translation(pivot) * simd_float4x4(turn) * Self.translation(-pivot)
             transform = transform * Self.translation(direction * slide)
-            transform = transform * Self.scale(max(s, 0.0001)) * simd_float4x4(simd_quatf(angle: yaw, axis: SculptedCamera.up))
+            transform = transform * Self.scale(max(s, 0.0001)) * yaw
             model.simdTransform = transform
         }
         node.root.runAction(.sequence([.wait(duration: start), fall, .removeFromParentNode()]), forKey: "pose")
@@ -944,7 +951,7 @@ final class SculptedBoardScene {
     /// beside a move that is still landing.
     private func vanish(_ node: PieceNode, after delay: Double, duration: Double, key: String = "pose") {
         let model = node.model
-        let yaw = node.yaw
+        let yaw = node.rest
         let sink = SCNAction.customAction(duration: duration) { _, elapsed in
             let u = Ease.smooth(Float(Double(elapsed) / duration))
             model.simdTransform = Self.pose(y: 0, axis: SIMD3(1, 0, 0), angle: 0, scale: 1 - 0.35 * u, yaw: yaw)
@@ -959,7 +966,7 @@ final class SculptedBoardScene {
     /// A piece arriving on the board: it rises out of the stone and settles.
     private func appear(_ node: PieceNode, after delay: Double) {
         let model = node.model
-        let yaw = node.yaw
+        let yaw = node.rest
         node.root.opacity = 0
         setPose(node, y: 0, scale: 0.6)
         let grow = SCNAction.customAction(duration: 0.3) { _, elapsed in
@@ -980,7 +987,7 @@ final class SculptedBoardScene {
         let from = node.model.simdPosition.y
         let to = lifted ? Self.selectionLift : 0
         let model = node.model
-        let yaw = node.yaw
+        let yaw = node.rest
         let duration = lifted ? 0.14 : 0.12
         let action = SCNAction.customAction(duration: duration) { _, elapsed in
             let u = Float(Double(elapsed) / duration)
@@ -1002,7 +1009,7 @@ final class SculptedBoardScene {
     }
 
     private func setPose(_ node: PieceNode, y: Float, scale: Float = 1) {
-        node.model.simdTransform = Self.pose(y: y, axis: SIMD3(1, 0, 0), angle: 0, scale: scale, yaw: node.yaw)
+        node.model.simdTransform = Self.pose(y: y, axis: SIMD3(1, 0, 0), angle: 0, scale: scale, yaw: node.rest)
     }
 
     /// A direction on the board turned into the piece's own frame.
@@ -1010,12 +1017,39 @@ final class SculptedBoardScene {
         node.root.simdWorldOrientation.inverse.act(vector)
     }
 
-    private static func pose(y: Float, axis: SIMD3<Float>, angle: Float, scale s: Float, yaw: Float) -> simd_float4x4 {
+    /// `yaw` is the piece's rest (`PieceNode.rest`): its turn, and on Big Board its lying down.
+    private static func pose(y: Float, axis: SIMD3<Float>, angle: Float, scale s: Float, yaw: simd_float4x4) -> simd_float4x4 {
         translation(SIMD3(0, y, 0))
             * simd_float4x4(simd_quatf(angle: angle, axis: simd_normalize(axis)))
             * scale(s)
-            * simd_float4x4(simd_quatf(angle: yaw, axis: SculptedCamera.up))
+            * yaw
     }
+
+    /// Lays a piece down for Big Board: on its side, head away from the player and the face
+    /// the player sees standing turned up, centered in its square and resting on the board.
+    /// Each kind is sized so it lies well inside the square; taller pieces stay longer.
+    private func layDown(_ node: PieceNode, framing: SculptedCamera.Framing) {
+        let turn = simd_float4x4(simd_quatf(angle: node.yaw, axis: SculptedCamera.up))
+        node.lies = framing.lying
+        guard framing.lying else {
+            node.rest = turn
+            node.contact.scale = SCNVector3(node.baseRadius / 0.33, node.baseRadius / 0.33, 1)
+            return
+        }
+        let height = max(assets.height(of: node.piece.kind), 0.1)
+        let size = min(Self.lyingLength / height, 0.8)
+        let length = height * size
+        let radius = node.baseRadius * size
+        node.rest = Self.translation(SIMD3(0, radius, length / 2))
+            * simd_float4x4(simd_quatf(angle: -.pi / 2, axis: SIMD3(1, 0, 0)))
+            * Self.scale(size)
+            * turn
+        // The blob stretches along the lying piece: its own x and y are the board's x and z.
+        node.contact.scale = SCNVector3(radius * 1.3 / 0.33, length * 0.6 / 0.33, 1)
+    }
+
+    /// A lying king's length, as a share of its square.
+    private static let lyingLength: Float = 0.86
 
     private static func translation(_ v: SIMD3<Float>) -> simd_float4x4 {
         var m = matrix_identity_float4x4
@@ -1107,8 +1141,8 @@ final class SculptedBoardScene {
         let node = PieceNode(id: -1, piece: piece, model: model, contact: contact)
         node.root.name = "ghost"
         node.root.renderingOrder = 20
-        node.root.simdScale = SIMD3(repeating: framing.pieceScale)
         node.root.addChildNode(model)
+        layDown(node, framing: framing)
         setPose(node, y: 0)
         return node
     }
@@ -1410,15 +1444,15 @@ final class SculptedBoardScene {
     /// How the board is seen now.
     private var framing: SculptedCamera.Framing { state?.framing ?? .standing }
 
-    /// Moves the camera to the new framing and sizes the pieces for it: up above for Big Board,
-    /// each piece inside its square, or back down to the player's chair.
+    /// Moves the camera to the new framing and sets the pieces down for it: from above for
+    /// Big Board, each piece lying in its square, or back to the player's chair, standing.
     private func reframe(_ framing: SculptedCamera.Framing, animated: Bool) {
-        let scale = SIMD3<Float>(repeating: framing.pieceScale)
-        let pieces = Array(nodes.values) + Array(ghostNodes.values)
-        guard heldCamera == nil else {
-            for node in pieces { node.root.simdScale = scale }
-            return
+        for node in Array(nodes.values) + Array(ghostNodes.values) {
+            node.model.removeAllActions()
+            layDown(node, framing: framing)
+            setPose(node, y: node.lifted ? Self.selectionLift : 0)
         }
+        guard heldCamera == nil else { return }
         let from = camera
         let target = SculptedCamera.fitted(aspect: camera.aspect, flipped: state?.flipped ?? false, framing: framing)
         camera = target
@@ -1427,7 +1461,6 @@ final class SculptedBoardScene {
         cameraNode.removeAction(forKey: "orbit")
         guard animated, !UIAccessibility.isReduceMotionEnabled else {
             place(target)
-            for node in pieces { node.root.simdScale = scale }
             return
         }
         let duration = 0.45
@@ -1444,11 +1477,6 @@ final class SculptedBoardScene {
             node.simdLook(at: step.target, up: SculptedCamera.up, localFront: SCNNode.simdLocalFront)
         }
         cameraNode.runAction(move, forKey: "orbit")
-        for node in pieces {
-            let size = SCNAction.scale(to: CGFloat(framing.pieceScale), duration: duration)
-            size.timingMode = .easeInEaseOut
-            node.root.runAction(size, forKey: "size")
-        }
     }
 
     private func buildLights() {

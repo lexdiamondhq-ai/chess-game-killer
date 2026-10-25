@@ -54,7 +54,7 @@ struct SculptedBoardView: View {
     var endBrowsing: (() -> Void)?
     /// Ghost Vision, when the player can hold the board to see ahead.
     var vision: GhostVision?
-    /// Seen from the player's chair, or from above with each piece inside its square (Big Board).
+    /// Seen from the player's chair, or from above with each piece lying in its square (Big Board).
     var framing: SculptedCamera.Framing = .standing
 
     /// Width over height: the board seen at an angle is wider than it is tall.
@@ -272,7 +272,7 @@ struct SculptedBoardView: View {
     /// when the far edge of the view is too close.
     private func calloutPoint(over square: Square, camera: SculptedCamera, size: CGSize) -> CGPoint {
         let foot = SculptedCamera.position(of: square)
-        let height = (SculptedAssets.shared.height(of: .king) + 0.2) * framing.pieceScale
+        let height = framing.lying ? 0.5 : SculptedAssets.shared.height(of: .king) + 0.2
         let top = camera.screenPoint(foot + SIMD3(0, height + 0.16, 0), in: size)
         let below = camera.screenPoint(foot + SIMD3(0, 0, flipped ? -0.62 : 0.62), in: size)
         return top.y - 14 >= 14 ? CGPoint(x: top.x, y: top.y - 12) : below

@@ -39,6 +39,8 @@ struct ContentView: View {
     /// Big Board: the board edge to edge with everything else tucked into a pull-up tray.
     @AppStorage("bigBoard") private var bigBoard = false
     @AppStorage("sculpted3D") private var sculpted3D = true
+    /// Tilted or flat 3D board (Settings, Board view).
+    @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.auto
     @AppStorage(BoardTheme.coordinatesKey) private var showsCoordinates = true
     /// Hold the board to see the engine's line ahead (counts as help).
     @AppStorage(GhostVision.storageKey) private var ghostVisionOn = true
@@ -511,7 +513,7 @@ struct ContentView: View {
         if bigBoard {
             browsableBoard
         } else {
-            BoardView(match: match, theme: theme, vision: ghostVisionOn ? vision : nil)
+            BoardView(match: match, theme: theme, vision: ghostVisionOn ? vision : nil, framing: framing)
         }
     }
 
@@ -541,7 +543,7 @@ struct ContentView: View {
             // the earlier position laid over it.
             BoardView(match: match, theme: theme, browsing: browsedPosition, endBrowsing: {
                 withAnimation(.snappy) { browsePly = nil }
-            }, vision: ghostVisionOn ? vision : nil, framing: .seated)
+            }, vision: ghostVisionOn ? vision : nil, framing: framing)
             if !BoardView.playsIn3D(theme, setting: sculpted3D), let ply = browsePly,
                let fen = match.game.positionFENs[safe: ply], let draft = PositionDraft(fen: fen) {
                 PositionBoard(draft: draft, theme: theme, flipped: match.isBoardFlipped) { _ in
@@ -568,7 +570,12 @@ struct ContentView: View {
 
     /// Width over height of the board in play: 1 for the flat looks, wider for the 3D board.
     private var boardAspect: CGFloat {
-        BoardView.aspect(theme, setting: sculpted3D, framing: bigBoard ? .seated : .standing)
+        BoardView.aspect(theme, setting: sculpted3D, framing: framing)
+    }
+
+    /// How the 3D board is seen: the Board view setting, with Auto laying Big Board flat.
+    private var framing: SculptedCamera.Framing {
+        tilt.framing(bigBoard: bigBoard)
     }
 
     /// One position for every ~34 points of sideways drag.
