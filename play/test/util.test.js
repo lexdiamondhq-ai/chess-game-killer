@@ -5,6 +5,7 @@ import {
   CODE_ALPHABET,
   ERROR_STATUS,
   cleanName,
+  isOffensiveName,
   errorResponse,
   hashToken,
   isToken,
@@ -96,16 +97,28 @@ test("names are cut to 24 whole characters", () => {
   assert.equal(cleanName(cleanName(" x ".repeat(20))), cleanName(" x ".repeat(20)));
 });
 
+test("the name filter catches slurs and disguises, not real names", () => {
+  for (const bad of ["Shit", "sh1t", "S.H.I.T", "fuuuck", "F u c k", "a s s", "Mr Ass", "p0rn", "Fück you", "xXnazIXx nazi"]) {
+    assert.equal(isOffensiveName(bad), true, bad);
+    assert.equal(cleanName(bad), "Player", bad);
+  }
+  for (const fine of ["Alex", "Cassandra", "Hancock", "Dick Smith", "Peacock", "Dickens", "Assad", "Niger", "Nazir", "Fukuda",
+    "Torpedo", "Therapist", "Sussex", "Analise", "Jessica", "Grape", "Pornpimol", "Sam 2"]) {
+    assert.equal(isOffensiveName(fine), false, fine);
+    assert.equal(cleanName(fine), fine, fine);
+  }
+});
+
 test("settings come from the vars, with safe defaults", () => {
   const DAY = 24 * 60 * 60 * 1000;
-  assert.deepEqual(readConfig({}), { leaveGraceMs: 20000, minClockSeconds: 60, keepFinishedMs: 30 * DAY });
+  assert.deepEqual(readConfig({}), { leaveGraceMs: 60000, minClockSeconds: 60, keepFinishedMs: 30 * DAY });
   assert.deepEqual(readConfig({ LEAVE_GRACE_MS: "1500", MIN_CLOCK_SECONDS: "1", KEEP_FINISHED_MS: "4000" }), {
     leaveGraceMs: 1500,
     minClockSeconds: 1,
     keepFinishedMs: 4000,
   });
   assert.deepEqual(readConfig({ LEAVE_GRACE_MS: "soon", MIN_CLOCK_SECONDS: "0", KEEP_FINISHED_MS: "" }), {
-    leaveGraceMs: 20000,
+    leaveGraceMs: 60000,
     minClockSeconds: 1,
     keepFinishedMs: 30 * DAY,
   });

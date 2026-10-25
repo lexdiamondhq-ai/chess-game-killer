@@ -96,11 +96,14 @@ struct FriendGameState: Codable, Equatable, Sendable {
         var online = false
         /// When the current absence began, in server milliseconds; nil while present.
         var away: Double?
+        /// When the other side may claim the win because this one left, in server milliseconds;
+        /// nil while present, or when the leave rule doesn't apply.
+        var claimableAt: Double?
         var screenshots = 0
         var recordings = 0
 
         enum CodingKeys: String, CodingKey {
-            case name, seated, online, away, screenshots, recordings
+            case name, seated, online, away, claimableAt, screenshots, recordings
         }
     }
 
@@ -221,8 +224,8 @@ struct FriendGameState: Codable, Equatable, Sendable {
     var drawOffer: FriendSeat?
     var rematch: Rematch?
     var result: Result?
-    /// How long an absence may last in a timed game before it forfeits.
-    var leaveGraceMs: Double = 20_000
+    /// How long someone may be away in a timed game before the other side may claim the win.
+    var leaveGraceMs: Double = 60_000
     /// The server's time when it sent this, in milliseconds since 1970.
     var now: Double = 0
 
@@ -258,7 +261,7 @@ extension FriendGameState {
         drawOffer = try c.decodeIfPresent(FriendSeat.self, forKey: .drawOffer)
         rematch = try c.decodeIfPresent(Rematch.self, forKey: .rematch)
         result = try c.decodeIfPresent(Result.self, forKey: .result)
-        leaveGraceMs = try c.decodeIfPresent(Double.self, forKey: .leaveGraceMs) ?? 20_000
+        leaveGraceMs = try c.decodeIfPresent(Double.self, forKey: .leaveGraceMs) ?? 60_000
         now = try c.decodeIfPresent(Double.self, forKey: .now) ?? 0
     }
 }
@@ -270,6 +273,7 @@ extension FriendGameState.Player {
         seated = try c.decodeIfPresent(Bool.self, forKey: .seated) ?? false
         online = try c.decodeIfPresent(Bool.self, forKey: .online) ?? false
         away = try c.decodeIfPresent(Double.self, forKey: .away)
+        claimableAt = try c.decodeIfPresent(Double.self, forKey: .claimableAt)
         screenshots = try c.decodeIfPresent(Int.self, forKey: .screenshots) ?? 0
         recordings = try c.decodeIfPresent(Int.self, forKey: .recordings) ?? 0
     }
@@ -432,6 +436,7 @@ enum ChallengeError: Error, Equatable, Sendable {
             case "illegal_move": return "That move isn't allowed here."
             case "rate_limited": return "That was a lot at once. Wait a moment and try again."
             case "server_error": return "Something went wrong on our side. Try again in a moment."
+            case "cannot_claim": return message ?? "Your friend came back, so the game goes on."
             default: return message ?? "Something went wrong. Try again in a moment."
             }
         }
@@ -450,7 +455,7 @@ enum FriendResultWords {
         case .checkmate: return won ? "Checkmate. You win" : "Checkmate. \(opponent) wins"
         case .resign: return won ? "\(opponent) resigned. You win" : "You resigned. \(opponent) wins"
         case .timeout: return won ? "\(opponent) ran out of time. You win" : "You lost on time"
-        case .left: return won ? "\(opponent) left the game. You win" : "You left the game. \(opponent) wins"
+        case .left: return won ? "\(opponent) left the game. You win" : "You were away too long. \(opponent) wins"
         case .stalemate: return "Draw by stalemate"
         case .repetition: return "Draw by repetition"
         case .fiftyMoves: return "Draw by the 50-move rule"
@@ -628,23 +633,26 @@ enum FriendClockMath {
         Duration.milliseconds(max(milliseconds, 0)).clockLabel
     }
 
-    /// Leaving forfeits only a timed game under way once both sides have moved.
+    /// Leaving counts only in a timed game under way once both sides have moved. It never ends the
+    /// game by itself: after the grace period the other side may claim the win, or keep waiting.
     static func leaveRuleApplies(_ state: FriendGameState) -> Bool {
         state.clock != nil && state.status == .active && state.moves.count >= 2
     }
 
-    /// When `seat`'s absence forfeits the game, in server milliseconds; nil when it isn't away or the rule doesn't apply.
+    /// When the other side may claim the win because `seat` left, in server milliseconds; nil when it isn't
+    /// away or the rule doesn't apply. The server says so in `claimableAt`; an older server didn't, so it is worked out.
     /// An absence counts from when it began, but never from before the clocks started. One that began
     /// earlier can only still stand with exactly two moves played (a move ends it), and then the clocks
     /// started at the last move: `clocks.since`.
     static func awayDeadline(_ state: FriendGameState, seat: FriendSeat) -> Double? {
         guard leaveRuleApplies(state), let away = state[seat].away else { return nil }
+        if let claimable = state[seat].claimableAt { return claimable }
         var start = away
         if state.moves.count == 2, let since = state.clocks?.since { start = max(away, since) }
         return start + state.leaveGraceMs
     }
 
-    /// Whole seconds before `seat`'s absence forfeits the game; nil when it isn't away or the rule doesn't apply.
+    /// Whole seconds before the other side may claim the win from `seat`; nil when it isn't away or the rule doesn't apply.
     static func awaySecondsLeft(_ state: FriendGameState, seat: FriendSeat, serverNow: Double) -> Int? {
         guard let deadline = awayDeadline(state, seat: seat) else { return nil }
         let left = (deadline - serverNow) / 1000

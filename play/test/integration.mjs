@@ -333,7 +333,7 @@ try {
     assert.equal(crowd.json.error, "seat_taken");
   });
 
-  await scenario("leaving a timed game forfeits it after the grace period", async () => {
+  await scenario("after the grace period, the one who stayed can claim the win", async () => {
     const game = await newGame({ initial: 60, increment: 0 });
     const white = live(game.code, game.white);
     const black = live(game.code, game.black);
@@ -341,15 +341,31 @@ try {
     assert.equal((await move(game.code, game.white, "e2e4", 0)).status, 200);
     assert.equal((await move(game.code, game.black, "e7e5", 1)).status, 200);
 
-    const left = Date.now();
+    const claim = () => act(game.code, game.black, "claim_win");
     white.close();
     await black.notice("away", "white");
-    const over = await black.state((g) => g.result !== null, "the forfeit", 10000);
-    const waited = Date.now() - left;
-    assert.deepEqual(over.result, { winner: "black", reason: "left" });
-    assert.ok(waited >= GRACE_MS - 200, `forfeited after ${waited} ms, before the ${GRACE_MS} ms grace`);
-    assert.equal(over.white.online, false);
-    assert.equal(over.clocks.running, null);
+    const away = await black.state((g) => g.white.claimableAt !== null, "the claim time");
+    assert.ok(away.white.claimableAt >= away.white.away + GRACE_MS);
+    const early = await claim();
+    assert.equal(early.status, 409, early.text);
+    assert.equal(early.json.error, "cannot_claim");
+
+    // Leaving never ends the game by itself.
+    await pause(GRACE_MS + 800);
+    const still = await api(base, "GET", `/api/games/${game.code}`);
+    assert.equal(still.json.game.result, null);
+    const claimed = await claim();
+    assert.equal(claimed.status, 200, claimed.text);
+    assert.deepEqual(claimed.json.game.result, { winner: "black", reason: "left" });
+    assert.equal(claimed.json.game.white.online, false);
+    assert.equal(claimed.json.game.clocks.running, null);
+  });
+
+  await scenario("reporting a name hides it", async () => {
+    const game = await newGame(null);
+    const reported = await act(game.code, game.white, "report_name");
+    assert.equal(reported.status, 200, reported.text);
+    assert.equal(reported.json.game.black.name, "Player");
   });
 
   await scenario("a flag falls on a 1-second clock", async () => {

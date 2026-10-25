@@ -20,6 +20,7 @@ export const ERROR_STATUS = {
   not_your_turn: 409,
   stale: 409,
   game_over: 409,
+  cannot_claim: 409,
   illegal_move: 422,
   rate_limited: 429,
   server_error: 500,
@@ -85,7 +86,8 @@ const UNWANTED_IN_NAMES = /[\p{Cc}؜ᅟᅠ᠎​‎‏‪-‮⁠-⁤⁦-⁩ㅤ�
 /**
  * A player's name as others will see it: every kind of space or line break
  * becomes one plain space, control and invisible characters are removed,
- * the ends are trimmed and it is cut to 24 characters. Empty becomes "Player".
+ * the ends are trimmed and it is cut to 24 characters. Empty becomes "Player",
+ * and so does a name that is a slur or plainly obscene (see isOffensiveName).
  * Names are stored as typed otherwise; the pages escape them when they show them.
  */
 export function cleanName(input) {
@@ -102,7 +104,51 @@ export function cleanName(input) {
     // joiner or space the cut may have left dangling at the end.
     name = characters.slice(0, NAME_MAX).join("").replace(/[‍\s]+$/u, "");
   }
-  return name || DEFAULT_NAME;
+  if (!name || isOffensiveName(name)) return DEFAULT_NAME;
+  return name;
+}
+
+// The name filter. Short on purpose: it catches slurs and plain obscenity,
+// including the usual disguises (sh1t, f.u.c.k, fuuuck), without flagging
+// real names that happen to contain a bad word (Cassandra, Hancock, Dick).
+// Anything it misses can be reported from the game, which hides the name.
+
+/** Banned anywhere in a name, even joined to other letters. */
+const BANNED_ANYWHERE = [
+  "fuck", "shit", "cunt", "nigger", "nigga", "faggot", "fagot", "retard", "whore", "slut", "bitch",
+  "pussy", "penis", "vagina", "hitler", "tranny", "twat", "jizz", "pornhub", "asshole", "motherf",
+  "bastard", "killyourself", "wetback", "raghead", "towelhead", "dildo", "blowjob", "handjob", "cocksuck",
+  "dickhead", "bollock", "wanker", "kkk", "heilh", "siegheil", "pedophile", "paedophile", "molest",
+];
+/** Banned only as a whole word, because they hide inside ordinary names and words. */
+const BANNED_WORDS = new Set([
+  "ass", "arse", "dicks", "fuk", "porn", "rapist", "pedo", "paedo", "cock", "cocks", "cum", "fag", "fags", "rape", "raped", "nazi", "nazis", "kike",
+  "spic", "chink", "gook", "dyke", "coon", "paki", "homo", "tits", "boobs", "wank", "kys", "negro", "beaner",
+  "anal", "sex", "slag", "prick", "spaz",
+]);
+const LOOKALIKES = { 0: "o", 1: "i", 2: "z", 3: "e", 4: "a", 5: "s", 6: "g", 7: "t", 8: "b", 9: "g", "@": "a", $: "s", "!": "i", "|": "i", "€": "e", "£": "l" };
+
+/** Lower case, accents and look-alike digits undone: "Sh1t" → "shit", "Fück" → "fuck". */
+function plainLetters(text) {
+  return text
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[0-9@$!|€£]/g, (c) => LOOKALIKES[c] ?? c);
+}
+
+/** True when a name is a slur or plainly obscene. */
+export function isOffensiveName(name) {
+  if (typeof name !== "string" || name === "") return false;
+  const plain = plainLetters(name);
+  const words = plain.split(/[^a-z]+/).filter(Boolean);
+  if (words.some((word) => BANNED_WORDS.has(word))) return true;
+  // Letters spaced or dotted apart ("f u c k", "s.h.i.t") and repeated ("fuuuck") still count.
+  const squashed = words.join("");
+  const single = squashed.replace(/(.)\1+/g, "$1");
+  if (BANNED_ANYWHERE.some((bad) => squashed.includes(bad) || single.includes(bad))) return true;
+  // Single letters spaced apart make a word too: "a s s".
+  return words.length > 1 && words.every((word) => word.length === 1) && BANNED_WORDS.has(squashed);
 }
 
 /** Reads a whole number from a setting such as LEAVE_GRACE_MS, kept within min and max. */
@@ -120,7 +166,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  */
 export function readConfig(env = {}) {
   return {
-    leaveGraceMs: intSetting(env.LEAVE_GRACE_MS, 20000, 0, 10 * 60 * 1000),
+    leaveGraceMs: intSetting(env.LEAVE_GRACE_MS, 60000, 0, 10 * 60 * 1000),
     minClockSeconds: intSetting(env.MIN_CLOCK_SECONDS, 60, 1, 3600),
     keepFinishedMs: intSetting(env.KEEP_FINISHED_MS, 30 * DAY_MS, 1000, 365 * DAY_MS),
   };
