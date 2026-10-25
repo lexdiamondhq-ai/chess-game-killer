@@ -401,14 +401,16 @@ struct CoachArrow: View {
 
 extension TrainingBoardView {
     /// How far the tallest piece (a king on the far rank, picked up) rises above a board `side`
-    /// points wide, past its frame. With coordinates the frame is wide enough to hold it; with the
-    /// thin rim a king's cross stands out above the board, and a scroll view would cut it off.
+    /// points wide, past its frame: a king's cross stands out above the board, most with the thin rim, and a
+    /// scroll view right above the board would cut it off.
     static func headroom(theme: BoardTheme, side: CGFloat, coordinates: Bool) -> CGFloat {
         guard theme.spritePieces, side > 0 else { return 0 }
         let inset: CGFloat = theme.frameInset(side: side, coordinates: coordinates)
         let sq: CGFloat = (side - inset * 2) / 8
         let king = theme.imageName(for: Piece(.king, color: .black, square: .e8))
-        let top: CGFloat = -PieceImage.boardRect(of: king, squareSize: sq).minY * PieceImage.liftedScale
+        let frame = SpriteFrame.of(king)
+        // The king's top above its square's center (the picture itself has empty room above it).
+        let top: CGFloat = (frame.reach * frame.boardScale - frame.lift) * sq * PieceImage.liftedScale
         let rise: CGFloat = top - sq / 2
         return max(0, ceil(rise - inset + 2))
     }
