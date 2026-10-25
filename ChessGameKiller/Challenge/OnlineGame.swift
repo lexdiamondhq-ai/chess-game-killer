@@ -211,10 +211,18 @@ final class OnlineGame {
                                           creator: state.creator)
     }
 
-    /// "Rapid · 10+0 · 34 moves".
+    /// "Rapid · 10+0 · 34 moves", and in a rated game first the new rating: "Rating 1220 (+20) · Blitz · 5+0 · 12 moves".
     var resultDetail: String {
-        state.map(FriendResultWords.detail) ?? ""
+        guard let state else { return "" }
+        let detail = FriendResultWords.detail(state)
+        guard let rating = state.ratings?[seat], let after = rating.after, let change = rating.change else { return detail }
+        let sign: String = change >= 0 ? "+" : "−"
+        let magnitude: Int = abs(change)
+        return "Rating \(after) (\(sign)\(magnitude)) · \(detail)"
     }
+
+    /// A game paired online with someone from the lobby, not a friend's link.
+    var isRated: Bool { state?.rated ?? false }
 
     /// The player won, lost (false), or neither (nil): a draw, or a game that never happened.
     var didWin: Bool? {

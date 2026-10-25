@@ -100,6 +100,14 @@ export class GameRoom extends DurableObject {
     return { seat: this.game.creator, game: this.#view() };
   }
 
+  /** Starts a game paired in the online lobby, both players seated. Returns { inUse: true } if the code already has one. */
+  async createPaired({ code, white, black, clock, look, rated }) {
+    if (this.game) return { inUse: true };
+    this.game = rules.createPairedGame({ code, white, black, clock, look, rated, now: Date.now(), leaveGraceMs: this.config.leaveGraceMs });
+    await this.#settle({ changed: true, notices: [] });
+    return { game: this.#view() };
+  }
+
   /** Holds a rematch made by another game's room. Returns { inUse: true } if the code already has a game. */
   async createRematch(record) {
     if (this.game) return { inUse: true };
@@ -336,6 +344,7 @@ export class GameRoom extends DurableObject {
    */
   async #settle(out, visible = false) {
     if (out.changed) await this.ctx.storage.put("game", this.game);
+    if (this.game && rules.needsRatingReport(this.game)) await this.#reportRating();
     await this.#syncAlarm();
     if (out.changed || visible) {
       const message = this.#stateMessage();
@@ -347,6 +356,36 @@ export class GameRoom extends DurableObject {
       for (const ws of this.ctx.getWebSockets()) {
         if (infoOf(ws).seat !== notice.seat) send(ws, message);
       }
+    }
+  }
+
+  /**
+   * Tells the lobby how a rated game ended, once, and notes the new ratings.
+   * Marked as reported before asking, so a second event meanwhile can't count
+   * the game twice (the lobby also ignores a code it has already counted).
+   */
+  async #reportRating() {
+    const game = this.game;
+    game.rated.reported = true;
+    await this.ctx.storage.put("game", game);
+    if (!this.env.LOBBY) return;
+    try {
+      const lobby = this.env.LOBBY.get(this.env.LOBBY.idFromName("lobby"));
+      const after = await lobby.recordResult({
+        code: game.code,
+        white: game.rated.white.player,
+        black: game.rated.black.player,
+        score: rules.whiteScore(game),
+      });
+      if (this.game !== game) return;
+      const out = rules.setRatingsAfter(game, after, Date.now());
+      if (out.changed) {
+        await this.ctx.storage.put("game", game);
+        const message = this.#stateMessage();
+        for (const ws of this.ctx.getWebSockets()) send(ws, message);
+      }
+    } catch (error) {
+      console.error("reporting a rated result failed:", error && error.message);
     }
   }
 

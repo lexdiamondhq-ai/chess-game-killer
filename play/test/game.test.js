@@ -63,6 +63,8 @@ test("a new game seats its creator and waits", () => {
     rematch: null,
     result: null,
     leaveGraceMs: GRACE,
+    rated: false,
+    ratings: null,
     now: T0 + 5,
   });
 });

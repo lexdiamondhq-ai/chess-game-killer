@@ -119,6 +119,64 @@ final class FakeChallengeAPI: ChallengeAPI {
         return live
     }
 
+    // MARK: Play online
+
+    /// Who waits in the lobby.
+    var lobbyList = LobbyList()
+    /// The reply to a seek; a waiting seek by default.
+    var seekReply: LobbyReply?
+    /// The replies to check-ins, one each, then "still waiting".
+    var checkReplies: [LobbyReply] = []
+    /// The reply to taking a player on, by their seek's id.
+    var playReplies: [String: LobbyReply] = [:]
+    var onlineRating = OnlineRating(rating: 1200, games: 0, provisional: true)
+    /// The reply to a cancel; "cancelled" by default.
+    var cancelReply: LobbyReply?
+
+    private(set) var seeks: [(name: String, clock: FriendClock, player: String)] = []
+    private(set) var checks: [String] = []
+    private(set) var cancels: [String] = []
+    private(set) var plays: [(id: String, name: String, player: String)] = []
+
+    func lobby() async throws -> LobbyList {
+        if let failure { throw failure }
+        return lobbyList
+    }
+
+    func rating(player: String) async throws -> OnlineRating {
+        if let failure { throw failure }
+        return onlineRating
+    }
+
+    func seek(name: String, clock: FriendClock, player: String) async throws -> LobbyReply {
+        seeks.append((name, clock, player))
+        if let failure { throw failure }
+        if let seekReply { return seekReply }
+        return LobbyReply(seek: LobbyPlayer(id: "a1b2c3d4e5f6", name: name, rating: 1200, provisional: true, clock: clock),
+                          token: String(repeating: "5", count: 32), you: onlineRating)
+    }
+
+    func checkSeek(_ id: String, token: String) async throws -> LobbyReply {
+        checks.append(id)
+        if let failure { throw failure }
+        if !checkReplies.isEmpty { return checkReplies.removeFirst() }
+        return LobbyReply(waiting: lobbyList.waiting + 1)
+    }
+
+    func cancelSeek(_ id: String, token: String) async throws -> LobbyReply {
+        cancels.append(id)
+        if let failure { throw failure }
+        return cancelReply ?? LobbyReply(cancelled: true)
+    }
+
+    func play(_ id: String, name: String, player: String) async throws -> LobbyReply {
+        plays.append((id, name, player))
+        if let failure { throw failure }
+        guard let reply = playReplies[id] else { throw Self.notFound }
+        if let game = reply.match?.game { games[game.code] = game }
+        return reply
+    }
+
     /// The actions asked for, in order, without presence and fair-play reports.
     var playerActions: [ChallengeAction] {
         let reports: Set<ChallengeAction> = [.away, .back, .screenshot, .recording]

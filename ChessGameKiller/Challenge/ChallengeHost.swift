@@ -83,6 +83,8 @@ struct ChallengeScreens: View {
             ChallengeJoinView(invite: invite, theme: theme)
         case .game(let game)?:
             ChallengeGameView(game: game, theme: theme)
+        case .online(let lobby)?:
+            OnlineLobbyView(lobby: lobby, theme: theme)
         case nil:
             Color.clear
         }

@@ -1,3 +1,4 @@
+import ChessKit
 import SwiftUI
 
 /// Right under the clock card: Challenge a friend, as a sealed move. In a game adjourned over
@@ -150,5 +151,101 @@ struct HomeEnvelopeFold: Shape {
         path.addLine(to: meet)
         path.addLine(to: CGPoint(x: rect.maxX - inset, y: rect.maxY - inset))
         return path
+    }
+}
+
+/// Under Challenge a friend: Play online, for a game with someone waiting right now. Two kings
+/// face each other across a hairline, with a live dot between them; the line says how many
+/// players are waiting when the lobby has answered. The whole card is the button.
+struct HomeOnlineCard: View {
+    let tone: HomeTone
+    let pieceTheme: BoardTheme
+    /// Players waiting in the lobby, nil until known.
+    let waiting: Int?
+    let action: () -> Void
+
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: HomeMetrics.cardRadius, style: .continuous)
+        Button(action: action) {
+            HStack(spacing: 16) {
+                if !typeSize.isAccessibilitySize {
+                    HomeFacingKings(tone: tone, pieceTheme: pieceTheme)
+                        .frame(width: 58, height: 44)
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Play online")
+                        .font(HomeType.title)
+                        .foregroundStyle(tone.ink)
+                    Text(line)
+                        .font(.subheadline)
+                        .foregroundStyle(tone.ink2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .contentTransition(.numericText())
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "chevron.forward")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(tone.ink3)
+            }
+            .padding(.horizontal, HomeMetrics.inset + 4)
+            .padding(.vertical, 16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .homePane(shape, tone: tone)
+            .contentShape(shape)
+        }
+        .buttonStyle(HomePressStyle())
+        .animation(.snappy(duration: 0.3), value: waiting)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Play online")
+        .accessibilityValue(line)
+        .accessibilityHint("Rated games with players waiting now. Take one on, or find a game.")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityInputLabels(["Play online", "Online", "Find a game"])
+    }
+
+    private var line: String {
+        switch waiting {
+        case let count? where count == 1: return "1 player waiting now. Take them on."
+        case let count? where count > 1: return "\(count) players waiting now. Take one on."
+        default: return "Rated games with players online now."
+        }
+    }
+}
+
+/// A white king and a black king facing each other across a hairline, a live dot on the line.
+struct HomeFacingKings: View {
+    let tone: HomeTone
+    let pieceTheme: BoardTheme
+
+    @State private var breathe = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        ZStack {
+            Rectangle()
+                .fill(tone.ink.opacity(0.22))
+                .frame(width: 0.75, height: 30)
+            PieceImage(piece: Piece(.king, color: .white, square: .e1), theme: pieceTheme, size: 30)
+                .offset(x: -14)
+            PieceImage(piece: Piece(.king, color: .black, square: .e8), theme: pieceTheme, size: 30)
+                .offset(x: 14)
+            Circle()
+                .fill(tone.metal)
+                .frame(width: 6, height: 6)
+                .background {
+                    Circle()
+                        .fill(tone.metal.opacity(0.4))
+                        .scaleEffect(breathe ? 2.6 : 1)
+                        .opacity(breathe ? 0 : 1)
+                }
+                .offset(y: 19)
+        }
+        .accessibilityHidden(true)
+        .onAppear {
+            guard !reduceMotion else { return }
+            withAnimation(.easeOut(duration: 1.8).repeatForever(autoreverses: false)) { breathe = true }
+        }
     }
 }

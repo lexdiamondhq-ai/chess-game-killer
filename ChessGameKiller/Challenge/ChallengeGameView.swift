@@ -669,10 +669,18 @@ struct FriendPlate: View {
         HStack(spacing: 12) {
             avatar
             VStack(alignment: .leading, spacing: 3) {
-                Text(name)
-                    .font(theme.challengeFont(16, .semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(name)
+                        .font(theme.challengeFont(16, .semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    if let rating {
+                        Text(rating)
+                            .font(theme.challengeFont(13, .medium).monospacedDigit())
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel("rated \(rating)")
+                    }
+                }
                 status
             }
             Spacer(minLength: 8)
@@ -696,6 +704,11 @@ struct FriendPlate: View {
             ChallengeAvatar(name: game.opponentName, theme: theme, size: 38,
                             online: game.phase == .playing ? game.isOnline(seat) : nil)
         }
+    }
+
+    /// The rating in a game paired online: "1250", or "1200?" while it is still settling.
+    private var rating: String? {
+        game.state?.ratings?[seat].label
     }
 
     private var name: String {

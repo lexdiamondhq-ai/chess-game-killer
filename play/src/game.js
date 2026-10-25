@@ -175,6 +175,51 @@ export function createGame({ code, name, side = "random", clock = null, look = n
 }
 
 /**
+ * A game paired in the online lobby (lobby.js): both players seated from the
+ * start, so it is active at once. `rated` holds each side's player (by the
+ * hash of their key) and rating as the game began; the room reports the result
+ * to the lobby, which keeps the ratings. White counts as the creator.
+ */
+export function createPairedGame({ code, white, black, clock, look = null, rated, now, leaveGraceMs = DEFAULT_LEAVE_GRACE_MS }) {
+  const game = createGame({ code, name: white.name, side: "white", clock, look, tokenHash: white.tokenHash, now, leaveGraceMs });
+  game.black = newSeat(black.name, black.tokenHash);
+  game.joinedAt = now;
+  game.lastMoveAt = now;
+  game.rated = {
+    white: { player: rated.white.player, rating: rated.white.rating, games: rated.white.games },
+    black: { player: rated.black.player, rating: rated.black.rating, games: rated.black.games },
+    reported: false,
+    after: null,
+  };
+  return game;
+}
+
+/** True once a rated game has ended in a way that counts and the lobby hasn't been told yet. */
+export function needsRatingReport(game) {
+  return Boolean(game.rated && game.result && !game.rated.reported && !["aborted", "cancelled", "expired"].includes(game.result.reason));
+}
+
+/** White's score for the lobby's ratings: 1, 0.5 or 0. */
+export function whiteScore(game) {
+  if (!game.result) return null;
+  if (game.result.winner === "white") return 1;
+  if (game.result.winner === "black") return 0;
+  return 0.5;
+}
+
+/** Notes the ratings after the game, as the lobby worked them out: { white: { rating, games }, black: {...} }. */
+export function setRatingsAfter(game, after, now) {
+  const out = blank();
+  if (!game.rated || !after || !after.white || !after.black) return out;
+  game.rated.after = {
+    white: { rating: after.white.rating, games: after.white.games },
+    black: { rating: after.black.rating, games: after.black.games },
+  };
+  touch(game, out, now);
+  return out;
+}
+
+/**
  * The record for a rematch: the same players and clock with the colors
  * swapped, both already seated, and each player's token (by its hash) now
  * holding their new seat. The original creator stays the creator.
@@ -194,6 +239,11 @@ export function rematchRecord(game, code, now, leaveGraceMs = game.leaveGraceMs)
   next.creator = other(game.creator);
   next.joinedAt = now;
   next.lastMoveAt = now;
+  if (game.rated) {
+    // A rematch of a rated game is rated too, from each player's newest rating.
+    const latest = (seat) => ({ player: game.rated[seat].player, ...(game.rated.after ? game.rated.after[seat] : { rating: game.rated[seat].rating, games: game.rated[seat].games }) });
+    next.rated = { white: latest("black"), black: latest("white"), reported: false, after: null };
+  }
   return next;
 }
 
@@ -698,6 +748,20 @@ export function view(game, now, connected = {}) {
     rematch: game.rematch ? { by: game.rematch.by, code: game.rematch.code } : null,
     result: game.result ? { winner: game.result.winner, reason: game.result.reason } : null,
     leaveGraceMs: game.leaveGraceMs,
+    rated: Boolean(game.rated),
+    ratings: game.rated ? { white: ratingView(game.rated, "white"), black: ratingView(game.rated, "black") } : null,
     now,
+  };
+}
+
+/** One side's rating in a rated game: as it began, and once the lobby has it, after (with the change). Never the player's key. */
+function ratingView(rated, seat) {
+  const before = rated[seat];
+  const after = rated.after ? rated.after[seat] : null;
+  return {
+    rating: before.rating,
+    provisional: before.games < 10,
+    after: after ? after.rating : null,
+    change: after ? after.rating - before.rating : null,
   };
 }
