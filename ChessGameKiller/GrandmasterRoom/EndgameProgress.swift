@@ -58,16 +58,13 @@ final class EndgameProgress {
 
     /// The player's progress, kept in Application Support.
     static func live(studies: [EndgameStudy] = GrandmasterContent.shared.endgames) -> EndgameProgress {
-        let url = try? FileManager.default
-            .url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-            .appendingPathComponent("endgame-progress.json")
-        return load(from: url, studies: studies)
+        load(from: ProgressFile.url("endgame-progress.json"), studies: studies)
     }
 
-    /// Progress saved at `url`, or none yet when there's no file. It is saved back there.
+    /// Progress saved at `url`, or none yet when there's no file (or one that can't be read, which
+    /// is set aside). It is saved back there.
     static func load(from url: URL?, studies: [EndgameStudy]) -> EndgameProgress {
-        let saved = url.flatMap { try? Data(contentsOf: $0) }
-            .flatMap { try? JSONDecoder().decode(Saved.self, from: $0) }
+        let saved = ProgressFile.read(Saved.self, at: url)
         return EndgameProgress(studies: studies, records: saved?.records ?? [:], fileURL: url)
     }
 

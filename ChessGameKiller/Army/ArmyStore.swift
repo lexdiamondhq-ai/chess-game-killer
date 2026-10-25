@@ -389,15 +389,11 @@ final class ArmyStore {
         self.fileURL = fileURL
     }
 
+    /// The player's army, saved on this device. A file that can't be read is set aside, never
+    /// written over (see `ProgressFile`).
     static func live() -> ArmyStore {
-        let url = try? FileManager.default
-            .url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-            .appendingPathComponent("army.json")
-        var army = Army()
-        if let url, let data = try? Data(contentsOf: url), let saved = try? JSONDecoder().decode(Army.self, from: data) {
-            army = saved
-        }
-        return ArmyStore(army: army, fileURL: url)
+        let url = ProgressFile.url("army.json")
+        return ArmyStore(army: ProgressFile.read(Army.self, at: url) ?? Army(), fileURL: url)
     }
 
     // MARK: Reading

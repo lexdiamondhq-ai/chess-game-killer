@@ -34,10 +34,8 @@ final class GameVault {
         if let saved = try? JSONDecoder().decode([Lossy<SavedGame>].self, from: data) {
             return saved.compactMap(\.value)
         }
-        let aside = url.deletingPathExtension().appendingPathExtension("unreadable.json")
-        try? FileManager.default.removeItem(at: aside)
-        try? FileManager.default.moveItem(at: url, to: aside)
-        NSLog("The saved games couldn't be read; the file was moved aside")
+        ProgressFile.setAside(url)
+        NSLog("The saved games couldn't be read; the file was set aside")
         return []
     }
 

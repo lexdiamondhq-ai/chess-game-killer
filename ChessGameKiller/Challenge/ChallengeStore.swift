@@ -137,16 +137,14 @@ final class ChallengeStore {
     }
 
     static func live() -> ChallengeStore {
-        let url = try? FileManager.default
-            .url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-            .appendingPathComponent("friend-games.json")
+        let url = ProgressFile.url("friend-games.json")
         return ChallengeStore(games: url.map { load(from: $0) } ?? [], fileURL: url)
     }
 
+    /// The games saved at `url`. A game that can't be read any more is skipped; a file that can't
+    /// be read at all is set aside rather than written over.
     static func load(from url: URL) -> [FriendGame] {
-        guard let data = try? Data(contentsOf: url),
-              let games = try? JSONDecoder().decode([FriendGame].self, from: data) else { return [] }
-        return games
+        ProgressFile.read([Lossy<FriendGame>].self, at: url)?.compactMap(\.value) ?? []
     }
 
     /// Your move first, then their move, open challenges, and finished games, newest first within each.

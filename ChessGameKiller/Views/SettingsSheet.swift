@@ -20,6 +20,8 @@ struct SettingsSheet: View {
     @AppStorage(HomeScreen.key) private var homeScreen = HomeScreen.defaultOn
     /// Shared with the lessons' speaker button and the highlight reel.
     @AppStorage("coachVoiceMuted") private var voiceMuted = false
+    /// Out loud with the ring switch on silent. Read by CoachVoice when a lesson, reel or Leo's reply starts.
+    @AppStorage(CoachVoice.speaksOnSilentKey) private var speaksOnSilent = false
     /// "Nice move", "Try again" and the like in puzzles and drills. Read by CoachReactions.
     @AppStorage(CoachReactions.storageKey) private var reactionsOn = true
     @AppStorage(ReviewLevel.storageKey) private var reviewLevel = ReviewLevel.club.rawValue
@@ -108,6 +110,10 @@ struct SettingsSheet: View {
                             rule
                             ToggleRow(title: "Coach's voice", subtitle: "\(Coach.current.name) reads lessons and highlight reels aloud. Captions always show.",
                                       symbol: "waveform", isOn: Binding(get: { !voiceMuted }, set: { voiceMuted = !$0 }), theme: theme)
+                            rule
+                            ToggleRow(title: "Speak on silent", subtitle: "Lessons, reels and Talk It Through play out loud even with the ring switch on silent. Off, the coach goes quiet with it, like the game's sounds.",
+                                      symbol: "bell.slash.fill", isOn: $speaksOnSilent, theme: theme)
+                                .disabled(voiceMuted)
                             rule
                             ToggleRow(title: "Voice reactions", subtitle: reactionsSubtitle,
                                       symbol: "bubble.left.and.text.bubble.right.fill", isOn: $reactionsOn, theme: theme)

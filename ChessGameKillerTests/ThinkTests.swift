@@ -604,7 +604,7 @@ actor ThinkSlowEngine: ChessEngine {
         return []
     }
 
-    func chooseMove(fen: String, skill: Int, thinkTimeMs: Int) async -> String? { nil }
+    func chooseMove(fen: String, skill: Int, depth: Int?, thinkTimeMs: Int) async -> String? { nil }
 }
 
 /// The thinking drills' screens at iPhone size in their main states, on the

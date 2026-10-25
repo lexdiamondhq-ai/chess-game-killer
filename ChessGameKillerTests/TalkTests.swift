@@ -251,7 +251,7 @@ private actor TalkTestEngine: ChessEngine {
         return moves.prefix(lines).map { EngineLine(moves: [$0], evaluation: .centipawns(0)) }
     }
 
-    func chooseMove(fen: String, skill: Int, thinkTimeMs: Int) async -> String? {
+    func chooseMove(fen: String, skill: Int, depth: Int?, thinkTimeMs: Int) async -> String? {
         nil
     }
 }
