@@ -120,6 +120,7 @@ struct PuzzleCyclesView: View {
                                       arrows: runner.arrows, marks: runner.marks, labels: runner.labels,
                                       onTap: runner.acceptsTaps ? { (square: Square) in runner.tap(square) } : nil)
                         .frame(width: side, height: side)
+                        .boardHeadroom(theme: theme, side: side)
                     TurnBadge(theme: theme, side: runner.learner, showing: runner.phase == .solving)
                         .padding(.top, -8)
                     RoomMessage(text: runner.message, tone: runner.tone, theme: theme)

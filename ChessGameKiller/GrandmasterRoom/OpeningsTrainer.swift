@@ -399,6 +399,7 @@ struct OpeningLineView: View {
                     TrainingBoardView(game: runner.board, theme: theme, flipped: side == .black, arrows: runner.arrows,
                                       onTap: { (square: Square) in runner.tap(square) })
                         .frame(width: boardSide, height: boardSide)
+                        .boardHeadroom(theme: theme, side: boardSide)
                     RoomMessage(text: runner.message, tone: runner.tone, theme: theme)
                         .padding(.horizontal, 16)
                 }
@@ -514,6 +515,7 @@ private struct RepertoireReview: View {
                     TrainingBoardView(game: runner.board, theme: theme, flipped: runner.side == .black, arrows: runner.arrows,
                                       onTap: { (square: Square) in runner.tap(square) })
                         .frame(width: side, height: side)
+                        .boardHeadroom(theme: theme, side: side)
                     RoomMessage(text: runner.message, tone: runner.tone, theme: theme)
                         .padding(.horizontal, 16)
                     if runner.isDone {

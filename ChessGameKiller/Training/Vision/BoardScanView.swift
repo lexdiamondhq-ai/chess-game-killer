@@ -214,6 +214,7 @@ struct BoardScanView: View {
             onTap: runner.phase == .scanning ? { (square: Square) in runner.tap(square) } : nil
         )
         .frame(width: side, height: side)
+        .boardHeadroom(theme: theme, side: side)
         .overlay {
             ScanMarks(theme: theme, flipped: flipped, found: attempt.found, slips: attempt.slips,
                       missed: runner.phase == .revealed ? attempt.missed.map(\.square) : [])

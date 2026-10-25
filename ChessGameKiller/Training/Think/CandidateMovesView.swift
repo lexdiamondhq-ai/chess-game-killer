@@ -175,6 +175,7 @@ private struct CandidatePositionView: View {
             onTap: runner.phase == .listing ? { (square: Square) in runner.tap(square) } : nil
         )
         .frame(width: boardSide, height: boardSide)
+        .boardHeadroom(theme: theme, side: boardSide)
     }
 
     /// "White to move" in the player's color, under the board while the list is made.
