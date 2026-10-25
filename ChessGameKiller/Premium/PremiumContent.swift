@@ -16,7 +16,7 @@ extension TrainingLibrary {
 
 extension BoardTheme {
     /// The looks every player has. Each rival's board opens once that rival is beaten.
-    static let freeLooks: Set<BoardTheme.ID> = [.gilded, .noir, .midnight]
+    static let freeLooks: Set<BoardTheme.ID> = [.gilded, .classic, .noir, .midnight]
 }
 
 /// Which rivals' boards the player has earned by beating them, remembered on this device

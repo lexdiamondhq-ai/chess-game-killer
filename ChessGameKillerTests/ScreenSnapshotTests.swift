@@ -140,8 +140,9 @@ final class ScreenSnapshotTests: XCTestCase {
         XCTAssertTrue(match.isOver)
     }
 
-    /// Hints on and the king tapped, on the whole game screen: brackets on the pieces the
-    /// coach would move, dots where the king can go, and a halo on castling, its best move.
+    /// Hints on and the king tapped, on the whole game screen: castling, the best move, in the
+    /// spotlight (the rest of the board dimmed), dots where the king can go, and the move in
+    /// words on your line. The runner-up is only in the coach panel.
     func testHintsOnTheGameScreen() throws {
         defaults.set(false, forKey: "matchRival")
         defaults.set(true, forKey: "showBestMoves")
@@ -161,6 +162,36 @@ final class ScreenSnapshotTests: XCTestCase {
             XCTAssertEqual(match.game.selected, .e1)
             try snapshot("hints-\(id)\(threeD ? "-3d" : "-flat")", match: match, wait: 2.5)
             XCTAssertEqual(match.hints.map(\.uci), ["e1g1", "c1g5"])
+            XCTAssertEqual(match.bestHint?.uci, "e1g1")
+        }
+    }
+
+    /// Alex's game from 2026-10-24: his knight can take the queen. The spotlight lights the
+    /// knight and the queen's square, and his line reads "Hint · Knight takes the queen".
+    /// Before and after tapping the knight, on the 3D board and flat.
+    func testSpotlightKnightTakesQueen() throws {
+        defaults.set(false, forKey: "matchRival")
+        defaults.set(true, forKey: "showBestMoves")
+        let fen = "2kr3r/ppp2pbp/5np1/nP1N4/2PNQ1P1/P3P2P/1BR2P2/4K2R b K - 0 20"
+        let shots: [(id: String, threeD: Bool, tapped: Bool)] = [
+            ("gilded", true, false), ("gilded", true, true), ("gilded", false, false), ("midnight", false, true),
+        ]
+        for shot in shots {
+            defaults.set(shot.id, forKey: "boardTheme")
+            defaults.set(shot.threeD, forKey: "sculpted3D")
+            let engine = FakeEngine(scripted: [fen: [
+                EngineLine(moves: ["f6e4"], evaluation: .centipawns(600)),
+                EngineLine(moves: ["c8b8"], evaluation: .centipawns(-300)),
+            ]])
+            let match = MatchController(engine: engine, sounds: nil)
+            let position = try XCTUnwrap(Position(fen: fen))
+            match.start(MatchController.Setup(opponent: .computer, playerColor: .black, level: .beginner), from: position)
+            if shot.tapped { match.tap(.f6) }
+            let name = "spotlight-\(shot.id)\(shot.threeD ? "-3d" : "-flat")\(shot.tapped ? "-tapped" : "")"
+            try snapshot(name, match: match, wait: 2.5)
+            let best = try XCTUnwrap(match.bestHint)
+            XCTAssertEqual(best.uci, "f6e4")
+            XCTAssertEqual(HintWords.phrase(for: best, in: match.game), "Knight takes the queen")
         }
     }
 

@@ -12,6 +12,25 @@ actor FakeEngine: ChessEngine {
     /// An engine that never answers anything.
     private let silent: Bool
     private(set) var moveRequests = 0
+    /// The strength asked for with each move request, in order.
+    private(set) var moveSearches: [MoveSearch] = []
+    /// Every analysis asked for, in order: what the coach's searches cost.
+    private(set) var searches: [Search] = []
+
+    /// One request for the rival's move.
+    struct MoveSearch: Equatable {
+        let skill: Int
+        let depth: Int?
+        let thinkTimeMs: Int
+    }
+
+    /// One analysis.
+    struct Search: Equatable {
+        let fen: String
+        let depth: Int
+        let lines: Int
+        let maxTimeMs: Int?
+    }
 
     /// The score given to unscripted positions, for the side to move.
     private let score: Int
@@ -25,13 +44,15 @@ actor FakeEngine: ChessEngine {
 
     func analyze(fen: String, depth: Int, lines: Int, maxTimeMs: Int?) async -> [EngineLine] {
         analyzed.append(fen)
+        searches.append(Search(fen: fen, depth: depth, lines: lines, maxTimeMs: maxTimeMs))
         if silent { return [] }
         if let lines = scripted[fen] { return lines }
         return Self.legalMoves(fen: fen).prefix(lines).map { EngineLine(moves: [$0], evaluation: .centipawns(score)) }
     }
 
-    func chooseMove(fen: String, skill: Int, thinkTimeMs: Int) async -> String? {
+    func chooseMove(fen: String, skill: Int, depth: Int?, thinkTimeMs: Int) async -> String? {
         moveRequests += 1
+        moveSearches.append(MoveSearch(skill: skill, depth: depth, thinkTimeMs: thinkTimeMs))
         if silent { return nil }
         if missedMoves > 0 {
             missedMoves -= 1
@@ -468,17 +489,69 @@ final class MatchControllerTests: XCTestCase {
         XCTAssertNil(match.clock?.running)
     }
 
-    func testSparkSometimesPlaysAnyLegalMove() async {
+    /// Every rival plays the move its own search found. Its level is in that search (how deep
+    /// it looks, how noisy its choice is) and never in a random move laid over the engine's:
+    /// Spark once played any legal move 30% of the time, which made it a strong engine that
+    /// threw pieces away by turns, not a beginner.
+    func testEveryRivalPlaysTheEnginesMoveAtItsOwnStrength() async {
         let start = GameModel().fen
-        let engine = FakeEngine(scripted: [start: [EngineLine(moves: ["e2e4"], evaluation: .centipawns(30))]])
+        for level in MatchController.Level.allCases {
+            let engine = FakeEngine(scripted: [start: [EngineLine(moves: ["e2e4"], evaluation: .centipawns(30))]])
+            let match = MatchController(engine: engine, sounds: nil)
+            match.start(.init(opponent: .computer, playerColor: .black, level: level))
+            await waitUntil("\(level) opens") { match.game.plyCount == 1 }
+            XCTAssertEqual(match.game.moves, ["e4"], "\(level)")
+            XCTAssertFalse(match.engineFailed, "\(level)")
+            let searches = await engine.moveSearches
+            XCTAssertEqual(searches, [FakeEngine.MoveSearch(skill: level.skill, depth: level.depth, thinkTimeMs: level.thinkTimeMs)],
+                           "\(level) asks for its own strength")
+        }
+    }
+
+    /// The rivals climb like Lichess's levels: noisier and quicker at the bottom, a few moves
+    /// deep until Singularity, which is the whole engine.
+    func testRivalsGetStrongerInOrder() {
+        let levels = MatchController.Level.allCases
+        for (weaker, stronger) in zip(levels, levels.dropFirst()) {
+            XCTAssertLessThan(weaker.skill, stronger.skill, "\(stronger) picks its moves with less noise than \(weaker)")
+            XCTAssertLessThan(weaker.thinkTimeMs, stronger.thinkTimeMs, "\(stronger) takes longer than \(weaker)")
+        }
+        XCTAssertEqual(MatchController.Level.beginner.skill, 3, "Spark is Lichess level 1")
+        XCTAssertEqual(MatchController.Level.grandmaster.skill, 20)
+        for level in levels where level != .grandmaster {
+            XCTAssertEqual(level.depth, 5, "\(level) looks a few moves ahead and no further")
+        }
+        XCTAssertNil(MatchController.Level.grandmaster.depth, "Singularity searches as deep as its time allows")
+    }
+
+    /// On a hot phone, or in Low Power Mode, the coach asks the engine for less: a shallower,
+    /// shorter look-ahead on the person's turn and a lighter grading of their move.
+    func testTheBudgetSetsHowHardTheCoachSearches() async {
+        let engine = FakeEngine()
         let match = MatchController(engine: engine, sounds: nil)
-        // Always slip, and take the first legal move in notation order.
-        match.chance = { 0 }
-        match.start(.init(opponent: .computer, playerColor: .black, level: .beginner))
-        await waitUntil("the computer opens") { match.game.plyCount == 1 }
-        XCTAssertEqual(match.game.moves, ["a3"])
-        XCTAssertEqual(match.game.sideToMove, .black)
-        XCTAssertFalse(match.engineFailed)
+        match.budget = { .light }
+        match.startTapping()
+        await waitUntil("hints appear") { match.hints.count == 2 }
+        tapMove(match, "e2e4")
+        await waitUntil("the move is reviewed") { match.review != nil }
+        let searches = await engine.searches
+        let light = EngineBudget.light
+        XCTAssertEqual(searches.first, FakeEngine.Search(fen: GameModel().fen, depth: light.lookaheadDepth, lines: 2, maxTimeMs: light.lookaheadMs))
+        XCTAssertTrue(searches.contains { $0.depth == light.gradeDepth && $0.maxTimeMs == light.gradeAfterMs },
+                      "The move is graded within the light budget: \(searches)")
+        XCTAssertFalse(searches.contains { $0.depth > max(light.lookaheadDepth, light.gradeDepth) },
+                       "Nothing searches deeper than the budget: \(searches)")
+    }
+
+    /// With nothing holding the phone back, the coach has its full budget.
+    func testTheFullBudgetIsTheDefault() async {
+        let engine = FakeEngine()
+        let match = MatchController(engine: engine, sounds: nil)
+        match.startTapping()
+        await waitUntil("hints appear") { match.hints.count == 2 }
+        let searches = await engine.searches
+        XCTAssertEqual(searches.first, FakeEngine.Search(fen: GameModel().fen, depth: EngineBudget.full.lookaheadDepth, lines: 2,
+                                                        maxTimeMs: EngineBudget.full.lookaheadMs))
     }
 
     /// Alex played Spark with Spark as white and nothing moved: the engine's first
@@ -586,16 +659,6 @@ final class MatchControllerTests: XCTestCase {
         XCTAssertNotEqual(match.rivalLine, hello)
         tapMove(match, "e4d5")
         XCTAssertEqual(match.rivalLine?.text.contains("queen"), true, "\(match.rivalLine?.text ?? "nothing")")
-    }
-
-    func testStrongerRivalsAlwaysPlayTheEnginesMove() async {
-        let start = GameModel().fen
-        let engine = FakeEngine(scripted: [start: [EngineLine(moves: ["e2e4"], evaluation: .centipawns(30))]])
-        let match = MatchController(engine: engine, sounds: nil)
-        match.chance = { 0 }
-        match.start(.init(opponent: .computer, playerColor: .black, level: .club))
-        await waitUntil("the computer opens") { match.game.plyCount == 1 }
-        XCTAssertEqual(match.game.moves, ["e4"])
     }
 
     /// Two moves made before the coach could grade the first: both are graded, only the newest is shown.

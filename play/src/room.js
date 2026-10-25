@@ -14,7 +14,7 @@
 //   may put the object to sleep and still keep the sockets open, and the
 //   text "ping" is answered with "pong" without waking it.
 // - One alarm wakes the object for the next thing that can happen on its own:
-//   a flag falling, an absent player's grace running out, the game expiring,
+//   a flag falling, the game expiring,
 //   or a finished game being deleted.
 //
 // About waiting: while this code awaits storage, Cloudflare delivers no other
@@ -92,10 +92,10 @@ export class GameRoom extends DurableObject {
   // Calls from the router
 
   /** Starts a new game under this code. Returns { inUse: true } if the code already has one. */
-  async create({ code, name, side, clock, tokenHash }) {
+  async create({ code, name, side, clock, look, tokenHash }) {
     if (this.game) return { inUse: true };
     const now = Date.now();
-    this.game = rules.createGame({ code, name, side, clock, tokenHash, now, leaveGraceMs: this.config.leaveGraceMs });
+    this.game = rules.createGame({ code, name, side, clock, look, tokenHash, now, leaveGraceMs: this.config.leaveGraceMs });
     await this.#settle({ changed: true, notices: [] });
     return { seat: this.game.creator, game: this.#view() };
   }
@@ -151,6 +151,8 @@ export class GameRoom extends DurableObject {
     const out = rules.act(this.game, seat, type, Date.now());
     await this.#settle(out);
     if (!out.ok) return refuse(out.error, out.message, this.#view());
+    // Reports go to the worker's logs (Workers Logs in the Cloudflare dashboard): search "player_report".
+    if (out.report) console.log(JSON.stringify({ event: "player_report", ...out.report }));
     if (out.rematchReady) {
       try {
         await this.#makeRematch();

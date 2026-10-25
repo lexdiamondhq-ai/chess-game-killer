@@ -1,6 +1,6 @@
 // The rules of a friend game, with nothing Cloudflare-specific in them:
 // creating and joining a game, moves, clocks, draw offers, presence and the
-// leave rule, results, expiry and rematches.
+// leave rule (claiming a win from someone who left), reports, results, expiry and rematches.
 //
 // A game is a plain object, the "record", which the game room (room.js)
 // saves as it is. The functions here change the record in place and report
@@ -16,7 +16,7 @@
 // The record also holds the hashes of the seat tokens; view() leaves them out.
 
 import { Chess, DEFAULT_POSITION } from "../public/vendor/chess.js";
-import { cleanName } from "./util.js";
+import { cleanName, DEFAULT_NAME } from "./util.js";
 
 export const SEATS = ["white", "black"];
 export const SIDES = ["white", "black", "random"];
@@ -32,7 +32,15 @@ export const ACTIONS = [
   "back",
   "screenshot",
   "recording",
+  "claim_win",
+  "report_name",
+  "report_cheating",
 ];
+
+/** How long a player in a timed game may be away before the other side may claim the win. */
+export const DEFAULT_LEAVE_GRACE_MS = 60000;
+/** The reports a player can make about the other side, by action type. */
+export const REPORTS = { report_name: "name", report_cheating: "cheating" };
 
 const DAY = 24 * 60 * 60 * 1000;
 /** A game nobody joins expires after 7 days. */
@@ -108,7 +116,16 @@ export function parseCreateInput(body, { minClockSeconds = 60 } = {}) {
   if (!SIDES.includes(side)) return invalid('"side" must be "white", "black" or "random".');
   const clock = parseClock(input.clock, minClockSeconds);
   if (!clock.ok) return clock;
-  return { ok: true, value: { name: cleanName(name), side, clock: clock.clock } };
+  return { ok: true, value: { name: cleanName(name), side, clock: clock.clock, look: cleanLook(input.look) } };
+}
+
+/**
+ * The creator's board look in the app ("gilded", "classic", ...), shown to the friend in the
+ * browser. Only a short lowercase word is kept; anything else (or an older app sending none)
+ * is null, and the browser shows the app's default look.
+ */
+export function cleanLook(value) {
+  return typeof value === "string" && /^[a-z]{2,20}$/.test(value) ? value : null;
 }
 
 function randomSide() {
@@ -123,7 +140,7 @@ function newSeat(name, tokenHash) {
  * A new game with its creator seated. A "random" side is settled here, once,
  * so the creator knows their color from the start. pickSide is for tests.
  */
-export function createGame({ code, name, side = "random", clock = null, tokenHash, now, leaveGraceMs = 20000, pickSide = randomSide }) {
+export function createGame({ code, name, side = "random", clock = null, look = null, tokenHash, now, leaveGraceMs = DEFAULT_LEAVE_GRACE_MS, pickSide = randomSide }) {
   const seat = side === "white" || side === "black" ? side : pickSide();
   const game = {
     v: 1,
@@ -132,6 +149,7 @@ export function createGame({ code, name, side = "random", clock = null, tokenHas
     updatedAt: now,
     clock: clock ? { initial: clock.initial, increment: clock.increment } : null,
     creator: seat,
+    look: cleanLook(look),
     leaveGraceMs,
     white: null,
     black: null,
@@ -167,6 +185,7 @@ export function rematchRecord(game, code, now, leaveGraceMs = game.leaveGraceMs)
     name: game.black.name,
     side: "white",
     clock: game.clock,
+    look: game.look,
     tokenHash: game.black.tokenHash,
     now,
     leaveGraceMs,
@@ -193,7 +212,7 @@ function blank() {
   return { ok: true, changed: false, notices: [] };
 }
 
-/** Starts an outcome, first applying anything that has happened by `now` (a flag fall, a forfeit, expiry). */
+/** Starts an outcome, first applying anything that has happened by `now` (a flag fall or expiry). */
 function begin(game, now) {
   const out = blank();
   catchUp(game, now, out);
@@ -221,6 +240,11 @@ const NOT_JOINED = "Your friend hasn't joined yet.";
 
 // ---------------------------------------------------------------------------
 // Time: flags, the leave rule and expiry
+//
+// Leaving never ends a game by itself. Once a player in a timed game has been
+// away for the grace period (60 s), the other side may claim the win
+// (claim_win) or keep waiting. Their clock still runs meanwhile, so a game
+// nobody claims still ends when that flag falls.
 
 /** Applies whatever has happened by `now`. Used by every request and by the room's alarm. */
 export function tick(game, now) {
@@ -238,6 +262,18 @@ function catchUp(game, now, out) {
 /** True once the leave rule is in force: a timed game in progress where both sides have moved. */
 export function leaveRuleApplies(game) {
   return game.clock !== null && statusOf(game) === "active" && game.moves.length >= 2;
+}
+
+/**
+ * When the other side may claim the win because `seat` left, in ms; null while
+ * `seat` is here or the leave rule doesn't apply. An absence counts from when
+ * it began, but never from before the clocks started.
+ */
+export function claimableAt(game, seat) {
+  if (!leaveRuleApplies(game)) return null;
+  const away = game[seat] ? game[seat].away : null;
+  if (away === null || away === undefined) return null;
+  return Math.max(away, game.timedFrom ?? 0) + game.leaveGraceMs;
 }
 
 /**
@@ -261,25 +297,13 @@ function nextEvent(game) {
         : { at, winner: null, reason: "timeout_insufficient" },
     );
   }
-  if (leaveRuleApplies(game)) {
-    // An absence counts from when it began, but never from before the
-    // clocks started. The side to move is listed first, so it loses a tie.
-    const toMove = turnOf(game);
-    for (const seat of [toMove, other(toMove)]) {
-      const away = game[seat].away;
-      if (away !== null) {
-        events.push({ at: Math.max(away, game.timedFrom ?? 0) + game.leaveGraceMs, winner: other(seat), reason: "left" });
-      }
-    }
-  }
   events.push({ at: (game.lastMoveAt ?? game.createdAt) + IDLE_EXPIRY_MS, winner: null, reason: "expired" });
-  // The earliest wins; on a tie the first listed (a flag beats a forfeit).
+  // The earliest wins; on a tie the first listed (a flag beats expiry).
   return events.reduce((first, event) => (event.at < first.at ? event : first));
 }
 
 /**
- * When the room's alarm should next go off: the next flag fall, forfeit or
- * expiry, or for a finished game the moment it is deleted (keepMs after it
+ * When the room's alarm should next go off: the next flag fall or expiry, or for a finished game the moment it is deleted (keepMs after it
  * ended; tests shorten that).
  */
 export function nextDeadline(game, keepMs = KEEP_FINISHED_MS) {
@@ -523,6 +547,11 @@ export function act(game, seat, type, now) {
     }
     case "rematch":
       return askForRematch(game, seat, now, out);
+    case "claim_win":
+      return claimWin(game, seat, now, out);
+    case "report_name":
+    case "report_cheating":
+      return report(game, seat, REPORTS[type], now, out);
     case "cancel":
       if (status === "over") return fail(out, "game_over", GAME_OVER);
       if (status === "active") return fail(out, "bad_request", "Your friend has already joined. You can abort or resign instead.");
@@ -577,6 +606,39 @@ export function act(game, seat, type, now) {
   }
 }
 
+/** The other side has been away past the grace period: `seat` takes the win. */
+function claimWin(game, seat, now, out) {
+  if (game.result) return fail(out, "game_over", GAME_OVER);
+  if (statusOf(game) === "waiting") return fail(out, "bad_request", NOT_JOINED);
+  if (!leaveRuleApplies(game)) {
+    return fail(out, "cannot_claim", "You can claim a win only in a timed game, once both sides have moved.");
+  }
+  const at = claimableAt(game, other(seat));
+  if (at === null) return fail(out, "cannot_claim", "Your friend is back.");
+  if (now < at) return fail(out, "cannot_claim", `Your friend has ${Math.ceil((at - now) / 1000)} seconds left to come back.`);
+  finish(game, seat, "left", now);
+  touch(game, out, now);
+  return out;
+}
+
+/**
+ * `seat` reports the other player. A name report hides that name at once, in
+ * this game and its rematches. Each kind of report counts once per player;
+ * the room logs it (out.report) for a person to read.
+ */
+function report(game, seat, reason, now, out) {
+  const them = game[other(seat)];
+  if (!them) return fail(out, "bad_request", "Nobody has joined yet, so there's no one to report.");
+  game.reports ??= [];
+  if (game.reports.some((r) => r.by === seat && r.reason === reason)) return out;
+  const entry = { by: seat, reason, at: now, name: them.name, moves: game.moves.length };
+  game.reports.push(entry);
+  if (reason === "name") them.name = DEFAULT_NAME;
+  touch(game, out, now);
+  out.report = { code: game.code, ...entry, status: statusOf(game) };
+  return out;
+}
+
 function askForRematch(game, seat, now, out) {
   if (!game.result) return fail(out, "bad_request", "You can ask for a rematch once the game is over.");
   if (!game.white || !game.black) return fail(out, "bad_request", "Nobody joined this game, so there's no one to play a rematch with.");
@@ -596,13 +658,15 @@ function askForRematch(game, seat, now, out) {
 // ---------------------------------------------------------------------------
 // What players see
 
-function seatView(player, connected) {
-  if (!player) return { name: null, seated: false, online: false, away: null, screenshots: 0, recordings: 0 };
+function seatView(game, seat, connected) {
+  const player = game[seat];
+  if (!player) return { name: null, seated: false, online: false, away: null, claimableAt: null, screenshots: 0, recordings: 0 };
   return {
     name: player.name,
     seated: true,
     online: Boolean(connected) && player.away === null,
     away: player.away,
+    claimableAt: claimableAt(game, seat),
     screenshots: player.screenshots,
     recordings: player.recordings,
   };
@@ -620,8 +684,9 @@ export function view(game, now, connected = {}) {
     updatedAt: game.updatedAt,
     clock: game.clock ? { initial: game.clock.initial, increment: game.clock.increment } : null,
     creator: game.creator,
-    white: seatView(game.white, connected.white),
-    black: seatView(game.black, connected.black),
+    look: game.look ?? null,
+    white: seatView(game, "white", connected.white),
+    black: seatView(game, "black", connected.black),
     moves: game.moves.slice(),
     san: game.san.slice(),
     fen: game.fen,

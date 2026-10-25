@@ -16,9 +16,12 @@ struct SettingsSheet: View {
     @AppStorage("bigBoard") private var bigBoard = false
     @AppStorage("sculpted3D") private var sculpted3D = true
     @AppStorage(Heirloom.settingKey) private var heirloomOn = true
+    @AppStorage(BoardTheme.coordinatesKey) private var coordinatesOn = true
     @AppStorage(HomeScreen.key) private var homeScreen = HomeScreen.defaultOn
     /// Shared with the lessons' speaker button and the highlight reel.
     @AppStorage("coachVoiceMuted") private var voiceMuted = false
+    /// Out loud with the ring switch on silent. Read by CoachVoice when a lesson, reel or Leo's reply starts.
+    @AppStorage(CoachVoice.speaksOnSilentKey) private var speaksOnSilent = false
     /// "Nice move", "Try again" and the like in puzzles and drills. Read by CoachReactions.
     @AppStorage(CoachReactions.storageKey) private var reactionsOn = true
     @AppStorage(ReviewLevel.storageKey) private var reviewLevel = ReviewLevel.club.rawValue
@@ -51,6 +54,9 @@ struct SettingsSheet: View {
                                           symbol: "cube", isOn: $sculpted3D, theme: theme)
                                 rule
                             }
+                            ToggleRow(title: "Coordinates", subtitle: "Letters and numbers around the board. Off gives the squares more room.",
+                                      symbol: "textformat.abc", isOn: $coordinatesOn, theme: theme)
+                            rule
                             ToggleRow(title: "Match rival", subtitle: "Computer games use the rival's own board, not the one picked above.",
                                       symbol: "person.crop.circle.badge.checkmark", isOn: $matchRival, theme: theme)
                             rule
@@ -69,14 +75,14 @@ struct SettingsSheet: View {
                         CoachPicker(theme: theme)
                             .padding(.bottom, 4)
                         SettingsGroup(theme: theme) {
-                            ToggleRow(title: "Move hints", subtitle: "Marks the piece the coach would move. Tap it and its best square glows. Off for a fair game.",
+                            ToggleRow(title: "Move hints", subtitle: "Spotlights the coach's best move and says it under the board. Off for a fair game.",
                                       symbol: "sparkles", isOn: $showBestMoves, theme: theme)
                             rule
-                            ToggleRow(title: "Second-best hint", subtitle: "Also marks the runner-up, more faintly. Off leaves just the best.",
+                            ToggleRow(title: "Runner-up in the coach", subtitle: "The coach panel lists a second choice too. The board only ever lights the best.",
                                       symbol: "lightbulb", isOn: $showSecondBest, theme: theme)
                                 .disabled(!showBestMoves)
                             rule
-                            ToggleRow(title: "Ghost Vision", subtitle: "Hold the board to see the computer's line a few moves ahead. Slide left to step back through it. Counts as help.",
+                            ToggleRow(title: "See ahead", subtitle: "Ghost Vision. Hold the board to see the computer's line a few moves ahead. Slide left to step back through it. Counts as help.",
                                       symbol: "eye", isOn: $ghostVisionOn, theme: theme)
                             rule
                             ToggleRow(title: "Move grades", subtitle: "Rates each move you play, from Best to Blunder.",
@@ -105,6 +111,10 @@ struct SettingsSheet: View {
                             ToggleRow(title: "Coach's voice", subtitle: "\(Coach.current.name) reads lessons and highlight reels aloud. Captions always show.",
                                       symbol: "waveform", isOn: Binding(get: { !voiceMuted }, set: { voiceMuted = !$0 }), theme: theme)
                             rule
+                            ToggleRow(title: "Speak on silent", subtitle: "Lessons, reels and Talk It Through play out loud even with the ring switch on silent. Off, the coach goes quiet with it, like the game's sounds.",
+                                      symbol: "bell.slash.fill", isOn: $speaksOnSilent, theme: theme)
+                                .disabled(voiceMuted)
+                            rule
                             ToggleRow(title: "Voice reactions", subtitle: reactionsSubtitle,
                                       symbol: "bubble.left.and.text.bubble.right.fill", isOn: $reactionsOn, theme: theme)
                                 .disabled(voiceMuted)
@@ -113,6 +123,17 @@ struct SettingsSheet: View {
 
                     section("About") {
                         SettingsGroup(theme: theme) {
+                            // Every gesture and every rule that costs something, in plain words.
+                            NavigationLink {
+                                GuideView(theme: theme) {
+                                    Welcome.reset()
+                                    dismiss()
+                                }
+                            } label: {
+                                LinkRowLabel(title: "How it works", symbol: "questionmark.circle", theme: theme)
+                            }
+                            .buttonStyle(.plain)
+                            rule
                             NavigationLink {
                                 LicensesView(theme: theme)
                             } label: {
@@ -172,7 +193,7 @@ struct SettingsSheet: View {
     /// The chosen board with a piece tapped, its moves and hints as they look in a game.
     private var preview: some View {
         VStack(spacing: 14) {
-            BoardPreview(theme: theme, showBest: showBestMoves, showSecond: showBestMoves && showSecondBest, size: 172,
+            BoardPreview(theme: theme, showBest: showBestMoves, size: 172,
                          threeD: theme.sculptedLook != nil && sculpted3D)
                 .padding(.top, 6)
             Text("Live preview")
@@ -234,19 +255,19 @@ struct SettingsSheet: View {
 // MARK: - The live preview
 
 /// A small board that is not for playing: it shows a theme the way a game draws it,
-/// with the king tapped and its moves dotted. White is about to castle, the coach's
-/// pick; Bg5 is the runner-up.
+/// with the king tapped and its moves dotted. With hints on, castling, the coach's pick,
+/// is in the spotlight.
 struct BoardPreview: View {
     let theme: BoardTheme
     let showBest: Bool
-    let showSecond: Bool
     var size: CGFloat = 160
     /// The look's real 3D board, with the same position and marks.
     var threeD = false
 
+    @AppStorage(BoardTheme.coordinatesKey) private var showsCoordinates = true
+
     private static let position = Position(fen: "r1bqk2r/ppp2ppp/2np1n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQK2R w KQkq - 0 6")
     private static let best = (from: Square.e1, to: Square.g1)
-    private static let second = (from: Square.c1, to: Square.g5)
     /// The tapped king and where it can go.
     private static let selected = Square.e1
     private static let targets: Set<Square> = [.d2, .e2, .f1, .g1]
@@ -264,30 +285,19 @@ struct BoardPreview: View {
         }
     }
 
-    /// The pieces the coach would move, true for the best move's piece.
-    private var hintedPieces: [Square: Bool] {
-        var pieces: [Square: Bool] = [:]
-        if showBest, showSecond { pieces[Self.second.from] = false }
-        if showBest { pieces[Self.best.from] = true }
-        return pieces
-    }
-
     private var stillHints: [SculptedHint] {
-        var hints: [SculptedHint] = []
-        if showBest { hints.append(SculptedHint(from: Self.best.from, to: Self.best.to, isBest: true)) }
-        if showBest, showSecond { hints.append(SculptedHint(from: Self.second.from, to: Self.second.to, isBest: false)) }
-        return hints
+        showBest ? [SculptedHint(from: Self.best.from, to: Self.best.to, isBest: true)] : []
     }
 
     @ViewBuilder
     private var flatPreview: some View {
-        let inset = theme.frameInset(side: size)
+        let inset = theme.frameInset(side: size, coordinates: showsCoordinates)
         let sq = (size - inset * 2) / 8
         let corner = RoundedRectangle(cornerRadius: sq * 0.12, style: .continuous)
         ZStack(alignment: .topLeading) {
             ZStack {
                 if let art = theme.boardArt {
-                    BoardArt(name: art, flipped: false)
+                    BoardArt(name: art, flipped: false, coordinates: showsCoordinates)
                 }
                 if let surface = theme.surface {
                     LinearGradient(colors: surface, startPoint: .topLeading, endPoint: .bottomTrailing)
@@ -323,7 +333,6 @@ struct BoardPreview: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: showBest)
-        .animation(.easeInOut(duration: 0.25), value: showSecond)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Preview of the \(theme.name) board")
     }
@@ -340,7 +349,7 @@ struct BoardPreview: View {
         }
     }
 
-    /// One square as the game draws it: the tapped king's square, the coach's brackets,
+    /// One square as the game draws it: the tapped king's square, the hint spotlight,
     /// and a dot (or a ring around a piece) where the king can go.
     private func squareView(_ square: Square, size: CGFloat) -> some View {
         let isLight = (square.fileIndex + square.rankIndex) % 2 == 1
@@ -350,15 +359,18 @@ struct BoardPreview: View {
             if let gridLine = theme.gridLine {
                 Rectangle().strokeBorder(gridLine, lineWidth: 0.5)
             }
+            let lit = square == Self.best.from || square == Self.best.to
+            if showBest, !lit {
+                Rectangle().fill(Color.black.opacity(HintSpotlight.dim))
+            }
             if square == Self.selected {
                 Rectangle().fill(theme.selected)
                 if let ring = theme.selectedRing {
                     Rectangle().strokeBorder(ring, lineWidth: size * 0.035)
                 }
             }
-            if let isBest = hintedPieces[square] {
-                HintBrackets(color: theme.hint, size: size)
-                    .opacity(isBest ? 1 : 0.5)
+            if showBest, lit {
+                SpotlightMark(size: size, isTarget: square == Self.best.to)
             }
             if isTarget {
                 MoveDot(occupied: Self.position?.piece(at: square) != nil,

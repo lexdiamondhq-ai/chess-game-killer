@@ -152,6 +152,13 @@ struct ArmyNewsBanner: View {
                         .font(.system(.subheadline, design: .themed).weight(.semibold))
                         .foregroundStyle(.primary)
                         .multilineTextAlignment(.leading)
+                    if let rule = news.rule {
+                        Text(rule)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right")
@@ -251,7 +258,7 @@ struct ArmyView: View {
                 .padding(.vertical, 12)
             }
             .background { TrainingBackdrop(theme: theme) }
-            .navigationTitle("Your army")
+            .navigationTitle("Your pieces")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

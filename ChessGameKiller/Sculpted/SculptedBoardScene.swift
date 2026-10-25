@@ -4,8 +4,8 @@ import SceneKit
 import UIKit
 import simd
 
-/// One of the coach's suggested moves on the 3D board: brackets around the piece,
-/// and a ringed dot where it goes once the piece is picked up.
+/// One of the coach's suggested moves on the 3D board. The best one is in a spotlight: the
+/// other squares dim, the piece's square glows and its target has a breathing ring.
 struct SculptedHint: Equatable {
     let from: Square
     let to: Square
@@ -54,6 +54,8 @@ struct SculptedBoardState: Equatable {
     var checkedKing: Square?
     var hints: [SculptedHint] = []
     var flipped = false
+    /// The files and ranks engraved in the frame (the Coordinates setting).
+    var showsCoordinates = true
     /// The newest capture, so a piece that leaves the board can tip over rather than fade.
     var lastCapture: CaptureEvent?
     /// Veteran glows by piece id.
@@ -145,11 +147,12 @@ final class SculptedBoardScene {
         view.scene = scene
         view.backgroundColor = .clear
         view.isOpaque = false
-        view.antialiasingMode = .multisampling4X
         // No jittering: it keeps redrawing a still board, which takes the CPU and GPU
-        // from Stockfish while the computer thinks. 60 frames a second is smooth enough.
+        // from Stockfish while the computer thinks. 60 frames a second is smooth enough,
+        // and 30 with lighter smoothing on a hot phone or in Low Power Mode (see applyPower).
         view.isJitteringEnabled = false
-        view.preferredFramesPerSecond = 60
+        applyPower()
+        watchPower()
         view.isUserInteractionEnabled = false
         view.accessibilityElementsHidden = true
         view.autoenablesDefaultLighting = false
@@ -166,6 +169,29 @@ final class SculptedBoardScene {
         }
         buildLabels(flipped: false)
         view.onLayout = { [weak self] size in self?.layout(size) }
+    }
+
+    deinit {
+        for observer in powerObservers { NotificationCenter.default.removeObserver(observer) }
+    }
+
+    // MARK: Power
+
+    private var powerObservers: [NSObjectProtocol] = []
+
+    /// Draws at 60 frames a second with 4x smoothing, or at 30 with 2x when the phone should
+    /// hold back. `PowerPolicy` says which; the scene follows the same notifications it does.
+    func applyPower(constrained: Bool = PowerPolicy.systemConstrained()) {
+        view.preferredFramesPerSecond = PowerPolicy.framesPerSecond(constrained: constrained)
+        view.antialiasingMode = constrained ? .multisampling2X : .multisampling4X
+    }
+
+    private func watchPower() {
+        for name in [ProcessInfo.thermalStateDidChangeNotification, Notification.Name.NSProcessInfoPowerStateDidChange] {
+            powerObservers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                self?.applyPower()
+            })
+        }
     }
 
     // MARK: Reading the view
@@ -260,6 +286,7 @@ final class SculptedBoardScene {
             // A board about to turn around walks the camera itself.
             endFinale(animated: animate && old.flipped == new.flipped)
         }
+        labelsNode.isHidden = !new.showsCoordinates
         if old.flipped != new.flipped {
             orbit(flipped: new.flipped, animated: animate && old.flipped != new.flipped)
         }
@@ -1161,6 +1188,28 @@ final class SculptedBoardScene {
                 addMark(lastMoveMark, at: square, height: 0.0015)
             }
         }
+        // The coach's best move in a spotlight: every other square dims (under the pieces,
+        // the selection and the move marks), its two squares glow and the target breathes.
+        let best = new.hints.first(where: \.isBest)
+        let spotlightKey = best.map { "\($0.from)\($0.to)" }
+        let spotlightIsNew = spotlightKey != shownSpotlight
+        shownSpotlight = spotlightKey
+        if let best {
+            for index in 0..<64 {
+                guard let square = Square(rawValue: index), square != best.from, square != best.to else { continue }
+                addMark(spotlightDimMark, at: square, height: 0.0016, fade: spotlightIsNew, fadeTime: 0.35)
+            }
+            addMark(spotlightGlowMark, at: best.from, height: 0.00165, fade: spotlightIsNew, fadeTime: 0.35)
+            addMark(spotlightGlowMark, at: best.to, height: 0.00165, fade: spotlightIsNew, fadeTime: 0.35)
+            // Over the move marks, so the best capture's ring wins over the plain capture corners.
+            let ring = addMark(spotlightRingMark, at: best.to, height: 0.0025, order: 16)
+            if !UIAccessibility.isReduceMotionEnabled {
+                ring.runAction(.repeatForever(.sequence([
+                    .fadeOpacity(to: 0.55, duration: 0.9),
+                    .fadeOpacity(to: 1, duration: 0.9),
+                ])))
+            }
+        }
         if let selected = new.selected {
             addMark(selectedMark, at: selected, height: 0.0017)
         }
@@ -1197,16 +1246,10 @@ final class SculptedBoardScene {
                 }
             }
         }
-        // The coach's picks: brackets around each piece it would move, best brightest.
-        var hintedPieces: [Square: Bool] = [:]
-        for hint in new.hints { hintedPieces[hint.from] = (hintedPieces[hint.from] ?? false) || hint.isBest }
-        for (square, isBest) in hintedPieces {
-            addMark(isBest ? bracketsMark : bracketsFaintMark, at: square, height: 0.0022, fade: true)
-        }
-        // Where the selected piece can go; its suggested moves get a halo.
+        // Where the selected piece can go; the coach's best move gets a halo.
         var hintedTargets: [Square: Bool] = [:]
-        for hint in new.hints where hint.from == new.selected {
-            hintedTargets[hint.to] = (hintedTargets[hint.to] ?? false) || hint.isBest
+        if let best, best.from == new.selected {
+            hintedTargets[best.to] = true
         }
         for target in new.targets {
             let kind = TargetKind(capture: occupied.contains(target), hint: hintedTargets[target])
@@ -1217,7 +1260,8 @@ final class SculptedBoardScene {
     }
 
     @discardableResult
-    private func addMark(_ geometry: SCNGeometry, at square: Square, height: Float, order: Int = 10, fade: Bool = false) -> SCNNode {
+    private func addMark(_ geometry: SCNGeometry, at square: Square, height: Float, order: Int = 10, fade: Bool = false,
+                         fadeTime: TimeInterval = 0.14) -> SCNNode {
         let node = SCNNode(geometry: geometry)
         node.simdPosition = SculptedCamera.position(of: square) + SIMD3(0, height, 0)
         node.simdOrientation = Self.flat
@@ -1225,7 +1269,7 @@ final class SculptedBoardScene {
         node.castsShadow = false
         if fade {
             node.opacity = 0
-            node.runAction(.fadeIn(duration: 0.14))
+            node.runAction(.fadeIn(duration: fadeTime))
         }
         marksNode.addChildNode(node)
         return node
@@ -1284,8 +1328,11 @@ final class SculptedBoardScene {
     private lazy var checkMark = Self.mark(size: 1.5, color: look.check, alpha: 0.9, mask: MarkImages.glow)
     private lazy var checkRingMark = Self.mark(size: 1, color: look.check, alpha: 1, mask: MarkImages.squareRing)
     private lazy var dustMark = Self.mark(size: 1, color: UIColor(white: 0.93, alpha: 1), alpha: 0.5, mask: MarkImages.contact)
-    private lazy var bracketsMark = Self.mark(size: 1, color: look.accent, alpha: 0.95, mask: MarkImages.brackets)
-    private lazy var bracketsFaintMark = Self.mark(size: 1, color: look.accent, alpha: 0.5, mask: MarkImages.brackets)
+    private lazy var spotlightDimMark = Self.mark(size: 1, color: .black, alpha: CGFloat(HintSpotlight.dim3D), mask: nil)
+    private lazy var spotlightGlowMark = Self.mark(size: 1, color: HintSpotlight.uiGold, alpha: 0.7, mask: MarkImages.squareGlow)
+    private lazy var spotlightRingMark = Self.mark(size: 1, color: HintSpotlight.uiGold, alpha: 1, mask: MarkImages.spotlightRing)
+    /// The squares lit last time the marks were drawn, so a lit board only fades in once.
+    private var shownSpotlight: String?
     private static let contactGeometry = mark(size: 1, color: .black, alpha: 0.5, mask: MarkImages.contact)
     private static let haloMask = MarkImages.halo
 
@@ -1507,25 +1554,17 @@ enum MarkImages {
         context.strokePath()
     }
 
-    /// Four brackets in the corners of a square: the piece the coach would move.
-    static let brackets = draw(256) { context, size in
-        let line = size * 0.05
-        let low = size * 0.08
-        let high = size - low
-        let arm = size * 0.2
+    /// The hint spotlight's ring around its target square: bolder than the check's.
+    static let spotlightRing = draw(256) { context, size in
+        let line = size * 0.09
+        let rect = CGRect(x: 0, y: 0, width: size, height: size).insetBy(dx: size * 0.03 + line / 2, dy: size * 0.03 + line / 2)
         context.setLineWidth(line)
-        context.setLineCap(.round)
-        context.setLineJoin(.round)
-        let corners: [(x: CGFloat, y: CGFloat, dx: CGFloat, dy: CGFloat)] = [
-            (low, low, 1, 1), (high, low, -1, 1), (high, high, -1, -1), (low, high, 1, -1),
-        ]
-        for (x, y, dx, dy) in corners {
-            context.move(to: CGPoint(x: x, y: y + arm * dy))
-            context.addLine(to: CGPoint(x: x, y: y))
-            context.addLine(to: CGPoint(x: x + arm * dx, y: y))
-        }
+        context.addPath(CGPath(roundedRect: rect, cornerWidth: size * 0.12, cornerHeight: size * 0.12, transform: nil))
         context.strokePath()
     }
+
+    /// A soft glow filling a square, brightest in the middle: a lit square of the hint spotlight.
+    static let squareGlow = radial(256, stops: [(0, 0.85), (0.6, 0.45), (1, 0.12)])
 
     /// A move mark's masks.
     struct Target {

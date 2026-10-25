@@ -30,12 +30,30 @@ final class StockfishTests: XCTestCase {
         XCTAssertEqual(lines.first?.evaluation, .mate(1))
     }
 
+    /// Spark's own search: noisy and a few moves deep, and still a legal move every time.
     func testChoosesALegalMoveAtLowSkill() async throws {
         try XCTSkipUnless(StockfishEngine.hasNetworks)
         let fen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"
-        let chosen = await StockfishEngine.shared.chooseMove(fen: fen, skill: 0, thinkTimeMs: 100)
-        let move = try XCTUnwrap(chosen)
-        XCTAssertNotNil(Notation.san(of: move, fen: fen), "\(move) should be legal")
+        let spark = MatchController.Level.beginner
+        for _ in 0..<3 {
+            let chosen = await StockfishEngine.shared.chooseMove(fen: fen, skill: spark.skill, depth: spark.depth,
+                                                                 thinkTimeMs: spark.thinkTimeMs)
+            let move = try XCTUnwrap(chosen)
+            XCTAssertNotNil(Notation.san(of: move, fen: fen), "\(move) should be legal")
+        }
+    }
+
+    /// A depth cap ends a search long before its time: the weaker rivals answer almost at once.
+    func testACappedSearchEndsEarly() async throws {
+        try XCTSkipUnless(StockfishEngine.hasNetworks)
+        await StockfishEngine.shared.warmUp()
+        let fen = Position.standard.fen
+        let started = ContinuousClock.now
+        let chosen = await StockfishEngine.shared.chooseMove(fen: fen, skill: 10, depth: 5, thinkTimeMs: 5000)
+        let elapsed = ContinuousClock.now - started
+        XCTAssertNotNil(chosen)
+        NSLog("TIMING capped depth=5 movetime=5000ms total=\(elapsed)")
+        XCTAssertLessThan(elapsed, .seconds(2), "Depth 5 from the start takes a few milliseconds")
     }
 
     /// How long the computer takes to answer a move at every level, with the real engine,

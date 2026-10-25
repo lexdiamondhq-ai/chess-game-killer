@@ -215,7 +215,7 @@ struct HomeDiagram: View {
                         ZStack {
                             Rectangle().fill((at.fileIndex + at.rankIndex) % 2 == 1 ? theme.light : theme.dark)
                             if let token = draft[at] {
-                                PieceImage(piece: token.piece(at: at), theme: theme, size: square)
+                                PieceImage(piece: token.piece(at: at), theme: theme, size: square, onBoard: true)
                             }
                         }
                         .frame(width: square, height: square)
@@ -611,13 +611,12 @@ struct HomeScoresheet: View {
 
 // MARK: - Friends
 
-/// Your games with friends still going, your move first, and the way to start one. A game
+/// Your games with friends still going, your move first (Challenge a friend sits just above). A game
 /// that has ended is kept with your games, so it shows on the scoresheet instead.
 struct HomeFriendsCard: View {
     let games: [FriendGame]
     let tone: HomeTone
     let open: (FriendGame) -> Void
-    let challenge: () -> Void
 
     @State private var showsAll = false
 
@@ -627,9 +626,9 @@ struct HomeFriendsCard: View {
     var body: some View {
         let shown = showsAll ? games : Array(games.prefix(Self.limit))
         VStack(spacing: 0) {
-            ForEach(shown, id: \.code) { game in
+            ForEach(Array(shown.enumerated()), id: \.element.code) { index, game in
+                if index > 0 { HomeHairline(tone: tone) }
                 row(game)
-                HomeHairline(tone: tone)
             }
             if games.count > Self.limit {
                 Button {
@@ -642,10 +641,7 @@ struct HomeFriendsCard: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(HomeRowPressStyle(tone: tone))
-                HomeHairline(tone: tone)
             }
-            HomeLinkRow(title: "Challenge a friend", detail: "Send a game by text or email",
-                        tone: tone, action: challenge)
         }
         .padding(.horizontal, HomeMetrics.inset)
         .homePane(RoundedRectangle(cornerRadius: HomeMetrics.cardRadius, style: .continuous), tone: tone)

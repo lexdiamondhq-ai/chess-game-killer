@@ -17,7 +17,7 @@ struct ChallengeGameView: View {
     @State private var copied = false
 
     enum Confirmation: Identifiable {
-        case resign, abort, leave, cancelChallenge
+        case resign, abort, leave, cancelChallenge, reportName, reportCheating
 
         var id: Self { self }
     }
@@ -153,6 +153,24 @@ struct ChallengeGameView: View {
                 } label: {
                     Label("Flip board", systemImage: "arrow.up.arrow.down")
                 }
+                if game.canReport {
+                    Section("Report \(game.opponentName)") {
+                        Button {
+                            confirming = .reportName
+                        } label: {
+                            Label(game.reported.contains(.reportName) ? "Name reported" : "Offensive name",
+                                  systemImage: "person.crop.circle.badge.exclamationmark")
+                        }
+                        .disabled(game.reported.contains(.reportName))
+                        Button {
+                            confirming = .reportCheating
+                        } label: {
+                            Label(game.reported.contains(.reportCheating) ? "Cheating reported" : "Cheating",
+                                  systemImage: "exclamationmark.shield")
+                        }
+                        .disabled(game.reported.contains(.reportCheating))
+                    }
+                }
             } label: {
                 ChallengeBarIcon(symbol: "ellipsis")
             }
@@ -179,9 +197,15 @@ struct ChallengeGameView: View {
     private var notices: some View {
         VStack(spacing: 8) {
             if game.cameBack {
-                banner(symbol: "exclamationmark.triangle.fill", text: "You left the game. Leaving for 20 seconds forfeits.",
+                banner(symbol: "exclamationmark.triangle.fill",
+                       text: "You left the game. Away for over \(game.graceWords), \(game.opponentName) can claim the win.",
                        urgent: true) {
                     game.dismissCameBack()
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
+            } else if game.showsFairPlay {
+                banner(symbol: "checkmark.shield.fill", text: fairPlayLine, urgent: false) {
+                    game.dismissFairPlay()
                 }
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
@@ -217,7 +241,17 @@ struct ChallengeGameView: View {
         .frame(maxWidth: 560)
         .animation(.spring(response: 0.4, dampingFraction: 0.86), value: game.toast?.id)
         .animation(.spring(response: 0.4, dampingFraction: 0.86), value: game.cameBack)
+        .animation(.spring(response: 0.4, dampingFraction: 0.86), value: game.showsFairPlay)
         .animation(.spring(response: 0.4, dampingFraction: 0.86), value: game.connection)
+    }
+
+    /// The fair-play rules, on the first screen of a game.
+    private var fairPlayLine: String {
+        var line = "Fair play: no hints or analysis."
+        if game.isTimed {
+            line += " Leave for over \(game.graceWords) and \(game.opponentName) can claim the win."
+        }
+        return line + " \(game.opponentName) is told if you take a screenshot."
     }
 
     private func banner(symbol: String, text: String, urgent: Bool, dismiss: @escaping () -> Void) -> some View {
@@ -249,7 +283,12 @@ struct ChallengeGameView: View {
             .opacity(game.phase == .playing ? 1 : 0)
             .allowsHitTesting(game.phase == .playing)
             .overlay(alignment: .top) {
-                if game.drawOfferedToMe {
+                if game.phase == .playing, game.offersClaim {
+                    claimBanner
+                        .fixedSize(horizontal: false, vertical: true)
+                        .alignmentGuide(.top) { $0[.bottom] + 10 }
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                } else if game.drawOfferedToMe {
                     drawBanner
                         .fixedSize(horizontal: false, vertical: true)
                         .alignmentGuide(.top) { $0[.bottom] + 10 }
@@ -268,6 +307,7 @@ struct ChallengeGameView: View {
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
             .animation(.spring(response: 0.42, dampingFraction: 0.86), value: game.drawOfferedToMe)
+            .animation(.spring(response: 0.42, dampingFraction: 0.86), value: game.offersClaim)
             .animation(.spring(response: 0.42, dampingFraction: 0.86), value: game.phase)
     }
 
@@ -317,6 +357,41 @@ struct ChallengeGameView: View {
             .fixedSize()
             Button("Accept") {
                 Task { await game.acceptDraw() }
+            }
+            .buttonStyle(ChallengeButtonStyle(kind: .primary, theme: theme, height: 38))
+            .fixedSize()
+        }
+        .disabled(game.sending != nil)
+        .padding(.leading, 12)
+        .padding(.trailing, 10)
+        .padding(.vertical, 10)
+        .challengeGlass(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .frame(maxWidth: 520)
+        .padding(.horizontal, 16)
+    }
+
+    /// The friend left and stayed away: claim the win, or keep waiting.
+    private var claimBanner: some View {
+        HStack(spacing: 12) {
+            ChallengeAvatar(name: game.opponentName, theme: theme, size: 32, online: false)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(game.opponentName) left the game")
+                    .font(theme.challengeFont(15, .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Text("Away for over \(game.graceWords)")
+                    .font(theme.challengeFont(12.5))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 6)
+            Button("Wait") {
+                game.keepWaiting()
+            }
+            .buttonStyle(ChallengeButtonStyle(kind: .glass, theme: theme, height: 38))
+            .fixedSize()
+            Button("Claim win") {
+                Task { await game.claimWin() }
             }
             .buttonStyle(ChallengeButtonStyle(kind: .primary, theme: theme, height: 38))
             .fixedSize()
@@ -517,7 +592,7 @@ struct ChallengeGameView: View {
     // MARK: Leaving, resigning, cancelling
 
     private func close() {
-        // Closing a timed game under way is leaving it, and leaving forfeits.
+        // Closing a timed game under way is leaving it: away long enough, the friend can claim the win.
         if game.phase == .playing, game.isTimed {
             confirming = .leave
         } else {
@@ -533,8 +608,10 @@ struct ChallengeGameView: View {
         switch confirming {
         case .resign?: return "Resign this game?"
         case .abort?: return "Abort this game?"
-        case .leave?: return "Leave and forfeit?"
+        case .leave?: return "Leave the game?"
         case .cancelChallenge?: return "Cancel this challenge?"
+        case .reportName?: return "Report \(game.opponentName)'s name?"
+        case .reportCheating?: return "Report \(game.opponentName) for cheating?"
         case nil: return ""
         }
     }
@@ -543,8 +620,10 @@ struct ChallengeGameView: View {
         switch item {
         case .resign: return "\(game.opponentName) wins."
         case .abort: return "Neither of you has moved yet, so nobody wins or loses."
-        case .leave: return "In a timed game, being away for 20 seconds loses the game."
+        case .leave: return "Your clock keeps running. Away for over \(game.graceWords), \(game.opponentName) can claim the win."
         case .cancelChallenge: return "The link stops working, and your friend can't join."
+        case .reportName: return "Their name is hidden from now on, and we'll take a look."
+        case .reportCheating: return "We'll take a look at this game."
         }
     }
 
@@ -563,6 +642,12 @@ struct ChallengeGameView: View {
         case .cancelChallenge:
             Button("Cancel challenge", role: .destructive) { Task { await game.cancelChallenge() } }
             Button("Keep it open", role: .cancel) {}
+        case .reportName:
+            Button("Report name", role: .destructive) { Task { await game.reportOpponent(.reportName) } }
+            Button("Cancel", role: .cancel) {}
+        case .reportCheating:
+            Button("Report cheating", role: .destructive) { Task { await game.reportOpponent(.reportCheating) } }
+            Button("Cancel", role: .cancel) {}
         }
     }
 }
@@ -640,12 +725,20 @@ struct FriendPlate: View {
                 HStack(spacing: 5) {
                     Image(systemName: "figure.walk.departure")
                         .font(.system(size: 11, weight: .semibold))
-                    Text("Away · \(left)s")
+                    Text(left > 0 ? "Away · \(left)s" : "Left the game")
                         .font(theme.challengeFont(12.5, .semibold).monospacedDigit())
                         .contentTransition(.numericText(countsDown: true))
+                    if left == 0, !game.offersClaim {
+                        Button("Claim win") {
+                            Task { await game.claimWin() }
+                        }
+                        .font(theme.challengeFont(12.5, .bold))
+                        .foregroundStyle(theme.challengeAccent)
+                        .disabled(game.sending != nil)
+                    }
                 }
                 .foregroundStyle(ChallengeColors.urgent)
-                .accessibilityLabel("Away. Forfeits in \(left) seconds")
+                .accessibilityLabel(left > 0 ? "Away. You can claim the win in \(left) seconds" : "Left the game. You can claim the win")
             }
         } else {
             HStack(spacing: 6) {

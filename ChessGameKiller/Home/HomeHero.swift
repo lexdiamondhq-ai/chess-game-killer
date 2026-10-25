@@ -85,8 +85,11 @@ struct HomeHeroBoard: UIViewRepresentable {
     let pieces: [Piece]
     let camera: SculptedCamera
 
+    @AppStorage(BoardTheme.coordinatesKey) private var showsCoordinates = true
+
     final class Coordinator {
         var pieces: [Piece] = []
+        var showsCoordinates = true
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -95,6 +98,7 @@ struct HomeHeroBoard: UIViewRepresentable {
         let scene = stage.scene(for: look)
         scene.apply(state, animated: false)
         context.coordinator.pieces = pieces
+        context.coordinator.showsCoordinates = showsCoordinates
         scene.heldCamera = camera
         return scene.view
     }
@@ -102,15 +106,18 @@ struct HomeHeroBoard: UIViewRepresentable {
     func updateUIView(_ view: SculptedSceneKitView, context: Context) {
         let scene = stage.scene(for: look)
         // The page redraws this every frame it scrolls: only a real change touches the pieces.
-        if context.coordinator.pieces != pieces {
+        if context.coordinator.pieces != pieces || context.coordinator.showsCoordinates != showsCoordinates {
             context.coordinator.pieces = pieces
+            context.coordinator.showsCoordinates = showsCoordinates
             scene.apply(state, animated: true)
         }
         if scene.heldCamera != camera { scene.heldCamera = camera }
     }
 
     private var state: SculptedBoardState {
-        SculptedBoardState(pieces: pieces.map { PlacedPiece(id: 0, piece: $0) }, matchesPieces: true)
+        var state = SculptedBoardState(pieces: pieces.map { PlacedPiece(id: 0, piece: $0) }, matchesPieces: true)
+        state.showsCoordinates = showsCoordinates
+        return state
     }
 }
 

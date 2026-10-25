@@ -15,6 +15,19 @@ final class CoachVoice: NSObject {
         set { UserDefaults.standard.set(newValue, forKey: "coachVoiceMuted") }
     }
 
+    /// The "Speak on silent" switch in Settings. Off (the default), the coach goes quiet when the
+    /// ring switch is on silent, like the game's own sounds; on, lessons play like videos, out
+    /// loud whatever the switch says.
+    static let speaksOnSilentKey = "coachSpeaksOnSilent"
+
+    var speaksOnSilent: Bool {
+        get { UserDefaults.standard.bool(forKey: Self.speaksOnSilentKey) }
+        set { UserDefaults.standard.set(newValue, forKey: Self.speaksOnSilentKey) }
+    }
+
+    /// The lesson audio is set up: a lesson, a highlight reel or Leo's reply is playing through it.
+    private(set) var lessonAudioActive = false
+
     private var player: AVAudioPlayer?
     private let synthesizer = AVSpeechSynthesizer()
     private var utterance: AVSpeechUtterance?
@@ -87,17 +100,31 @@ final class CoachVoice: NSObject {
         finish()
     }
 
-    /// Lessons play like videos: out loud even with the ring switch on silent,
-    /// with other audio turned down while the coach talks.
-    func beginLesson() {
-        let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
-        try? session.setActive(true)
+    /// The audio a lesson wants: other audio turned down while the coach talks, and out loud
+    /// with the ring switch on silent only when the player asked for that in Settings.
+    nonisolated static func lessonAudio(speaksOnSilent: Bool) -> (category: AVAudioSession.Category, options: AVAudioSession.CategoryOptions) {
+        (speaksOnSilent ? .playback : .ambient, [.duckOthers])
     }
 
-    /// Back to the game's quiet sound effects, which respect the silent switch.
+    /// Sets the audio up for the coach to talk: music and podcasts turn down while it does, and
+    /// the ring switch is respected unless "Speak on silent" is on.
+    func beginLesson() {
+        let session = AVAudioSession.sharedInstance()
+        let wanted = Self.lessonAudio(speaksOnSilent: speaksOnSilent)
+        do {
+            try session.setCategory(wanted.category, mode: .spokenAudio, options: wanted.options)
+        } catch {
+            // Should the system refuse that pairing, mixing with other audio is the next best.
+            try? session.setCategory(wanted.category, mode: .default, options: [.mixWithOthers])
+        }
+        try? session.setActive(true)
+        lessonAudioActive = true
+    }
+
+    /// Back to the game's quiet sound effects.
     func endLesson() {
         stop()
+        lessonAudioActive = false
         let session = AVAudioSession.sharedInstance()
         try? session.setActive(false, options: .notifyOthersOnDeactivation)
         try? session.setCategory(.ambient, options: [.mixWithOthers])
@@ -139,13 +166,13 @@ final class CoachVoice: NSObject {
         continuation?.resume()
     }
 
-    /// The nicest English voice on the device for the coach: a man's for Leo (British first),
+    /// The nicest English voice on the device for the coach: a man's for Leo (American first),
     /// a woman's for Vera (American first).
     private static func deviceVoice(for coach: Coach) -> AVSpeechSynthesisVoice? {
         if let voice = deviceVoices[coach] { return voice }
         let english = AVSpeechSynthesisVoice.speechVoices().filter { $0.language.hasPrefix("en") }
         let gender: AVSpeechSynthesisVoiceGender = coach == .leo ? .male : .female
-        let first = coach == .leo ? "en-GB" : "en-US"
+        let first = "en-US"
         let matching = english.filter { $0.gender == gender }
         let ranked = matching.filter { $0.language == first } + matching.filter { $0.language != first }
         let voice = ranked.first { $0.quality == .premium }

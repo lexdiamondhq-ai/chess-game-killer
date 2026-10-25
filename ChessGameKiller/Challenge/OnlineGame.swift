@@ -70,6 +70,14 @@ final class OnlineGame {
     private(set) var isSwitching = false
     /// The player is back in a timed game after leaving the app: the banner says what leaving costs.
     private(set) var cameBack = false
+    /// The friend has been away past the grace period: the player may claim the win.
+    private(set) var claimReady = false
+    /// The friend's absence the player chose to wait out instead of claiming, by when it began.
+    private(set) var waitedOutAway: Double? = nil
+    /// The fair-play rules were put away on this game's first screen.
+    private(set) var fairPlaySeen = false
+    /// What the player has reported about the friend in this game.
+    private(set) var reported: Set<ChallengeAction> = []
     private(set) var pending: PendingMove? = nil
 
     /// The record changed: a new state, or a rematch with its own code.
@@ -88,6 +96,7 @@ final class OnlineGame {
     @ObservationIgnored private var moveTask: Task<Void, Never>?
     @ObservationIgnored private var pollTask: Task<Void, Never>?
     @ObservationIgnored private var deadlineTask: Task<Void, Never>?
+    @ObservationIgnored private var claimTask: Task<Void, Never>?
     @ObservationIgnored private var toastTask: Task<Void, Never>?
     @ObservationIgnored private var cameBackTask: Task<Void, Never>?
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
@@ -141,7 +150,8 @@ final class OnlineGame {
         "vs \(opponentName) · \(clock?.label ?? "No clock")"
     }
 
-    /// Leaving for 20 seconds forfeits: a timed game, under way, both sides have moved.
+    /// Leaving counts: a timed game, under way, both sides have moved. Away past the grace period,
+    /// the other side may claim the win.
     var leaveRuleApplies: Bool { state.map(FriendClockMath.leaveRuleApplies) ?? false }
     /// A timed game: closing it is leaving it.
     var isTimed: Bool { clock != nil }
@@ -189,7 +199,7 @@ final class OnlineGame {
         return !(seat == self.seat && pending != nil)
     }
 
-    /// Whole seconds before `seat`'s absence forfeits the game; nil when it isn't away.
+    /// Whole seconds before the other side may claim the win from `seat`; nil when it isn't away.
     func awaySecondsLeft(for seat: FriendSeat, at instant: ContinuousClock.Instant = .now) -> Int? {
         state.flatMap { FriendClockMath.awaySecondsLeft($0, seat: seat, serverNow: serverNow(at: instant)) }
     }
@@ -266,6 +276,8 @@ final class OnlineGame {
         stopPolling()
         deadlineTask?.cancel()
         deadlineTask = nil
+        claimTask?.cancel()
+        claimTask = nil
         cameBackTask?.cancel()
         cameBack = false
         UIApplication.shared.isIdleTimerDisabled = false
@@ -295,6 +307,33 @@ final class OnlineGame {
         cameBack = false
     }
 
+    /// The fair-play rules show on the first screen of a game under way, until both sides have moved.
+    var showsFairPlay: Bool {
+        phase == .playing && !fairPlaySeen && (state?.moves.count ?? 0) < 2
+    }
+
+    func dismissFairPlay() {
+        fairPlaySeen = true
+    }
+
+    /// The claim is on offer: the friend left a while ago and the player hasn't chosen to wait.
+    var offersClaim: Bool {
+        claimReady && waitedOutAway != state?[opponentSeat].away
+    }
+
+    /// Keeps waiting for the friend instead of claiming the win. The friend's line still offers it.
+    func keepWaiting() {
+        waitedOutAway = state?[opponentSeat].away
+    }
+
+    /// "Away for over a minute".
+    var graceWords: String {
+        let seconds = Int(((state?.leaveGraceMs ?? 60_000) / 1000).rounded())
+        if seconds == 60 { return "a minute" }
+        if seconds % 60 == 0 { return "\(seconds / 60) minutes" }
+        return "\(seconds) seconds"
+    }
+
     // MARK: Actions
 
     func offerDraw() async { await act(.offerDraw) }
@@ -307,6 +346,25 @@ final class OnlineGame {
     func abort() async { await act(.abort) }
     func cancelChallenge() async { await act(.cancel) }
 
+    /// The friend left and stayed away past the grace period: the player takes the win.
+    func claimWin() async { await act(.claimWin) }
+
+    /// Reports the friend's name (hidden at once) or cheating. Each counts once.
+    func reportOpponent(_ action: ChallengeAction) async {
+        guard action == .reportName || action == .reportCheating, !reported.contains(action) else { return }
+        guard await act(action) else { return }
+        reported.insert(action)
+        say(action == .reportName ? "Thanks. The name is hidden and we'll take a look."
+                                  : "Thanks. We'll take a look at this game.",
+            symbol: "checkmark.shield")
+    }
+
+    /// The friend has sat down: there is someone to report.
+    var canReport: Bool {
+        guard let state, phase == .playing || phase == .over else { return false }
+        return state[opponentSeat].seated
+    }
+
     func askForRematch() async {
         if rematchStage == .ready, let code = state?.rematch?.code {
             switchToRematch(code)
@@ -315,12 +373,14 @@ final class OnlineGame {
         await act(.rematch)
     }
 
-    private func act(_ action: ChallengeAction) async {
-        guard sending == nil else { return }
+    @discardableResult
+    private func act(_ action: ChallengeAction) async -> Bool {
+        guard sending == nil else { return false }
         sending = action
         defer { sending = nil }
         do {
             apply(try await api.act(action, in: code, token: record.token))
+            return true
         } catch is CancellationError {
         } catch let error as ChallengeError {
             if let game = error.game { apply(game) }
@@ -330,6 +390,7 @@ final class OnlineGame {
         } catch {
             say(ChallengeError.unreachable.message, symbol: "wifi.exclamationmark", warning: true)
         }
+        return false
     }
 
     /// Fire and forget: presence and fair-play reports. The reply still brings the game up to date.
@@ -373,7 +434,7 @@ final class OnlineGame {
 
     /// The server can think the player left while they're looking right at the board: the live connection
     /// dropped and polling doesn't count as being there, or the report of leaving arrived after the one of
-    /// coming back. In a timed game that would forfeit in 20 seconds, so the app says it's here, once per absence.
+    /// coming back. In a timed game the friend could soon claim the win, so the app says it's here, once per absence.
     private func reclaimPresence(_ new: FriendGameState) {
         guard isActive, connection != .elsewhere, new.status == .active,
               let away = new[seat].away, away != reclaimedAway,
@@ -700,18 +761,17 @@ final class OnlineGame {
 
     // MARK: Deadlines
 
-    /// When a clock runs out or an absence forfeits, the server ends the game. Look again just after,
-    /// so the end shows at once even when the live connection is quiet.
+    /// When a clock runs out, the server ends the game. Look again just after, so the end shows at once
+    /// even when the live connection is quiet. Leaving never ends a game: once the friend has been away
+    /// past the grace period, the claim is offered instead.
     private func scheduleDeadline() {
         deadlineTask?.cancel()
         deadlineTask = nil
+        scheduleClaim()
         guard isActive, let state, state.status == .active else { return }
         var deadlines: [Double] = []
         if let clocks = state.clocks, let running = clocks.running, let since = clocks.since {
             deadlines.append(since + clocks[running])
-        }
-        for side in FriendSeat.allCases {
-            if let deadline = FriendClockMath.awayDeadline(state, seat: side) { deadlines.append(deadline) }
         }
         guard let first = deadlines.min() else { return }
         let now = serverNow()
@@ -722,6 +782,27 @@ final class OnlineGame {
             try? await Task.sleep(for: .seconds(wait))
             guard !Task.isCancelled else { return }
             await self?.refresh()
+        }
+    }
+
+    /// Offers the claim the moment the friend's grace period runs out, and takes it back when they return.
+    private func scheduleClaim() {
+        claimTask?.cancel()
+        claimTask = nil
+        guard phase == .playing, let state, let at = FriendClockMath.awayDeadline(state, seat: opponentSeat) else {
+            claimReady = false
+            return
+        }
+        let wait = (at - serverNow()) / 1000
+        if wait <= 0 {
+            claimReady = true
+            return
+        }
+        claimReady = false
+        claimTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(wait + 0.05))
+            guard !Task.isCancelled, let self, self.phase == .playing else { return }
+            self.claimReady = true
         }
     }
 

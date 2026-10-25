@@ -625,7 +625,7 @@ final class DrillRunner {
 
     /// The defending king's move: the engine's, or one that keeps the king central and free.
     private func defenderMove(fen: String) async -> String? {
-        if let engine, let move = await engine.chooseMove(fen: fen, skill: 20, thinkTimeMs: 250) {
+        if let engine, let move = await engine.chooseMove(fen: fen, skill: 20, depth: nil, thinkTimeMs: 250) {
             return move
         }
         guard let board = TrainingChess.board(after: [], from: fen) else { return nil }

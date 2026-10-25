@@ -1,6 +1,10 @@
 import Foundation
 
 /// Everything the app remembers about a learner's training. Saved as JSON.
+///
+/// Every struct here reads any saved version: a key a file doesn't have yet keeps its default,
+/// and a mistake that can't be read is dropped rather than losing the rest. A new field must
+/// follow the same rule, so an update never wipes a learner's progress.
 struct TrainingProgress: Codable, Equatable {
     var skills: [String: SkillRecord] = [:]
     var items: [String: ItemRecord] = [:]
@@ -14,6 +18,25 @@ struct TrainingProgress: Codable, Equatable {
     var lastAccuracy: Double?
     /// The rating from the level check, when the learner took it.
     var placement: Int?
+
+    init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case skills, items, lessonsDone, mistakes, xp, streak, sessionsDone, lastAccuracy, placement
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        skills = try c.decodeIfPresent([String: SkillRecord].self, forKey: .skills) ?? [:]
+        items = try c.decodeIfPresent([String: ItemRecord].self, forKey: .items) ?? [:]
+        lessonsDone = try c.decodeIfPresent([String: Date].self, forKey: .lessonsDone) ?? [:]
+        mistakes = try c.decodeIfPresent([Lossy<GameMistake>].self, forKey: .mistakes)?.compactMap(\.value) ?? []
+        xp = try c.decodeIfPresent(Int.self, forKey: .xp) ?? 0
+        streak = try c.decodeIfPresent(Streak.self, forKey: .streak) ?? Streak()
+        sessionsDone = try c.decodeIfPresent(Int.self, forKey: .sessionsDone) ?? 0
+        lastAccuracy = try c.decodeIfPresent(Double.self, forKey: .lastAccuracy)
+        placement = try c.decodeIfPresent(Int.self, forKey: .placement)
+    }
 }
 
 /// A learner's level at one skill, on the same scale as drill ratings.
@@ -25,6 +48,28 @@ struct SkillRecord: Codable, Equatable {
     var gameHits = 0
     var gameMisses = 0
     var lastPracticed: Date?
+
+    init(rating: Double = Trainer.startingRating, attempts: Int = 0, solved: Int = 0,
+         gameHits: Int = 0, gameMisses: Int = 0, lastPracticed: Date? = nil) {
+        self.rating = rating
+        self.attempts = attempts
+        self.solved = solved
+        self.gameHits = gameHits
+        self.gameMisses = gameMisses
+        self.lastPracticed = lastPracticed
+    }
+
+    private enum CodingKeys: String, CodingKey { case rating, attempts, solved, gameHits, gameMisses, lastPracticed }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        rating = try c.decodeIfPresent(Double.self, forKey: .rating) ?? Trainer.startingRating
+        attempts = try c.decodeIfPresent(Int.self, forKey: .attempts) ?? 0
+        solved = try c.decodeIfPresent(Int.self, forKey: .solved) ?? 0
+        gameHits = try c.decodeIfPresent(Int.self, forKey: .gameHits) ?? 0
+        gameMisses = try c.decodeIfPresent(Int.self, forKey: .gameMisses) ?? 0
+        lastPracticed = try c.decodeIfPresent(Date.self, forKey: .lastPracticed)
+    }
 }
 
 /// Spaced-repetition state for one drill the learner has seen.
@@ -35,6 +80,25 @@ struct ItemRecord: Codable, Equatable {
     var attempts = 0
     var lastSeen: Date
     var lastSolved = false
+
+    init(box: Int = 0, due: Date, attempts: Int = 0, lastSeen: Date, lastSolved: Bool = false) {
+        self.box = box
+        self.due = due
+        self.attempts = attempts
+        self.lastSeen = lastSeen
+        self.lastSolved = lastSolved
+    }
+
+    private enum CodingKeys: String, CodingKey { case box, due, attempts, lastSeen, lastSolved }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        box = try c.decodeIfPresent(Int.self, forKey: .box) ?? 0
+        lastSeen = try c.decodeIfPresent(Date.self, forKey: .lastSeen) ?? .now
+        due = try c.decodeIfPresent(Date.self, forKey: .due) ?? lastSeen
+        attempts = try c.decodeIfPresent(Int.self, forKey: .attempts) ?? 0
+        lastSolved = try c.decodeIfPresent(Bool.self, forKey: .lastSolved) ?? false
+    }
 }
 
 /// A position from one of the learner's games where a better move was missed.
@@ -52,6 +116,41 @@ struct GameMistake: Codable, Hashable, Identifiable {
     var due: Date
     var attempts = 0
     var fixed = false
+
+    init(id: String, fen: String, best: String, played: String, skill: String, title: String,
+         created: Date, box: Int = 0, due: Date, attempts: Int = 0, fixed: Bool = false) {
+        self.id = id
+        self.fen = fen
+        self.best = best
+        self.played = played
+        self.skill = skill
+        self.title = title
+        self.created = created
+        self.box = box
+        self.due = due
+        self.attempts = attempts
+        self.fixed = fixed
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, fen, best, played, skill, title, created, box, due, attempts, fixed
+    }
+
+    /// The position and the moves are the mistake; everything else keeps a default.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        fen = try c.decode(String.self, forKey: .fen)
+        best = try c.decode(String.self, forKey: .best)
+        played = try c.decodeIfPresent(String.self, forKey: .played) ?? ""
+        skill = try c.decodeIfPresent(String.self, forKey: .skill) ?? ""
+        title = try c.decodeIfPresent(String.self, forKey: .title) ?? ""
+        created = try c.decodeIfPresent(Date.self, forKey: .created) ?? .now
+        box = try c.decodeIfPresent(Int.self, forKey: .box) ?? 0
+        due = try c.decodeIfPresent(Date.self, forKey: .due) ?? created
+        attempts = try c.decodeIfPresent(Int.self, forKey: .attempts) ?? 0
+        fixed = try c.decodeIfPresent(Bool.self, forKey: .fixed) ?? false
+    }
 }
 
 struct Streak: Codable, Equatable {
@@ -61,6 +160,23 @@ struct Streak: Codable, Equatable {
     var lastDay: String?
     /// The most recent day that was forgiven as a rest day.
     var restDay: String?
+
+    init(current: Int = 0, best: Int = 0, lastDay: String? = nil, restDay: String? = nil) {
+        self.current = current
+        self.best = best
+        self.lastDay = lastDay
+        self.restDay = restDay
+    }
+
+    private enum CodingKeys: String, CodingKey { case current, best, lastDay, restDay }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        current = try c.decodeIfPresent(Int.self, forKey: .current) ?? 0
+        best = try c.decodeIfPresent(Int.self, forKey: .best) ?? 0
+        lastDay = try c.decodeIfPresent(String.self, forKey: .lastDay)
+        restDay = try c.decodeIfPresent(String.self, forKey: .restDay)
+    }
 }
 
 /// How a drill went.

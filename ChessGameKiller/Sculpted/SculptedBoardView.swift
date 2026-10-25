@@ -22,14 +22,23 @@ struct SculptedSceneView: UIViewRepresentable {
     let look: SculptedLook
     let state: SculptedBoardState
 
+    @AppStorage(BoardTheme.coordinatesKey) private var showsCoordinates = true
+
+    /// The state with the Coordinates setting, which every 3D board follows.
+    private var shown: SculptedBoardState {
+        var shown = state
+        shown.showsCoordinates = showsCoordinates
+        return shown
+    }
+
     func makeUIView(context: Context) -> SculptedSceneKitView {
         let scene = stage.scene(for: look)
-        scene.apply(state, animated: false)
+        scene.apply(shown, animated: false)
         return scene.view
     }
 
     func updateUIView(_ view: SculptedSceneKitView, context: Context) {
-        stage.scene(for: look).apply(state, animated: !context.transaction.disablesAnimations)
+        stage.scene(for: look).apply(shown, animated: !context.transaction.disablesAnimations)
     }
 }
 
@@ -167,7 +176,8 @@ struct SculptedBoardView: View {
             targets: game.targets,
             lastMove: game.lastMove,
             checkedKing: game.checkedKing,
-            hints: match.hints.map { SculptedHint(from: $0.from, to: $0.to, isBest: $0.rank == 0) },
+            // Only the best move is lit: one thing to look at.
+            hints: match.bestHint.map { [SculptedHint(from: $0.from, to: $0.to, isBest: true)] } ?? [],
             flipped: flipped,
             lastCapture: game.captureEvents.last,
             halos: halos,
@@ -246,8 +256,8 @@ struct SculptedBoardView: View {
         var parts = [square.notation]
         if let occupant { parts.append(occupant.spokenName) }
         if game.targets.contains(square) { parts.append(occupant == nil ? "move here" : "capture") }
-        if let hint = match.hints.first(where: { $0.from == square }) {
-            parts.append(hint.rank == 0 ? "best move \(hint.san)" : "second best move \(hint.san)")
+        if let best = match.bestHint, best.from == square {
+            parts.append("hint: \(HintWords.phrase(for: best, in: game))")
         }
         return parts.joined(separator: ", ")
     }

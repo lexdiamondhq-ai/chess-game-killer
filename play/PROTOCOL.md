@@ -35,14 +35,20 @@ link by text or email; the friend opens it in the app or plays right in the brow
 ## Fair play (friend games)
 
 - No hints, arrows, grades or analysis in the app during a friend game. (After the game it may be reviewed.)
-- **Leaving forfeits a timed game.** Only when `clock != null`, the game is `active` and both sides have moved (ply ≥ 2):
-  a seat is *away* from the moment its client posts `away` or its last WebSocket closes. If it is still away
-  `leaveGraceMs` (20000) later, it loses with reason `left`. Posting `back`, opening a WebSocket or making a move
-  ends the absence. An absence that began before both sides had moved counts from the moment they have.
-  Two absences at once: whichever deadline passes first loses.
+- **Leaving lets the other side claim the win.** Only when `clock != null`, the game is `active` and both sides have
+  moved (ply ≥ 2): a seat is *away* from the moment its client posts `away` or its last WebSocket closes. Once it has
+  been away `leaveGraceMs` (60000), the other side may post `claim_win` and win with reason `left`, or keep waiting.
+  Leaving never ends a game by itself: the absent side's clock keeps running, so an unclaimed game still ends on time.
+  Each seat's `claimableAt` says when a claim becomes possible (`null` while it is here or the rule doesn't apply).
+  Posting `back`, opening a WebSocket or making a move ends the absence. An absence that began before both sides had
+  moved counts from the moment they have.
 - **Screenshots are reported.** The app posts `screenshot` when the player takes one (and `recording` when screen
   recording starts). The other side gets a notice; the counts are in the GameState.
 - Games with no clock have no leave rule: come and go as you like.
+- **Names are filtered.** A name that is a slur or plainly obscene (util.js `isOffensiveName`) becomes `"Player"`.
+- **Reports.** A player may post `report_name` or `report_cheating` about the other side, during or after the game.
+  A name report replaces that name with `"Player"` at once (in rematches too). Each kind counts once per player and
+  is written to the worker's logs as a `player_report` line (Cloudflare dashboard → Workers → play → Logs).
 
 ## GameState
 
@@ -56,8 +62,9 @@ Every REST reply carries `{ "game": GameState }`, and the WebSocket sends `{ "ty
   "updatedAt": 1761187200000,
   "clock": { "initial": 600, "increment": 0 },
   "creator": "white",
-  "white": { "name": "Alex", "seated": true, "online": true, "away": null, "screenshots": 0, "recordings": 0 },
-  "black": { "name": null, "seated": false, "online": false, "away": null, "screenshots": 0, "recordings": 0 },
+  "look": "gilded",
+  "white": { "name": "Alex", "seated": true, "online": true, "away": null, "claimableAt": null, "screenshots": 0, "recordings": 0 },
+  "black": { "name": null, "seated": false, "online": false, "away": null, "claimableAt": null, "screenshots": 0, "recordings": 0 },
   "moves": ["e2e4", "e7e5"],
   "san": ["e4", "e5"],
   "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
@@ -66,11 +73,15 @@ Every REST reply carries `{ "game": GameState }`, and the WebSocket sends `{ "ty
   "drawOffer": null,
   "rematch": null,
   "result": null,
-  "leaveGraceMs": 20000,
+  "leaveGraceMs": 60000,
   "now": 1761187200123
 }
 ```
 
+- `look`: the board look the creator plays with in the app (`BoardTheme.ID`, such as `"gilded"` or `"classic"`), so the
+  browser shows the same board. Sent on create; anything but 2–20 lowercase letters is dropped. `null` for games from
+  older apps: the browser then shows the app's default look. The browser's looks are exported from the app by
+  `scripts/play/export_looks.py` into `public/looks/`, `looks.css` and `looks.js`.
 - `status`: `"waiting"` (only the creator is seated), `"active"` (both seated, not over), `"over"`.
 - `white` / `black`: `seated` once someone holds that seat; `online` while that seat has an open WebSocket and is
   not away; `away` is the time the current absence began, or `null`.
@@ -85,7 +96,7 @@ Every REST reply carries `{ "game": GameState }`, and the WebSocket sends `{ "ty
   player's token from this game works for their seat in the new one**. Clients just switch to the new code.
 - `result`: `null` until over, then `{ "winner": "white" | "black" | null, "reason": REASON }`.
 
-Reasons: `checkmate`, `resign`, `timeout`, `left` (forfeit by leaving), `stalemate`, `repetition` (threefold),
+Reasons: `checkmate`, `resign`, `timeout`, `left` (the other side claimed the win after this side left), `stalemate`, `repetition` (threefold),
 `fifty_moves`, `insufficient`, `agreement`, `timeout_insufficient` (draw), `aborted` (stopped before both sides moved),
 `cancelled` (the creator withdrew before anyone joined), `expired` (nobody joined within 7 days, or no move for 30 days).
 
@@ -97,7 +108,7 @@ instead of the Authorization header, so a browser can report `away` with `naviga
 
 | Method & path | Body | Reply |
 | --- | --- | --- |
-| `POST /api/games` | `{ "name", "side": "white"\|"black"\|"random", "clock": {…}\|null }` | `201 { "code", "url", "appUrl", "seat", "token", "game" }` |
+| `POST /api/games` | `{ "name", "side": "white"\|"black"\|"random", "clock": {…}\|null, "look"? }` | `201 { "code", "url", "appUrl", "seat", "token", "game" }` |
 | `GET /api/games/{code}` | – | `200 { "game" }` |
 | `POST /api/games/{code}/join` | `{ "name" }` | `200 { "seat", "token", "game" }` |
 | `POST /api/games/{code}/move` | `{ "uci", "ply" }` + Bearer | `200 { "game" }` |
@@ -116,10 +127,12 @@ instead of the Authorization header, so a browser can report `away` with `naviga
     no offer from the other side), `decline_draw` (harmless when there's none),
   - `rematch` (after the game is over; see `rematch` above; asking again is harmless),
   - `away`, `back` (presence, see Fair play),
-  - `screenshot`, `recording` (reported to the other side; counted only while the game is `active`).
+  - `screenshot`, `recording` (reported to the other side; counted only while the game is `active`),
+  - `claim_win` (see Fair play; `cannot_claim` 409 when it's too early, the friend is back, or the rule doesn't apply),
+  - `report_name`, `report_cheating` (see Fair play; `bad_request` before anyone joined).
 
 Error codes: `not_found` 404, `bad_request` 400, `unauthorized` 401, `seat_taken` 409, `not_your_turn` 409,
-`stale` 409, `game_over` 409, `illegal_move` 422, `rate_limited` 429, and `server_error` 500 if something breaks on
+`stale` 409, `game_over` 409, `cannot_claim` 409, `illegal_move` 422, `rate_limited` 429, and `server_error` 500 if something breaks on
 the server (try again). A move before the friend has joined is `not_your_turn`.
 
 ## WebSocket

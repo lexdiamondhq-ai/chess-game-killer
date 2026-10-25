@@ -32,13 +32,12 @@ enum CoachMode: CaseIterable, Identifiable {
         }
     }
 
-    /// One line about the mode. How many hints it promises follows the
-    /// second-best setting, so the text matches what the game marks.
-    func detail(twoHints: Bool) -> String {
+    /// One line about the mode.
+    var detail: String {
         switch self {
-        case .full: return twoHints ? "Rates each move and marks your two best moves" : "Rates each move and marks your best move"
+        case .full: return "Rates each move and spotlights your best move"
         case .verdicts: return "Rates each move, no hints. A fair test."
-        case .hints: return twoHints ? "Marks your two best moves, no grades" : "Marks your best move, no grades"
+        case .hints: return "Spotlights your best move, no grades"
         case .silent: return "Just chess. The coach keeps quiet."
         }
     }
@@ -80,7 +79,6 @@ struct NewGameSheet: View {
     @AppStorage("setup.clock") private var timeControl: TimeControl = .unlimited
     @AppStorage("showBestMoves") private var showBestMoves = false
     @AppStorage("coachVerdicts") private var showVerdicts = true
-    @AppStorage("showSecondBest") private var showSecondBest = true
 
     @AppStorage("haptics") private var hapticsOn = true
 
@@ -259,7 +257,7 @@ struct NewGameSheet: View {
             if openRow == .coach {
                 optionList {
                     ForEach(CoachMode.allCases) { mode in
-                        OptionRow(title: mode.name, detail: mode.detail(twoHints: showSecondBest), isOn: draftCoach == mode, theme: theme) {
+                        OptionRow(title: mode.name, detail: mode.detail, isOn: draftCoach == mode, theme: theme) {
                             choose { draftCoach = mode }
                         }
                     }

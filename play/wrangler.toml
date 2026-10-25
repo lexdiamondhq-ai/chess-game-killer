@@ -14,6 +14,11 @@ directory = "./public"
 binding = "ASSETS"
 run_worker_first = ["/", "/c/*", "/api/*", "/.well-known/*"]
 
+# Keep the worker's logs, so player reports ("player_report") can be read in
+# the Cloudflare dashboard: Workers & Pages → play → Logs.
+[observability]
+enabled = true
+
 # Each game is one Durable Object (GameRoom in src/room.js), found by its code.
 [[durable_objects.bindings]]
 name = "GAMES"
@@ -25,8 +30,9 @@ tag = "v1"
 new_sqlite_classes = ["GameRoom"]
 
 [vars]
-# How long a player in a timed game may be away before losing by leaving.
-LEAVE_GRACE_MS = "20000"
+# How long a player in a timed game may be away before the other side may
+# claim the win (they choose to; leaving never ends a game by itself).
+LEAVE_GRACE_MS = "60000"
 # The shortest clock a game may have, in seconds. Tests lower both of these
 # with `wrangler dev --var LEAVE_GRACE_MS:1500 --var MIN_CLOCK_SECONDS:1`.
 MIN_CLOCK_SECONDS = "60"
