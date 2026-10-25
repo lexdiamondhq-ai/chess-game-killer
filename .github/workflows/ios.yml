@@ -140,6 +140,7 @@ jobs:
           home home
           home home-today -showcaseHomeAt today
           home home-ladder -showcaseHomeAt ladder
+          home home-friends -showcaseHomeAt friends
           xcrun simctl terminate "$UDID" $BUNDLE 2>/dev/null || true
       - name: Upload build log
         if: always()

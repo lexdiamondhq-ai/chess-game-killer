@@ -29,11 +29,10 @@ struct HomeActions {
 /// it and moves in on your king while the glass cards rise over it and it slips out of focus.
 ///
 /// The page, top to bottom: a chess clock (resume your game, or start the next one), today's
-/// puzzle and session, the ladder of rivals and the scoresheet of your games. Games with
-/// friends come right under the clock while one is going; otherwise Challenge a friend
-/// follows the ladder. The glass dock
-/// holds the five doors. Your pieces and Settings are in the You panel, from the dock or by
-/// pulling the board down. Each thing has one way in, so nothing is found twice.
+/// puzzle and session, the ladder of rivals and the scoresheet of your games. Challenge a
+/// friend sits right under the clock as a sealed envelope, with friend games still going
+/// below it. The glass dock holds the four doors. Your pieces, your games and Settings are in
+/// the You panel, from the dock or by pulling the board down. Each thing has one way in, so nothing is found twice.
 struct HomeView: View {
     let match: MatchController
     let theme: BoardTheme
@@ -95,6 +94,14 @@ struct HomeView: View {
 
     private var piecesLine: String {
         army.gamesPlayed == 0 ? "Every piece remembers its games" : "\(army.gamesPlayed) games together"
+    }
+
+    private var gamesLine: String {
+        switch vault.games.count {
+        case 0: return "Replay and rewrite your games"
+        case 1: return "1 game to replay and rewrite"
+        default: return "\(vault.games.count) games to replay and rewrite"
+        }
     }
 
     /// How far above the dock the page starts to fade away.
@@ -222,11 +229,9 @@ struct HomeView: View {
 
     @ViewBuilder
     private func sections(upNext: HomeUpNext) -> some View {
-        let friendGames = challenges?.store.sorted.filter { !$0.isOver } ?? []
-        // A friend's game still going comes first, under the clock.
-        if !friendGames.isEmpty {
-            friends(friendGames)
-        }
+        // Challenge a friend, sealed like an adjourned move, right under the clock; friend
+        // games still going follow it, your move first.
+        friends(challenges?.store.sorted.filter { !$0.isOver } ?? [])
 
         // Dated like a newspaper's chess column; it turns over at midnight with the page open.
         TimelineView(.everyMinute) { context in
@@ -245,11 +250,6 @@ struct HomeView: View {
         HomeLadderCard(ladder: ladder, tone: tone, pieceTheme: pieceTheme, youColor: upNext.playerColor,
                        play: { level in actions.playRival(level) })
 
-        // With none going, the way to start one follows the rivals.
-        if friendGames.isEmpty {
-            friends([])
-        }
-
         // The game under way is on the clock card. (A long one is also kept in Your games
         // while the app is away, in case iOS closes it.)
         let played = upNext.inProgress ? vault.games.filter { $0.id != match.gameID } : vault.games
@@ -264,15 +264,20 @@ struct HomeView: View {
         }
     }
 
-    /// Your games with friends and the way to start one: Challenge a friend opens the composer,
-    /// which lists every friend game too.
+    /// The way to start a game with a friend, then the ones going. Challenge a friend opens
+    /// the composer, which lists every friend game too.
     @ViewBuilder
     private func friends(_ games: [FriendGame]) -> some View {
         if let challenges {
-            HomeSectionHeader(title: "With friends", tone: tone)
-                .id("friends")
-            HomeFriendsCard(games: games, tone: tone, open: { challenges.play($0) }, challenge: { challenges.compose() })
-                .task { await challenges.refreshGames() }
+            VStack(spacing: 10) {
+                HomeChallengeCard(tone: tone) { challenges.compose() }
+                if !games.isEmpty {
+                    HomeFriendsCard(games: games, tone: tone, open: { challenges.play($0) })
+                }
+            }
+            .padding(.top, 12)
+            .id("friends")
+            .task { await challenges.refreshGames() }
         }
     }
 
@@ -343,7 +348,7 @@ struct HomeView: View {
             .onTapGesture { closeYou() }
             .transition(.opacity)
             .accessibilityHidden(true)
-        HomeYouPanel(tone: tone, piecesLine: piecesLine, actions: actions, fromTop: fromTop, close: closeYou)
+        HomeYouPanel(tone: tone, piecesLine: piecesLine, gamesLine: gamesLine, actions: actions, fromTop: fromTop, close: closeYou)
             .padding(.horizontal, 16)
             .padding(.top, fromTop ? 6 : 0)
             .padding(.bottom, fromTop ? 0 : 10)
