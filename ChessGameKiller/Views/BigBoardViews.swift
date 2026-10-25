@@ -91,7 +91,7 @@ struct BigBoardTray<Dock: View>: View {
                     Button(action: onGames) { Label("Your games", image: Glyphs.games) }
                 }
                 if let onArmy {
-                    Button(action: onArmy) { Label("Your army", image: Glyphs.army) }
+                    Button(action: onArmy) { Label("Your pieces", image: Glyphs.army) }
                 }
                 Button(action: onSettings) { Label("Settings", image: Glyphs.settings) }
             } label: {

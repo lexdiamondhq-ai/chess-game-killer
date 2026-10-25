@@ -3,6 +3,7 @@
 One beautiful iOS chess game, with every feature easy to reach and easy to understand.
 
 ## Features
+- A first run of four short pages: what the app is, how much chess you've played (which picks your first rival), your board, and the three rules that cost something (help halves the XP, leaving is a loss, rivals hold grudges). Then the first game starts. One-line tips appear the first time a hidden gesture would help, and Settings › How it works lists every gesture and rule
 - Play five computer rivals, Spark to Singularity (Stockfish 17 from Beginner to Grandmaster), each with its own portrait, board and a line about how it plays. Starting a new game while one is under way asks first, since leaving counts as a loss
 - Pick your side: White or Black (Gold or Violet on the Neon board), or random
 - Chess clocks: 3+2, 5+0, 10+0 or 15+10, or no clock. A clock starts with the first move and waits whenever another screen covers the board. The last ten seconds count down in tenths, and a fallen flag ends the game
