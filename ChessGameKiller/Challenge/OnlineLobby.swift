@@ -67,15 +67,6 @@ struct LobbyList: Decodable, Equatable, Sendable {
     }
 }
 
-/// Decodes an element if it can, nil if not.
-struct Lossy<Value: Decodable>: Decodable {
-    let value: Value?
-
-    init(from decoder: Decoder) throws {
-        value = try? Value(from: decoder)
-    }
-}
-
 /// The player's online rating.
 struct OnlineRating: Codable, Equatable, Sendable {
     var rating: Int
