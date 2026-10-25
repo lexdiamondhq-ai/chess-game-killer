@@ -3,7 +3,13 @@
 // between squares. Tap a piece then a square, or drag it. Legal moves show as dots on empty
 // squares and rings on captures.
 //
-// Piece artwork: the "cburnett" set by Colin M.L. Burnett, GPLv2+ (via Lichess), in /pieces.
+// Piece artwork: the "cburnett" set by Colin M.L. Burnett, GPLv2+ (via Lichess), in /pieces, for the
+// Classic look; every other look uses the app's own pictures in /looks (see looks.css).
+
+import { setLook } from './looks.js';
+
+// The app's default look until a game says which look the friend who sent the link plays with.
+setLook(document.documentElement.dataset.look);
 
 const FILES = 'abcdefgh';
 const PIECE_NAMES = { k: 'king', q: 'queen', r: 'rook', b: 'bishop', n: 'knight', p: 'pawn' };
@@ -59,6 +65,7 @@ export class Board {
     this.promo = null;
 
     this.root = el('div', 'board');
+    this.root.classList.toggle('flipped', this.orientation === 'black');
     if (opts.className) this.root.classList.add(...opts.className.split(' '));
     this.root.setAttribute('role', 'group');
     this.squaresEl = el('div', 'squares');
@@ -129,6 +136,7 @@ export class Board {
   setOrientation(orientation) {
     if (orientation === this.orientation) return;
     this.orientation = orientation;
+    this.root.classList.toggle('flipped', orientation === 'black');
     this.buildSquares();
     for (const [sq, p] of this.position) this.place(p.el, sq, false);
     this.refreshMarks();
@@ -136,6 +144,7 @@ export class Board {
 
   place(pieceEl, sq, animate = true) {
     const [c, r] = this.colRow(sq);
+    pieceEl.style.zIndex = r + 1; // the 3D pieces stand in front of the rank behind them
     if (!animate) {
       pieceEl.style.transition = 'none';
       pieceEl.style.transform = `translate(${c * 100}%, ${r * 100}%)`;

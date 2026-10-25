@@ -97,6 +97,7 @@ ${robots ? `<meta name="robots" content="${robots}">\n` : ''}<link rel="canonica
 <meta name="twitter:description" content="${esc(description)}">
 <meta name="twitter:image" content="${esc(image)}">
 <link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/looks.css">
 <link rel="modulepreload" href="/board.js">
 <link rel="modulepreload" href="/vendor/chess.js">
 <script type="module" src="/app.js"></script>`;
@@ -161,7 +162,7 @@ ${CREDITS}
 
   const opener = game.creator === 'white' ? 'black' : 'white';
   return `<!doctype html>
-<html lang="en" class="page-game">
+<html lang="en" class="page-game"${game.look ? ` data-look="${esc(game.look)}"` : ''}>
 <head>
 ${head({ title: `${ogTitle} · ${SITE}`, ogTitle, description, url, origin, robots: 'noindex' })}
 </head>

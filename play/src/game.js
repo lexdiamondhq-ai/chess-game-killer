@@ -108,7 +108,16 @@ export function parseCreateInput(body, { minClockSeconds = 60 } = {}) {
   if (!SIDES.includes(side)) return invalid('"side" must be "white", "black" or "random".');
   const clock = parseClock(input.clock, minClockSeconds);
   if (!clock.ok) return clock;
-  return { ok: true, value: { name: cleanName(name), side, clock: clock.clock } };
+  return { ok: true, value: { name: cleanName(name), side, clock: clock.clock, look: cleanLook(input.look) } };
+}
+
+/**
+ * The creator's board look in the app ("gilded", "classic", ...), shown to the friend in the
+ * browser. Only a short lowercase word is kept; anything else (or an older app sending none)
+ * is null, and the browser shows the app's default look.
+ */
+export function cleanLook(value) {
+  return typeof value === "string" && /^[a-z]{2,20}$/.test(value) ? value : null;
 }
 
 function randomSide() {
@@ -123,7 +132,7 @@ function newSeat(name, tokenHash) {
  * A new game with its creator seated. A "random" side is settled here, once,
  * so the creator knows their color from the start. pickSide is for tests.
  */
-export function createGame({ code, name, side = "random", clock = null, tokenHash, now, leaveGraceMs = 20000, pickSide = randomSide }) {
+export function createGame({ code, name, side = "random", clock = null, look = null, tokenHash, now, leaveGraceMs = 20000, pickSide = randomSide }) {
   const seat = side === "white" || side === "black" ? side : pickSide();
   const game = {
     v: 1,
@@ -132,6 +141,7 @@ export function createGame({ code, name, side = "random", clock = null, tokenHas
     updatedAt: now,
     clock: clock ? { initial: clock.initial, increment: clock.increment } : null,
     creator: seat,
+    look: cleanLook(look),
     leaveGraceMs,
     white: null,
     black: null,
@@ -167,6 +177,7 @@ export function rematchRecord(game, code, now, leaveGraceMs = game.leaveGraceMs)
     name: game.black.name,
     side: "white",
     clock: game.clock,
+    look: game.look,
     tokenHash: game.black.tokenHash,
     now,
     leaveGraceMs,
@@ -620,6 +631,7 @@ export function view(game, now, connected = {}) {
     updatedAt: game.updatedAt,
     clock: game.clock ? { initial: game.clock.initial, increment: game.clock.increment } : null,
     creator: game.creator,
+    look: game.look ?? null,
     white: seatView(game.white, connected.white),
     black: seatView(game.black, connected.black),
     moves: game.moves.slice(),
