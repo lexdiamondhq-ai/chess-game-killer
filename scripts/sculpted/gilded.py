@@ -7,7 +7,8 @@ import bpy, bmesh, math, numpy as np, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pieces import (arc, bead, cove, ogee, line, lathe, uvsphere, rbox, cut, group, mitre_profile, mitre_cut,
                     prism, crenel, shade, ring_lathe, merlon_caps, TAU,
-                    beads, gadroons, compose, radius_at, slits, FRONT)
+                    beads, gadroons, compose, radius_at, slits, FRONT,
+                    pattee, squash_above, cross_finish, crown_gems, KING_H, LATIN_TOP, QUEEN_TOP, QUEEN_H)
 
 FOOT = 0.118          # top of every base: the piece's body starts here
 
@@ -86,8 +87,8 @@ def knight(M, parts, fin):
 
 
 # ---------- the turned pieces ----------
-# The classic set's tops at its heights (see pieces.py): a thick gold cross, a coronet of eight
-# gold-tipped spikes, a pointed mitre cut through to its gold core, a tower with five square
+# The classic set's tops at its heights (see pieces.py): a long Latin cross, a low coronet of
+# twelve gold balls, a pointed mitre cut through to its gold core, a tower with five square
 # merlons capped in gold round a dark well, one round ball. Smooth polished bodies; the gold is a band under
 # each piece, a few stripes on the body as on the knight's mane, a band at the collar and the crown.
 
@@ -131,67 +132,48 @@ def stripes(name, prof, z_top, M, widths=(0.014, 0.014, 0.014), gap=0.013):
 
 
 def king(M):
+    """The Latin king (see pieces.py) in the gilded finish: a long cross, ivory on the ivory king and
+    gold on the onyx one, amber stones round the crown."""
     R = 0.31; p = base_profile(R) + body_start(R)
-    p += ogee(R - 0.115, 0.15, 0.135, 0.56, 32)
+    p += ogee(R - 0.115, 0.15, 0.125, 0.62, 32)
     body_top = len(p)
-    p += line(0.135, 0.56, 0.16, 0.572, 2); p += bead(0.177, 0.572, 0.03)
-    p += line(0.17, 0.602, 0.208, 0.61, 2); p += bead(0.213, 0.61, 0.036)
-    p += line(0.198, 0.646, 0.12, 0.66, 2)
-    p += cove(0.12, 0.66, 0.205, 0.8)
-    p += bead(0.207, 0.8, 0.024, 10)
-    p += line(0.195, 0.824, 0.183, 0.828, 1)
-    p += [(0.183 * math.cos(t), 0.828 + 0.085 * math.sin(t)) for t in np.linspace(0, math.pi / 2 * 0.86, 16)]
+    p += line(0.125, 0.62, 0.15, 0.632, 2); p += bead(0.168, 0.632, 0.03)
+    p += line(0.16, 0.662, 0.2, 0.67, 2); p += bead(0.205, 0.67, 0.036)
+    p += line(0.19, 0.706, 0.11, 0.72, 2)
+    p += cove(0.11, 0.72, 0.17, 0.84); p += bead(0.17, 0.84, 0.024, 10)
+    p += line(0.158, 0.864, 0.07, 0.875, 2)
+    p += [(0.07 * math.cos(t), 0.875 + 0.03 * math.sin(t)) for t in np.linspace(0, math.pi / 2 * 0.9, 8)]
     top = p[-1]; p += line(top[0], top[1], 0.0, top[1], 3)
-    objs = [lathe('K', p, mod=gadroons(0.668, 0.792, 20, 0.011), mat=M['body']), band('Kband', R, M), band_beads('Kbeadband', R, M)]
-    # four amber stones round the gadrooned crown, one facing the player
-    for i in range(4):
-        a = FRONT + i * math.pi / 2; rr = radius_at(p, 0.73) + 0.006
-        g = uvsphere(f'Kgem{i}', 0.026, (rr * math.cos(a), rr * math.sin(a), 0.73), M['gem'])
-        g.scale = (0.55, 0.55, 1.0); g.rotation_euler = (0, 0, a); objs.append(g)
-    objs += stripes('Kst', p[:body_top], 0.535, M)
-    objs.append(flat_band('Kring', 0.234, 0.612, 0.644, M))
-    objs.append(beads('Kbeadcrown', 0.2215, 0.812, 44, 0.0118, M['metal']))
-    zt = top[1] - 0.008
-    objs.append(lathe('Kcush', [(0.0, zt - 0.005), (0.065, zt - 0.005), (0.076, zt + 0.012), (0.056, zt + 0.03), (0.0, zt + 0.03)], seg=128, mat=M['metal']))
-    # the classic king's thick cross, in gold, an amber stone either side of its middle
-    H = 1.336; bar = 0.12; span = 0.36
-    z0 = zt + 0.02; zc = H - 0.115 - bar / 2
-    objs.append(rbox('Kcv', (bar, bar, H - z0), (0, 0, (H + z0) / 2), M['metal'], 0.024))
-    objs.append(rbox('Kch', (span, bar, bar), (0, 0, zc), M['metal'], 0.024))
-    for y in (-bar / 2, bar / 2):
-        objs.append(uvsphere('Kgem', 0.034, (0, y, zc), M['gem'], (1, 0.45, 1)))
+    objs = [lathe('K', p, mod=gadroons(0.73, 0.83, 18, 0.01), mat=M['body']), band('Kband', R, M), band_beads('Kbeadband', R, M)]
+    objs += crown_gems('Kgem', p, 0.79, M)
+    objs += stripes('Kst', p[:body_top], 0.595, M)
+    objs.append(flat_band('Kring', 0.226, 0.672, 0.704, M))
+    objs.append(beads('Kbeadcrown', 0.182, 0.852, 36, 0.011, M['metal']))
+    objs += pattee('Kcross', 0.89, LATIN_TOP, 1.30, 0.30, 0.075, 0.10, 0.075, cross_finish(M))
+    squash_above(objs, 0.2, (KING_H - 0.2) / (LATIN_TOP - 0.2))
     return group('king', objs)
 
 
 def queen(M):
+    """The short queen (see pieces.py) in the gilded finish: a low coronet ringed with twelve gold balls."""
     R = 0.30; p = base_profile(R) + body_start(R)
     p += ogee(R - 0.115, 0.15, 0.12, 0.5, 32)
     body_top = len(p)
     p += line(0.12, 0.5, 0.145, 0.512, 2); p += bead(0.162, 0.512, 0.028)
     p += line(0.157, 0.54, 0.195, 0.548, 2); p += bead(0.2, 0.548, 0.033)
     p += line(0.185, 0.581, 0.105, 0.596, 2)
-    p += cove(0.105, 0.596, 0.19, 0.75)
-    # the coronet flares wide into eight tall spikes, each tipped with a gold ball
-    ZR = 0.96; RO = 0.268; RI = 0.236
-    p += line(0.19, 0.75, RO, ZR, 8)
-    p += line(RO, ZR, RI, ZR, 2)
-    p += line(RI, ZR, 0.172, 0.82, 4)
-    p += [(0.172 * math.cos(t), 0.82 + 0.05 * math.sin(t)) for t in np.linspace(0, math.pi / 2 * 0.8, 10)]
+    ZR = 0.80
+    p += cove(0.105, 0.596, 0.25, ZR - 0.02); p += line(0.25, ZR - 0.02, 0.262, ZR, 2); p += line(0.262, ZR, 0.23, ZR, 2)
+    p += line(0.23, ZR, 0.15, 0.74, 4)
+    p += [(0.15 * math.cos(t), 0.74 + 0.035 * math.sin(t)) for t in np.linspace(0, math.pi / 2 * 0.8, 8)]
     top = p[-1]; p += line(top[0], top[1], 0.0, top[1], 3)
-    body = lathe('Q', p, mod=gadroons(0.605, 0.745, 16, 0.01), mat=M['body'])
+    body = lathe('Q', p, mod=gadroons(0.62, 0.77, 18, 0.012), mat=M['body'])
     objs = [body, band('Qband', R, M), band_beads('Qbeadband', R, M), beads('Qbeadcollar', 0.1715, 0.526, 36, 0.0105, M['metal'])]
-    NPT = 8; apex = 0.845; hw = 0.088 * (ZR + 0.06 - apex) / (ZR - apex)
-    for i in range(NPT):
-        a = TAU * (i + 0.5) / NPT
-        cut(body, prism(f'Qn{i}', [(-hw, ZR + 0.06), (hw, ZR + 0.06), (0, apex)], 0.12, 0.36, a))
-    for i in range(NPT):
-        a = TAU * i / NPT; objs.append(uvsphere(f'Qball{i}', 0.043, (math.cos(a) * 0.252, math.sin(a) * 0.252, ZR + 0.026), M['metal']))
+    for i in range(12):
+        a = TAU * i / 12; objs.append(uvsphere(f'Qball{i}', 0.036, (math.cos(a) * 0.247, math.sin(a) * 0.247, ZR + 0.03), M['metal']))
     objs += stripes('Qst', p[:body_top], 0.475, M)
     objs.append(flat_band('Qring', 0.2195, 0.5505, 0.5785, M))
-    objs.append(sleeve('Qcrown', p, 0.79, 0.816, M))
-    zt = top[1]; zb = 1.08 - 0.058
-    objs.append(lathe('Qstem', [(0.0, zt - 0.01), (0.04, zt - 0.01), (0.022, zb - 0.02), (0.0, zb - 0.02)], seg=96, mat=M['metal']))
-    objs.append(uvsphere('Qtopball', 0.058, (0, 0, zb), M['metal']))
+    squash_above(objs, 0.2, (QUEEN_H - 0.2) / (QUEEN_TOP - 0.2))
     return group('queen', objs)
 
 

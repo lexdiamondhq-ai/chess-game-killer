@@ -162,6 +162,7 @@ struct LevelCheckView: View {
                                 ? { (square: Square) in runner.tap(square) } : nil
                         )
                         .frame(width: boardSide, height: boardSide)
+                        .boardHeadroom(theme: theme, side: boardSide)
                         .id(ObjectIdentifier(drill))
                         .transition(.opacity)
                         TurnBadge(theme: theme, side: drill.learner,
