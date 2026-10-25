@@ -82,7 +82,7 @@ struct SettingsSheet: View {
                                       symbol: "lightbulb", isOn: $showSecondBest, theme: theme)
                                 .disabled(!showBestMoves)
                             rule
-                            ToggleRow(title: "Ghost Vision", subtitle: "Hold the board to see the computer's line a few moves ahead. Slide left to step back through it. Counts as help.",
+                            ToggleRow(title: "See ahead", subtitle: "Ghost Vision. Hold the board to see the computer's line a few moves ahead. Slide left to step back through it. Counts as help.",
                                       symbol: "eye", isOn: $ghostVisionOn, theme: theme)
                             rule
                             ToggleRow(title: "Move grades", subtitle: "Rates each move you play, from Best to Blunder.",
@@ -123,6 +123,17 @@ struct SettingsSheet: View {
 
                     section("About") {
                         SettingsGroup(theme: theme) {
+                            // Every gesture and every rule that costs something, in plain words.
+                            NavigationLink {
+                                GuideView(theme: theme) {
+                                    Welcome.reset()
+                                    dismiss()
+                                }
+                            } label: {
+                                LinkRowLabel(title: "How it works", symbol: "questionmark.circle", theme: theme)
+                            }
+                            .buttonStyle(.plain)
+                            rule
                             NavigationLink {
                                 LicensesView(theme: theme)
                             } label: {
