@@ -19,7 +19,7 @@ One beautiful iOS chess game, with every feature easy to reach and easy to under
 - Training with Coach Leo, a grandmaster coach: narrated lessons, daily puzzles and your own mistakes to fix (see below)
 
 ## Stack
-- SwiftUI, iOS 17+
+- SwiftUI, iOS 17+, iPhone only for now (iPad once it has a layout of its own)
 - Xcode project generated with [XcodeGen](https://github.com/yonaskolb/XcodeGen)
 - [ChessKit](https://github.com/chesskit-app/chesskit-swift) for the rules
 - [ChessKitEngine](https://github.com/chesskit-app/chesskit-engine) to run Stockfish on the device
