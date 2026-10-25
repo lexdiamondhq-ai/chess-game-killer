@@ -541,7 +541,7 @@ struct ContentView: View {
             // the earlier position laid over it.
             BoardView(match: match, theme: theme, browsing: browsedPosition, endBrowsing: {
                 withAnimation(.snappy) { browsePly = nil }
-            }, vision: ghostVisionOn ? vision : nil)
+            }, vision: ghostVisionOn ? vision : nil, framing: .seated)
             if !BoardView.playsIn3D(theme, setting: sculpted3D), let ply = browsePly,
                let fen = match.game.positionFENs[safe: ply], let draft = PositionDraft(fen: fen) {
                 PositionBoard(draft: draft, theme: theme, flipped: match.isBoardFlipped) { _ in
@@ -568,7 +568,7 @@ struct ContentView: View {
 
     /// Width over height of the board in play: 1 for the flat looks, wider for the 3D board.
     private var boardAspect: CGFloat {
-        BoardView.aspect(theme, setting: sculpted3D)
+        BoardView.aspect(theme, setting: sculpted3D, framing: bigBoard ? .seated : .standing)
     }
 
     /// One position for every ~34 points of sideways drag.

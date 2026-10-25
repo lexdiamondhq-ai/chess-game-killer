@@ -66,6 +66,8 @@ struct SculptedBoardState: Equatable {
     var finale: SculptedFinale?
     /// Ghost Vision's line, nearest step first, while the player holds the board.
     var ghosts: [SculptedGhostStep] = []
+    /// Seen from the player's chair, or from above with each piece inside its square (Big Board).
+    var framing: SculptedCamera.Framing = .standing
     /// The pieces come without lasting ids (an earlier position of the game, a preview):
     /// the scene matches them to the pieces on the board so each one moves rather than fades.
     var matchesPieces = false
@@ -287,6 +289,9 @@ final class SculptedBoardScene {
             endFinale(animated: animate && old.flipped == new.flipped)
         }
         labelsNode.isHidden = !new.showsCoordinates
+        if old.framing != new.framing {
+            reframe(new.framing, animated: animate && old.flipped == new.flipped)
+        }
         if old.flipped != new.flipped {
             orbit(flipped: new.flipped, animated: animate && old.flipped != new.flipped)
         }
@@ -426,7 +431,7 @@ final class SculptedBoardScene {
             return
         }
         let flipped = state?.flipped ?? false
-        camera = .fitted(aspect: Float(newSize.width / newSize.height), flipped: flipped)
+        camera = .fitted(aspect: Float(newSize.width / newSize.height), flipped: flipped, framing: framing)
         cameraNode.removeAction(forKey: "orbit")
         place(camera)
         if let point = leanPoint {
@@ -498,6 +503,7 @@ final class SculptedBoardScene {
         node.root.addChildNode(model)
         node.root.simdPosition = SculptedCamera.position(of: placed.square)
         node.root.simdOrientation = simd_quatf(angle: (state?.flipped ?? false) ? .pi : 0, axis: SculptedCamera.up)
+        node.root.simdScale = SIMD3(repeating: framing.pieceScale)
         // The blob is a plane laid flat, so its own x and y are the board's x and z.
         node.contact.scale = SCNVector3(node.baseRadius / 0.33, node.baseRadius / 0.33, 1)
         setPose(node, y: 0)
@@ -1101,6 +1107,7 @@ final class SculptedBoardScene {
         let node = PieceNode(id: -1, piece: piece, model: model, contact: contact)
         node.root.name = "ghost"
         node.root.renderingOrder = 20
+        node.root.simdScale = SIMD3(repeating: framing.pieceScale)
         node.root.addChildNode(model)
         setPose(node, y: 0)
         return node
@@ -1352,6 +1359,7 @@ final class SculptedBoardScene {
     }
 
     private func place(_ camera: SculptedCamera) {
+        cameraNode.camera?.fieldOfView = CGFloat(camera.fieldOfView * 180 / .pi)
         cameraNode.simdPosition = camera.eye
         cameraNode.simdLook(at: camera.target, up: SculptedCamera.up, localFront: SCNNode.simdLocalFront)
         rig.simdOrientation = simd_quatf(angle: camera.azimuth, axis: SculptedCamera.up)
@@ -1360,7 +1368,7 @@ final class SculptedBoardScene {
     /// Walks the camera around to the other side, and turns the pieces and labels with it
     /// so they keep facing the player.
     private func orbit(flipped: Bool, animated: Bool) {
-        let target = SculptedCamera.fitted(aspect: camera.aspect, flipped: flipped)
+        let target = SculptedCamera.fitted(aspect: camera.aspect, flipped: flipped, framing: framing)
         let turn: Float = flipped ? .pi : 0
         camera = target
         // The walk takes over from any lean toward a fallen king.
@@ -1397,6 +1405,50 @@ final class SculptedBoardScene {
             .wait(duration: duration * 0.5),
             .fadeIn(duration: duration * 0.3),
         ]))
+    }
+
+    /// How the board is seen now.
+    private var framing: SculptedCamera.Framing { state?.framing ?? .standing }
+
+    /// Moves the camera to the new framing and sizes the pieces for it: up above for Big Board,
+    /// each piece inside its square, or back down to the player's chair.
+    private func reframe(_ framing: SculptedCamera.Framing, animated: Bool) {
+        let scale = SIMD3<Float>(repeating: framing.pieceScale)
+        let pieces = Array(nodes.values) + Array(ghostNodes.values)
+        guard heldCamera == nil else {
+            for node in pieces { node.root.simdScale = scale }
+            return
+        }
+        let from = camera
+        let target = SculptedCamera.fitted(aspect: camera.aspect, flipped: state?.flipped ?? false, framing: framing)
+        camera = target
+        leanPoint = nil
+        cameraNode.removeAction(forKey: "finale")
+        cameraNode.removeAction(forKey: "orbit")
+        guard animated, !UIAccessibility.isReduceMotionEnabled else {
+            place(target)
+            for node in pieces { node.root.simdScale = scale }
+            return
+        }
+        let duration = 0.45
+        let lens = cameraNode.camera
+        let move = SCNAction.customAction(duration: duration) { node, elapsed in
+            let u = Ease.smooth(Float(Double(elapsed) / duration))
+            var step = target
+            step.elevation = from.elevation + (target.elevation - from.elevation) * u
+            step.fieldOfView = from.fieldOfView + (target.fieldOfView - from.fieldOfView) * u
+            step.distance = from.distance + (target.distance - from.distance) * u
+            step.focus = from.focus + (target.focus - from.focus) * u
+            lens?.fieldOfView = CGFloat(step.fieldOfView * 180 / .pi)
+            node.simdPosition = step.eye
+            node.simdLook(at: step.target, up: SculptedCamera.up, localFront: SCNNode.simdLocalFront)
+        }
+        cameraNode.runAction(move, forKey: "orbit")
+        for node in pieces {
+            let size = SCNAction.scale(to: CGFloat(framing.pieceScale), duration: duration)
+            size.timingMode = .easeInEaseOut
+            node.root.runAction(size, forKey: "size")
+        }
     }
 
     private func buildLights() {
