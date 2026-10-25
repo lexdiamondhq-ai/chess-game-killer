@@ -147,11 +147,12 @@ final class SculptedBoardScene {
         view.scene = scene
         view.backgroundColor = .clear
         view.isOpaque = false
-        view.antialiasingMode = .multisampling4X
         // No jittering: it keeps redrawing a still board, which takes the CPU and GPU
-        // from Stockfish while the computer thinks. 60 frames a second is smooth enough.
+        // from Stockfish while the computer thinks. 60 frames a second is smooth enough,
+        // and 30 with lighter smoothing on a hot phone or in Low Power Mode (see applyPower).
         view.isJitteringEnabled = false
-        view.preferredFramesPerSecond = 60
+        applyPower()
+        watchPower()
         view.isUserInteractionEnabled = false
         view.accessibilityElementsHidden = true
         view.autoenablesDefaultLighting = false
@@ -168,6 +169,29 @@ final class SculptedBoardScene {
         }
         buildLabels(flipped: false)
         view.onLayout = { [weak self] size in self?.layout(size) }
+    }
+
+    deinit {
+        for observer in powerObservers { NotificationCenter.default.removeObserver(observer) }
+    }
+
+    // MARK: Power
+
+    private var powerObservers: [NSObjectProtocol] = []
+
+    /// Draws at 60 frames a second with 4x smoothing, or at 30 with 2x when the phone should
+    /// hold back. `PowerPolicy` says which; the scene follows the same notifications it does.
+    func applyPower(constrained: Bool = PowerPolicy.systemConstrained()) {
+        view.preferredFramesPerSecond = PowerPolicy.framesPerSecond(constrained: constrained)
+        view.antialiasingMode = constrained ? .multisampling2X : .multisampling4X
+    }
+
+    private func watchPower() {
+        for name in [ProcessInfo.thermalStateDidChangeNotification, Notification.Name.NSProcessInfoPowerStateDidChange] {
+            powerObservers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                self?.applyPower()
+            })
+        }
     }
 
     // MARK: Reading the view

@@ -103,7 +103,7 @@ final class ChallengeSnapshotTests: XCTestCase {
         let now = realNow
         var state = FriendGameState.sample(moves: Self.ruyLopez, now: now)
         state.clocks = FriendGameState.Clocks(white: 312_400, black: 287_900, running: .white, since: now - 4_000)
-        // Away for about six and a half seconds when the picture is taken: "Away · 14s".
+        // Away for about six and a half seconds when the picture is taken: "Away · 54s".
         state.black.away = now - 3_300
         state.black.online = false
         api.games[state.code] = state
@@ -111,6 +111,37 @@ final class ChallengeSnapshotTests: XCTestCase {
         let center = makeCenter(api, games: [record])
         center.play(record, initial: state)
         try snapshot("challenge-game", center: center, wait: 3)
+        center.dismiss()
+    }
+
+    /// The friend left over a minute ago: the claim offer over the dock, Wait or Claim win.
+    func testClaimTheWin() throws {
+        defaults.set(false, forKey: "sculpted3D")
+        let api = FakeChallengeAPI()
+        let now = realNow
+        var state = FriendGameState.sample(moves: Self.ruyLopez, now: now)
+        state.clocks = FriendGameState.Clocks(white: 241_000, black: 198_500, running: .white, since: now - 1_500)
+        state.black.away = now - 75_000
+        state.black.claimableAt = now - 15_000
+        state.black.online = false
+        api.games[state.code] = state
+        let record = FriendGame.sample(state, seat: .white)
+        let center = makeCenter(api, games: [record])
+        center.play(record, initial: state)
+        try snapshot("challenge-claim-win", center: center)
+        center.dismiss()
+    }
+
+    /// A game just begun: the fair-play rules across the top of the first screen.
+    func testFairPlayOnTheFirstScreen() throws {
+        defaults.set(false, forKey: "sculpted3D")
+        let api = FakeChallengeAPI()
+        let state = FriendGameState.sample(now: realNow)
+        api.games[state.code] = state
+        let record = FriendGame.sample(state, seat: .white)
+        let center = makeCenter(api, games: [record])
+        center.play(record, initial: state)
+        try snapshot("challenge-fair-play", center: center)
         center.dismiss()
     }
 

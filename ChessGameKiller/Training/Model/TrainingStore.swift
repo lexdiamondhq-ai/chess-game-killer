@@ -44,14 +44,8 @@ final class TrainingStore {
 
     /// The app's store: the bundled course and the progress saved on this device.
     static func live() -> TrainingStore {
-        let url = try? FileManager.default
-            .url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-            .appendingPathComponent("training-progress.json")
-        var progress = TrainingProgress()
-        if let url, let data = try? Data(contentsOf: url),
-           let saved = try? JSONDecoder().decode(TrainingProgress.self, from: data) {
-            progress = saved
-        }
+        let url = ProgressFile.url("training-progress.json")
+        let progress = ProgressFile.read(TrainingProgress.self, at: url) ?? TrainingProgress()
         return TrainingStore(library: TrainingLibrary.shared, progress: progress, fileURL: url)
     }
 

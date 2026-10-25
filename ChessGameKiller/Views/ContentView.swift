@@ -51,6 +51,9 @@ struct ContentView: View {
     @State private var talk: TalkSession?
     /// The move the player pressed Play on in Talk it through, made once the talk has slid away.
     @State private var talkMove: PendingTalkMove?
+    /// The first-run welcome, over everything until the player starts or skips.
+    @State private var showingWelcome: Bool
+    @AppStorage(Welcome.key) private var welcomeSeen = false
 
     /// The app opens on the home screen when it is on, otherwise on the New Game sheet;
     /// tests and screenshots that picture the game screen skip both, and may open the coach.
@@ -59,8 +62,10 @@ struct ContentView: View {
         if let match { _match = State(initialValue: match) }
         if let vision { _vision = State(initialValue: vision) }
         let home = startsAtHome ?? (startsWithNewGame && HomeScreen.isOn())
+        let welcome = startsWithNewGame && !Welcome.isUnderTest && Welcome.shouldShow()
         _showingHome = State(initialValue: home)
-        _showingNewGame = State(initialValue: startsWithNewGame && !home)
+        _showingWelcome = State(initialValue: welcome)
+        _showingNewGame = State(initialValue: startsWithNewGame && !home && !welcome)
         _trayOpen = State(initialValue: trayOpen)
         _coachExpanded = State(initialValue: coachOpen)
     }
@@ -84,7 +89,7 @@ struct ContentView: View {
         scenePhase != .active || showingHome || showingTraining || showingArmy || showingPuzzles || showingGames
             || showingNewGame || showingSettings || showingAnalyze
             || coach.presentedLesson != nil || coach.presentedSession != nil
-            || challenges?.isPresenting == true || talk != nil
+            || challenges?.isPresenting == true || talk != nil || showingWelcome
     }
     /// Starting a game now would cost the one in progress: the rival it is against, so the
     /// screens that start games can ask first.
@@ -135,6 +140,18 @@ struct ContentView: View {
         // Fonts read the look from here: rounded on Neon, plain SF Pro on the rest.
         let _ = ThemeFont.use(theme)
         presented
+            .overlay {
+                if showingWelcome {
+                    WelcomeFlow(canStartGame: !match.newGameForfeits, page: Welcome.showcasePage()) { play, choice in
+                        finishWelcome(play: play, choice: choice)
+                    }
+                    .transition(.opacity)
+                }
+            }
+            .onChange(of: welcomeSeen) { _, seen in
+                // Settings › How it works › Replay the welcome.
+                if !seen { withAnimation(.easeInOut(duration: 0.35)) { showingWelcome = true } }
+            }
             .onAppear {
                 syncCoachSettings()
                 // A game left unfinished when a new one starts is still kept.
@@ -358,6 +375,23 @@ struct ContentView: View {
         )
     }
 
+    /// Tips keep out of the way of the army's news, the unfolded coach and a held board.
+    private var tipsBlocked: Bool {
+        armyNews != nil || coachExpanded || vision.isHolding || showingWelcome
+    }
+
+    /// The welcome is done: start the first game, or leave the player on the home (or the New Game sheet).
+    private func finishWelcome(play: Bool, choice: WelcomeChoice) {
+        withAnimation(.easeInOut(duration: 0.35)) { showingWelcome = false }
+        syncCoachSettings()
+        if play {
+            withAnimation(.snappy) { match.start(choice.setup()) }
+            leaveHome()
+        } else if !showingHome, !match.hasStarted {
+            showingNewGame = true
+        }
+    }
+
     private func leaveHome() {
         guard showingHome else { return }
         withAnimation(.easeInOut(duration: 0.35)) { showingHome = false }
@@ -388,6 +422,14 @@ struct ContentView: View {
                         .padding(.bottom, 8)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
+                }
+                // A one-line tip the first time a hidden gesture or a rule would help.
+                .overlay(alignment: .bottom) {
+                    GameTips(match: match, theme: theme, bigBoard: bigBoard, ghostVisionOn: ghostVisionOn,
+                             blocked: tipsBlocked)
+                        .frame(maxWidth: Self.dockMaxWidth)
+                        .padding(.horizontal, Self.inset)
+                        .padding(.bottom, 8)
                 }
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     let coachHeight = screen.size.height * Self.coachShare
@@ -626,7 +668,7 @@ struct ContentView: View {
                 Button {
                     showingArmy = true
                 } label: {
-                    Label("Your army", image: Glyphs.army)
+                    Label("Your pieces", image: Glyphs.army)
                 }
                 Button {
                     showingSettings = true

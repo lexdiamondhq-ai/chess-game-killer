@@ -242,7 +242,7 @@ ${BRAND}
   <div class="home-board" id="home-board" aria-hidden="true"></div>
 
   <ul class="points">
-    <li><span class="point-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg></span><div><h2>Fair play, built in</h2><p>No hints or engines. In a timed game, leaving the page for 20 seconds forfeits.</p></div></li>
+    <li><span class="point-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg></span><div><h2>Fair play, built in</h2><p>No hints or engines. In a timed game, leave for over a minute and your friend can claim the win.</p></div></li>
     <li><span class="point-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9.5 2.5h5"/></svg></span><div><h2>Any pace</h2><p>Blitz, rapid, or no clock at all. Moves arrive the instant they’re made.</p></div></li>
     <li><span class="point-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg></span><div><h2>${SITE} for iPhone</h2><p>Lessons, puzzles and five rivals to beat. Coming soon to the App Store.</p></div></li>
   </ul>

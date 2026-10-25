@@ -89,6 +89,8 @@ jobs:
           grep -E "error:|Test Case .* failed|\*\* " build.log | head -80 || true
           grep -E "Executed" build.log | tail -3 || true
           grep -E "\] TIMING " build.log | head -120 || true
+          # The app's own encoding of each progress file, next to the hand-written ones in ProgressFileTests.
+          grep -E "\] FIXTURE " build.log | head -40 || true
           # On a crash: which test was running, and the lines around the error.
           if [ "$status" != 0 ]; then
             grep -E "Restarting after|Test Case '.*' started" build.log | tail -4 || true
@@ -138,10 +140,17 @@ jobs:
             sleep 12
             xcrun simctl io "$UDID" screenshot "snapshots/device-$name.png" >/dev/null && echo "device-$name.png" || echo "No screenshot for $name"
           }
-          home home
-          home home-today -showcaseHomeAt today
-          home home-ladder -showcaseHomeAt ladder
-          home home-friends -showcaseHomeAt friends
+          # The home as a returning player sees it: no welcome, no tips.
+          home home -welcomeSeen YES -tipsOff YES
+          home home-today -showcaseHomeAt today -welcomeSeen YES -tipsOff YES
+          home home-ladder -showcaseHomeAt ladder -welcomeSeen YES -tipsOff YES
+          home home-friends -showcaseHomeAt friends -welcomeSeen YES -tipsOff YES
+          # The first run's four pages, then a tip on the game screen.
+          home welcome-1 -showcaseWelcome 0
+          home welcome-2 -showcaseWelcome 1
+          home welcome-3 -showcaseWelcome 2
+          home welcome-4 -showcaseWelcome 3
+          shoot tip-ghost -showcaseLook gilded -showcase3D NO -showcaseTip ghostVision
           xcrun simctl terminate "$UDID" $BUNDLE 2>/dev/null || true
       - name: Upload build log
         if: always()

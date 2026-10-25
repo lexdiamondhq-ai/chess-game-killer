@@ -76,22 +76,10 @@ final class PuzzleStore {
     }
 
     static func live() -> PuzzleStore {
-        let folder = try? FileManager.default
-            .url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-        let url = folder?.appendingPathComponent("puzzle-progress.json")
-        let cyclesURL = folder?.appendingPathComponent("puzzle-cycles.json")
-        return PuzzleStore(progress: read(PuzzleProgress.self, from: url) ?? PuzzleProgress(), fileURL: url,
-                           cycles: read(PuzzleCycleFile.self, from: cyclesURL) ?? PuzzleCycleFile(), cyclesURL: cyclesURL)
-    }
-
-    private static func read<Saved: Decodable>(_ type: Saved.Type, from url: URL?) -> Saved? {
-        guard let url, let data = try? Data(contentsOf: url) else { return nil }
-        do {
-            return try JSONDecoder().decode(type, from: data)
-        } catch {
-            NSLog("Couldn't read %@: %@", url.lastPathComponent, "\(error)")
-            return nil
-        }
+        let url = ProgressFile.url("puzzle-progress.json")
+        let cyclesURL = ProgressFile.url("puzzle-cycles.json")
+        return PuzzleStore(progress: ProgressFile.read(PuzzleProgress.self, at: url) ?? PuzzleProgress(), fileURL: url,
+                           cycles: ProgressFile.read(PuzzleCycleFile.self, at: cyclesURL) ?? PuzzleCycleFile(), cyclesURL: cyclesURL)
     }
 
     /// Reads the bundled pack off the main thread, once.

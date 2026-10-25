@@ -666,11 +666,11 @@ h1, h2, h3, p { margin: 0; }
   --board-size: min(calc(100vw - 2 * var(--gutter)), 640px, calc(100svh - 296px - var(--safe-t) - var(--safe-b)));
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "opp" "board" "me" "moves" "bar";
+  grid-template-areas: "opp" "board" "me" "moves" "bar" "report";
   justify-items: center;
   gap: 8px;
 }
-.view-game.is-over { grid-template-areas: "opp" "board" "me" "moves" "bar" "after"; }
+.view-game.is-over { grid-template-areas: "opp" "board" "me" "moves" "bar" "after" "report"; }
 .view-game > .plate, .view-game > .moves, .view-game > .bar, .view-game > .after { width: var(--board-size); }
 .view-game > .board-slot { grid-area: board; padding: 4px 0; }
 .view-game > .plate.opp { grid-area: opp; }
@@ -678,6 +678,7 @@ h1, h2, h3, p { margin: 0; }
 .view-game > .moves { grid-area: moves; }
 .view-game > .bar { grid-area: bar; }
 .view-game > .after { grid-area: after; }
+.view-game > .game-foot { grid-area: report; width: var(--board-size); display: flex; justify-content: center; }
 
 @supports not (height: 100svh) {
   .view-game { --board-size: min(calc(100vw - 2 * var(--gutter)), 640px, calc(100vh - 296px)); }
@@ -907,6 +908,32 @@ h1, h2, h3, p { margin: 0; }
 .after-link svg { width: 17px; height: 17px; color: var(--text-2); }
 .app-line { font-size: 12.5px; color: var(--text-3); text-align: center; }
 
+.fair-note { display: flex; gap: 8px; align-items: flex-start; margin: 2px 0 0; max-width: 520px; font-size: 13px; line-height: 1.4; color: var(--text-2); text-wrap: pretty; }
+.fair-note[hidden] { display: none; }
+.fair-note svg { flex: none; width: 17px; height: 17px; margin-top: 1px; color: var(--accent); }
+.report-link {
+  appearance: none;
+  border: 0;
+  background: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: color 0.2s, background-color 0.2s;
+}
+.report-link[hidden] { display: none; }
+.report-link:hover { color: var(--text-2); background: var(--glass); }
+.report-link svg { width: 15px; height: 15px; }
+.bar .btn.btn-sm-bar { padding: 0 14px; }
+.bar-close { flex: none; }
+.bar-close svg { transform: rotate(45deg); }
+
 /* ---- Toasts ----------------------------------------------------------------------------- */
 
 .toasts {
@@ -1011,8 +1038,8 @@ h1, h2, h3, p { margin: 0; }
   .view-game, .view-game.is-over {
     --board-size: var(--desk-board);
     grid-template-columns: var(--board-size) 320px;
-    grid-template-rows: auto minmax(0, 1fr) auto auto;
-    grid-template-areas: "board opp" "board moves" "board bar" "board me";
+    grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+    grid-template-areas: "board opp" "board moves" "board bar" "board report" "board me";
     justify-content: start;
     justify-items: stretch;
     align-items: start;
@@ -1020,10 +1047,11 @@ h1, h2, h3, p { margin: 0; }
     row-gap: 12px;
   }
   .view-game.is-over {
-    grid-template-rows: auto minmax(0, 1fr) auto auto auto;
-    grid-template-areas: "board opp" "board moves" "board bar" "board after" "board me";
+    grid-template-rows: auto minmax(0, 1fr) auto auto auto auto;
+    grid-template-areas: "board opp" "board moves" "board bar" "board after" "board report" "board me";
   }
-  .view-game > .plate, .view-game > .moves, .view-game > .bar, .view-game > .after { width: 100%; }
+  .view-game > .plate, .view-game > .moves, .view-game > .bar, .view-game > .after, .view-game > .game-foot { width: 100%; }
+  .view-game > .game-foot { justify-content: flex-start; }
   .view-game > .board-slot { padding: 0; align-self: start; }
   .view-game > .after { align-items: flex-start; gap: 8px; padding: 2px 4px 0; }
   .view-game > .after .app-line { text-align: left; padding-left: 4px; }

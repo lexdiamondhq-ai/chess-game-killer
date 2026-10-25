@@ -228,7 +228,7 @@ struct ChallengeAvatar: View {
 struct FairPlayCard: View {
     let theme: BoardTheme
 
-    static let text = "Friend games are fair: no hints or analysis. In a timed game, leaving the app for 20 seconds forfeits. Your friend is told if you take a screenshot."
+    static let text = "Friend games are fair: no hints or analysis. In a timed game, if you leave the app for over a minute, your friend can claim the win. Your friend is told if you take a screenshot."
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
