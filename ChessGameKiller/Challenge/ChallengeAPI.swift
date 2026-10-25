@@ -16,6 +16,11 @@ enum ChallengeAction: String, Sendable {
     case away, back
     /// Reported to the other side: a screenshot was taken, or screen recording started.
     case screenshot, recording
+    /// The friend has been away past the grace period in a timed game: take the win.
+    case claimWin = "claim_win"
+    /// Reports about the friend. A name report hides their name at once.
+    case reportName = "report_name"
+    case reportCheating = "report_cheating"
 }
 
 /// The game server, as the app uses it. The live one talks to play/; tests use a fake.

@@ -8,7 +8,7 @@ const SECOND = 1000;
 const DAY = 24 * 60 * 60 * SECOND;
 const WHITE = "a".repeat(64); // token hashes
 const BLACK = "b".repeat(64);
-const GRACE = 20000;
+const GRACE = 60000;
 
 /** A game Alex (White) created at T0, with Sam (Black) already joined unless joined is false. */
 function newGame({ clock = null, joined = true, side = "white" } = {}) {
@@ -51,8 +51,8 @@ test("a new game seats its creator and waits", () => {
     updatedAt: T0,
     clock: { initial: 600, increment: 0 },
     creator: "white",
-    white: { name: "Alex", seated: true, online: true, away: null, screenshots: 0, recordings: 0 },
-    black: { name: null, seated: false, online: false, away: null, screenshots: 0, recordings: 0 },
+    white: { name: "Alex", seated: true, online: true, away: null, claimableAt: null, screenshots: 0, recordings: 0 },
+    black: { name: null, seated: false, online: false, away: null, claimableAt: null, screenshots: 0, recordings: 0 },
     moves: [],
     san: [],
     fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
@@ -456,19 +456,52 @@ function timedGame() {
   return game;
 }
 
-test("leaving a timed game loses after the grace period", () => {
+test("leaving a timed game lets the other side claim the win after the grace period", () => {
   const game = timedGame();
   const away = rules.setAway(game, "white", true, T0 + 5000);
   assert.deepEqual(away.notices, [{ kind: "away", seat: "white", at: T0 + 5000 }]);
   assert.equal(game.white.away, T0 + 5000);
-  assert.equal(rules.view(game, T0 + 5000, { white: true, black: true }).white.online, false);
-  assert.equal(rules.nextDeadline(game), T0 + 5000 + GRACE);
-  assert.equal(rules.tick(game, T0 + 5000 + GRACE - 1).changed, false);
+  const seen = rules.view(game, T0 + 5000, { white: true, black: true });
+  assert.equal(seen.white.online, false);
+  assert.equal(seen.white.claimableAt, T0 + 5000 + GRACE);
+  assert.equal(seen.black.claimableAt, null);
+  // Leaving never ends the game on its own: the alarm only waits for White's flag.
+  assert.equal(rules.nextDeadline(game), T0 + 2000 + 600000);
+  rules.tick(game, T0 + 5000 + GRACE + 30000);
   assert.equal(game.result, null);
-  assert.equal(rules.tick(game, T0 + 5000 + GRACE).changed, true);
+
+  const early = rules.act(game, "black", "claim_win", T0 + 5000 + GRACE - 1);
+  assert.equal(early.ok, false);
+  assert.equal(early.error, "cannot_claim");
+  assert.match(early.message, /1 seconds left/);
+  assert.equal(game.result, null);
+  assert.equal(rules.act(game, "white", "claim_win", T0 + 5000 + GRACE).error, "cannot_claim", "Black is here");
+
+  const claim = rules.act(game, "black", "claim_win", T0 + 5000 + GRACE + 30000);
+  assert.equal(claim.ok, true);
+  assert.equal(claim.changed, true);
   assert.deepEqual(game.result, { winner: "black", reason: "left" });
-  // White's clock was charged up to the moment of the forfeit.
-  assert.equal(game.remaining.white, 600000 - (5000 + GRACE - 2000));
+  // White's clock was charged up to the moment of the claim.
+  assert.equal(game.remaining.white, 600000 - (5000 + GRACE + 30000 - 2000));
+  assert.equal(rules.act(game, "black", "claim_win", T0 + 5000 + GRACE + 31000).error, "game_over");
+});
+
+test("a claim fails once the player is back, and in games the rule doesn't cover", () => {
+  const game = timedGame();
+  rules.setAway(game, "white", true, T0 + 5000);
+  rules.setAway(game, "white", false, T0 + 5000 + GRACE + 1000);
+  const late = rules.act(game, "black", "claim_win", T0 + 5000 + GRACE + 2000);
+  assert.equal(late.error, "cannot_claim");
+  assert.equal(late.message, "Your friend is back.");
+
+  const untimed = newGame();
+  play(untimed, "e2e4 e7e5");
+  rules.setAway(untimed, "white", true, T0 + 3000);
+  assert.equal(rules.act(untimed, "black", "claim_win", T0 + DAY).error, "cannot_claim");
+  assert.equal(rules.view(untimed, T0 + DAY).white.claimableAt, null);
+
+  const waiting = newGame({ joined: false, clock: { initial: 600, increment: 0 } });
+  assert.equal(rules.act(waiting, "white", "claim_win", T0 + DAY).error, "bad_request");
 });
 
 test("coming back in time keeps the game going", () => {
@@ -497,31 +530,30 @@ test("an absence from before the clocks started counts from when they started", 
   const game = newGame({ clock: { initial: 600, increment: 0 } });
   play(game, "e2e4"); // ply 1 at T0 + 1 s
   rules.setAway(game, "white", true, T0 + 1500);
-  rules.tick(game, T0 + 1500 + GRACE + 5000);
-  assert.equal(game.result, null, "no leave rule before both sides have moved");
+  assert.equal(rules.view(game, T0 + 1600).white.claimableAt, null, "no leave rule before both sides have moved");
   const started = T0 + 1500 + GRACE + 6000;
   assert.equal(moveAs(game, "black", "e7e5", started).ok, true);
-  assert.equal(rules.nextDeadline(game), started + GRACE);
-  rules.tick(game, started + GRACE - 1);
-  assert.equal(game.result, null);
-  rules.tick(game, started + GRACE);
+  assert.equal(rules.view(game, started).white.claimableAt, started + GRACE);
+  assert.equal(rules.act(game, "black", "claim_win", started + GRACE - 1).error, "cannot_claim");
+  assert.equal(rules.act(game, "black", "claim_win", started + GRACE).ok, true);
   assert.deepEqual(game.result, { winner: "black", reason: "left" });
 });
 
-test("when both leave, whoever left first loses", () => {
+test("when both leave, nobody can claim, and the running flag decides", () => {
   const game = timedGame();
   rules.setAway(game, "black", true, T0 + 3000);
   rules.setAway(game, "white", true, T0 + 4000);
-  // Even if nothing checks until both graces have run out.
   rules.tick(game, T0 + 4000 + GRACE + 10000);
-  assert.deepEqual(game.result, { winner: "white", reason: "left" });
-  assert.equal(game.endedAt, T0 + 3000 + GRACE);
+  assert.equal(game.result, null);
+  // White is to move, so White's clock runs out first.
+  rules.tick(game, T0 + 2000 + 600000);
+  assert.deepEqual(game.result, { winner: "black", reason: "timeout" });
 });
 
 test("a flag that falls before the grace runs out is a loss on time", () => {
   const game = newGame({ clock: { initial: 60, increment: 0 } });
   play(game, "e2e4 e7e5"); // White's clock runs from T0 + 2 s with 60 s
-  rules.setAway(game, "black", true, T0 + 50000); // Black's grace would end at T0 + 70 s
+  rules.setAway(game, "black", true, T0 + 50000); // Black's grace would end at T0 + 110 s
   rules.tick(game, T0 + 90000);
   assert.deepEqual(game.result, { winner: "black", reason: "timeout" });
 });
@@ -760,4 +792,43 @@ test("a finished game is deleted 30 days after it ended", () => {
   assert.equal(rules.shouldDelete(game, end + 5000, 5000), true);
   // Time passing doesn't change a finished game.
   assert.equal(rules.tick(game, end + 10 * DAY).changed, false);
+});
+
+// ---------------------------------------------------------------------------
+// Reports
+
+test("reporting a name hides it at once, in the rematch too", () => {
+  const game = newGame();
+  play(game, "e2e4 e7e5");
+  const out = rules.act(game, "white", "report_name", T0 + 5000);
+  assert.equal(out.ok, true);
+  assert.equal(out.changed, true);
+  assert.deepEqual(out.notices, [], "the reported player isn't told");
+  assert.deepEqual(out.report, { code: "7KQ2XM", by: "white", reason: "name", at: T0 + 5000, name: "Sam", moves: 2, status: "active" });
+  assert.equal(game.black.name, "Player");
+  assert.equal(rules.view(game, T0 + 5000).black.name, "Player");
+  // Once per kind of report.
+  const again = rules.act(game, "white", "report_name", T0 + 6000);
+  assert.equal(again.changed, false);
+  assert.equal(again.report, undefined);
+  // Reporting works after the game too, and cheating is its own report.
+  rules.act(game, "black", "resign", T0 + 7000);
+  const cheat = rules.act(game, "white", "report_cheating", T0 + 8000);
+  assert.equal(cheat.report.reason, "cheating");
+  assert.equal(cheat.report.status, "over");
+  assert.equal(game.reports.length, 2);
+  const next = rules.rematchRecord(game, "NEXT22", T0 + 9000);
+  assert.equal(next.white.name, "Player");
+});
+
+test("there is no one to report before a friend joins", () => {
+  const game = newGame({ joined: false });
+  assert.equal(rules.act(game, "white", "report_name", T0 + 1000).error, "bad_request");
+});
+
+test("offensive names become Player when a game is made or joined", () => {
+  const game = rules.createGame({ code: "7KQ2XM", name: "sh1thead", tokenHash: WHITE, now: T0, pickSide: () => "white" });
+  assert.equal(game.white.name, "Player");
+  rules.join(game, { name: "F u c k", tokenHash: BLACK }, T0);
+  assert.equal(game.black.name, "Player");
 });

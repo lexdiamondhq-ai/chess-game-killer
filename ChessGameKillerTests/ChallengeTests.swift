@@ -131,7 +131,7 @@ final class ChallengeTests: XCTestCase {
         XCTAssertNil(game.clocks)
         XCTAssertEqual(game.turn, .black, "with no turn given, it follows from the moves")
         XCTAssertEqual(game.fen, Position.standard.fen)
-        XCTAssertEqual(game.leaveGraceMs, 20_000)
+        XCTAssertEqual(game.leaveGraceMs, 60_000)
         XCTAssertEqual(game.white.screenshots, 0)
         XCTAssertEqual(game.result?.reason, .other("meteor_strike"))
         XCTAssertTrue(game.result?.reason.wasPlayed ?? false)
@@ -315,17 +315,21 @@ final class ChallengeTests: XCTestCase {
         var game = FriendGameState.sample(moves: ["e2e4", "e7e5", "g1f3"])
         game.black.away = game.now - 6_000
         XCTAssertTrue(FriendClockMath.leaveRuleApplies(game))
-        XCTAssertEqual(FriendClockMath.awayDeadline(game, seat: .black), game.now + 14_000)
-        XCTAssertEqual(FriendClockMath.awaySecondsLeft(game, seat: .black, serverNow: game.now), 14)
-        XCTAssertEqual(FriendClockMath.awaySecondsLeft(game, seat: .black, serverNow: game.now + 13_100), 1)
-        XCTAssertEqual(FriendClockMath.awaySecondsLeft(game, seat: .black, serverNow: game.now + 30_000), 0)
+        XCTAssertEqual(FriendClockMath.awayDeadline(game, seat: .black), game.now + 54_000)
+        XCTAssertEqual(FriendClockMath.awaySecondsLeft(game, seat: .black, serverNow: game.now), 54)
+        XCTAssertEqual(FriendClockMath.awaySecondsLeft(game, seat: .black, serverNow: game.now + 53_100), 1)
+        XCTAssertEqual(FriendClockMath.awaySecondsLeft(game, seat: .black, serverNow: game.now + 70_000), 0)
+        // The server's own claim time wins over the app's reckoning.
+        var told = game
+        told.black.claimableAt = game.now + 40_000
+        XCTAssertEqual(FriendClockMath.awayDeadline(told, seat: .black), game.now + 40_000)
         XCTAssertNil(FriendClockMath.awaySecondsLeft(game, seat: .white, serverNow: game.now))
 
         // An absence that began before both sides had moved counts from when they had.
         var early = FriendGameState.sample(moves: ["e2e4", "e7e5"])
-        early.white.away = early.now - 60_000
+        early.white.away = early.now - 90_000
         early.clocks?.since = early.now - 5_000
-        XCTAssertEqual(FriendClockMath.awayDeadline(early, seat: .white), early.now + 15_000)
+        XCTAssertEqual(FriendClockMath.awayDeadline(early, seat: .white), early.now + 55_000)
 
         var untimed = game
         untimed.clock = nil
@@ -553,7 +557,8 @@ final class ChallengeTests: XCTestCase {
         state.now += 1
         game.apply(state)
         XCTAssertEqual(game.toast?.text, "Sam left the game")
-        XCTAssertEqual(game.awaySecondsLeft(for: .black), 14)
+        XCTAssertEqual(game.awaySecondsLeft(for: .black), 54)
+        XCTAssertFalse(game.claimReady, "not before the grace period is over")
         XCTAssertFalse(game.isOnline(.black))
 
         state.black.away = nil
@@ -576,6 +581,72 @@ final class ChallengeTests: XCTestCase {
         state.now += 1_000
         game.apply(state)
         XCTAssertTrue(game.drawOfferedToMe)
+    }
+
+    func testAFriendAwayPastTheGraceCanBeClaimedOrWaitedFor() async {
+        let api = FakeChallengeAPI()
+        var state = FriendGameState.sample(moves: ["e2e4", "e7e5", "g1f3"])
+        api.games[state.code] = state
+        let game = OnlineGame(record: .sample(state, seat: .white), api: api, sounds: nil, initial: state)
+        XCTAssertFalse(game.offersClaim)
+
+        state.black.away = state.now - 70_000
+        state.black.claimableAt = state.now - 10_000
+        state.black.online = false
+        state.now += 1
+        game.apply(state)
+        XCTAssertTrue(game.claimReady)
+        XCTAssertTrue(game.offersClaim)
+        XCTAssertEqual(game.awaySecondsLeft(for: .black), 0)
+        XCTAssertEqual(game.phase, .playing, "leaving never ends the game by itself")
+
+        game.keepWaiting()
+        XCTAssertFalse(game.offersClaim, "waiting puts the offer away for this absence")
+        XCTAssertTrue(game.claimReady, "the friend's line still offers it")
+
+        var over = state
+        over.status = .over
+        over.result = FriendGameState.Result(winner: .white, reason: .left)
+        over.now += 1_000
+        api.actionReply = { _ in over }
+        await game.claimWin()
+        XCTAssertEqual(api.playerActions, [.claimWin])
+        XCTAssertEqual(game.phase, .over)
+        XCTAssertFalse(game.claimReady)
+        XCTAssertEqual(game.resultHeadline, "Sam left the game. You win")
+    }
+
+    func testReportingTheFriendCountsOnceAndThanksThePlayer() async {
+        let api = FakeChallengeAPI()
+        let state = FriendGameState.sample(moves: ["e2e4", "e7e5"])
+        api.games[state.code] = state
+        let game = OnlineGame(record: .sample(state, seat: .white), api: api, sounds: nil, initial: state)
+        XCTAssertTrue(game.canReport)
+        await game.reportOpponent(.reportName)
+        await game.reportOpponent(.reportName)
+        XCTAssertEqual(api.playerActions, [.reportName])
+        XCTAssertTrue(game.reported.contains(.reportName))
+        XCTAssertEqual(game.toast?.text, "Thanks. The name is hidden and we'll take a look.")
+        await game.reportOpponent(.reportCheating)
+        XCTAssertEqual(api.playerActions, [.reportName, .reportCheating])
+        await game.reportOpponent(.resign)
+        XCTAssertEqual(api.playerActions.count, 2, "only reports go through here")
+
+        let lobby = FriendGameState.sample(status: .waiting)
+        XCTAssertFalse(OnlineGame(record: .sample(lobby, seat: .white), api: api, sounds: nil, initial: lobby).canReport)
+    }
+
+    func testTheFairPlayRulesShowOnTheFirstScreen() {
+        let state = FriendGameState.sample()
+        let game = OnlineGame(record: .sample(state, seat: .white), api: FakeChallengeAPI(), sounds: nil, initial: state)
+        XCTAssertTrue(game.showsFairPlay)
+        XCTAssertEqual(game.graceWords, "a minute")
+        game.dismissFairPlay()
+        XCTAssertFalse(game.showsFairPlay)
+
+        let underWay = FriendGameState.sample(moves: ["e2e4", "e7e5"])
+        XCTAssertFalse(OnlineGame(record: .sample(underWay, seat: .white), api: FakeChallengeAPI(), sounds: nil,
+                                  initial: underWay).showsFairPlay)
     }
 
     func testTheClocksFollowTheServerNotThePhone() {

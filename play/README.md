@@ -48,5 +48,5 @@ pushes to `main` also deploys with wrangler and plays a game on the live server 
 repository secret, `CLOUDFLARE_API_TOKEN` (made from Cloudflare's "Edit Cloudflare Workers" template); the account
 ID is looked up from the token. It runs on the Workers Free plan: the Durable Objects use SQLite storage.
 
-Settings (`[vars]` in `wrangler.toml`): `LEAVE_GRACE_MS` (20000) and `MIN_CLOCK_SECONDS` (60). Setting
+Settings (`[vars]` in `wrangler.toml`): `LEAVE_GRACE_MS` (60000, how long someone may be away before their friend can claim the win) and `MIN_CLOCK_SECONDS` (60). Setting
 `APPLE_TEAM_ID` serves `/.well-known/apple-app-site-association`, so iOS can open invite links in the app.

@@ -47,6 +47,8 @@ const ICONS = {
   record: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/>',
   person: '<circle cx="12" cy="8" r="3.6"/><path d="M5 20a7 7 0 0 1 14 0"/>',
   leave: '<path d="M14 4.5h3.5A2.5 2.5 0 0 1 20 7v10a2.5 2.5 0 0 1-2.5 2.5H14"/><path d="M10 16.5 5.5 12 10 7.5M5.8 12H15"/>',
+  shield: '<path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/>',
+  report: '<path d="M12 3.5 21 19.5H3z"/><path d="M12 10v4.2"/><circle cx="12" cy="16.9" r=".9" fill="currentColor"/>',
   wifi: '<path d="M3.5 9.5a12 12 0 0 1 17 0M6.5 12.6a7.6 7.6 0 0 1 11 0M9.5 15.7a3.4 3.4 0 0 1 5 0"/><circle cx="12" cy="18.6" r=".9" fill="currentColor"/>',
 };
 function icon(name) {
@@ -100,6 +102,7 @@ const MESSAGES = {
   not_found: "This challenge isn’t here anymore.",
   seat_taken: 'Someone else accepted this challenge first.',
   game_over: 'This game has already ended.',
+  cannot_claim: 'Your friend came back, so the game goes on.',
   rate_limited: 'That was a lot of tries at once. Wait a moment, then try again.',
   unauthorized: "This browser doesn’t hold a seat in this game.",
   illegal_move: "That move isn’t allowed here.",
@@ -309,6 +312,8 @@ const S = {
   disp: null,
   confirm: null,
   busy: null,
+  waitedFor: null, // the absence the player chose to wait out instead of claiming the win
+  claimShown: false,
   ws: null,
   wsOpen: false,
   wsAttempts: 0,
@@ -580,8 +585,33 @@ function onNotice(n) {
 function nameOf(side) {
   return S.game?.[side]?.name || sideWord(side);
 }
+const GRACE_MS = 60000;
+/** "a minute", or "45 seconds" when the server says otherwise. */
 function graceWords(g = S.game) {
-  return plural(Math.max(1, Math.round((g?.leaveGraceMs || 20000) / 1000)), 'second');
+  const seconds = Math.max(1, Math.round((g?.leaveGraceMs || GRACE_MS) / 1000));
+  if (seconds === 60) return 'a minute';
+  if (seconds % 60 === 0) return plural(seconds / 60, 'minute');
+  return plural(seconds, 'second');
+}
+/** The fair-play rules, said before a game and on its first screen. */
+function fairWords(g = S.game) {
+  return `Fair play: no hints or engines. In a timed game, if you leave for over ${graceWords(g)}, your friend can claim the win. Screenshots in the app are shown to your friend.`;
+}
+/** When the other side may claim the win because `side` left, in server ms; null if they can't. */
+function claimableAt(side, g = S.game) {
+  const seat = g?.[side];
+  if (!seat || seat.away == null || !leaveRuleApplies(g)) return null;
+  if (seat.claimableAt != null) return seat.claimableAt;
+  return seat.away + (g.leaveGraceMs || GRACE_MS);
+}
+/** I can claim the win right now: my friend has been away past the grace period. */
+function canClaim(g = S.game) {
+  if (!S.seat || !g || g.status !== 'active') return false;
+  const at = claimableAt(other(S.seat), g);
+  return at != null && serverNow() >= at;
+}
+function claimOffered(g = S.game) {
+  return canClaim(g) && S.waitedFor !== g[other(S.seat)].away;
 }
 function leaveRuleApplies(g = S.game) {
   return !!(g && g.clock && g.status === 'active' && g.moves.length >= 2);
@@ -685,7 +715,7 @@ function resultWords() {
     case 'checkmate': return [title, 'By checkmate'];
     case 'resign': return [title, `${L} resigned`];
     case 'timeout': return [title, `${L} ran out of time`];
-    case 'left': return [title, loser === me ? `You were away for ${graceWords()}` : `${L} left the game`];
+    case 'left': return [title, loser === me ? `You were away for over ${graceWords()}` : `${L} left the game`];
     case 'stalemate': return [title, 'By stalemate'];
     case 'repetition': return [title, 'The same position, three times'];
     case 'fifty_moves': return [title, 'By the fifty-move rule'];
@@ -856,7 +886,7 @@ function buildInvite() {
     h('h1', {}, `${creator} challenged you to chess`),
     h('div', { class: 'chips' }, chip(icon('clock'), clockWords(g.clock)), sideChip(mySide)),
     form,
-    h('p', { class: 'fine fair' }, `No hints or engines. In a timed game, leaving the page for ${graceWords()} forfeits.`),
+    h('p', { class: 'fine fair' }, fairWords()),
   );
 }
 
@@ -1001,8 +1031,17 @@ function buildGame() {
   const after = h('div', { class: 'after', hidden: true },
     h('a', { class: 'after-link', href: '/' }, icon('plus'), S.seat ? 'New game' : 'Challenge a friend'),
     h('p', { class: 'app-line' }, 'The iPhone app is coming soon to the App Store.'));
-  const view = h('section', { class: 'view view-game', 'aria-label': 'Game' }, opp.el, slot, me.el, moves, bar, after);
-  S.ui = { view, opp, me, moves, bar, after, barKey: null, movesKey: null };
+  const reportBtn = h('button', {
+    class: 'report-link',
+    type: 'button',
+    hidden: true,
+    onclick: () => { S.confirm = 'report'; updateBar(); },
+  });
+  // Under the game: the fair-play rules until both sides have moved, then a quiet Report.
+  const fair = h('p', { class: 'fair-note', hidden: true }, icon('shield'), h('span', {}));
+  const foot = h('div', { class: 'game-foot' }, fair, reportBtn);
+  const view = h('section', { class: 'view view-game', 'aria-label': 'Game' }, opp.el, slot, me.el, moves, bar, after, foot);
+  S.ui = { view, opp, me, moves, bar, after, fair, report: reportBtn, reportKey: null, barKey: null, movesKey: null };
   startTicking();
   return view;
 }
@@ -1090,10 +1129,16 @@ function updatePresence(p) {
     else if (g.status === 'active' && g.clocks && S.disp.turn === side && !S.pending) { text = 'Your move'; cls += ' mine'; }
   } else if (seat.seated) {
     if (seat.away != null && g.status === 'active') {
-      if (leaveRuleApplies()) {
-        const left = Math.max(0, (g.leaveGraceMs || 20000) - (serverNow() - seat.away));
-        text = `left · ${Math.ceil(left / 1000)}s`;
-        cls += left < 6000 ? ' away urgent' : ' away';
+      const at = claimableAt(side);
+      if (at != null) {
+        const left = at - serverNow();
+        if (left > 0) {
+          text = `left · ${Math.ceil(left / 1000)}s`;
+          cls += left < 6000 ? ' away urgent' : ' away';
+        } else {
+          text = 'left';
+          cls += ' away urgent';
+        }
       } else {
         text = 'away';
         cls += ' away';
@@ -1168,11 +1213,14 @@ function updateBar() {
   const me = S.seat;
   const opp = me ? other(me) : null;
   const early = g.moves.length < 2;
+  const opponentHere = !!(me && g[opp]?.seated);
   let key;
-  if (g.status === 'over') key = `over:${g.result?.reason}:${g.result?.winner}:${JSON.stringify(g.rematch)}:${S.busy}`;
+  if (S.confirm === 'report' && opponentHere) key = `report:${S.busy}:${g.status}`;
+  else if (g.status === 'over') key = `over:${g.result?.reason}:${g.result?.winner}:${JSON.stringify(g.rematch)}:${S.busy}`;
   else if (!me) key = 'watch';
   else if (S.elsewhere) key = 'elsewhere';
   else if (S.confirm === 'resign') key = `confirm:${early}:${S.busy}`;
+  else if (claimOffered()) key = `claim:${S.busy}`;
   else if (g.drawOffer === opp) key = `offer:${S.busy}`;
   else key = `play:${g.drawOffer === me}:${early}:${S.busy}`;
   if (key === ui.barKey) return;
@@ -1183,12 +1231,22 @@ function updateBar() {
     ui.bar = node;
   };
 
-  if (g.status === 'over') {
-    replaceBar(buildResult());
-    ui.after.hidden = false;
+  ui.after.hidden = g.status !== 'over';
+  updateReportLink();
+  if (key.startsWith('report:')) {
+    const bar = h('div', { class: 'bar' },
+      h('div', { class: 'bar-text' }, h('strong', {}, `Report ${nameOf(opp)}`), h('small', {}, 'For their name, or for cheating?')),
+      h('button', { class: 'btn btn-secondary btn-sm-bar', type: 'button', disabled: !!S.busy, onclick: () => report('report_name') }, 'Name'),
+      h('button', { class: 'btn btn-secondary btn-sm-bar', type: 'button', disabled: !!S.busy, onclick: () => report('report_cheating') }, 'Cheating'),
+      h('button', { class: 'icon-btn bar-close', type: 'button', 'aria-label': 'Cancel', onclick: () => { S.confirm = null; updateBar(); } }, icon('plus')),
+    );
+    replaceBar(bar);
     return;
   }
-  ui.after.hidden = true;
+  if (g.status === 'over') {
+    replaceBar(buildResult());
+    return;
+  }
   const bar = h('div', { class: 'bar' });
   if (!me) {
     bar.classList.add('watching');
@@ -1203,6 +1261,12 @@ function updateBar() {
       h('div', { class: 'bar-text' }, h('strong', {}, early ? 'Abort the game?' : 'Resign?'), h('small', {}, early ? 'Nobody wins or loses' : `${nameOf(opp)} wins the game`)),
       h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => { S.confirm = null; updateBar(); } }, 'Cancel'),
       h('button', { class: 'btn btn-secondary btn-danger', type: 'button', disabled: S.busy === 'resign', onclick: () => act('resign') }, early ? 'Abort' : 'Resign'),
+    );
+  } else if (key.startsWith('claim:')) {
+    bar.append(
+      h('div', { class: 'bar-text' }, h('strong', {}, `${nameOf(opp)} left the game`), h('small', {}, `Away for over ${graceWords()}`)),
+      h('button', { class: 'btn btn-secondary', type: 'button', disabled: !!S.busy, onclick: () => { S.waitedFor = g[opp].away; updateBar(); } }, 'Wait'),
+      h('button', { class: 'btn btn-primary', type: 'button', disabled: !!S.busy, onclick: () => act('claim_win') }, 'Claim win'),
     );
   } else if (g.drawOffer === opp) {
     bar.append(
@@ -1244,6 +1308,29 @@ function buildResult() {
     if (detail) text.append(h('small', {}, detail));
   }
   return bar;
+}
+
+/** A quiet "Report" under the game, for a player once their friend has joined. */
+function updateReportLink() {
+  const ui = S.ui;
+  const me = S.seat;
+  const g = S.game;
+  const early = !!(me && g.status === 'active' && g.moves.length < 2);
+  const show = !!(me && !early && g[other(me)]?.seated && S.confirm !== 'report');
+  const name = show ? nameOf(other(me)) : '';
+  const key = `${early}:${show}:${name}`;
+  if (ui.reportKey === key) return;
+  ui.reportKey = key;
+  ui.fair.hidden = !early;
+  if (early) ui.fair.lastChild.textContent = fairWords();
+  ui.report.hidden = !show;
+  ui.report.replaceChildren(icon('report'), `Report ${name}`);
+}
+
+async function report(type) {
+  await act(type);
+  S.confirm = null;
+  if (S.view === 'game' && S.ui) { S.ui.barKey = null; updateBar(); }
 }
 
 // ---- Moves and actions -------------------------------------------------------------------
@@ -1294,6 +1381,8 @@ async function act(type) {
     S.busy = null;
     if (type === 'resign') S.confirm = null;
     applyState(res.game, { receivedAt: res.receivedAt, force: true });
+    if (type === 'report_name') toast('Thanks. The name is hidden and we’ll take a look.', 'report');
+    if (type === 'report_cheating') toast('Thanks. We’ll take a look at this game.', 'report');
   } catch (err) {
     S.busy = null;
     if (type === 'resign') S.confirm = null;
@@ -1378,13 +1467,11 @@ function tick() {
     S.flagRefreshAt = Date.now();
     setTimeout(refresh, 400);
   }
-  // An absence ran out: the server ends the game; fetch it if the socket is quiet.
-  for (const side of ['white', 'black']) {
-    const away = g[side].away;
-    if (away != null && leaveRuleApplies() && serverNow() - away > (g.leaveGraceMs || 20000) + 600 && Date.now() - S.flagRefreshAt > 1500) {
-      S.flagRefreshAt = Date.now();
-      refresh();
-    }
+  // An absence passed the grace period: offer the claim (leaving never ends the game by itself).
+  const offered = claimOffered();
+  if (offered !== S.claimShown) {
+    S.claimShown = offered;
+    updateBar();
   }
 }
 
