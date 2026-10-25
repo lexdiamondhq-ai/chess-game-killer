@@ -105,14 +105,26 @@ final class SculptedBoardTests: XCTestCase {
         }
     }
 
-    /// Tournament heights, so every piece is told apart by its height alone.
-    func testPiecesStandAtTournamentHeights() {
+    /// Every piece at its own height, so each is told apart by its height alone. The queen stands
+    /// well under the king (Alex once mistook one for the other) and so under the bishop too.
+    func testPiecesStandAtTheirOwnHeights() {
         let h = SculptedAssets.shared.heights
-        let order: [Piece.Kind] = [.king, .queen, .bishop, .knight, .rook, .pawn]
+        let order: [Piece.Kind] = [.king, .bishop, .queen, .knight, .rook, .pawn]
         for (taller, shorter) in zip(order, order.dropFirst()) {
             XCTAssertGreaterThan(h[taller] ?? 0, (h[shorter] ?? 0) + 0.05, "\(taller) should stand above \(shorter)")
         }
         XCTAssertLessThanOrEqual(h[.king] ?? 9, SculptedCamera.tallest)
+        XCTAssertGreaterThan(h[.king] ?? 0, (h[.queen] ?? 9) + 0.4, "the king must tower over the queen")
+    }
+
+    /// The king's cross is its own finish: ivory on the white king, metal on the dark one.
+    func testTheKingsCrossIsIvoryOnWhiteAndMetalOnBlack() {
+        let assets = SculptedAssets.shared
+        for look in [SculptedLook.gilded, .noir] {
+            XCTAssertTrue(assets.parts(for: look)[.king]?.contains { $0.finish == .cross } ?? false, "\(look.name): the king has no cross")
+            XCTAssertTrue(assets.material(.cross, for: .white, look: look) === assets.material(.body, for: .white, look: look))
+            XCTAssertTrue(assets.material(.cross, for: .black, look: look) === assets.material(.metal, for: .black, look: look))
+        }
     }
 
     func testTheFramedBoardFillsTheViewAndStaysInside() {

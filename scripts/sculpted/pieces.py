@@ -186,71 +186,88 @@ def merlon_caps(name,ri,ro,z,mat,count=5,notch=math.radians(31),t=0.012,e=0.004)
         cut(caps,crenel(f'{name}c{i}',-math.pi/2+TAU*i/count,notch,z-0.05,z+0.1))
     return caps
 # ---------- pieces ----------
-# Heights (squares, before the game's 1.1 scale): K 1.336 > Q 1.08 > B 1.0 > N 0.83 > R 0.742 > P 0.56.
+# Heights (squares, before the game's 1.1 scale): K 1.336 > B 1.0 > Q 0.92 > N 0.83 > R 0.742 > P 0.56.
 # Every piece is told by its top, made big enough to read on a phone, over a low base:
-#   king a thick cross, queen a coronet of eight ball-tipped spikes round a central ball,
+#   king a long Latin cross, queen a low coronet ringed with twelve pearls (and far shorter),
 #   bishop a tall pointed mitre with a diagonal cut showing its metal core, rook a tower with
 #   five square merlons capped in metal round a dark well, knight a horse's head, pawn one ball on a collar.
 # The surfaces differ too: king straight flutes, queen spiral flutes, bishop fine flutes,
 # rook masonry, pawn short flutes.
-def king(M):
-    R=0.31; p=base_profile(R); p+=body_start(R)
-    p+=ogee(R-0.095,TOP,0.135,0.56,32)        # tall body
-    p+=line(0.135,0.56,0.16,0.572,2); p+=bead(0.177,0.572,0.03)
-    p+=line(0.17,0.602,0.208,0.61,2); p+=bead(0.213,0.61,0.036)     # main collar (ring sits here)
-    p+=line(0.198,0.646,0.12,0.66,2)
-    p+=cove(0.12,0.66,0.205,0.8)                # crown cup
-    p+=bead(0.207,0.8,0.024,10)
-    p+=line(0.195,0.824,0.183,0.828,1)
-    p+=[(0.183*math.cos(t),0.828+0.085*math.sin(t)) for t in np.linspace(0,math.pi/2*0.86,16)]   # orb dome
-    top=p[-1]; p+=line(top[0],top[1],0.0,top[1],3)
-    # a gadrooned crown cup over the fluted body
-    body=lathe('K',p,mod=compose(flutes(0.19,0.54,28,0.012),gadroons(0.668,0.792,20,0.011)),mat=M['body'])
-    ring=torus('Kring',0.224,0.0095,0.628,M['metal'])
-    zt=top[1]-0.008
-    objs=[body,ring,base_beads('Kbeadbase',R,M)]
-    # pearled crown rim, and four stones set round the crown, one facing the player
-    objs.append(beads('Kbeadcrown',0.2165,0.812,44,0.0112,M['metal']))
+def pattee(name, z0, z1, zc, span, bar, flare, depth, mat):
+    """A cross standing in the plane facing the player, `depth` thick: a centre block and four arms
+    widening a little toward their ends (flare = an arm's width at its end). Built from convex parts:
+    a concave outline turned into one prism fills its own notches."""
+    h=bar/2; f=flare/2; arm=span/2
+    quads=[[(-h,zc-h),(h,zc-h),(h,zc+h),(-h,zc+h)],
+           [(-h,zc+h-0.002),(h,zc+h-0.002),(f,z1),(-f,z1)],
+           [(-h,z0),(h,z0),(h,zc-h+0.002),(-h,zc-h+0.002)],
+           [(h-0.002,zc-h),(arm,zc-f),(arm,zc+f),(h-0.002,zc+h)],
+           [(-arm,zc-f),(-h+0.002,zc-h),(-h+0.002,zc+h),(-arm,zc+f)]]
+    parts=[]
+    for k,q in enumerate(quads):
+        o=prism(f'{name}{k}',q,-depth/2,depth/2,FRONT,mat)
+        m=o.modifiers.new('bev','BEVEL'); m.width=0.008; m.segments=3; m.limit_method='ANGLE'
+        parts.append(o)
+    return parts
+def squash_above(objs, z0, s):
+    """Shortens a piece above z0 by the factor s, so the base keeps the set's height."""
+    for o in objs:
+        if o.type!='MESH': continue
+        o.data.transform(o.matrix_basis); o.matrix_basis=Matrix.Identity(4)
+        for v in o.data.vertices:
+            if v.co.z>z0: v.co.z=z0+(v.co.z-z0)*s
+        o.data.update()
+def cross_finish(M):
+    """The king's cross: the ivory king's in its own stone, the black king's in metal, so it shows
+    light against the dark frame behind the far rank. The game meshes carry it as its own finish
+    (`cross`, id 5), which the app draws that way."""
+    if 'cross' in M: return M['cross']
+    return M['body'] if M['body'].name.startswith('ivory') else M['metal']
+def crown_gems(name,p,z,M,size=0.024):
+    """Four stones set round a crown cup, one facing the player."""
+    out=[]
     for i in range(4):
-        a=FRONT+i*math.pi/2; rr=radius_at(p,0.73)+0.006
-        g=uvsphere(f'Kgem{i}',0.026,(rr*math.cos(a),rr*math.sin(a),0.73),M['gem'],(1,1,1))
-        g.scale=(0.55,0.55,1.0); g.rotation_euler=(0,0,a); objs.append(g)
-    objs.append(lathe('Kcush',[(0.0,zt-0.005),(0.065,zt-0.005),(0.076,zt+0.012),(0.056,zt+0.03),(0.0,zt+0.03)],seg=128,mat=M['metal']))
-    # the cross is what says "king": thick bars, arms three times the bar's width
-    H=1.336; bar=0.12; span=0.36
-    z0=zt+0.02; zc=H-0.115-bar/2
-    objs.append(rbox('Kcv',(bar,bar,H-z0),(0,0,(H+z0)/2),M['metal'],0.024))
-    objs.append(rbox('Kch',(span,bar,bar),(0,0,zc),M['metal'],0.024))
-    for y in (-bar/2,bar/2):
-        objs.append(uvsphere('Kgem',0.034,(0,y,zc),M['gem'],(1,0.45,1)))
+        a=FRONT+i*math.pi/2; rr=radius_at(p,z)+0.005
+        g=uvsphere(f'{name}{i}',size,(rr*math.cos(a),rr*math.sin(a),z),M['gem'],(1,1,1))
+        g.scale=(0.55,0.55,1.0); g.rotation_euler=(0,0,a); out.append(g)
+    return out
+KING_H=1.336     # the king's height, cross included: every set's frame is fitted to it
+LATIN_TOP=1.46   # the Latin king as drawn, before it is brought down to KING_H
+QUEEN_TOP=0.866  # the queen as drawn (her pearls' tops) and the height she is brought to: under the
+QUEEN_H=0.92     # bishop, over the knight, far under the king
+def king(M):
+    """A tall king under a long Latin cross: the cross alone says king."""
+    R=0.31; p=base_profile(R); p+=body_start(R)
+    p+=ogee(R-0.095,TOP,0.125,0.62,32)
+    p+=line(0.125,0.62,0.15,0.632,2); p+=bead(0.168,0.632,0.03)
+    p+=line(0.16,0.662,0.2,0.67,2); p+=bead(0.205,0.67,0.036)      # main collar (ring sits here)
+    p+=line(0.19,0.706,0.11,0.72,2)
+    p+=cove(0.11,0.72,0.17,0.84); p+=bead(0.17,0.84,0.024,10)       # crown cup
+    p+=line(0.158,0.864,0.07,0.875,2)
+    p+=[(0.07*math.cos(t),0.875+0.03*math.sin(t)) for t in np.linspace(0,math.pi/2*0.9,8)]
+    top=p[-1]; p+=line(top[0],top[1],0.0,top[1],3)
+    body=lathe('K',p,mod=compose(flutes(0.19,0.6,28,0.012),gadroons(0.73,0.83,18,0.01)),mat=M['body'])
+    objs=[body,torus('Kring',0.215,0.0095,0.688,M['metal']),base_beads('Kbeadbase',R,M),beads('Kbeadcrown',0.18,0.852,36,0.0105,M['metal'])]
+    objs+=crown_gems('Kgem',p,0.79,M)
+    objs+=pattee('Kcross',0.89,LATIN_TOP,1.30,0.30,0.075,0.10,0.075,cross_finish(M))
+    squash_above(objs,0.2,(KING_H-0.2)/(LATIN_TOP-0.2))
     return group('king',objs)
 def queen(M):
+    """A short queen, well below the king, wearing a low coronet ringed with twelve pearls."""
     R=0.30; p=base_profile(R); p+=body_start(R)
     p+=ogee(R-0.095,TOP,0.12,0.5,32)
     p+=line(0.12,0.5,0.145,0.512,2); p+=bead(0.162,0.512,0.028)
     p+=line(0.157,0.54,0.195,0.548,2); p+=bead(0.2,0.548,0.033)     # ring sits here
     p+=line(0.185,0.581,0.105,0.596,2)
-    p+=cove(0.105,0.596,0.19,0.75)               # crown cup
-    # the coronet flares wide: eight tall spikes, each with a ball on its tip
-    ZR=0.96; RO=0.268; RI=0.236
-    p+=line(0.19,0.75,RO,ZR,8)
-    p+=line(RO,ZR,RI,ZR,2)
-    p+=line(RI,ZR,0.172,0.82,4)                 # inner wall
-    p+=[(0.172*math.cos(t),0.82+0.05*math.sin(t)) for t in np.linspace(0,math.pi/2*0.8,10)]
+    ZR=0.80
+    p+=cove(0.105,0.596,0.25,ZR-0.02); p+=line(0.25,ZR-0.02,0.262,ZR,2); p+=line(0.262,ZR,0.23,ZR,2)
+    p+=line(0.23,ZR,0.15,0.74,4); p+=[(0.15*math.cos(t),0.74+0.035*math.sin(t)) for t in np.linspace(0,math.pi/2*0.8,8)]
     top=p[-1]; p+=line(top[0],top[1],0.0,top[1],3)
-    body=lathe('Q',p,mod=compose(flutes(0.19,0.48,22,0.012,twist=0.16),gadroons(0.605,0.745,16,0.01)),mat=M['body'])
-    # pearls strung round the lower collar, carved beads round the plinth
-    objs=[body,base_beads('Qbeadbase',R,M),beads('Qbeadcollar',0.1715,0.526,36,0.0105,M['pearl'])]
-    NPT=8; apex=0.845; hw=0.088*(ZR+0.06-apex)/(ZR-apex)
-    for i in range(NPT):
-        a=TAU*(i+0.5)/NPT
-        cut(body,prism(f'Qn{i}',[(-hw,ZR+0.06),(hw,ZR+0.06),(0,apex)],0.12,0.36,a))
-    for i in range(NPT):
-        a=TAU*i/NPT; objs.append(uvsphere(f'Qp{i}',0.043,(math.cos(a)*0.252,math.sin(a)*0.252,ZR+0.026),M['pearl']))
-    objs.append(torus('Qring',0.21,0.0085,0.5645,M['metal']))
-    zt=top[1]; zb=1.08-0.058
-    objs.append(lathe('Qstem',[(0.0,zt-0.01),(0.04,zt-0.01),(0.022,zb-0.02),(0.0,zb-0.02)],seg=96,mat=M['metal']))
-    objs.append(uvsphere('Qball',0.058,(0,0,zb),M['metal']))
+    body=lathe('Q',p,mod=compose(flutes(0.19,0.48,22,0.012,twist=0.16),gadroons(0.62,0.77,18,0.012)),mat=M['body'])
+    objs=[body,base_beads('Qbeadbase',R,M),beads('Qbeadcollar',0.1715,0.526,36,0.0105,M['pearl']),torus('Qring',0.21,0.0085,0.5645,M['metal'])]
+    for i in range(12):
+        a=TAU*i/12; objs.append(uvsphere(f'Qp{i}',0.036,(math.cos(a)*0.247,math.sin(a)*0.247,ZR+0.03),M['pearl']))
+    squash_above(objs,0.2,(QUEEN_H-0.2)/(QUEEN_TOP-0.2))
     return group('queen',objs)
 def mitre_profile(z0=0.51,z1=0.935,rmax=0.178,n=48):
     """The bishop's mitre: an almond that comes to a point, never a ball like the pawn's head."""
