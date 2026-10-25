@@ -53,16 +53,13 @@ final class ThinkStore {
 
     /// The app's store: the record saved on this device.
     static func live() -> ThinkStore {
-        let url = try? FileManager.default
-            .url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-            .appendingPathComponent("think-progress.json")
+        let url = ProgressFile.url("think-progress.json")
         return ThinkStore(progress: load(from: url) ?? ThinkProgress(), fileURL: url)
     }
 
-    /// The record saved at `url`, or nil when there isn't one that reads.
+    /// The record saved at `url`, or nil when there isn't one that reads (one that doesn't is set aside).
     static func load(from url: URL?) -> ThinkProgress? {
-        guard let url, let data = try? Data(contentsOf: url) else { return nil }
-        return try? JSONDecoder().decode(ThinkProgress.self, from: data)
+        ProgressFile.read(ThinkProgress.self, at: url)
     }
 
     // MARK: Recording

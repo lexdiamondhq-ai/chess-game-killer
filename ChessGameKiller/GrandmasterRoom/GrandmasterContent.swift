@@ -272,6 +272,28 @@ struct RepertoireEntry: Codable, Identifiable, Hashable {
     var due: Date = .now
 
     var color: Piece.Color { side == "b" ? .black : .white }
+
+    init(lineID: String, name: String, moves: [String], side: String, box: Int = 0, due: Date = .now) {
+        self.lineID = lineID
+        self.name = name
+        self.moves = moves
+        self.side = side
+        self.box = box
+        self.due = due
+    }
+
+    private enum CodingKeys: String, CodingKey { case lineID, name, moves, side, box, due }
+
+    /// Reads any saved version: a key a file doesn't have yet keeps its default.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        lineID = try c.decode(String.self, forKey: .lineID)
+        name = try c.decodeIfPresent(String.self, forKey: .name) ?? ""
+        moves = try c.decodeIfPresent([String].self, forKey: .moves) ?? []
+        side = try c.decodeIfPresent(String.self, forKey: .side) ?? "w"
+        box = try c.decodeIfPresent(Int.self, forKey: .box) ?? 0
+        due = try c.decodeIfPresent(Date.self, forKey: .due) ?? .now
+    }
 }
 
 /// The player's opening repertoire and when each line is next due.
@@ -289,11 +311,8 @@ final class RepertoireStore {
     }
 
     static func live() -> RepertoireStore {
-        let url = try? FileManager.default
-            .url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-            .appendingPathComponent("repertoire.json")
-        let saved = url.flatMap { try? Data(contentsOf: $0) }
-            .flatMap { try? JSONDecoder().decode([RepertoireEntry].self, from: $0) } ?? []
+        let url = ProgressFile.url("repertoire.json")
+        let saved = ProgressFile.read([Lossy<RepertoireEntry>].self, at: url)?.compactMap(\.value) ?? []
         return RepertoireStore(entries: saved, fileURL: url)
     }
 

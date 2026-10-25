@@ -37,35 +37,39 @@ final class MatchController {
             }
         }
 
-        /// Stockfish "Skill Level", 0 to 20.
+        // How each rival searches, after Lichess's Stockfish levels (its skill, depth and time
+        // per move), which millions of games have calibrated: Spark is level 1, Drift level 2,
+        // Pulse between 3 and 4, Vector level 5 and Singularity level 8. A shallow, noisy search
+        // misses what a weaker player misses (a fork two moves off, a loose piece), where a
+        // strong engine that now and then hands a piece away at random plays like nobody.
+
+        /// Stockfish "Skill Level", 0 to 20: how much noise goes into picking among its best moves.
         var skill: Int {
             switch self {
-            case .beginner: return 0
-            case .casual: return 4
-            case .club: return 9
+            case .beginner: return 3
+            case .casual: return 6
+            case .club: return 10
             case .expert: return 14
             case .grandmaster: return 20
             }
         }
 
-        var thinkTimeMs: Int {
+        /// How far ahead the rival looks. Nil: as far as its time allows.
+        var depth: Int? {
             switch self {
-            case .beginner: return 80
-            case .casual: return 120
-            case .club: return 200
-            case .expert: return 350
-            case .grandmaster: return 600
+            case .beginner, .casual, .club, .expert: return 5
+            case .grandmaster: return nil
             }
         }
 
-        /// How often the rival plays any legal move instead of the engine's.
-        /// Stockfish's lowest skill level is still about 1300 Elo, so the weakest
-        /// rivals have to miss things on purpose to be the beginners they say they are.
-        var slipRate: Double {
+        /// The most time the rival takes over a move. The shallow searches end long before it.
+        var thinkTimeMs: Int {
             switch self {
-            case .beginner: return 0.3
-            case .casual: return 0.1
-            default: return 0
+            case .beginner: return 50
+            case .casual: return 100
+            case .club: return 200
+            case .expert: return 300
+            case .grandmaster: return 600
             }
         }
     }
@@ -208,9 +212,13 @@ final class MatchController {
         gradeLog.values.reduce(into: [MoveReview.Grade: Int]()) { $0[$1, default: 0] += 1 }
     }
 
-    /// A number in 0..<1 drawn for each of the rival's slips: whether it slips, and
-    /// which move it plays instead. Tests swap in a fixed value.
+    /// A number in 0..<1 drawn whenever the rival has a choice to make off the board: whether
+    /// it remarks on a move and which line it says, and which move it plays when the engine
+    /// has nothing. Tests swap in a fixed value.
     @ObservationIgnored var chance: () -> Double = { Double.random(in: 0..<1) }
+    /// How much engine work a turn may cost. The app reads it from `PowerPolicy`, which holds
+    /// back on a hot phone or in Low Power Mode; tests set what they need.
+    @ObservationIgnored var budget: @MainActor () -> EngineBudget = { .full }
 
     private let engine: ChessEngine?
     private let sounds: SoundPlaying?
@@ -240,9 +248,12 @@ final class MatchController {
         self.sounds = sounds
     }
 
-    /// The app's controller: on-device Stockfish and the bundled sounds.
+    /// The app's controller: on-device Stockfish and the bundled sounds, working as hard as
+    /// the phone can afford.
     static func live() -> MatchController {
-        MatchController(engine: StockfishEngine.shared, sounds: SoundPlayer.shared)
+        let match = MatchController(engine: StockfishEngine.shared, sounds: SoundPlayer.shared)
+        match.budget = { PowerPolicy.shared.engineBudget }
+        return match
     }
 
     // MARK: Actions
@@ -812,11 +823,12 @@ final class MatchController {
         }
         guard let engine else { return true }
 
+        let allowance = budget()
         let before: [EngineLine]
         if let known = knownLines(for: move.fenBefore) {
             before = known
         } else {
-            before = await engine.analyze(fen: move.fenBefore, depth: 12, lines: 2, maxTimeMs: 900)
+            before = await engine.analyze(fen: move.fenBefore, depth: allowance.gradeDepth, lines: 2, maxTimeMs: allowance.gradeBeforeMs)
             guard gen == generation, !Task.isCancelled else { return false }
             remember(before, for: move.fenBefore)
         }
@@ -835,7 +847,7 @@ final class MatchController {
         } else if played.endedGame {
             after = .centipawns(0)
         } else {
-            let answer = await engine.analyze(fen: played.fenAfter, depth: 12, lines: 1, maxTimeMs: 700)
+            let answer = await engine.analyze(fen: played.fenAfter, depth: allowance.gradeDepth, lines: 1, maxTimeMs: allowance.gradeAfterMs)
             guard gen == generation, !Task.isCancelled else { return false }
             guard let line = answer.first else { return true }
             after = line.evaluation.flipped
@@ -905,7 +917,7 @@ final class MatchController {
         // never acknowledged). Ask again before giving up, with a little more time.
         var chosen: String?
         for attempt in 0..<Self.engineAttempts {
-            chosen = await engine.chooseMove(fen: fen, skill: level.skill,
+            chosen = await engine.chooseMove(fen: fen, skill: level.skill, depth: level.depth,
                                              thinkTimeMs: level.thinkTimeMs * (attempt + 1))
             guard gen == generation, !Task.isCancelled else { return }
             if chosen != nil { break }
@@ -922,15 +934,10 @@ final class MatchController {
         guard gen == generation, !Task.isCancelled else { return }
         isComputerThinking = false
 
-        // The weakest rivals miss things on purpose: now and then they play any
-        // legal move instead of the engine's.
-        let slips = engineAnswered && level.slipRate > 0 && chance() < level.slipRate
-        let slip = slips ? randomLegalMove() : nil
-        // A slip the game refuses (a castling ChessKit still offers after the rook was
-        // taken) falls back to the engine's move.
+        // The rival plays what its search found: its level is in the search itself (see
+        // `Level.skill` and `Level.depth`), never in a random move laid over it.
         var moved = false
-        if let slip { moved = game.playEngineMove(slip) }
-        if !moved, let chosen { moved = game.playEngineMove(chosen) }
+        if let chosen { moved = game.playEngineMove(chosen) }
         // The game must never freeze on the computer's turn: with no answer from the
         // engine at all, the rival still plays a sensible move of its own.
         if !moved, let fallback = fallbackMove() { moved = game.playEngineMove(fallback) }
@@ -996,7 +1003,8 @@ final class MatchController {
         if let known = knownLines(for: fen), known.count > 1 {
             lines = known
         } else {
-            lines = await engine.analyze(fen: fen, depth: 14, lines: 2, maxTimeMs: 2000)
+            let allowance = budget()
+            lines = await engine.analyze(fen: fen, depth: allowance.lookaheadDepth, lines: 2, maxTimeMs: allowance.lookaheadMs)
             // Only a search that ran its course says anything about the engine; one cut
             // short by an undo or a new game doesn't.
             guard gen == generation, game.fen == fen, !Task.isCancelled else { return }

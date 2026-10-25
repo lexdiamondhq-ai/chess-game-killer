@@ -4,7 +4,7 @@ One beautiful iOS chess game, with every feature easy to reach and easy to under
 
 ## Features
 - A first run of four short pages: what the app is, how much chess you've played (which picks your first rival), your board, and the three rules that cost something (help halves the XP, leaving is a loss, rivals hold grudges). Then the first game starts. One-line tips appear the first time a hidden gesture would help, and Settings › How it works lists every gesture and rule
-- Play five computer rivals, Spark to Singularity (Stockfish 17 from Beginner to Grandmaster), each with its own portrait, board and a line about how it plays. Starting a new game while one is under way asks first, since leaving counts as a loss
+- Play five computer rivals, Spark to Singularity (Stockfish 17, set like Lichess's levels: the weaker rivals search a few moves deep with a noisy pick, never a random move, and Singularity is the whole engine), each with its own portrait, board and a line about how it plays. Starting a new game while one is under way asks first, since leaving counts as a loss
 - Pick your side: White or Black (Gold or Violet on the Neon board), or random
 - Chess clocks: 3+2, 5+0, 10+0 or 15+10, or no clock. A clock starts with the first move and waits whenever another screen covers the board. The last ten seconds count down in tenths, and a fallen flag ends the game
 - The coach is one orb at the bottom of the screen. Its ring is your share of the game. After each move its grade (best, excellent, good, inaccuracy, mistake, blunder) shows for a few seconds in your own line by the board, with the better move. Tap the orb and it unfolds into the full coach: eval bar, Leo's picks (tap one to see it, ▶︎ to play it), Undo, Hints, Flip and New game
@@ -14,7 +14,7 @@ One beautiful iOS chess game, with every feature easy to reach and easy to under
 - A captured piece tips over away from its attacker and slides off in a little dust
 - Analyzer: take a photo of a real board, pick a screenshot or set up any position, fix any square, and see Stockfish's two best moves with the lines that follow; then play on from there
 - Sound effects made with ElevenLabs
-- Settings with a live board preview: every look, rival boards, hints, grades, sound, haptics, rival remarks, the coach's voice, and the open-source licenses
+- Settings with a live board preview: every look, rival boards, hints, grades, sound, haptics, rival remarks, the coach's voice (quiet with the ring switch unless "Speak on silent" is on), and the open-source licenses
 - Undo, flip the board, promotion picker, haptics
 - Training with Coach Leo, a grandmaster coach: narrated lessons, daily puzzles and your own mistakes to fix (see below)
 

@@ -2,8 +2,9 @@ import AVFoundation
 import Foundation
 
 /// Plays Leo's recorded answer from the server, or has CoachVoice speak it with the device's voice
-/// when there is no recording. While Leo talks the audio is set up as in lessons (out loud even on
-/// silent, other audio turned down); afterwards the game's quiet sound effects come back.
+/// when there is no recording. While Leo talks the audio is set up as in lessons (other audio
+/// turned down, and the ring switch respected unless "Speak on silent" is on); afterwards the
+/// game's quiet sound effects come back.
 @MainActor
 final class LeoSpeaker: NSObject, TalkSpeaker {
     private var player: AVAudioPlayer?
@@ -93,7 +94,7 @@ final class LeoSpeaker: NSObject, TalkSpeaker {
     private func beginLessonAudio() {
         guard !holdsLessonAudio else { return }
         // A lesson already has the coach's audio set up, and keeps it after Leo is done.
-        guard AVAudioSession.sharedInstance().category != .playback else { return }
+        guard !CoachVoice.shared.lessonAudioActive else { return }
         CoachVoice.shared.beginLesson()
         holdsLessonAudio = true
     }

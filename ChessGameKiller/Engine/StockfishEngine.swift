@@ -7,8 +7,10 @@ protocol ChessEngine: AnyObject, Sendable {
     /// The best `lines` continuations from `fen`, best first. The search stops at
     /// `depth` or after `maxTimeMs`, whichever comes first; nil means no time cap.
     func analyze(fen: String, depth: Int, lines: Int, maxTimeMs: Int?) async -> [EngineLine]
-    /// A move to play from `fen` at the given strength (0 = weakest, 20 = full strength).
-    func chooseMove(fen: String, skill: Int, thinkTimeMs: Int) async -> String?
+    /// A move to play from `fen` at the given strength: Stockfish's skill level (0 = weakest,
+    /// 20 = full strength), how deep to look (nil: as deep as the time allows) and the most
+    /// time to take.
+    func chooseMove(fen: String, skill: Int, depth: Int?, thinkTimeMs: Int) async -> String?
 }
 
 extension ChessEngine {
@@ -46,6 +48,36 @@ actor StockfishEngine: ChessEngine {
     private var unansweredGos = 0
     /// How long to wait for a given-up search's "bestmove" before counting it lost.
     static let lostAnswer = Duration.seconds(2)
+    /// The search threads wanted now, and the number the engine was last told. On a hot phone
+    /// or in Low Power Mode one thread searches; see `PowerPolicy`.
+    private var threadsWanted = StockfishEngine.searchThreads
+    private var threadsApplied = 0
+    private var powerObservers: [NSObjectProtocol] = []
+
+    /// Sets the threads from the phone's state (one when it should hold back, else
+    /// `searchThreads`) and keeps them set as heat and Low Power Mode come and go.
+    private func watchPower() {
+        readPower()
+        guard powerObservers.isEmpty else { return }
+        // Both notifications arrive on any thread.
+        for name in [ProcessInfo.thermalStateDidChangeNotification, Notification.Name.NSProcessInfoPowerStateDidChange] {
+            powerObservers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: nil) { [weak self] _ in
+                Task { await self?.readPower() }
+            })
+        }
+    }
+
+    private func readPower() {
+        setThreads(PowerPolicy.systemConstrained() ? 1 : Self.searchThreads)
+    }
+
+    /// How many threads the next search runs on. The engine is told before that search starts.
+    func setThreads(_ count: Int) {
+        threadsWanted = max(1, count)
+    }
+
+    /// The threads the engine is set to now, for tests.
+    var threads: Int { threadsWanted }
 
     private struct PendingSearch {
         let id: Int
@@ -83,11 +115,14 @@ actor StockfishEngine: ChessEngine {
         _ = await startIfNeeded()
     }
 
-    func chooseMove(fen: String, skill: Int, thinkTimeMs: Int) async -> String? {
+    func chooseMove(fen: String, skill: Int, depth: Int?, thinkTimeMs: Int) async -> String? {
+        // A depth cap ends the search long before its time: the weaker rivals look a few
+        // moves ahead and no further, whatever the phone could manage.
+        let go: EngineCommand = depth.map { .go(depth: $0, movetime: thinkTimeMs) } ?? .go(movetime: thinkTimeMs)
         let result = await search(
             fen: fen,
             options: [("Skill Level", "\(max(0, min(20, skill)))"), ("MultiPV", "1")],
-            go: .go(movetime: thinkTimeMs),
+            go: go,
             // Room for a search the engine is still winding down before this one runs.
             timeout: .milliseconds(thinkTimeMs + 1500)
         )
@@ -160,6 +195,10 @@ actor StockfishEngine: ChessEngine {
         for (name, value) in options {
             await engine.send(command: .setoption(id: name, value: value))
         }
+        if threadsApplied != threadsWanted {
+            threadsApplied = threadsWanted
+            await engine.send(command: .setoption(id: "Threads", value: "\(threadsWanted)"))
+        }
         await engine.send(command: .position(.fen(fen)))
         // Counted before it is sent, so its answer can never find the count at zero.
         unansweredGos += 1
@@ -225,6 +264,7 @@ actor StockfishEngine: ChessEngine {
         guard Self.hasNetworks else { return false }
 
         launched = true
+        watchPower()
         await engine.start()
         if await attachWhenRunning(within: .seconds(15)) { return true }
         startGaveUp = true
@@ -271,7 +311,8 @@ actor StockfishEngine: ChessEngine {
         // Then ask again: this "readyok" comes once the networks are loaded.
         let seen = readyCount
         await engine.send(command: .setoption(id: "Hash", value: "64"))
-        await engine.send(command: .setoption(id: "Threads", value: "\(Self.searchThreads)"))
+        threadsApplied = threadsWanted
+        await engine.send(command: .setoption(id: "Threads", value: "\(threadsWanted)"))
         await engine.send(command: .isready)
         attempts = 0
         while readyCount == seen, attempts < 400 {

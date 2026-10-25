@@ -89,6 +89,8 @@ jobs:
           grep -E "error:|Test Case .* failed|\*\* " build.log | head -80 || true
           grep -E "Executed" build.log | tail -3 || true
           grep -E "\] TIMING " build.log | head -120 || true
+          # The app's own encoding of each progress file, next to the hand-written ones in ProgressFileTests.
+          grep -E "\] FIXTURE " build.log | head -40 || true
           # On a crash: which test was running, and the lines around the error.
           if [ "$status" != 0 ]; then
             grep -E "Restarting after|Test Case '.*' started" build.log | tail -4 || true
