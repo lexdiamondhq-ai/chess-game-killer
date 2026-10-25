@@ -125,6 +125,7 @@ jobs:
           shoot midnight-flat -showcaseLook midnight -showcase3D NO
           shoot faberge -showcaseLook faberge
           shoot neon -showcaseLook neon
+          shoot classic -showcaseLook classic
           shoot spark -showcaseLook spark -showcaseRival spark -showcaseClock 3+2
           shoot coach -showcaseLook gilded -showcase3D NO -showcaseCoach open
           # Ghost Vision held: the engine's line ahead as see-through pieces, then slid back a step.

@@ -74,7 +74,7 @@ final class LiveChallengeAPI: ChallengeAPI {
     }
 
     func create(name: String, side: SideChoice, clock: FriendClock?) async throws -> CreatedChallenge {
-        try await send("POST", "api/games", body: CreateBody(name: name, side: side.rawValue, clock: clock))
+        try await send("POST", "api/games", body: CreateBody(name: name, side: side.rawValue, clock: clock, look: Self.currentLook()))
     }
 
     func game(_ code: String) async throws -> FriendGameState {
@@ -121,13 +121,20 @@ final class LiveChallengeAPI: ChallengeAPI {
 
     // MARK: Requests
 
+    /// The board look the player picked in Settings, so a friend in the browser sees the same board.
+    static func currentLook(_ defaults: UserDefaults = .standard) -> String {
+        let saved = defaults.string(forKey: "boardTheme").flatMap(BoardTheme.ID.init(rawValue:))
+        return (saved ?? BoardTheme.all[0].id).rawValue
+    }
+
     private struct CreateBody: Encodable {
         let name: String
         let side: String
         let clock: FriendClock?
+        let look: String
 
         enum CodingKeys: String, CodingKey {
-            case name, side, clock
+            case name, side, clock, look
         }
 
         // No clock is sent as an explicit null, as the protocol spells it.
@@ -136,6 +143,7 @@ final class LiveChallengeAPI: ChallengeAPI {
             try container.encode(name, forKey: .name)
             try container.encode(side, forKey: .side)
             try container.encode(clock, forKey: .clock)
+            try container.encode(look, forKey: .look)
         }
     }
 

@@ -62,6 +62,7 @@ Every REST reply carries `{ "game": GameState }`, and the WebSocket sends `{ "ty
   "updatedAt": 1761187200000,
   "clock": { "initial": 600, "increment": 0 },
   "creator": "white",
+  "look": "gilded",
   "white": { "name": "Alex", "seated": true, "online": true, "away": null, "claimableAt": null, "screenshots": 0, "recordings": 0 },
   "black": { "name": null, "seated": false, "online": false, "away": null, "claimableAt": null, "screenshots": 0, "recordings": 0 },
   "moves": ["e2e4", "e7e5"],
@@ -77,6 +78,10 @@ Every REST reply carries `{ "game": GameState }`, and the WebSocket sends `{ "ty
 }
 ```
 
+- `look`: the board look the creator plays with in the app (`BoardTheme.ID`, such as `"gilded"` or `"classic"`), so the
+  browser shows the same board. Sent on create; anything but 2–20 lowercase letters is dropped. `null` for games from
+  older apps: the browser then shows the app's default look. The browser's looks are exported from the app by
+  `scripts/play/export_looks.py` into `public/looks/`, `looks.css` and `looks.js`.
 - `status`: `"waiting"` (only the creator is seated), `"active"` (both seated, not over), `"over"`.
 - `white` / `black`: `seated` once someone holds that seat; `online` while that seat has an open WebSocket and is
   not away; `away` is the time the current absence began, or `null`.
@@ -103,7 +108,7 @@ instead of the Authorization header, so a browser can report `away` with `naviga
 
 | Method & path | Body | Reply |
 | --- | --- | --- |
-| `POST /api/games` | `{ "name", "side": "white"\|"black"\|"random", "clock": {…}\|null }` | `201 { "code", "url", "appUrl", "seat", "token", "game" }` |
+| `POST /api/games` | `{ "name", "side": "white"\|"black"\|"random", "clock": {…}\|null, "look"? }` | `201 { "code", "url", "appUrl", "seat", "token", "game" }` |
 | `GET /api/games/{code}` | – | `200 { "game" }` |
 | `POST /api/games/{code}/join` | `{ "name" }` | `200 { "seat", "token", "game" }` |
 | `POST /api/games/{code}/move` | `{ "uci", "ply" }` + Bearer | `200 { "game" }` |

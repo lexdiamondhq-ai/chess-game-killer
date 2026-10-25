@@ -113,7 +113,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable, Codable {
         case .trainingRooms: return "Candidate moves and Guess the Move come with Premium."
         case .allOpenings: return "The popular openings are free. Premium opens all 3,865 named lines and search."
         case .masterGames: return "Browsing master games, and how players at your level answer, come with Premium."
-        case .boardLooks: return "Gilded, Noir and Midnight are free, and each rival's board once you beat that rival. Premium opens every look."
+        case .boardLooks: return "Gilded, Classic, Noir and Midnight are free, and each rival's board once you beat that rival. Premium opens every look."
         case .coachProfile: return "Your top weakness is free. Premium shows your whole style and a plan rebuilt after every game."
         }
     }

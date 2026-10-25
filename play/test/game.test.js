@@ -51,6 +51,7 @@ test("a new game seats its creator and waits", () => {
     updatedAt: T0,
     clock: { initial: 600, increment: 0 },
     creator: "white",
+    look: null,
     white: { name: "Alex", seated: true, online: true, away: null, claimableAt: null, screenshots: 0, recordings: 0 },
     black: { name: null, seated: false, online: false, away: null, claimableAt: null, screenshots: 0, recordings: 0 },
     moves: [],
@@ -79,13 +80,25 @@ test("a random side is settled when the game is made", () => {
   assert.deepEqual([...sides].sort(), ["black", "white"]);
 });
 
+test("the creator's board look is kept, shown and carried into a rematch", () => {
+  const game = rules.createGame({ code: "7KQ2XM", name: "A", side: "white", clock: null, look: "midnight", tokenHash: WHITE, now: T0 });
+  assert.equal(rules.view(game, T0).look, "midnight");
+  game.black = { name: "B", tokenHash: BLACK, away: null, screenshots: 0, recordings: 0 };
+  assert.equal(rules.rematchRecord(game, "8KQ2XM", T0).look, "midnight");
+  const older = rules.createGame({ code: "7KQ2XM", name: "A", side: "white", tokenHash: WHITE, now: T0 });
+  assert.equal(rules.view(older, T0).look, null);
+});
+
 test("the request to make a game is checked", () => {
   const ok = (body, options) => rules.parseCreateInput(body, options);
-  assert.deepEqual(ok({}), { ok: true, value: { name: "Player", side: "random", clock: null } });
+  assert.deepEqual(ok({}), { ok: true, value: { name: "Player", side: "random", clock: null, look: null } });
   assert.deepEqual(ok({ name: "  Alex ", side: "black", clock: { initial: 180, increment: 2 } }), {
     ok: true,
-    value: { name: "Alex", side: "black", clock: { initial: 180, increment: 2 } },
+    value: { name: "Alex", side: "black", clock: { initial: 180, increment: 2 }, look: null },
   });
+  // The creator's board look rides along; anything odd is dropped, never refused.
+  assert.equal(ok({ look: "classic" }).value.look, "classic");
+  for (const look of ["", "Gilded", "../x", 7, "a".repeat(21), null]) assert.equal(ok({ look }).value.look, null);
   assert.deepEqual(ok({ clock: { initial: 300 } }).value.clock, { initial: 300, increment: 0 });
   assert.equal(ok({ side: null }).value.side, "random");
   assert.equal(ok({ clock: null }).value.clock, null);

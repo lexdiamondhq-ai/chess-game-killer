@@ -4,7 +4,7 @@ import SwiftUI
 /// Everything that changes when the player picks a different board look.
 struct BoardTheme: Identifiable {
     enum ID: String, CaseIterable {
-        case gilded, portoro, noir, sculpted, bordeaux, midnight, neon, faberge, blueprint
+        case gilded, portoro, classic, noir, sculpted, bordeaux, midnight, neon, faberge, blueprint
         // One board per rival, matching its portrait.
         case spark, drift, pulse, vector, singularity
     }
@@ -132,7 +132,7 @@ struct BoardTheme: Identifiable {
 
     /// The first is the default look.
     static let all: [BoardTheme] = [
-        .gilded, .portoro, .noir, .sculpted, .bordeaux, .midnight, .neon, .faberge, .blueprint, .spark, .drift, .pulse, .vector, .singularity,
+        .gilded, .portoro, .classic, .noir, .sculpted, .bordeaux, .midnight, .neon, .faberge, .blueprint, .spark, .drift, .pulse, .vector, .singularity,
     ]
 
     /// The boards that belong to a rival, in rival order.
@@ -181,6 +181,44 @@ struct BoardTheme: Identifiable {
         sculptedLook: .gilded,
         boardArt: "board-gilded",
         spritePieces: true,
+        backdrop: [Color(hex: 0x2B2A2C), Color(hex: 0x070708)]
+    )
+
+    /// Clean and flat, as the browser shows a friend game: the classic printed pieces on plain
+    /// cream and brown squares. No 3D, no picture, nothing but the game.
+    static let classic = BoardTheme(
+        id: .classic,
+        name: "Classic",
+        symbol: "square.grid.3x3.fill",
+        light: Color(hex: 0xCDBC9C),
+        dark: Color(hex: 0x553420),
+        surface: nil,
+        gridLine: nil,
+        labelOnLight: Color(hex: 0x2A2722).opacity(0.82),
+        labelOnDark: Color(hex: 0xE8DFCC).opacity(0.85),
+        selected: Color(hex: 0x5E8FFF).opacity(0.3),
+        selectedRing: nil,
+        lastMove: BoardTheme.goldWash,
+        lastMoveRing: nil,
+        hint: Color(hex: 0x5E8FFF).opacity(0.86),
+        hintGlow: nil,
+        check: Color(hex: 0xD92D3F),
+        pieceSet: "",
+        whiteGlow: nil,
+        blackGlow: nil,
+        whiteSide: Color(hex: 0xF4F1EA),
+        blackSide: Color(hex: 0x141416),
+        whiteName: "White",
+        blackName: "Black",
+        bestArrow: Color(hex: 0x5E8FFF).opacity(0.95),
+        secondArrow: Color(hex: 0x5E8FFF).opacity(0.72),
+        arrowGlow: nil,
+        whiteSparks: [Color.white, Color(hex: 0xF1E4C8), Color(hex: 0xF2C27A), Color(hex: 0xE39A45)],
+        blackSparks: [Color.white, Color(hex: 0xF2C27A), Color(hex: 0xE39A45), Color(hex: 0xFF8A2A)],
+        boardEdge: nil,
+        boardShadows: [],
+        isDark: true,
+        accent: Color(hex: 0x7EA6FF),
         backdrop: [Color(hex: 0x2B2A2C), Color(hex: 0x070708)]
     )
 
@@ -652,6 +690,7 @@ extension BoardTheme {
         switch id {
         case .gilded: return BackdropLight(top: 0x16120F, bottom: 0x060505, key: 0xD9A65E, fill: 0x7A4A26, floor: 0xD29A52)
         case .portoro: return BackdropLight(top: 0x232220, bottom: 0x09090A, key: 0xD2B06A, fill: 0x4A4640, floor: 0xBC9A55)
+        case .classic: return BackdropLight(top: 0x1A1612, bottom: 0x070606, key: 0xD9B98A, fill: 0x553420, floor: 0xC9A06A)
         case .noir: return BackdropLight(top: 0x232224, bottom: 0x08080A, key: 0xDCCBA6, fill: 0x3E3E46, floor: 0xB9A784)
         case .sculpted: return BackdropLight(top: 0x24262A, bottom: 0x08080A, key: 0xD8CCB4, fill: 0x4A4C55, floor: 0xA9A08C)
         case .bordeaux: return BackdropLight(top: 0x2A1E21, bottom: 0x0A0607, key: 0xEBB357, fill: 0x7A2530, floor: 0xA8404E)

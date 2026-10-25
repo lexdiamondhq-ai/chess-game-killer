@@ -92,10 +92,10 @@ export class GameRoom extends DurableObject {
   // Calls from the router
 
   /** Starts a new game under this code. Returns { inUse: true } if the code already has one. */
-  async create({ code, name, side, clock, tokenHash }) {
+  async create({ code, name, side, clock, look, tokenHash }) {
     if (this.game) return { inUse: true };
     const now = Date.now();
-    this.game = rules.createGame({ code, name, side, clock, tokenHash, now, leaveGraceMs: this.config.leaveGraceMs });
+    this.game = rules.createGame({ code, name, side, clock, look, tokenHash, now, leaveGraceMs: this.config.leaveGraceMs });
     await this.#settle({ changed: true, notices: [] });
     return { seat: this.game.creator, game: this.#view() };
   }

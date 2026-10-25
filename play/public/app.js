@@ -3,6 +3,7 @@
 
 import { Chess } from '/vendor/chess.js';
 import { Board, parseFen } from './board.js';
+import { setLook } from './looks.js';
 
 // ---- Small helpers ------------------------------------------------------------------------
 
@@ -371,6 +372,7 @@ function applyState(game, { force = false, receivedAt = Date.now(), quiet = fals
   if (typeof game.now === 'number') S.offset = game.now - receivedAt;
   const prev = S.game;
   S.game = game;
+  setLook(game.look); // the board the friend who sent the link plays on in the app
   if (S.joining) return; // the join's answer decides what this page shows
   if (S.pending && (game.moves.length > S.pending.ply || game.status !== 'active')) S.pending = null;
   if (S.confirm && game.status !== 'active' && game.status !== 'waiting') S.confirm = null;

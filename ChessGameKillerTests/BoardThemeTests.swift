@@ -55,6 +55,20 @@ final class BoardThemeTests: XCTestCase {
         XCTAssertEqual(BoardTheme.named(.noir).sculptedLook?.pieces, "sculpted-pieces")
     }
 
+    /// Classic, the clean flat board from the browser game: printed pieces on plain squares, free for everyone.
+    @MainActor
+    func testClassicIsAFreeFlatLook() {
+        let classic = BoardTheme.named(.classic)
+        XCTAssertEqual(classic.name, "Classic")
+        XCTAssertEqual(classic.pieceSet, "")
+        XCTAssertNil(classic.boardArt)
+        XCTAssertNil(classic.sculptedLook)
+        XCTAssertFalse(classic.spritePieces)
+        XCTAssertTrue(BoardTheme.freeLooks.contains(.classic))
+        XCTAssertTrue(RivalBoardsEarned.opens(classic))
+        XCTAssertNotEqual(BoardTheme.all.first?.id, .classic, "Classic is an option, not the default")
+    }
+
     func testTheCarvedLooksPlayIn3DAndTheRestStayFlat() {
         for id in [BoardTheme.ID.gilded, .portoro, .noir, .sculpted, .bordeaux, .midnight] {
             let theme = BoardTheme.named(id)
