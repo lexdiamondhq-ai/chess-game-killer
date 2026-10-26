@@ -146,9 +146,9 @@ final class SculptedBoardTests: XCTestCase {
         }
     }
 
-    /// Flat from above: a lying king, end to end and as high as its foot's rim,
-    /// stays inside its own square on every square, from both sides.
-    func testLyingPiecesStayInsideTheirSquares() {
+    /// Flat from above: a Crystal tile's top stays inside its own square on every square,
+    /// from both sides.
+    func testFlatPiecesStayInsideTheirSquares() {
         let framing = SculptedCamera.Framing.seated
         let size = CGSize(width: 402, height: 402 / framing.aspect)
         for flipped in [false, true] {
@@ -157,10 +157,11 @@ final class SculptedBoardTests: XCTestCase {
                 let square = Square(file: index % 8, rank: index / 8)
                 let center = SculptedCamera.position(of: square)
                 let outline = camera.frame(of: square, in: size).insetBy(dx: -0.5, dy: -0.5)
-                // The head, away from the player, is low and slim; the foot's rim stands higher.
-                let away: Float = flipped ? 1 : -1
-                for (dz, height) in [(0.43 * away, Float(0.25)), (-0.43 * away, Float(0.42))] {
-                    for dx: Float in [-0.2, 0.2] {
+                // Every corner of a full-size tile's top.
+                let (width, tall) = SculptedCrystal.size(of: .king)
+                let half = Float(width) / 2, height = Float(tall) + 0.01
+                for dz in [-half, half] {
+                    for dx in [-half, half] {
                         let point = camera.screenPoint(center + SIMD3(dx, height, dz), in: size)
                         XCTAssertTrue(outline.contains(point), "\(square) flipped \(flipped)")
                     }

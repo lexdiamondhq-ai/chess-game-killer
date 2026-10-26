@@ -450,8 +450,11 @@ final class SculptedBoardScene {
         var piece: Piece
         /// Stands on the square, turned to face the player.
         let root = SCNNode()
-        /// The sculpture itself: lifted, leaned and tipped by the animations.
-        let model: SCNNode
+        /// The sculpture itself: lifted, leaned and tipped by the animations. On the flat
+        /// board it is a Crystal tile instead.
+        var model: SCNNode
+        /// Shown as a Crystal tile (the flat board).
+        var crystal = false
         /// A soft shadow on the stone, darkest right under the foot.
         let contact: SCNNode
         var halo: SCNNode?
@@ -464,7 +467,7 @@ final class SculptedBoardScene {
         /// The piece at rest in its own frame: turned by `yaw`, and on Big Board laid down
         /// on its side. Every pose of the model ends with it.
         var rest: simd_float4x4
-        /// Laid down on its side (Big Board, flat).
+        /// Seen flat from above: no tipping over at the end of the game.
         var lies = false
         let baseRadius: Float
         /// Raised for the selection.
@@ -1025,31 +1028,31 @@ final class SculptedBoardScene {
             * yaw
     }
 
-    /// Lays a piece down for Big Board: on its side, head away from the player and the face
-    /// the player sees standing turned up, centered in its square and resting on the board.
-    /// Each kind is sized so it lies well inside the square; taller pieces stay longer.
+    /// Dresses a piece for the framing: the carved piece standing, turned by its yaw, or on the
+    /// flat board a Crystal tile with the piece etched in it, which reads from above.
     private func layDown(_ node: PieceNode, framing: SculptedCamera.Framing) {
-        let turn = simd_float4x4(simd_quatf(angle: node.yaw, axis: SculptedCamera.up))
         node.lies = framing.lying
-        guard framing.lying else {
-            node.rest = turn
-            node.contact.scale = SCNVector3(node.baseRadius / 0.33, node.baseRadius / 0.33, 1)
-            return
+        if node.crystal != framing.lying {
+            let model = framing.lying
+                ? SculptedCrystal.makePiece(node.piece.kind, color: node.piece.color, look: look)
+                : assets.makePiece(node.piece.kind, color: node.piece.color, look: look)
+            node.root.replaceChildNode(node.model, with: model)
+            node.model = model
+            node.crystal = framing.lying
+            // The history marks belong to the carved piece; they come back with it.
+            node.heirloom = nil
+            node.heirloomUndo = []
+            node.heirloomParts = []
         }
-        let height = max(assets.height(of: node.piece.kind), 0.1)
-        let size = min(Self.lyingLength / height, 0.8)
-        let length = height * size
-        let radius = node.baseRadius * size
-        node.rest = Self.translation(SIMD3(0, radius, length / 2))
-            * simd_float4x4(simd_quatf(angle: -.pi / 2, axis: SIMD3(1, 0, 0)))
-            * Self.scale(size)
-            * turn
-        // The blob stretches along the lying piece: its own x and y are the board's x and z.
-        node.contact.scale = SCNVector3(radius * 1.3 / 0.33, length * 0.6 / 0.33, 1)
+        if framing.lying {
+            node.rest = matrix_identity_float4x4
+            let half = Float(SculptedCrystal.size(of: node.piece.kind).width) * 0.62
+            node.contact.scale = SCNVector3(half / 0.33, half / 0.33, 1)
+        } else {
+            node.rest = simd_float4x4(simd_quatf(angle: node.yaw, axis: SculptedCamera.up))
+            node.contact.scale = SCNVector3(node.baseRadius / 0.33, node.baseRadius / 0.33, 1)
+        }
     }
-
-    /// A lying king's length, as a share of its square.
-    private static let lyingLength: Float = 0.86
 
     private static func translation(_ v: SIMD3<Float>) -> simd_float4x4 {
         var m = matrix_identity_float4x4
@@ -1143,6 +1146,10 @@ final class SculptedBoardScene {
         node.root.renderingOrder = 20
         node.root.addChildNode(model)
         layDown(node, framing: framing)
+        node.model.enumerateHierarchy { child, _ in
+            child.castsShadow = false
+            child.categoryBitMask = 1
+        }
         setPose(node, y: 0)
         return node
     }
@@ -1192,7 +1199,7 @@ final class SculptedBoardScene {
     /// Dresses each army piece in its history (and undresses one that no longer should be).
     private func updateHeirlooms(_ new: SculptedBoardState) {
         for (id, node) in nodes {
-            let wanted = new.heirlooms[id].flatMap { $0.isEmpty ? nil : $0 }
+            let wanted = node.crystal ? nil : new.heirlooms[id].flatMap { $0.isEmpty ? nil : $0 }
             guard node.heirloom != wanted else { continue }
             for undo in node.heirloomUndo { undo.node.geometry = undo.geometry }
             node.heirloomUndo = []
@@ -1444,14 +1451,22 @@ final class SculptedBoardScene {
     /// How the board is seen now.
     private var framing: SculptedCamera.Framing { state?.framing ?? .standing }
 
-    /// Moves the camera to the new framing and sets the pieces down for it: from above for
-    /// Big Board, each piece lying in its square, or back to the player's chair, standing.
+    /// Moves the camera to the new framing and dresses the pieces for it: from above with
+    /// Crystal tiles, or back to the player's chair with the carved pieces standing.
     private func reframe(_ framing: SculptedCamera.Framing, animated: Bool) {
         for node in Array(nodes.values) + Array(ghostNodes.values) {
             node.model.removeAllActions()
             layDown(node, framing: framing)
             setPose(node, y: node.lifted ? Self.selectionLift : 0)
         }
+        // Ghosts cast no shadow and never take a tap, whichever model they show.
+        for node in ghostNodes.values {
+            node.model.enumerateHierarchy { child, _ in
+                child.castsShadow = false
+                child.categoryBitMask = 1
+            }
+        }
+        if let state { updateHeirlooms(state) }
         guard heldCamera == nil else { return }
         let from = camera
         let target = SculptedCamera.fitted(aspect: camera.aspect, flipped: state?.flipped ?? false, framing: framing)
