@@ -146,6 +146,50 @@ final class SculptedBoardTests: XCTestCase {
         }
     }
 
+    /// Flat from above: a Crystal tile's top stays inside its own square on every square,
+    /// from both sides.
+    func testFlatPiecesStayInsideTheirSquares() {
+        let framing = SculptedCamera.Framing.seated
+        let size = CGSize(width: 402, height: 402 / framing.aspect)
+        for flipped in [false, true] {
+            let camera = SculptedCamera.fitted(aspect: Float(size.width / size.height), flipped: flipped, framing: framing)
+            for index in 0..<64 {
+                let square = Square(file: index % 8, rank: index / 8)
+                let center = SculptedCamera.position(of: square)
+                let outline = camera.frame(of: square, in: size).insetBy(dx: -0.5, dy: -0.5)
+                // Every corner of a full-size tile's top.
+                let (width, tall) = SculptedCrystal.size(of: .king)
+                let half = Float(width) / 2, height = Float(tall) + 0.01
+                for dz in [-half, half] {
+                    for dx in [-half, half] {
+                        let point = camera.screenPoint(center + SIMD3(dx, height, dz), in: size)
+                        XCTAssertTrue(outline.contains(point), "\(square) flipped \(flipped)")
+                    }
+                }
+            }
+        }
+    }
+
+    func testTheFlatBoardFillsItsViewAndStaysInside() {
+        let framing = SculptedCamera.Framing.seated
+        for flipped in [false, true] {
+            let camera = SculptedCamera.fitted(aspect: Float(framing.aspect), flipped: flipped, framing: framing)
+            let points = SculptedCamera.keyPoints(tallest: framing.tallest)
+                .map { flipped ? SIMD3($0.x * -1, $0.y, $0.z * -1) : $0 }
+                .map(camera.normalized)
+            XCTAssertTrue(points.allSatisfy { abs($0.x) <= 1 && abs($0.y) <= 1 })
+            XCTAssertGreaterThan(points.map { abs($0.x) }.max() ?? 0, 0.95, "edge to edge")
+            XCTAssertGreaterThan(points.map { abs($0.y) }.max() ?? 0, 0.9, "top to bottom, nothing wasted")
+        }
+    }
+
+    func testBoardViewSetting() {
+        XCTAssertEqual(BoardTilt.auto.framing(bigBoard: false), .standing)
+        XCTAssertEqual(BoardTilt.auto.framing(bigBoard: true), .seated)
+        XCTAssertEqual(BoardTilt.tilted.framing(bigBoard: true), .standing)
+        XCTAssertEqual(BoardTilt.flat.framing(bigBoard: false), .seated)
+    }
+
     func testEverySquareIsFoundUnderItsOwnCenter() {
         let size = CGSize(width: 390, height: 390 / SculptedBoardView.aspect)
         for flipped in [false, true] {

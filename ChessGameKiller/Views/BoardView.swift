@@ -15,6 +15,8 @@ struct BoardView: View {
     /// Ghost Vision: hold the board to see the engine's line ahead. Nil where it isn't
     /// allowed, such as a game against a friend.
     var vision: GhostVision?
+    /// How the 3D board is seen: Big Board looks from above, each piece inside its square.
+    var framing: SculptedCamera.Framing = .standing
 
     @AppStorage("haptics") private var hapticsOn = true
     /// The player's army, so veteran pieces show their glow and scar.
@@ -33,7 +35,8 @@ struct BoardView: View {
     var body: some View {
         Group {
             if Self.playsIn3D(theme, setting: sculpted3D) {
-                SculptedBoardView(match: match, theme: theme, browsing: browsing, endBrowsing: endBrowsing, vision: vision)
+                SculptedBoardView(match: match, theme: theme, browsing: browsing, endBrowsing: endBrowsing, vision: vision,
+                                  framing: framing)
             } else {
                 flatBoard
             }
@@ -46,9 +49,10 @@ struct BoardView: View {
         theme.sculptedLook != nil && setting && SculptedAssets.shared.isLoaded
     }
 
-    /// Width over height of the board: the 3D board, seen at an angle, is wider than tall.
-    static func aspect(_ theme: BoardTheme, setting: Bool) -> CGFloat {
-        playsIn3D(theme, setting: setting) ? SculptedBoardView.aspect : 1
+    /// Width over height of the board: the 3D board, seen at an angle, is wider than tall
+    /// (less so seen from above, as on Big Board).
+    static func aspect(_ theme: BoardTheme, setting: Bool, framing: SculptedCamera.Framing = .standing) -> CGFloat {
+        playsIn3D(theme, setting: setting) ? framing.aspect : 1
     }
 
     private var flatBoard: some View {

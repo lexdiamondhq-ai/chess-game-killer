@@ -20,6 +20,8 @@ struct SculptedCamera: Equatable {
     var focus = SIMD3<Float>(0, 0, 0)
     /// Width over height of the view.
     var aspect: Float = 1
+    /// How the board is seen; it also sets the pieces' size.
+    var framing: Framing = .standing
 
     static let up = SIMD3<Float>(0, 1, 0)
 
@@ -105,7 +107,9 @@ struct SculptedCamera: Equatable {
 
     /// What must stay in the picture: the frame's corners (its top and the bottom of its
     /// near face) and the tops of the tallest pieces on the far rank.
-    static var keyPoints: [SIMD3<Float>] {
+    static var keyPoints: [SIMD3<Float>] { keyPoints(tallest: tallest) }
+
+    static func keyPoints(tallest: Float) -> [SIMD3<Float>] {
         let w = boardHalfWidth
         var points: [SIMD3<Float>] = []
         for x in [-w, w] {
@@ -122,11 +126,56 @@ struct SculptedCamera: Equatable {
 
     // MARK: Framing
 
+    /// How the board is seen: from the player's chair, pieces standing tall, or from high
+    /// above (Big Board), each piece a Crystal glass tile inside its own square.
+    enum Framing: Equatable {
+        case standing
+        case seated
+
+        /// Height above the board, as an angle.
+        var elevation: Float {
+            switch self {
+            case .standing: return 50 * .pi / 180
+            case .seated: return 80 * .pi / 180
+            }
+        }
+
+        /// Across the view. From above, a longer lens keeps the far rank's pieces from leaning out of their squares.
+        var fieldOfView: Float {
+            switch self {
+            case .standing: return 22 * .pi / 180
+            case .seated: return 12 * .pi / 180
+            }
+        }
+
+        /// The pieces are Crystal tiles, each inside its square.
+        var lying: Bool { self == .seated }
+
+        /// How high the pieces reach above the board: a standing king's cross, or a glass tile.
+        var tallest: Float {
+            switch self {
+            case .standing: return SculptedCamera.tallest
+            case .seated: return 0.5
+            }
+        }
+
+        /// Width over height of a view that holds the board snugly.
+        var aspect: CGFloat {
+            switch self {
+            case .standing: return 1.35
+            case .seated: return 1.01
+            }
+        }
+    }
+
     /// The camera for a view of this shape: the board as wide as the view allows, the
     /// picture centered top to bottom. Flipping turns the same framing to black's side.
-    static func fitted(aspect: Float, flipped: Bool) -> SculptedCamera {
+    static func fitted(aspect: Float, flipped: Bool, framing: Framing = .standing) -> SculptedCamera {
         var camera = SculptedCamera()
         camera.aspect = aspect
+        camera.elevation = framing.elevation
+        camera.fieldOfView = framing.fieldOfView
+        camera.framing = framing
         // Find the look point that centers the picture, then the distance that fits it.
         var low: Float = -3
         var high: Float = 3
@@ -160,7 +209,7 @@ struct SculptedCamera: Equatable {
     }
 
     private func fits() -> Bool {
-        Self.keyPoints.allSatisfy { point in
+        Self.keyPoints(tallest: framing.tallest).allSatisfy { point in
             let n = normalized(point)
             return abs(n.x) <= 1 - Self.margin.x && abs(n.y) <= 1 - Self.margin.y
         }
@@ -168,7 +217,41 @@ struct SculptedCamera: Equatable {
 
     /// How far the picture's middle sits above the view's middle, from -1 to 1.
     private func verticalOffset() -> Float {
-        let ys = Self.keyPoints.map { normalized($0).y }
+        let ys = Self.keyPoints(tallest: framing.tallest).map { normalized($0).y }
         return (ys.max()! + ys.min()!) / 2
+    }
+}
+
+/// The "Board view" setting for the 3D board: tilted with the pieces standing, or flat from
+/// above with each piece a glass tile in its square. Auto tilts the usual board and lays Big Board flat.
+enum BoardTilt: String, CaseIterable, Identifiable {
+    case auto, tilted, flat
+
+    static let storageKey = "boardTilt"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .auto: return "Auto"
+        case .tilted: return "Tilted"
+        case .flat: return "Flat"
+        }
+    }
+
+    var blurb: String {
+        switch self {
+        case .auto: return "Tilted, with the pieces standing. Flat on Big Board, with Crystal glass pieces."
+        case .tilted: return "Always tilted, with the pieces standing, Big Board too."
+        case .flat: return "Always flat from above, with Crystal glass pieces."
+        }
+    }
+
+    func framing(bigBoard: Bool) -> SculptedCamera.Framing {
+        switch self {
+        case .auto: return bigBoard ? .seated : .standing
+        case .tilted: return .standing
+        case .flat: return .seated
+        }
     }
 }

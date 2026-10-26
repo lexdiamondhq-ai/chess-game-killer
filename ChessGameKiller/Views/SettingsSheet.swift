@@ -15,6 +15,7 @@ struct SettingsSheet: View {
     @AppStorage("rivalBanter") private var banterOn = true
     @AppStorage("bigBoard") private var bigBoard = false
     @AppStorage("sculpted3D") private var sculpted3D = true
+    @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.auto
     @AppStorage(Heirloom.settingKey) private var heirloomOn = true
     @AppStorage(BoardTheme.coordinatesKey) private var coordinatesOn = true
     @AppStorage(HomeScreen.key) private var homeScreen = HomeScreen.defaultOn
@@ -53,6 +54,16 @@ struct SettingsSheet: View {
                                 ToggleRow(title: "3D pieces", subtitle: "Carved pieces that lift, glide and fall. Off draws the same set flat.",
                                           symbol: "cube", isOn: $sculpted3D, theme: theme)
                                 rule
+                                if sculpted3D {
+                                    PickerRow(title: "Board view", subtitle: tilt.blurb, symbol: "perspective", theme: theme) {
+                                        Picker("Board view", selection: $tilt) {
+                                            ForEach(BoardTilt.allCases) { choice in
+                                                Text(choice.title).tag(choice)
+                                            }
+                                        }
+                                    }
+                                    rule
+                                }
                             }
                             ToggleRow(title: "Coordinates", subtitle: "Letters and numbers around the board. Off gives the squares more room.",
                                       symbol: "textformat.abc", isOn: $coordinatesOn, theme: theme)
