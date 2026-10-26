@@ -127,7 +127,7 @@ struct SculptedCamera: Equatable {
     // MARK: Framing
 
     /// How the board is seen: from the player's chair, pieces standing tall, or from high
-    /// above (Big Board), each piece a Crystal glass tile inside its own square.
+    /// above (Big Board), each piece a Medallion coin inside its own square.
     enum Framing: Equatable {
         case standing
         case seated
@@ -148,7 +148,7 @@ struct SculptedCamera: Equatable {
             }
         }
 
-        /// The pieces are Crystal tiles, each inside its square.
+        /// The pieces are Medallion coins, each inside its square.
         var lying: Bool { self == .seated }
 
         /// How high the pieces reach above the board: a standing king's cross, or a glass tile.
@@ -241,9 +241,9 @@ enum BoardTilt: String, CaseIterable, Identifiable {
 
     var blurb: String {
         switch self {
-        case .auto: return "Tilted, with the pieces standing. Flat on Big Board, with Crystal glass pieces."
+        case .auto: return "Tilted, with the pieces standing. Flat on Big Board, with Medallion coins."
         case .tilted: return "Always tilted, with the pieces standing, Big Board too."
-        case .flat: return "Always flat from above, with Crystal glass pieces."
+        case .flat: return "Always flat from above, with Medallion coins."
         }
     }
 
