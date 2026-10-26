@@ -146,7 +146,7 @@ final class SculptedBoardTests: XCTestCase {
         }
     }
 
-    /// Flat from above: a Medallion coin's rim stays inside its own square on every square,
+    /// Flat from above: a Crystal tile's top stays inside its own square on every square,
     /// from both sides.
     func testFlatPiecesStayInsideTheirSquares() {
         let framing = SculptedCamera.Framing.seated
@@ -157,14 +157,14 @@ final class SculptedBoardTests: XCTestCase {
                 let square = Square(file: index % 8, rank: index / 8)
                 let center = SculptedCamera.position(of: square)
                 let outline = camera.frame(of: square, in: size).insetBy(dx: -0.5, dy: -0.5)
-                // The edge of the largest coin's rim, all the way round.
-                let (radius, tall) = SculptedMedallion.size(of: .king)
-                let height = Float(tall) + 0.02
-                for step in 0..<16 {
-                    let angle = Float(step) * .pi / 8
-                    let edge = SIMD3(Float(radius) * cos(angle), height, Float(radius) * sin(angle))
-                    let point = camera.screenPoint(center + edge, in: size)
-                    XCTAssertTrue(outline.contains(point), "\(square) flipped \(flipped)")
+                // Every corner of a full-size tile's top.
+                let (width, tall) = SculptedCrystal.size(of: .king)
+                let half = Float(width) / 2, height = Float(tall) + 0.01
+                for dz in [-half, half] {
+                    for dx in [-half, half] {
+                        let point = camera.screenPoint(center + SIMD3(dx, height, dz), in: size)
+                        XCTAssertTrue(outline.contains(point), "\(square) flipped \(flipped)")
+                    }
                 }
             }
         }
