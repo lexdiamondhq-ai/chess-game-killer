@@ -3,8 +3,8 @@ import SceneKit
 import UIKit
 
 /// The Crystal set, for the flat board seen from above: each piece is a glass tile with the
-/// piece etched inside. White is clear glass with the piece inked dark on top; black is smoked
-/// glass with the piece glowing gold inside. A gold plate sits under each tile.
+/// piece etched into its top. White is clear glass with the piece inked dark; black is smoked
+/// glass with the piece glowing gold. A gold plate sits under each tile.
 ///
 /// Sizes are in squares, the tile's foot at the origin, y up, the top of the etching toward -z
 /// (away from White), like the carved sets.
@@ -28,9 +28,9 @@ enum SculptedCrystal {
         plane.materials = [etching(kind, color: color)]
         let etch = SCNNode(geometry: plane)
         etch.eulerAngles.x = -.pi / 2
-        // White's ink sits on the top face; black's glows from inside the smoke.
-        etch.position = SCNVector3(0, Float(color == .white ? height + 0.002 : height * 0.55), 0)
-        etch.renderingOrder = color == .white ? 14 : 10
+        // Etched into the top face, over the glass: dark ink on White's, glowing gold on Black's.
+        etch.position = SCNVector3(0, Float(height + 0.002), 0)
+        etch.renderingOrder = 14
         etch.castsShadow = false
 
         let plate = SCNNode(geometry: SCNBox(width: width - 0.02, height: 0.012, length: width - 0.02, chamferRadius: 0.05))
@@ -50,9 +50,10 @@ enum SculptedCrystal {
     private static func glass(_ color: Piece.Color) -> SCNMaterial {
         if let made = glasses[color] { return made }
         let material = SculptedAssets.pbr(
-            color == .white ? UIColor(white: 0.97, alpha: 1) : UIColor(red: 0.2, green: 0.185, blue: 0.17, alpha: 1),
-            roughness: 0.06, coat: 1, coatRoughness: 0.03)
-        material.transparency = color == .white ? 0.72 : 0.86
+            color == .white ? UIColor(white: 0.96, alpha: 1) : UIColor(red: 0.17, green: 0.13, blue: 0.1, alpha: 1),
+            roughness: 0.05, coat: 1, coatRoughness: 0.02)
+        // See-through enough that the square shows under it, like glass.
+        material.transparency = color == .white ? 0.58 : 0.78
         material.transparencyMode = .dualLayer
         material.blendMode = .alpha
         material.writesToDepthBuffer = false
@@ -71,7 +72,7 @@ enum SculptedCrystal {
             let gold = UIColor(red: 0.95, green: 0.78, blue: 0.47, alpha: 1)
             material = SculptedAssets.pbr(gold, roughness: 0.3, metalness: 1)
             material.emission.contents = gold
-            material.emission.intensity = 0.7
+            material.emission.intensity = 1.0
         }
         material.transparent.contents = mask
         material.transparencyMode = .aOne
