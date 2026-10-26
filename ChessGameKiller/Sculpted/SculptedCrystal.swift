@@ -18,7 +18,9 @@ enum SculptedCrystal {
         let (width, height) = size(of: kind)
         let node = SCNNode()
 
-        let tile = SCNNode(geometry: SCNBox(width: width, height: height, length: width, chamferRadius: 0.07))
+        // Rounded well over: the bevels catch the light like cut glass.
+        let tile = SCNNode(geometry: SCNBox(width: width, height: height, length: width, chamferRadius: 0.09))
+        (tile.geometry as? SCNBox)?.chamferSegmentCount = 8
         tile.geometry?.materials = [glass(color)]
         tile.position = SCNVector3(0, Float(height / 2), 0)
         // Drawn after the etching, so the glass is seen over it.
@@ -28,8 +30,9 @@ enum SculptedCrystal {
         plane.materials = [etching(kind, color: color)]
         let etch = SCNNode(geometry: plane)
         etch.eulerAngles.x = -.pi / 2
-        // Etched into the top face, over the glass: dark ink on White's, glowing gold on Black's.
-        etch.position = SCNVector3(0, Float(height + 0.002), 0)
+        // White's piece is inked into the top face. Black's glows from inside the smoked glass:
+        // drawn after the glass, halfway down, so it shifts a little under the top as the board turns.
+        etch.position = SCNVector3(0, Float(color == .white ? height + 0.002 : height * 0.5), 0)
         etch.renderingOrder = 14
         etch.castsShadow = false
 
@@ -50,15 +53,30 @@ enum SculptedCrystal {
     private static func glass(_ color: Piece.Color) -> SCNMaterial {
         if let made = glasses[color] { return made }
         let material = SculptedAssets.pbr(
-            color == .white ? UIColor(white: 0.96, alpha: 1) : UIColor(red: 0.17, green: 0.13, blue: 0.1, alpha: 1),
-            roughness: 0.05, coat: 1, coatRoughness: 0.02)
+            color == .white ? UIColor(red: 0.95, green: 0.96, blue: 0.97, alpha: 1) : UIColor(red: 0.16, green: 0.12, blue: 0.09, alpha: 1),
+            roughness: 0.02, coat: 1, coatRoughness: 0.01)
         // See-through enough that the square shows under it, like glass.
-        material.transparency = color == .white ? 0.58 : 0.78
+        material.transparency = color == .white ? 0.45 : 0.72
+        // Glass brightens and turns opaque toward its edges (Fresnel), which is what makes it read
+        // as glass from above: bright rims and bevels round a clear middle.
+        material.shaderModifiers = [.fragment: color == .white ? edgeLight(0.85, opacity: 0.9) : edgeLight(0.55, opacity: 0.95)]
         material.transparencyMode = .dualLayer
         material.blendMode = .alpha
         material.writesToDepthBuffer = false
         glasses[color] = material
         return material
+    }
+
+    /// Fresnel for the glass: toward grazing angles, the color lifts toward white and turns opaque.
+    private static func edgeLight(_ strength: Double, opacity: Double) -> String {
+        """
+        float3 crystalN = normalize(_surface.normal);
+        float3 crystalV = normalize(-_surface.position);
+        float crystalEdge = pow(1.0 - saturate(abs(dot(crystalN, crystalV))), 2.5);
+        float crystalLift = crystalEdge * \(strength);
+        _output.color.rgb = _output.color.rgb + float3(crystalLift) * \(opacity);
+        _output.color.a = max(_output.color.a, crystalEdge * \(opacity));
+        """
     }
 
     private static func etching(_ kind: Piece.Kind, color: Piece.Color) -> SCNMaterial {
@@ -72,7 +90,7 @@ enum SculptedCrystal {
             let gold = UIColor(red: 0.95, green: 0.78, blue: 0.47, alpha: 1)
             material = SculptedAssets.pbr(gold, roughness: 0.3, metalness: 1)
             material.emission.contents = gold
-            material.emission.intensity = 1.0
+            material.emission.intensity = 1.4
         }
         material.transparent.contents = mask
         material.transparencyMode = .aOne
