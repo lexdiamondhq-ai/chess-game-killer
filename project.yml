@@ -53,9 +53,11 @@ targets:
         INFOPLIST_KEY_NSCameraUsageDescription: Take a photo of a chess board to find the best move.
         INFOPLIST_KEY_NSMicrophoneUsageDescription: Leo listens while you hold the button to talk through your move.
         INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: Your words become text so Leo can check your plan.
-        # The game and lesson screens are laid out for portrait; iPad keeps every orientation.
+        # The game and lesson screens are laid out for portrait.
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
-        TARGETED_DEVICE_FAMILY: "1,2"
+        # iPhone only for 1.0: nothing has been laid out or tested for iPad yet, and an app that is
+        # offered to iPad owners has to work there. Set back to "1,2" once it is designed for it.
+        TARGETED_DEVICE_FAMILY: "1"
   ChessGameKillerTests:
     type: bundle.unit-test
     platform: iOS

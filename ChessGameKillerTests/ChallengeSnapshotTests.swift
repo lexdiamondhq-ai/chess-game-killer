@@ -14,7 +14,7 @@ final class ChallengeSnapshotTests: XCTestCase {
 
     private let defaults = UserDefaults.standard
     private var saved: [String: Any?] = [:]
-    private static let keys = ["boardTheme", "sculpted3D", ChallengeName.key, "challenge.clock", "challenge.side"]
+    private static let keys = ["boardTheme", "sculpted3D", ChallengeName.key, "challenge.clock", "challenge.side", "online.clock"]
 
     /// The phone's own time, for games that must look recent. Clocks and absences count from the server's `now`.
     private var realNow: Double { Date.now.timeIntervalSince1970 * 1000 }
@@ -65,6 +65,67 @@ final class ChallengeSnapshotTests: XCTestCase {
         Task { await composer.create(name: "Alex", clock: FriendClock(.rapid10), side: .white) }
         spin(until: "the challenge exists") { composer.created != nil }
         try snapshot("challenge-composer-created", center: center)
+        center.dismiss()
+    }
+
+    // MARK: Play online
+
+    func testOnlineLobby() throws {
+        let api = FakeChallengeAPI()
+        api.onlineRating = OnlineRating(rating: 1236, games: 4, provisional: true)
+        api.lobbyList = LobbyList(players: [
+            LobbyPlayer(id: "111111111111", name: "Sam Okafor", rating: 1310, clock: FriendClock(initial: 300, increment: 0), waitingFor: 42_000),
+            LobbyPlayer(id: "222222222222", name: "Priya", rating: 1188, provisional: true, clock: FriendClock(initial: 300, increment: 0), waitingFor: 3_000),
+            LobbyPlayer(id: "333333333333", name: "Jordan", rating: 1544, clock: FriendClock(initial: 600, increment: 0), waitingFor: 130_000),
+            LobbyPlayer(id: "444444444444", name: "Mia", rating: 1402, clock: FriendClock(initial: 180, increment: 2), waitingFor: 18_000),
+        ])
+        defaults.set(TimeControl.blitz5.rawValue, forKey: "online.clock")
+        let center = makeCenter(api)
+        center.playOnline()
+        try snapshot("online-lobby", center: center, wait: 2.5)
+        center.dismiss()
+    }
+
+    func testOnlineFindingAGame() throws {
+        let api = FakeChallengeAPI()
+        defaults.set(TimeControl.blitz5.rawValue, forKey: "online.clock")
+        let center = makeCenter(api)
+        center.playOnline()
+        guard case .online(let lobby)? = center.screen else { return XCTFail("Play online should be up") }
+        Task { await lobby.find(clock: FriendClock(initial: 300, increment: 0), name: "Alex") }
+        spin(until: "waiting in the lobby") { lobby.isSearching }
+        try snapshot("online-finding", center: center, wait: 2.5)
+        center.dismiss()
+    }
+
+    func testOnlineRatedGame() throws {
+        let api = FakeChallengeAPI()
+        var state = FriendGameState.sample(code: "ONL1NE", moves: Array(Self.ruyLopez.prefix(12)),
+                                           clock: FriendClock(initial: 300, increment: 0), black: "Sam Okafor", now: realNow)
+        state.rated = true
+        state.ratings = .init(white: .init(rating: 1236, provisional: true), black: .init(rating: 1310))
+        api.games[state.code] = state
+        let record = FriendGame.sample(state, seat: .white)
+        let center = makeCenter(api, games: [record])
+        center.play(record, initial: state)
+        try snapshot("online-rated-game", center: center, wait: 3)
+        center.dismiss()
+    }
+
+    func testOnlineRatedGameOver() throws {
+        let api = FakeChallengeAPI()
+        var state = FriendGameState.sample(code: "ONL1NE", moves: Array(Self.ruyLopez.prefix(20)),
+                                           clock: FriendClock(initial: 300, increment: 0), black: "Sam Okafor", now: realNow)
+        state.status = .over
+        state.result = FriendGameState.Result(winner: .white, reason: .resign)
+        state.rated = true
+        state.ratings = .init(white: .init(rating: 1236, provisional: true, after: 1262, change: 26),
+                              black: .init(rating: 1310, after: 1297, change: -13))
+        api.games[state.code] = state
+        let record = FriendGame.sample(state, seat: .white)
+        let center = makeCenter(api, games: [record])
+        center.play(record, initial: state)
+        try snapshot("online-rated-over", center: center, wait: 3)
         center.dismiss()
     }
 

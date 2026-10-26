@@ -44,10 +44,12 @@ repository root with Blender's Python module (`pip install bpy==5.2.2 numpy scip
 
 `pieces.py` holds the turned pieces (lathe profiles, flutes, booleans), `gilded.py` the gilded set
 (stepped bases, gold bands and crowns, the striped-mane knight), `board.py` the marble, frame and inlay.
-Both sets share their tops and heights, so each type is told by its top as much as its height: a thick
-cross, a coronet of ball-tipped spikes round a central ball, a pointed mitre cut through to a metal core,
+Both sets share their tops and heights, so each type is told by its top as much as its height: a long
+Latin cross (ivory on the white king, metal on the dark one: the `cross` finish, id 5), a crown of eight
+metal points tipped with balls round a ball on top (`queen_crown` in `pieces.py`) on a slim queen standing well
+under the king, which from the 3D camera above reads as a star round a ball and never as the rook's ring, a pointed mitre cut through to a metal core,
 a tower of five capped merlons round a dark well, the horse's head, one ball. Heights in squares, before
-the game's 1.1 scale: K 1.336, Q 1.08, B 1.0, N 0.83 (gilded 0.82), R 0.742, P 0.561.
+the game's 1.1 scale: K 1.336, B 1.0, Q 0.92, N 0.83 (gilded 0.82), R 0.742, P 0.561.
 
 Fine detail (both sets): a row of carved beads round every plinth (gilded: gold beads along the recessed band),
 gadrooned crown cups on the king and queen, four stones round the king's crown (one faces the player), pearl or

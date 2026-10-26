@@ -44,6 +44,23 @@ final class GrandmasterRoomTests: XCTestCase {
         XCTAssertEqual(store.entries[0].box, 0)
     }
 
+    /// Lichess asks every client to say who it is; a request without a User-Agent can be throttled.
+    func testTablebaseRequestsSayWhoIsAsking() throws {
+        let fen = "8/8/8/8/8/4k3/8/4K2R w K - 0 1"
+        let request = Tablebase.request(for: fen, timeout: 3)
+        let url = try XCTUnwrap(request.url)
+        XCTAssertEqual(url.host(), "tablebase.lichess.ovh")
+        XCTAssertEqual(url.path(), "/standard")
+        let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        XCTAssertEqual(query.first { $0.name == "fen" }?.value, fen)
+        XCTAssertEqual(request.timeoutInterval, 3)
+        let agent = try XCTUnwrap(request.value(forHTTPHeaderField: "User-Agent"))
+        XCTAssertTrue(agent.hasPrefix("ChessGameKiller/"), agent)
+        XCTAssertTrue(agent.contains("github.com/lexdiamondhq-ai/chess-game-killer"), "Where to reach us: \(agent)")
+        XCTAssertEqual(Tablebase.userAgent(version: "1.2"), "ChessGameKiller/1.2 (iOS; +https://github.com/lexdiamondhq-ai/chess-game-killer)")
+        XCTAssertEqual(Tablebase.userAgent(version: nil), "ChessGameKiller/dev (iOS; +https://github.com/lexdiamondhq-ai/chess-game-killer)")
+    }
+
     func testTablebaseValues() throws {
         let json = """
         {"category":"win","dtm":17,"checkmate":false,"stalemate":false,

@@ -8,7 +8,7 @@ sys.path.insert(0,'scripts/sculpted'); import pieces as P
 args=sys.argv[sys.argv.index('--')+1:] if '--' in sys.argv else []
 SET=args.pop(0) if args and args[0] in ('classic','gilded') else 'classic'
 bpy.ops.wm.read_factory_settings(use_empty=True)
-MATS=('body','metal','gem','pearl','shade')   # the finish ids SculptedAssets.Finish reads; an older app reads 4 as body
+MATS=('body','metal','gem','pearl','shade','cross')   # the finish ids SculptedAssets.Finish reads; cross = ivory's stone or ebony's metal
 M={k:bpy.data.materials.new(k) for k in MATS}
 if SET=='gilded':
     import gilded as G
@@ -37,6 +37,8 @@ def budget(name):
     if 'bead' in low or 'slit' in low: return None   # already low: small icospheres and flat slabs
     if 'ring' in low: return SMALL['ring']
     if 'gem' in low: return SMALL['gem']
+    if name.startswith('Qtip'): return 400       # the queen's crown: the balls on its points
+    if name.startswith('Qpt'): return 500        # and the points
     if name.startswith('Qp'): return SMALL['p']
     if name.startswith('Nmane') and name!='Nmane': return 300
     if 'ball' in low: return SMALL['ball'] if name!='Qtopball' else 700

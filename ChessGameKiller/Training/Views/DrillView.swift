@@ -27,6 +27,7 @@ struct DrillView: View {
                     onTap: runner.acceptsTaps ? { (square: Square) in runner.tap(square) } : nil
                 )
                 .frame(width: boardSide, height: boardSide)
+                .boardHeadroom(theme: theme, side: boardSide)
                 // Under the board, never over the back rank; the space is kept so nothing jumps.
                 turnBadge
             }

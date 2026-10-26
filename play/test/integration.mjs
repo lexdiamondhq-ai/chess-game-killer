@@ -429,6 +429,82 @@ try {
     assert.equal((await move(game.code, game.white, "e2e4", 0)).status, 404);
   });
 
+  await scenario("play online: wait in the lobby, get taken on by name, play a rated game", async () => {
+    const keyA = "a".repeat(32);
+    const keyB = "b".repeat(32);
+    const blitz = { initial: 300, increment: 0 };
+    const waiting = await api(base, "POST", "/api/lobby/seeks", { body: { name: "Alex", clock: blitz, player: keyA, look: "classic" } });
+    assert.equal(waiting.status, 201, waiting.text);
+    assert.match(waiting.json.token, /^[0-9a-f]{32}$/);
+    assert.deepEqual(waiting.json.you, { rating: 1200, games: 0, provisional: true });
+    const id = waiting.json.seek.id;
+
+    const list = await api(base, "GET", "/api/lobby");
+    assert.equal(list.status, 200);
+    const shown = list.json.players.find((p) => p.id === id);
+    assert.equal(shown.name, "Alex");
+    assert.ok(!list.text.includes(waiting.json.token) && !list.text.includes(keyA), "no tokens or keys in the list");
+
+    // You can't take yourself on, and a check-in needs the seek's token.
+    assert.equal((await api(base, "POST", `/api/lobby/seeks/${id}/play`, { body: { name: "Alex", player: keyA } })).status, 400);
+    assert.equal((await api(base, "POST", `/api/lobby/seeks/${id}`, { body: {} })).status, 401);
+    const still = await api(base, "POST", `/api/lobby/seeks/${id}`, { body: {}, token: waiting.json.token });
+    assert.ok(still.json.seek, still.text);
+
+    const taken = await api(base, "POST", `/api/lobby/seeks/${id}/play`, { body: { name: "Sam", player: keyB } });
+    assert.equal(taken.status, 200, taken.text);
+    const match = taken.json.match;
+    assert.equal(match.game.status, "active");
+    assert.equal(match.game.rated, true);
+    assert.equal(match.game.look, "classic");
+    // Someone else is too late.
+    assert.equal((await api(base, "POST", `/api/lobby/seeks/${id}/play`, { body: { name: "Kim", player: "c".repeat(32) } })).status, 404);
+
+    const picked = await api(base, "POST", `/api/lobby/seeks/${id}`, { body: {}, token: waiting.json.token });
+    assert.equal(picked.json.match.code, match.code);
+    assert.notEqual(picked.json.match.seat, match.seat);
+    const tokens = { [match.seat]: match.token, [picked.json.match.seat]: picked.json.match.token };
+
+    // Fool's mate: Black wins.
+    const line = ["f2f3", "e7e5", "g2g4", "d8h4"];
+    for (const [ply, uci] of line.entries()) {
+      const answer = await move(match.code, tokens[ply % 2 === 0 ? "white" : "black"], uci, ply);
+      assert.equal(answer.status, 200, answer.text);
+    }
+    let game = (await api(base, "GET", `/api/games/${match.code}`)).json.game;
+    for (let i = 0; i < 20 && game.ratings.black.after === null; i += 1) {
+      await pause(100);
+      game = (await api(base, "GET", `/api/games/${match.code}`)).json.game;
+    }
+    assert.deepEqual(game.result, { winner: "black", reason: "checkmate" });
+    assert.equal(game.ratings.black.change, 20);
+    assert.equal(game.ratings.white.change, -20);
+    const blackKey = picked.json.match.seat === "black" ? keyA : keyB;
+    const me = await api(base, "POST", "/api/lobby/me", { body: { player: blackKey } });
+    assert.deepEqual(me.json.you, { rating: 1220, games: 1, provisional: true });
+  });
+
+  await scenario("play online: quick pairing finds the player waiting at the same clock; cancelling leaves", async () => {
+    const rapid = { initial: 600, increment: 5 };
+    const first = await api(base, "POST", "/api/lobby/seeks", { body: { name: "Kim", clock: rapid, player: "d".repeat(32) } });
+    assert.equal(first.status, 201, first.text);
+    const other = await api(base, "POST", "/api/lobby/seeks", { body: { name: "Lee", clock: { initial: 180, increment: 2 }, player: "e".repeat(32) } });
+    assert.equal(other.status, 201, "a different clock waits instead");
+    const second = await api(base, "POST", "/api/lobby/seeks", { body: { name: "Max", clock: rapid, player: "f".repeat(32) } });
+    assert.equal(second.status, 200, second.text);
+    assert.equal(second.json.match.game.clock.increment, 5);
+    const names = [second.json.match.game.white.name, second.json.match.game.black.name].sort();
+    assert.deepEqual(names, ["Kim", "Max"]);
+
+    const cancelled = await api(base, "POST", `/api/lobby/seeks/${other.json.seek.id}/cancel`, { body: {}, token: other.json.token });
+    assert.deepEqual(cancelled.json, { cancelled: true });
+    const list = (await api(base, "GET", "/api/lobby")).json;
+    assert.ok(!list.players.some((p) => p.id === other.json.seek.id));
+    // A friend game made by link stays unrated.
+    const friend = await newGame();
+    assert.equal(friend.made.game.rated, false);
+  });
+
   await scenario("the rate limits work in local dev too", async () => {
     let limited = null;
     for (let i = 0; i < 45 && !limited; i += 1) {

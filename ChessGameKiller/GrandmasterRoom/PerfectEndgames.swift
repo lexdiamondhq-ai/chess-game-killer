@@ -35,6 +35,7 @@ struct EndgameView: View {
                                       marks: runner.marks,
                                       onTap: runner.phase == .playing ? { (square: Square) in runner.tap(square) } : nil)
                         .frame(width: side, height: side)
+                        .boardHeadroom(theme: theme, side: side)
                         .id(runner.study.id)
                         .transition(.opacity)
                     RoomMessage(text: runner.message, tone: runner.tone, theme: theme)

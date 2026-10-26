@@ -233,13 +233,29 @@ enum Tablebase {
     }
 
     static func probe(_ fen: String, timeout: TimeInterval = 8) async throws -> TablebaseResult {
+        let (data, response) = try await URLSession.shared.data(for: request(for: fen, timeout: timeout))
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+        return try JSONDecoder().decode(TablebaseResult.self, from: data)
+    }
+
+    /// The lookup for one position. Lichess asks every client to say who it is in the User-Agent
+    /// header, and may throttle one that doesn't.
+    static func request(for fen: String, timeout: TimeInterval) -> URLRequest {
         var components = URLComponents(string: "https://tablebase.lichess.ovh/standard")!
         components.queryItems = [URLQueryItem(name: "fen", value: fen)]
         var request = URLRequest(url: components.url!)
         request.timeoutInterval = timeout
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
-        return try JSONDecoder().decode(TablebaseResult.self, from: data)
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        return request
+    }
+
+    /// Who is asking: the app, its version, and where to find it.
+    static var userAgent: String {
+        userAgent(version: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String)
+    }
+
+    static func userAgent(version: String?) -> String {
+        "ChessGameKiller/\(version ?? "dev") (iOS; +https://github.com/lexdiamondhq-ai/chess-game-killer)"
     }
 }
 

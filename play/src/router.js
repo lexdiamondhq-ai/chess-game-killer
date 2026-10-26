@@ -8,6 +8,7 @@
 // address, so no CORS headers are needed, and the app talks to it directly.
 
 import { parseCreateInput, ACTIONS } from "./game.js";
+import { parseSeekInput } from "./lobby.js";
 import { renderHomePage, renderInvitePage } from "./pages.js";
 import {
   errorResponse,
@@ -60,6 +61,7 @@ async function route(request, env, url) {
   if (path === "/api/games" || path === "/api/games/") {
     return method === "POST" ? createGame(request, env, url) : wrongMethod("POST");
   }
+  if (path === "/api/lobby" || path.startsWith("/api/lobby/")) return lobbyRequest(request, env, url, path);
   const game = GAME_PATH.exec(path);
   if (game) return gameRequest(request, env, url, game[1], game[2] ?? "");
   if (path.startsWith("/api/") || path === "/api") {
@@ -202,6 +204,76 @@ async function gameRequest(request, env, url, rawCode, part) {
   // A rematch can start a new game, so it also counts against the new-game limit.
   if (type === "rematch" && (await overLimit(env.CREATE_LIMITER, request))) return rateLimited();
   return fromRoom(await room.action({ token, type }));
+}
+
+// ---------------------------------------------------------------------------
+// Play online: the lobby (PROTOCOL.md, "Play online")
+
+const SEEK_PATH = /^\/api\/lobby\/seeks\/([0-9a-f]{12})(?:\/(cancel))?\/?$/;
+const TAKE_PATH = /^\/api\/lobby\/seeks\/([0-9a-f]{12})\/play\/?$/;
+
+function lobbyRoom(env) {
+  return env.LOBBY.get(env.LOBBY.idFromName("lobby"));
+}
+
+async function lobbyRequest(request, env, url, path) {
+  const method = request.method;
+  const lobby = lobbyRoom(env);
+  if (path === "/api/lobby" || path === "/api/lobby/") {
+    if (method !== "GET" && method !== "HEAD") return wrongMethod("GET");
+    return fromRoom(await lobby.list());
+  }
+  if (path === "/api/lobby/me" || path === "/api/lobby/me/") {
+    if (method !== "POST") return wrongMethod("POST");
+    const body = await readJson(request);
+    if (!body.ok) return badRequest(body.message);
+    if (!isToken(body.value.player)) return badRequest('"player" must be the app\'s player key.');
+    return fromRoom(await lobby.me({ playerHash: await hashToken(body.value.player) }));
+  }
+  if (path === "/api/lobby/seeks" || path === "/api/lobby/seeks/") {
+    if (method !== "POST") return wrongMethod("POST");
+    if (await overLimit(env.CREATE_LIMITER, request)) return rateLimited();
+    const body = await readJson(request);
+    if (!body.ok) return badRequest(body.message);
+    const input = parseSeekInput(body.value, { minClockSeconds: readConfig(env).minClockSeconds, isKey: isToken });
+    if (!input.ok) return badRequest(input.message);
+    const token = newToken();
+    const answer = await lobby.seek({
+      tokenHash: await hashToken(token),
+      playerHash: await hashToken(input.value.player),
+      name: input.value.name,
+      clock: input.value.clock,
+      look: input.value.look,
+      pair: body.value.pair !== false,
+    });
+    // A seek's own token comes back only to the player who made it.
+    if (answer.status === 201) answer.body.token = token;
+    return fromRoom(answer);
+  }
+  const take = TAKE_PATH.exec(path);
+  if (take) {
+    if (method !== "POST") return wrongMethod("POST");
+    if (await overLimit(env.CREATE_LIMITER, request)) return rateLimited();
+    const body = await readJson(request);
+    if (!body.ok) return badRequest(body.message);
+    const input = parseSeekInput(body.value, { needsClock: false, isKey: isToken });
+    if (!input.ok) return badRequest(input.message);
+    return fromRoom(
+      await lobby.take({ id: take[1], playerHash: await hashToken(input.value.player), name: input.value.name, look: input.value.look }),
+    );
+  }
+  const seek = SEEK_PATH.exec(path);
+  if (seek) {
+    if (method !== "POST") return wrongMethod("POST");
+    if (await overLimit(env.MOVE_LIMITER, request)) return rateLimited();
+    const body = await readJson(request);
+    if (!body.ok) return badRequest(body.message);
+    const token = tokenFrom(request, body.value);
+    if (!isToken(token)) return unauthorized();
+    const tokenHash = await hashToken(token);
+    return fromRoom(seek[2] === "cancel" ? await lobby.cancel({ id: seek[1], tokenHash }) : await lobby.check({ id: seek[1], tokenHash }));
+  }
+  return errorResponse("not_found", "There's nothing at this address.");
 }
 
 // ---------------------------------------------------------------------------

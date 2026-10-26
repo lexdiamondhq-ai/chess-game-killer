@@ -398,3 +398,39 @@ struct CoachArrow: View {
         .shadow(color: glows ? color.opacity(0.85) : .black.opacity(0.18), radius: glows ? squareSize * 0.1 : 1.5)
     }
 }
+
+extension TrainingBoardView {
+    /// How far the tallest piece (a king on the far rank, picked up) rises above a board `side`
+    /// points wide, past its frame: a king's cross stands out above the board, most with the thin rim, and a
+    /// scroll view right above the board would cut it off.
+    static func headroom(theme: BoardTheme, side: CGFloat, coordinates: Bool) -> CGFloat {
+        guard theme.spritePieces, side > 0 else { return 0 }
+        let inset: CGFloat = theme.frameInset(side: side, coordinates: coordinates)
+        let sq: CGFloat = (side - inset * 2) / 8
+        let king = theme.imageName(for: Piece(.king, color: .black, square: .e8))
+        let frame = SpriteFrame.of(king)
+        // The king's top above its square's center (the picture itself has empty room above it).
+        let top: CGFloat = (frame.reach * frame.boardScale - frame.lift) * sq * PieceImage.liftedScale
+        let rise: CGFloat = top - sq / 2
+        return max(0, ceil(rise - inset + 2))
+    }
+}
+
+/// Room above a training board for its far rank's tallest pieces, so nothing above the board
+/// (a scroll view's edge, a card) cuts off a king's cross.
+private struct BoardHeadroom: ViewModifier {
+    let theme: BoardTheme
+    let side: CGFloat
+    @AppStorage(BoardTheme.coordinatesKey) private var showsCoordinates = true
+
+    func body(content: Content) -> some View {
+        content.padding(.top, TrainingBoardView.headroom(theme: theme, side: side, coordinates: showsCoordinates))
+    }
+}
+
+extension View {
+    /// Keeps room above a training board `side` points wide for the pieces that rise above it.
+    func boardHeadroom(theme: BoardTheme, side: CGFloat) -> some View {
+        modifier(BoardHeadroom(theme: theme, side: side))
+    }
+}

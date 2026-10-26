@@ -39,6 +39,19 @@ final class BoardThemeTests: XCTestCase {
         XCTAssertEqual(BoardTheme.neon.frameInset(side: side, coordinates: false), 0)
     }
 
+    /// With the thin rim a far-rank king's cross rises above the board; training screens keep room
+    /// for it, so a scroll view's edge never cuts it off (Alex's puzzle screen lost the black king's cross).
+    @MainActor
+    func testTrainingBoardsKeepRoomForTheKingsCross() {
+        let side: CGFloat = 360
+        for theme in BoardTheme.all where theme.spritePieces {
+            let room = TrainingBoardView.headroom(theme: theme, side: side, coordinates: false)
+            XCTAssertGreaterThan(room, 4, "\(theme.name): no room above the board for the king")
+            XCTAssertLessThan(room, side / 8, "\(theme.name): too much room above the board")
+        }
+        XCTAssertEqual(TrainingBoardView.headroom(theme: .neon, side: side, coordinates: false), 0)
+    }
+
     func testGildedIsTheDefaultLook() {
         XCTAssertEqual(BoardTheme.all.first?.id, .gilded)
         XCTAssertEqual(BoardTheme.named(.gilded).pieceSet, "gilded-")

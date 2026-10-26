@@ -207,6 +207,7 @@ struct GuessTheMoveView: View {
                                       arrows: runner.arrows,
                                       onTap: runner.phase == .guessing ? { (square: Square) in runner.tap(square) } : nil)
                         .frame(width: side, height: side)
+                        .boardHeadroom(theme: theme, side: side)
                     RoomMessage(text: runner.message, tone: runner.tone, theme: theme)
                         .padding(.horizontal, 16)
                     if runner.phase == .finished {

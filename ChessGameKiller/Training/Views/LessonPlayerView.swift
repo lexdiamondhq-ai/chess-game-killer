@@ -97,6 +97,7 @@ struct LessonPlayerView: View {
                     onTap: player.phase == .task ? { (square: Square) in player.tap(square) } : nil
                 )
                 .frame(width: boardSide, height: boardSide)
+                .boardHeadroom(theme: theme, side: boardSide)
                 .padding(.top, 4)
                 ScrollView {
                     caption(player)

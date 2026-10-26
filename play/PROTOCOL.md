@@ -1,4 +1,4 @@
-# Challenge a friend: the game server's protocol
+# Challenge a friend and play online: the game server's protocol
 
 `play/` is a Cloudflare Worker with one Durable Object per game. It lets a player send a
 link by text or email; the friend opens it in the app or plays right in the browser.
@@ -134,6 +134,39 @@ instead of the Authorization header, so a browser can report `away` with `naviga
 Error codes: `not_found` 404, `bad_request` 400, `unauthorized` 401, `seat_taken` 409, `not_your_turn` 409,
 `stale` 409, `game_over` 409, `cannot_claim` 409, `illegal_move` 422, `rate_limited` 429, and `server_error` 500 if something breaks on
 the server (try again). A move before the friend has joined is `not_your_turn`.
+
+## Play online (the lobby)
+
+Players with the app can also play someone online they don't know: they wait in the lobby with a clock, and
+anyone can take them on by name, or ask for a quick pairing. One Durable Object (class `Lobby`, binding
+`LOBBY`, named `"lobby"`) holds everyone waiting and the ratings. Games paired there are ordinary games
+(everything above applies, fair play included) that are also **rated**.
+
+- **Player key**: 32 lowercase hex characters the app makes once and keeps. It is the app's private id for its
+  player: ratings are kept by its hash. It is never shown to anyone.
+- **Ratings**: Elo, 1200 to start; K = 40 for a player's first 10 games (shown as provisional), then 20.
+  Aborted, cancelled and expired games don't count. A rematch of a rated game is rated too.
+- **A seek** is one player waiting at a clock. A waiting app checks in every 2 s; a seek not checked for 20 s
+  leaves the lobby. A player waits once: a new seek replaces their old one. Online games always have a clock.
+- GameState gains `rated` (true for games paired here) and `ratings`: `null`, or for each side
+  `{ "rating", "provisional", "after", "change" }` (`after` and `change` are `null` until the game is over and counted).
+
+| Method & path | Body | Reply |
+| --- | --- | --- |
+| `GET /api/lobby` | – | `200 { "players": [Seek], "waiting", "now" }`, the longest waiting first (at most 40) |
+| `POST /api/lobby/me` | `{ "player" }` | `200 { "you": { "rating", "games", "provisional" } }` |
+| `POST /api/lobby/seeks` | `{ "name", "clock", "look"?, "player", "pair"? }` | `201 { "seek", "token", "you" }` waiting, or `200 { "match", "you" }` paired at once |
+| `POST /api/lobby/seeks/{id}` | `{}` + Bearer seek token | `200 { "seek", "waiting" }` still waiting, or `200 { "match" }` |
+| `POST /api/lobby/seeks/{id}/cancel` | `{}` + Bearer seek token | `200 { "cancelled": true }`, or `200 { "match" }` if someone took you on first |
+| `POST /api/lobby/seeks/{id}/play` | `{ "name", "look"?, "player" }` | `200 { "match", "you" }`: you took that player on |
+
+- `Seek`: `{ "id", "name", "rating", "provisional", "clock", "look", "waitingFor" }` (ms). Never a token or key.
+- `match`: `{ "code", "seat", "token", "game"? }`: the new game, your seat in it and your seat's token. From then
+  on it is a game like any other (`/api/games/{code}/…`).
+- `pair` (default true): first take on the closest-rated player already waiting at the same clock, if any.
+- Errors: `not_found` (that player isn't waiting any more, or your seek is gone), `bad_request` (taking yourself
+  on, no clock, no player key), `pairing` 409 (cancel while someone is taking you on: check in again), `rate_limited`.
+- Limits: making a seek or taking one on counts as a new game; check-ins and cancels count as actions.
 
 ## WebSocket
 

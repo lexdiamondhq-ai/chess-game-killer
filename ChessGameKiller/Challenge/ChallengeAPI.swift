@@ -36,6 +36,21 @@ protocol ChallengeAPI: AnyObject {
     func act(_ action: ChallengeAction, in code: String, token: String) async throws -> FriendGameState
     /// The live connection for a seat, or nil when there is none to be had.
     func live(_ code: String, token: String) -> ChallengeLive?
+
+    // Play online: the lobby (play/PROTOCOL.md, "Play online").
+
+    /// Who is waiting for a game right now.
+    func lobby() async throws -> LobbyList
+    /// The player's online rating, by their player key.
+    func rating(player: String) async throws -> OnlineRating
+    /// Waits for a game at `clock`, first taking on the closest-rated player already waiting at it.
+    func seek(name: String, clock: FriendClock, player: String) async throws -> LobbyReply
+    /// Checks in while waiting: still waiting, or the game someone started with you.
+    func checkSeek(_ id: String, token: String) async throws -> LobbyReply
+    /// Stops waiting, unless someone took you on first (then the reply holds the game).
+    func cancelSeek(_ id: String, token: String) async throws -> LobbyReply
+    /// Takes on one waiting player.
+    func play(_ id: String, name: String, player: String) async throws -> LobbyReply
 }
 
 /// A live connection to one game: every change as it happens, and the moments worth a toast.
@@ -101,6 +116,32 @@ final class LiveChallengeAPI: ChallengeAPI {
         return ChallengeSocket(url: url, session: session)
     }
 
+    func lobby() async throws -> LobbyList {
+        try await send("GET", "api/lobby")
+    }
+
+    func rating(player: String) async throws -> OnlineRating {
+        let reply: LobbyReply = try await send("POST", "api/lobby/me", body: PlayerBody(player: player))
+        guard let you = reply.you else { throw ChallengeError.badReply }
+        return you
+    }
+
+    func seek(name: String, clock: FriendClock, player: String) async throws -> LobbyReply {
+        try await send("POST", "api/lobby/seeks", body: SeekBody(name: name, clock: clock, look: Self.currentLook(), player: player))
+    }
+
+    func checkSeek(_ id: String, token: String) async throws -> LobbyReply {
+        try await send("POST", "api/lobby/seeks/\(id)", body: EmptyBody(), token: token)
+    }
+
+    func cancelSeek(_ id: String, token: String) async throws -> LobbyReply {
+        try await send("POST", "api/lobby/seeks/\(id)/cancel", body: EmptyBody(), token: token)
+    }
+
+    func play(_ id: String, name: String, player: String) async throws -> LobbyReply {
+        try await send("POST", "api/lobby/seeks/\(id)/play", body: TakeBody(name: name, look: Self.currentLook(), player: player))
+    }
+
     /// Seconds to wait from a Retry-After header: a number of seconds, one second when it says nothing usable.
     nonisolated static func retryAfter(_ header: String?) -> Double {
         guard let header, let seconds = Double(header.trimmingCharacters(in: .whitespaces)), seconds.isFinite else { return 1 }
@@ -146,6 +187,25 @@ final class LiveChallengeAPI: ChallengeAPI {
             try container.encode(look, forKey: .look)
         }
     }
+
+    private struct PlayerBody: Encodable {
+        let player: String
+    }
+
+    private struct SeekBody: Encodable {
+        let name: String
+        let clock: FriendClock
+        let look: String
+        let player: String
+    }
+
+    private struct TakeBody: Encodable {
+        let name: String
+        let look: String
+        let player: String
+    }
+
+    private struct EmptyBody: Encodable {}
 
     private struct NameBody: Encodable {
         let name: String

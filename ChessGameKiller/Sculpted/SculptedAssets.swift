@@ -18,6 +18,9 @@ final class SculptedAssets {
         case body = 0, metal = 1, gem = 2, pearl = 3
         /// The floor inside the rook's tower, which the studio light never reaches.
         case shade = 4
+        /// The king's cross: the ivory king's in its own stone, the dark king's in metal, so it
+        /// shows light against the dark frame behind the far rank.
+        case cross = 5
     }
 
     struct Part {
@@ -86,6 +89,7 @@ final class SculptedAssets {
     /// Ivory or ebony for the body and its shade. The gems are the same on both sides; the metal and
     /// pearls too, unless the look darkens them on the ivory (`ivoryMetal`, `ivoryPearl`).
     func material(_ finish: Finish, for color: Piece.Color, look: SculptedLook) -> SCNMaterial {
+        if finish == .cross { return material(color == .white ? .body : .metal, for: color, look: look) }
         let darkMarks = color == .white && ((finish == .metal && look.ivoryMetal != nil) || (finish == .pearl && look.ivoryPearl != nil))
         let sided = finish == .body || finish == .shade || darkMarks
         let key = "\(look.name)-" + (sided ? "\(finish)-\(color.rawValue)" : "\(finish)")
@@ -109,6 +113,8 @@ final class SculptedAssets {
             if let glow = look.gemGlow { made.emission.contents = glow }
         case .pearl:
             made = Self.pbr(look.pearl, roughness: 0.2, coat: 1, coatRoughness: 0.05)
+        case .cross:
+            made = Self.pbr(look.platinum, roughness: look.metalRoughness, metalness: 1)  // never reached: see above
         case .shade:
             // Matte and dark: the scene has no ambient occlusion, so the rook's well would light up like its top.
             made = Self.pbr(color == .white ? look.ivoryShade : look.ebonyShade, roughness: 0.7)
