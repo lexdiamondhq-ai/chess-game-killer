@@ -37,6 +37,8 @@ def budget(name):
     if 'bead' in low or 'slit' in low: return None   # already low: small icospheres and flat slabs
     if 'ring' in low: return SMALL['ring']
     if 'gem' in low: return SMALL['gem']
+    if name.startswith('Qtip'): return 400       # the queen's crown: the balls on its points
+    if name.startswith('Qpt'): return 500        # and the points
     if name.startswith('Qp'): return SMALL['p']
     if name.startswith('Nmane') and name!='Nmane': return 300
     if 'ball' in low: return SMALL['ball'] if name!='Qtopball' else 700
