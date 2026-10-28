@@ -68,6 +68,8 @@ struct SculptedBoardState: Equatable {
     var ghosts: [SculptedGhostStep] = []
     /// Seen from the player's chair, or from above with each piece inside its square (Big Board).
     var framing: SculptedCamera.Framing = .standing
+    /// The pieces' design on the flat board.
+    var flatStyle: FlatPieceStyle = .crystal
     /// The pieces come without lasting ids (an earlier position of the game, a preview):
     /// the scene matches them to the pieces on the board so each one moves rather than fades.
     var matchesPieces = false
@@ -291,6 +293,8 @@ final class SculptedBoardScene {
         labelsNode.isHidden = !new.showsCoordinates
         if old.framing != new.framing {
             reframe(new.framing, animated: animate && old.flipped == new.flipped)
+        } else if old.flatStyle != new.flatStyle {
+            redress(new.framing)
         }
         if old.flipped != new.flipped {
             orbit(flipped: new.flipped, animated: animate && old.flipped != new.flipped)
@@ -451,10 +455,10 @@ final class SculptedBoardScene {
         /// Stands on the square, turned to face the player.
         let root = SCNNode()
         /// The sculpture itself: lifted, leaned and tipped by the animations. On the flat
-        /// board it is a Crystal tile instead.
+        /// board it is a flat-board piece instead.
         var model: SCNNode
-        /// Shown as a Crystal tile (the flat board).
-        var crystal = false
+        /// The flat-board design it shows, or nil for the carved piece.
+        var flat: FlatPieceStyle?
         /// A soft shadow on the stone, darkest right under the foot.
         let contact: SCNNode
         var halo: SCNNode?
@@ -1029,16 +1033,17 @@ final class SculptedBoardScene {
     }
 
     /// Dresses a piece for the framing: the carved piece standing, turned by its yaw, or on the
-    /// flat board a Crystal tile with the piece etched in it, which reads from above.
+    /// flat board the flat design (Crystal unless another is picked), which reads from above.
     private func layDown(_ node: PieceNode, framing: SculptedCamera.Framing) {
         node.lies = framing.lying
-        if node.crystal != framing.lying {
-            let model = framing.lying
-                ? SculptedCrystal.makePiece(node.piece.kind, color: node.piece.color, look: look)
-                : assets.makePiece(node.piece.kind, color: node.piece.color, look: look)
+        let wanted: FlatPieceStyle? = framing.lying ? flatStyle : nil
+        if node.flat != wanted {
+            let kind = node.piece.kind, color = node.piece.color
+            let model = wanted.map { SculptedFlatSet.makePiece(kind, color: color, look: look, style: $0) }
+                ?? assets.makePiece(kind, color: color, look: look)
             node.root.replaceChildNode(node.model, with: model)
             node.model = model
-            node.crystal = framing.lying
+            node.flat = wanted
             // The history marks belong to the carved piece; they come back with it.
             node.heirloom = nil
             node.heirloomUndo = []
@@ -1046,7 +1051,7 @@ final class SculptedBoardScene {
         }
         if framing.lying {
             node.rest = matrix_identity_float4x4
-            let half = Float(SculptedCrystal.size(of: node.piece.kind).width) * 0.62
+            let half = SculptedFlatSet.extent(of: node.piece.kind, style: flatStyle).reach * 1.24
             node.contact.scale = SCNVector3(half / 0.33, half / 0.33, 1)
         } else {
             node.rest = simd_float4x4(simd_quatf(angle: node.yaw, axis: SculptedCamera.up))
@@ -1199,7 +1204,7 @@ final class SculptedBoardScene {
     /// Dresses each army piece in its history (and undresses one that no longer should be).
     private func updateHeirlooms(_ new: SculptedBoardState) {
         for (id, node) in nodes {
-            let wanted = node.crystal ? nil : new.heirlooms[id].flatMap { $0.isEmpty ? nil : $0 }
+            let wanted = node.flat != nil ? nil : new.heirlooms[id].flatMap { $0.isEmpty ? nil : $0 }
             guard node.heirloom != wanted else { continue }
             for undo in node.heirloomUndo { undo.node.geometry = undo.geometry }
             node.heirloomUndo = []
@@ -1450,23 +1455,13 @@ final class SculptedBoardScene {
 
     /// How the board is seen now.
     private var framing: SculptedCamera.Framing { state?.framing ?? .standing }
+    /// The pieces' design on the flat board.
+    private var flatStyle: FlatPieceStyle { state?.flatStyle ?? .crystal }
 
-    /// Moves the camera to the new framing and dresses the pieces for it: from above with
-    /// Crystal tiles, or back to the player's chair with the carved pieces standing.
+    /// Moves the camera to the new framing and dresses the pieces for it: from above in the
+    /// flat design, or back to the player's chair with the carved pieces standing.
     private func reframe(_ framing: SculptedCamera.Framing, animated: Bool) {
-        for node in Array(nodes.values) + Array(ghostNodes.values) {
-            node.model.removeAllActions()
-            layDown(node, framing: framing)
-            setPose(node, y: node.lifted ? Self.selectionLift : 0)
-        }
-        // Ghosts cast no shadow and never take a tap, whichever model they show.
-        for node in ghostNodes.values {
-            node.model.enumerateHierarchy { child, _ in
-                child.castsShadow = false
-                child.categoryBitMask = 1
-            }
-        }
-        if let state { updateHeirlooms(state) }
+        redress(framing)
         guard heldCamera == nil else { return }
         let from = camera
         let target = SculptedCamera.fitted(aspect: camera.aspect, flipped: state?.flipped ?? false, framing: framing)
@@ -1492,6 +1487,23 @@ final class SculptedBoardScene {
             node.simdLook(at: step.target, up: SculptedCamera.up, localFront: SCNNode.simdLocalFront)
         }
         cameraNode.runAction(move, forKey: "orbit")
+    }
+
+    /// Dresses every piece, and every ghost, for the framing and the flat design.
+    private func redress(_ framing: SculptedCamera.Framing) {
+        for node in Array(nodes.values) + Array(ghostNodes.values) {
+            node.model.removeAllActions()
+            layDown(node, framing: framing)
+            setPose(node, y: node.lifted ? Self.selectionLift : 0)
+        }
+        // Ghosts cast no shadow and never take a tap, whichever model they show.
+        for node in ghostNodes.values {
+            node.model.enumerateHierarchy { child, _ in
+                child.castsShadow = false
+                child.categoryBitMask = 1
+            }
+        }
+        if let state { updateHeirlooms(state) }
     }
 
     private func buildLights() {

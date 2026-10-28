@@ -61,6 +61,8 @@ struct SculptedBoardView: View {
     static let aspect: CGFloat = SculptedCamera.Framing.standing.aspect
 
     @AppStorage("haptics") private var hapticsOn = true
+    /// The pieces' design when the board is seen flat from above.
+    @AppStorage(FlatPieceStyle.storageKey) private var flatStyle = FlatPieceStyle.crystal
     @Environment(ArmyStore.self) private var army: ArmyStore?
     @AppStorage(Heirloom.settingKey) private var showsHeirloom = true
     @State private var stage = SculptedStage()
@@ -172,6 +174,7 @@ struct SculptedBoardView: View {
             var state = SculptedBoardState(pieces: browsing.pieces.map { PlacedPiece(id: 0, piece: $0) },
                                            flipped: flipped, matchesPieces: true)
             state.framing = framing
+            state.flatStyle = flatStyle
             return state
         }
         var state = SculptedBoardState(
@@ -190,6 +193,7 @@ struct SculptedBoardView: View {
             ghosts: ghosts
         )
         state.framing = framing
+        state.flatStyle = flatStyle
         return state
     }
 
