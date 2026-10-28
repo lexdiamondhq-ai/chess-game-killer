@@ -190,6 +190,16 @@ final class SculptedBoardTests: XCTestCase {
         XCTAssertEqual(BoardTilt.flat.framing(bigBoard: false), .seated)
     }
 
+    /// The Board view note names free looks that really have a 3D board.
+    func testTheTiltNoteNamesFree3DLooks() {
+        for look in [BoardTheme.gilded, .noir, .midnight] {
+            XCTAssertNotNil(look.sculptedLook, look.name)
+            XCTAssertTrue(BoardTheme.freeLooks.contains(look.id), look.name)
+            XCTAssertTrue(BoardTilt.needsThreeD.contains(look.name), look.name)
+        }
+        XCTAssertNil(BoardTheme.classic.sculptedLook)
+    }
+
     func testEverySquareIsFoundUnderItsOwnCenter() {
         let size = CGSize(width: 390, height: 390 / SculptedBoardView.aspect)
         for flipped in [false, true] {
