@@ -146,44 +146,40 @@ final class SculptedBoardTests: XCTestCase {
         }
     }
 
-    /// Flat from above: in every flat design, every piece's box stays inside its own square on
-    /// every square, from both sides.
+    /// Flat from above: every flat piece's box stays inside its own square on every square, from
+    /// both sides.
     func testFlatPiecesStayInsideTheirSquares() {
         let framing = SculptedCamera.Framing.seated
         let size = CGSize(width: 402, height: 402 / framing.aspect)
         let kinds: [Piece.Kind] = [.king, .queen, .rook, .bishop, .knight, .pawn]
-        for style in FlatPieceStyle.allCases {
-            // The widest and the tallest of the set, together: a box round all of it.
-            let extents = kinds.map { SculptedFlatSet.extent(of: $0, style: style) }
-            let half = extents.map { $0.reach }.max() ?? 0
-            let height = (extents.map { $0.height }.max() ?? 0) + 0.01
-            XCTAssertGreaterThan(half, 0.2, "\(style) loaded")
-            for flipped in [false, true] {
-                let camera = SculptedCamera.fitted(aspect: Float(size.width / size.height), flipped: flipped, framing: framing)
-                for index in 0..<64 {
-                    let square = Square(file: index % 8, rank: index / 8)
-                    let center = SculptedCamera.position(of: square)
-                    let outline = camera.frame(of: square, in: size).insetBy(dx: -0.5, dy: -0.5)
-                    for dz in [-half, half] {
-                        for dx in [-half, half] {
-                            let point = camera.screenPoint(center + SIMD3(dx, height, dz), in: size)
-                            XCTAssertTrue(outline.contains(point), "\(style) \(square) flipped \(flipped)")
-                        }
+        // The widest and the tallest of the set, together: a box round all of it.
+        let extents = kinds.map { SculptedFlatSet.extent(of: $0) }
+        let half = extents.map { $0.reach }.max() ?? 0
+        let height = (extents.map { $0.height }.max() ?? 0) + 0.01
+        XCTAssertGreaterThan(half, 0.2, "the flat set loaded")
+        for flipped in [false, true] {
+            let camera = SculptedCamera.fitted(aspect: Float(size.width / size.height), flipped: flipped, framing: framing)
+            for index in 0..<64 {
+                let square = Square(file: index % 8, rank: index / 8)
+                let center = SculptedCamera.position(of: square)
+                let outline = camera.frame(of: square, in: size).insetBy(dx: -0.5, dy: -0.5)
+                for dz in [-half, half] {
+                    for dx in [-half, half] {
+                        let point = camera.screenPoint(center + SIMD3(dx, height, dz), in: size)
+                        XCTAssertTrue(outline.contains(point), "\(square) flipped \(flipped)")
                     }
                 }
             }
         }
     }
 
-    /// Every flat design built from meshes has all six pieces, each with its parts.
-    func testEveryFlatDesignHasAllSixPieces() {
-        for style in FlatPieceStyle.allCases where style != .crystal {
+    /// The flat set has all six pieces in both colors, each with its stone and its metal foot.
+    func testTheFlatSetHasAllSixPieces() throws {
+        for color in [Piece.Color.white, .black] {
             for kind in [Piece.Kind.king, .queen, .rook, .bishop, .knight, .pawn] {
-                let node = SculptedFlatSet.makePiece(kind, color: .black, look: .gilded, style: style)
-                XCTAssertGreaterThan(node.childNodes.count, 0, "\(style) \(kind)")
-                // Its own meshes, not Crystal's box and etched plane.
-                XCTAssertFalse(node.childNodes.contains { $0.geometry is SCNBox || $0.geometry is SCNPlane },
-                               "\(style) \(kind) fell back to Crystal")
+                let node = try XCTUnwrap(SculptedFlatSet.makePiece(kind, color: color, look: .gilded), "\(color) \(kind)")
+                XCTAssertGreaterThanOrEqual(node.childNodes.count, 2, "\(color) \(kind)")
+                XCTAssertTrue(node.childNodes.allSatisfy { $0.geometry != nil }, "\(color) \(kind)")
             }
         }
     }

@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// Under the board, beside the moves: Tilted or Flat, one tap. Tilted plays the carved 3D pieces
-/// standing on a tilted board; Flat looks straight down on the Crystal glass pieces. Either one
-/// turns the 3D board on, and a board without a 3D version moves to one that has it.
+/// standing on a tilted board; Flat looks straight down on the flat pieces. Either one turns the
+/// 3D board on, and a board without a 3D version moves to one that has it.
 struct BoardViewSwitch: View {
     /// The board in play: the player's look, or a rival's board.
     let theme: BoardTheme

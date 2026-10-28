@@ -127,7 +127,7 @@ struct SculptedCamera: Equatable {
     // MARK: Framing
 
     /// How the board is seen: from the player's chair, pieces standing tall, or from high
-    /// above (Big Board), each piece a Crystal glass tile inside its own square.
+    /// above (Big Board), each piece a flat piece inside its own square.
     enum Framing: Equatable {
         case standing
         case seated
@@ -148,10 +148,10 @@ struct SculptedCamera: Equatable {
             }
         }
 
-        /// The pieces are Crystal tiles, each inside its square.
+        /// The pieces are the flat ones (SculptedFlatSet), each inside its square.
         var lying: Bool { self == .seated }
 
-        /// How high the pieces reach above the board: a standing king's cross, or a glass tile.
+        /// How high the pieces reach above the board: a standing king's cross, or the flat pieces with room to spare.
         var tallest: Float {
             switch self {
             case .standing: return SculptedCamera.tallest
@@ -223,7 +223,7 @@ struct SculptedCamera: Equatable {
 }
 
 /// The "Board view" setting for the 3D board: tilted with the pieces standing, or flat from
-/// above with each piece a glass tile in its square. Auto tilts the usual board and lays Big Board flat.
+/// above with each piece cut flat in its square. Auto tilts the usual board and lays Big Board flat.
 enum BoardTilt: String, CaseIterable, Identifiable {
     case auto, tilted, flat
 
@@ -241,9 +241,9 @@ enum BoardTilt: String, CaseIterable, Identifiable {
 
     var blurb: String {
         switch self {
-        case .auto: return "Tilted, with the pieces standing. Flat on Big Board, with Crystal glass pieces."
+        case .auto: return "Tilted, with the pieces standing. Flat from above on Big Board."
         case .tilted: return "Always tilted, with the pieces standing, Big Board too."
-        case .flat: return "Always flat from above, with Crystal glass pieces."
+        case .flat: return "Always flat from above, with flat pieces."
         }
     }
 
