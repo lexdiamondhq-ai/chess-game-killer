@@ -70,24 +70,36 @@ def icon(kind):
     return objs
 
 # ---------- Gem Cut: each piece a jewel cut, set in gold ----------
-def facet_gem(outline, h_girdle, h_table, table=0.55, mid=0.82, twist=0.0):
-    pts = list(outline.exterior.coords)[:-1]; n = len(pts)
+def rose_gem(outline, girdle=0.04, t_out=36, t_in=22, split=0.6, twist=12):
+    """A rose cut over a convex outline: a low girdle wall, a row of triangles up to a ring set half a
+    step round (and turned by `twist` degrees), then triangles up to a point. No flat table: seen from
+    straight above a table mirrors the studio's bright ceiling and turns a black stone grey. These
+    facets lean 22-36 degrees, so they mirror the dark studio and catch its soft boxes as glints."""
+    pts = np.array(list(outline.exterior.coords)[:-1])
+    if not outline.exterior.is_ccw: pts = pts[::-1]
+    n = len(pts)
+    mids = (pts + np.roll(pts, -1, axis=0)) / 2
+    c, s = math.cos(math.radians(twist)), math.sin(math.radians(twist))
+    mids = np.stack([mids[:, 0] * c - mids[:, 1] * s, mids[:, 0] * s + mids[:, 1] * c], 1)
+    r = float(np.mean(np.linalg.norm(pts, axis=1)))
+    z1 = girdle + (1 - split) * r * math.tan(math.radians(t_out))
+    z2 = z1 + split * r * math.tan(math.radians(t_in))
     bm = bmesh.new()
-    def ring(scale, z, rot=0.0):
-        c, s = math.cos(rot), math.sin(rot)
-        return [bm.verts.new((scale * (x * c - y * s), scale * (x * s + y * c), z)) for x, y in pts]
-    base = ring(1.0, 0.0); gird = ring(1.0, h_girdle)
-    star = ring(mid, h_girdle + (h_table - h_girdle) * 0.55, twist); top = ring(table, h_table)
+    base = [bm.verts.new((x, y, 0.0)) for x, y in pts]
+    gird = [bm.verts.new((x, y, girdle)) for x, y in pts]
+    ring = [bm.verts.new((x * split, y * split, z1)) for x, y in mids]
+    apex = bm.verts.new((0, 0, z2))
     bm.faces.new(list(reversed(base)))
-    for a, b_ in ((base, gird), (gird, star), (star, top)):
-        for i in range(n):
-            j = (i + 1) % n
-            bm.faces.new((a[i], a[j], b_[j], b_[i]))
-    bm.faces.new(top)
+    for i in range(n):
+        j = (i + 1) % n
+        bm.faces.new((base[i], base[j], gird[j], gird[i]))
+        bm.faces.new((gird[i], gird[j], ring[i]))
+        bm.faces.new((ring[i], gird[j], ring[j]))
+        bm.faces.new((ring[i], ring[j], apex))
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     me = bpy.data.meshes.new('gem'); bm.to_mesh(me); bm.free()
     ob = link(bpy.data.objects.new('gem', me)); me.materials.append(M['jewel'])
-    return ob
+    return ob, z2
 
 def resample(poly, n):
     ring = poly.exterior
@@ -110,28 +122,28 @@ def dome(r, h, role, seg=64, z=0.0):
 
 def gem(kind):
     objs = []
-    if kind == 'K':     # emerald cut, a gold cross on the table
+    if kind == 'K':     # emerald outline, a gold cross on its point
         a, b, c = 0.29, 0.33, 0.09
         o = Polygon([(-a + c, -b), (a - c, -b), (a, -b + c), (a, b - c), (a - c, b), (-a + c, b), (-a, b - c), (-a, -b + c)])
-        g = facet_gem(o, 0.05, 0.2, table=0.55, mid=0.8)
+        g, top = rose_gem(resample(o, 16))
         cross = unary_union([box(-0.028, -0.13, 0.028, 0.13), box(-0.09, 0.025, 0.09, 0.075)])
-        objs += prism('cross', cross, 0.19, 0.228, 'metal', bevel=0.008, segs=3)
-    elif kind == 'Q':   # round brilliant, a coronet of eight gold beads
+        objs += prism('cross', cross, top - 0.06, top + 0.016, 'metal', bevel=0.008, segs=3)
+    elif kind == 'Q':   # round, a coronet of eight gold beads
         o = resample(circle(0.34), 16)
-        g = facet_gem(o, 0.05, 0.22, table=0.5, mid=0.82, twist=math.pi / 16)
+        g, top = rose_gem(o)
         for i in range(8):
             t = 2 * math.pi * i / 8 + math.pi / 8
             objs.append(ball(0.042, (0.345 * math.cos(t), 0.345 * math.sin(t), 0.075), 'metal'))
     elif kind == 'R':   # princess: a sharp square
         o = box(-0.28, -0.28, 0.28, 0.28)
-        g = facet_gem(resample(o, 16), 0.05, 0.19, table=0.55, mid=0.8)
+        g, top = rose_gem(resample(o, 16))
     elif kind == 'B':   # marquise, on the diagonal
         lens = Point(-0.22, 0).buffer(0.44, quad_segs=24).intersection(Point(0.22, 0).buffer(0.44, quad_segs=24))
         o = affinity.rotate(affinity.scale(lens, 1.0, 1.3), 45, origin=(0, 0))
-        g = facet_gem(resample(o, 20), 0.05, 0.19, table=0.45, mid=0.78)
+        g, top = rose_gem(resample(o, 20))
     elif kind == 'N':   # trillion, its point forward
         o = Polygon([(0, 0.35), (-0.32, -0.21), (0.32, -0.21)]).buffer(0.04, quad_segs=6)
-        g = facet_gem(resample(o, 18), 0.05, 0.19, table=0.5, mid=0.8)
+        g, top = rose_gem(resample(o, 18))
     else:               # pawn: a round cabochon
         g = dome(0.24, 0.13, 'jewel')
         o = circle(0.24)
