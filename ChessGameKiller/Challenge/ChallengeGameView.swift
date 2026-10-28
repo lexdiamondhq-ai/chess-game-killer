@@ -96,8 +96,11 @@ struct ChallengeGameView: View {
                 .frame(width: width, height: width / aspect)
             FriendPlate(game: game, seat: topSeat.opposite, theme: theme)
                 .frame(height: Self.plateHeight)
-            MoveRibbon(moves: game.ribbon, theme: theme)
-                .frame(height: Self.ribbonHeight)
+            HStack(spacing: 10) {
+                MoveRibbon(moves: game.ribbon, theme: theme)
+                BoardViewSwitch(theme: theme)
+            }
+            .frame(height: Self.ribbonHeight)
             Spacer(minLength: 0)
         }
         .frame(maxWidth: Self.maxBoardSide)

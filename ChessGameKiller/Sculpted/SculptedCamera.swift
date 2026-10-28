@@ -229,9 +229,6 @@ enum BoardTilt: String, CaseIterable, Identifiable {
 
     static let storageKey = "boardTilt"
 
-    /// Shown in place of the choices on a look that has no 3D board.
-    static let needsThreeD = "Tilt and Crystal pieces need a 3D look: Gilded, Noir or Midnight."
-
     var id: String { rawValue }
 
     var title: String {

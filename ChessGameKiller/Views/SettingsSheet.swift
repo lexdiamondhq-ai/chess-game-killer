@@ -34,20 +34,6 @@ struct SettingsSheet: View {
     private var theme: BoardTheme { .named(themeID) }
     private var accent: Color { theme.accent ?? .accentColor }
 
-    /// What the Board view row says under its title.
-    private var tiltNote: String {
-        if theme.sculptedLook == nil { return BoardTilt.needsThreeD }
-        return sculpted3D ? tilt.blurb : "Turns 3D pieces on. " + tilt.blurb
-    }
-
-    /// Choosing a board view also turns 3D pieces on, since only the 3D board tilts.
-    private var tiltChoice: Binding<BoardTilt> {
-        Binding(get: { tilt }, set: { choice in
-            tilt = choice
-            sculpted3D = true
-        })
-    }
-
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -68,18 +54,17 @@ struct SettingsSheet: View {
                                 ToggleRow(title: "3D pieces", subtitle: "Carved pieces that lift, glide and fall. Off draws the same set flat.",
                                           symbol: "cube", isOn: $sculpted3D, theme: theme)
                                 rule
-                            }
-                            // Always shown, so the tilt is easy to find. Picking a view turns 3D pieces on;
-                            // a look without a 3D board says which looks have one.
-                            PickerRow(title: "Board view", subtitle: tiltNote, symbol: "perspective", theme: theme) {
-                                Picker("Board view", selection: tiltChoice) {
-                                    ForEach(BoardTilt.allCases) { choice in
-                                        Text(choice.title).tag(choice)
+                                if sculpted3D {
+                                    PickerRow(title: "Board view", subtitle: tilt.blurb, symbol: "perspective", theme: theme) {
+                                        Picker("Board view", selection: $tilt) {
+                                            ForEach(BoardTilt.allCases) { choice in
+                                                Text(choice.title).tag(choice)
+                                            }
+                                        }
                                     }
+                                    rule
                                 }
-                                .disabled(theme.sculptedLook == nil)
                             }
-                            rule
                             ToggleRow(title: "Coordinates", subtitle: "Letters and numbers around the board. Off gives the squares more room.",
                                       symbol: "textformat.abc", isOn: $coordinatesOn, theme: theme)
                             rule

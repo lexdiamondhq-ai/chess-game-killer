@@ -190,14 +190,23 @@ final class SculptedBoardTests: XCTestCase {
         XCTAssertEqual(BoardTilt.flat.framing(bigBoard: false), .seated)
     }
 
-    /// The Board view note names free looks that really have a 3D board.
-    func testTheTiltNoteNamesFree3DLooks() {
-        for look in [BoardTheme.gilded, .noir, .midnight] {
-            XCTAssertNotNil(look.sculptedLook, look.name)
-            XCTAssertTrue(BoardTheme.freeLooks.contains(look.id), look.name)
-            XCTAssertTrue(BoardTilt.needsThreeD.contains(look.name), look.name)
-        }
-        XCTAssertNil(BoardTheme.classic.sculptedLook)
+    /// The switch under the board shows the view in play, and none while the board is 2D.
+    func testTheBoardViewSwitchShowsTheViewInPlay() {
+        XCTAssertEqual(BoardViewSwitch.showing(.gilded, threeD: true, framing: .standing), .tilted)
+        XCTAssertEqual(BoardViewSwitch.showing(.noir, threeD: true, framing: .seated), .flat)
+        XCTAssertNil(BoardViewSwitch.showing(.gilded, threeD: false, framing: .standing))
+        XCTAssertNil(BoardViewSwitch.showing(.classic, threeD: true, framing: .seated))
+    }
+
+    /// Picking Tilted or Flat always ends on a 3D board: a look without one moves to Gilded,
+    /// and a rival's board gives way to the player's own look.
+    func testPickingAViewAlwaysLandsOnA3DBoard() {
+        XCTAssertEqual(BoardViewSwitch.change(inPlay: .noir, chosen: .noir), .init())
+        XCTAssertEqual(BoardViewSwitch.change(inPlay: .classic, chosen: .classic), .init(look: .gilded))
+        XCTAssertEqual(BoardViewSwitch.change(inPlay: .spark, chosen: .midnight), .init(leavesRivalBoard: true))
+        XCTAssertEqual(BoardViewSwitch.change(inPlay: .spark, chosen: .neon), .init(leavesRivalBoard: true, look: .gilded))
+        XCTAssertEqual(BoardViewSwitch.change(inPlay: .pulse, chosen: .pulse), .init(look: .gilded))
+        XCTAssertNotNil(BoardTheme.gilded.sculptedLook)
     }
 
     func testEverySquareIsFoundUnderItsOwnCenter() {
