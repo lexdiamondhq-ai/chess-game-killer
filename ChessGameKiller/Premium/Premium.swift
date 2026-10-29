@@ -84,6 +84,23 @@ final class Premium {
         return took
     }
 
+    /// Gives back a use whose request failed, so a dropped connection never costs a free try.
+    func giveBack(_ feature: PremiumFeature, key: String? = nil) {
+        guard !feature.isLocked, let allowance = allowance(feature) else { return }
+        ledger.giveBack(feature, key: key, allowance: allowance)
+        uses += 1
+    }
+
+    /// How much of a counted allowance is used and when it comes back, for the limit card
+    /// and the offer. Nil when there's no count to show (unlimited, or a locked feature).
+    func usage(_ feature: PremiumFeature, now: Date = .now) -> PremiumUsage? {
+        _ = uses
+        guard !feature.isLocked, let allowance = allowance(feature) else { return nil }
+        let used: Int = min(allowance.uses, ledger.used(feature, allowance: allowance, now: now))
+        let back: Date = ledger.refreshDate(allowance.period, after: now)
+        return PremiumUsage(used: used, of: allowance.uses, period: allowance.period, refreshes: back)
+    }
+
     /// Whether a locked feature is open.
     func opens(_ feature: PremiumFeature) -> Bool {
         unlimited || isPremium || !feature.isLocked
@@ -195,5 +212,37 @@ final class Premium {
     private func setPremium(_ active: Bool) {
         isPremium = active
         defaults.set(active, forKey: Self.activeKey)
+    }
+}
+
+/// "2 of 3 used" and when the allowance comes back, said the same way on every screen.
+struct PremiumUsage: Equatable {
+    let used: Int
+    let of: Int
+    let period: PremiumFeature.Allowance.Period
+    let refreshes: Date
+
+    /// "3 of 3 used today" or "2 of 3 used this week".
+    var countLine: String {
+        let when: String = period == .day ? "today" : "this week"
+        return "\(used) of \(of) used \(when)"
+    }
+
+    /// "Back tomorrow" or "Back Monday", the day the allowance refreshes.
+    func refreshLine(now: Date = .now, calendar: Calendar = .current) -> String {
+        let today: Date = calendar.startOfDay(for: now)
+        let days: Int = calendar.dateComponents([.day], from: today, to: calendar.startOfDay(for: refreshes)).day ?? 1
+        if days <= 1 { return "Back tomorrow" }
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.locale = Locale.current
+        formatter.setLocalizedDateFormatFromTemplate("EEEE")
+        return "Back \(formatter.string(from: refreshes))"
+    }
+
+    /// The whole line for a card: "3 of 3 used this week · Back Monday".
+    func line(now: Date = .now, calendar: Calendar = .current) -> String {
+        "\(countLine) · \(refreshLine(now: now, calendar: calendar))"
     }
 }

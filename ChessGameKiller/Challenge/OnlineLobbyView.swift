@@ -149,8 +149,13 @@ struct OnlineLobbyView: View {
             }
             switch lobby.phase {
             case .searching(let waitingClock, let since):
-                OnlineSearchingBar(clock: waitingClock, since: since, theme: theme) {
-                    Task { await lobby.cancel() }
+                VStack(spacing: 10) {
+                    OnlineQuietCard(since: since, theme: theme,
+                                    playRival: { center.playComputerInstead() },
+                                    invite: { center.compose() })
+                    OnlineSearchingBar(clock: waitingClock, since: since, theme: theme) {
+                        Task { await lobby.cancel() }
+                    }
                 }
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
             case .starting:
@@ -263,6 +268,47 @@ struct OnlineSearchingBar: View {
         .padding(.leading, 8)
         .challengeGlass(Capsule(style: .continuous))
         .accessibilityElement(children: .contain)
+    }
+}
+
+/// After a quiet half minute in the lobby: a way to play right now, so waiting never ends in nothing.
+struct OnlineQuietCard: View {
+    let since: Date
+    let theme: BoardTheme
+    let playRival: () -> Void
+    let invite: () -> Void
+
+    /// How long the lobby waits before offering another way to play.
+    static let patience: TimeInterval = 30
+
+    var body: some View {
+        TimelineView(.periodic(from: since, by: 1)) { context in
+            let waited: TimeInterval = context.date.timeIntervalSince(since)
+            if waited >= Self.patience {
+                card
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
+        }
+    }
+
+    private var card: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("It's quiet right now")
+                .font(theme.challengeFont(15, .semibold))
+            Text("Keep waiting, or play now: a rival on this phone, or a friend with a link.")
+                .font(theme.challengeFont(13))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 8) {
+                Button("Play a rival", action: playRival)
+                    .buttonStyle(ChallengeButtonStyle(kind: .primary, theme: theme, height: 40))
+                Button("Invite a friend", action: invite)
+                    .buttonStyle(ChallengeButtonStyle(kind: .glass, theme: theme, height: 40))
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .challengeGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 }
 

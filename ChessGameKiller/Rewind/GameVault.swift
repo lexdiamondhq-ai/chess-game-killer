@@ -69,8 +69,19 @@ final class GameVault {
         save()
     }
 
-    func delete(_ id: UUID) {
-        games.removeAll { $0.id == id }
+    /// Takes a game off the list. What comes back can put it back (the Undo after a delete).
+    @discardableResult
+    func delete(_ id: UUID) -> DeletedGame? {
+        guard let index = games.firstIndex(where: { $0.id == id }) else { return nil }
+        let game = games.remove(at: index)
+        save()
+        return DeletedGame(game: game, index: index)
+    }
+
+    /// Puts a just-deleted game back where it was.
+    func restore(_ deleted: DeletedGame) {
+        guard !games.contains(where: { $0.id == deleted.game.id }) else { return }
+        games.insert(deleted.game, at: min(deleted.index, games.count))
         save()
     }
 
@@ -123,4 +134,10 @@ struct Lossy<Value: Decodable>: Decodable {
     init(from decoder: Decoder) throws {
         value = try? Value(from: decoder)
     }
+}
+
+/// A game just taken off the list, and where it was, so Undo can put it back.
+struct DeletedGame {
+    let game: SavedGame
+    let index: Int
 }

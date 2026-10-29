@@ -39,6 +39,8 @@ final class ChallengeCenter {
     /// A finished friend game, to keep with the player's games. ContentView keeps it in its vault,
     /// the only place games.json is written from.
     @ObservationIgnored var onGameFinished: (@MainActor (SavedGame) -> Void)?
+    /// Nobody came in Play online and the player chose a rival instead: ContentView opens New Game.
+    @ObservationIgnored var onPlayComputer: (@MainActor () -> Void)?
     @ObservationIgnored private var lastRefresh: Date?
     /// A link opened during a timed game: it opens once that game is closed.
     @ObservationIgnored private(set) var heldCode: String?
@@ -157,6 +159,12 @@ final class ChallengeCenter {
             heldCode = nil
             open(code: held)
         }
+    }
+
+    /// The lobby stayed quiet: close Play online (the seat is given up) and play a rival now.
+    func playComputerInstead() {
+        dismiss()
+        onPlayComputer?()
     }
 
     /// Takes a finished game off the list. Games still going stay.

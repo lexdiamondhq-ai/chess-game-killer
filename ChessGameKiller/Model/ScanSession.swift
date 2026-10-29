@@ -82,7 +82,9 @@ final class ScanSession {
         readID += 1
         isReading = false
         readingFailed = false
-        readingNote = "Stopped. Set up the pieces by hand (tap the photo to see it), or go back and pick another."
+        // Nothing was read, so the scan isn't counted.
+        Premium.shared.giveBack(.scan)
+        readingNote = "Stopped, and this scan didn't count. Set up the pieces by hand (tap the photo to see it), or go back and pick another."
     }
 
     private func finishReading(_ reading: BoardReading, id: Int) {
@@ -100,7 +102,10 @@ final class ScanSession {
         guard isReading, id == readID else { return }
         isReading = false
         readingFailed = true
-        readingNote = (error as? LocalizedError)?.errorDescription ?? BoardReaderError.failed.errorDescription
+        // A read that failed (no connection, a busy server) never costs one of the free scans.
+        Premium.shared.giveBack(.scan)
+        let why: String = (error as? LocalizedError)?.errorDescription ?? BoardReaderError.failed.errorDescription ?? ""
+        readingNote = Premium.shared.allowance(.scan) == nil ? why : why + " This scan didn't count."
     }
 
     private func reset() {

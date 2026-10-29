@@ -213,6 +213,10 @@ struct ChallengeGameView: View {
                 }
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
+            if game.connection == .offline, game.phase == .playing {
+                offlineNotice
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
             if game.connection == .elsewhere {
                 HStack(spacing: 10) {
                     Image(systemName: "rectangle.on.rectangle")
@@ -256,6 +260,26 @@ struct ChallengeGameView: View {
             line += " Leave for over \(game.graceWords) and \(game.opponentName) can claim the win."
         }
         return line + " \(game.opponentName) is told if you take a screenshot."
+    }
+
+    /// The player's own connection dropped mid-game: said plainly, with what keeps happening meanwhile.
+    private var offlineNotice: some View {
+        let sending: Bool = game.pending != nil
+        let clockLine: String = game.isTimed ? " The clock keeps running." : ""
+        let first: String = sending ? "No connection. Your move sends when you're back." : "No connection. Reconnecting…"
+        let line: String = first + clockLine
+        return HStack(spacing: 10) {
+            ProgressView()
+                .controlSize(.small)
+            Text(line)
+                .font(theme.challengeFont(14, .medium))
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 11)
+        .challengeGlass(Capsule(style: .continuous))
+        .accessibilityElement(children: .combine)
     }
 
     private func banner(symbol: String, text: String, urgent: Bool, dismiss: @escaping () -> Void) -> some View {

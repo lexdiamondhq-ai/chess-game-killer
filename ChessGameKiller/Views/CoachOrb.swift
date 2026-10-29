@@ -499,8 +499,13 @@ private struct CoachPanel: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.title3).foregroundStyle(accent).frame(width: 40, height: 40)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(Coach.current.name) is offline").font(.headline)
-                    Text("The engine didn't answer. Play on: grades and hints come back when it does.")
+                    let weakRival: Bool = match.rivalPlayedWithoutEngine
+                    let offlineTitle: String = "\(Coach.current.name) is offline"
+                    let headline: String = weakRival ? "The engine stopped answering" : offlineTitle
+                    let weakDetail: String = "\(rival) is playing simple moves of its own until it's back, so this game isn't a real test. Start a new game to play it at full strength."
+                    let detail: String = weakRival ? weakDetail : "The engine didn't answer. Play on: grades and hints come back when it does."
+                    Text(headline).font(.headline)
+                    Text(detail)
                         .font(.subheadline).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }

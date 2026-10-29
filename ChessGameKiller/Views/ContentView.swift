@@ -160,6 +160,13 @@ struct ContentView: View {
                 match.onArchive = { [vault] game in vault.record(game) }
                 // So is a finished friend game.
                 challenges?.onGameFinished = { [vault] game in vault.record(game) }
+                // Nobody came online: the New Game sheet opens once Play online has closed.
+                challenges?.onPlayComputer = {
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(450))
+                        showingNewGame = true
+                    }
+                }
                 match.onAbandon = { [army] ledger, setup, assisted in
                     // Walking away from a game counts as a loss.
                     army.record(ledger, playerColor: setup.playerColor, won: false,

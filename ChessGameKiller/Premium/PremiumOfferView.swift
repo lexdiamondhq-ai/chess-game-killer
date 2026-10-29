@@ -1,3 +1,4 @@
+import StoreKit
 import SwiftUI
 
 /// The one Premium screen: what it adds, the two plans with the yearly one picked, and a clear
@@ -10,6 +11,7 @@ struct PremiumOfferView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var plan: PremiumPlan = .yearly
     @State private var trial = true
+    @State private var managing = false
     private var premium: Premium { .shared }
 
     private var theme: BoardTheme { .named(themeID) }
@@ -22,7 +24,7 @@ struct PremiumOfferView: View {
                 VStack(spacing: 22) {
                     PremiumOfferHeader(accent: accent)
                     if let feature {
-                        PremiumReasonCard(text: feature.limitLine, accent: accent)
+                        PremiumReasonCard(text: feature.limitLine, usage: premium.usage(feature), accent: accent)
                     }
                     PremiumBenefitList(accent: accent)
                     plans
@@ -97,12 +99,12 @@ struct PremiumOfferView: View {
             .buttonStyle(.plain)
             .disabled(busy)
             if let problem = premium.problem {
-                Text(problem)
-                    .font(.system(.footnote, design: .themed))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
+                PremiumProblemCard(text: problem, accent: accent, restoring: premium.isRestoring,
+                                   restore: { Task { await premium.restore() } },
+                                   manage: { managing = true })
             }
         }
+        .manageSubscriptionsSheet(isPresented: $managing)
     }
 
     private var footerLinks: some View {
@@ -148,6 +150,7 @@ private struct PremiumOfferHeader: View {
 
 private struct PremiumReasonCard: View {
     let text: String
+    let usage: PremiumUsage?
     let accent: Color
 
     var body: some View {
@@ -156,9 +159,14 @@ private struct PremiumReasonCard: View {
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(accent)
                 .padding(.top, 2)
-            Text(text)
-                .font(.system(.subheadline, design: .themed).weight(.medium))
-                .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 8) {
+                if let usage {
+                    PremiumUsageBadge(usage: usage, accent: accent)
+                }
+                Text(text)
+                    .font(.system(.subheadline, design: .themed).weight(.medium))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Spacer(minLength: 0)
         }
         .padding(14)
@@ -310,6 +318,9 @@ struct PremiumLimitCard: View {
             Image(systemName: "crown.fill")
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(accent)
+            if let usage = Premium.shared.usage(feature) {
+                PremiumUsageBadge(usage: usage, accent: accent)
+            }
             Text(feature.limitLine)
                 .font(.system(.subheadline, design: .themed).weight(.medium))
                 .multilineTextAlignment(.center)
@@ -333,6 +344,59 @@ struct PremiumLimitCard: View {
     }
 }
 
+/// When a purchase or restore goes wrong: what happened, and the two things that fix most cases,
+/// right there, so nobody is left wondering whether they paid.
+private struct PremiumProblemCard: View {
+    let text: String
+    let accent: Color
+    let restoring: Bool
+    let restore: () -> Void
+    let manage: () -> Void
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Text(text)
+                .font(.system(.footnote, design: .themed).weight(.medium))
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("If you were charged, Restore brings Premium back. Your subscription is always in your Apple ID settings.")
+                .font(.system(.caption, design: .themed))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 18) {
+                Button(restoring ? "Restoring…" : "Restore", action: restore)
+                    .disabled(restoring)
+                Button("Manage subscription", action: manage)
+            }
+            .font(.system(.footnote, design: .themed).weight(.semibold))
+            .foregroundStyle(accent)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity)
+        .glassPane(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+}
+
+/// The one way every screen says how much of a free allowance is used and when it comes back:
+/// "3 of 3 used this week · Back Monday".
+struct PremiumUsageBadge: View {
+    let usage: PremiumUsage
+    let accent: Color
+
+    var body: some View {
+        let line: String = usage.line()
+        Text(line)
+            .font(.system(.caption, design: .themed).weight(.semibold).monospacedDigit())
+            .foregroundStyle(accent)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(accent.opacity(0.14), in: Capsule())
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityLabel(line)
+    }
+}
+
 /// The small crown on a row only Premium opens.
 struct PremiumTag: View {
     let accent: Color
@@ -352,12 +416,15 @@ struct PremiumTag: View {
 struct PremiumSettingsCard: View {
     let theme: BoardTheme
     let open: () -> Void
+    @State private var managing = false
     private var premium: Premium { .shared }
 
     var body: some View {
         let accent: Color = theme.accent ?? PremiumStyle.gold
         let active: Bool = premium.isPremium
-        Button(action: open) {
+        Button {
+            if active { managing = true } else { open() }
+        } label: {
             HStack(spacing: 12) {
                 Image(systemName: "crown.fill")
                     .font(.system(size: 15, weight: .semibold))
@@ -368,7 +435,7 @@ struct PremiumSettingsCard: View {
                     Text(active ? "Premium is on" : "Premium")
                         .font(.body.weight(.semibold))
                         .foregroundStyle(Color.primary)
-                    Text(active ? "Thank you. Everything is open." : "A coach that learns you, full Rewind, unlimited puzzles and every look.")
+                    Text(active ? "Thank you. Everything is open. Tap to manage your subscription." : "A coach that learns you, full Rewind, unlimited puzzles and every look.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -384,6 +451,6 @@ struct PremiumSettingsCard: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .disabled(active)
+        .manageSubscriptionsSheet(isPresented: $managing)
     }
 }

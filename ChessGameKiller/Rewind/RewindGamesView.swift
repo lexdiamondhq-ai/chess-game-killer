@@ -14,6 +14,8 @@ struct RewindGamesView: View {
     @Environment(GameVault.self) private var vault
     @Environment(\.dismiss) private var dismiss
     @State private var path: [UUID]
+    /// The game just deleted, while its Undo shows.
+    @State private var deleted: DeletedGame?
 
     /// `opening` is a game to show straight away, as when one is picked on the home screen.
     init(theme: BoardTheme, opening: UUID? = nil, forfeits: String? = nil, onPlayAgain: ((SavedGame) -> Void)? = nil) {
@@ -39,7 +41,7 @@ struct RewindGamesView: View {
                             .buttonStyle(.plain)
                             .contextMenu {
                                 Button(role: .destructive) {
-                                    withAnimation { vault.delete(game.id) }
+                                    withAnimation { deleted = vault.delete(game.id) }
                                 } label: {
                                     Label("Delete game", systemImage: "trash")
                                 }
@@ -53,6 +55,23 @@ struct RewindGamesView: View {
                 .frame(maxWidth: .infinity)
             }
             .background { ThemeBackdrop(theme: theme).ignoresSafeArea() }
+            .overlay(alignment: .bottom) {
+                if let deleted {
+                    UndoDeleteToast(name: deleted.game.opponent) {
+                        withAnimation { vault.restore(deleted) }
+                        withAnimation { self.deleted = nil }
+                    }
+                    .padding(.bottom, 12)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .task(id: deleted?.game.id) {
+                // The Undo stays for a few seconds, then the delete is final.
+                guard deleted != nil else { return }
+                try? await Task.sleep(for: .seconds(5))
+                guard !Task.isCancelled else { return }
+                withAnimation { deleted = nil }
+            }
             .navigationTitle("Your games")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -236,5 +255,30 @@ private struct GameCard: View {
 
     private var footColor: Color {
         game.toRewrite.isEmpty || game.leftToRewrite == 0 ? RewindPalette.gold : RewindPalette.amber
+    }
+}
+
+/// "Game against Nova deleted · Undo", for a few seconds after a delete.
+private struct UndoDeleteToast: View {
+    let name: String
+    let undo: () -> Void
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: "trash")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.secondary)
+            Text("Game against \(name) deleted")
+                .font(.system(.subheadline, design: .themed).weight(.medium))
+                .lineLimit(1)
+            Spacer(minLength: 4)
+            Button("Undo", action: undo)
+                .font(.system(.subheadline, design: .themed).weight(.bold))
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 13)
+        .glassPane(Capsule(style: .continuous))
+        .padding(.horizontal, 16)
+        .frame(maxWidth: 560)
     }
 }

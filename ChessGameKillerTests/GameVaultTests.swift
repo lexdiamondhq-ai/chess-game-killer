@@ -44,4 +44,22 @@ final class GameVaultTests: XCTestCase {
         XCTAssertEqual(GameVault.load(from: url).count, 1)
         XCTAssertEqual(try Data(contentsOf: aside), garbage)
     }
+
+    func testUndoPutsADeletedGameBackWhereItWas() {
+        let url = temporaryURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let vault = GameVault(fileURL: url)
+        for _ in 0..<3 { vault.record(RewindSample.game(id: UUID())) }
+        let before = vault.games.map(\.id)
+        let middle = before[1]
+        let deleted = vault.delete(middle)
+        XCTAssertEqual(vault.games.count, 2)
+        XCTAssertNotNil(deleted)
+        if let deleted { vault.restore(deleted) }
+        XCTAssertEqual(vault.games.map(\.id), before)
+        // Undo twice changes nothing.
+        if let deleted { vault.restore(deleted) }
+        XCTAssertEqual(vault.games.count, 3)
+        XCTAssertNil(vault.delete(UUID()))
+    }
 }

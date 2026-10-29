@@ -178,6 +178,7 @@ final class TalkSession: Identifiable {
         case .ready, .typing:
             break
         }
+        if refuseWhenOutOfTalks() { return }
         guard canListen else {
             phase = .typing
             return
@@ -243,6 +244,7 @@ final class TalkSession: Identifiable {
         case .answered:
             resetGo()
         }
+        if refuseWhenOutOfTalks() { return }
         buttonDown = false
         if draft.isEmpty { draft = carried }
         phase = .typing
@@ -435,6 +437,16 @@ final class TalkSession: Identifiable {
 
     // MARK: Asking Leo
 
+    /// Out of talks before a word is said: the limit shows now, not after the player has explained a whole plan.
+    private func refuseWhenOutOfTalks() -> Bool {
+        guard !Premium.shared.canUse(.talk) else { return false }
+        buttonDown = false
+        outOfTalks = true
+        problem = PremiumFeature.talk.limitLine
+        phase = .failed
+        return true
+    }
+
     private func send(typed: Bool) {
         // Out of talks: say so before anything counts as help in the game.
         guard Premium.shared.canUse(.talk) else {
@@ -554,7 +566,8 @@ final class TalkSession: Identifiable {
             if let answer { speak(.words(answer)) }
             return
         }
-        // No verdicts: nothing to show, so nothing of Leo's either.
+        // No verdicts: nothing to show, so nothing of Leo's either, and the talk isn't counted.
+        Premium.shared.giveBack(.talk)
         if isSpeaking { stopSpeaking() }
         answer = nil
         if let serverError {

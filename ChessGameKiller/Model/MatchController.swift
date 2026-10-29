@@ -125,6 +125,9 @@ final class MatchController {
     private(set) var gameNumber = 0
     /// Set when the engine couldn't answer, so the screen can say so.
     private(set) var engineFailed = false
+    /// Set when the rival had to play a move of its own because the engine never answered:
+    /// this game isn't at the rival's real strength, and the screen says so.
+    private(set) var rivalPlayedWithoutEngine = false
     /// The clock, when the game is timed.
     private(set) var clock: ChessClock?
     /// Set when the game ended on the clock rather than on the board.
@@ -302,6 +305,7 @@ final class MatchController {
         isFlippedByHand = false
         evaluation = nil
         engineFailed = false
+        rivalPlayedWithoutEngine = false
         startClock()
         clearRivalLine()
         lastLinePly = -10
@@ -946,6 +950,7 @@ final class MatchController {
             return
         }
         engineFailed = !engineAnswered
+        if !engineAnswered { rivalPlayedWithoutEngine = true }
         moveLanded(played)
     }
 

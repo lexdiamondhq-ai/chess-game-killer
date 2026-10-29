@@ -94,6 +94,62 @@ final class PremiumTests: XCTestCase {
         XCTAssertTrue(ledger.alreadyUsed(.fullRewind, key: "game-1", allowance: allowance, now: now))
     }
 
+    func testAFailedRequestGivesItsUseBack() {
+        let ledger = AllowanceLedger(defaults: defaults, calendar: calendar())
+        let now = date("2026-10-21T10:00:00-05:00")
+        let allowance = PremiumFeature.Allowance.perWeek(3)
+        for _ in 0..<3 { XCTAssertTrue(ledger.take(.scan, allowance: allowance, now: now)) }
+        XCTAssertEqual(ledger.remaining(.scan, allowance: allowance, now: now), 0)
+        ledger.giveBack(.scan, allowance: allowance, now: now)
+        XCTAssertEqual(ledger.remaining(.scan, allowance: allowance, now: now), 1)
+        // Never below nothing used.
+        for _ in 0..<5 { ledger.giveBack(.scan, allowance: allowance, now: now) }
+        XCTAssertEqual(ledger.used(.scan, allowance: allowance, now: now), 0)
+    }
+
+    func testAGivenBackKeyCanBeUsedAgain() {
+        let ledger = AllowanceLedger(defaults: defaults, calendar: calendar())
+        let now = date("2026-10-24T12:00:00-05:00")
+        let allowance = PremiumFeature.Allowance.perDay(1)
+        XCTAssertTrue(ledger.take(.fullRewind, key: "game-1", allowance: allowance, now: now))
+        ledger.giveBack(.fullRewind, key: "game-1", allowance: allowance, now: now)
+        XCTAssertFalse(ledger.alreadyUsed(.fullRewind, key: "game-1", allowance: allowance, now: now))
+        XCTAssertTrue(ledger.take(.fullRewind, key: "game-2", allowance: allowance, now: now))
+    }
+
+    func testTheLimitSaysHowMuchIsUsedAndWhenItComesBack() {
+        let cal = calendar()
+        let ledger = AllowanceLedger(defaults: defaults, calendar: cal)
+        let morning = date("2026-10-24T09:00:00-05:00")
+        XCTAssertEqual(ledger.refreshDate(.day, after: morning), date("2026-10-25T00:00:00-05:00"))
+        let dayUsage = PremiumUsage(used: 3, of: 3, period: .day, refreshes: ledger.refreshDate(.day, after: morning))
+        XCTAssertEqual(dayUsage.countLine, "3 of 3 used today")
+        XCTAssertEqual(dayUsage.refreshLine(now: morning, calendar: cal), "Back tomorrow")
+
+        let wednesday = date("2026-10-21T09:00:00-05:00")
+        let weekBack = ledger.refreshDate(.week, after: wednesday)
+        XCTAssertGreaterThan(weekBack, wednesday)
+        XCTAssertLessThanOrEqual(weekBack.timeIntervalSince(wednesday), 7 * 24 * 3600)
+        let weekUsage = PremiumUsage(used: 2, of: 3, period: .week, refreshes: weekBack)
+        XCTAssertEqual(weekUsage.countLine, "2 of 3 used this week")
+        let back = weekUsage.refreshLine(now: wednesday, calendar: cal)
+        XCTAssertTrue(back.hasPrefix("Back "), back)
+        XCTAssertNotEqual(back, "Back tomorrow")
+        XCTAssertTrue(weekUsage.line(now: wednesday, calendar: cal).contains(" · "))
+    }
+
+    func testUsageIsShownOnlyWhereThereIsACount() {
+        let free = Premium(defaults: defaults, isPremium: false)
+        XCTAssertEqual(free.usage(.ghostVision)?.of, 3)
+        XCTAssertEqual(free.usage(.ghostVision)?.used, 0)
+        XCTAssertTrue(free.use(.ghostVision, key: "fen-a"))
+        XCTAssertEqual(free.usage(.ghostVision)?.used, 1)
+        free.giveBack(.ghostVision, key: "fen-a")
+        XCTAssertEqual(free.usage(.ghostVision)?.used, 0)
+        XCTAssertNil(free.usage(.lessons))
+        XCTAssertNil(Premium(defaults: defaults, isPremium: false, unlimited: true).usage(.talk))
+    }
+
     func testFeaturesCountSeparately() {
         let ledger = AllowanceLedger(defaults: defaults, calendar: calendar())
         let now = date("2026-10-24T12:00:00-05:00")

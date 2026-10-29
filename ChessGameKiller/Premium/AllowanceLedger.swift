@@ -44,6 +44,23 @@ struct AllowanceLedger {
         return true
     }
 
+    /// Hands back one use taken in this period, because what it paid for never came
+    /// (no connection, a busy server). A key taken with it is forgotten too.
+    func giveBack(_ feature: PremiumFeature, key: String? = nil, allowance: PremiumFeature.Allowance, now: Date = .now) {
+        var entry = current(feature, allowance: allowance, now: now)
+        guard entry.count > 0 else { return }
+        entry.count -= 1
+        if let key, let index = entry.keys.lastIndex(of: key) { entry.keys.remove(at: index) }
+        save(entry, for: feature)
+    }
+
+    /// When the allowance comes back: the start of the next day, or of the next week.
+    func refreshDate(_ period: PremiumFeature.Allowance.Period, after date: Date) -> Date {
+        let start: Date = periodStart(period, for: date)
+        let component: Calendar.Component = period == .day ? .day : .weekOfYear
+        return calendar.date(byAdding: component, value: 1, to: start) ?? start
+    }
+
     /// The first moment of the period that holds `date`.
     func periodStart(_ period: PremiumFeature.Allowance.Period, for date: Date) -> Date {
         switch period {
