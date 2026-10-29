@@ -62,7 +62,7 @@ struct TrainBadge: View {
 
     var body: some View {
         Text(count > 99 ? "99+" : "\(count)")
-            .font(.system(.caption, design: .themed).weight(.bold).monospacedDigit())
+            .font(.app(.caption, weight: .bold).monospacedDigit())
             .foregroundStyle(Color.black)
             .padding(.horizontal, 7)
             .frame(minWidth: 22, minHeight: 22)
@@ -89,12 +89,12 @@ struct DoorTile: View {
             }
             Spacer(minLength: 12)
             Text(door.title)
-                .font(.system(.headline, design: .themed))
+                .font(.app(.headline))
                 .foregroundStyle(.primary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
             Text(status)
-                .font(.system(.footnote, design: .themed))
+                .font(.app(.footnote))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
@@ -125,17 +125,17 @@ struct TrainRow: View {
             TrainIcon(symbol: symbol, theme: theme, size: 44, tint: tint)
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(.headline, design: .themed))
+                    .font(.app(.headline))
                     .foregroundStyle(.primary)
                 Text(detail)
-                    .font(.system(.subheadline, design: .themed))
+                    .font(.app(.subheadline))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if let value {
                 Text(value)
-                    .font(.system(.subheadline, design: .themed).weight(.semibold).monospacedDigit())
+                    .font(.app(.subheadline, weight: .semibold).monospacedDigit())
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .fixedSize()
@@ -144,7 +144,7 @@ struct TrainRow: View {
                 TrainBadge(count: badge, theme: theme)
             }
             Image(systemName: "chevron.right")
-                .font(.caption.weight(.bold))
+                .font(.app(.caption, weight: .bold))
                 .foregroundStyle(.tertiary)
                 .accessibilityHidden(true)
         }
@@ -162,7 +162,7 @@ struct TrainSectionTitle: View {
 
     var body: some View {
         Text(text.uppercased())
-            .font(.system(.caption, design: .themed).weight(.semibold))
+            .font(.app(.caption, weight: .semibold))
             .tracking(0.9)
             .foregroundStyle(.secondary)
             .padding(.leading, 4)
@@ -184,7 +184,7 @@ struct TrainScreen<Content: View>: View {
             VStack(alignment: .leading, spacing: 12) {
                 if let intro {
                     Text(intro)
-                        .font(.system(.subheadline, design: .themed))
+                        .font(.app(.subheadline))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.horizontal, 4)
@@ -216,9 +216,9 @@ struct StreakPill: View {
                 .foregroundStyle(streak > 0 ? color : Color.secondary.opacity(0.6))
                 .symbolEffect(.bounce, value: streak)
             Text("\(streak)")
-                .font(.system(.headline, design: .themed).monospacedDigit())
+                .font(.app(.headline).monospacedDigit())
             Text(streak == 1 ? "day" : "days")
-                .font(.system(.footnote, design: .themed))
+                .font(.app(.footnote))
                 .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 12)
@@ -241,14 +241,14 @@ struct RankStrip: View {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(rank.title)
-                            .font(.system(.subheadline, design: .themed).weight(.semibold))
+                            .font(.app(.subheadline, weight: .semibold))
                         Text("\(store.progress.xp) XP")
-                            .font(.system(.caption, design: .themed).weight(.medium).monospacedDigit())
+                            .font(.app(.caption, weight: .medium).monospacedDigit())
                             .foregroundStyle(.secondary)
                         Spacer(minLength: 4)
                         if let next = store.nextRank {
                             Text("Next: \(next.title)")
-                                .font(.system(.caption, design: .themed))
+                                .font(.app(.caption))
                                 .foregroundStyle(.secondary)
                         }
                     }

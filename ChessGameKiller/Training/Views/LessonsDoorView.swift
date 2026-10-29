@@ -34,7 +34,7 @@ struct LessonsDoorView: View {
                     }
                 }
                 Text("Every drill was checked by Stockfish.")
-                    .font(.system(.footnote, design: .themed))
+                    .font(.app(.footnote))
                     .foregroundStyle(.tertiary)
                     .frame(maxWidth: .infinity)
                     .padding(.top, 6)
@@ -83,14 +83,14 @@ struct HabitCard: View {
                     TrafficLightDots(theme: theme, size: 10)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("The Traffic Light")
-                            .font(.system(.headline, design: .themed))
+                            .font(.app(.headline))
                         Text("Three questions before every move")
-                            .font(.system(.subheadline, design: .themed))
+                            .font(.app(.subheadline))
                             .foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 4)
                     Image(systemName: "chevron.down")
-                        .font(.caption.weight(.bold))
+                        .font(.app(.caption, weight: .bold))
                         .foregroundStyle(.tertiary)
                         .rotationEffect(.degrees(expanded ? 180 : 0))
                 }
@@ -109,9 +109,9 @@ struct HabitCard: View {
                             .padding(.top, 4)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(light.question)
-                                .font(.system(.subheadline, design: .themed).weight(.semibold))
+                                .font(.app(.subheadline, weight: .semibold))
                             Text(light.detail)
-                                .font(.system(.footnote, design: .themed))
+                                .font(.app(.footnote))
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
@@ -157,9 +157,9 @@ struct UnitCard: View {
                     TrainIcon(symbol: unit.symbol, theme: theme, size: 40, tint: color)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(unit.title)
-                            .font(.system(.headline, design: .themed))
+                            .font(.app(.headline))
                         Text(unit.subtitle)
-                            .font(.system(.caption, design: .themed))
+                            .font(.app(.caption))
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -169,11 +169,11 @@ struct UnitCard: View {
                             .foregroundStyle(color)
                     } else if !lessons.isEmpty {
                         Text("\(done)/\(lessons.count)")
-                            .font(.system(.caption, design: .themed).weight(.semibold).monospacedDigit())
+                            .font(.app(.caption, weight: .semibold).monospacedDigit())
                             .foregroundStyle(.secondary)
                     }
                     Image(systemName: "chevron.down")
-                        .font(.caption.weight(.bold))
+                        .font(.app(.caption, weight: .bold))
                         .foregroundStyle(.tertiary)
                         .rotationEffect(.degrees(isOpen ? 180 : 0))
                 }
@@ -213,15 +213,15 @@ struct UnitCard: View {
                 .frame(width: 34)
             VStack(alignment: .leading, spacing: 1) {
                 Text(lesson.title)
-                    .font(.system(.subheadline, design: .themed).weight(.semibold))
+                    .font(.app(.subheadline, weight: .semibold))
                 Text(lesson.subtitle)
-                    .font(.system(.caption, design: .themed))
+                    .font(.app(.caption))
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
             }
             Spacer(minLength: 4)
             Image(systemName: "chevron.right")
-                .font(.caption.weight(.bold))
+                .font(.app(.caption, weight: .bold))
                 .foregroundStyle(.tertiary)
         }
         .contentShape(Rectangle())
@@ -243,15 +243,15 @@ struct UnitCard: View {
             .frame(width: 34, height: 34)
             VStack(alignment: .leading, spacing: 1) {
                 Text(skill.title)
-                    .font(.system(.subheadline, design: .themed).weight(.semibold))
+                    .font(.app(.subheadline, weight: .semibold))
                 Text(TrainingStore.levelName(level))
-                    .font(.system(.caption, design: .themed))
+                    .font(.app(.caption))
                     .foregroundStyle(level >= 2 ? color : Color.secondary)
             }
             Spacer(minLength: 4)
             if hasDrills {
                 Button("Practice") { practice(skill) }
-                    .font(.system(.caption, design: .themed).weight(.bold))
+                    .font(.app(.caption, weight: .bold))
                     .buttonStyle(.bordered)
                     .buttonBorderShape(.capsule)
                     .tint(color)

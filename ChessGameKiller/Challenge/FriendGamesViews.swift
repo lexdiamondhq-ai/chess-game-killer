@@ -65,7 +65,7 @@ struct FriendGamesCard: View {
                     withAnimation(.snappy(duration: 0.3)) { showsAll.toggle() }
                 } label: {
                     Text(showsAll ? "Show fewer" : "Show all \(games.count)")
-                        .font(.system(size: 15, weight: .semibold, design: design))
+                        .font(.app(size: 15, weight: .semibold))
                         .foregroundStyle(.tint)
                         .frame(maxWidth: .infinity, minHeight: 48)
                         .contentShape(Rectangle())
@@ -122,18 +122,18 @@ struct FriendGameRow: View {
                 badge
                 VStack(alignment: .leading, spacing: 2) {
                     Text(game.title)
-                        .font(.system(size: 16, weight: .semibold, design: design))
+                        .font(.app(size: 16, weight: .semibold))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                     Text(game.statusLine)
-                        .font(.system(size: 13, weight: game.isYourMove ? .semibold : .medium, design: design))
+                        .font(.app(size: 13, weight: game.isYourMove ? .semibold : .medium))
                         .foregroundStyle(game.isYourMove ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
                         .lineLimit(1)
                         .minimumScaleFactor(0.85)
                 }
                 Spacer(minLength: 8)
                 Text(game.clock?.label ?? "No clock")
-                    .font(.system(size: 13, weight: .medium, design: design).monospacedDigit())
+                    .font(.app(size: 13, weight: .medium).monospacedDigit())
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
                 Image(systemName: "chevron.right")
@@ -163,7 +163,7 @@ struct FriendGameRow: View {
                     .foregroundStyle(.tint)
             } else {
                 Text(initial)
-                    .font(.system(size: 16, weight: .semibold, design: design))
+                    .font(.app(size: 16, weight: .semibold))
                     .foregroundStyle(game.isOver ? Color.secondary : Color.primary)
             }
         }

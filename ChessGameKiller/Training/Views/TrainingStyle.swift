@@ -119,7 +119,7 @@ struct TrainingButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         let color = tint ?? theme.trainingAccent
         configuration.label
-            .font(.system(.headline, design: .themed))
+            .font(.app(.headline))
             .lineLimit(1)
             .minimumScaleFactor(0.8)
             .frame(maxWidth: .infinity)
@@ -246,7 +246,7 @@ struct TurnBadge: View {
                 .overlay(Circle().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
                 .frame(width: 10, height: 10)
             Text(text ?? "\(side.displayName) to move")
-                .font(.caption.weight(.semibold))
+                .font(.app(.caption, weight: .semibold))
                 .lineLimit(1)
         }
         .padding(.horizontal, 10)
@@ -268,9 +268,9 @@ struct TrainingChip: View {
     var body: some View {
         HStack(spacing: 4) {
             if let symbol {
-                Image(systemName: symbol).font(.caption2.weight(.bold))
+                Image(systemName: symbol).font(.app(.caption2, weight: .bold))
             }
-            Text(text).font(.caption.weight(.semibold))
+            Text(text).font(.app(.caption, weight: .semibold))
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 4)

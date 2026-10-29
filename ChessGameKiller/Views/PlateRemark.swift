@@ -19,7 +19,7 @@ struct PlateRemark<Status: View>: View {
         ZStack(alignment: .leading) {
             if isRival, banterOn, let line = match.rivalLine {
                 Text("\u{201C}\(line.text)\u{201D}")
-                    .font(.system(.footnote, design: .themed).weight(.medium))
+                    .font(.app(.footnote, weight: .medium))
                     .italic()
                     .foregroundStyle(Color.primary.opacity(0.72))
                     .lineLimit(1)
@@ -56,11 +56,11 @@ private struct VerdictLine: View {
                 .fill(review.grade.color(on: theme))
                 .frame(width: 6, height: 6)
             Text(review.title)
-                .font(.system(.footnote, design: .themed).weight(.semibold))
+                .font(.app(.footnote, weight: .semibold))
                 .foregroundStyle(review.grade.color(on: theme))
             if let advice {
                 Text(advice)
-                    .font(.system(.footnote, design: .themed))
+                    .font(.app(.footnote))
                     .foregroundStyle(Color.primary.opacity(0.72))
             }
         }

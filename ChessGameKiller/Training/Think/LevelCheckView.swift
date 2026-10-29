@@ -90,9 +90,9 @@ struct LevelCheckView: View {
                         .accessibilityHidden(true)
                     VStack(spacing: 8) {
                         Text("Find your level")
-                            .font(.system(.title2, design: .themed).weight(.bold))
+                            .font(.app(.title2, weight: .bold))
                         Text("A quick check so \(Coach.current.name) starts you in the right place, and you skip what you already know.")
-                            .font(.system(.subheadline, design: .themed))
+                            .font(.app(.subheadline))
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
                             .fixedSize(horizontal: false, vertical: true)
@@ -135,12 +135,12 @@ struct LevelCheckView: View {
     private func point(_ symbol: String, _ text: String) -> some View {
         HStack(spacing: 12) {
             Image(systemName: symbol)
-                .font(.system(.body, design: .themed).weight(.semibold))
+                .font(.app(.body, weight: .semibold))
                 .foregroundStyle(theme.trainingAccent)
                 .frame(width: 26)
                 .accessibilityHidden(true)
             Text(text)
-                .font(.system(.subheadline, design: .themed).weight(.medium))
+                .font(.app(.subheadline, weight: .medium))
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -217,17 +217,17 @@ struct LevelCheckView: View {
                 VStack(spacing: 16) {
                     VStack(spacing: 12) {
                         Text("Your level")
-                            .font(.system(.subheadline, design: .themed).weight(.semibold))
+                            .font(.app(.subheadline, weight: .semibold))
                             .foregroundStyle(.secondary)
                         Text("\(runner.rating)")
-                            .font(.system(.largeTitle, design: .themed).weight(.bold).monospacedDigit())
+                            .font(.app(.largeTitle, weight: .bold).monospacedDigit())
                             .foregroundStyle(theme.trainingAccent)
                         Text(band.name)
-                            .font(.system(.title3, design: .themed).weight(.semibold))
+                            .font(.app(.title3, weight: .semibold))
                         LevelBandScale(band: band, theme: theme)
                             .padding(.top, 4)
                         Text(band.advice)
-                            .font(.system(.subheadline, design: .themed))
+                            .font(.app(.subheadline))
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
                             .fixedSize(horizontal: false, vertical: true)
@@ -238,7 +238,7 @@ struct LevelCheckView: View {
                     .trainingCard(theme)
                     .accessibilityElement(children: .combine)
                     Text("You solved \(runner.solved) of \(runner.estimator.answers.count). Puzzle ratings run from about 400 to 2900.")
-                        .font(.footnote)
+                        .font(.app(.footnote))
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
@@ -300,7 +300,7 @@ private struct LevelBandScale: View {
                 Spacer()
                 Text(LevelBand.expert.name)
             }
-            .font(.caption2)
+            .font(.app(.caption2))
             .foregroundStyle(.secondary)
         }
         .frame(maxWidth: 280)

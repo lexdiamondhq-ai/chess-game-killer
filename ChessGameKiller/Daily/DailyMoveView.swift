@@ -44,7 +44,7 @@ struct DailyMoveView: View {
                                     .padding(.top, 4)
                             } else if puzzle == nil {
                                 Text("Today's Move couldn't be loaded.")
-                                    .font(.subheadline)
+                                    .font(.app(.subheadline))
                                     .foregroundStyle(.secondary)
                                     .padding(.top, 60)
                             }
@@ -92,9 +92,9 @@ struct DailyMoveView: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 Text("Today's Move")
-                    .font(.system(.headline, design: .serif, weight: .semibold))
+                    .font(.app(.headline, weight: .semibold))
                 Text(dateline)
-                    .font(.caption)
+                    .font(.app(.caption))
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -115,7 +115,7 @@ struct DailyMoveView: View {
     private func resultCard(_ outcome: Outcome) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(Self.verdict(outcome))
-                .font(.system(.title2, design: .serif, weight: .semibold))
+                .font(.app(.title2, weight: .semibold))
             tallyLine
             Divider().opacity(0.5)
             streakBlock
@@ -145,15 +145,15 @@ struct DailyMoveView: View {
     private var tallyLine: some View {
         if let tally {
             Label(tally.line, systemImage: "globe")
-                .font(.subheadline)
+                .font(.app(.subheadline))
                 .foregroundStyle(.secondary)
         } else if tallyFailed || stats == nil {
             Label("Everyone gets this same puzzle today.", systemImage: "globe")
-                .font(.subheadline)
+                .font(.app(.subheadline))
                 .foregroundStyle(.secondary)
         } else {
             Label("Checking how everyone else did…", systemImage: "globe")
-                .font(.subheadline)
+                .font(.app(.subheadline))
                 .foregroundStyle(.secondary)
         }
     }
@@ -165,20 +165,20 @@ struct DailyMoveView: View {
                     .foregroundStyle(theme.trainingAccent)
                     .symbolEffect(.bounce, value: daily.streak)
                 Text(daily.streak == 1 ? "1-day streak" : "\(daily.streak)-day streak")
-                    .font(.headline.monospacedDigit())
+                    .font(.app(.headline).monospacedDigit())
                 Spacer()
                 Text("Day done")
-                    .font(.caption.weight(.semibold))
+                    .font(.app(.caption, weight: .semibold))
                     .foregroundStyle(theme.trainingAccent)
             }
             if let mark = daily.markToday {
                 Label("\(mark.piece) now carries your \(mark.days)-day mark, for good.", systemImage: "seal.fill")
-                    .font(.subheadline)
+                    .font(.app(.subheadline))
                     .foregroundStyle(theme.trainingAccent)
             } else if let next = daily.nextMilestone {
                 Text(next.toGo == 1 ? "Tomorrow earns a piece your \(next.days)-day mark."
                      : "\(next.toGo) more days and a piece earns your \(next.days)-day mark.")
-                    .font(.subheadline)
+                    .font(.app(.subheadline))
                     .foregroundStyle(.secondary)
             }
         }

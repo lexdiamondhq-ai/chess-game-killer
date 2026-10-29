@@ -58,11 +58,11 @@ struct CandidateMovesView: View {
             if let session, session.stage == .playing {
                 VStack(alignment: .trailing, spacing: 0) {
                     Text("\(session.round.points)")
-                        .font(.system(.headline, design: .themed).weight(.bold).monospacedDigit())
+                        .font(.app(.headline, weight: .bold).monospacedDigit())
                         .foregroundStyle(theme.trainingAccent)
                         .contentTransition(.numericText(value: Double(session.round.points)))
                     Text("points")
-                        .font(.caption2)
+                        .font(.app(.caption2))
                         .foregroundStyle(.secondary)
                 }
                 .padding(.trailing, 16)
@@ -200,7 +200,7 @@ private struct CandidatePositionView: View {
             HStack(spacing: 10) {
                 ProgressView()
                 Text("\(Coach.current.name) is checking…")
-                    .font(.system(.subheadline, design: .themed).weight(.semibold))
+                    .font(.app(.subheadline, weight: .semibold))
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, minHeight: 50)
@@ -275,12 +275,12 @@ private struct CandidateSlots: View {
             HStack(spacing: 8) {
                 CandidateNumber(number: number, color: color, size: badge, theme: theme)
                 Text(candidate.san)
-                    .font(.system(.subheadline, design: .themed).weight(.semibold).monospacedDigit())
+                    .font(.app(.subheadline, weight: .semibold).monospacedDigit())
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 Spacer(minLength: 0)
                 Image(systemName: "xmark")
-                    .font(.caption2.weight(.bold))
+                    .font(.app(.caption2, weight: .bold))
                     .foregroundStyle(.secondary)
             }
             .padding(.horizontal, 10)
@@ -298,7 +298,7 @@ private struct CandidateSlots: View {
     private func empty(number: Int) -> some View {
         HStack(spacing: 8) {
             Text("\(number)")
-                .font(.caption.weight(.bold).monospacedDigit())
+                .font(.app(.caption, weight: .bold).monospacedDigit())
                 .foregroundStyle(.tertiary)
                 .frame(width: badge, height: badge)
                 .overlay(Circle().strokeBorder(Color.secondary.opacity(0.4), lineWidth: 1))
@@ -321,7 +321,7 @@ private struct CandidateNumber: View {
 
     var body: some View {
         Text("\(number)")
-            .font(.caption.weight(.heavy).monospacedDigit())
+            .font(.app(.caption, weight: .heavy).monospacedDigit())
             .foregroundStyle(theme.isDark ? Color.black : Color.white)
             .frame(width: size, height: size)
             .background(color, in: Circle())
@@ -341,7 +341,7 @@ private struct CandidateVerdictCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("\(Coach.current.name)'s verdict")
-                    .font(.system(.headline, design: .themed))
+                    .font(.app(.headline))
                 Spacer()
                 TrainingChip(text: "+\(report.points)", symbol: "star.fill", color: theme.trainingAccent)
                     .accessibilityLabel("\(report.points) \(report.points == 1 ? "point" : "points")")
@@ -352,7 +352,7 @@ private struct CandidateVerdictCard: View {
                 }
             }
             Text(scoring)
-                .font(.footnote)
+                .font(.app(.footnote))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -425,7 +425,7 @@ private struct VerdictRow: View {
 
     private var move: some View {
         Text(row.san)
-            .font(.system(.body, design: .themed).weight(.semibold).monospacedDigit())
+            .font(.app(.body, weight: .semibold).monospacedDigit())
             .foregroundStyle(row.listed == nil && !row.isWinner ? Color.secondary : Color.primary)
             .lineLimit(1)
     }
@@ -434,7 +434,7 @@ private struct VerdictRow: View {
     private var verdict: some View {
         if let verdict = row.verdict {
             Text(verdict.words)
-                .font(.system(.subheadline, design: .themed).weight(.medium))
+                .font(.app(.subheadline, weight: .medium))
                 .foregroundStyle(verdict.color.map { $0.color(on: theme) } ?? Color.primary)
                 .lineLimit(1)
         }
@@ -444,7 +444,7 @@ private struct VerdictRow: View {
     private var tick: some View {
         if row.isMatch {
             Image(systemName: "checkmark.circle.fill")
-                .font(.system(.body, design: .themed))
+                .font(.app(.body))
                 .foregroundStyle(green)
         }
     }
@@ -485,10 +485,10 @@ private struct CandidateRoundSummary: View {
                             .background(theme.trainingAccent.opacity(0.14),
                                         in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                         Text("\(round.points)")
-                            .font(.system(.largeTitle, design: .themed).weight(.bold).monospacedDigit())
+                            .font(.app(.largeTitle, weight: .bold).monospacedDigit())
                             .foregroundStyle(theme.trainingAccent)
                         Text("points out of \(CandidateRound.maxPoints)")
-                            .font(.system(.subheadline, design: .themed))
+                            .font(.app(.subheadline))
                             .foregroundStyle(.secondary)
                         if session.newBest {
                             TrainingChip(text: "New best round", symbol: "trophy.fill", color: theme.trainingAccent)
@@ -536,9 +536,9 @@ private struct CandidateRoundSummary: View {
     private func stat(_ value: String, _ label: String) -> some View {
         VStack(spacing: 2) {
             Text(value)
-                .font(.system(.headline, design: .themed).monospacedDigit())
+                .font(.app(.headline).monospacedDigit())
             Text(label)
-                .font(.caption)
+                .font(.app(.caption))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)

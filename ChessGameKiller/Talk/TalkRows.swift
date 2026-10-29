@@ -11,7 +11,7 @@ import SwiftUI
 extension BoardTheme {
     /// Talk it through's type: the look's design (rounded on Neon), sized by Dynamic Type.
     func talkFont(_ style: Font.TextStyle, _ weight: Font.Weight = .regular) -> Font {
-        .system(style, design: challengeDesign, weight: weight)
+        .app(style, weight: weight)
     }
 }
 
@@ -397,7 +397,7 @@ private struct TalkPanelVerdicts: View {
     private var header: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text("LEO CHECKED")
-                .font(.caption.weight(.semibold))
+                .font(.app(.caption, weight: .semibold))
                 .tracking(1.1)
                 .foregroundStyle(.secondary)
                 .accessibilityAddTraits(.isHeader)
@@ -540,7 +540,7 @@ private struct TalkPanelMoveRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("YOUR MOVE")
-                .font(.caption2.weight(.semibold))
+                .font(.app(.caption2, weight: .semibold))
                 .tracking(1.1)
                 .foregroundStyle(.secondary)
             HStack(alignment: .firstTextBaseline, spacing: 10) {
@@ -790,7 +790,7 @@ private struct TalkPanelTrafficLight: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("TRAFFIC LIGHT")
-                .font(.caption.weight(.semibold))
+                .font(.app(.caption, weight: .semibold))
                 .tracking(1.1)
                 .foregroundStyle(.secondary)
                 .accessibilityAddTraits(.isHeader)

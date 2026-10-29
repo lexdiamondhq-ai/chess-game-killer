@@ -153,13 +153,13 @@ struct GhostStrip: View {
     var body: some View {
         HStack(spacing: 7) {
             Text("GHOST")
-                .font(.system(size: 10, weight: .bold, design: .themed))
+                .font(.app(size: 10, weight: .bold))
                 .tracking(1.2)
                 .foregroundStyle(.secondary)
             if let line {
                 moves(line)
                 Text(line.evaluation.label)
-                    .font(.system(size: 12, weight: .semibold, design: .themed).monospacedDigit())
+                    .font(.app(size: 12, weight: .semibold).monospacedDigit())
                     .foregroundStyle(.secondary)
             } else {
                 ProgressView().controlSize(.mini)
@@ -167,7 +167,7 @@ struct GhostStrip: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .font(.system(size: 14, weight: .semibold, design: .themed))
+        .font(.app(size: 14, weight: .semibold))
         .lineLimit(1)
         .padding(.horizontal, 12)
         .frame(height: 30)

@@ -68,7 +68,7 @@ struct WelcomeFlow: View {
                     page -= 1
                 } label: {
                     Image(systemName: "chevron.left")
-                        .font(.body.weight(.semibold))
+                        .font(.app(.body, weight: .semibold))
                         .frame(width: 36, height: 36)
                 }
                 .accessibilityLabel("Back")
@@ -76,7 +76,7 @@ struct WelcomeFlow: View {
             Spacer()
             if page < Self.pages - 1 {
                 Button("Skip") { done(play: false) }
-                    .font(.body.weight(.semibold))
+                    .font(.app(.body, weight: .semibold))
             }
         }
         .foregroundStyle(.secondary)
@@ -103,7 +103,7 @@ struct WelcomeFlow: View {
                 if last { done(play: canStartGame) } else { page += 1 }
             } label: {
                 Text(primaryTitle)
-                    .font(.headline)
+                    .font(.app(.headline))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
             }
@@ -114,7 +114,7 @@ struct WelcomeFlow: View {
             .foregroundStyle(Color.black)
             if last, canStartGame {
                 Button("Look around first") { done(play: false) }
-                    .font(.subheadline.weight(.semibold))
+                    .font(.app(.subheadline, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 6)
             }
@@ -147,11 +147,11 @@ struct WelcomeFlow: View {
     private func heading(_ title: String, _ subtitle: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(.system(.largeTitle, design: .themed).weight(.bold))
+                .font(.app(.largeTitle, weight: .bold))
                 .fixedSize(horizontal: false, vertical: true)
             if let subtitle {
                 Text(subtitle)
-                    .font(.body)
+                    .font(.app(.body))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -214,7 +214,7 @@ struct WelcomeFlow: View {
                 }
             }
             Text("All of this is in Settings under How it works.")
-                .font(.footnote)
+                .font(.app(.footnote))
                 .foregroundStyle(.secondary)
         }
     }
@@ -234,9 +234,9 @@ private struct WelcomeRow: View {
                 .frame(width: 30)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.headline)
+                    .font(.app(.headline))
                 Text(text)
-                    .font(.subheadline)
+                    .font(.app(.subheadline))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -259,10 +259,10 @@ private struct ExperienceCard: View {
                 RivalPortrait(rival: level.level.rival, size: 40, glows: false)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(level.title)
-                        .font(.body.weight(.semibold))
+                        .font(.app(.body, weight: .semibold))
                         .foregroundStyle(.primary)
                     Text(level.detail)
-                        .font(.caption)
+                        .font(.app(.caption))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -292,7 +292,7 @@ private struct LookChip: View {
     var body: some View {
         Button(action: select) {
             Text(look.name)
-                .font(.subheadline.weight(.semibold))
+                .font(.app(.subheadline, weight: .semibold))
                 .foregroundStyle(isSelected ? accent : Color.primary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 11)
@@ -319,9 +319,9 @@ struct HouseRuleRow: View {
                 .frame(width: 30)
             VStack(alignment: .leading, spacing: 3) {
                 Text(rule.title)
-                    .font(.headline)
+                    .font(.app(.headline))
                 Text(rule.text)
-                    .font(.subheadline)
+                    .font(.app(.subheadline))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }

@@ -18,7 +18,7 @@ struct GradeBadge: View {
                     .font(.system(size: 17, weight: .bold))
             case .text(let text):
                 Text(text)
-                    .font(.system(size: 16, weight: .heavy, design: .themed))
+                    .font(.app(size: 16, weight: .heavy))
             }
         }
         .foregroundStyle(.black.opacity(0.8))

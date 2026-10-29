@@ -47,14 +47,14 @@ struct HomeTone {
     }
 }
 
-/// The home's type: New York for what you read as a title or a number on a scoresheet,
-/// SF Pro for everything you tap. All of it follows the reader's text size.
+/// The home's type, all Geist: semibold for what you read as a title, medium for a score,
+/// regular for everything else. All of it follows the reader's text size.
 enum HomeType {
-    static let section = Font.system(.title2, design: .serif, weight: .medium)
-    static let title = Font.system(.title3, design: .serif, weight: .medium)
-    static let score = Font.system(.body, design: .serif, weight: .medium)
+    static let section = Font.app(.title2, weight: .semibold)
+    static let title = Font.app(.title3, weight: .semibold)
+    static let score = Font.app(.body, weight: .medium)
     /// The date over a column, the way a newspaper's chess column is dated.
-    static let dateline = Font.system(.subheadline, design: .serif).italic()
+    static let dateline = Font.app(.subheadline)
 }
 
 /// One set of measures for every card, so all their edges and insides line up.
@@ -161,7 +161,7 @@ struct HomeIvoryButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(compact ? .subheadline.weight(.semibold) : .headline)
+            .font(compact ? .app(.subheadline, weight: .semibold) : .app(.headline))
             .foregroundStyle(tone.onIvory)
             .lineLimit(1)
             .minimumScaleFactor(0.85)
@@ -184,7 +184,7 @@ struct HomeGlassButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(compact ? .subheadline.weight(.semibold) : .headline.weight(.medium))
+            .font(compact ? .app(.subheadline, weight: .semibold) : .app(.headline, weight: .medium))
             .foregroundStyle(tone.ink)
             .lineLimit(1)
             .minimumScaleFactor(0.85)
@@ -252,9 +252,9 @@ struct HomeSectionHeader: View {
                     HStack(spacing: 3) {
                         Text(link)
                         Image(systemName: "chevron.forward")
-                            .font(.caption.weight(.semibold))
+                            .font(.app(.caption, weight: .semibold))
                     }
-                    .font(.subheadline.weight(.medium))
+                    .font(.app(.subheadline, weight: .medium))
                     .foregroundStyle(tone.metal)
                     .frame(minHeight: 44)
                     .contentShape(Rectangle())
@@ -262,7 +262,7 @@ struct HomeSectionHeader: View {
                 .buttonStyle(.plain)
             } else if let note {
                 Text(note)
-                    .font(dateline ? HomeType.dateline : .subheadline)
+                    .font(dateline ? HomeType.dateline : .app(.subheadline))
                     .foregroundStyle(tone.ink2)
                     .multilineTextAlignment(.trailing)
             }
@@ -294,16 +294,16 @@ struct HomeLinkRow: View {
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.body.weight(.semibold))
+                        .font(.app(.body, weight: .semibold))
                         .foregroundStyle(tone.ink)
                     Text(detail)
-                        .font(.subheadline)
+                        .font(.app(.subheadline))
                         .foregroundStyle(tone.ink2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: "chevron.forward")
-                    .font(.footnote.weight(.semibold))
+                    .font(.app(.footnote, weight: .semibold))
                     .foregroundStyle(tone.ink3)
             }
             .padding(.vertical, 13)

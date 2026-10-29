@@ -47,7 +47,7 @@ struct SettingsSheet: View {
                     section("Board") {
                         themeGrid(Self.looks)
                         Text("Rival boards")
-                            .font(.footnote.weight(.semibold))
+                            .font(.app(.footnote, weight: .semibold))
                             .foregroundStyle(.secondary)
                             .padding(.top, 6)
                         themeGrid(BoardTheme.rivals)
@@ -170,10 +170,10 @@ struct SettingsSheet: View {
                             HStack(spacing: 12) {
                                 IconTile(symbol: "info.circle", theme: theme)
                                 Text("Version")
-                                    .font(.body.weight(.semibold))
+                                    .font(.app(.body, weight: .semibold))
                                 Spacer(minLength: 0)
                                 Text(Self.version)
-                                    .font(.subheadline.monospacedDigit())
+                                    .font(.app(.subheadline).monospacedDigit())
                                     .foregroundStyle(.secondary)
                             }
                             .padding(.horizontal, 14)
@@ -217,7 +217,7 @@ struct SettingsSheet: View {
                          threeD: theme.sculptedLook != nil && sculpted3D)
                 .padding(.top, 6)
             Text("Live preview")
-                .font(.caption.weight(.semibold))
+                .font(.app(.caption, weight: .semibold))
                 .tracking(1.5)
                 .textCase(.uppercase)
                 .foregroundStyle(.secondary)
@@ -256,7 +256,7 @@ struct SettingsSheet: View {
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title.uppercased())
-                .font(.caption.weight(.semibold))
+                .font(.app(.caption, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .tracking(1)
             content()
@@ -434,7 +434,7 @@ private struct ThemeCard: View {
                         }
                     }
                 Text(option.name)
-                    .font(.headline)
+                    .font(.app(.headline))
                     .foregroundStyle(locked ? Color.secondary : Color.primary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -510,10 +510,10 @@ private struct ToggleRow: View {
                 IconTile(symbol: symbol, theme: theme)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.body.weight(.semibold))
+                        .font(.app(.body, weight: .semibold))
                     if let subtitle {
                         Text(subtitle)
-                            .font(.caption)
+                            .font(.app(.caption))
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -539,10 +539,10 @@ private struct PickerRow<Choice: View>: View {
             IconTile(symbol: symbol, theme: theme)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.body.weight(.semibold))
+                    .font(.app(.body, weight: .semibold))
                 if let subtitle {
                     Text(subtitle)
-                        .font(.caption)
+                        .font(.app(.caption))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -568,11 +568,11 @@ private struct LinkRowLabel: View {
         HStack(spacing: 12) {
             IconTile(symbol: symbol, theme: theme)
             Text(title)
-                .font(.body.weight(.semibold))
+                .font(.app(.body, weight: .semibold))
                 .foregroundStyle(Color.primary)
             Spacer(minLength: 0)
             Image(systemName: "chevron.right")
-                .font(.footnote.weight(.semibold))
+                .font(.app(.footnote, weight: .semibold))
                 .foregroundStyle(.tertiary)
         }
         .padding(.horizontal, 14)
@@ -680,29 +680,29 @@ struct LicensesView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Chess Game Killer is built on open source, and is open source itself under the GPL because it ships with Stockfish.")
-                    .font(.footnote)
+                    .font(.app(.footnote))
                     .foregroundStyle(.secondary)
                     .padding(.bottom, 4)
                 ForEach(Self.credits) { credit in
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(alignment: .firstTextBaseline) {
                             Text(credit.name)
-                                .font(.headline)
+                                .font(.app(.headline))
                             Spacer(minLength: 8)
                             Text(credit.license)
-                                .font(.caption.weight(.semibold))
+                                .font(.app(.caption, weight: .semibold))
                                 .foregroundStyle(theme.accent ?? .accentColor)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
                                 .background((theme.accent ?? .accentColor).opacity(0.14), in: Capsule())
                         }
                         Text(credit.detail)
-                            .font(.subheadline)
+                            .font(.app(.subheadline))
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                         Link(destination: credit.url) {
                             Label(linkTitle(credit), systemImage: "arrow.up.right")
-                                .font(.caption.weight(.semibold))
+                                .font(.app(.caption, weight: .semibold))
                         }
                         .padding(.top, 2)
                     }
@@ -713,7 +713,7 @@ struct LicensesView: View {
                 }
                 Link(destination: URL(string: "https://github.com/lexdiamondhq-ai/chess-game-killer")!) {
                     Label("Chess Game Killer source code", systemImage: "chevron.left.forwardslash.chevron.right")
-                        .font(.subheadline.weight(.semibold))
+                        .font(.app(.subheadline, weight: .semibold))
                 }
                 .padding(.top, 8)
             }

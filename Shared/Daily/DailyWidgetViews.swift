@@ -72,7 +72,7 @@ struct DailyWidgetView: View {
             HStack(spacing: 4) {
                 flame
                 Text("\(entry.streak)")
-                    .font(.system(.subheadline, design: .serif, weight: .semibold).monospacedDigit())
+                    .font(.app(.subheadline, weight: .semibold).monospacedDigit())
                     .foregroundStyle(DailyPalette.ink)
                 Spacer(minLength: 4)
                 check
@@ -93,23 +93,23 @@ struct DailyWidgetView: View {
                     .tracking(0.8)
                     .foregroundStyle(DailyPalette.gold)
                 Text(entry.puzzle?.headline ?? "A new puzzle every day.")
-                    .font(.system(.headline, design: .serif, weight: .medium))
+                    .font(.app(.headline, weight: .medium))
                     .foregroundStyle(DailyPalette.ink)
                     .lineLimit(3)
                     .minimumScaleFactor(0.85)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(entry.puzzle.map { "\(entry.weekday) · \($0.difficulty)" } ?? entry.weekday)
-                    .font(.caption)
+                    .font(.app(.caption))
                     .foregroundStyle(DailyPalette.ink.opacity(0.6))
                 Spacer(minLength: 2)
                 HStack(spacing: 5) {
                     flame
                     Text(entry.streakLine)
-                        .font(.caption.weight(.semibold))
+                        .font(.app(.caption, weight: .semibold))
                         .foregroundStyle(DailyPalette.ink)
                 }
                 Text(entry.statusLine)
-                    .font(.caption2)
+                    .font(.app(.caption2))
                     .foregroundStyle(entry.doneToday ? DailyPalette.gold : DailyPalette.ink.opacity(0.6))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -130,7 +130,7 @@ struct DailyWidgetView: View {
 
     private var flame: some View {
         Image(systemName: "flame.fill")
-            .font(.caption.weight(.bold))
+            .font(.app(.caption, weight: .bold))
             .foregroundStyle(entry.streak > 0 ? DailyPalette.gold : DailyPalette.ink.opacity(0.35))
     }
 
@@ -138,11 +138,11 @@ struct DailyWidgetView: View {
     private var check: some View {
         if entry.doneToday {
             Image(systemName: "checkmark.circle.fill")
-                .font(.caption.weight(.bold))
+                .font(.app(.caption, weight: .bold))
                 .foregroundStyle(DailyPalette.gold)
         } else if let puzzle = entry.puzzle {
             Text("No. \(puzzle.number)")
-                .font(.caption2.weight(.semibold).monospacedDigit())
+                .font(.app(.caption2, weight: .semibold).monospacedDigit())
                 .foregroundStyle(DailyPalette.ink.opacity(0.6))
         }
     }
@@ -154,7 +154,7 @@ struct DailyWidgetView: View {
             Image(systemName: entry.doneToday ? "flame.fill" : "flame")
                 .font(.system(size: 15, weight: .bold))
             Text("\(entry.streak)")
-                .font(.system(.title3, design: .rounded, weight: .bold).monospacedDigit())
+                .font(.app(.title3, weight: .bold).monospacedDigit())
                 .minimumScaleFactor(0.6)
         }
         .accessibilityElement(children: .ignore)
@@ -167,12 +167,12 @@ struct DailyWidgetView: View {
                 Image(systemName: entry.doneToday ? "flame.fill" : "flame")
                 Text(entry.streakLine)
             }
-            .font(.headline)
+            .font(.app(.headline))
             Text(entry.puzzle?.headline ?? "Today's Move")
-                .font(.caption)
+                .font(.app(.caption))
                 .lineLimit(1)
             Text(entry.statusLine)
-                .font(.caption)
+                .font(.app(.caption))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

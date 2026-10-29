@@ -61,7 +61,7 @@ struct HomeDock: View {
                 Glyph(name: door.glyph, size: icon)
                 if !compact {
                     Text(door.title)
-                        .font(.caption2.weight(.medium))
+                        .font(.app(.caption2, weight: .medium))
                         .lineLimit(1)
                         .fixedSize()
                 }
@@ -105,7 +105,7 @@ struct HomeYouPanel: View {
                 Spacer(minLength: 0)
                 Button(action: close) {
                     Image(systemName: "xmark")
-                        .font(.body.weight(.semibold))
+                        .font(.app(.body, weight: .semibold))
                         .foregroundStyle(tone.ink2)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
@@ -178,7 +178,7 @@ struct HomePullCue: View {
             }
             .frame(width: 26, height: 26)
             Text("You")
-                .font(.footnote.weight(.semibold))
+                .font(.app(.footnote, weight: .semibold))
                 .foregroundStyle(full ? tone.metal : tone.ink)
         }
         .padding(.leading, 5)

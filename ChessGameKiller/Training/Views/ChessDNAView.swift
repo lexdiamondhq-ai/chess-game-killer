@@ -12,12 +12,12 @@ struct ChessDNACard: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline) {
                 Text("YOUR CHESS DNA")
-                    .font(.system(.caption, design: .themed).weight(.bold))
+                    .font(.app(.caption, weight: .bold))
                     .tracking(1)
                     .foregroundStyle(theme.trainingAccent)
                 Spacer()
                 Text(ChessDNAView.basis(dna))
-                    .font(.system(.footnote, design: .themed))
+                    .font(.app(.footnote))
                     .foregroundStyle(.secondary)
             }
             DNAStyleHeader(dna: dna, theme: theme, compact: true)
@@ -38,11 +38,11 @@ struct ChessDNACard: View {
             }
             HStack {
                 Text("See your Chess DNA")
-                    .font(.system(.subheadline, design: .themed).weight(.semibold))
+                    .font(.app(.subheadline, weight: .semibold))
                     .foregroundStyle(theme.trainingAccent)
                 Spacer()
                 Image(systemName: "chevron.right")
-                    .font(.caption.weight(.bold))
+                    .font(.app(.caption, weight: .bold))
                     .foregroundStyle(.tertiary)
                     .accessibilityHidden(true)
             }
@@ -91,7 +91,7 @@ struct ChessDNAView: View {
                 }
             }
             Text(Self.footnote(dna))
-                .font(.system(.footnote, design: .themed))
+                .font(.app(.footnote))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 4)
@@ -185,7 +185,7 @@ struct ChessDNAView: View {
     private var growthCard: some View {
         if dna.trends.isEmpty && dna.accuracyTrend == nil {
             Text("After \(ChessDNA.minimumTrendWindow * 2) games I can show you what's improving: your newest games against the ones before them.")
-                .font(.system(.subheadline, design: .themed))
+                .font(.app(.subheadline))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(18)
@@ -204,7 +204,7 @@ struct ChessDNAView: View {
                                 better: trend.improved, worse: trend.worse, theme: theme)
                 }
                 Text("Costly moves a game: your last games against the ones before them.")
-                    .font(.system(.caption, design: .themed))
+                    .font(.app(.caption))
                     .foregroundStyle(.secondary)
             }
             .padding(18)
@@ -256,9 +256,9 @@ struct DNAStyleHeader: View {
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.system(compact ? .title3 : .title2, design: .themed).weight(.bold))
+                    .font(.app(compact ? .title3 : .title2, weight: .bold))
                 Text(detail)
-                    .font(.system(.subheadline, design: .themed))
+                    .font(.app(.subheadline))
                     .foregroundStyle(.secondary)
                     .lineLimit(compact ? 3 : nil)
                     .fixedSize(horizontal: false, vertical: true)
@@ -303,10 +303,10 @@ struct DNATraitBar: View {
         VStack(alignment: .leading, spacing: 5) {
             HStack {
                 Text(trait.kind.title)
-                    .font(.system(.subheadline, design: .themed).weight(.semibold))
+                    .font(.app(.subheadline, weight: .semibold))
                 Spacer()
                 Text(trait.word)
-                    .font(.system(.caption, design: .themed).weight(.bold))
+                    .font(.app(.caption, weight: .bold))
                     .foregroundStyle(trait.value == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(theme.trainingAccent))
             }
             track
@@ -316,7 +316,7 @@ struct DNATraitBar: View {
                     Spacer()
                     Text(trait.kind.ends.high)
                 }
-                .font(.system(.caption2, design: .themed))
+                .font(.app(.caption2))
                 .foregroundStyle(.tertiary)
             }
         }
@@ -366,11 +366,11 @@ struct DNAChip: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
                 Text(label)
-                    .font(.system(size: 10, weight: .heavy, design: .themed))
+                    .font(.app(size: 10, weight: .heavy))
                     .tracking(0.8)
                     .foregroundStyle(tint)
                 Text(title)
-                    .font(.system(.footnote, design: .themed).weight(.semibold))
+                    .font(.app(.footnote, weight: .semibold))
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -398,16 +398,16 @@ struct DNAFocusCard<Action: View>: View {
                 Image(systemName: symbol)
                     .font(.system(size: 13, weight: .bold))
                 Text(label)
-                    .font(.system(.caption, design: .themed).weight(.bold))
+                    .font(.app(.caption, weight: .bold))
                     .tracking(1)
             }
             .foregroundStyle(tint)
             .accessibilityElement(children: .combine)
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.system(.title3, design: .themed).weight(.bold))
+                    .font(.app(.title3, weight: .bold))
                 Text(detail)
-                    .font(.system(.subheadline, design: .themed))
+                    .font(.app(.subheadline))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -453,18 +453,18 @@ struct DNATrendRow: View {
                 .frame(width: 20)
                 .accessibilityHidden(true)
             Text(title)
-                .font(.system(.subheadline, design: .themed).weight(.medium))
+                .font(.app(.subheadline, weight: .medium))
                 .lineLimit(1)
             Spacer()
             Text(before)
-                .font(.system(.subheadline, design: .themed).monospacedDigit())
+                .font(.app(.subheadline).monospacedDigit())
                 .foregroundStyle(.secondary)
             Image(systemName: arrow)
-                .font(.caption.weight(.bold))
+                .font(.app(.caption, weight: .bold))
                 .foregroundStyle(tint)
                 .accessibilityHidden(true)
             Text(now)
-                .font(.system(.subheadline, design: .themed).weight(.bold).monospacedDigit())
+                .font(.app(.subheadline, weight: .bold).monospacedDigit())
                 .foregroundStyle(tint)
         }
         .accessibilityElement(children: .ignore)
@@ -486,16 +486,16 @@ struct DNAOpeningRow: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(record.family)
-                    .font(.system(.subheadline, design: .themed).weight(.semibold))
+                    .font(.app(.subheadline, weight: .semibold))
                     .lineLimit(1)
                 Text(caption)
-                    .font(.system(.caption, design: .themed))
+                    .font(.app(.caption))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Text(record.tally)
-                .font(.system(.subheadline, design: .themed).weight(.bold).monospacedDigit())
+                .font(.app(.subheadline, weight: .bold).monospacedDigit())
                 .foregroundStyle(record.score >= 0.5 ? AnyShapeStyle(theme.trainingAccent) : AnyShapeStyle(.secondary))
         }
         .padding(.horizontal, 16)
@@ -528,11 +528,11 @@ struct LearnedAboutYouRow: View {
                     CoachAvatar(theme: theme, size: 34)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("\(Coach.current.name.uppercased()) LEARNED")
-                            .font(.system(size: 10, weight: .heavy, design: .themed))
+                            .font(.app(size: 10, weight: .heavy))
                             .tracking(0.8)
                             .foregroundStyle(theme.trainingAccent)
                         Text(line)
-                            .font(.system(.subheadline, design: .themed).weight(.medium))
+                            .font(.app(.subheadline, weight: .medium))
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 0)

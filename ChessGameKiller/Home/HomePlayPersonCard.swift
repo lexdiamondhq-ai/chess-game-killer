@@ -40,7 +40,7 @@ struct HomePlayPersonCard: View {
                         .fill(tone.metal)
                         .frame(width: 6, height: 6)
                     Text("\(waiting) waiting")
-                        .font(.footnote)
+                        .font(.app(.footnote))
                         .foregroundStyle(tone.ink2)
                         .contentTransition(.numericText())
                 }
@@ -101,7 +101,7 @@ struct HomePlayFace<Art: View>: View {
                     .font(HomeType.score)
                     .foregroundStyle(tone.ink)
                 Text(line)
-                    .font(.footnote)
+                    .font(.app(.footnote))
                     .foregroundStyle(tone.ink2)
                     .fixedSize(horizontal: false, vertical: true)
             }
