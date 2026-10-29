@@ -26,7 +26,10 @@ repository root with Blender's Python module (`pip install bpy==5.2.2 numpy scip
    Next to each picture goes `mask/<name>.png`, the piece alone, for the finishing step. `--res 50` renders
    at half size for quick tests and `--light tweaks.json` tries other light levels or finishes.
 5. `python scripts/sculpted/env.py` draws the studio light tent the pieces reflect, and `env_studio.py` the dark
-   studio (a few soft boxes in a near-black room) used by the richer looks. `marble.py looks/m-<name>.json out.png`
+   studio (a few soft boxes in a near-black room) used by the richer looks. With `--above` each draws its version
+   for the flat view (`sculpted-env-above`, `sculpted-env-studio-above`): seen from straight above, the polished
+   board mirrors whatever is overhead, so `env_above.py` moves the overhead light out to a ring around the camera,
+   with as much light falling on the board, under a dark ceiling. `marble.py looks/m-<name>.json out.png`
    draws a look's stone squares, and `flat_art.py <squares.jpg> <board.jpg> [line hex]` its flat board picture
    (Noir uses the champagne line CCB88F, Gilded and Portoro the gold DDB06C; copy to `Assets.xcassets/Boards/board-<look>.imageset`).
    A spec with `"crisp": true` draws even, sharp-edged veins: Gilded's brown marble with black veins

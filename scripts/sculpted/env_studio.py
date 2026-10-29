@@ -2,7 +2,7 @@
 # overhead, four tall soft boxes on the diagonals and thin low strips, all in a near-black room, so
 # polished surfaces show deep color with crisp highlights instead of a grey sheen.
 # Symmetric under quarter turns and mirrors, so it reads the same whichever way the engine maps it.
-import sys
+import os, sys
 import numpy as np
 from PIL import Image
 W,H=2048,1024
@@ -24,5 +24,12 @@ for a in (45,135,225,315):
     img+=box(a,30,26,30,0.85,0.35)
     img+=box(a+45,9,5,14,0.6,0.45)
 img=np.clip(img,0,1)
+# --above: the same studio for the flat view, seen from straight above (env_above.py).
+args=[a for a in sys.argv[1:] if a!='--above']
+if '--above' in sys.argv:
+    sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)))
+    from env_above import above
+    img=above(img,el*np.ones_like(az))
 rgb=np.stack([img*0.99,img*0.99,img],-1)
-Image.fromarray((np.clip(rgb,0,1)**(1/2.2)*255+0.5).astype(np.uint8)).save(sys.argv[1] if len(sys.argv) > 1 else "build/sculpted/out/sculpted-env-studio.png",optimize=True)
+out=args[0] if args else "build/sculpted/out/sculpted-env-studio%s.png"%('-above' if '--above' in sys.argv else '')
+Image.fromarray((np.clip(rgb,0,1)**(1/2.2)*255+0.5).astype(np.uint8)).save(out,optimize=True)

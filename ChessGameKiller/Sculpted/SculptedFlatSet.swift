@@ -1,5 +1,6 @@
 import ChessKit
 import SceneKit
+import UIKit
 
 /// The pieces for the flat board, seen from straight above: the familiar shapes cut solid from
 /// the look's stone, on a fine foot of its metal, with their inner lines drawn on top (dark on
@@ -38,8 +39,18 @@ enum SculptedFlatSet {
         return (reach, height)
     }
 
+    /// The glow of the flat pieces' metal, which the fine line round the squares takes too in the
+    /// flat view. From straight above the flat tops face the studio's dark ceiling
+    /// (`SculptedLook.studioAbove`) and reflect little, so a brighter glow than the carved pieces'
+    /// keeps the feet and lines gold, or platinum, rather than a dull brown or grey.
+    static func glow(_ look: SculptedLook) -> UIColor {
+        guard let glow = look.metalGlow else { return scaled(look.platinum, by: 0.5) }
+        return scaled(glow, by: 1.6)
+    }
+
     private static var loaded: [Piece.Kind: [SculptedAssets.Part]]?
     private static var templates: [String: SCNNode] = [:]
+    private static var metals: [String: SCNMaterial] = [:]
 
     private static var meshes: [Piece.Kind: [SculptedAssets.Part]]? {
         if let set = loaded { return set }
@@ -54,14 +65,30 @@ enum SculptedFlatSet {
     private static func material(_ finish: SculptedAssets.Finish, color: Piece.Color, look: SculptedLook) -> SCNMaterial {
         let assets = SculptedAssets.shared
         switch finish {
+        case .metal where color == .white && look.ivoryMetal != nil:
+            // The look marks its ivory pieces in a dark metal: so does the ivory's foot.
+            return assets.material(.metal, for: .white, look: look)
         case .metal:
-            return assets.material(.metal, for: color, look: look)
+            return metal(look)
         case .gem:
-            return color == .white
-                ? assets.material(.body, for: .black, look: look)
-                : assets.material(.metal, for: .black, look: look)
+            return color == .white ? assets.material(.body, for: .black, look: look) : metal(look)
         default:
             return assets.material(.body, for: color, look: look)
         }
+    }
+
+    /// The look's metal with the flat set's brighter glow.
+    private static func metal(_ look: SculptedLook) -> SCNMaterial {
+        if let made = metals[look.name] { return made }
+        let made = SculptedAssets.pbr(look.platinum, roughness: look.metalRoughness, metalness: 1)
+        made.emission.contents = glow(look)
+        metals[look.name] = made
+        return made
+    }
+
+    private static func scaled(_ color: UIColor, by factor: CGFloat) -> UIColor {
+        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+        color.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        return UIColor(red: min(red * factor, 1), green: min(green * factor, 1), blue: min(blue * factor, 1), alpha: alpha)
     }
 }
