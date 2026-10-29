@@ -135,7 +135,9 @@ struct HomeTodayCard: View {
             }
             .buttonStyle(.plain)
             .accessibilityHidden(true)
-            .padding(.vertical, 12)
+            // Room above for the back rank's crowns and crosses, which stand taller than a square.
+            .padding(.top, 26)
+            .padding(.bottom, 12)
             HStack(alignment: .center, spacing: 12) {
                 Text(puzzle.title)
                     .font(HomeType.title)
