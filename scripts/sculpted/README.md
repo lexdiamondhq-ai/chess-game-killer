@@ -47,10 +47,6 @@ repository root with Blender's Python module (`pip install bpy==5.2.2 numpy scip
 
 7. The flat view's pieces (the board seen from above): `flat/build.py` builds the Icon set
    (`Sculpted/flat-icon.dataset`) and `flat/preview.py` shows a set under the app's light first.
-   `flat/glass.py -- <out dir>` draws the glass tiles (Crystal) as pictures, since SceneKit can't draw that
-   glass: each tile rendered alone in the concept render's glass and light, from the flat view's 80 degrees
-   without perspective, 512 px across, its top and the sliver of near side the view sees (copy to
-   `Assets.xcassets/Crystal/glass-*.imageset`). The pieces come from the masks in `flat/crystal-masks`.
 
 `pieces.py` holds the turned pieces (lathe profiles, flutes, booleans), `gilded.py` the gilded set
 (stepped bases, gold bands and crowns, the striped-mane knight), `board.py` the marble, frame and inlay.

@@ -10,10 +10,8 @@ enum SculptedFlatSet {
     /// The meshes' asset name.
     static let assetName = "flat-icon"
 
-    /// A new piece in the look's finishes, or nil if the meshes are missing. A glass tile while
-    /// the Crystal tiles are being compared (`SculptedCrystal.isOn`).
+    /// A new piece in the look's finishes, or nil if the meshes are missing.
     static func makePiece(_ kind: Piece.Kind, color: Piece.Color, look: SculptedLook) -> SCNNode? {
-        if SculptedCrystal.isOn { return SculptedCrystal.makePiece(kind, color: color, look: look) }
         guard let parts = meshes?[kind] else { return nil }
         let key = "\(look.name)-\(color.rawValue)\(kind)"
         if let template = templates[key] { return template.clone() }
@@ -32,10 +30,6 @@ enum SculptedFlatSet {
     /// How far the piece reaches from its square's center across the board, and how tall it
     /// is, in squares. Zero if the meshes are missing.
     static func extent(of kind: Piece.Kind) -> (reach: Float, height: Float) {
-        if SculptedCrystal.isOn {
-            let tile = SculptedCrystal.size(of: kind)
-            return (Float(tile.width) / 2, Float(tile.height))
-        }
         var reach: Float = 0, height: Float = 0
         for part in meshes?[kind] ?? [] {
             let (low, high) = part.geometry.boundingBox

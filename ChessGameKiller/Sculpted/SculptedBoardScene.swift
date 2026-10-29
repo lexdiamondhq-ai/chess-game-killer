@@ -104,9 +104,6 @@ final class SculptedSceneKitView: SCNView {
 /// Legal moves and the coach's hints are marks on the stone, never arrows.
 final class SculptedBoardScene {
     static let pieceCategory = 1 << 1
-    /// Where the key light hangs, seen from White's side: high on the player's left, a little
-    /// toward the player. It turns with the camera (`rig`).
-    static let keyPosition = SIMD3<Float>(-6, 9, 5)
 
     let view: SculptedSceneKitView
     private let scene = SCNScene()
@@ -908,7 +905,6 @@ final class SculptedBoardScene {
         keyLight?.intensity = look.key * (dimmed ? 0.5 : 1)
         rimLight?.intensity = look.rim * (dimmed ? 0.6 : 1)
         scene.lightingEnvironment.intensity = look.environment * (dimmed ? 0.55 : 1)
-        SculptedCrystal.dim(dimmed)
         SCNTransaction.commit()
     }
 
@@ -1535,7 +1531,7 @@ final class SculptedBoardScene {
         let keyNode = SCNNode()
         keyNode.light = key
         keyLight = key
-        keyNode.simdPosition = Self.keyPosition
+        keyNode.simdPosition = SIMD3(-6, 9, 5)
         keyNode.simdLook(at: .zero, up: SculptedCamera.up, localFront: SCNNode.simdLocalFront)
         rig.addChildNode(keyNode)
 
