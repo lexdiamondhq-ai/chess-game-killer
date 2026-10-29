@@ -58,6 +58,8 @@ final class PuzzleStore {
     private(set) var upNext: LichessPuzzle?
     /// The last puzzle served, so the next one picked is a different one even before it is played.
     @ObservationIgnored private var lastServed: String?
+    /// Told about every rated puzzle recorded, for the daily streak (three solved make a day).
+    @ObservationIgnored var onRated: ((Outcome) -> Void)?
 
     private let fileURL: URL?
     private let cyclesURL: URL?
@@ -177,6 +179,7 @@ final class PuzzleStore {
         }
         remember(puzzle.id)
         save()
+        onRated?(outcome)
         return change
     }
 

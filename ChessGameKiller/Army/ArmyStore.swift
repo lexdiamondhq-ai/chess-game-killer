@@ -149,6 +149,8 @@ struct PieceRecord: Codable, Equatable {
     var trophies: Set<Int> = []
     /// Times it was taken prisoner while on the line and won back.
     var escapes = 0
+    /// Daily streaks it carries the mark of, in days (7, 30, 100, 365): a mark for good.
+    var streakMarks: Set<Int> = []
 
     var rank: ArmyRank { .forXP(xp) }
 
@@ -175,7 +177,7 @@ struct PieceRecord: Codable, Equatable {
 
     private enum CodingKeys: String, CodingKey {
         case name, games, wins, survivedWins, captures, captureValue, mates, promotions, falls, xp
-        case honors, takenBy, revenge, trophies, escapes
+        case honors, takenBy, revenge, trophies, escapes, streakMarks
     }
 
     init(from decoder: Decoder) throws {
@@ -197,6 +199,7 @@ struct PieceRecord: Codable, Equatable {
         revenge = try c.decodeIfPresent(Set<Int>.self, forKey: .revenge) ?? []
         trophies = try c.decodeIfPresent(Set<Int>.self, forKey: .trophies) ?? []
         escapes = try c.decodeIfPresent(Int.self, forKey: .escapes) ?? 0
+        streakMarks = try c.decodeIfPresent(Set<Int>.self, forKey: .streakMarks) ?? []
     }
 }
 
@@ -260,6 +263,8 @@ struct ArmyNews: Identifiable, Equatable {
         case captured(rival: String)
         /// A win against the rival holding it set it free.
         case rescued(rival: String)
+        /// The daily streak reached this many days, and this piece carries the mark.
+        case streakMark(days: Int)
     }
 
     let slot: ArmySlot
@@ -280,6 +285,7 @@ struct ArmyNews: Identifiable, Equatable {
         case .wonStake: return "TROPHY"
         case .captured: return "TAKEN PRISONER"
         case .rescued: return "RESCUED"
+        case .streakMark(let days): return "\(days)-DAY MARK"
         }
     }
 
@@ -297,6 +303,8 @@ struct ArmyNews: Identifiable, Equatable {
             return "\(rival) is holding \(name). Beat \(rival) to get it back."
         case .rescued(let rival):
             return "\(name) escaped from \(rival)."
+        case .streakMark(let days):
+            return "\(name) carries your \(days)-day streak mark."
         case .promoted:
             switch rank {
             case .veteran: return "Your \(slot.title.lowercased()) earned a name: \(name)"
@@ -312,6 +320,7 @@ struct ArmyNews: Identifiable, Equatable {
         switch kind {
         case .captured: return 40
         case .rescued: return 35
+        case .streakMark: return 32
         case .wonStake: return 30
         case .revenge: return 25
         case .grudge, .staked: return 0
@@ -397,6 +406,30 @@ final class ArmyStore {
     }
 
     // MARK: Reading
+
+    /// The piece with the most experience (the king never fights alone, so it counts too), and
+    /// its name: the army's face on the widget. Nil before any game.
+    var hero: (slot: ArmySlot, name: String, rank: ArmyRank)? {
+        guard let best = ArmySlot.allCases.max(by: { record(for: $0).xp < record(for: $1).xp }),
+              record(for: best).xp > 0 else { return nil }
+        return (best, displayName(of: best), record(for: best).rank)
+    }
+
+    // MARK: Daily streak marks
+
+    /// Marks a daily streak milestone on a piece for good: the piece with the most experience
+    /// that doesn't carry this mark yet. Answers the news, or nil when every piece has it.
+    @discardableResult
+    func markStreak(days: Int) -> ArmyNews? {
+        let unmarked = ArmySlot.allCases.filter { !record(for: $0).streakMarks.contains(days) }
+        // The most experienced first; on a tie, the order of the slots (the queen's rook before the king's).
+        guard let slot = unmarked.max(by: { record(for: $0).xp < record(for: $1).xp }) else { return nil }
+        var piece = record(for: slot)
+        piece.streakMarks.insert(days)
+        army.records[slot] = piece
+        save()
+        return ArmyNews(slot: slot, rank: piece.rank, name: displayName(of: slot), kind: .streakMark(days: days))
+    }
 
     func record(for slot: ArmySlot) -> PieceRecord {
         army.records[slot] ?? PieceRecord()

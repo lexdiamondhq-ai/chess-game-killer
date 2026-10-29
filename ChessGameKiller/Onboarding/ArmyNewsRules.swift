@@ -11,6 +11,8 @@ extension ArmyNews {
             return "Win: double XP and a trophy. Lose: \(rival) keeps \(name) until you win it back."
         case .captured:
             return "Until then it earns no XP."
+        case .streakMark:
+            return "A mark for good, for playing every day."
         case .promoted, .revenge, .wonStake, .rescued:
             return nil
         }

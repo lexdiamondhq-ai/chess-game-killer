@@ -29,6 +29,8 @@ final class TrainingStore {
     /// The content as written, in Leo's words.
     private let baseLibrary: TrainingLibrary?
     @ObservationIgnored private let coach: CoachChoice
+    /// Told when a lesson or a session is finished, for the daily streak.
+    @ObservationIgnored var onFinished: (() -> Void)?
 
     private let fileURL: URL?
     private let calendar: Calendar
@@ -234,14 +236,18 @@ final class TrainingStore {
     func completeLesson(_ id: String, at date: Date = .now) -> TrainingReward {
         let firstTime = progress.lessonsDone[id] == nil
         progress.lessonsDone[id] = date
-        return earn(firstTime ? Trainer.lessonXP : 10, at: date)
+        let reward = earn(firstTime ? Trainer.lessonXP : 10, at: date)
+        onFinished?()
+        return reward
     }
 
     @discardableResult
     func finishSession(accuracy: Double, at date: Date = .now) -> TrainingReward {
         progress.sessionsDone += 1
         progress.lastAccuracy = accuracy
-        return earn(Trainer.sessionXP, at: date)
+        let reward = earn(Trainer.sessionXP, at: date)
+        onFinished?()
+        return reward
     }
 
     /// Saves a position from a game to practice later. False if it's already saved.

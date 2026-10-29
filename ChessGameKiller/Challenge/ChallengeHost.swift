@@ -10,7 +10,12 @@ struct ChallengeHost: ViewModifier {
     func body(content: Content) -> some View {
         content
             .onOpenURL { url in
-                center?.open(url)
+                // The Today's Move widget opens the game screen's daily puzzle; every other link is a challenge.
+                if DailyLink.matches(url) {
+                    DailyLink.open()
+                } else {
+                    center?.open(url)
+                }
             }
             // Universal links, once the server serves the association file.
             .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in

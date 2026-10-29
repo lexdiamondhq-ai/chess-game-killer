@@ -13,6 +13,7 @@
 
 import { DurableObject } from "cloudflare:workers";
 import * as lobby from "./lobby.js";
+import * as daily from "./daily.js";
 import { ERROR_STATUS, errorBody, hashToken, newCode, newToken, readConfig } from "./util.js";
 
 function reply(status, body) {
@@ -59,6 +60,19 @@ export class Lobby extends DurableObject {
 
   // -------------------------------------------------------------------------
   // Calls from the router
+
+  /**
+   * Today's Move: counts a player's try once a day and answers the day's tally
+   * for that puzzle, { players, found }. A second report the same day changes nothing.
+   */
+  async dailyReport({ day, puzzle, playerHash, found }) {
+    const key = daily.tallyKey(day, puzzle);
+    const mark = daily.playerKey(day, playerHash);
+    const seen = (await this.ctx.storage.get(mark)) !== undefined;
+    const tally = daily.counted(await this.ctx.storage.get(key), { found, seen });
+    if (!seen) await this.ctx.storage.put({ [key]: tally, [mark]: 1 });
+    return reply(200, tally);
+  }
 
   async list() {
     const now = Date.now();

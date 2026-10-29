@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 @main
 struct ChessGameKillerApp: App {
@@ -11,6 +12,8 @@ struct ChessGameKillerApp: App {
         LookIntroduction.applyOnce()
         HintsIntroduction.applyOnce()
         showcase = Showcase.fromLaunchArguments()
+        // A tapped daily reminder opens Today's Move.
+        UNUserNotificationCenter.current().delegate = DailyNotificationDelegate.shared
     }
 
     var body: some Scene {
