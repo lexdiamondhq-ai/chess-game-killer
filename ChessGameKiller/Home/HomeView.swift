@@ -229,8 +229,8 @@ struct HomeView: View {
 
     @ViewBuilder
     private func sections(upNext: HomeUpNext) -> some View {
-        // Challenge a friend, sealed like an adjourned move, right under the clock, then Play
-        // online; friend games still going follow them, your move first.
+        // Play a person (online, or a friend by link) right under the clock; friend games
+        // still going follow it, your move first.
         friends(challenges?.store.sorted.filter { !$0.isOver } ?? [])
 
         // Dated like a newspaper's chess column; it turns over at midnight with the page open.
@@ -264,16 +264,14 @@ struct HomeView: View {
         }
     }
 
-    /// The way to start a game with a friend, then the ones going. Challenge a friend opens
+    /// The way to start a game with a person, then the friend games going. A friend opens
     /// the composer, which lists every friend game too.
     @ViewBuilder
     private func friends(_ games: [FriendGame]) -> some View {
         if let challenges {
             VStack(spacing: 10) {
-                HomeChallengeCard(tone: tone) { challenges.compose() }
-                HomeOnlineCard(tone: tone, pieceTheme: pieceTheme, waiting: challenges.onlineWaiting) {
-                    challenges.playOnline()
-                }
+                HomePlayPersonCard(tone: tone, pieceTheme: pieceTheme, waiting: challenges.onlineWaiting,
+                                   online: { challenges.playOnline() }, friend: { challenges.compose() })
                 if !games.isEmpty {
                     HomeFriendsCard(games: games, tone: tone, open: { challenges.play($0) })
                 }
