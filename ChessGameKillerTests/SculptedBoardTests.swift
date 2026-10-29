@@ -184,6 +184,23 @@ final class SculptedBoardTests: XCTestCase {
         }
     }
 
+    /// The glass tiles, while they are compared with the Icon pieces: every piece has its picture,
+    /// as wide as the tile and as tall as the flat view sees it, laid on a tile of its own.
+    func testTheGlassTilesHaveTheirPictures() throws {
+        let elevation = CGFloat(SculptedCamera.Framing.seated.elevation)
+        for color in [Piece.Color.white, .black] {
+            for kind in [Piece.Kind.king, .queen, .rook, .bishop, .knight, .pawn] {
+                let name = SculptedCrystal.pictureName(kind, color: color)
+                let picture = try XCTUnwrap(UIImage(named: name), "\(name) is missing")
+                let (width, height) = SculptedCrystal.size(of: kind)
+                let seen = width * sin(elevation) + height * cos(elevation)
+                XCTAssertEqual(picture.size.height / picture.size.width, seen / width, accuracy: 0.005, name)
+                XCTAssertLessThan(width / 2 + SculptedCrystal.reach(of: kind), 0.5, "\(name) reaches out of its square")
+                XCTAssertEqual(SculptedCrystal.makePiece(kind, color: color, look: .gilded).childNodes.count, 2, name)
+            }
+        }
+    }
+
     /// The flat view looks straight down, so the polished board mirrors the top of its studio:
     /// under the soft box overhead the stone and the glass frame went milky. Seen from above, every
     /// look's studio has a dark ceiling; the tilted view keeps its soft box.
