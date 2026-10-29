@@ -146,26 +146,40 @@ final class SculptedBoardTests: XCTestCase {
         }
     }
 
-    /// Flat from above: a Crystal tile's top stays inside its own square on every square,
-    /// from both sides.
+    /// Flat from above: every flat piece's box stays inside its own square on every square, from
+    /// both sides.
     func testFlatPiecesStayInsideTheirSquares() {
         let framing = SculptedCamera.Framing.seated
         let size = CGSize(width: 402, height: 402 / framing.aspect)
+        let kinds: [Piece.Kind] = [.king, .queen, .rook, .bishop, .knight, .pawn]
+        // The widest and the tallest of the set, together: a box round all of it.
+        let extents = kinds.map { SculptedFlatSet.extent(of: $0) }
+        let half = extents.map { $0.reach }.max() ?? 0
+        let height = (extents.map { $0.height }.max() ?? 0) + 0.01
+        XCTAssertGreaterThan(half, 0.2, "the flat set loaded")
         for flipped in [false, true] {
             let camera = SculptedCamera.fitted(aspect: Float(size.width / size.height), flipped: flipped, framing: framing)
             for index in 0..<64 {
                 let square = Square(file: index % 8, rank: index / 8)
                 let center = SculptedCamera.position(of: square)
                 let outline = camera.frame(of: square, in: size).insetBy(dx: -0.5, dy: -0.5)
-                // Every corner of a full-size tile's top.
-                let (width, tall) = SculptedCrystal.size(of: .king)
-                let half = Float(width) / 2, height = Float(tall) + 0.01
                 for dz in [-half, half] {
                     for dx in [-half, half] {
                         let point = camera.screenPoint(center + SIMD3(dx, height, dz), in: size)
                         XCTAssertTrue(outline.contains(point), "\(square) flipped \(flipped)")
                     }
                 }
+            }
+        }
+    }
+
+    /// The flat set has all six pieces in both colors, each with its stone and its metal foot.
+    func testTheFlatSetHasAllSixPieces() throws {
+        for color in [Piece.Color.white, .black] {
+            for kind in [Piece.Kind.king, .queen, .rook, .bishop, .knight, .pawn] {
+                let node = try XCTUnwrap(SculptedFlatSet.makePiece(kind, color: color, look: .gilded), "\(color) \(kind)")
+                XCTAssertGreaterThanOrEqual(node.childNodes.count, 2, "\(color) \(kind)")
+                XCTAssertTrue(node.childNodes.allSatisfy { $0.geometry != nil }, "\(color) \(kind)")
             }
         }
     }
@@ -188,6 +202,25 @@ final class SculptedBoardTests: XCTestCase {
         XCTAssertEqual(BoardTilt.auto.framing(bigBoard: true), .seated)
         XCTAssertEqual(BoardTilt.tilted.framing(bigBoard: true), .standing)
         XCTAssertEqual(BoardTilt.flat.framing(bigBoard: false), .seated)
+    }
+
+    /// The switch under the board shows the view in play, and none while the board is 2D.
+    func testTheBoardViewSwitchShowsTheViewInPlay() {
+        XCTAssertEqual(BoardViewSwitch.showing(.gilded, threeD: true, framing: .standing), .tilted)
+        XCTAssertEqual(BoardViewSwitch.showing(.noir, threeD: true, framing: .seated), .flat)
+        XCTAssertNil(BoardViewSwitch.showing(.gilded, threeD: false, framing: .standing))
+        XCTAssertNil(BoardViewSwitch.showing(.classic, threeD: true, framing: .seated))
+    }
+
+    /// Picking Tilted or Flat always ends on a 3D board: a look without one moves to Gilded,
+    /// and a rival's board gives way to the player's own look.
+    func testPickingAViewAlwaysLandsOnA3DBoard() {
+        XCTAssertEqual(BoardViewSwitch.change(inPlay: .noir, chosen: .noir), .init())
+        XCTAssertEqual(BoardViewSwitch.change(inPlay: .classic, chosen: .classic), .init(look: .gilded))
+        XCTAssertEqual(BoardViewSwitch.change(inPlay: .spark, chosen: .midnight), .init(leavesRivalBoard: true))
+        XCTAssertEqual(BoardViewSwitch.change(inPlay: .spark, chosen: .neon), .init(leavesRivalBoard: true, look: .gilded))
+        XCTAssertEqual(BoardViewSwitch.change(inPlay: .pulse, chosen: .pulse), .init(look: .gilded))
+        XCTAssertNotNil(BoardTheme.gilded.sculptedLook)
     }
 
     func testEverySquareIsFoundUnderItsOwnCenter() {

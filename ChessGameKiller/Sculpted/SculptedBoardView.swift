@@ -54,7 +54,7 @@ struct SculptedBoardView: View {
     var endBrowsing: (() -> Void)?
     /// Ghost Vision, when the player can hold the board to see ahead.
     var vision: GhostVision?
-    /// Seen from the player's chair, or from above with Crystal tiles (Big Board).
+    /// Seen from the player's chair, or from above with the flat pieces (Big Board).
     var framing: SculptedCamera.Framing = .standing
 
     /// Width over height: the board seen at an angle is wider than it is tall.
