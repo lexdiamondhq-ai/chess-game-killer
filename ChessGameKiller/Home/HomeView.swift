@@ -31,9 +31,8 @@ struct HomeActions {
 /// it and moves in on your king while the glass cards rise over it and it slips out of focus.
 ///
 /// The page, top to bottom: a chess clock (resume your game, or start the next one), today's
-/// puzzle and session, the ladder of rivals and the scoresheet of your games. Challenge a
-/// friend sits right under the clock as a sealed envelope, with friend games still going
-/// below it. The glass dock holds the four doors. Your pieces, your games and Settings are in
+/// puzzle and session, the ladder of rivals and the scoresheet of your games. Play a person
+/// sits right under the clock, then Current games: every game still going, whose move it is. The glass dock holds the four doors. Your pieces, your games and Settings are in
 /// the You panel, from the dock or by pulling the board down. Each thing has one way in, so nothing is found twice.
 struct HomeView: View {
     let match: MatchController
@@ -233,9 +232,10 @@ struct HomeView: View {
 
     @ViewBuilder
     private func sections(upNext: HomeUpNext) -> some View {
-        // Play a person (online, or a friend by link) right under the clock; friend games
-        // still going follow it, your move first.
-        friends(challenges?.store.sorted.filter { !$0.isOver } ?? [])
+        // Play a person (online, or a friend by link) right under the clock, then every game
+        // still going, with whose move it is: yours first.
+        playPerson()
+        currentGames(upNext: upNext)
 
         // Dated like a newspaper's chess column; it turns over at midnight with the page open.
         TimelineView(.everyMinute) { context in
@@ -268,23 +268,48 @@ struct HomeView: View {
         }
     }
 
-    /// The way to start a game with a person, then the friend games going. A friend opens
-    /// the composer, which lists every friend game too.
+    /// The way to start a game with a person: online, or a friend by link.
     @ViewBuilder
-    private func friends(_ games: [FriendGame]) -> some View {
+    private func playPerson() -> some View {
         if let challenges {
-            VStack(spacing: 10) {
-                HomePlayPersonCard(tone: tone, pieceTheme: pieceTheme, waiting: challenges.onlineWaiting,
-                                   online: { challenges.playOnline() }, friend: { challenges.compose() })
-                if !games.isEmpty {
-                    HomeFriendsCard(games: games, tone: tone, open: { challenges.play($0) })
+            HomePlayPersonCard(tone: tone, pieceTheme: pieceTheme, waiting: challenges.onlineWaiting,
+                               online: { challenges.playOnline() }, friend: { challenges.compose() })
+                .padding(.top, 12)
+                .id("friends")
+                .task {
+                    // Keeps whose move it is up to date while the home is showing.
+                    while !Task.isCancelled {
+                        await challenges.refreshGames()
+                        await challenges.refreshOnlineCount()
+                        try? await Task.sleep(for: .seconds(ChallengeCenter.refreshInterval))
+                    }
                 }
-            }
-            .padding(.top, 12)
-            .id("friends")
-            .task {
-                await challenges.refreshGames()
-                await challenges.refreshOnlineCount()
+        }
+    }
+
+    /// Every game still going: the one against the computer, friend games and online games.
+    private func currentGameList(upNext: HomeUpNext) -> [HomeCurrentGame] {
+        var games: [HomeCurrentGame] = []
+        if let computer = HomeCurrentGame.computer(upNext, fen: match.game.fen) {
+            games.append(computer)
+        }
+        let friends = challenges?.store.sorted.filter { !$0.isOver } ?? []
+        games += friends.map(HomeCurrentGame.friend)
+        return HomeCurrentGame.sorted(games)
+    }
+
+    @ViewBuilder
+    private func currentGames(upNext: HomeUpNext) -> some View {
+        let games = currentGameList(upNext: upNext)
+        if !games.isEmpty {
+            HomeSectionHeader(title: "Current games", tone: tone, note: HomeCurrentGame.note(games))
+                .id("current")
+            HomeCurrentGamesCard(games: games, tone: tone, pieceTheme: pieceTheme) { game in
+                if let friend = game.friendGame {
+                    challenges?.play(friend)
+                } else {
+                    actions.resume()
+                }
             }
         }
     }
