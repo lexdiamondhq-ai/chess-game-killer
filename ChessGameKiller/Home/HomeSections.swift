@@ -6,11 +6,42 @@ import SwiftUI
 
 // MARK: - Today
 
-/// A real puzzle printed as a diagram, the way a chess column prints one, and today's
-/// session with Coach Leo. Solve opens Puzzles on this very puzzle; Start starts the session.
+/// Where the daily habit stands, for the Today card: the streak, what's done, and Today's Move.
+struct HomeDailyState: Equatable {
+    var streak = 0
+    var doneToday = false
+    /// Today's Move: its number, how hard, whether it was played and found.
+    var number = 0
+    var difficulty = ""
+    var played = false
+    var found = false
+    /// Rated puzzles solved today, toward the three that make a day.
+    var puzzlesToday = 0
+    /// "Ghost now carries your 7-day mark.", the day it's earned.
+    var mark: String?
+    /// "2 more days to your 7-day mark."
+    var nextMark: String?
+    /// Ask, once, after the first day done, whether to send a reminder.
+    var asksReminder = false
+
+    /// The line under the streak: what keeps it, or what it earned.
+    var detail: String {
+        if doneToday { return mark ?? nextMark ?? "Done for today. See you tomorrow." }
+        if puzzlesToday > 0 {
+            let left = DailyRules.puzzlesForTheDay - puzzlesToday
+            return "\(left) more \(left == 1 ? "puzzle" : "puzzles"), one game or Today's Move keeps it."
+        }
+        return streak > 0 ? "One game, Today's Move or 3 puzzles keeps it going."
+            : "One game, Today's Move or 3 puzzles starts a streak."
+    }
+}
+
+/// The day on the home: the streak, Today's Move printed as a diagram the way a chess column
+/// prints it (the same puzzle for every player), and today's session with Coach Leo.
+/// Solve opens Today's Move; Start starts the session.
 struct HomeTodayCard: View {
     let puzzle: HomePuzzle?
-    let rating: Int
+    let daily: HomeDailyState
     let plan: SessionPlan?
     let trainedToday: Bool
     let tone: HomeTone
@@ -18,9 +49,18 @@ struct HomeTodayCard: View {
     let solve: () -> Void
     let startSession: (SessionPlan) -> Void
     let train: () -> Void
+    /// Answers the reminder question: true to be reminded.
+    var remind: (Bool) -> Void = { _ in }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            streakBlock
+            if daily.asksReminder {
+                reminderBlock
+                    .padding(.top, 14)
+            }
+            HomeHairline(tone: tone)
+                .padding(.vertical, 16)
             puzzleBlock
             HomeHairline(tone: tone)
                 .padding(.vertical, 16)
@@ -30,55 +70,117 @@ struct HomeTodayCard: View {
         .homePane(RoundedRectangle(cornerRadius: HomeMetrics.cardRadius, style: .continuous), tone: tone)
     }
 
-    // MARK: The puzzle
+    // MARK: The streak
+
+    private var streakBlock: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "flame.fill")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(daily.streak > 0 ? tone.metal : tone.ink3)
+                    .symbolEffect(.bounce, value: daily.streak)
+                Text(streakTitle)
+                    .font(HomeType.title)
+                    .foregroundStyle(tone.ink)
+                    .contentTransition(.numericText(value: Double(daily.streak)))
+                Spacer(minLength: 8)
+                if daily.doneToday {
+                    Label("Done", systemImage: "checkmark.circle.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(tone.metal)
+                        .labelStyle(.titleAndIcon)
+                }
+            }
+            Text(daily.detail)
+                .font(.subheadline)
+                .foregroundStyle(daily.mark != nil && daily.doneToday ? tone.metal : tone.ink2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var streakTitle: String {
+        switch daily.streak {
+        case 0: return "No streak yet"
+        case 1: return "1-day streak"
+        default: return "\(daily.streak)-day streak"
+        }
+    }
+
+    private var reminderBlock: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Text("A reminder tomorrow, around this time?")
+                .font(.subheadline)
+                .foregroundStyle(tone.ink)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button("Not now") { remind(false) }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(tone.ink2)
+                .buttonStyle(.plain)
+                .frame(minHeight: 44)
+            Button("Remind me") { remind(true) }
+                .buttonStyle(HomeGlassButtonStyle(tone: tone, compact: true))
+        }
+    }
+
+    // MARK: Today's Move
 
     @ViewBuilder
     private var puzzleBlock: some View {
+        label(moveLabel)
         if let puzzle, let draft = PositionDraft(fen: puzzle.fen) {
             Button(action: solve) {
                 HomeDiagram(draft: draft, flipped: puzzle.solver == .black, theme: pieceTheme, tone: tone)
             }
             .buttonStyle(.plain)
             .accessibilityHidden(true)
-            .padding(.bottom, 16)
-            label("Puzzle rated \(puzzle.puzzle.rating)")
+            // Room above for the back rank's crowns and crosses, which stand taller than a square.
+            .padding(.top, 26)
+            .padding(.bottom, 12)
             HStack(alignment: .center, spacing: 12) {
                 Text(puzzle.title)
                     .font(HomeType.title)
                     .foregroundStyle(tone.ink)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                Button("Solve", action: solve)
-                    .buttonStyle(HomeIvoryButtonStyle(tone: tone, compact: true))
-                    .accessibilityLabel("Solve: \(puzzle.title)")
+                if daily.played {
+                    Button("Again", action: solve)
+                        .buttonStyle(HomeGlassButtonStyle(tone: tone, compact: true))
+                        .accessibilityLabel("Play Today's Move again")
+                } else {
+                    Button("Solve", action: solve)
+                        .buttonStyle(HomeIvoryButtonStyle(tone: tone, compact: true))
+                        .accessibilityLabel("Solve Today's Move: \(puzzle.title)")
+                }
             }
-            .padding(.top, 4)
-            Text(ratingLine)
+            Text(moveStatus)
                 .font(.footnote)
-                .foregroundStyle(tone.ink2)
+                .foregroundStyle(daily.played ? tone.metal : tone.ink2)
                 .padding(.top, 6)
         } else {
-            // The pack is still loading (or missing): the rating and the way in.
             HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Puzzles")
-                        .font(HomeType.title)
-                        .foregroundStyle(tone.ink)
-                    Text(ratingLine)
-                        .font(.footnote)
-                        .foregroundStyle(tone.ink2)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                Text("A new puzzle every day.")
+                    .font(HomeType.title)
+                    .foregroundStyle(tone.ink)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 Button("Solve", action: solve)
                     .buttonStyle(HomeIvoryButtonStyle(tone: tone, compact: true))
-                    .accessibilityLabel("Solve puzzles")
             }
+            .padding(.top, 4)
         }
     }
 
-    /// Your puzzle rating, said as such: the ladder shows your level in games.
-    /// Chess ratings are written without a thousands separator.
-    private var ratingLine: String { "Your puzzle rating \(rating)" }
+    /// "Today's Move · No. 29 · Tricky"
+    private var moveLabel: String {
+        guard daily.number > 0 else { return "Today's Move" }
+        return "Today's Move · No. \(daily.number) · \(daily.difficulty)"
+    }
+
+    private var moveStatus: String {
+        if daily.played { return daily.found ? "You found it. Same puzzle for everyone today." : "Played. A new one tomorrow." }
+        return "Everyone in the world gets this one today."
+    }
 
     /// A block's small name, over its title.
     private func label(_ text: String) -> some View {

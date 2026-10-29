@@ -673,12 +673,17 @@ struct PieceDetailView: View {
     }
 
     private func stats(_ record: PieceRecord) -> some View {
-        let items: [(String, Int)] = [
+        var items: [(String, Int)] = [
             ("Games", record.games), ("Wins", record.wins), ("Captures", record.captures),
             ("Material taken", record.captureValue), ("Checkmates", record.mates),
             ("Promotions", record.promotions), ("Times fallen", record.falls),
             ("Piece of the Match", record.honors),
         ]
+        // Shown once it carries one, as a mark of the daily streak.
+        if !record.streakMarks.isEmpty {
+            items.append(("Streak marks", record.streakMarks.count))
+            items.append(("Best streak mark, days", record.streakMarks.max() ?? 0))
+        }
         return LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
             ForEach(items, id: \.0) { item in
                 VStack(spacing: 2) {

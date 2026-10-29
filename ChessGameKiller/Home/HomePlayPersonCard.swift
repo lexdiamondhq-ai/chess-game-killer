@@ -1,56 +1,122 @@
 import ChessKit
 import SwiftUI
 
-/// Right under the clock card: Challenge a friend, as a sealed move. In a game adjourned over
-/// the board, the next move went into an envelope and was sealed; here the envelope is the
-/// invite. A small glass card with the envelope, its wax seal in the pieces' metal, and one
-/// line on how it travels. The whole card is the button; it opens the challenge composer.
-struct HomeChallengeCard: View {
+/// Right under the clock card: one card for a game with a person, as Chess.com and Lichess
+/// keep online play and playing a friend side by side under one Play. Two faces inside it:
+/// Online, lit, for someone waiting right now; and A friend, a sealed envelope, for a game
+/// sent by link. The header says how many players are waiting once the lobby has answered.
+struct HomePlayPersonCard: View {
     let tone: HomeTone
-    let action: () -> Void
+    let pieceTheme: BoardTheme
+    /// Players waiting in the lobby, nil until known.
+    let waiting: Int?
+    let online: () -> Void
+    let friend: () -> Void
 
-    @ScaledMetric(relativeTo: .title3) private var art: CGFloat = 58
     @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: HomeMetrics.cardRadius, style: .continuous)
-        Button(action: action) {
-            HStack(spacing: 16) {
-                if !typeSize.isAccessibilitySize {
-                    HomeSealedEnvelope(tone: tone)
-                        .frame(width: min(art, 76), height: min(art, 76) * 0.72)
-                        .padding(.vertical, 4)
+        VStack(alignment: .leading, spacing: 12) {
+            header
+            faces
+        }
+        .padding(HomeMetrics.inset)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .homePane(shape, tone: tone)
+        .animation(.snappy(duration: 0.3), value: waiting)
+    }
+
+    private var header: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text("Play a person")
+                .font(HomeType.title)
+                .foregroundStyle(tone.ink)
+                .accessibilityAddTraits(.isHeader)
+            Spacer(minLength: 8)
+            if let waiting, waiting > 0 {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(tone.metal)
+                        .frame(width: 6, height: 6)
+                    Text("\(waiting) waiting")
+                        .font(.footnote)
+                        .foregroundStyle(tone.ink2)
+                        .contentTransition(.numericText())
                 }
-                words
-                Image(systemName: "chevron.forward")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(tone.ink3)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(waiting == 1 ? "1 player waiting" : "\(waiting) players waiting")
             }
-            .padding(.horizontal, HomeMetrics.inset + 4)
-            .padding(.vertical, 18)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .homePane(shape, tone: tone)
+        }
+        .padding(.horizontal, 4)
+    }
+
+    @ViewBuilder
+    private var faces: some View {
+        let layout = typeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(spacing: 10)) : AnyLayout(HStackLayout(alignment: .top, spacing: 10))
+        layout {
+            HomePlayFace(title: "Online", label: "Play online", line: "Rated, at your clock", lit: true, tone: tone,
+                         hint: "Rated games with players waiting now. Take one on, or find a game.",
+                         inputLabels: ["Play online", "Online", "Find a game"], action: online) {
+                HomeFacingKings(tone: tone, pieceTheme: pieceTheme)
+                    .frame(width: 58, height: 44)
+            }
+            HomePlayFace(title: "A friend", label: "Challenge a friend", line: "Send a link by text", lit: false, tone: tone,
+                         hint: "Send a game by text or email. They can play in a browser, no app needed.",
+                         inputLabels: ["Challenge a friend", "Challenge", "Friend"], action: friend) {
+                HomeSealedEnvelope(tone: tone)
+                    .frame(width: 52, height: 37)
+                    .padding(.vertical, 3.5)
+            }
+        }
+    }
+}
+
+/// One face of the Play a person card: a small drawing, a name and one line. The whole face
+/// is the button. The lit face is the one most people want.
+struct HomePlayFace<Art: View>: View {
+    let title: String
+    /// What VoiceOver says for the face.
+    let label: String
+    let line: String
+    let lit: Bool
+    let tone: HomeTone
+    let hint: String
+    let inputLabels: [String]
+    let action: () -> Void
+    @ViewBuilder let art: () -> Art
+
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: HomeMetrics.innerRadius, style: .continuous)
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 2) {
+                if !typeSize.isAccessibilitySize {
+                    art()
+                        .padding(.bottom, 8)
+                }
+                Text(title)
+                    .font(HomeType.score)
+                    .foregroundStyle(tone.ink)
+                Text(line)
+                    .font(.footnote)
+                    .foregroundStyle(tone.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .homePane(shape, tone: tone, weight: .well(lit: lit))
             .contentShape(shape)
         }
         .buttonStyle(HomePressStyle())
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Challenge a friend")
-        .accessibilityHint("Send a game by text or email. They can play in a browser, no app needed.")
+        .accessibilityLabel(label)
+        .accessibilityValue(line)
+        .accessibilityHint(hint)
         .accessibilityAddTraits(.isButton)
-        .accessibilityInputLabels(["Challenge a friend", "Challenge", "Friend"])
-    }
-
-    private var words: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text("Challenge a friend")
-                .font(HomeType.title)
-                .foregroundStyle(tone.ink)
-            Text("Seal a game in a link. Send it by text or email.")
-                .font(.subheadline)
-                .foregroundStyle(tone.ink2)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityInputLabels(inputLabels)
     }
 }
 
@@ -151,66 +217,6 @@ struct HomeEnvelopeFold: Shape {
         path.addLine(to: meet)
         path.addLine(to: CGPoint(x: rect.maxX - inset, y: rect.maxY - inset))
         return path
-    }
-}
-
-/// Under Challenge a friend: Play online, for a game with someone waiting right now. Two kings
-/// face each other across a hairline, with a live dot between them; the line says how many
-/// players are waiting when the lobby has answered. The whole card is the button.
-struct HomeOnlineCard: View {
-    let tone: HomeTone
-    let pieceTheme: BoardTheme
-    /// Players waiting in the lobby, nil until known.
-    let waiting: Int?
-    let action: () -> Void
-
-    @Environment(\.dynamicTypeSize) private var typeSize
-
-    var body: some View {
-        let shape = RoundedRectangle(cornerRadius: HomeMetrics.cardRadius, style: .continuous)
-        Button(action: action) {
-            HStack(spacing: 16) {
-                if !typeSize.isAccessibilitySize {
-                    HomeFacingKings(tone: tone, pieceTheme: pieceTheme)
-                        .frame(width: 58, height: 44)
-                }
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Play online")
-                        .font(HomeType.title)
-                        .foregroundStyle(tone.ink)
-                    Text(line)
-                        .font(.subheadline)
-                        .foregroundStyle(tone.ink2)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .contentTransition(.numericText())
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                Image(systemName: "chevron.forward")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(tone.ink3)
-            }
-            .padding(.horizontal, HomeMetrics.inset + 4)
-            .padding(.vertical, 16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .homePane(shape, tone: tone)
-            .contentShape(shape)
-        }
-        .buttonStyle(HomePressStyle())
-        .animation(.snappy(duration: 0.3), value: waiting)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Play online")
-        .accessibilityValue(line)
-        .accessibilityHint("Rated games with players waiting now. Take one on, or find a game.")
-        .accessibilityAddTraits(.isButton)
-        .accessibilityInputLabels(["Play online", "Online", "Find a game"])
-    }
-
-    private var line: String {
-        switch waiting {
-        case let count? where count == 1: return "1 player waiting now. Take them on."
-        case let count? where count > 1: return "\(count) players waiting now. Take one on."
-        default: return "Rated games with players online now."
-        }
     }
 }
 

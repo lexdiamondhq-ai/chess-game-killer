@@ -16,6 +16,8 @@ struct HomeActions {
     /// Starts today's session with Coach Leo.
     var trainToday: (SessionPlan) -> Void = { _ in }
     var puzzles: () -> Void = {}
+    /// Opens Today's Move, the puzzle of the day.
+    var dailyMove: () -> Void = {}
     var rewind: () -> Void = {}
     var openGame: (SavedGame) -> Void = { _ in }
     var army: () -> Void = {}
@@ -42,6 +44,8 @@ struct HomeView: View {
     @Environment(ArmyStore.self) private var army
     @Environment(TrainingStore.self) private var training
     @Environment(PuzzleStore.self) private var puzzles
+    /// The daily streak and Today's Move (pictures drawn in tests may leave it out).
+    @Environment(DailyStore.self) private var daily: DailyStore?
     /// Challenge a friend, when the app provides it (pictures drawn in tests don't).
     @Environment(ChallengeCenter.self) private var challenges: ChallengeCenter?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -229,8 +233,8 @@ struct HomeView: View {
 
     @ViewBuilder
     private func sections(upNext: HomeUpNext) -> some View {
-        // Challenge a friend, sealed like an adjourned move, right under the clock, then Play
-        // online; friend games still going follow them, your move first.
+        // Play a person (online, or a friend by link) right under the clock; friend games
+        // still going follow it, your move first.
         friends(challenges?.store.sorted.filter { !$0.isOver } ?? [])
 
         // Dated like a newspaper's chess column; it turns over at midnight with the page open.
@@ -238,10 +242,10 @@ struct HomeView: View {
             HomeSectionHeader(title: "Today", tone: tone, note: HomeView.dateline(context.date), dateline: true)
         }
         .id("today")
-        HomeTodayCard(puzzle: puzzles.upNext.flatMap(HomePuzzle.init), rating: puzzles.progress.rating,
+        HomeTodayCard(puzzle: dailyPuzzle, daily: dailyState,
                       plan: plan, trainedToday: training.trainedToday,
-                      tone: tone, pieceTheme: pieceTheme, solve: actions.puzzles,
-                      startSession: actions.trainToday, train: actions.train)
+                      tone: tone, pieceTheme: pieceTheme, solve: actions.dailyMove,
+                      startSession: actions.trainToday, train: actions.train, remind: answerReminder)
 
         let ladder = HomeLadder(games: vault.games)
         HomeSectionHeader(title: "The ladder", tone: tone,
@@ -264,16 +268,14 @@ struct HomeView: View {
         }
     }
 
-    /// The way to start a game with a friend, then the ones going. Challenge a friend opens
+    /// The way to start a game with a person, then the friend games going. A friend opens
     /// the composer, which lists every friend game too.
     @ViewBuilder
     private func friends(_ games: [FriendGame]) -> some View {
         if let challenges {
             VStack(spacing: 10) {
-                HomeChallengeCard(tone: tone) { challenges.compose() }
-                HomeOnlineCard(tone: tone, pieceTheme: pieceTheme, waiting: challenges.onlineWaiting) {
-                    challenges.playOnline()
-                }
+                HomePlayPersonCard(tone: tone, pieceTheme: pieceTheme, waiting: challenges.onlineWaiting,
+                                   online: { challenges.playOnline() }, friend: { challenges.compose() })
                 if !games.isEmpty {
                     HomeFriendsCard(games: games, tone: tone, open: { challenges.play($0) })
                 }
@@ -284,6 +286,49 @@ struct HomeView: View {
                 await challenges.refreshGames()
                 await challenges.refreshOnlineCount()
             }
+        }
+    }
+
+    // MARK: The day
+
+    /// Today's Move as a diagram, the same puzzle for every player.
+    private var dailyPuzzle: HomePuzzle? {
+        guard let today = daily?.puzzle() ?? DailyMoves.puzzle(for: .now) else { return nil }
+        return HomePuzzle(LichessPuzzle(id: today.id, fen: today.fen, moves: today.moves, rating: today.rating,
+                                        themes: today.themes))
+    }
+
+    private var dailyState: HomeDailyState {
+        guard let daily else { return HomeDailyState() }
+        let today = daily.puzzle()
+        var state = HomeDailyState()
+        state.streak = daily.streak
+        state.doneToday = daily.doneToday
+        state.number = today?.number ?? 0
+        state.difficulty = today?.difficulty ?? ""
+        state.played = daily.playedTodaysMove
+        state.found = daily.playedTodaysMove && daily.state.moveFound
+        state.puzzlesToday = daily.puzzlesToday
+        if let mark = daily.markToday {
+            state.mark = "\(mark.piece) now carries your \(mark.days)-day mark, for good."
+        }
+        if let next = daily.nextMilestone {
+            state.nextMark = next.toGo == 1 ? "Tomorrow a piece earns your \(next.days)-day mark."
+                : "\(next.toGo) more days and a piece earns your \(next.days)-day mark."
+        }
+        state.asksReminder = daily.doneToday && !daily.state.reminderAsked
+        return state
+    }
+
+    /// The reminder question, answered: asks iOS for permission on a yes.
+    private func answerReminder(_ yes: Bool) {
+        daily?.markReminderAsked()
+        guard yes else { return }
+        UserDefaults.standard.set(true, forKey: DailyReminders.enabledKey)
+        Task { @MainActor in
+            _ = await DailyReminders.requestPermission()
+            // Plans the reminders now that they may be sent.
+            daily?.onChange?()
         }
     }
 

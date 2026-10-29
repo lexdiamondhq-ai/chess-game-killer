@@ -55,7 +55,7 @@ final class HomeSnapshotTests: XCTestCase {
         window.isHidden = true
     }
 
-    /// Challenge a friend, a sealed envelope, sits right under the clock, with friend games
+    /// Play a person (Online, or A friend by sealed link) sits right under the clock, with friend games
     /// still going under it, your move first.
     func testFriendGamesUnderTheClock() throws {
         let api = FakeChallengeAPI()
@@ -253,7 +253,16 @@ enum HomeSample {
             puzzleProgress.streak = 7
         }
         let puzzles = PuzzleStore(progress: puzzleProgress)
+        // Five days in a row up to yesterday, and two of today's three puzzles solved.
+        var daily = DailyRecord()
+        if !empty {
+            daily.streak = Streak(current: 5, best: 9, lastDay: Trainer.dayString(.now.addingTimeInterval(-86_400)))
+            daily.day = Trainer.dayString(.now)
+            daily.puzzlesSolved = 2
+        }
+        daily.seeded = true
         return HomeView(match: game, theme: .named(theme), actions: HomeActions(), showsYou: showsYou)
+            .environment(DailyStore(state: daily))
             .environment(vault)
             .environment(army)
             .environment(training)

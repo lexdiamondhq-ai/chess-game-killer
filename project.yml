@@ -21,7 +21,13 @@ targets:
   ChessGameKiller:
     type: application
     platform: iOS
-    sources: [ChessGameKiller]
+    # Shared/ holds Today's Move and the widget's faces, compiled into the widget too.
+    sources: [ChessGameKiller, Shared]
+    # The app group lets the widget read the streak the app writes (Shared/Daily/DailySnapshot.swift).
+    entitlements:
+      path: Support/ChessGameKiller.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.chessgamekiller.app]
     # Challenge links (chessgamekiller://c/CODE) open the app. Xcode merges this file with the generated keys.
     info:
       path: Support/ChessGameKiller-Info.plist
@@ -34,6 +40,8 @@ targets:
     dependencies:
       - package: ChessKit
       - package: ChessKitEngine
+      # The Today's Move widget, embedded in the app.
+      - target: ChessGameKillerWidget
     postBuildScripts:
       # Stockfish's neural networks are too big for git; this downloads them once and bundles them.
       - name: Bundle Stockfish networks
@@ -58,6 +66,31 @@ targets:
         # iPhone only for 1.0: nothing has been laid out or tested for iPad yet, and an app that is
         # offered to iPad owners has to work there. Set back to "1,2" once it is designed for it.
         TARGETED_DEVICE_FAMILY: "1"
+  ChessGameKillerWidget:
+    # Today's Move and the streak on the Home Screen and the Lock Screen.
+    type: app-extension
+    platform: iOS
+    sources: [ChessGameKillerWidget, Shared]
+    entitlements:
+      path: Support/ChessGameKillerWidget.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.chessgamekiller.app]
+    info:
+      path: Support/ChessGameKillerWidget-Info.plist
+      properties:
+        CFBundleDisplayName: Chess Game Killer
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.chessgamekiller.app.widget
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: "1"
+        SKIP_INSTALL: YES
   ChessGameKillerTests:
     type: bundle.unit-test
     platform: iOS

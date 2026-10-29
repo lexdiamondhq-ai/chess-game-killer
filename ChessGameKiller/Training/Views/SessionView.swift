@@ -321,12 +321,14 @@ struct SessionSummary: View {
     let done: () -> Void
 
     @State private var shown = false
+    /// The app-wide daily streak, when the app provides it.
+    @Environment(DailyStore.self) private var daily: DailyStore?
 
     private var store: TrainingStore { runner.store }
 
     var body: some View {
         let accuracy = runner.accuracy
-        let days = max(runner.reward.streak, store.streak)
+        let days = daily?.streak ?? max(runner.reward.streak, store.streak)
         let green = theme.glows ? TrainingColor.green.color(on: theme) : theme.trainingAccent
         ScrollView {
             VStack(spacing: 20) {
