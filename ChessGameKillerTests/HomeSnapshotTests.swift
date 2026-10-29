@@ -55,27 +55,43 @@ final class HomeSnapshotTests: XCTestCase {
         window.isHidden = true
     }
 
-    /// Play a person (Online, or A friend by sealed link) sits right under the clock, with friend games
-    /// still going under it, your move first.
-    func testFriendGamesUnderTheClock() throws {
+    /// Play a person (Online, or A friend by sealed link) sits right under the clock, then Current
+    /// games: every game still going, with a small board and whose move it is, your move first.
+    func testCurrentGamesUnderTheClock() throws {
         let api = FakeChallengeAPI()
         let now = Date().timeIntervalSince1970 * 1000
         let yourMove = FriendGameState.sample(code: "7KQ2XM", moves: ["e2e4", "c7c5"], black: "Sam", now: now - 60_000)
         let theirMove = FriendGameState.sample(code: "P4HRWN", moves: ["d2d4", "g8f6", "c2c4"],
                                                clock: FriendClock(initial: 300, increment: 0), black: "Jordan",
                                                now: now - 600_000)
+        var online = FriendGameState.sample(code: "R3ATED", moves: ["d2d4", "d7d5", "c2c4", "e7e6", "b1c3"],
+                                            clock: FriendClock(initial: 180, increment: 2), white: "Maya", black: "Alex",
+                                            now: now - 30_000)
+        online.rated = true
+        online.ratings = .init(white: .init(rating: 1342), black: .init(rating: 1262))
         let waiting = FriendGameState.sample(code: "M8TQ3D", status: .waiting,
                                              clock: FriendClock(initial: 180, increment: 2), now: now - 3_600_000)
-        let states = [yourMove, theirMove, waiting]
+        let states = [yourMove, theirMove, online, waiting]
         for state in states {
             api.games[state.code] = state
         }
-        let center = ChallengeCenter(api: api, store: ChallengeStore(games: states.map { FriendGame.sample($0, seat: .white) }),
-                                     sounds: nil)
+        let records = [FriendGame.sample(yourMove, seat: .white), FriendGame.sample(theirMove, seat: .white),
+                       FriendGame.sample(online, seat: .black), FriendGame.sample(waiting, seat: .white)]
+        let center = ChallengeCenter(api: api, store: ChallengeStore(games: records), sounds: nil)
         let window = try show(HomeSample.home().environment(center))
         scroll(window, to: 300)
         try save(window, "zz-home-8-friends")
         window.isHidden = true
+
+        // With a game against the computer under way too.
+        let match = MatchController(engine: nil, sounds: nil)
+        let position = try XCTUnwrap(Position(fen: HomeSample.italianFEN))
+        match.start(MatchController.Setup(playerColor: .black, level: .club, timeControl: .blitz5), from: position)
+        match.suspend()
+        let all = try show(HomeSample.home(match: match).environment(center))
+        scroll(all, to: 300)
+        try save(all, "zz-home-8-current-all")
+        all.isHidden = true
 
         let none = ChallengeCenter(api: FakeChallengeAPI(), store: ChallengeStore(), sounds: nil)
         let quiet = try show(HomeSample.home().environment(none))
@@ -83,6 +99,29 @@ final class HomeSnapshotTests: XCTestCase {
         scroll(quiet, to: 260)
         try save(quiet, "zz-home-8-friends-none")
         quiet.isHidden = true
+    }
+
+    /// Your move first, then theirs, then open challenges; the header counts the games waiting on you.
+    func testCurrentGamesPutYourMoveFirst() {
+        let now = Date().timeIntervalSince1970 * 1000
+        let theirs = FriendGame.sample(.sample(code: "AAAAAA", moves: ["e2e4"], now: now), seat: .white)
+        let open = FriendGame.sample(.sample(code: "BBBBBB", status: .waiting, now: now), seat: .white)
+        var ratedState = FriendGameState.sample(code: "CCCCCC", moves: ["e2e4"], now: now)
+        ratedState.rated = true
+        ratedState.ratings = .init(white: .init(rating: 1300), black: .init(rating: 1200, provisional: true))
+        let yours = FriendGame.sample(ratedState, seat: .black)
+        let list = HomeCurrentGame.sorted([open, theirs, yours].map(HomeCurrentGame.friend))
+        XCTAssertEqual(list.map(\.id), ["CCCCCC", "AAAAAA", "BBBBBB"])
+        XCTAssertEqual(list.map(\.status), [.yourMove, .theirMove, .waiting])
+        XCTAssertEqual(list[0].kind, .online)
+        XCTAssertEqual(list[0].detail, "Online · 1300 · 10+0 · Move 1")
+        XCTAssertTrue(list[0].flipped, "Playing Black, Black is at the bottom")
+        XCTAssertEqual(list[1].detail, "Friend · 10+0 · Move 1")
+        XCTAssertEqual(list[1].shortDetail, "Friend · 10+0")
+        XCTAssertEqual(HomeCurrentGame.note(list), "1 needs your move")
+        XCTAssertEqual(HomeCurrentGame.note([list[1]]), "Waiting on them")
+        XCTAssertNil(HomeCurrentGame.note([]))
+        XCTAssertNotNil(yours.fen)
     }
 
     /// The home takes its colors from the board look.

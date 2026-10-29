@@ -40,6 +40,8 @@ final class ChallengeCenter {
     /// the only place games.json is written from.
     @ObservationIgnored var onGameFinished: (@MainActor (SavedGame) -> Void)?
     @ObservationIgnored private var lastRefresh: Date?
+    /// Never asks the server about the listed games: CI's pictures list games the server doesn't have.
+    @ObservationIgnored var holdsStill = false
     /// A link opened during a timed game: it opens once that game is closed.
     @ObservationIgnored private(set) var heldCode: String?
 
@@ -194,6 +196,7 @@ final class ChallengeCenter {
     /// Brings the unfinished games up to date: whose move it is, and which ended meanwhile.
     /// At most every 15 seconds unless `force`d.
     func refreshGames(force: Bool = false) async {
+        if holdsStill { return }
         if !force, let lastRefresh, Date.now.timeIntervalSince(lastRefresh) < Self.refreshInterval { return }
         lastRefresh = .now
         // Games still going, and finished ones not yet kept with the player's games.
