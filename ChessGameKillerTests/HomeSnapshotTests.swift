@@ -55,7 +55,7 @@ final class HomeSnapshotTests: XCTestCase {
         window.isHidden = true
     }
 
-    /// Challenge a friend, a sealed envelope, sits right under the clock, with friend games
+    /// Play a person (Online, or A friend by sealed link) sits right under the clock, with friend games
     /// still going under it, your move first.
     func testFriendGamesUnderTheClock() throws {
         let api = FakeChallengeAPI()
