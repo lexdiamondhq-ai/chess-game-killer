@@ -184,6 +184,15 @@ final class SculptedBoardTests: XCTestCase {
         }
     }
 
+    /// Every flat piece has its lines drawn on top, the pawn too: without a collar under its head
+    /// and a band round its base it read as a plain blob next to the others.
+    func testEveryFlatPieceHasItsLines() throws {
+        let meshes = try XCTUnwrap(SculptedAssets.loadMeshes(named: SculptedFlatSet.assetName))
+        for kind in Piece.Kind.allCases {
+            XCTAssertTrue(meshes[kind]?.contains { $0.finish == .gem } ?? false, "the flat \(kind) has no lines")
+        }
+    }
+
     /// The flat view looks straight down, so the polished board mirrors the top of its studio:
     /// under the soft box overhead the stone and the glass frame went milky. Seen from above, every
     /// look's studio has a dark ceiling; the tilted view keeps its soft box.

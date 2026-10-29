@@ -8,7 +8,7 @@ its inner lines on top. Sizes in squares; Blender y = away from White. Part fini
 app reads (SculptedFlatSet.swift): body = the look's stone, metal = its metal, ink (the "gem" slot) =
 lines drawn on the piece."""
 import bpy, bmesh, math, sys, os, json, struct, zlib, numpy as np
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, LineString, box
 from shapely.ops import unary_union
 from shapely import affinity
 
@@ -48,11 +48,31 @@ def prism(name, shape, z0, z1, role, bevel=0.0, segs=3):
         objs.append(ob)
     return objs
 
+# The pawn's own lines. The cburnett pawn has none, so next to the others' bands it read as a plain
+# blob: a collar under the head and a band round the base, arcs like the king's and queen's bands.
+# Each is (height, inset from the outline at that height, how far its middle rises), in glyph units.
+PAWN_LINES = [(0.168, 0.03, 0.012), (-0.30, 0.06, 0.03)]
+LINE = 0.032   # as thick as the traced pieces' lines
+
+
+def pawn_lines(outline):
+    bars = []
+    for y, inset, rise in PAWN_LINES:
+        x0, _, x1, _ = outline.intersection(box(-1, y - 1e-4, 1, y + 1e-4)).bounds
+        x0 += inset; x1 -= inset
+        xs = np.linspace(x0, x1, 40); half = (x1 - x0) / 2; mid = (x0 + x1) / 2
+        ys = y + rise * (1 - ((xs - mid) / half) ** 2)
+        bars.append(LineString(list(zip(xs, ys))).buffer(LINE / 2, cap_style=1))
+    return unary_union(bars)
+
+
 def glyph(kind, s):
     polys = [Polygon(p[0], p[1:]) for p in G[kind]['outline']]
     det = [Polygon(p[0], p[1:]) for p in G[kind]['details']]
     sc = lambda g: affinity.scale(g, s, s, origin=(0, 0))
-    return sc(unary_union(polys).buffer(0)), sc(unary_union(det).buffer(0)) if det else None
+    outline = unary_union(polys).buffer(0)
+    lines = unary_union(det).buffer(0) if det else pawn_lines(outline) if kind == 'P' else None
+    return sc(outline), sc(lines) if lines is not None else None
 
 SCALE = 0.80 / 0.861          # the widest icon (the queen) comes out 0.80 square
 
