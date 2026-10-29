@@ -349,6 +349,10 @@ struct LessonDoneCard: View {
     let done: () -> Void
 
     @State private var appeared = false
+    /// The app-wide daily streak, when the app provides it.
+    @Environment(DailyStore.self) private var daily: DailyStore?
+
+    private var streakDays: Int { daily?.streak ?? reward.streak }
 
     var body: some View {
         let green = TrainingColor.green.color(on: theme)
@@ -375,8 +379,8 @@ struct LessonDoneCard: View {
                 }
                 HStack(spacing: 8) {
                     TrainingChip(text: "+\(reward.xp) XP", symbol: "sparkles", color: theme.trainingAccent)
-                    if reward.streak > 0 {
-                        TrainingChip(text: "\(reward.streak)-day streak", symbol: "flame.fill",
+                    if streakDays > 0 {
+                        TrainingChip(text: "\(streakDays)-day streak", symbol: "flame.fill",
                                      color: TrainingColor.orange.color(on: theme))
                     }
                 }

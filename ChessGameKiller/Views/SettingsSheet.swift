@@ -26,6 +26,8 @@ struct SettingsSheet: View {
     /// "Nice move", "Try again" and the like in puzzles and drills. Read by CoachReactions.
     @AppStorage(CoachReactions.storageKey) private var reactionsOn = true
     @AppStorage(ReviewLevel.storageKey) private var reviewLevel = ReviewLevel.club.rawValue
+    /// One reminder a day, at the hour you usually play, only on a day not done yet.
+    @AppStorage(DailyReminders.enabledKey) private var remindersOn = true
 
     @Environment(\.dismiss) private var dismiss
     @State private var offer: PremiumFeature?
@@ -115,6 +117,13 @@ struct SettingsSheet: View {
                             ToggleRow(title: "Sound effects", symbol: "speaker.wave.2.fill", isOn: $soundOn, theme: theme)
                             rule
                             ToggleRow(title: "Haptics", symbol: "iphone.radiowaves.left.and.right", isOn: $hapticsOn, theme: theme)
+                            rule
+                            ToggleRow(title: "Daily reminder", subtitle: "At most one a day, around when you usually play, and only if the day isn't done yet.",
+                                      symbol: "flame.fill", isOn: $remindersOn, theme: theme)
+                                .onChange(of: remindersOn) { _, on in
+                                    // Turned on: ask iOS once, then the app plans them when Settings closes.
+                                    if on { Task { _ = await DailyReminders.requestPermission() } }
+                                }
                             rule
                             ToggleRow(title: "Rival banter", subtitle: "Rivals talk to you during the game.",
                                       symbol: "bubble.left.fill", isOn: $banterOn, theme: theme)

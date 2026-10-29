@@ -10,6 +10,8 @@ struct TrainingHubView: View {
     @Environment(TrainingStore.self) private var store
     @Environment(PuzzleStore.self) private var puzzles
     @Environment(GameVault.self) private var vault
+    /// The app-wide daily streak, when the app provides it.
+    @Environment(DailyStore.self) private var daily: DailyStore?
     @Environment(\.dismiss) private var dismiss
     @AppStorage("coachVoiceMuted") private var voiceMuted = false
     @AppStorage(CoachReactions.storageKey) private var reactionsOn = true
@@ -121,7 +123,7 @@ struct TrainingHubView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            StreakPill(streak: store.streak, theme: theme)
+            StreakPill(streak: daily?.streak ?? store.streak, theme: theme)
         }
         .padding(.top, 2)
     }
