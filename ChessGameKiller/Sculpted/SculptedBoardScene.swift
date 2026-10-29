@@ -127,6 +127,11 @@ final class SculptedBoardScene {
     private var ghostNodes: [String: PieceNode] = [:]
     private var keyLight: SCNLight?
     private var rimLight: SCNLight?
+    /// The fine metal line round the squares, and its own glow, which the flat view brightens.
+    private var inlay: SCNMaterial?
+    private var inlayGlow: Any?
+    /// Lit by the studio seen from straight above, the flat view's, with its dark ceiling.
+    private(set) var litFromAbove = false
     /// The finale's glow under the fallen king.
     private var finaleGlow: SCNNode?
     /// The king lying on its side, stood back up when the finale ends.
@@ -884,6 +889,15 @@ final class SculptedBoardScene {
         }
     }
 
+    /// The studio for the framing. From straight above, the board mirrors whatever is overhead,
+    /// so it takes the studio with a dark ceiling: the stone keeps the deep color it shows tilted,
+    /// instead of a milky veil. The fine line round the squares glows like the flat pieces' metal.
+    private func light(for framing: SculptedCamera.Framing) {
+        litFromAbove = framing.lying
+        scene.lightingEnvironment.contents = assets.environment(look, above: litFromAbove)
+        inlay?.emission.contents = litFromAbove ? SculptedFlatSet.glow(look) : inlayGlow
+    }
+
     /// The studio lights down to a warm hush for the finale, or back up.
     private func dim(_ dimmed: Bool, duration: Double) {
         SCNTransaction.begin()
@@ -1454,6 +1468,7 @@ final class SculptedBoardScene {
     /// Moves the camera to the new framing and dresses the pieces for it: from above with the
     /// flat pieces, or back to the player's chair with the carved pieces standing.
     private func reframe(_ framing: SculptedCamera.Framing, animated: Bool) {
+        light(for: framing)
         for node in Array(nodes.values) + Array(ghostNodes.values) {
             node.model.removeAllActions()
             layDown(node, framing: framing)
@@ -1578,8 +1593,11 @@ final class SculptedBoardScene {
             board.addChildNode(node)
         }
 
-        // A fine metal line around the squares.
-        let metal = assets.inlayMaterial(look)
+        // A fine metal line around the squares: its own copy, as the flat view makes it glow.
+        let shared = assets.inlayMaterial(look)
+        let metal = shared.copy() as? SCNMaterial ?? shared
+        inlay = metal
+        inlayGlow = metal.emission.contents
         let gap: Float = 0.09
         let line: Float = 0.012
         let span = 8 + 2 * gap + line

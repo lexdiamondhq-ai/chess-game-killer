@@ -154,8 +154,11 @@ final class SculptedAssets {
         return Self.pbr(inlay, roughness: 0.2, metalness: 1)
     }
 
-    /// The studio light the pieces reflect, the same from every side.
-    func environment(_ look: SculptedLook) -> UIImage? { UIImage(named: look.studio) }
+    /// The studio light the pieces reflect, the same from every side; from straight above, the
+    /// one with a dark ceiling (`SculptedLook.studioAbove`).
+    func environment(_ look: SculptedLook, above: Bool = false) -> UIImage? {
+        UIImage(named: above ? look.studioAbove : look.studio)
+    }
 
     /// Darkens a surface toward its silhouette, where it turns away from the eye, so a light piece
     /// keeps a clear outline on light stone.
@@ -332,6 +335,10 @@ struct SculptedLook {
 
     /// The studio the pieces reflect: a soft light tent, or a dark room with a few soft boxes.
     var studio = "sculpted-env"
+    /// The same studio for the flat view, seen from straight above. There the polished stone and
+    /// glass mirror whatever is overhead, and the soft box over the board turned them milky: here its
+    /// light moves out to a ring around the camera, as much light from above, under a dark ceiling.
+    var studioAbove = "sculpted-env-above"
     /// How bright the studio is, and the key light that casts the shadows.
     var environment: CGFloat = 2.0
     var key: CGFloat = 1100
@@ -366,6 +373,7 @@ extension SculptedLook {
     private static func lit(_ look: SculptedLook) -> SculptedLook {
         var look = look
         look.studio = "sculpted-env-studio"
+        look.studioAbove = "sculpted-env-studio-above"
         look.environment = 1.2
         look.key = 410
         look.rim = 540

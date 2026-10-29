@@ -184,6 +184,42 @@ final class SculptedBoardTests: XCTestCase {
         }
     }
 
+    /// Every flat piece has its lines drawn on top, the pawn too: without a collar under its head
+    /// and a band round its base it read as a plain blob next to the others.
+    func testEveryFlatPieceHasItsLines() throws {
+        let meshes = try XCTUnwrap(SculptedAssets.loadMeshes(named: SculptedFlatSet.assetName))
+        for kind in Piece.Kind.allCases {
+            XCTAssertTrue(meshes[kind]?.contains { $0.finish == .gem } ?? false, "the flat \(kind) has no lines")
+        }
+    }
+
+    /// The flat view looks straight down, so the polished board mirrors the top of its studio:
+    /// under the soft box overhead the stone and the glass frame went milky. Seen from above, every
+    /// look's studio has a dark ceiling; the tilted view keeps its soft box.
+    func testTheStudioSeenFromAboveHasADarkCeiling() throws {
+        for look in SculptedLook.all {
+            let above = try XCTUnwrap(SculptedAssets.shared.environment(look, above: true)?.cgImage,
+                                      "\(look.name) is missing \(look.studioAbove)")
+            let tilted = try XCTUnwrap(SculptedAssets.shared.environment(look)?.cgImage, look.name)
+            XCTAssertLessThan(Self.ceilingBrightness(above), 0.15, "\(look.name): the flat board would mirror a light")
+            XCTAssertGreaterThan(Self.ceilingBrightness(tilted), 0.5, look.name)
+        }
+    }
+
+    /// Flat, the scene takes the studio seen from above; tilted again, its own.
+    func testTheFlatViewIsLitFromAbove() {
+        let scene = SculptedBoardScene()
+        let tilted = SculptedBoardState(pieces: Self.startPieces)
+        var flat = tilted
+        flat.framing = .seated
+        scene.apply(tilted, animated: false)
+        XCTAssertFalse(scene.litFromAbove)
+        scene.apply(flat, animated: false)
+        XCTAssertTrue(scene.litFromAbove)
+        scene.apply(tilted, animated: false)
+        XCTAssertFalse(scene.litFromAbove)
+    }
+
     func testTheFlatBoardFillsItsViewAndStaysInside() {
         let framing = SculptedCamera.Framing.seated
         for flipped in [false, true] {
@@ -393,6 +429,22 @@ final class SculptedBoardTests: XCTestCase {
             }
         }
         return max(sums[0] / Double(max(counts[0], 1)), sums[1] / Double(max(counts[1], 1)))
+    }
+
+    /// How bright an equirectangular studio is at its top, straight overhead, from 0 to 1.
+    static func ceilingBrightness(_ image: CGImage) -> Double {
+        let width = 64, height = 32, rows = 3
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        pixels.withUnsafeMutableBytes { buffer in
+            let context = CGContext(data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8,
+                                    bytesPerRow: width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+            context?.interpolationQuality = .high
+            context?.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        }
+        // The buffer starts with the picture's top row.
+        let top = (0..<(width * rows)).map { Double(pixels[$0 * 4]) / 255 }
+        return top.reduce(0, +) / Double(top.count)
     }
 
     /// The average luminance of a piece picture where it is solid, leaving out its soft shadow.

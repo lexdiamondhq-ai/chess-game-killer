@@ -1,5 +1,6 @@
 # A studio "light tent" as an equirectangular image for SceneKit's lighting environment.
 # Symmetric under quarter turns and mirrors, so it reads the same whichever way the engine maps it.
+import os, sys
 import numpy as np
 from PIL import Image
 W,H=2048,1024
@@ -24,6 +25,13 @@ for a in (45,135,225,315):
     img+=box(a,32,34,26,1.0,0.3)
     img+=box(a+45,12,10,24,0.55,0.4)
 img=np.clip(img,0,1)
+# --above: the same tent for the flat view, seen from straight above (env_above.py).
+args=[a for a in sys.argv[1:] if a!='--above']
+if '--above' in sys.argv:
+    sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)))
+    from env_above import above
+    img=above(img,el*np.ones_like(az))
 rgb=np.stack([img*0.985,img*0.99,img],-1)   # very slightly cool
-Image.fromarray((np.clip(rgb,0,1)**(1/2.2)*255+0.5).astype(np.uint8)).save('build/sculpted/out/sculpted-env.png',optimize=True)
+out=args[0] if args else 'build/sculpted/out/sculpted-env%s.png'%('-above' if '--above' in sys.argv else '')
+Image.fromarray((np.clip(rgb,0,1)**(1/2.2)*255+0.5).astype(np.uint8)).save(out,optimize=True)
 print('ok')
