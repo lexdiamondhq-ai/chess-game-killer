@@ -14,6 +14,10 @@ struct HomeCurrentGame: Identifiable, Equatable {
     let title: String
     /// "Friend · 10+0 · Move 12".
     let detail: String
+    /// The detail without its last part, for a row too narrow for all of it: "Friend · 10+0".
+    var shortDetail: String {
+        detail.components(separatedBy: " · ").dropLast().joined(separator: " · ")
+    }
     /// The position now, drawn small from your side.
     let fen: String?
     /// You play Black, so Black is at the bottom of the small board.
@@ -151,9 +155,12 @@ struct HomeCurrentGamesCard: View {
                     Text(game.title)
                         .font(.body.weight(.semibold))
                         .foregroundStyle(tone.ink)
-                    Text(game.detail)
-                        .font(.footnote.monospacedDigit())
-                        .foregroundStyle(tone.ink3)
+                    ViewThatFits(in: .horizontal) {
+                        Text(game.detail)
+                        Text(game.shortDetail)
+                    }
+                    .font(.footnote.monospacedDigit())
+                    .foregroundStyle(tone.ink3)
                 }
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)

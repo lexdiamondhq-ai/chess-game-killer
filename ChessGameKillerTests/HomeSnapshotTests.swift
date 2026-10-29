@@ -117,6 +117,7 @@ final class HomeSnapshotTests: XCTestCase {
         XCTAssertEqual(list[0].detail, "Online · 1300 · 10+0 · Move 1")
         XCTAssertTrue(list[0].flipped, "Playing Black, Black is at the bottom")
         XCTAssertEqual(list[1].detail, "Friend · 10+0 · Move 1")
+        XCTAssertEqual(list[1].shortDetail, "Friend · 10+0")
         XCTAssertEqual(HomeCurrentGame.note(list), "1 needs your move")
         XCTAssertEqual(HomeCurrentGame.note([list[1]]), "Waiting on them")
         XCTAssertNil(HomeCurrentGame.note([]))
