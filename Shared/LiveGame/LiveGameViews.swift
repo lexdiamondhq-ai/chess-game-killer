@@ -107,8 +107,9 @@ struct LiveGameLockView: View {
 enum LiveGameIsland {
     /// Folded up: from each rounded end of the island to the orb or the clock.
     static let endMargin: CGFloat = 8
-    /// Folded up: from the camera to the orb or the clock.
-    static let cameraMargin: CGFloat = 9
+    /// Folded up: from the camera to the orb or the clock. Snug, as Apple asks, with just
+    /// enough room that neither touches it.
+    static let cameraMargin: CGFloat = 3
 
     struct Leading: View {
         let game: LiveGameAttributes
