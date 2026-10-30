@@ -157,6 +157,19 @@ jobs:
           home home-current-all -showcase game -showcaseHome YES -showcaseGames YES -showcaseHomeAt current -welcomeSeen YES -tipsOff YES
           # Today's Move, opened as the widget or a reminder opens it.
           home daily-move -showcaseDaily YES -welcomeSeen YES -tipsOff YES
+          # The gold knight in the dock, held: the rivals and shortcuts over the veiled home.
+          home home-shortcuts -showcaseShortcuts YES -welcomeSeen YES -tipsOff YES
+          # Someone at the Table with a game under way against Vector: violet light, leaning in on your move.
+          home home-vector -showcase game -showcaseHome YES -showcaseRival vector -welcomeSeen YES -tipsOff YES
+          # The game in the Dynamic Island: a timed game under way, then another app in front of it.
+          xcrun simctl terminate "$UDID" $BUNDLE 2>/dev/null || true
+          if xcrun simctl launch "$UDID" $BUNDLE -showcase game -showcaseClock 5+0 -welcomeSeen YES -tipsOff YES >/dev/null; then
+            sleep 10
+            xcrun simctl launch "$UDID" com.apple.Preferences >/dev/null || true
+            sleep 5
+            xcrun simctl io "$UDID" screenshot "snapshots/device-island.png" >/dev/null && echo "device-island.png" || echo "No screenshot for island"
+            xcrun simctl terminate "$UDID" com.apple.Preferences 2>/dev/null || true
+          fi
           # The first run's four pages, then a tip on the game screen.
           home welcome-1 -showcaseWelcome 0
           home welcome-2 -showcaseWelcome 1
@@ -202,7 +215,7 @@ jobs:
         # The screens being worked on, once more at the very end and small, so a short tail of the log holds them.
         run: |
           [ -d snapshots ] || exit 0
-          for f in snapshots/zz-home-0-top.png snapshots/zz-home-3-foot.png snapshots/zz-home-first-launch.png snapshots/zz-home-6-black-timed.png snapshots/device-home.png snapshots/device-home-ladder.png snapshots/device-home-current.png snapshots/device-home-current-all.png; do
+          for f in snapshots/zz-home-9-shortcuts.png snapshots/zz-live-lock-timed.png snapshots/zz-live-island.png snapshots/zz-live-island-compact.png snapshots/device-gilded-3d.png snapshots/device-home.png snapshots/device-home-ladder.png snapshots/device-home-shortcuts.png snapshots/device-home-vector.png snapshots/device-island.png; do
             [ -e "$f" ] || continue
             sips -s format jpeg -s formatOptions 70 -Z 1700 "$f" --out /tmp/tiny.jpg >/dev/null
             echo "BEGIN-SCREEN $(basename "$f")"

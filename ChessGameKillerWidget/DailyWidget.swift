@@ -5,11 +5,14 @@ import WidgetKit
 // DailyWidgetView (Shared/Daily), which the app's tests draw too. The app writes the streak to
 // the app group (DailySnapshot) and asks for a fresh timeline whenever it changes; the widget
 // turns the page itself at midnight, when a new puzzle starts.
+// The bundle also draws the game under way on the Lock Screen and in the Dynamic Island
+// (LiveGameWidget.swift).
 
 @main
 struct ChessGameKillerWidgets: WidgetBundle {
     var body: some Widget {
         DailyMoveWidget()
+        LiveGameWidget()
     }
 }
 

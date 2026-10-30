@@ -31,6 +31,32 @@ struct SculptedHalo: Equatable {
     }
 }
 
+/// Someone at the table: a rival's own light, from across the board. It turns with the camera
+/// like the studio's lights, so it always stands on the far side, and it tints the stone and
+/// catches the pieces' edges in the rival's color.
+struct SculptedPresence: Equatable {
+    var color: UIColor
+    /// 0 to 1: how strongly it lights the board.
+    var strength: Float = 1
+    /// Where it stands, as if the camera were in White's chair: across the board and above it.
+    var position = SIMD3<Float>(0.6, 1.2, -0.8)
+    /// How far its light reaches before it is gone.
+    var reach: Float = 10
+
+    /// Over the home's board window: just across the middle of the board, so its pool of light
+    /// falls on the squares right under the orb floating in the window's top, and it rims the
+    /// pieces in front of it.
+    static func window(_ color: UIColor, strength: Float = 1) -> SculptedPresence {
+        SculptedPresence(color: color, strength: strength)
+    }
+
+    /// In a game: behind the rival's own back rank and higher, a quiet edge of color on its
+    /// pieces and the far squares that leaves the board's middle as it was.
+    static func game(_ color: UIColor) -> SculptedPresence {
+        SculptedPresence(color: color, strength: 0.55, position: SIMD3(0, 3.2, -6.5), reach: 9)
+    }
+}
+
 /// The end of a decided game: the losing king, which tips over while the camera leans in.
 struct SculptedFinale: Equatable {
     let kingID: Int
@@ -127,6 +153,8 @@ final class SculptedBoardScene {
     private var ghostNodes: [String: PieceNode] = [:]
     private var keyLight: SCNLight?
     private var rimLight: SCNLight?
+    /// Someone at the table's light, made the first time there is one.
+    private var presenceNode: SCNNode?
     /// The fine metal line round the squares, and its own glow, which the flat view brightens.
     private var inlay: SCNMaterial?
     private var inlayGlow: Any?
@@ -896,6 +924,50 @@ final class SculptedBoardScene {
         litFromAbove = framing.lying
         scene.lightingEnvironment.contents = assets.environment(look, above: litFromAbove)
         inlay?.emission.contents = litFromAbove ? SculptedFlatSet.glow(look) : inlayGlow
+        applyPresence()
+    }
+
+    // MARK: Someone at the table
+
+    /// A rival's light from across the board, or nil for none. Seen from above (the flat view)
+    /// there is no across, so it is left out there.
+    var presence: SculptedPresence? {
+        didSet {
+            guard presence != oldValue else { return }
+            applyPresence()
+        }
+    }
+
+    /// How bright the presence is at full strength. An omni light comes out about as bright as
+    /// the key's spot for the same number (see `SculptedLook.lit`).
+    static let presenceIntensity: Float = 520
+
+    private func applyPresence() {
+        guard let presence, presence.strength > 0.001, !litFromAbove else {
+            presenceNode?.isHidden = true
+            return
+        }
+        let node = presenceNode ?? makePresenceNode()
+        node.isHidden = false
+        node.simdPosition = presence.position
+        guard let light = node.light else { return }
+        light.color = presence.color
+        light.intensity = CGFloat(Self.presenceIntensity * min(presence.strength, 1.5))
+        light.attenuationEndDistance = CGFloat(presence.reach)
+    }
+
+    /// The light, in the rig with the studio's own, so it stays across from the camera.
+    private func makePresenceNode() -> SCNNode {
+        let light = SCNLight()
+        light.type = .omni
+        light.castsShadow = false
+        light.attenuationStartDistance = 0.5
+        light.attenuationFalloffExponent = 1.6
+        let node = SCNNode()
+        node.light = light
+        rig.addChildNode(node)
+        presenceNode = node
+        return node
     }
 
     /// The studio lights down to a warm hush for the finale, or back up.

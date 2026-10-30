@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// A computer opponent's personality: a name, a look and a rough rating for each level.
 struct Rival: Identifiable {
@@ -26,6 +27,29 @@ struct Rival: Identifiable {
 
     /// The rival's portrait in Assets.xcassets/Rivals.
     var portraitName: String { "rival-" + name.lowercased() }
+
+    /// The portrait as light with no backdrop (scripts/make_rival_glows.py), to lay over the board.
+    var glowName: String { portraitName + "-glow" }
+
+    /// The color the portrait glows: Spark burns orange, Drift teal, Pulse blue, Vector violet,
+    /// Singularity a pale violet. Someone at the Table casts it across the board, and the game on
+    /// the Lock Screen wears it.
+    var lightHex: UInt32 {
+        switch level {
+        case .beginner: return 0xFF8A3D
+        case .casual: return 0x3FD0F0
+        case .club: return 0x2FA8FF
+        case .expert: return 0x9A72FF
+        case .grandmaster: return 0xB9A8FF
+        }
+    }
+
+    var light: Color { Color(hex: lightHex) }
+
+    var lightUI: UIColor {
+        UIColor(red: CGFloat((lightHex >> 16) & 0xFF) / 255, green: CGFloat((lightHex >> 8) & 0xFF) / 255,
+                blue: CGFloat(lightHex & 0xFF) / 255, alpha: 1)
+    }
 
     static let all: [Rival] = MatchController.Level.allCases.map(\.rival)
 }

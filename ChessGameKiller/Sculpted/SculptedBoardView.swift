@@ -21,6 +21,8 @@ struct SculptedSceneView: UIViewRepresentable {
     let stage: SculptedStage
     let look: SculptedLook
     let state: SculptedBoardState
+    /// Someone at the table: the rival's light from across the board, if any.
+    var presence: SculptedPresence? = nil
 
     @AppStorage(BoardTheme.coordinatesKey) private var showsCoordinates = true
 
@@ -34,11 +36,14 @@ struct SculptedSceneView: UIViewRepresentable {
     func makeUIView(context: Context) -> SculptedSceneKitView {
         let scene = stage.scene(for: look)
         scene.apply(shown, animated: false)
+        scene.presence = presence
         return scene.view
     }
 
     func updateUIView(_ view: SculptedSceneKitView, context: Context) {
-        stage.scene(for: look).apply(shown, animated: !context.transaction.disablesAnimations)
+        let scene = stage.scene(for: look)
+        scene.apply(shown, animated: !context.transaction.disablesAnimations)
+        if scene.presence != presence { scene.presence = presence }
     }
 }
 
@@ -78,13 +83,19 @@ struct SculptedBoardView: View {
     private var game: GameModel { match.game }
     private var flipped: Bool { match.isBoardFlipped }
     private var look: SculptedLook { theme.sculptedLook ?? .gilded }
+    /// Someone at the table: the rival sits across the board as its own soft light, the same
+    /// light the home's window shows before the game.
+    private var presence: SculptedPresence? {
+        guard match.setup.opponent == .computer else { return nil }
+        return .game(match.setup.level.rival.lightUI)
+    }
 
     var body: some View {
         GeometryReader { geo in
             let size = geo.size
             let camera = SculptedCamera.fitted(aspect: Float(size.width / max(size.height, 1)), flipped: flipped, framing: framing)
             ZStack(alignment: .topLeading) {
-                SculptedSceneView(stage: stage, look: look, state: boardState)
+                SculptedSceneView(stage: stage, look: look, state: boardState, presence: presence)
                     .id(look.name)
                     .frame(width: size.width, height: size.height)
                     .accessibilityHidden(true)

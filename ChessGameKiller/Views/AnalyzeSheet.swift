@@ -17,6 +17,8 @@ struct AnalyzeSheet: View {
     /// Called when the person analyzes a game still being played: that counts as help, like Undo.
     let onAnalyzeGame: (() -> Void)?
     let onPlay: (PositionDraft) -> Void
+    /// Opened from the home's Scan a board shortcut: the camera comes up straight away.
+    let startsWithCamera: Bool
 
     @State private var session: ScanSession
     @State private var photoItem: PhotosPickerItem?
@@ -35,6 +37,7 @@ struct AnalyzeSheet: View {
         clock: TimeControl,
         forfeits: String? = nil,
         onAnalyzeGame: (() -> Void)? = nil,
+        startsWithCamera: Bool = false,
         onPlay: @escaping (PositionDraft) -> Void
     ) {
         self.theme = theme
@@ -44,6 +47,7 @@ struct AnalyzeSheet: View {
         self.clock = clock
         self.forfeits = forfeits
         self.onAnalyzeGame = onAnalyzeGame
+        self.startsWithCamera = startsWithCamera
         self.onPlay = onPlay
         _session = State(initialValue: ScanSession(reader: reader))
     }
@@ -169,6 +173,12 @@ struct AnalyzeSheet: View {
         .fullScreenCover(isPresented: $showingCamera) {
             CameraPicker { image in scan(image) }
                 .ignoresSafeArea()
+        }
+        .task {
+            // Scan a board: the camera once the sheet is up (or the offer, with no scans left).
+            guard startsWithCamera, hasCamera else { return }
+            try? await Task.sleep(for: .milliseconds(450))
+            if canScan { showingCamera = true } else { offer = .scan }
         }
         .premiumOffer($offer)
         .tint(accent)

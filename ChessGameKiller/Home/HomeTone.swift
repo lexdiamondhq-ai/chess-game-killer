@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// The home's colors, taken from the board it stands on: the dark of the room, the stone's
 /// warmth, the pieces' metal and the ivory of the white set. Gilded gives espresso and
@@ -47,6 +48,28 @@ struct HomeTone {
             return HomeTone(canvas: Color(hex: 0x100B08), smoke: Color(hex: 0x1E150F), pool: Color(hex: 0x684F40),
                             metal: Color(hex: 0xE2B577), ivory: Color(hex: 0xF4EDDF), onIvory: Color(hex: 0x15110C))
         }
+    }
+}
+
+extension HomeTone {
+    /// The jewel's gold, top to foot: the pieces' metal lit toward white where the light
+    /// catches it, then deepening into shadow.
+    var jewelLight: Color { metal.mixed(with: .white, by: 0.55) }
+    var jewelDeep: Color { metal.mixed(with: .black, by: 0.42) }
+}
+
+extension Color {
+    /// This color taken `amount` of the way toward `other` (0 is this color, 1 is `other`).
+    func mixed(with other: UIColor, by amount: CGFloat) -> Color {
+        var r1: CGFloat = 0, g1: CGFloat = 0, b1: CGFloat = 0, a1: CGFloat = 0
+        var r2: CGFloat = 0, g2: CGFloat = 0, b2: CGFloat = 0, a2: CGFloat = 0
+        UIColor(self).getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
+        other.getRed(&r2, green: &g2, blue: &b2, alpha: &a2)
+        let t: CGFloat = min(max(amount, 0), 1)
+        let red: CGFloat = r1 + (r2 - r1) * t
+        let green: CGFloat = g1 + (g2 - g1) * t
+        let blue: CGFloat = b1 + (b2 - b1) * t
+        return Color(red: Double(red), green: Double(green), blue: Double(blue), opacity: Double(a1))
     }
 }
 

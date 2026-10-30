@@ -21,7 +21,7 @@ targets:
   ChessGameKiller:
     type: application
     platform: iOS
-    # Shared/ holds Today's Move and the widget's faces, compiled into the widget too.
+    # Shared/ holds Today's Move, the game's Live Activity and the widget's faces, compiled into the widget too.
     sources: [ChessGameKiller, Shared]
     # The app group lets the widget read the streak the app writes (Shared/Daily/DailySnapshot.swift).
     entitlements:
@@ -39,6 +39,8 @@ targets:
             CFBundleURLSchemes: [chessgamekiller]
         # Geist, the app's typeface (Shared/Fonts, Shared/AppFont.swift).
         UIAppFonts: [Geist-Regular.ttf, Geist-Medium.ttf, Geist-SemiBold.ttf, Geist-Bold.ttf]
+        # The game under way on the Lock Screen and in the Dynamic Island (Shared/LiveGame).
+        NSSupportsLiveActivities: true
     dependencies:
       - package: ChessKit
       - package: ChessKitEngine
@@ -69,7 +71,8 @@ targets:
         # offered to iPad owners has to work there. Set back to "1,2" once it is designed for it.
         TARGETED_DEVICE_FAMILY: "1"
   ChessGameKillerWidget:
-    # Today's Move and the streak on the Home Screen and the Lock Screen.
+    # Today's Move and the streak on the Home Screen and the Lock Screen, and the game under way
+    # as a Live Activity (Lock Screen, Dynamic Island, StandBy).
     type: app-extension
     platform: iOS
     sources: [ChessGameKillerWidget, Shared]
