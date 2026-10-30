@@ -26,14 +26,14 @@ struct HomeActions {
     var premium: (() -> Void)? = nil
 }
 
-/// The home screen. The real 3D board is the world behind the whole page: at rest it fills
-/// the top of the screen with nothing on it, and as the page scrolls the camera walks around
-/// it and moves in on your king while the glass cards rise over it and it slips out of focus.
+/// The home screen, as tiles that fit on about one screen (Alex's Bento, 2026-10-30).
 ///
-/// The page, top to bottom: a chess clock (resume your game, or start the next one), today's
-/// puzzle and session, the ladder of rivals and the scoresheet of your games. Play a person
-/// sits right under the clock, then Current games: every game still going, whose move it is. The glass dock holds the four doors. Your pieces, your games and Settings are in
-/// the You panel, from the dock or by pulling the board down. Each thing has one way in, so nothing is found twice.
+/// Top to bottom: hello with your streak and level; the board window, the real 3D set with
+/// the game under way (or the next one) and the way to play right on it; Play a person
+/// (Online, or A friend by link); Today's Move and today's session with the coach side by
+/// side; the games still going with people, as a strip of small boards; the ladder of rivals;
+/// and your games. The glass dock holds the four doors. Your pieces, your games and Settings
+/// are in the You panel, from the dock or by pulling the page down. Each thing has one way in.
 struct HomeView: View {
     let match: MatchController
     let theme: BoardTheme
@@ -54,6 +54,8 @@ struct HomeView: View {
     @AppStorage("setup.level") private var storedLevel: Int?
     @AppStorage("setup.clock") private var timeControl: TimeControl = .unlimited
     @AppStorage("haptics") private var hapticsOn = true
+    /// The name friends see, from the last challenge: the home says hello with it.
+    @AppStorage(ChallengeName.key) private var playerName = ""
 
     @State private var scroll = HomeScroll()
     /// The You panel, and where it came from.
@@ -65,15 +67,16 @@ struct HomeView: View {
     @State private var pullReady = true
     /// Today's session, worked out once rather than on every redraw.
     @State private var plan: SessionPlan?
-    /// The clock card has scrolled out of sight; the dock carries it instead.
-    @State private var clockGone = false
-    @State private var clockHeight: CGFloat = 236
+    /// The board window has scrolled out of sight; the dock carries its button instead.
+    @State private var windowGone = false
 
     enum YouOrigin { case top, bottom }
 
-    /// How far the board must be pulled down to open the You panel.
+    /// How far the page must be pulled down to open the You panel.
     static let pullToOpen: CGFloat = 86
     private static let space = "home-scroll"
+    /// The gap between tiles, and between the tiles and the screen's edge.
+    static let gap: CGFloat = 10
 
     init(match: MatchController, theme: BoardTheme, actions: HomeActions, showsYou: Bool = false) {
         self.match = match
@@ -86,7 +89,7 @@ struct HomeView: View {
 
     private var look: SculptedLook { theme.sculptedLook ?? .gilded }
     private var tone: HomeTone { .of(look) }
-    /// The pieces on the clock and in diagrams match the board behind the page.
+    /// The pieces on the small boards match the board in the window.
     private var pieceTheme: BoardTheme { theme.sculptedLook == nil ? .named(.gilded) : theme }
 
     private var upNext: HomeUpNext {
@@ -114,25 +117,20 @@ struct HomeView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let layout = HomeLayout(size: geo.size, insets: geo.safeAreaInsets, cardHeight: clockHeight)
-            let upNext = self.upNext
+            let safeTop = geo.safeAreaInsets.top
             ZStack(alignment: .top) {
-                HomeWorld(scroll: scroll, look: look, tone: tone, pieces: match.game.pieces.map(\.piece),
-                          black: upNext.playerColor == .black, pool: layout.boardCenter,
-                          restLook: layout.restLook, endLook: layout.crownLook,
-                          walk: layout.walk, foot: layout.cardTop)
+                HomeBackdrop(tone: tone)
 
-                page(layout, upNext: upNext)
+                page(safeTop: safeTop)
 
-                HomeTopEdge(scroll: scroll, tone: tone, start: layout.cardTop - layout.safeTop - 24,
-                            height: layout.safeTop + 40)
+                HomeTopEdge(scroll: scroll, tone: tone, start: 0, height: safeTop + 34)
                     .ignoresSafeArea(edges: .top)
 
                 HomePullCue(scroll: scroll, tone: tone, threshold: Self.pullToOpen, armed: pullArmed)
                     .padding(.top, 6)
 
                 if let origin = you {
-                    youPanel(origin, layout: layout)
+                    youPanel(origin)
                 }
             }
         }
@@ -146,7 +144,7 @@ struct HomeView: View {
             puzzles.prepareUpNext()
         }
         .onChange(of: puzzles.upNext == nil) { _, gone in
-            // Puzzles took the one shown here: pick the next, so the home always shows the puzzle Solve opens.
+            // Puzzles took the one ready: pick the next, so Puzzles always opens on one.
             if gone { puzzles.prepareUpNext() }
         }
         .task(id: planKey) {
@@ -163,32 +161,28 @@ struct HomeView: View {
 
     // MARK: The page
 
-    private func page(_ layout: HomeLayout, upNext: HomeUpNext) -> some View {
-        ScrollViewReader { reader in
+    private func page(safeTop: CGFloat) -> some View {
+        let upNext = self.upNext
+        let ladder = HomeLadder(games: vault.games)
+        let day = dailyState
+        return ScrollViewReader { reader in
             ScrollView(.vertical) {
-                VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: Self.gap) {
                     Color.clear.frame(height: 0)
                         .onGeometryChange(for: CGFloat.self) { proxy in
                             proxy.frame(in: .named(Self.space)).minY
                         } action: { minY in
                             scrolled(to: -minY)
                         }
-                    // The board shows through here. Nothing is drawn on it.
-                    Color.clear
-                        .frame(height: layout.cardTop)
-                        .accessibilityHidden(true)
-                    HomeClockCard(upNext: upNext, tone: tone, pieceTheme: pieceTheme,
-                                  primary: { primary(upNext) }, secondary: { secondary(upNext) })
-                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { clockHeight = $0 }
-                        .onGeometryChange(for: Bool.self) { proxy in
-                            proxy.frame(in: .named(Self.space)).maxY < layout.safeTop + 20
-                        } action: { gone in
-                            clockGone = gone
-                        }
-                    sections(upNext: upNext)
+                    HomeGreeting(name: playerName, streak: day.streak, doneToday: day.doneToday,
+                                 streakDetail: day.detail, level: ladder.yourRating, tone: tone,
+                                 openStreak: actions.dailyMove, openLevel: { show("ladder", in: reader) })
+                    window(upNext, safeTop: safeTop)
+                    tiles(upNext: upNext, ladder: ladder, day: day)
                 }
+                .padding(.top, safeTop + 4)
                 .padding(.horizontal, 16)
-                // The last card ends clear of the fade above the dock.
+                // The last tile ends clear of the fade above the dock.
                 .padding(.bottom, Self.dockFade + 16)
                 .frame(maxWidth: 640)
                 .frame(maxWidth: .infinity)
@@ -202,9 +196,10 @@ struct HomeView: View {
                     openYou(.top)
                 }
             })
+            // The page runs under the status bar, so its top is measured from the screen's.
             .ignoresSafeArea(edges: .top)
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                HomeDock(tone: tone, upNext: upNext, compact: clockGone, actions: actions,
+                HomeDock(tone: tone, upNext: upNext, compact: windowGone, actions: actions,
                          openYou: { openYou(.bottom) }, primary: { primary(upNext) })
                     .background(alignment: .top) {
                         // The page fades away just above the dock and stays hidden under it.
@@ -221,60 +216,73 @@ struct HomeView: View {
         }
     }
 
-    /// CI's pictures on the simulator open the page at a section with `-showcaseHomeAt today`
-    /// (or ladder, games, friends), as Showcase in ChessGameKillerApp.swift does for a game.
-    /// A normal launch never passes it.
+    private func window(_ upNext: HomeUpNext, safeTop: CGFloat) -> some View {
+        HomeBoardWindow(upNext: upNext, tone: tone, look: look, pieces: match.game.pieces.map(\.piece),
+                        scroll: scroll, primary: { primary(upNext) }, secondary: { secondary(upNext) })
+            .onGeometryChange(for: Bool.self) { proxy in
+                proxy.frame(in: .named(Self.space)).maxY < safeTop + 20
+            } action: { gone in
+                windowGone = gone
+            }
+            .id("play")
+    }
+
+    @ViewBuilder
+    private func tiles(upNext: HomeUpNext, ladder: HomeLadder, day: HomeDailyState) -> some View {
+        playPerson()
+
+        HStack(alignment: .top, spacing: Self.gap) {
+            HomeDailyTile(puzzle: dailyPuzzle, daily: day, tone: tone, pieceTheme: pieceTheme,
+                          solve: actions.dailyMove)
+            HomeCoachTile(plan: plan, trainedToday: training.trainedToday, progress: training.rankProgress,
+                          tone: tone, start: actions.trainToday, train: actions.train)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .id("today")
+
+        if HomeNoticeCard.shows(day) {
+            HomeNoticeCard(daily: day, tone: tone, remind: answerReminder)
+                .transition(.opacity)
+        }
+
+        currentGames()
+
+        HomeLadderTile(ladder: ladder, tone: tone, play: { level in actions.playRival(level) })
+            .padding(.top, 4)
+            .id("ladder")
+
+        // The game under way is in the window. (A long one is also kept in Your games while
+        // the app is away, in case iOS closes it.)
+        let played = upNext.inProgress ? vault.games.filter { $0.id != match.gameID } : vault.games
+        if !played.isEmpty {
+            HomeGamesTile(rows: HomeGameRow.rows(played), total: vault.games.count,
+                          week: HomeGameRow.thisWeek(played), tone: tone, openAll: actions.rewind)
+                .id("games")
+        }
+    }
+
+    /// Scrolls the page to a tile, as the level chip does for the ladder.
+    private func show(_ id: String, in reader: ScrollViewProxy) {
+        withAnimation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.5, dampingFraction: 0.88)) {
+            reader.scrollTo(id, anchor: .center)
+        }
+    }
+
+    /// CI's pictures on the simulator open the page at a tile with `-showcaseHomeAt today`
+    /// (or ladder, games, friends, current), as Showcase in ChessGameKillerApp.swift does for
+    /// a game. A normal launch never passes it.
     private func showcaseScroll(_ reader: ScrollViewProxy) async {
         guard let section = UserDefaults.standard.string(forKey: "showcaseHomeAt") else { return }
         try? await Task.sleep(for: .seconds(1.5))
         reader.scrollTo(section, anchor: UnitPoint(x: 0.5, y: 0.2))
     }
 
-    @ViewBuilder
-    private func sections(upNext: HomeUpNext) -> some View {
-        // Play a person (online, or a friend by link) right under the clock, then every game
-        // still going, with whose move it is: yours first.
-        playPerson()
-        currentGames(upNext: upNext)
-
-        // Dated like a newspaper's chess column; it turns over at midnight with the page open.
-        TimelineView(.everyMinute) { context in
-            HomeSectionHeader(title: "Today", tone: tone, note: HomeView.dateline(context.date), dateline: true)
-        }
-        .id("today")
-        HomeTodayCard(puzzle: dailyPuzzle, daily: dailyState,
-                      plan: plan, trainedToday: training.trainedToday,
-                      tone: tone, pieceTheme: pieceTheme, solve: actions.dailyMove,
-                      startSession: actions.trainToday, train: actions.train, remind: answerReminder)
-
-        let ladder = HomeLadder(games: vault.games)
-        HomeSectionHeader(title: "The ladder", tone: tone,
-                          note: ladder.nextToBeat == nil ? "You lead every rival" : nil)
-            .id("ladder")
-        HomeLadderCard(ladder: ladder, tone: tone, pieceTheme: pieceTheme, youColor: upNext.playerColor,
-                       play: { level in actions.playRival(level) })
-
-        // The game under way is on the clock card. (A long one is also kept in Your games
-        // while the app is away, in case iOS closes it.)
-        let played = upNext.inProgress ? vault.games.filter { $0.id != match.gameID } : vault.games
-        let rows = HomeGameRow.rows(played)
-        if !rows.isEmpty {
-            let week = HomeGameRow.thisWeek(played)
-            HomeSectionHeader(title: "Your games", tone: tone, note: week > 0 ? "\(week) this week" : nil)
-                .id("games")
-            // "All N games" opens Rewind, which lists every saved game.
-            HomeScoresheet(rows: rows, total: vault.games.count, tone: tone,
-                           open: actions.openGame, openAll: actions.rewind)
-        }
-    }
-
     /// The way to start a game with a person: online, or a friend by link.
     @ViewBuilder
     private func playPerson() -> some View {
         if let challenges {
-            HomePlayPersonCard(tone: tone, pieceTheme: pieceTheme, waiting: challenges.onlineWaiting,
-                               online: { challenges.playOnline() }, friend: { challenges.compose() })
-                .padding(.top, 12)
+            HomePlayTile(tone: tone, waiting: challenges.onlineWaiting,
+                         online: { challenges.playOnline() }, friend: { challenges.compose() })
                 .id("friends")
                 .task {
                     // Keeps whose move it is up to date while the home is showing.
@@ -287,36 +295,32 @@ struct HomeView: View {
         }
     }
 
-    /// Every game still going: the one against the computer, friend games and online games.
-    private func currentGameList(upNext: HomeUpNext) -> [HomeCurrentGame] {
-        var games: [HomeCurrentGame] = []
-        if let computer = HomeCurrentGame.computer(upNext, fen: match.game.fen) {
-            games.append(computer)
-        }
+    /// Every game still going with a person, friend and online. The game against the
+    /// computer is in the board window, so it isn't listed twice.
+    private var currentGameList: [HomeCurrentGame] {
         let friends = challenges?.store.sorted.filter { !$0.isOver } ?? []
-        games += friends.map(HomeCurrentGame.friend)
-        return HomeCurrentGame.sorted(games)
+        return HomeCurrentGame.sorted(friends.map(HomeCurrentGame.friend))
     }
 
     @ViewBuilder
-    private func currentGames(upNext: HomeUpNext) -> some View {
-        let games = currentGameList(upNext: upNext)
+    private func currentGames() -> some View {
+        let games = currentGameList
         if !games.isEmpty {
-            HomeSectionHeader(title: "Current games", tone: tone, note: HomeCurrentGame.note(games))
-                .id("current")
-            HomeCurrentGamesCard(games: games, tone: tone, pieceTheme: pieceTheme) { game in
+            HomeCurrentStrip(games: games, tone: tone, pieceTheme: pieceTheme) { game in
                 if let friend = game.friendGame {
                     challenges?.play(friend)
                 } else {
                     actions.resume()
                 }
             }
+            .padding(.top, 6)
+            .id("current")
         }
     }
 
     // MARK: The day
 
-    /// Today's Move as a diagram, the same puzzle for every player.
+    /// Today's Move as a small board, the same puzzle for every player.
     private var dailyPuzzle: HomePuzzle? {
         guard let today = daily?.puzzle() ?? DailyMoves.puzzle(for: .now) else { return nil }
         return HomePuzzle(LichessPuzzle(id: today.id, fen: today.fen, moves: today.moves, rating: today.rating,
@@ -347,7 +351,9 @@ struct HomeView: View {
 
     /// The reminder question, answered: asks iOS for permission on a yes.
     private func answerReminder(_ yes: Bool) {
-        daily?.markReminderAsked()
+        withAnimation(.snappy(duration: 0.3)) {
+            daily?.markReminderAsked()
+        }
         guard yes else { return }
         UserDefaults.standard.set(true, forKey: DailyReminders.enabledKey)
         Task { @MainActor in
@@ -357,12 +363,7 @@ struct HomeView: View {
         }
     }
 
-    /// "Thursday, October 23", in the reader's own way of writing a date.
-    static func dateline(_ date: Date) -> String {
-        date.formatted(.dateTime.weekday(.wide).month(.wide).day())
-    }
-
-    // MARK: The clock's buttons
+    // MARK: The window's buttons
 
     /// Resume the game under way, or start the next one as set up, against the rival named.
     private func primary(_ upNext: HomeUpNext) {
@@ -376,7 +377,7 @@ struct HomeView: View {
     }
 
     /// New game during a game, or Change before one, which opens the New Game sheet on the
-    /// rival the card shows. The sheet asks before a new game ends the one under way.
+    /// rival the window shows. The sheet asks before a new game ends the one under way.
     private func secondary(_ upNext: HomeUpNext) {
         if upNext.inProgress {
             actions.play()
@@ -391,7 +392,7 @@ struct HomeView: View {
         scroll.y = y
         guard you == nil else { return }
         if #available(iOS 18.0, *) {
-            // Armed while the finger holds the board past the mark; it opens on release.
+            // Armed while the finger holds the page past the mark; it opens on release.
             let past = y < -Self.pullToOpen
             if interacting, past != pullArmed { pullArmed = past }
             if !interacting, !past, pullArmed { pullArmed = false }
@@ -417,7 +418,7 @@ struct HomeView: View {
     }
 
     @ViewBuilder
-    private func youPanel(_ origin: YouOrigin, layout: HomeLayout) -> some View {
+    private func youPanel(_ origin: YouOrigin) -> some View {
         let fromTop = origin == .top
         tone.canvas.opacity(0.7)
             .ignoresSafeArea()
@@ -435,45 +436,22 @@ struct HomeView: View {
     }
 }
 
-/// Where things sit on the home, from the screen's size.
-struct HomeLayout {
-    let width: CGFloat
-    /// The whole screen, under the status bar and the home indicator too.
-    let height: CGFloat
-    let safeTop: CGFloat
-    let safeBottom: CGFloat
-    let cardHeight: CGFloat
+/// The room behind the home: its own dark, a pool of warm light where the board window
+/// sits, and a breath of the pieces' gold lower down, so the glass tiles have light to catch.
+struct HomeBackdrop: View {
+    let tone: HomeTone
 
-    init(size: CGSize, insets: EdgeInsets, cardHeight: CGFloat) {
-        width = size.width
-        height = size.height + insets.top + insets.bottom
-        safeTop = insets.top
-        safeBottom = insets.bottom
-        self.cardHeight = cardHeight
-    }
-
-    /// The frame the board is composed in: the top of the screen, as tall as a phone is wide and a bit.
-    var heroFrame: CGFloat { min(max(width * 1.2, 440), 620) + safeTop * 0.3 }
-    /// Where the board's middle sits at rest, from the top of the screen.
-    var boardCenter: CGFloat { heroFrame / 2 }
-    /// Where the camera's look point (the near half of the board) sits at rest: high, so the
-    /// pieces rising from it fill the top of the screen.
-    var restLook: CGFloat { heroFrame * 0.323 }
-    /// How far the page scrolls while the camera walks in and the board goes soft.
-    var walk: CGFloat { heroFrame * 0.62 }
-    /// Where the king's head sits once the camera has come in: halfway between the status
-    /// bar and the top of the clock card at that moment, so the cross and crown both show.
-    var crownLook: CGFloat {
-        max((safeTop + cardTop - HomeWorld.arrival * walk) / 2, safeTop + 40)
-    }
-    /// The dock and the space around it.
-    static let dockZone: CGFloat = 76
-
-    /// The top of the clock card: over the foot of the board, and always wholly above the dock.
-    var cardTop: CGFloat {
-        let natural = heroFrame - 112
-        let fits = height - safeBottom - Self.dockZone - cardHeight - 10
-        return max(min(natural, fits), height * 0.28)
+    var body: some View {
+        ZStack {
+            tone.canvas
+            RadialGradient(colors: [tone.pool.opacity(0.5), tone.canvas.opacity(0)],
+                           center: UnitPoint(x: 0.5, y: 0.16), startRadius: 0, endRadius: 440)
+            RadialGradient(colors: [tone.metal.opacity(0.08), tone.canvas.opacity(0)],
+                           center: UnitPoint(x: 0.92, y: 0.62), startRadius: 0, endRadius: 320)
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 

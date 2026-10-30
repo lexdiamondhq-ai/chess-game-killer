@@ -48,9 +48,10 @@ enum Glyphs {
     static let pawn = "glyph-pawn"
     static let coach = "glyph-coach"
     static let challenge = "glyph-challenge"
+    static let online = "glyph-online"
 
     static let all = [home, train, play, puzzles, analyze, army, games, undo, hints, hintsOff, flip,
-                      settings, normalView, bigBoard, king, pawn, coach, challenge]
+                      settings, normalView, bigBoard, king, pawn, coach, challenge, online]
 }
 
 /// The small dark well a row's icon sits in (New Game's match card, Challenge a friend):

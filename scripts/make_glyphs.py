@@ -308,6 +308,17 @@ def challenge():
     return svg([rider, plane])
 
 
+def online():
+    """A globe with its equator and two meridians: a game with someone anywhere in the world."""
+    ring = circle(12, 12, 9.5) + " " + circle(12, 12, 7.9, clockwise=False)
+    lines = [
+        ("M3.8 12H20.2", 1.6),
+        ("M12 3.4C8.2 6.4 8.2 17.6 12 20.6", 1.6),
+        ("M12 3.4C15.8 6.4 15.8 17.6 12 20.6", 1.6),
+    ]
+    return svg([ring], lines)
+
+
 GLYPHS = {
     "glyph-home": svg([rook()]),
     "glyph-train": svg([knight()]),
@@ -327,6 +338,7 @@ GLYPHS = {
     "glyph-pawn": svg([pawn()]),
     "glyph-coach": coach(),
     "glyph-challenge": challenge(),
+    "glyph-online": online(),
 }
 
 

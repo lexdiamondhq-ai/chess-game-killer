@@ -1,8 +1,8 @@
 import ChessKit
 import SwiftUI
 
-/// One game still going, as the home's Current games lists it: against the computer, a friend
-/// by link, or a player found online.
+/// One game still going, as the home's strip of current games shows it: against the computer,
+/// a friend by link, or a player found online.
 struct HomeCurrentGame: Identifiable, Equatable {
     enum Kind: Equatable {
         case computer, friend, online
@@ -98,101 +98,6 @@ struct HomeCurrentGame: Identifiable, Equatable {
         let yours = games.filter(\.isYourMove).count
         if yours == 0 { return games.isEmpty ? nil : "Waiting on them" }
         return yours == 1 ? "1 needs your move" : "\(yours) need your move"
-    }
-}
-
-/// Current games: every game still going, each with a small board of where it stands and
-/// whose move it is, your move first and lit in gold. Tap one to go back to it.
-struct HomeCurrentGamesCard: View {
-    let games: [HomeCurrentGame]
-    let tone: HomeTone
-    let pieceTheme: BoardTheme
-    let open: (HomeCurrentGame) -> Void
-
-    @State private var showsAll = false
-    @ScaledMetric(relativeTo: .body) private var boardSize: CGFloat = 46
-
-    /// How many games show before "Show all".
-    static let limit = 4
-
-    /// The small board grows with the text, but not past where it would squeeze the name.
-    private var board: CGFloat { min(boardSize, 64) }
-
-    var body: some View {
-        let shown = showsAll ? games : Array(games.prefix(Self.limit))
-        VStack(spacing: 0) {
-            ForEach(Array(shown.enumerated()), id: \.element.id) { index, game in
-                if index > 0 { HomeHairline(tone: tone) }
-                row(game)
-            }
-            if games.count > Self.limit {
-                HomeHairline(tone: tone)
-                Button {
-                    withAnimation(.snappy(duration: 0.3)) { showsAll.toggle() }
-                } label: {
-                    Text(showsAll ? "Show fewer" : "Show all \(games.count)")
-                        .font(.app(.subheadline, weight: .semibold))
-                        .foregroundStyle(tone.metal)
-                        .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(HomeRowPressStyle(tone: tone))
-            }
-        }
-        .padding(.horizontal, HomeMetrics.inset)
-        .homePane(RoundedRectangle(cornerRadius: HomeMetrics.cardRadius, style: .continuous), tone: tone)
-    }
-
-    private func row(_ game: HomeCurrentGame) -> some View {
-        Button {
-            open(game)
-        } label: {
-            HStack(spacing: 12) {
-                HomeMiniBoard(fen: game.fen, flipped: game.flipped, theme: pieceTheme, tone: tone,
-                              lit: game.isYourMove)
-                    .frame(width: board, height: board)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(game.title)
-                        .font(.app(.body, weight: .semibold))
-                        .foregroundStyle(tone.ink)
-                    ViewThatFits(in: .horizontal) {
-                        Text(game.detail)
-                        Text(game.shortDetail)
-                    }
-                    .font(.app(.footnote).monospacedDigit())
-                    .foregroundStyle(tone.ink3)
-                }
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                status(game.status)
-                Image(systemName: "chevron.forward")
-                    .font(.app(.footnote, weight: .semibold))
-                    .foregroundStyle(tone.ink3)
-            }
-            .padding(.vertical, 12)
-            .frame(minHeight: 64)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(HomeRowPressStyle(tone: tone))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(game.title), \(game.status.words), \(game.detail.replacingOccurrences(of: " · ", with: ", "))")
-        .accessibilityAddTraits(.isButton)
-    }
-
-    /// Your move in gold with a lit dot; their move and waiting quietly.
-    private func status(_ status: HomeCurrentGame.Status) -> some View {
-        let yours = status == .yourMove
-        return HStack(spacing: 6) {
-            Circle()
-                .fill(yours ? tone.metal : tone.ink3.opacity(0.5))
-                .frame(width: 7, height: 7)
-                .shadow(color: yours ? tone.metal.opacity(0.7) : .clear, radius: 3)
-            Text(status.words)
-                .font(.app(.subheadline, weight: yours ? .semibold : .regular))
-                .foregroundStyle(yours ? tone.metal : tone.ink2)
-        }
-        .lineLimit(1)
-        .fixedSize()
     }
 }
 
