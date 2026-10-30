@@ -32,8 +32,8 @@ struct SculptedHalo: Equatable {
 }
 
 /// Someone at the table: a rival's own light, from across the board. It turns with the camera
-/// like the studio's lights, so it always stands on the far side, and it tints the stone and
-/// catches the pieces' edges in the rival's color.
+/// like the studio's lights, so it always stands on the far side, and it catches the pieces'
+/// edges in the rival's color (over the home, it tints the stone as well).
 struct SculptedPresence: Equatable {
     var color: UIColor
     /// 0 to 1: how strongly it lights the board.
@@ -42,6 +42,8 @@ struct SculptedPresence: Equatable {
     var position = SIMD3<Float>(0.6, 1.2, -0.8)
     /// How far its light reaches before it is gone.
     var reach: Float = 10
+    /// Whether it lights the board too, or only the pieces.
+    var lightsBoard = true
 
     /// Over the home's board window: just across the middle of the board, so its pool of light
     /// falls on the squares right under the orb floating in the window's top, and it rims the
@@ -50,11 +52,11 @@ struct SculptedPresence: Equatable {
         SculptedPresence(color: color, strength: strength)
     }
 
-    /// In a game: low behind the rival's own back rank, an edge of color on its pieces and a
-    /// glow along the far edge that fades before the middle. Kept low, so its gleam on the
-    /// polished board falls beyond the far edge rather than on the squares in play.
+    /// In a game: low behind the rival's own back rank, an edge of its color on the rival's
+    /// pieces. It lights the pieces only, so the squares, the last move and every mark on them
+    /// look as they always do, and the polished board never shows its gleam.
     static func game(_ color: UIColor) -> SculptedPresence {
-        SculptedPresence(color: color, strength: 1, position: SIMD3(0, 1.3, -7.5), reach: 10)
+        SculptedPresence(color: color, strength: 1, position: SIMD3(0, 1.3, -7.5), reach: 10, lightsBoard: false)
     }
 }
 
@@ -955,6 +957,8 @@ final class SculptedBoardScene {
         light.color = presence.color
         light.intensity = CGFloat(Self.presenceIntensity * min(presence.strength, 1.5))
         light.attenuationEndDistance = CGFloat(presence.reach)
+        // All of the scene, or only what is carved as a piece.
+        light.categoryBitMask = presence.lightsBoard ? -1 : Self.pieceCategory
     }
 
     /// The light, in the rig with the studio's own, so it stays across from the camera.
