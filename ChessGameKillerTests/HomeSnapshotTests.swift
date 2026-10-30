@@ -5,19 +5,18 @@ import XCTest
 import simd
 @testable import ChessGameKiller
 
-/// The home screen at iPhone size: at rest, as the camera walks in, with the glass cards over
-/// the board, down the ladder and at the foot; pulled down and with the You panel open; on a
-/// first launch; in the real app; with a timed game under way as Black; with friend games;
-/// and on other looks.
+/// The home screen at iPhone size: at rest, scrolled and at the foot; pulled down and with
+/// the You panel open; on a first launch; in the real app; with a timed game under way as
+/// Black; with friend games; and on other looks.
 /// When SNAPSHOT_DIR is set the pictures are saved there, named to sort last so CI prints them at the log's end.
 @MainActor
 final class HomeSnapshotTests: XCTestCase {
 
     func testHomeScrolling() throws {
         let window = try show(HomeSample.home())
-        // "Closer" is where the camera has come in: the king's head between the status bar and the card.
-        for (name, offset) in [("zz-home-0-top", 0.0), ("zz-home-1-turning", 120.0), ("zz-home-1-closer", 190.0),
-                               ("zz-home-2-cards", 520.0), ("zz-home-3-ladder", 900.0), ("zz-home-3-foot", 2000.0)] {
+        // The page fits on about a screen: at rest, partway (the board turning in its window), and at its foot.
+        for (name, offset) in [("zz-home-0-top", 0.0), ("zz-home-1-turning", 140.0), ("zz-home-2-cards", 260.0),
+                               ("zz-home-3-foot", 2000.0)] {
             scroll(window, to: offset)
             try save(window, name)
         }
@@ -42,7 +41,7 @@ final class HomeSnapshotTests: XCTestCase {
         window.isHidden = true
     }
 
-    /// A timed game against Pulse, playing Black, left at move 5: the clock card says so.
+    /// A timed game against Pulse, playing Black, left at move 5: the board window says so.
     func testGameUnderWayAsBlack() throws {
         let match = MatchController(engine: nil, sounds: nil)
         let position = try XCTUnwrap(Position(fen: HomeSample.italianFEN))
@@ -50,13 +49,11 @@ final class HomeSnapshotTests: XCTestCase {
         match.suspend()
         let window = try show(HomeSample.home(match: match))
         try save(window, "zz-home-6-black-timed")
-        scroll(window, to: 190)
-        try save(window, "zz-home-6-black-closer")
         window.isHidden = true
     }
 
-    /// Play a person (Online, or A friend by sealed link) sits right under the clock, then Current
-    /// games: every game still going, with a small board and whose move it is, your move first.
+    /// Play a person (Online, or A friend by link) sits right under the board window; further
+    /// down, every game still going with a person, with a small board and whose move it is, your move first.
     func testCurrentGamesUnderTheClock() throws {
         let api = FakeChallengeAPI()
         let now = Date().timeIntervalSince1970 * 1000
@@ -169,26 +166,28 @@ final class HomeSnapshotTests: XCTestCase {
         XCTAssertLessThan(abs(crown.y), 0.15)
     }
 
-    /// Once the camera has come in, the king's whole head, cross and crown, stands between the
-    /// status bar and the clock card, in the middle of the screen; at rest the board fills the top.
-    func testTheCrownLandsBetweenTheStatusBarAndTheCard() {
-        let screen = CGSize(width: 402, height: 874)
-        let layout = HomeLayout(size: CGSize(width: 402, height: 874 - 62 - 34),
-                                insets: EdgeInsets(top: 62, leading: 0, bottom: 34, trailing: 0), cardHeight: 190)
-        let cardTopThen = layout.cardTop - HomeWorld.arrival * layout.walk
-        XCTAssertGreaterThan(layout.crownLook, layout.safeTop + 30)
-        XCTAssertLessThan(layout.crownLook, cardTopThen - 30)
-        XCTAssertLessThan(layout.restLook, layout.cardTop - 100, "At rest the board stands in the top of the screen")
+    /// Through the board window the pieces stand in its top and its foot is left for the words.
+    /// The camera settles in from higher and further back, and turns as the page scrolls.
+    func testTheWindowFramesThePieces() {
+        let size = CGSize(width: 370, height: 247)
+        let rest = HomeWindowBoard.camera(size: size, scrolled: 0, arrival: 0, black: false)
+        // White's queen, the top of her crown: in the window, right of the middle, in its top half.
+        let queen = rest.screenPoint(SIMD3(-0.5, 1.2, 3.5), in: size)
+        XCTAssertGreaterThan(queen.x, size.width * 0.5)
+        XCTAssertLessThan(queen.x, size.width * 0.95)
+        XCTAssertGreaterThan(queen.y, 8, "The crown clears the window's top")
+        XCTAssertLessThan(queen.y, size.height * 0.45, "and stands above the words at the foot")
+        // The pieces' feet on White's back rank sit above the title too.
+        let foot = rest.screenPoint(SIMD3(-0.5, 0, 3.5), in: size)
+        XCTAssertLessThan(foot.y, size.height * 0.72)
 
-        let camera = HomeHeroCamera.camera(aspect: Float(screen.width / screen.height),
-                                           anchor: Float(1 - 2 * layout.crownLook / screen.height),
-                                           progress: 1, pull: 0)
-        let cross = camera.screenPoint(SIMD3(0.5, SculptedCamera.tallest, 3.5), in: screen)
-        // The foot of the crown, where it meets the king's neck.
-        let crownFoot = camera.screenPoint(SIMD3(0.5, 0.83, 3.5), in: screen)
-        XCTAssertGreaterThan(cross.y, layout.safeTop + 8, "The cross clears the status bar")
-        XCTAssertLessThan(crownFoot.y, cardTopThen - 12, "The crown is clear of the card")
-        XCTAssertEqual(cross.x, screen.width / 2, accuracy: 24, "The king stands in the middle")
+        let start = HomeWindowBoard.camera(size: size, scrolled: 0, arrival: 1, black: false)
+        XCTAssertGreaterThan(start.elevation, rest.elevation, "It settles in from above")
+        XCTAssertGreaterThan(start.distance, rest.distance, "and from further back")
+        let turned = HomeWindowBoard.camera(size: size, scrolled: 1, arrival: 0, black: false)
+        XCTAssertGreaterThan(turned.azimuth - rest.azimuth, 0.3, "Scrolling turns the board")
+        let black = HomeWindowBoard.camera(size: size, scrolled: 0, arrival: 0, black: true)
+        XCTAssertLessThan(black.eye.z, 0, "Playing Black, the window looks from Black's side")
     }
 
     func testTheHeroCameraLooksAtTheBoard() {

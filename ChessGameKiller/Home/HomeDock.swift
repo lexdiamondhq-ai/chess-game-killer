@@ -1,12 +1,13 @@
+import ChessKit
 import SwiftUI
 
 /// The glass dock at the foot of the home: the four ways into the app, the same every day.
-/// It never lights one up: it is a row of doors, not tabs. Once the clock card has scrolled
-/// away, the dock folds to its icons and the clock rides along at its side.
+/// It never lights one up: it is a row of doors, not tabs. Once the board window has scrolled
+/// away, the dock folds to its icons and the window's button rides along at its side.
 struct HomeDock: View {
     let tone: HomeTone
     let upNext: HomeUpNext
-    /// The clock card has scrolled out of sight.
+    /// The board window has scrolled out of sight.
     let compact: Bool
     let actions: HomeActions
     let openYou: () -> Void
@@ -244,5 +245,77 @@ struct HomeBottomEdge: View {
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+}
+
+/// The board window's button, folded into the dock once the window has scrolled away: one
+/// tap to resume or to start the next game, from anywhere on the page. It is the window's own
+/// ivory button, so the way to play looks the same all the way down the page.
+struct HomeClockCapsule: View {
+    let upNext: HomeUpNext
+    let tone: HomeTone
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            // The longest label that fits beside the dock, down to the play mark alone.
+            ViewThatFits(in: .horizontal) {
+                label(title, subtitle)
+                label(title, shortSubtitle)
+                label(title, nil)
+                label(shortTitle, shortSubtitle)
+                label(shortTitle, nil)
+                Image(systemName: "play.fill")
+                    .font(.app(.body, weight: .bold))
+            }
+            .foregroundStyle(tone.onIvory)
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, minHeight: 56)
+            .background { HomeIvoryFill(tone: tone) }
+            .contentShape(Capsule())
+        }
+        .buttonStyle(HomePressStyle())
+        .accessibilityLabel(upNext.inProgress ? "Resume your game against \(upNext.rival.name)" : "Play \(upNext.rival.name)")
+        .accessibilityValue(subtitle)
+        .accessibilityInputLabels(inputLabels)
+    }
+
+    private var inputLabels: [String] {
+        upNext.inProgress ? ["Resume"] : ["Play", "Play \(upNext.rival.name)"]
+    }
+
+    private var title: String { upNext.inProgress ? "Resume" : "Play \(upNext.rival.name)" }
+    private var shortTitle: String { upNext.inProgress ? "Resume" : "Play" }
+
+    private var side: String {
+        upNext.randomSide ? "Either side" : (upNext.playerColor == .white ? "White" : "Black")
+    }
+
+    /// The game in a few words: "White · No clock", "Your move · 4:12".
+    private var subtitle: String {
+        if upNext.inProgress {
+            if let time = upNext.yourTime { return "\(shortSubtitle) · \(time.clockLabel)" }
+            return shortSubtitle
+        }
+        return "\(side) · \(upNext.timeControl.name)"
+    }
+
+    /// Fewer words for a narrow capsule: whose move it is, or your side.
+    private var shortSubtitle: String {
+        upNext.inProgress ? (upNext.yourMove ? "Your move" : "Their move") : side
+    }
+
+    private func label(_ title: String, _ subtitle: String?) -> some View {
+        VStack(spacing: 0) {
+            Text(title)
+                .font(.app(.subheadline, weight: .semibold))
+            if let subtitle {
+                Text(subtitle)
+                    .font(.app(.caption).monospacedDigit())
+                    .opacity(0.68)
+            }
+        }
+        .lineLimit(1)
+        .fixedSize()
     }
 }

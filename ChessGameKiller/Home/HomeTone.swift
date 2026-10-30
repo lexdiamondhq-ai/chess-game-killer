@@ -21,6 +21,9 @@ struct HomeTone {
     var ink2: Color { ink.opacity(0.72) }
     var ink3: Color { ink.opacity(0.6) }
     var hairline: Color { ink.opacity(0.12) }
+    /// Something happening right now, like players waiting online: a soft green, the one
+    /// color that isn't the board's, kept to a dot.
+    var live: Color { Color(hex: 0x7FE0A3) }
 
     static func of(_ look: SculptedLook) -> HomeTone {
         switch look.name {
@@ -47,25 +50,20 @@ struct HomeTone {
     }
 }
 
-/// The home's type, all Geist: semibold for what you read as a title, medium for a score,
-/// regular for everything else. All of it follows the reader's text size.
+/// The home's type, all Geist. It follows the reader's text size.
 enum HomeType {
+    /// A panel's name, like the You panel's.
     static let section = Font.app(.title2, weight: .semibold)
-    static let title = Font.app(.title3, weight: .semibold)
-    static let score = Font.app(.body, weight: .medium)
-    /// The date over a column, the way a newspaper's chess column is dated.
-    static let dateline = Font.app(.subheadline)
 }
 
 /// One set of measures for every card, so all their edges and insides line up.
 enum HomeMetrics {
     /// A card's corner.
     static let cardRadius: CGFloat = 30
-    /// What a card keeps between its edge and what it holds. With the page's own margin,
-    /// everything inside a card (and every section's name) starts 32 points from the screen's edge.
+    /// What a card keeps between its edge and what it holds.
     static let inset: CGFloat = 16
-    /// A pane inside a card, so its corner follows the card's.
-    static let innerRadius: CGFloat = cardRadius - inset
+    /// A tile's corner: a touch tighter than the board window's, so the window leads.
+    static let tileRadius: CGFloat = 26
 }
 
 // MARK: - Glass
@@ -228,50 +226,6 @@ struct HomePressStyle: ButtonStyle {
 }
 
 // MARK: - Shared pieces
-
-/// A section's name in New York, with a quiet note, a dateline or a link on the right.
-/// It starts where the cards' insides start, so the name lines up with what it heads.
-struct HomeSectionHeader: View {
-    let title: String
-    let tone: HomeTone
-    var note: String? = nil
-    /// The note set as a dateline, in New York italic.
-    var dateline = false
-    var link: String? = nil
-    var action: (() -> Void)? = nil
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text(title)
-                .font(HomeType.section)
-                .foregroundStyle(tone.ink)
-                .accessibilityAddTraits(.isHeader)
-            Spacer(minLength: 0)
-            if let link, let action {
-                Button(action: action) {
-                    HStack(spacing: 3) {
-                        Text(link)
-                        Image(systemName: "chevron.forward")
-                            .font(.app(.caption, weight: .semibold))
-                    }
-                    .font(.app(.subheadline, weight: .medium))
-                    .foregroundStyle(tone.metal)
-                    .frame(minHeight: 44)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            } else if let note {
-                Text(note)
-                    .font(dateline ? HomeType.dateline : .app(.subheadline))
-                    .foregroundStyle(tone.ink2)
-                    .multilineTextAlignment(.trailing)
-            }
-        }
-        .padding(.horizontal, HomeMetrics.inset)
-        .padding(.top, 30)
-        .padding(.bottom, 8)
-    }
-}
 
 /// A row that opens one thing: a name, a line about it, and a chevron, with a glyph in
 /// front only where it says something the words don't.

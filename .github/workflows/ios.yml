@@ -202,7 +202,7 @@ jobs:
         # The screens being worked on, once more at the very end and small, so a short tail of the log holds them.
         run: |
           [ -d snapshots ] || exit 0
-          for f in snapshots/device-home-current.png snapshots/device-home-current-all.png snapshots/zz-home-8-friends.png snapshots/zz-daily-widget-medium.png snapshots/zz-daily-widget-small.png snapshots/zz-daily-widget-lock.png snapshots/zz-daily-move-solved.png snapshots/zz-home-2-cards.png snapshots/device-home-today.png snapshots/device-daily-move.png snapshots/device-flat-3d.png snapshots/device-gilded-3d.png; do
+          for f in snapshots/zz-home-0-top.png snapshots/zz-home-3-foot.png snapshots/zz-home-first-launch.png snapshots/zz-home-6-black-timed.png snapshots/device-home.png snapshots/device-home-ladder.png snapshots/device-home-current.png snapshots/device-home-current-all.png; do
             [ -e "$f" ] || continue
             sips -s format jpeg -s formatOptions 70 -Z 1700 "$f" --out /tmp/tiny.jpg >/dev/null
             echo "BEGIN-SCREEN $(basename "$f")"
