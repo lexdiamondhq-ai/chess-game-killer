@@ -226,7 +226,15 @@ final class HomeSnapshotTests: XCTestCase {
         XCTAssertLessThan(arriving.strength, settled.strength * 0.5)
         XCTAssertEqual(settled.strength, 1, accuracy: 0.001)
         XCTAssertGreaterThan(leaning.strength, settled.strength)
-        XCTAssertLessThan(SculptedPresence.game(.orange).strength, settled.strength * 0.5, "Softer in a game, where the board is the point")
+        // In a game it stands farther off, so less of it reaches the middle of the board.
+        XCTAssertLessThan(middle(SculptedPresence.game(.orange)), middle(settled) * 0.5, "Softer in a game, where the board is the point")
+    }
+
+    /// How much of a presence's light reaches the middle of the board: its strength, fading
+    /// with distance until its reach (a simple stand-in for SceneKit's falloff).
+    private func middle(_ presence: SculptedPresence) -> Float {
+        let distance: Float = simd_length(presence.position)
+        return presence.strength * max(0, 1 - distance / presence.reach)
     }
 
     /// In a game the rival's light is low behind its back rank, so its gleam on the polished
