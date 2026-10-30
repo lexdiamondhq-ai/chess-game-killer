@@ -167,25 +167,28 @@ struct HomeView: View {
         let day = dailyState
         return ScrollViewReader { reader in
             ScrollView(.vertical) {
-                VStack(alignment: .leading, spacing: Self.gap) {
+                VStack(spacing: 0) {
+                    // The very top of the page, at the screen's top at rest: how far it has scrolled.
                     Color.clear.frame(height: 0)
                         .onGeometryChange(for: CGFloat.self) { proxy in
                             proxy.frame(in: .named(Self.space)).minY
                         } action: { minY in
                             scrolled(to: -minY)
                         }
-                    HomeGreeting(name: playerName, streak: day.streak, doneToday: day.doneToday,
-                                 streakDetail: day.detail, level: ladder.yourRating, tone: tone,
-                                 openStreak: actions.dailyMove, openLevel: { show("ladder", in: reader) })
-                    window(upNext, safeTop: safeTop)
-                    tiles(upNext: upNext, ladder: ladder, day: day)
+                    VStack(alignment: .leading, spacing: Self.gap) {
+                        HomeGreeting(name: playerName, streak: day.streak, doneToday: day.doneToday,
+                                     streakDetail: day.detail, level: ladder.yourRating, tone: tone,
+                                     openStreak: actions.dailyMove, openLevel: { show("ladder", in: reader) })
+                        window(upNext, safeTop: safeTop)
+                        tiles(upNext: upNext, ladder: ladder, day: day)
+                    }
+                    .padding(.top, safeTop + 4)
+                    .padding(.horizontal, 16)
+                    // The last tile ends clear of the fade above the dock.
+                    .padding(.bottom, Self.dockFade + 16)
+                    .frame(maxWidth: 640)
+                    .frame(maxWidth: .infinity)
                 }
-                .padding(.top, safeTop + 4)
-                .padding(.horizontal, 16)
-                // The last tile ends clear of the fade above the dock.
-                .padding(.bottom, Self.dockFade + 16)
-                .frame(maxWidth: 640)
-                .frame(maxWidth: .infinity)
             }
             .scrollIndicators(.hidden)
             .coordinateSpace(name: Self.space)

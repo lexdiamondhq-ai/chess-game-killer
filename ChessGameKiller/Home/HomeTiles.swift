@@ -490,6 +490,8 @@ struct HomeNoticeCard: View {
         .homePane(RoundedRectangle(cornerRadius: HomeMetrics.tileRadius, style: .continuous), tone: tone)
     }
 
+    /// The question, with Remind me beside it and a small cross for Not now, so it fits on
+    /// one card without cutting either short.
     private var reminder: some View {
         let layout = typeSize.isAccessibilitySize
             ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
@@ -505,15 +507,22 @@ struct HomeNoticeCard: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            HStack(spacing: 4) {
-                Button("Not now") { remind(false) }
-                    .font(.app(.subheadline, weight: .semibold))
-                    .foregroundStyle(tone.ink2)
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 8)
-                    .frame(minHeight: 44)
+            HStack(spacing: 2) {
                 Button("Remind me") { remind(true) }
                     .buttonStyle(HomeGlassButtonStyle(tone: tone, compact: true))
+                    .fixedSize()
+                Button {
+                    remind(false)
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(tone.ink3)
+                        .frame(width: 36, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(HomePressStyle())
+                .accessibilityLabel("Not now")
+                .padding(.trailing, -8)
             }
         }
     }
