@@ -50,10 +50,11 @@ struct SculptedPresence: Equatable {
         SculptedPresence(color: color, strength: strength)
     }
 
-    /// In a game: behind the rival's own back rank and higher, a quiet edge of color on its
-    /// pieces and the far squares that leaves the board's middle as it was.
+    /// In a game: low behind the rival's own back rank, a quiet edge of color on its pieces
+    /// that leaves the squares as they were. Kept low, so its gleam on the polished board
+    /// falls beyond the far edge rather than on the squares in play.
     static func game(_ color: UIColor) -> SculptedPresence {
-        SculptedPresence(color: color, strength: 0.55, position: SIMD3(0, 3.2, -6.5), reach: 9)
+        SculptedPresence(color: color, strength: 0.4, position: SIMD3(0, 1.3, -7.5), reach: 10)
     }
 }
 

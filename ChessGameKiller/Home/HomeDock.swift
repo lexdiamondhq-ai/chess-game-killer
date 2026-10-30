@@ -65,8 +65,10 @@ struct HomeDock: View {
         HStack(spacing: 0) {
             button(doors[0])
             button(doors[1])
+            // The jewel's place: as wide as its slot and no taller than nothing, so the bar
+            // keeps the doors' height.
             Color.clear
-                .frame(width: slot)
+                .frame(width: slot, height: 0)
                 .accessibilityHidden(true)
             button(doors[2])
             button(doors[3])

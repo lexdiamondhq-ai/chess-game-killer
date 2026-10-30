@@ -226,7 +226,30 @@ final class HomeSnapshotTests: XCTestCase {
         XCTAssertLessThan(arriving.strength, settled.strength * 0.5)
         XCTAssertEqual(settled.strength, 1, accuracy: 0.001)
         XCTAssertGreaterThan(leaning.strength, settled.strength)
-        XCTAssertEqual(SculptedPresence.game(.orange).strength, 0.55, accuracy: 0.001, "Softer in a game, where the board is the point")
+        XCTAssertLessThan(SculptedPresence.game(.orange).strength, settled.strength * 0.5, "Softer in a game, where the board is the point")
+    }
+
+    /// In a game the rival's light is low behind its back rank, so its gleam on the polished
+    /// board (where the eye sees the light mirrored) lands past the far edge, not on the squares
+    /// in play, from either side of the board.
+    func testTheRivalsLightInAGameGleamsPastTheFarEdge() {
+        let light = SculptedPresence.game(.orange).position
+        for flipped in [false, true] {
+            let camera = SculptedCamera.fitted(aspect: Float(SculptedCamera.Framing.standing.aspect), flipped: flipped)
+            // The light turns with the camera (it hangs in the studio's rig).
+            let turn = simd_quatf(angle: camera.azimuth, axis: SculptedCamera.up)
+            let lamp: SIMD3<Float> = turn.act(light)
+            // The gleam is where the line from the eye to the lamp's mirror image under the
+            // board crosses the board.
+            let mirrored = SIMD3<Float>(lamp.x, -lamp.y, lamp.z)
+            let eye: SIMD3<Float> = camera.eye
+            let part: Float = eye.y / (eye.y + lamp.y)
+            let toMirror: SIMD3<Float> = mirrored - eye
+            let gleam: SIMD3<Float> = eye + part * toMirror
+            let across: Float = simd_length(SIMD2<Float>(gleam.x, gleam.z))
+            XCTAssertGreaterThan(across, SculptedCamera.boardHalfWidth + 0.5, "The gleam lands past the board (flipped: \(flipped))")
+            XCTAssertLessThan(lamp.y, SculptedCamera.tallest, "Lower than the king's cross, so it edges the pieces rather than lighting them")
+        }
     }
 
     func testTheHeroCameraLooksAtTheBoard() {
