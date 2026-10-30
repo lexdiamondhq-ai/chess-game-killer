@@ -137,13 +137,14 @@ final class LiveGameTests: XCTestCase {
         .environment(\.colorScheme, .dark)
     }
 
+    /// Folded around the camera (the gap between them), with the widget's margins.
     private func compact(_ state: LiveState) -> some View {
         HStack(spacing: 0) {
             LiveGameIsland.CompactLeading(game: pulse)
             Spacer(minLength: 0)
             LiveGameIsland.CompactTrailing(game: pulse, state: state)
         }
-        .padding(.horizontal, 10)
+        .padding(.horizontal, LiveGameIsland.endMargin)
         .frame(width: 250, height: 37)
         .background(Color.black, in: Capsule())
         .padding(12)

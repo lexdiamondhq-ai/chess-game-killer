@@ -105,6 +105,11 @@ struct LiveGameLockView: View {
 /// The Dynamic Island, held open: the rival on the left, your clock on the right, and under
 /// them the board and what just happened.
 enum LiveGameIsland {
+    /// Folded up: from each rounded end of the island to the orb or the clock.
+    static let endMargin: CGFloat = 8
+    /// Folded up: from the camera to the orb or the clock.
+    static let cameraMargin: CGFloat = 9
+
     struct Leading: View {
         let game: LiveGameAttributes
 

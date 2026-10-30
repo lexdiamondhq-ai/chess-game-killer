@@ -30,6 +30,13 @@ struct LiveGameWidget: Widget {
             } minimal: {
                 LiveGameIsland.CompactLeading(game: context.attributes)
             }
+            // Folded up, the orb and the clock keep even margins from the island's rounded ends
+            // and a little room on the camera's side. Left to the defaults, iOS set them so far in
+            // that the orb's inner half and the clock's first digit slid under the camera.
+            .contentMargins(.leading, LiveGameIsland.endMargin, for: .compactLeading)
+            .contentMargins(.trailing, LiveGameIsland.cameraMargin, for: .compactLeading)
+            .contentMargins(.leading, LiveGameIsland.cameraMargin, for: .compactTrailing)
+            .contentMargins(.trailing, LiveGameIsland.endMargin, for: .compactTrailing)
             .widgetURL(LiveGameLink.url)
             .keylineTint(context.attributes.light)
         }
