@@ -189,7 +189,7 @@ struct TrainingBoardView: View {
 
     private func coordinate(_ text: String, size: CGFloat, color: Color, alignment: Alignment) -> some View {
         Text(text)
-            .font(.system(size: size * 0.2, weight: .semibold, design: .themed))
+            .font(.app(size: size * 0.2, weight: .semibold))
             .foregroundStyle(color)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignment)
             .padding(size * 0.05)
@@ -302,7 +302,7 @@ struct TrainingBoardView: View {
                     let color = (label.color ?? .blue).color(on: theme)
                     let cell = cell(of: square)
                     Text(label.text)
-                        .font(.system(size: size * 0.24, weight: .heavy, design: .themed))
+                        .font(.app(size: size * 0.24, weight: .heavy))
                         .monospacedDigit()
                         .lineLimit(1)
                         .foregroundStyle(theme.isDark ? Color.black : Color.white)

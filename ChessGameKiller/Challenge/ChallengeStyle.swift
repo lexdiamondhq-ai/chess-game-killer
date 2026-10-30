@@ -41,7 +41,7 @@ extension BoardTheme {
     var challengeDesign: Font.Design { glows ? .rounded : .default }
 
     func challengeFont(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
-        .system(size: size, weight: weight, design: challengeDesign)
+        .app(size: size, weight: weight)
     }
 }
 
@@ -197,7 +197,7 @@ struct ChallengeAvatar: View {
     var body: some View {
         let accent = theme.challengeAccent
         Text(initial)
-            .font(.system(size: size * 0.42, weight: .semibold, design: theme.challengeDesign))
+            .font(.app(size: size * 0.42, weight: .semibold))
             .foregroundStyle(.primary)
             .frame(width: size, height: size)
             .background {
@@ -259,7 +259,7 @@ struct ChallengeSectionTitle: View {
 
     var body: some View {
         Text(title.uppercased())
-            .font(.caption.weight(.semibold))
+            .font(.app(.caption, weight: .semibold))
             .tracking(1.1)
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)

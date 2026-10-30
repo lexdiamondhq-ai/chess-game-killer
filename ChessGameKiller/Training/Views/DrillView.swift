@@ -67,7 +67,7 @@ struct DrillView: View {
                         TrainingChip(text: chip.text, symbol: chip.symbol, color: chip.color)
                     }
                     Text(runner.message)
-                        .font(.system(.body, design: .themed).weight(.medium))
+                        .font(.app(.body, weight: .medium))
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .id(runner.message)
@@ -154,7 +154,7 @@ struct DrillView: View {
             } else if runner.phase == .solving {
                 HStack(spacing: 10) {
                     Text("Moves: \(runner.movesMade) of \(runner.moveLimit)")
-                        .font(.system(.subheadline, design: .themed).weight(.semibold).monospacedDigit())
+                        .font(.app(.subheadline, weight: .semibold).monospacedDigit())
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .layoutPriority(1)
@@ -259,7 +259,7 @@ struct DrillView: View {
         } label: {
             HStack(spacing: 10) {
                 Text(option.text)
-                    .font(.system(.subheadline, design: .themed).weight(.semibold))
+                    .font(.app(.subheadline, weight: .semibold))
                     .multilineTextAlignment(.leading)
                     .strikethrough(tried && !option.correct, color: color)
                 Spacer(minLength: 4)

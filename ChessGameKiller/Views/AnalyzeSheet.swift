@@ -81,7 +81,7 @@ struct AnalyzeSheet: View {
             ScrollView {
                 VStack(spacing: 12) {
                     Text("Snap a real board, pick a screenshot or set one up. I'll find the two best moves.")
-                        .font(.subheadline)
+                        .font(.app(.subheadline))
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.bottom, 8)
@@ -194,15 +194,15 @@ private struct StartCard: View {
                 .frame(width: 44, height: 44)
                 .background((theme.accent ?? .accentColor).opacity(0.15), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.headline)
-                Text(detail).font(.subheadline).foregroundStyle(.secondary)
+                Text(title).font(.app(.headline))
+                Text(detail).font(.app(.subheadline)).foregroundStyle(.secondary)
             }
             Spacer()
             if isLoading {
                 ProgressView().controlSize(.small)
             } else {
                 Image(systemName: "chevron.right")
-                    .font(.footnote.weight(.semibold))
+                    .font(.app(.footnote, weight: .semibold))
                     .foregroundStyle(.tertiary)
             }
         }
@@ -295,7 +295,7 @@ struct BoardEditorView: View {
 
                 if let problem, !session.isReading {
                     Label(problem, systemImage: "exclamationmark.triangle.fill")
-                        .font(.subheadline.weight(.medium))
+                        .font(.app(.subheadline, weight: .medium))
                         .foregroundStyle(Color(hex: 0xFF9A3C))
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .transition(.opacity)
@@ -339,9 +339,9 @@ struct BoardEditorView: View {
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text(session.isReading ? "Reading your photo" : session.readingFailed ? "Couldn't read it" : "Board read")
-                    .font(.headline)
+                    .font(.app(.headline))
                 Text(session.isReading ? "I'm checking every square. This can take up to a minute." : session.readingNote ?? "")
-                    .font(.subheadline)
+                    .font(.app(.subheadline))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -371,7 +371,7 @@ struct BoardEditorView: View {
                     if color == .white {
                         toolButton(.eraser) {
                             Image(systemName: "eraser.fill")
-                                .font(.title3)
+                                .font(.app(.title3))
                                 .foregroundStyle(.secondary)
                                 .frame(width: 36, height: 36)
                         }
@@ -410,7 +410,7 @@ struct BoardEditorView: View {
             withAnimation(.snappy) { action() }
         } label: {
             Label(title, systemImage: symbol)
-                .font(.subheadline.weight(.medium))
+                .font(.app(.subheadline, weight: .medium))
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(.bordered)
@@ -473,7 +473,7 @@ struct AnalysisView: View {
                         if forfeits == nil { onPlay(model.draft) } else { confirmingForfeit = true }
                     } label: {
                         Label("Play \(rival) from here", systemImage: "play.fill")
-                            .font(.headline)
+                            .font(.app(.headline))
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
                             .frame(maxWidth: .infinity)
@@ -484,7 +484,7 @@ struct AnalysisView: View {
                     .foregroundStyle(theme.isDark ? Color.black : Color.white)
                     .disabled(model.ending != nil || model.draft.position == nil)
                     Text("You play \(sideName) · \(clock.isTimed ? clock.name : "no clock")")
-                        .font(.footnote)
+                        .font(.app(.footnote))
                         .foregroundStyle(.secondary)
                 }
                 .confirmationDialog("Leave your game against \(forfeits ?? rival)?",
@@ -520,18 +520,18 @@ struct AnalysisView: View {
     private var header: some View {
         if let ending = model.ending {
             Text(ending)
-                .font(.title2.weight(.bold))
+                .font(.app(.title2, weight: .bold))
                 .foregroundStyle(accent)
                 .frame(maxWidth: .infinity, alignment: .leading)
         } else {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text(headline)
-                        .font(.headline)
+                        .font(.app(.headline))
                     Spacer()
                     if let evaluation = model.evaluationForWhite {
                         Text(evaluation.label)
-                            .font(.system(.headline, design: .themed).monospacedDigit())
+                            .font(.app(.headline).monospacedDigit())
                     }
                 }
                 EvaluationBar(winningChances: model.evaluationForWhite?.winningChances ?? 0, theme: theme)
@@ -561,19 +561,19 @@ struct AnalysisView: View {
                         HStack(spacing: 8) {
                             ArrowSample(color: index == 0 ? theme.bestArrow : theme.secondArrow, dashed: index != 0)
                             Text(index == 0 ? "Best" : "Next best")
-                                .font(.subheadline)
+                                .font(.app(.subheadline))
                                 .foregroundStyle(.secondary)
                             if index < model.hints.count {
                                 Text(model.hints[index].san)
-                                    .font(.system(.headline, design: .themed))
+                                    .font(.app(.headline))
                             }
                             Spacer()
                             Text(scoreLabel(line))
-                                .font(.system(.subheadline, design: .themed).weight(.semibold).monospacedDigit())
+                                .font(.app(.subheadline, weight: .semibold).monospacedDigit())
                                 .foregroundStyle(.secondary)
                         }
                         Text(model.readable(line))
-                            .font(.footnote)
+                            .font(.app(.footnote))
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -591,7 +591,7 @@ struct AnalysisView: View {
                         Text("Checked by Stockfish 17")
                     }
                 }
-                .font(.footnote)
+                .font(.app(.footnote))
                 .foregroundStyle(.secondary)
             }
             .padding(14)

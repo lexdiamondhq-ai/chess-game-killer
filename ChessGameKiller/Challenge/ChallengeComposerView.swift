@@ -219,7 +219,7 @@ struct ChallengeComposerView: View {
     private func codeCard(_ created: FriendGame, invite: ChallengeInviteContent) -> some View {
         VStack(spacing: 12) {
             Text("CODE")
-                .font(.caption.weight(.semibold))
+                .font(.app(.caption, weight: .semibold))
                 .tracking(1.4)
                 .foregroundStyle(.secondary)
             Text(ChallengeLink.spaced(created.code))

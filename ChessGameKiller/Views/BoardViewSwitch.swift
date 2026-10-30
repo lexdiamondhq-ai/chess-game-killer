@@ -45,7 +45,7 @@ struct BoardViewSwitch: View {
                     .imageScale(.small)
                 Text(choice.title)
             }
-            .font(.system(.footnote, design: .themed).weight(.semibold))
+            .font(.app(.footnote, weight: .semibold))
             .foregroundStyle(isOn ? Color.primary : Color.secondary)
             .lineLimit(1)
             .padding(.horizontal, 10)

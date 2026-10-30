@@ -151,7 +151,7 @@ struct EvalStrip: View {
             }
             .frame(height: 6)
             Text(caption)
-                .font(.system(.caption, design: .themed).weight(.semibold).monospacedDigit())
+                .font(.app(.caption, weight: .semibold).monospacedDigit())
                 .foregroundStyle(.secondary)
                 .frame(minWidth: 34, alignment: .trailing)
         }
@@ -188,7 +188,7 @@ struct BrowsePill: View {
                 Text("Back to game")
                     .foregroundStyle(theme.accent ?? .accentColor)
             }
-            .font(.system(.footnote, design: .themed).weight(.semibold))
+            .font(.app(.footnote, weight: .semibold))
             .lineLimit(1)
             .padding(.horizontal, 12)
             .frame(height: 26)

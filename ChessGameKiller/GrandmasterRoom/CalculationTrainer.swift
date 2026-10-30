@@ -217,7 +217,7 @@ struct CalculationView: View {
             .pickerStyle(.segmented)
             Toggle(isOn: $blindfold) {
                 Label("Blindfold", systemImage: "eye.slash.fill")
-                    .font(.system(.subheadline, design: .themed).weight(.semibold))
+                    .font(.app(.subheadline, weight: .semibold))
             }
             .toggleStyle(.button)
         }
@@ -256,7 +256,7 @@ struct CalculationView: View {
         case .right, .wrong:
             HStack {
                 Text("\(runner.solved) of \(runner.tried)")
-                    .font(.system(.subheadline, design: .themed).weight(.semibold).monospacedDigit())
+                    .font(.app(.subheadline, weight: .semibold).monospacedDigit())
                     .foregroundStyle(.secondary)
                 Button("Next") { withAnimation(.snappy) { runner.next() } }
                     .buttonStyle(TrainingButtonStyle(theme: theme))

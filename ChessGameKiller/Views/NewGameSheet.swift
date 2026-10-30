@@ -166,7 +166,7 @@ struct NewGameSheet: View {
                     if forfeits == nil { play() } else { confirmingForfeit = true }
                 } label: {
                     Label(playTitle, systemImage: "play.fill")
-                        .font(.headline)
+                        .font(.app(.headline))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
                 }
@@ -206,7 +206,7 @@ struct NewGameSheet: View {
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title.uppercased())
-                .font(.caption.weight(.semibold))
+                .font(.app(.caption, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .tracking(1)
                 .accessibilityAddTraits(.isHeader)
@@ -392,7 +392,7 @@ struct NewGameSheet: View {
         VStack(alignment: .leading, spacing: 10) {
             if let reason = stakeBlocked {
                 Text(reason)
-                    .font(.footnote)
+                    .font(.app(.footnote))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else if let army {
@@ -406,7 +406,7 @@ struct NewGameSheet: View {
                     .padding(.vertical, 2)
                 }
                 Text("Win: double XP and a trophy from \(draftLevel.rival.name). Lose: \(draftLevel.rival.name) keeps the piece until you beat \(draftLevel.rival.name) again.")
-                    .font(.footnote)
+                    .font(.app(.footnote))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -431,18 +431,18 @@ struct NewGameSheet: View {
                             .modifier(VeteranAura(rank: record.rank, piece: piece, theme: theme, size: 40, onBoard: false))
                     } else {
                         Image(systemName: "minus")
-                            .font(.title3.weight(.semibold))
+                            .font(.app(.title3, weight: .semibold))
                             .foregroundStyle(.secondary)
                     }
                 }
                 .frame(height: 42)
                 Text(name)
-                    .font(.caption.weight(.bold))
+                    .font(.app(.caption, weight: .bold))
                     .foregroundStyle(isSelected ? accent : Color.primary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 Text(record.map { "\($0.rank.title) · \($0.xp) XP" } ?? "Just play")
-                    .font(.caption2)
+                    .font(.app(.caption2))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
@@ -533,7 +533,7 @@ struct NewGameSheet: View {
                 sideArt(choice)
                     .frame(height: 46)
                 Text(sideName(choice))
-                    .font(.caption.weight(.bold))
+                    .font(.app(.caption, weight: .bold))
                     .foregroundStyle(isSelected ? color : Color.secondary)
             }
             .frame(maxWidth: .infinity)
@@ -600,20 +600,20 @@ private struct RivalCard: View {
             RivalPortrait(rival: rival, size: 100, glows: theme.glows)
             VStack(alignment: .leading, spacing: 4) {
                 Text(rival.name)
-                    .font(.system(.title2, design: .themed).weight(.heavy))
+                    .font(.app(.title2, weight: .heavy))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 (Text(rival.level.name).foregroundStyle(rival.hue) + Text(" · Elo \(rival.elo)"))
-                    .font(.caption.weight(.semibold))
+                    .font(.app(.caption, weight: .semibold))
                     .foregroundStyle(.secondary)
                 Text(rival.blurb)
-                    .font(.caption)
+                    .font(.app(.caption))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 2)
                 if let holding {
                     Label("Holding \(holding)", systemImage: "lock.fill")
-                        .font(.caption2.weight(.bold))
+                        .font(.app(.caption2, weight: .bold))
                         .foregroundStyle(rival.hue)
                         .lineLimit(1)
                         .padding(.horizontal, 8)
@@ -674,17 +674,17 @@ private struct MatchRowButton<Icon: View>: View {
                 GlyphTile(theme: theme, content: icon)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(label.uppercased())
-                        .font(.caption2.weight(.semibold))
+                        .font(.app(.caption2, weight: .semibold))
                         .foregroundStyle(.secondary)
                         .tracking(1)
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(value)
-                            .font(.system(.callout, design: .themed).weight(.bold))
+                            .font(.app(.callout, weight: .bold))
                             .foregroundStyle(.primary)
                             .contentTransition(.numericText())
                         if let detail {
                             Text(detail)
-                                .font(.footnote)
+                                .font(.app(.footnote))
                                 .foregroundStyle(.secondary)
                                 .contentTransition(.opacity)
                         }
@@ -725,10 +725,10 @@ private struct OptionRow: View {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title)
-                        .font(.subheadline.weight(.semibold))
+                        .font(.app(.subheadline, weight: .semibold))
                         .foregroundStyle(isOn ? Color.primary : Color.primary.opacity(0.85))
                     Text(detail)
-                        .font(.caption2)
+                        .font(.app(.caption2))
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)

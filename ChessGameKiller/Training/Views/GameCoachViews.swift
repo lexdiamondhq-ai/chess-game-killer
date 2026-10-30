@@ -61,10 +61,10 @@ struct GameCoachRow: View {
             CoachAvatar(theme: theme, size: 38, tint: tint)
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.subheadline.weight(.bold))
+                    .font(.app(.subheadline, weight: .bold))
                     .foregroundStyle(tint)
                 Text(detail)
-                    .font(.footnote)
+                    .font(.app(.footnote))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 8) {
@@ -78,7 +78,7 @@ struct GameCoachRow: View {
                     withAnimation(.snappy) { coach.dismiss() }
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.caption2.weight(.bold))
+                        .font(.app(.caption2, weight: .bold))
                         .foregroundStyle(.secondary)
                         .frame(width: 24, height: 24)
                         .background(Color.secondary.opacity(0.14), in: Circle())
@@ -104,7 +104,7 @@ struct GameCoachRow: View {
         let accent = theme.trainingAccent
         return Button(action: action) {
             Label(title, systemImage: symbol)
-                .font(.caption.weight(.bold))
+                .font(.app(.caption, weight: .bold))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .foregroundStyle(accent)
@@ -147,7 +147,7 @@ struct ThinkActionButton: View {
                     .background(Color.primary.opacity(theme.isDark ? 0.07 : 0.05), in: Circle())
                     .overlay(Circle().strokeBorder(Color.primary.opacity(0.11), lineWidth: 1))
                 Text("Think")
-                    .font(.caption2.weight(.semibold))
+                    .font(.app(.caption2, weight: .semibold))
             }
             .foregroundStyle(Color.primary.opacity(0.85))
             .frame(maxWidth: .infinity)
@@ -193,7 +193,7 @@ struct ThinkWithMeSheet: View {
                     HStack(spacing: 12) {
                         CoachAvatar(theme: theme, size: 48)
                         Text("Before you move, ask three questions. Here's what I see.")
-                            .font(.system(.subheadline, design: .themed).weight(.medium))
+                            .font(.app(.subheadline, weight: .medium))
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     if let scan {
@@ -229,11 +229,11 @@ struct ThinkWithMeSheet: View {
                     .frame(width: 14, height: 14)
                     .shadow(color: theme.glows ? tint : .clear, radius: 6)
                 Text(title)
-                    .font(.system(.headline, design: .themed))
+                    .font(.app(.headline))
             }
             ForEach(lines, id: \.self) { line in
                 Text(line)
-                    .font(.subheadline)
+                    .font(.app(.subheadline))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.leading, 24)

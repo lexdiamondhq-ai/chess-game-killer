@@ -83,9 +83,9 @@ struct RewindGamesView: View {
                 .font(.system(size: 44, weight: .light))
                 .foregroundStyle(.secondary)
             Text("No games yet")
-                .font(.system(.title3, design: .themed).weight(.semibold))
+                .font(.app(.title3, weight: .semibold))
             Text("Finish a game and it lands here. Rewind it to see the moments that mattered, then go back and fix them.")
-                .font(.body)
+                .font(.app(.body))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
@@ -99,7 +99,7 @@ struct RewindGamesView: View {
         let next = vault.games.first { $0.leftToRewrite > 0 }
         return VStack(alignment: .leading, spacing: 8) {
             Text("This week")
-                .font(.caption.weight(.semibold))
+                .font(.app(.caption, weight: .semibold))
                 .tracking(2)
                 .textCase(.uppercase)
                 .foregroundStyle(RewindPalette.gold)
@@ -115,7 +115,7 @@ struct RewindGamesView: View {
                             Text("Next")
                             Image(systemName: "chevron.right")
                         }
-                        .font(.subheadline.weight(.semibold))
+                        .font(.app(.subheadline, weight: .semibold))
                     }
                     .tint(.primary)
                 }
@@ -131,8 +131,8 @@ struct RewindGamesView: View {
 
     private func stat(_ value: Int, _ label: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 5) {
-            Text("\(value)").font(.system(.title, design: .themed).weight(.semibold).monospacedDigit())
-            Text(label).font(.subheadline).foregroundStyle(.secondary)
+            Text("\(value)").font(.app(.title, weight: .semibold).monospacedDigit())
+            Text(label).font(.app(.subheadline)).foregroundStyle(.secondary)
         }
     }
 }
@@ -165,11 +165,11 @@ private struct GameCard: View {
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
                             Text(game.opponent)
-                                .font(.system(.headline, design: .themed))
+                                .font(.app(.headline))
                                 .lineLimit(1)
                             Spacer(minLength: 4)
                             Text(game.result.title.uppercased())
-                                .font(.caption2.weight(.bold))
+                                .font(.app(.caption2, weight: .bold))
                                 .tracking(1.2)
                                 .foregroundStyle(resultColor)
                                 .padding(.horizontal, 7)
@@ -178,7 +178,7 @@ private struct GameCard: View {
                                 .fixedSize()
                         }
                         Text("\(game.moveCount) moves · \(game.date.formatted(.relative(presentation: .named)))")
-                            .font(.caption)
+                            .font(.app(.caption))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.85)
@@ -189,14 +189,14 @@ private struct GameCard: View {
                 HStack(spacing: 6) {
                     Circle().fill(footColor).frame(width: 7, height: 7)
                     Text(footText)
-                        .font(.caption.weight(.semibold))
+                        .font(.app(.caption, weight: .semibold))
                         .foregroundStyle(.secondary)
                     Spacer()
                     HStack(spacing: 2) {
                         Text("Rewind")
                         Image(systemName: "chevron.right")
                     }
-                    .font(.caption.weight(.semibold))
+                    .font(.app(.caption, weight: .semibold))
                 }
             }
         }
@@ -218,7 +218,7 @@ private struct GameCard: View {
                 .clipShape(Circle())
         } else {
             Image(systemName: "person.2.fill")
-                .font(.footnote)
+                .font(.app(.footnote))
                 .frame(width: 32, height: 32)
                 .background(Circle().fill(Color.primary.opacity(0.08)))
         }

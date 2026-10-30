@@ -131,7 +131,7 @@ struct HomeCurrentGamesCard: View {
                     withAnimation(.snappy(duration: 0.3)) { showsAll.toggle() }
                 } label: {
                     Text(showsAll ? "Show fewer" : "Show all \(games.count)")
-                        .font(.subheadline.weight(.semibold))
+                        .font(.app(.subheadline, weight: .semibold))
                         .foregroundStyle(tone.metal)
                         .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
                         .contentShape(Rectangle())
@@ -153,20 +153,20 @@ struct HomeCurrentGamesCard: View {
                     .frame(width: board, height: board)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(game.title)
-                        .font(.body.weight(.semibold))
+                        .font(.app(.body, weight: .semibold))
                         .foregroundStyle(tone.ink)
                     ViewThatFits(in: .horizontal) {
                         Text(game.detail)
                         Text(game.shortDetail)
                     }
-                    .font(.footnote.monospacedDigit())
+                    .font(.app(.footnote).monospacedDigit())
                     .foregroundStyle(tone.ink3)
                 }
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 status(game.status)
                 Image(systemName: "chevron.forward")
-                    .font(.footnote.weight(.semibold))
+                    .font(.app(.footnote, weight: .semibold))
                     .foregroundStyle(tone.ink3)
             }
             .padding(.vertical, 12)
@@ -188,7 +188,7 @@ struct HomeCurrentGamesCard: View {
                 .frame(width: 7, height: 7)
                 .shadow(color: yours ? tone.metal.opacity(0.7) : .clear, radius: 3)
             Text(status.words)
-                .font(.subheadline.weight(yours ? .semibold : .regular))
+                .font(.app(.subheadline, weight: yours ? .semibold : .regular))
                 .foregroundStyle(yours ? tone.metal : tone.ink2)
         }
         .lineLimit(1)

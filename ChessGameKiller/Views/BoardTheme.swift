@@ -820,8 +820,8 @@ struct NeonBackdrop: View {
     }
 }
 
-/// The type design for the current look: rounded on Neon, plain SF Pro everywhere else.
-/// `ContentView` sets it for the theme on screen before anything draws.
+/// The system design a look would use. Text is drawn in Geist now (Shared/AppFont.swift),
+/// so this only matters to the few places that still ask for `.themed`.
 enum ThemeFont {
     static var design: Font.Design = .rounded
 

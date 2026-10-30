@@ -33,7 +33,7 @@ struct ExecutivePlate: View {
                     .frame(width: 40, height: 40)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(name)
-                        .font(.system(.headline, design: .themed))
+                        .font(.app(.headline))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
@@ -109,10 +109,10 @@ struct ExecutivePlate: View {
             if hintWords == nil, let piece = selectedArmyPiece {
                 HStack(spacing: 4) {
                     Image(systemName: piece.rank == .legend ? "crown.fill" : "shield.lefthalf.filled")
-                        .font(.caption2.weight(.bold))
+                        .font(.app(.caption2, weight: .bold))
                         .foregroundStyle(piece.color)
                     Text("\(piece.name) · \(piece.rank.title)")
-                        .font(.system(.footnote, design: .themed).weight(.medium))
+                        .font(.app(.footnote, weight: .medium))
                         .foregroundStyle(Color.primary.opacity(0.86))
                         .lineLimit(1)
                         .minimumScaleFactor(0.85)
@@ -122,14 +122,14 @@ struct ExecutivePlate: View {
             } else if let hintWords {
                 // The spotlit move in words, in the spotlight's gold.
                 Text(hintWords)
-                    .font(.system(.footnote, design: .themed).weight(.semibold))
+                    .font(.app(.footnote, weight: .semibold))
                     .foregroundStyle(theme.isDark ? HintSpotlight.gold : Color(red: 0.6, green: 0.43, blue: 0.06))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                     .transition(.opacity)
             } else if !status.isEmpty {
                 Text(status)
-                    .font(.system(.footnote, design: .themed).weight(isActive ? .medium : .regular))
+                    .font(.app(.footnote, weight: isActive ? .medium : .regular))
                     .foregroundStyle(isActive ? Color.primary.opacity(0.86) : Color.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
@@ -267,7 +267,7 @@ private struct CapturedPieces: View {
                         silhouette(of: entry.kind)
                         if entry.count > 1 {
                             Text("\(entry.count)")
-                                .font(.caption2.weight(.semibold).monospacedDigit())
+                                .font(.app(.caption2, weight: .semibold).monospacedDigit())
                         }
                     }
                 }
@@ -280,7 +280,7 @@ private struct CapturedPieces: View {
     private func leadLabel(_ lead: Int) -> some View {
         if lead > 0 {
             Text("+\(lead)")
-                .font(.footnote.weight(.semibold).monospacedDigit())
+                .font(.app(.footnote, weight: .semibold).monospacedDigit())
         }
     }
 
@@ -319,7 +319,7 @@ private struct ExecutiveClock: View {
             let urgent = isRunning && remaining < .seconds(10)
             let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
             Text(remaining.clockLabel)
-                .font(.system(.title3, design: .themed).weight(.medium).monospacedDigit())
+                .font(.app(.title3, weight: .medium).monospacedDigit())
                 .foregroundStyle(isRunning ? Color.black.opacity(0.88) : Color.secondary)
                 .lineLimit(1)
                 .padding(.horizontal, 11)
@@ -354,13 +354,13 @@ struct ExecutiveMatchTitle: View {
         VStack(spacing: 1) {
             if let kicker {
                 Text(kicker)
-                    .font(.system(size: kickerSize, weight: .medium, design: .themed))
+                    .font(.app(size: kickerSize, weight: .medium))
                     .tracking(1.2)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
             Text(headline)
-                .font(.system(.subheadline, design: .themed).weight(.semibold))
+                .font(.app(.subheadline, weight: .semibold))
                 .monospacedDigit()
                 .lineLimit(1)
         }
@@ -424,7 +424,7 @@ struct DockLabel: View {
                 .contentTransition(.symbolEffect(.replace))
                 .shadow(color: theme.glows && lit ? accent.opacity(0.7) : .clear, radius: 6)
             Text(title)
-                .font(.system(.caption2, design: .themed).weight(.medium))
+                .font(.app(.caption2, weight: .medium))
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
         }
@@ -443,7 +443,7 @@ struct CheckTag: View {
 
     var body: some View {
         Text("CHECK")
-            .font(.system(size: size, weight: .heavy, design: .themed))
+            .font(.app(size: size, weight: .heavy))
             .tracking(0.6)
             .foregroundStyle(.white)
             .padding(.horizontal, 6)

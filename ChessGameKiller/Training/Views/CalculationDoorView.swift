@@ -139,7 +139,7 @@ struct GuessTheMoveList: View {
                 .pickerStyle(.segmented)
                 if shelf == .masters {
                     Text("\(content.masterGames.count) recent classical games between players rated 2500 and up, from top tournaments.")
-                        .font(.system(.footnote, design: .themed))
+                        .font(.app(.footnote))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 4)
                 }
@@ -147,7 +147,7 @@ struct GuessTheMoveList: View {
             let games = shown
             if games.isEmpty {
                 Text("No game matches \u{201C}\(query)\u{201D}.")
-                    .font(.system(.subheadline, design: .themed))
+                    .font(.app(.subheadline))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
                     .padding(.top, 30)
@@ -203,29 +203,29 @@ private struct GuessGameRow: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(game.title)
-                    .font(.system(.subheadline, design: .themed).weight(.semibold))
+                    .font(.app(.subheadline, weight: .semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 if game.isMasterGame {
                     Text(game.playedAt)
-                        .font(.system(.caption, design: .themed))
+                        .font(.app(.caption))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
                 Text(detail)
-                    .font(.system(.caption, design: .themed))
+                    .font(.app(.caption))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
             Spacer(minLength: 8)
             if let best = GuessRunner.best(for: game.id) {
                 Text("Best \(best)%")
-                    .font(.system(.caption, design: .themed).weight(.semibold).monospacedDigit())
+                    .font(.app(.caption, weight: .semibold).monospacedDigit())
                     .foregroundStyle(.secondary)
                     .fixedSize()
             }
             Image(systemName: "chevron.right")
-                .font(.caption.weight(.bold))
+                .font(.app(.caption, weight: .bold))
                 .foregroundStyle(.tertiary)
         }
         .padding(.horizontal, 16)

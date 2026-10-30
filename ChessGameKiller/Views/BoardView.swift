@@ -292,7 +292,7 @@ struct BoardView: View {
 
     private func coordinate(_ text: String, size: CGFloat, color: Color, alignment: Alignment) -> some View {
         Text(text)
-            .font(.system(size: size * 0.2, weight: .semibold, design: .themed))
+            .font(.app(size: size * 0.2, weight: .semibold))
             .foregroundStyle(color)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignment)
             .padding(size * 0.05)
@@ -988,7 +988,7 @@ struct FrameCoordinates: View {
                     .position(x: inset / 2, y: inset + (CGFloat(index) + 0.5) * squareSize)
             }
         }
-        .font(.system(size: inset * 0.5, weight: .semibold, design: .themed))
+        .font(.app(size: inset * 0.5, weight: .semibold))
         .foregroundStyle(color)
         .frame(width: inset * 2 + squareSize * 8, height: inset * 2 + squareSize * 8)
         .allowsHitTesting(false)

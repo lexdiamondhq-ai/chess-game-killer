@@ -76,7 +76,7 @@ struct HomeTodayCard: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: "flame.fill")
-                    .font(.title3.weight(.semibold))
+                    .font(.app(.title3, weight: .semibold))
                     .foregroundStyle(daily.streak > 0 ? tone.metal : tone.ink3)
                     .symbolEffect(.bounce, value: daily.streak)
                 Text(streakTitle)
@@ -86,13 +86,13 @@ struct HomeTodayCard: View {
                 Spacer(minLength: 8)
                 if daily.doneToday {
                     Label("Done", systemImage: "checkmark.circle.fill")
-                        .font(.subheadline.weight(.semibold))
+                        .font(.app(.subheadline, weight: .semibold))
                         .foregroundStyle(tone.metal)
                         .labelStyle(.titleAndIcon)
                 }
             }
             Text(daily.detail)
-                .font(.subheadline)
+                .font(.app(.subheadline))
                 .foregroundStyle(daily.mark != nil && daily.doneToday ? tone.metal : tone.ink2)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -110,12 +110,12 @@ struct HomeTodayCard: View {
     private var reminderBlock: some View {
         HStack(alignment: .center, spacing: 12) {
             Text("A reminder tomorrow, around this time?")
-                .font(.subheadline)
+                .font(.app(.subheadline))
                 .foregroundStyle(tone.ink)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Button("Not now") { remind(false) }
-                .font(.subheadline.weight(.semibold))
+                .font(.app(.subheadline, weight: .semibold))
                 .foregroundStyle(tone.ink2)
                 .buttonStyle(.plain)
                 .frame(minHeight: 44)
@@ -155,7 +155,7 @@ struct HomeTodayCard: View {
                 }
             }
             Text(moveStatus)
-                .font(.footnote)
+                .font(.app(.footnote))
                 .foregroundStyle(daily.played ? tone.metal : tone.ink2)
                 .padding(.top, 6)
         } else {
@@ -185,7 +185,7 @@ struct HomeTodayCard: View {
     /// A block's small name, over its title.
     private func label(_ text: String) -> some View {
         Text(text)
-            .font(.footnote.weight(.semibold))
+            .font(.app(.footnote, weight: .semibold))
             .foregroundStyle(tone.ink2)
     }
 
@@ -205,9 +205,9 @@ struct HomeTodayCard: View {
                     HStack(spacing: 3) {
                         Text("Train more")
                         Image(systemName: "chevron.forward")
-                            .font(.caption.weight(.semibold))
+                            .font(.app(.caption, weight: .semibold))
                     }
-                    .font(.subheadline.weight(.semibold))
+                    .font(.app(.subheadline, weight: .semibold))
                     .foregroundStyle(tone.metal)
                     .frame(minHeight: 44)
                     .contentShape(Rectangle())
@@ -223,7 +223,7 @@ struct HomeTodayCard: View {
                         .font(HomeType.title)
                         .foregroundStyle(tone.ink)
                     Text(coachDetail)
-                        .font(.subheadline)
+                        .font(.app(.subheadline))
                         .foregroundStyle(tone.ink2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -406,15 +406,15 @@ struct HomeLadderCard: View {
                                            : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 6))
                     nameLayout {
                         Text(rival.name)
-                            .font(.body.weight(.semibold))
+                            .font(.app(.body, weight: .semibold))
                             .foregroundStyle(tone.ink)
                             .minimumScaleFactor(0.7)
                         Text(rival.elo)
-                            .font(.subheadline)
+                            .font(.app(.subheadline))
                             .foregroundStyle(tone.ink2)
                     }
                     Text(isNext ? "Next to beat · \(rung.level.tagline)" : rung.level.tagline)
-                        .font(.footnote)
+                        .font(.app(.footnote))
                         .foregroundStyle(isNext ? tone.metal : tone.ink2)
                     if large {
                         score(rung)
@@ -455,7 +455,7 @@ struct HomeLadderCard: View {
             .monospacedDigit()
             .foregroundStyle(rung.played == 0 ? tone.ink3 : tone.ink)
         Text(rung.standingText)
-            .font(.caption)
+            .font(.app(.caption))
             .foregroundStyle(tone.ink3)
     }
 
@@ -485,14 +485,14 @@ struct HomeLadderCard: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text("You")
-                        .font(.body.weight(.semibold))
+                        .font(.app(.body, weight: .semibold))
                         .foregroundStyle(tone.ink)
                     Text(verbatim: "~\(rating)")
-                        .font(.subheadline)
+                        .font(.app(.subheadline))
                         .foregroundStyle(tone.ink2)
                 }
                 Text("Your level, from \(ladder.gamesCounted) games")
-                    .font(.footnote)
+                    .font(.app(.footnote))
                     .foregroundStyle(tone.ink2)
             }
             .lineLimit(1)
@@ -579,10 +579,10 @@ struct HomeScoresheet: View {
             Button(action: openAll) {
                 HStack {
                     Text(total == 1 ? "Your game" : "All \(total) games")
-                        .font(.subheadline.weight(.semibold))
+                        .font(.app(.subheadline, weight: .semibold))
                     Spacer(minLength: 0)
                     Image(systemName: "chevron.forward")
-                        .font(.footnote.weight(.semibold))
+                        .font(.app(.footnote, weight: .semibold))
                         .foregroundStyle(tone.ink3)
                 }
                 .foregroundStyle(tone.ink)
@@ -609,7 +609,7 @@ struct HomeScoresheet: View {
             Text("Accuracy").frame(width: accuracyWidth, alignment: .trailing)
             Text("To fix").frame(width: fixWidth, alignment: .trailing)
         }
-        .font(.caption2.weight(.semibold))
+        .font(.app(.caption2, weight: .semibold))
         .textCase(.uppercase)
         .tracking(0.5)
         .lineLimit(1)
@@ -639,7 +639,7 @@ struct HomeScoresheet: View {
                 fix(row, words: false)
                     .frame(width: fixWidth, alignment: .trailing)
             }
-            .font(.subheadline)
+            .font(.app(.subheadline))
             .lineLimit(1)
             .padding(.vertical, 12)
             .frame(minHeight: 48)
@@ -660,7 +660,7 @@ struct HomeScoresheet: View {
                 }
                 .foregroundStyle(tone.ink2)
             }
-            .font(.subheadline)
+            .font(.app(.subheadline))
             .padding(.vertical, 12)
             .contentShape(Rectangle())
         }

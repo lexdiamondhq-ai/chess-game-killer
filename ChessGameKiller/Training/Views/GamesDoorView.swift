@@ -90,16 +90,16 @@ struct GamesDoorView: View {
                 Image(systemName: leak.area.symbol)
                     .font(.system(size: 13, weight: .bold))
                 Text("WORK ON THIS FIRST")
-                    .font(.system(.caption, design: .themed).weight(.bold))
+                    .font(.app(.caption, weight: .bold))
                     .tracking(1)
             }
             .foregroundStyle(theme.trainingAccent)
             .accessibilityElement(children: .combine)
             VStack(alignment: .leading, spacing: 4) {
                 Text(leak.headline)
-                    .font(.system(.title3, design: .themed).weight(.bold))
+                    .font(.app(.title3, weight: .bold))
                 Text(leak.detail)
-                    .font(.system(.subheadline, design: .themed))
+                    .font(.app(.subheadline))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -157,11 +157,11 @@ struct GamesDoorView: View {
         VStack(alignment: .leading, spacing: 10) {
             CoachAvatar(theme: theme, size: 40)
             Text(gamesRead == 0 ? "Play a game and I'll read it" : "A couple more games")
-                .font(.system(.title3, design: .themed).weight(.bold))
+                .font(.app(.title3, weight: .bold))
             Text(gamesRead == 0
                  ? "Play any rival. I'll look at every move you make and show you where your points go, and how to win them back."
                  : "I've read \(gamesRead == 1 ? "one game" : "\(gamesRead) games") so far. After a few longer ones I can tell you what's really costing you.")
-                .font(.system(.subheadline, design: .themed))
+                .font(.app(.subheadline))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -205,11 +205,11 @@ struct GamesDoorView: View {
             } label: {
                 HStack {
                     Text(vault.games.count > Self.recentCount ? "All \(vault.games.count) games" : "Open Rewind")
-                        .font(.system(.subheadline, design: .themed).weight(.semibold))
+                        .font(.app(.subheadline, weight: .semibold))
                         .foregroundStyle(theme.trainingAccent)
                     Spacer()
                     Image(systemName: "chevron.right")
-                        .font(.caption.weight(.bold))
+                        .font(.app(.caption, weight: .bold))
                         .foregroundStyle(.tertiary)
                         .accessibilityHidden(true)
                 }
@@ -236,26 +236,26 @@ struct RecentGameRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(game.opponent)
-                        .font(.system(.subheadline, design: .themed).weight(.semibold))
+                        .font(.app(.subheadline, weight: .semibold))
                         .foregroundStyle(.primary)
                     Text(game.result.title)
-                        .font(.system(.caption, design: .themed).weight(.bold))
+                        .font(.app(.caption, weight: .bold))
                         .foregroundStyle(game.result == .win ? theme.trainingAccent : Color.secondary)
                 }
                 Text(detail)
-                    .font(.system(.caption, design: .themed))
+                    .font(.app(.caption))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if game.leftToRewrite > 0 {
                 Text("\(game.leftToRewrite) to fix")
-                    .font(.system(.caption, design: .themed).weight(.semibold).monospacedDigit())
+                    .font(.app(.caption, weight: .semibold).monospacedDigit())
                     .foregroundStyle(.secondary)
                     .fixedSize()
             }
             Image(systemName: "chevron.right")
-                .font(.caption.weight(.bold))
+                .font(.app(.caption, weight: .bold))
                 .foregroundStyle(.tertiary)
                 .accessibilityHidden(true)
         }
@@ -283,7 +283,7 @@ struct RecentGameRow: View {
                 .accessibilityHidden(true)
         } else {
             Image(systemName: "person.2.fill")
-                .font(.footnote)
+                .font(.app(.footnote))
                 .foregroundStyle(.secondary)
                 .frame(width: 34, height: 34)
                 .background(Circle().fill(Color.primary.opacity(0.08)))
@@ -301,12 +301,12 @@ struct CoachReportCard: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline) {
                 Text("WHAT LEO SEES")
-                    .font(.system(.caption, design: .themed).weight(.bold))
+                    .font(.app(.caption, weight: .bold))
                     .tracking(1)
                     .foregroundStyle(theme.trainingAccent)
                 Spacer()
                 Text(report.gamesRead == 1 ? "Your last game" : "Your last \(report.gamesRead) games")
-                    .font(.system(.footnote, design: .themed))
+                    .font(.app(.footnote))
                     .foregroundStyle(.secondary)
             }
             VStack(spacing: 12) {
@@ -328,7 +328,7 @@ struct CoachReportCard: View {
                 .frame(width: 20)
                 .accessibilityHidden(true)
             Text(score.area.title)
-                .font(.system(.subheadline, design: .themed).weight(isLeak ? .bold : .medium))
+                .font(.app(.subheadline, weight: isLeak ? .bold : .medium))
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .frame(width: 96, alignment: .leading)
@@ -337,7 +337,7 @@ struct CoachReportCard: View {
                 .opacity(score.value == nil ? 0.35 : 1)
                 .accessibilityHidden(true)
             Text(score.verdict)
-                .font(.system(.caption, design: .themed).weight(isLeak ? .bold : .medium))
+                .font(.app(.caption, weight: isLeak ? .bold : .medium))
                 .foregroundStyle(isLeak ? AnyShapeStyle(theme.trainingAccent) : AnyShapeStyle(.secondary))
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)

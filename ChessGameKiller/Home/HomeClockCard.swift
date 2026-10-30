@@ -70,14 +70,14 @@ struct HomeClockCard: View {
         return HStack(alignment: .bottom, spacing: 4) {
             VStack(alignment: .leading, spacing: 1) {
                 Text(side == .you ? "You" : upNext.rival.name)
-                    .font(.headline)
+                    .font(.app(.headline))
                     .foregroundStyle(tone.ink)
                 Text(detail(side))
-                    .font(.subheadline)
+                    .font(.app(.subheadline))
                     .foregroundStyle(tone.ink2)
                 if let time = clockTime(side) {
                     Text(time.clockLabel)
-                        .font(.system(size: digits, weight: .regular, design: .serif))
+                        .font(.app(size: digits, weight: .regular))
                         .monospacedDigit()
                         .foregroundStyle(!upNext.inProgress || lit ? tone.ink : tone.ink2)
                         .minimumScaleFactor(0.6)
@@ -114,16 +114,16 @@ struct HomeClockCard: View {
                     .fill(tone.metal)
                     .frame(width: 7, height: 7)
                 Text(side == .you ? "Your move" : "Their move")
-                    .font(.footnote.weight(.medium))
+                    .font(.app(.footnote, weight: .medium))
                     .foregroundStyle(tone.metal)
             }
         } else if side == .you, let clockRule {
             Text(clockRule)
-                .font(.footnote)
+                .font(.app(.footnote))
                 .foregroundStyle(tone.ink3)
         } else {
             Text(verbatim: " ")
-                .font(.footnote.weight(.medium))
+                .font(.app(.footnote, weight: .medium))
                 .accessibilityHidden(true)
         }
     }
@@ -209,7 +209,7 @@ struct HomeClockCapsule: View {
                 label(shortTitle, shortSubtitle)
                 label(shortTitle, nil)
                 Image(systemName: "play.fill")
-                    .font(.body.weight(.bold))
+                    .font(.app(.body, weight: .bold))
             }
             .foregroundStyle(tone.onIvory)
             .padding(.horizontal, 14)
@@ -251,10 +251,10 @@ struct HomeClockCapsule: View {
     private func label(_ title: String, _ subtitle: String?) -> some View {
         VStack(spacing: 0) {
             Text(title)
-                .font(.subheadline.weight(.semibold))
+                .font(.app(.subheadline, weight: .semibold))
             if let subtitle {
                 Text(subtitle)
-                    .font(.caption.monospacedDigit())
+                    .font(.app(.caption).monospacedDigit())
                     .opacity(0.68)
             }
         }

@@ -155,7 +155,7 @@ struct PositionBoard: View {
 
     private func label(_ text: String, size: CGFloat, color: Color, alignment: Alignment) -> some View {
         Text(text)
-            .font(.system(size: size * 0.2, weight: .semibold, design: .themed))
+            .font(.app(size: size * 0.2, weight: .semibold))
             .foregroundStyle(color)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignment)
             .padding(size * 0.05)

@@ -16,7 +16,7 @@ struct TipBanner: View {
                     .foregroundStyle(accent)
                     .frame(width: 22)
                 Text(tip.text)
-                    .font(.system(.footnote, design: .themed).weight(.semibold))
+                    .font(.app(.footnote, weight: .semibold))
                     .foregroundStyle(.primary)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)

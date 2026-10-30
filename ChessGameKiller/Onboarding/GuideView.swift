@@ -41,14 +41,14 @@ struct GuideView: View {
                 } label: {
                     Label(tipsReset ? "Tips will show again" : "Show tips again",
                           systemImage: tipsReset ? "checkmark" : "lightbulb")
-                        .font(.body.weight(.semibold))
+                        .font(.app(.body, weight: .semibold))
                 }
                 .disabled(tipsReset)
                 Button {
                     replayWelcome()
                 } label: {
                     Label("Replay the welcome", systemImage: "sparkles")
-                        .font(.body.weight(.semibold))
+                        .font(.app(.body, weight: .semibold))
                 }
             }
             .padding(.horizontal, 20)
@@ -63,7 +63,7 @@ struct GuideView: View {
     private func group<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             Text(title.uppercased())
-                .font(.caption.weight(.semibold))
+                .font(.app(.caption, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .tracking(1)
             content()
@@ -88,9 +88,9 @@ private struct GuideRow: View {
                 .frame(width: 30)
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.headline)
+                    .font(.app(.headline))
                 Text(text)
-                    .font(.subheadline)
+                    .font(.app(.subheadline))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
