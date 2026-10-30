@@ -427,17 +427,23 @@ struct HomeProgressRing<Content: View>: View {
     @State private var shown: Double = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// The least progress the ring draws. (Computed: a generic type can't store a static.)
+    private static var least: Double { 0.03 }
+
     var body: some View {
         ZStack {
             Circle()
                 .stroke(tone.ink.opacity(0.1), lineWidth: 3.5)
+            // Too little progress to read as an arc would only be a stray gold dot, so the
+            // ring stays an empty track until there is some.
             Circle()
-                .trim(from: 0, to: max(min(shown, 1), 0.02))
+                .trim(from: 0, to: min(max(shown, 0), 1))
                 .stroke(LinearGradient(colors: [Color(hex: 0xFFE2A8), tone.metal, Color(hex: 0xB98A4A)],
                                        startPoint: .topLeading, endPoint: .bottomTrailing),
                         style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
                 .rotationEffect(.degrees(-90))
                 .shadow(color: tone.metal.opacity(0.35), radius: 4)
+                .opacity(shown < Self.least ? 0 : 1)
             content()
         }
         .padding(2)

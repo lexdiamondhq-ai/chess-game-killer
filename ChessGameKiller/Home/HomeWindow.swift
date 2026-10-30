@@ -44,7 +44,12 @@ struct HomeBoardWindow: View {
             .overlay { words }
             .clipShape(shape)
             .overlay { shape.strokeBorder(rim, lineWidth: 0.75) }
-            .shadow(color: .black.opacity(0.45), radius: 22, y: 14)
+            // The shadow is cast by the window's shape, not by the live board inside it, so
+            // the board isn't drawn a second time every frame while it turns.
+            .background {
+                shape.fill(tone.canvas)
+                    .shadow(color: .black.opacity(0.45), radius: 22, y: 14)
+            }
             .accessibilityElement(children: .contain)
             .accessibilityLabel(upNext.inProgress ? "Your game" : "Next game")
             .accessibilityAction(.magicTap, primary)
