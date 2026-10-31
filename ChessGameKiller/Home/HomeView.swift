@@ -274,7 +274,7 @@ struct HomeView: View {
                 .transition(.opacity)
         }
 
-        currentGames()
+        currentGames(upNext)
 
         HomeLadderTile(ladder: ladder, tone: tone, play: { level in actions.playRival(level) })
             .padding(.top, 4)
@@ -324,16 +324,16 @@ struct HomeView: View {
         }
     }
 
-    /// Every game still going with a person, friend and online. The game against the
-    /// computer is in the board window, so it isn't listed twice.
-    private var currentGameList: [HomeCurrentGame] {
-        let friends = challenges?.store.sorted.filter { !$0.isOver } ?? []
-        return HomeCurrentGame.sorted(friends.map(HomeCurrentGame.friend))
+    /// Every game still going, your move first. The game against the computer is listed
+    /// too, though the board window shows it: this is the one place for all your games.
+    private func currentGameList(_ upNext: HomeUpNext) -> [HomeCurrentGame] {
+        let friends: [FriendGame] = challenges?.store.sorted ?? []
+        return HomeCurrentGame.list(upNext, fen: match.game.fen, friends: friends)
     }
 
     @ViewBuilder
-    private func currentGames() -> some View {
-        let games = currentGameList
+    private func currentGames(_ upNext: HomeUpNext) -> some View {
+        let games = currentGameList(upNext)
         if !games.isEmpty {
             HomeCurrentStrip(games: games, tone: tone, pieceTheme: pieceTheme) { game in
                 if let friend = game.friendGame {

@@ -129,6 +129,42 @@ final class HomeSnapshotTests: XCTestCase {
         XCTAssertNotNil(yours.fen)
     }
 
+    /// The game against the computer is listed with the rest, so Your move shows even when it is
+    /// the only game going; among games that wait on the same side, it comes first.
+    func testCurrentGamesListTheGameAgainstTheComputer() {
+        let now = Date().timeIntervalSince1970 * 1000
+        let start = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+        let yourTurn = HomeUpNext(kind: .resume, level: .club, playerColor: .white, randomSide: false,
+                                  timeControl: .unlimited, yourTime: nil, theirTime: nil, yourMove: true,
+                                  moveNumber: 1, plies: 0)
+        let alone = HomeCurrentGame.list(yourTurn, fen: start, friends: [])
+        XCTAssertEqual(alone.map(\.id), ["computer"], "The only game going still gets its chip")
+        XCTAssertEqual(alone.first?.title, "vs Pulse")
+        XCTAssertEqual(alone.first?.kind, .computer)
+        XCTAssertEqual(alone.first?.status, .yourMove)
+        XCTAssertEqual(alone.first?.detail, "Computer · No clock · Move 1")
+        XCTAssertNil(alone.first?.friendGame, "Its chip resumes the game against the computer")
+        XCTAssertEqual(HomeCurrentGame.note(alone), "1 needs your move")
+
+        let theirs = FriendGame.sample(.sample(code: "AAAAAA", moves: ["e2e4"], now: now), seat: .white)
+        let yours = FriendGame.sample(.sample(code: "CCCCCC", moves: ["e2e4"], now: now), seat: .black)
+        let ended = FriendGame.sample(.sample(code: "DDDDDD", status: .over, moves: ["e2e4"], now: now), seat: .black)
+        let all = HomeCurrentGame.list(yourTurn, fen: start, friends: [theirs, yours, ended])
+        XCTAssertEqual(all.map(\.id), ["computer", "CCCCCC", "AAAAAA"], "Your move first; a game that ended is gone")
+
+        let computersTurn = HomeUpNext(kind: .resume, level: .club, playerColor: .white, randomSide: false,
+                                       timeControl: .unlimited, yourTime: nil, theirTime: nil, yourMove: false,
+                                       moveNumber: 1, plies: 1)
+        let waiting = HomeCurrentGame.list(computersTurn, fen: start, friends: [theirs, yours])
+        XCTAssertEqual(waiting.map(\.id), ["CCCCCC", "computer", "AAAAAA"])
+        XCTAssertEqual(waiting[1].status, .theirMove)
+
+        let ready = HomeUpNext(kind: .ready, level: .club, playerColor: .white, randomSide: false,
+                               timeControl: .unlimited, yourTime: nil, theirTime: nil, yourMove: true,
+                               moveNumber: 1, plies: 0)
+        XCTAssertTrue(HomeCurrentGame.list(ready, fen: start, friends: []).isEmpty, "Nothing under way, nothing listed")
+    }
+
     /// The home takes its colors from the board look.
     func testOtherLooks() throws {
         for (look, name, offset) in [(BoardTheme.ID.midnight, "zz-home-7-midnight", 0.0),
