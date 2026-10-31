@@ -48,6 +48,14 @@ final class StockfishTests: XCTestCase {
         try XCTSkipUnless(StockfishEngine.hasNetworks)
         await StockfishEngine.shared.warmUp()
         let fen = Position.standard.fen
+        // An earlier test can leave Stockfish still busy with a search whose stop it never
+        // answered, and a new search then waits behind it (see StockfishEngine.search). Short
+        // searches first, until one comes back promptly, so the timed one starts on an idle engine.
+        for _ in 0..<5 {
+            let settling = ContinuousClock.now
+            _ = await StockfishEngine.shared.chooseMove(fen: fen, skill: 10, depth: 1, thinkTimeMs: 100)
+            if ContinuousClock.now - settling < .milliseconds(500) { break }
+        }
         let started = ContinuousClock.now
         let chosen = await StockfishEngine.shared.chooseMove(fen: fen, skill: 10, depth: 5, thinkTimeMs: 5000)
         let elapsed = ContinuousClock.now - started
