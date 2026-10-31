@@ -161,8 +161,8 @@ jobs:
           home home-shortcuts -showcaseShortcuts YES -welcomeSeen YES -tipsOff YES
           # Someone at the Table with a game under way against Vector: violet light, leaning in on your move.
           home home-vector -showcase game -showcaseHome YES -showcaseRival vector -welcomeSeen YES -tipsOff YES
-          # The game against the computer alone in Current games: Your move shows for it too.
-          home home-current-computer -showcase game -showcaseHome YES -showcaseHomeAt current -welcomeSeen YES -tipsOff YES
+          # The home at rest with games going against the computer and with people: Your move under the board.
+          home home-current-rest -showcase game -showcaseHome YES -showcaseGames YES -welcomeSeen YES -tipsOff YES
           # The game in the Dynamic Island: a timed game under way, then another app in front of it.
           xcrun simctl terminate "$UDID" $BUNDLE 2>/dev/null || true
           if xcrun simctl launch "$UDID" $BUNDLE -showcase game -showcaseClock 5+0 -welcomeSeen YES -tipsOff YES >/dev/null; then
@@ -217,7 +217,7 @@ jobs:
         # The screens being worked on, once more at the very end and small, so a short tail of the log holds them.
         run: |
           [ -d snapshots ] || exit 0
-          for f in snapshots/device-home.png snapshots/device-home-vector.png snapshots/device-home-current-computer.png snapshots/device-home-current.png snapshots/device-home-current-all.png; do
+          for f in snapshots/device-home.png snapshots/device-home-vector.png snapshots/device-home-current-rest.png snapshots/device-home-current-all.png; do
             [ -e "$f" ] || continue
             sips -s format jpeg -s formatOptions 70 -Z 1700 "$f" --out /tmp/tiny.jpg >/dev/null
             echo "BEGIN-SCREEN $(basename "$f")"
