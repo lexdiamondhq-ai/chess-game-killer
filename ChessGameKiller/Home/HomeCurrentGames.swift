@@ -57,6 +57,18 @@ struct HomeCurrentGame: Identifiable, Equatable {
         }.map(\.element)
     }
 
+    /// Every game still going, your move first: the game against the computer when one is
+    /// under way (first among equals), then the friend and online games that haven't ended.
+    static func list(_ upNext: HomeUpNext, fen: String, friends: [FriendGame]) -> [HomeCurrentGame] {
+        var games: [HomeCurrentGame] = []
+        if let game = Self.computer(upNext, fen: fen) {
+            games.append(game)
+        }
+        let going: [FriendGame] = friends.filter { !$0.isOver }
+        games.append(contentsOf: going.map(Self.friend))
+        return Self.sorted(games)
+    }
+
     /// The game against the computer, when one is under way.
     static func computer(_ upNext: HomeUpNext, fen: String) -> HomeCurrentGame? {
         guard upNext.inProgress else { return nil }

@@ -536,8 +536,9 @@ struct HomeNoticeCard: View {
 
 // MARK: - Games still going
 
-/// Every game still going with a person, as a strip of chips you swipe: the position drawn
-/// small and whose move it is, your move first and lit in gold. Tap one to go back to it.
+/// Every game still going, against the computer and with people, as a strip of chips you
+/// swipe: the position drawn small and whose move it is, your move first and lit in gold.
+/// Tap one to go back to it.
 struct HomeCurrentStrip: View {
     let games: [HomeCurrentGame]
     let tone: HomeTone
