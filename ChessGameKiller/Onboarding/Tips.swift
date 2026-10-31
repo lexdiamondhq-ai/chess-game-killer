@@ -10,6 +10,8 @@ enum AppTip: String, CaseIterable, Identifiable {
     case undoHelp
     /// The first time Big Board is on during a game.
     case bigBoard
+    /// On the home, once a game has been played: the gold knight in the dock has shortcuts.
+    case jewelShortcuts
 
     var id: String { rawValue }
 
@@ -19,6 +21,7 @@ enum AppTip: String, CaseIterable, Identifiable {
         case .ghostVision: return "eye"
         case .undoHelp: return "hand.raised"
         case .bigBoard: return "hand.draw"
+        case .jewelShortcuts: return "hand.tap"
         }
     }
 
@@ -32,6 +35,8 @@ enum AppTip: String, CaseIterable, Identifiable {
             return "Undo counts as help: this game now earns your pieces half the XP."
         case .bigBoard:
             return "Swipe the board sideways to replay moves. Swipe up for the tools."
+        case .jewelShortcuts:
+            return "Hold the gold knight for shortcuts: your rivals, Online, a friend and more."
         }
     }
 

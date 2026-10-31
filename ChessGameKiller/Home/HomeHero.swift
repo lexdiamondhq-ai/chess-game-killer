@@ -82,6 +82,8 @@ struct HomeHeroBoard: UIViewRepresentable {
     let look: SculptedLook
     let pieces: [Piece]
     let camera: SculptedCamera
+    /// Someone at the table: the next rival's light from across the board.
+    var presence: SculptedPresence? = nil
 
     @AppStorage(BoardTheme.coordinatesKey) private var showsCoordinates = true
 
@@ -98,6 +100,7 @@ struct HomeHeroBoard: UIViewRepresentable {
         context.coordinator.pieces = pieces
         context.coordinator.showsCoordinates = showsCoordinates
         scene.heldCamera = camera
+        scene.presence = presence
         return scene.view
     }
 
@@ -110,6 +113,7 @@ struct HomeHeroBoard: UIViewRepresentable {
             scene.apply(state, animated: true)
         }
         if scene.heldCamera != camera { scene.heldCamera = camera }
+        if scene.presence != presence { scene.presence = presence }
     }
 
     private var state: SculptedBoardState {

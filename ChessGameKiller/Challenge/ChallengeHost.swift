@@ -10,9 +10,12 @@ struct ChallengeHost: ViewModifier {
     func body(content: Content) -> some View {
         content
             .onOpenURL { url in
-                // The Today's Move widget opens the game screen's daily puzzle; every other link is a challenge.
+                // The Today's Move widget opens the game screen's daily puzzle, and the game on the
+                // Lock Screen opens that game; every other link is a challenge.
                 if DailyLink.matches(url) {
                     DailyLink.open()
+                } else if LiveGameLink.matches(url) {
+                    LiveGameLink.open()
                 } else {
                     center?.open(url)
                 }

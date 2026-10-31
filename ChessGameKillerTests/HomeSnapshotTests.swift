@@ -35,6 +35,14 @@ final class HomeSnapshotTests: XCTestCase {
         open.isHidden = true
     }
 
+    /// Holding the gold knight in the dock: the five rivals and the other ways to a game rise
+    /// out of it over the veiled page, and the jewel wears a cross to close them.
+    func testTheJewelsShortcuts() throws {
+        let window = try show(HomeSample.home(showsShortcuts: true))
+        try save(window, "zz-home-9-shortcuts")
+        window.isHidden = true
+    }
+
     func testFirstLaunch() throws {
         let window = try show(HomeSample.home(empty: true))
         try save(window, "zz-home-first-launch")
@@ -190,6 +198,60 @@ final class HomeSnapshotTests: XCTestCase {
         XCTAssertLessThan(black.eye.z, 0, "Playing Black, the window looks from Black's side")
     }
 
+    // MARK: Someone at the Table
+
+    /// The rival's light hangs in the studio's rig, above the window and out of sight, and
+    /// pools on the board right under the orb in the window's top, from either side.
+    func testTheRivalsLightPoolsUnderTheOrb() {
+        let size = CGSize(width: 370, height: 247)
+        let orb = HomeRivalPresence.center(in: size)
+        let light = HomeWindowBoard.presence(.orange, arrival: 0, leaning: false)
+        let below = SIMD3<Float>(light.position.x, 0, light.position.z)
+        for black in [false, true] {
+            let camera = HomeWindowBoard.camera(size: size, scrolled: 0, arrival: 0, black: black)
+            let turn = simd_quatf(angle: camera.azimuth, axis: SculptedCamera.up)
+            let pool = camera.screenPoint(turn.act(below), in: size)
+            XCTAssertEqual(pool.x, orb.x, accuracy: 30, "The light falls under the orb, across (black: \(black))")
+            XCTAssertEqual(pool.y, orb.y, accuracy: 30, "and down (black: \(black))")
+            let lamp = camera.screenPoint(turn.act(light.position), in: size)
+            XCTAssertLessThan(lamp.y, 0, "The lamp itself hangs above the window")
+        }
+    }
+
+    /// The light comes up as the camera settles in, and leans in while a game waits on your move.
+    func testTheRivalsLightComesUpAsTheCameraSettles() {
+        let arriving = HomeWindowBoard.presence(.orange, arrival: 1, leaning: false)
+        let settled = HomeWindowBoard.presence(.orange, arrival: 0, leaning: false)
+        let leaning = HomeWindowBoard.presence(.orange, arrival: 0, leaning: true)
+        XCTAssertLessThan(arriving.strength, settled.strength * 0.5)
+        XCTAssertEqual(settled.strength, 1, accuracy: 0.001)
+        XCTAssertGreaterThan(leaning.strength, settled.strength)
+        XCTAssertLessThan(SculptedPresence.game(.orange).strength, settled.strength * 0.5, "Softer in a game, where the board is the point")
+    }
+
+    /// In a game the rival's light is low behind its back rank, so its gleam on the polished
+    /// board (where the eye sees the light mirrored) lands past the far edge, not on the squares
+    /// in play, from either side of the board.
+    func testTheRivalsLightInAGameGleamsPastTheFarEdge() {
+        let light = SculptedPresence.game(.orange).position
+        for flipped in [false, true] {
+            let camera = SculptedCamera.fitted(aspect: Float(SculptedCamera.Framing.standing.aspect), flipped: flipped)
+            // The light turns with the camera (it hangs in the studio's rig).
+            let turn = simd_quatf(angle: camera.azimuth, axis: SculptedCamera.up)
+            let lamp: SIMD3<Float> = turn.act(light)
+            // The gleam is where the line from the eye to the lamp's mirror image under the
+            // board crosses the board.
+            let mirrored = SIMD3<Float>(lamp.x, -lamp.y, lamp.z)
+            let eye: SIMD3<Float> = camera.eye
+            let part: Float = eye.y / (eye.y + lamp.y)
+            let toMirror: SIMD3<Float> = mirrored - eye
+            let gleam: SIMD3<Float> = eye + part * toMirror
+            let across: Float = simd_length(SIMD2<Float>(gleam.x, gleam.z))
+            XCTAssertGreaterThan(across, SculptedCamera.boardHalfWidth + 0.5, "The gleam lands past the board (flipped: \(flipped))")
+            XCTAssertLessThan(lamp.y, SculptedCamera.tallest, "Lower than the king's cross, so it edges the pieces rather than lighting them")
+        }
+    }
+
     func testTheHeroCameraLooksAtTheBoard() {
         let camera = HomeHeroCamera.camera(aspect: 402.0 / 520.0)
         let center = camera.normalized(SIMD3(0, 0, 0))
@@ -274,7 +336,7 @@ enum HomeSample {
     static let italianFEN = "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQK2R b KQkq - 0 5"
 
     static func home(empty: Bool = false, theme: BoardTheme.ID = .gilded, match: MatchController? = nil,
-                     showsYou: Bool = false) -> some View {
+                     showsYou: Bool = false, showsShortcuts: Bool = false) -> some View {
         let game = match ?? MatchController(engine: nil, sounds: nil)
         let vault = GameVault(games: empty ? [] : games())
         let army = empty ? ArmyStore() : ArmyStore(army: armyRecords())
@@ -299,7 +361,8 @@ enum HomeSample {
             daily.puzzlesSolved = 2
         }
         daily.seeded = true
-        return HomeView(match: game, theme: .named(theme), actions: HomeActions(), showsYou: showsYou)
+        return HomeView(match: game, theme: .named(theme), actions: HomeActions(), showsYou: showsYou,
+                        showsShortcuts: showsShortcuts)
             .environment(DailyStore(state: daily))
             .environment(vault)
             .environment(army)
