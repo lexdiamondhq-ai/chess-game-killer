@@ -1,25 +1,23 @@
 import ChessKit
-import CoreImage
 import Observation
 import SwiftUI
 import UIKit
 
-/// How far the home page has scrolled; below zero while the board is pulled down.
-/// Only the board behind the page and the top edge read it, so the page itself is not
+/// How far the home page has scrolled; below zero while the page is pulled down.
+/// Only the board window, the top edge and the pull cue read it, so the page itself is not
 /// redrawn as it scrolls.
 @Observable
 final class HomeScroll {
     var y: CGFloat = 0
 }
 
-/// The camera on the board behind the home page: the real 3D set seen low and from the
-/// corner, like a photograph of a real board. As the page scrolls the camera walks around
-/// the board and moves in on your king; pulled down past the top, it rises and steps back.
+/// The camera on the home's board: the real 3D set seen low and from the corner, like a
+/// photograph of a real board. Along its walk it goes around the board and in on your king;
+/// pulled up and back, it rises and steps away.
 ///
-/// The board fills the whole screen behind the page, so the camera is tilted down a little
-/// (`anchor`) to stand the board in the top of the screen, where the page leaves it showing.
-/// The walk ends looking at the king's crown. Playing Black, the same walk happens on
-/// Black's side and ends on Black's king.
+/// `anchor` tilts it so the look point sits higher or lower in the view (the board window
+/// stands the pieces in its top and leaves its foot for words). The walk ends looking at the
+/// king's crown. Playing Black, the same walk happens on Black's side and ends on Black's king.
 enum HomeHeroCamera {
     /// The lens: the game board's own, a short telephoto, so the pieces keep their shape up close.
     static let fieldOfView: Float = 22 * .pi / 180
@@ -78,12 +76,14 @@ enum HomeHeroCamera {
     private static func mix(_ a: Float, _ b: Float, _ t: Float) -> Float { a + (b - a) * t }
 }
 
-/// The live board behind the page: no taps, just the pieces and a camera the page moves.
+/// The live board in the home's window: no taps, just the pieces and a camera the page moves.
 struct HomeHeroBoard: UIViewRepresentable {
     let stage: SculptedStage
     let look: SculptedLook
     let pieces: [Piece]
     let camera: SculptedCamera
+    /// Someone at the table: the next rival's light from across the board.
+    var presence: SculptedPresence? = nil
 
     @AppStorage(BoardTheme.coordinatesKey) private var showsCoordinates = true
 
@@ -100,6 +100,7 @@ struct HomeHeroBoard: UIViewRepresentable {
         context.coordinator.pieces = pieces
         context.coordinator.showsCoordinates = showsCoordinates
         scene.heldCamera = camera
+        scene.presence = presence
         return scene.view
     }
 
@@ -112,153 +113,12 @@ struct HomeHeroBoard: UIViewRepresentable {
             scene.apply(state, animated: true)
         }
         if scene.heldCamera != camera { scene.heldCamera = camera }
+        if scene.presence != presence { scene.presence = presence }
     }
 
     private var state: SculptedBoardState {
         var state = SculptedBoardState(pieces: pieces.map { PlacedPiece(id: 0, piece: $0) }, matchesPieces: true)
         state.showsCoordinates = showsCoordinates
         return state
-    }
-}
-
-/// The world behind the home page: the board standing in a pool of light in a dark room.
-/// It never scrolls away. As the page rises over it the camera walks in until your king's
-/// crown stands between the status bar and the clock card; then, as the cards cover it, the
-/// picture slips softly out of focus and darkens, so the glass cards float over it.
-struct HomeWorld: View {
-    let scroll: HomeScroll
-    let look: SculptedLook
-    let tone: HomeTone
-    let pieces: [Piece]
-    let black: Bool
-    /// The middle of the pool of light the board stands in, in points from the top.
-    let pool: CGFloat
-    /// Where the camera's look point sits on the screen at rest, in points from the top.
-    let restLook: CGFloat
-    /// Where the king's crown sits once the camera has walked in.
-    let endLook: CGFloat
-    /// How far the page scrolls while the camera walks in and the picture goes soft.
-    let walk: CGFloat
-    /// Where the board fades into the room, at the top of the clock card.
-    let foot: CGFloat
-
-    /// The share of the walk the camera takes to come in. It holds still for the rest,
-    /// sharp for a moment, then soft.
-    static let arrival: CGFloat = 0.6
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var stage = SculptedStage()
-    @State private var shown = false
-    /// The end of the walk, out of focus: what the page scrolls over.
-    @State private var soft: UIImage?
-
-    var body: some View {
-        GeometryReader { geo in
-            let size = geo.size
-            let y = scroll.y
-            let scrolled = min(max(y / max(walk, 1), 0), 1)
-            let progress = reduceMotion ? 0 : min(scrolled / Self.arrival, 1)
-            let pull = reduceMotion ? 0 : min(max(-y / 150, 0), 1)
-            // Out of focus only once the camera has come in and held still a moment,
-            // so the soft picture is drawn from where the camera stands.
-            let frost = Self.smoothstep(Self.arrival + 0.07, 1, scrolled)
-            ZStack(alignment: .top) {
-                room(size)
-                if SculptedAssets.shared.isLoaded {
-                    HomeHeroBoard(stage: stage, look: look, pieces: pieces,
-                                  camera: camera(size, progress: progress, pull: pull))
-                        .id(look.name)
-                        .frame(width: size.width, height: size.height)
-                        .opacity(shown ? 1 : 0)
-                }
-                if let soft {
-                    Image(uiImage: soft)
-                        .resizable()
-                        .frame(width: size.width, height: size.height)
-                        .opacity(frost)
-                }
-                // The board sinks into the room toward the foot of the screen.
-                LinearGradient(stops: [
-                    .init(color: tone.canvas.opacity(0), location: 0),
-                    .init(color: tone.canvas.opacity(0.55), location: 0.55),
-                    .init(color: tone.canvas.opacity(0.92), location: 1),
-                ], startPoint: .top, endPoint: .bottom)
-                    .frame(height: max(size.height - foot + 60, 0))
-                    .frame(maxHeight: .infinity, alignment: .bottom)
-                // Darker as the page covers it, so titles read over it.
-                tone.canvas.opacity(0.5 * frost)
-                // The status bar stays readable over the far side of the board.
-                LinearGradient(colors: [.black.opacity(0.45), .clear], startPoint: .top, endPoint: .bottom)
-                    .frame(height: 130)
-            }
-            .frame(width: size.width, height: size.height)
-            .task(id: softKey(size)) { await renderSoft(size) }
-        }
-        .ignoresSafeArea()
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-        .onAppear {
-            withAnimation(.easeOut(duration: 0.6)) { shown = true }
-        }
-    }
-
-    /// The room: its own dark, and the pool of light the board stands in.
-    private func room(_ size: CGSize) -> some View {
-        ZStack {
-            tone.canvas
-            RadialGradient(colors: [tone.pool.opacity(0.9), tone.pool.opacity(0.28), tone.canvas.opacity(0)],
-                           center: UnitPoint(x: 0.55, y: pool / max(size.height, 1)),
-                           startRadius: 10, endRadius: max(size.width, 320) * 0.95)
-        }
-    }
-
-    private func camera(_ size: CGSize, progress: CGFloat, pull: CGFloat) -> SculptedCamera {
-        let height = max(size.height, 1)
-        // The look point rises up the screen as the camera comes in, in step with it.
-        let eased = CGFloat(Ease.smooth(Float(progress)))
-        let lookAt = restLook + (endLook - restLook) * eased
-        return HomeHeroCamera.camera(
-            aspect: Float(size.width / height),
-            anchor: Float(1 - 2 * lookAt / height),
-            progress: Float(progress), pull: Float(pull), black: black,
-            widthScale: Float(max(size.width / 440, 1))
-        )
-    }
-
-    // MARK: Out of focus
-
-    private func softKey(_ size: CGSize) -> String {
-        let place = pieces.map { "\($0.color == .white ? "w" : "b")\($0.kind.rawValue)\($0.square)" }.joined()
-        return "\(look.name) \(black) \(Int(size.width))x\(Int(size.height)) \(Int(restLook)) \(Int(endLook)) \(reduceMotion) \(place)"
-    }
-
-    /// Draws where the walk ends once, a moment after the page appears, and blurs it.
-    @MainActor
-    private func renderSoft(_ size: CGSize) async {
-        guard SculptedAssets.shared.isLoaded, size.width > 1, size.height > 1 else { return }
-        try? await Task.sleep(for: .milliseconds(450))
-        guard !Task.isCancelled else { return }
-        let end = camera(size, progress: reduceMotion ? 0 : 1, pull: 0)
-        let scene = stage.scene(for: look)
-        // Drawn small and plain: the blur hides both, and the picture costs the main
-        // thread a sixteenth of a full-size, smoothed one while the app is opening.
-        guard let still = scene.still(from: end, size: size, scale: 0.5, antialiased: false) else { return }
-        soft = Self.blurred(still, sigma: 8)
-    }
-
-    private static let context = CIContext(options: [.cacheIntermediates: false])
-
-    /// `sigma` is in the image's own pixels.
-    static func blurred(_ image: UIImage, sigma: Double = 16) -> UIImage? {
-        guard let cgImage = image.cgImage else { return nil }
-        let input = CIImage(cgImage: cgImage)
-        let output = input.clampedToExtent().applyingGaussianBlur(sigma: sigma).cropped(to: input.extent)
-        guard let result = context.createCGImage(output, from: input.extent) else { return nil }
-        return UIImage(cgImage: result, scale: image.scale, orientation: .up)
-    }
-
-    static func smoothstep(_ low: CGFloat, _ high: CGFloat, _ x: CGFloat) -> CGFloat {
-        let t = min(max((x - low) / (high - low), 0), 1)
-        return t * t * (3 - 2 * t)
     }
 }

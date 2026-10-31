@@ -21,6 +21,8 @@ struct SculptedSceneView: UIViewRepresentable {
     let stage: SculptedStage
     let look: SculptedLook
     let state: SculptedBoardState
+    /// Someone at the table: the rival's light from across the board, if any.
+    var presence: SculptedPresence? = nil
 
     @AppStorage(BoardTheme.coordinatesKey) private var showsCoordinates = true
 
@@ -34,11 +36,14 @@ struct SculptedSceneView: UIViewRepresentable {
     func makeUIView(context: Context) -> SculptedSceneKitView {
         let scene = stage.scene(for: look)
         scene.apply(shown, animated: false)
+        scene.presence = presence
         return scene.view
     }
 
     func updateUIView(_ view: SculptedSceneKitView, context: Context) {
-        stage.scene(for: look).apply(shown, animated: !context.transaction.disablesAnimations)
+        let scene = stage.scene(for: look)
+        scene.apply(shown, animated: !context.transaction.disablesAnimations)
+        if scene.presence != presence { scene.presence = presence }
     }
 }
 
@@ -54,9 +59,11 @@ struct SculptedBoardView: View {
     var endBrowsing: (() -> Void)?
     /// Ghost Vision, when the player can hold the board to see ahead.
     var vision: GhostVision?
+    /// Seen from the player's chair, or from above with the flat pieces (Big Board).
+    var framing: SculptedCamera.Framing = .standing
 
     /// Width over height: the board seen at an angle is wider than it is tall.
-    static let aspect: CGFloat = 1.35
+    static let aspect: CGFloat = SculptedCamera.Framing.standing.aspect
 
     @AppStorage("haptics") private var hapticsOn = true
     @Environment(ArmyStore.self) private var army: ArmyStore?
@@ -76,13 +83,19 @@ struct SculptedBoardView: View {
     private var game: GameModel { match.game }
     private var flipped: Bool { match.isBoardFlipped }
     private var look: SculptedLook { theme.sculptedLook ?? .gilded }
+    /// Someone at the table: the rival sits across the board as its own soft light, the same
+    /// light the home's window shows before the game.
+    private var presence: SculptedPresence? {
+        guard match.setup.opponent == .computer else { return nil }
+        return .game(match.setup.level.rival.lightUI)
+    }
 
     var body: some View {
         GeometryReader { geo in
             let size = geo.size
-            let camera = SculptedCamera.fitted(aspect: Float(size.width / max(size.height, 1)), flipped: flipped)
+            let camera = SculptedCamera.fitted(aspect: Float(size.width / max(size.height, 1)), flipped: flipped, framing: framing)
             ZStack(alignment: .topLeading) {
-                SculptedSceneView(stage: stage, look: look, state: boardState)
+                SculptedSceneView(stage: stage, look: look, state: boardState, presence: presence)
                     .id(look.name)
                     .frame(width: size.width, height: size.height)
                     .accessibilityHidden(true)
@@ -124,7 +137,7 @@ struct SculptedBoardView: View {
                 }
             }
         }
-        .aspectRatio(Self.aspect, contentMode: .fit)
+        .aspectRatio(framing.aspect, contentMode: .fit)
         // One tap as each move's piece touches down: firmer for a capture, a heavy thud as a
         // rook or queen falls and the board shakes, a sharp knock for a check against the player.
         .sensoryFeedback(trigger: touchdown) { _, new in
@@ -167,10 +180,12 @@ struct SculptedBoardView: View {
     /// The game, copied for the scene.
     private var boardState: SculptedBoardState {
         if let browsing {
-            return SculptedBoardState(pieces: browsing.pieces.map { PlacedPiece(id: 0, piece: $0) },
-                                      flipped: flipped, matchesPieces: true)
+            var state = SculptedBoardState(pieces: browsing.pieces.map { PlacedPiece(id: 0, piece: $0) },
+                                           flipped: flipped, matchesPieces: true)
+            state.framing = framing
+            return state
         }
-        return SculptedBoardState(
+        var state = SculptedBoardState(
             pieces: game.pieces,
             selected: game.selected,
             targets: game.targets,
@@ -185,6 +200,8 @@ struct SculptedBoardView: View {
             finale: finale,
             ghosts: ghosts
         )
+        state.framing = framing
+        return state
     }
 
     /// Ghost Vision's steps while the player holds the board.
@@ -266,7 +283,7 @@ struct SculptedBoardView: View {
     /// when the far edge of the view is too close.
     private func calloutPoint(over square: Square, camera: SculptedCamera, size: CGSize) -> CGPoint {
         let foot = SculptedCamera.position(of: square)
-        let height = SculptedAssets.shared.height(of: .king) + 0.2
+        let height = framing.lying ? 0.3 : SculptedAssets.shared.height(of: .king) + 0.2
         let top = camera.screenPoint(foot + SIMD3(0, height + 0.16, 0), in: size)
         let below = camera.screenPoint(foot + SIMD3(0, 0, flipped ? -0.62 : 0.62), in: size)
         return top.y - 14 >= 14 ? CGPoint(x: top.x, y: top.y - 12) : below

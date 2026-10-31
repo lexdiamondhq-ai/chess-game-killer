@@ -24,7 +24,7 @@ struct PlayersStrip: View {
             }
             PlayerName(match: match, theme: theme, color: topColor.opposite, pictureAfter: true)
         }
-        .font(.system(.footnote, design: .themed).weight(.semibold))
+        .font(.app(.footnote, weight: .semibold))
         .lineLimit(1)
         .minimumScaleFactor(0.8)
         .padding(.horizontal, 12)
@@ -85,7 +85,7 @@ struct ClockLabel: View {
             let remaining = clock.remaining(for: color)
             let urgent = isRunning && remaining < .seconds(10)
             Text(remaining.clockLabel)
-                .font(.system(size: size, weight: .semibold, design: .themed).monospacedDigit())
+                .font(.app(size: size, weight: .semibold).monospacedDigit())
                 .foregroundStyle(urgent ? Color(hex: 0xFF4D6D) : (isRunning ? Color.primary : Color.secondary))
                 .lineLimit(1)
                 .padding(.horizontal, 6)
@@ -119,7 +119,7 @@ struct MoveRibbon: View {
         GeometryReader { geo in
             if moves.isEmpty {
                 Text("Tap a piece to see where it can go")
-                    .font(.system(.footnote, design: .themed))
+                    .font(.app(.footnote))
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -185,7 +185,7 @@ struct MoveRibbon: View {
                 .id(index)
             }
         }
-        .font(Font.system(.footnote, design: .themed).monospacedDigit())
+        .font(Font.app(.footnote).monospacedDigit())
         .padding(.vertical, 2)
     }
 }

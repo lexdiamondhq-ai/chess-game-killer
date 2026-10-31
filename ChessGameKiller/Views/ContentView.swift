@@ -11,6 +11,8 @@ struct ContentView: View {
     @State private var showingNewGame = true
     @State private var showingSettings = false
     @State private var showingAnalyze = false
+    /// Analyze opens on the camera (the home's Scan a board shortcut).
+    @State private var analyzeWithCamera = false
     @State private var coachExpanded = false
     @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .gilded
     @AppStorage("matchRival") private var matchRival = false
@@ -18,7 +20,10 @@ struct ContentView: View {
     @AppStorage("showSecondBest") private var showSecondBest = true
     @AppStorage("coachVerdicts") private var showVerdicts = true
     @AppStorage("haptics") private var hapticsOn = true
-    @State private var training = TrainingStore.live()
+    @State private var training: TrainingStore
+    /// The daily streak and Today's Move, for the whole app.
+    @State private var daily: DailyStore
+    @State private var showingDaily = false
     @State private var coach = GameCoach()
     @State private var showingTraining = false
     @State private var puzzles = PuzzleStore.live()
@@ -39,6 +44,8 @@ struct ContentView: View {
     /// Big Board: the board edge to edge with everything else tucked into a pull-up tray.
     @AppStorage("bigBoard") private var bigBoard = false
     @AppStorage("sculpted3D") private var sculpted3D = true
+    /// Tilted or flat 3D board (Settings, Board view).
+    @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.auto
     @AppStorage(BoardTheme.coordinatesKey) private var showsCoordinates = true
     /// Hold the board to see the engine's line ahead (counts as help).
     @AppStorage(GhostVision.storageKey) private var ghostVisionOn = true
@@ -59,6 +66,10 @@ struct ContentView: View {
     /// tests and screenshots that picture the game screen skip both, and may open the coach.
     init(startsWithNewGame: Bool = true, trayOpen: Bool = false, startsAtHome: Bool? = nil,
          match: MatchController? = nil, coachOpen: Bool = false, vision: GhostVision? = nil) {
+        let trainingStore = TrainingStore.live()
+        _training = State(initialValue: trainingStore)
+        // The training streak carries over into the daily one the first time.
+        _daily = State(initialValue: DailyStore.live(trainingStreak: trainingStore.progress.streak))
         if let match { _match = State(initialValue: match) }
         if let vision { _vision = State(initialValue: vision) }
         let home = startsAtHome ?? (startsWithNewGame && HomeScreen.isOn())
@@ -86,7 +97,7 @@ struct ContentView: View {
     /// The board is out of sight: the app is in the background, or another screen covers the game.
     /// The clock and the rival wait while it is.
     private var boardHidden: Bool {
-        scenePhase != .active || showingHome || showingTraining || showingArmy || showingPuzzles || showingGames
+        scenePhase != .active || showingHome || showingTraining || showingArmy || showingPuzzles || showingGames || showingDaily
             || showingNewGame || showingSettings || showingAnalyze
             || coach.presentedLesson != nil || coach.presentedSession != nil
             || challenges?.isPresenting == true || talk != nil || showingWelcome
@@ -156,8 +167,12 @@ struct ContentView: View {
                 syncCoachSettings()
                 // A game left unfinished when a new one starts is still kept.
                 match.onArchive = { [vault] game in vault.record(game) }
-                // So is a finished friend game.
-                challenges?.onGameFinished = { [vault] game in vault.record(game) }
+                // So is a finished friend game, and it counts for the day.
+                challenges?.onGameFinished = { [vault, daily] game in
+                    vault.record(game)
+                    daily.record(.game)
+                }
+                hookUpDaily()
                 match.onAbandon = { [army] ledger, setup, assisted in
                     // Walking away from a game counts as a loss.
                     army.record(ledger, playerColor: setup.playerColor, won: false,
@@ -193,6 +208,8 @@ struct ContentView: View {
                 guard over else { return }
                 recordArmy()
                 recordGame()
+                // A game played to its end makes the day.
+                daily.record(.game)
                 if bigBoard { trayOpen = true }
                 // Let the last move land and the king fall, then open the summary.
                 let number = match.gameNumber
@@ -209,6 +226,17 @@ struct ContentView: View {
         observed
             .fullScreenCover(isPresented: $showingTraining) {
                 TrainingHubView(theme: chosenTheme).environment(training).environment(puzzles).environment(vault)
+                    .environment(daily)
+            }
+            .fullScreenCover(isPresented: $showingDaily) {
+                DailyMoveView(theme: chosenTheme, morePuzzles: {
+                    // Once Today's Move has slid away.
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(500))
+                        showingPuzzles = true
+                    }
+                })
+                .environment(daily).environment(puzzles).environment(training)
             }
             .fullScreenCover(isPresented: $showingPuzzles) {
                 PuzzlesView(theme: chosenTheme).environment(puzzles).environment(training)
@@ -224,7 +252,7 @@ struct ContentView: View {
                 ArmyView(theme: chosenTheme, color: match.setup.playerColor).environment(army)
             }
             .fullScreenCover(item: $coach.presentedLesson) { lesson in
-                LessonScreen(lesson: lesson, theme: chosenTheme).environment(training)
+                LessonScreen(lesson: lesson, theme: chosenTheme).environment(training).environment(daily)
             }
             .fullScreenCover(item: $coach.presentedSession) { plan in
                 // Asked for with one tap, so it starts at once. The puzzle store lets a missed
@@ -232,6 +260,7 @@ struct ContentView: View {
                 SessionView(plan: plan, theme: chosenTheme, startsAtOnce: true)
                     .environment(training)
                     .environment(puzzles)
+                    .environment(daily)
             }
             .fullScreenCover(item: $talk, onDismiss: playTalkMove) { (session: TalkSession) in
                 TalkPanel(session: session, theme: theme, play: { (uci: String) in
@@ -251,10 +280,10 @@ struct ContentView: View {
                 }
                 .environment(army)
             }
-            .sheet(isPresented: $showingSettings) {
+            .sheet(isPresented: $showingSettings, onDismiss: refreshDaily) {
                 SettingsSheet()
             }
-            .sheet(isPresented: $showingAnalyze) {
+            .sheet(isPresented: $showingAnalyze, onDismiss: { analyzeWithCamera = false }) {
                 AnalyzeSheet(
                     theme: theme,
                     currentFEN: match.hasStarted ? match.game.fen : nil,
@@ -263,7 +292,8 @@ struct ContentView: View {
                     rival: fromHereSetup.level.rival.name,
                     clock: fromHereSetup.timeControl,
                     forfeits: forfeits,
-                    onAnalyzeGame: analyzeGame
+                    onAnalyzeGame: analyzeGame,
+                    startsWithCamera: analyzeWithCamera
                 ) { draft in
                     play(from: draft)
                 }
@@ -282,6 +312,11 @@ struct ContentView: View {
             .environment(army)
             .environment(vault)
             .environment(puzzles)
+            .environment(daily)
+            .onReceive(NotificationCenter.default.publisher(for: DailyLink.notification)) { _ in openDaily() }
+            .onReceive(NotificationCenter.default.publisher(for: LiveGameLink.notification)) { _ in openLiveGame() }
+            // The game under way on the Lock Screen and in the Dynamic Island.
+            .modifier(LiveGameFollow(match: match))
             .onChange(of: match.reelLog.count) { _, _ in
                 // The last grades can land just after the game ends.
                 if match.isOver { recordGame() }
@@ -310,6 +345,8 @@ struct ContentView: View {
                 if hidden { match.suspend() } else { match.resume() }
             }
             .onChange(of: scenePhase) { _, phase in
+                // A new day may have started while away; the reminders and the widget follow.
+                if phase == .active || phase == .background { refreshDaily() }
                 // iOS may end the app while it is away: a game long enough to keep is kept in
                 // Your games, on disk before the app is put to sleep.
                 if phase == .background, match.hasStarted, !match.isOver,
@@ -362,9 +399,14 @@ struct ContentView: View {
             },
             resume: { leaveHome() },
             analyze: { showingAnalyze = true },
+            scan: {
+                analyzeWithCamera = true
+                showingAnalyze = true
+            },
             train: { showingTraining = true },
             trainToday: { plan in coach.presentedSession = plan },
             puzzles: { showingPuzzles = true },
+            dailyMove: { openDaily() },
             rewind: { showingGames = true },
             openGame: { game in
                 rewindOpening = game.id
@@ -373,6 +415,69 @@ struct ContentView: View {
             army: { showingArmy = true },
             settings: { showingSettings = true }
         )
+    }
+
+    // MARK: The daily habit
+
+    /// Everything that counts for the day reports to the daily store; a milestone marks a piece;
+    /// every change reaches the widget and the reminders.
+    private func hookUpDaily() {
+        puzzles.onRated = { [daily] outcome in daily.record(.ratedPuzzle(solved: outcome != .missed)) }
+        training.onFinished = { [daily] in daily.record(.training) }
+        daily.onMilestone = { [army] days in
+            guard let news = army.markStreak(days: days) else { return nil }
+            // On the game screen the banner says so; the home's Today card says it too.
+            if !showingHome { show(news, after: 3.0) }
+            return news.name
+        }
+        daily.onChange = { refreshDaily() }
+        refreshDaily()
+        // CI's pictures open Today's Move with `-showcaseDaily YES`; a normal launch never passes it.
+        if UserDefaults.standard.bool(forKey: "showcaseDaily") { DailyLink.pending = true }
+        if DailyLink.pending { openDaily() }
+    }
+
+    private func refreshDaily() {
+        DailyUpkeep.refresh(daily: daily, army: army, lastGame: vault.games.map(\.date).max())
+    }
+
+    /// The game on the Lock Screen was tapped: the game comes forward, over the home and any
+    /// screen opened over it. (After a cold start there is no game, and the home stays.)
+    private func openLiveGame() {
+        guard !showingWelcome, match.hasStarted else { return }
+        showingTraining = false
+        showingPuzzles = false
+        showingGames = false
+        showingArmy = false
+        showingDaily = false
+        showingNewGame = false
+        showingSettings = false
+        showingAnalyze = false
+        leaveHome()
+    }
+
+    /// Opens Today's Move over whatever is showing (from Home, the widget or a reminder).
+    private func openDaily() {
+        DailyLink.pending = false
+        guard !showingWelcome else { return }
+        let covered = showingTraining || showingPuzzles || showingGames || showingArmy || showingNewGame
+            || showingSettings || showingAnalyze
+        showingTraining = false
+        showingPuzzles = false
+        showingGames = false
+        showingArmy = false
+        showingNewGame = false
+        showingSettings = false
+        showingAnalyze = false
+        if !covered {
+            showingDaily = true
+            return
+        }
+        // Once the screen that was up has slid away.
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(600))
+            showingDaily = true
+        }
     }
 
     /// Tips keep out of the way of the army's news, the unfolded coach and a held board.
@@ -511,23 +616,35 @@ struct ContentView: View {
         if bigBoard {
             browsableBoard
         } else {
-            BoardView(match: match, theme: theme, vision: ghostVisionOn ? vision : nil)
+            BoardView(match: match, theme: theme, vision: ghostVisionOn ? vision : nil, framing: framing)
         }
     }
 
-    /// The moves, or in Big Board while looking back, where the game was and the way back.
+    /// The moves, or in Big Board while looking back, where the game was and the way back;
+    /// beside them the Tilted / Flat switch.
     @ViewBuilder
     private var ribbonRow: some View {
         if ghostVisionOn, vision.isHolding {
-            // Ghost Vision's line takes the moves' place while the board is held.
+            // Ghost Vision's line takes the whole row while the board is held.
             GhostStrip(line: match.ghostLine, focus: vision.focus, theme: theme)
                 .transition(.opacity)
-        } else if bigBoard, let ply = browsePly {
+        } else {
+            HStack(spacing: 10) {
+                movesOrBrowsing
+                BoardViewSwitch(theme: theme, bigBoard: bigBoard)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var movesOrBrowsing: some View {
+        if bigBoard, let ply = browsePly {
             BrowsePill(ply: ply,
                        san: ply > 0 && ply <= match.game.moves.count ? match.game.moves[ply - 1] : nil,
                        theme: theme) {
                 withAnimation(.snappy) { browsePly = nil }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         } else {
             MoveRibbon(moves: match.game.moves, theme: theme)
         }
@@ -541,7 +658,7 @@ struct ContentView: View {
             // the earlier position laid over it.
             BoardView(match: match, theme: theme, browsing: browsedPosition, endBrowsing: {
                 withAnimation(.snappy) { browsePly = nil }
-            }, vision: ghostVisionOn ? vision : nil)
+            }, vision: ghostVisionOn ? vision : nil, framing: framing)
             if !BoardView.playsIn3D(theme, setting: sculpted3D), let ply = browsePly,
                let fen = match.game.positionFENs[safe: ply], let draft = PositionDraft(fen: fen) {
                 PositionBoard(draft: draft, theme: theme, flipped: match.isBoardFlipped) { _ in
@@ -568,7 +685,12 @@ struct ContentView: View {
 
     /// Width over height of the board in play: 1 for the flat looks, wider for the 3D board.
     private var boardAspect: CGFloat {
-        BoardView.aspect(theme, setting: sculpted3D)
+        BoardView.aspect(theme, setting: sculpted3D, framing: framing)
+    }
+
+    /// How the 3D board is seen: the Board view setting, with Auto laying Big Board flat.
+    private var framing: SculptedCamera.Framing {
+        tilt.framing(bigBoard: bigBoard)
     }
 
     /// One position for every ~34 points of sideways drag.

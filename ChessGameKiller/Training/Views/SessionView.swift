@@ -150,7 +150,7 @@ struct SessionView: View {
             ProgressDots(count: runner.items.count, index: runner.index, outcomes: runner.outcomes, theme: theme)
 
             Text("+\(runner.reward.xp)")
-                .font(.system(.subheadline, design: .themed).weight(.bold).monospacedDigit())
+                .font(.app(.subheadline, weight: .bold).monospacedDigit())
                 .foregroundStyle(theme.trainingAccent)
                 .contentTransition(.numericText(value: Double(runner.reward.xp)))
                 .animation(.snappy, value: runner.reward.xp)
@@ -164,7 +164,7 @@ struct SessionView: View {
         HStack(alignment: .top, spacing: 10) {
             CoachAvatar(theme: theme, size: 30)
             Text(note)
-                .font(.system(.subheadline, design: .themed).weight(.medium))
+                .font(.app(.subheadline, weight: .medium))
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -252,15 +252,15 @@ struct SessionIntro: View {
                 CoachAvatar(theme: theme, size: 84)
                 VStack(spacing: 6) {
                     Text(plan.title)
-                        .font(.system(.title, design: .themed).weight(.bold))
+                        .font(.app(.title, weight: .bold))
                         .multilineTextAlignment(.center)
                     if let focus = plan.focus {
                         Label(focus.title, systemImage: focus.symbol)
-                            .font(.headline)
+                            .font(.app(.headline))
                             .foregroundStyle(theme.trainingAccent)
                     } else if let headline = plan.headline {
                         Label(headline, systemImage: plan.symbol ?? "puzzlepiece.fill")
-                            .font(.headline)
+                            .font(.app(.headline))
                             .foregroundStyle(theme.trainingAccent)
                     }
                 }
@@ -301,7 +301,7 @@ struct SessionIntro: View {
                 .foregroundStyle(theme.glows ? color.color(on: theme) : theme.trainingAccent)
                 .frame(width: 24)
             Text(text)
-                .font(.system(.subheadline, design: .themed).weight(.medium))
+                .font(.app(.subheadline, weight: .medium))
         }
     }
 }
@@ -321,12 +321,14 @@ struct SessionSummary: View {
     let done: () -> Void
 
     @State private var shown = false
+    /// The app-wide daily streak, when the app provides it.
+    @Environment(DailyStore.self) private var daily: DailyStore?
 
     private var store: TrainingStore { runner.store }
 
     var body: some View {
         let accuracy = runner.accuracy
-        let days = max(runner.reward.streak, store.streak)
+        let days = daily?.streak ?? max(runner.reward.streak, store.streak)
         let green = theme.glows ? TrainingColor.green.color(on: theme) : theme.trainingAccent
         ScrollView {
             VStack(spacing: 20) {
@@ -336,16 +338,16 @@ struct SessionSummary: View {
                         .shadow(color: theme.glows ? green.opacity(0.6) : .clear, radius: 10)
                     VStack(spacing: 2) {
                         Text("\(runner.solvedCount)/\(runner.outcomes.count)")
-                            .font(.system(size: 38, weight: .bold, design: .themed).monospacedDigit())
+                            .font(.app(size: 38, weight: .bold).monospacedDigit())
                         Text("solved")
-                            .font(.subheadline)
+                            .font(.app(.subheadline))
                             .foregroundStyle(.secondary)
                     }
                 }
                 .padding(.top, 28)
 
                 Text(headline)
-                    .font(.system(.title2, design: .themed).weight(.bold))
+                    .font(.app(.title2, weight: .bold))
                     .multilineTextAlignment(.center)
 
                 HStack(spacing: 10) {
@@ -366,7 +368,7 @@ struct SessionSummary: View {
                         Text(runner.reward.usedRestDay
                              ? "Your streak used its rest day, so it's still alive. \(line)"
                              : line)
-                            .font(.system(.body, design: .themed).weight(.medium))
+                            .font(.app(.body, weight: .medium))
                             .fixedSize(horizontal: false, vertical: true)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -410,13 +412,13 @@ struct SessionSummary: View {
     private func stat(_ value: String, _ unit: String, _ symbol: String, _ color: Color) -> some View {
         VStack(spacing: 4) {
             Image(systemName: symbol)
-                .font(.title3)
+                .font(.app(.title3))
                 .foregroundStyle(color)
                 .shadow(color: theme.glows ? color : .clear, radius: 6)
             Text(value)
-                .font(.system(.title3, design: .themed).weight(.bold).monospacedDigit())
+                .font(.app(.title3, weight: .bold).monospacedDigit())
             Text(unit)
-                .font(.caption)
+                .font(.app(.caption))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
@@ -432,11 +434,11 @@ struct SessionSummary: View {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Text(rank.title)
-                            .font(.system(.headline, design: .themed))
+                            .font(.app(.headline))
                         Spacer()
                         if let next = store.nextRank {
                             Text("\(next.xp - store.progress.xp) XP to \(next.title)")
-                                .font(.caption)
+                                .font(.app(.caption))
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -456,10 +458,10 @@ struct SessionSummary: View {
                 .scaleEffect(shown ? 1 : 0.4)
                 .shadow(color: gold.opacity(0.8), radius: 16)
             Text("Promoted to \(rank.title)!")
-                .font(.system(.title3, design: .themed).weight(.bold))
+                .font(.app(.title3, weight: .bold))
                 .foregroundStyle(gold)
             Text(store.library?.course.lines.promotion.randomElement() ?? "A new rank. Well earned.")
-                .font(.subheadline)
+                .font(.app(.subheadline))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }

@@ -207,3 +207,20 @@ Moves and actions always go through REST, so a reply tells the client whether th
   4001 (don't reconnect on 4001: the game is open somewhere newer). When 8 are open, a player's socket takes the
   oldest spectator's place (closed with 4002) and a new spectator is refused (429).
 - A game nobody joins expires after 7 days; a game with no move for 30 days expires; finished games are deleted 30 days later.
+
+## Today's Move (the daily puzzle)
+
+Every player with the app gets the same puzzle each day (the app's `Shared/Daily/daily-moves.csv`,
+picked by the date in the player's own calendar). After playing it, the app reports the try and shows how the
+world did ("62% of 1,284 players found it").
+
+`POST /api/daily/{day}` with `{ "player": "<the app's 32-hex player key>", "puzzle": "<Lichess puzzle id>", "found": true }`
+
+- `day` is the player's own date, `yyyy-mm-dd`, and must be within two days of the server's date (time zones).
+- Each player counts once a day: the server keeps only the SHA-256 of the key (the same key and hash Play online
+  uses), and a second report the same day changes nothing.
+- Answers `200 { "players": 1284, "found": 796 }`: everyone who has reported that day's puzzle so far.
+- `400` for a bad day, key, puzzle id or `found`; `405` for any method but POST; `429` past the move rate limit.
+
+The counts live in the `Lobby` Durable Object's storage (`daily:{day}:{puzzle}` and `daily-player:{day}:{hash}`);
+the rules are in `src/daily.js`.

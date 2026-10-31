@@ -133,11 +133,11 @@ struct LessonPlayerView: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(lesson.title)
-                    .font(.system(.headline, design: .themed))
+                    .font(.app(.headline))
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
                 Text(lesson.subtitle)
-                    .font(.caption)
+                    .font(.app(.caption))
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -149,7 +149,7 @@ struct LessonPlayerView: View {
                     onSkip()
                 } label: {
                     Text("Skip")
-                        .font(.system(.subheadline, design: .themed).weight(.semibold))
+                        .font(.app(.subheadline, weight: .semibold))
                         .padding(.horizontal, 14)
                         .frame(height: 36)
                         .background(.thinMaterial, in: Capsule())
@@ -207,7 +207,7 @@ struct LessonPlayerView: View {
                         TrainingChip(text: "Your turn", symbol: "hand.tap.fill", color: theme.trainingAccent)
                     }
                     Text(player.caption)
-                        .font(.system(.body, design: .themed).weight(.medium))
+                        .font(.app(.body, weight: .medium))
                         .foregroundStyle(Color.primary)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -240,7 +240,7 @@ struct LessonPlayerView: View {
         } label: {
             HStack(spacing: 10) {
                 Text(option.text)
-                    .font(.system(.subheadline, design: .themed).weight(.semibold))
+                    .font(.app(.subheadline, weight: .semibold))
                     .multilineTextAlignment(.leading)
                     .strikethrough(tried && !option.correct, color: color)
                 Spacer(minLength: 4)
@@ -327,10 +327,10 @@ struct LessonPlayerView: View {
     private var unavailable: some View {
         VStack(spacing: 14) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.largeTitle)
+                .font(.app(.largeTitle))
                 .foregroundStyle(TrainingColor.orange.color(on: theme))
             Text("This lesson couldn't load.")
-                .font(.headline)
+                .font(.app(.headline))
             Button("Close") { dismiss() }
                 .buttonStyle(TrainingButtonStyle(theme: theme))
                 .frame(maxWidth: 220)
@@ -349,6 +349,10 @@ struct LessonDoneCard: View {
     let done: () -> Void
 
     @State private var appeared = false
+    /// The app-wide daily streak, when the app provides it.
+    @Environment(DailyStore.self) private var daily: DailyStore?
+
+    private var streakDays: Int { daily?.streak ?? reward.streak }
 
     var body: some View {
         let green = TrainingColor.green.color(on: theme)
@@ -368,28 +372,28 @@ struct LessonDoneCard: View {
                 }
                 VStack(spacing: 6) {
                     Text("Lesson complete")
-                        .font(.system(.title2, design: .themed).weight(.bold))
+                        .font(.app(.title2, weight: .bold))
                     Text(lesson.title)
-                        .font(.subheadline)
+                        .font(.app(.subheadline))
                         .foregroundStyle(.secondary)
                 }
                 HStack(spacing: 8) {
                     TrainingChip(text: "+\(reward.xp) XP", symbol: "sparkles", color: theme.trainingAccent)
-                    if reward.streak > 0 {
-                        TrainingChip(text: "\(reward.streak)-day streak", symbol: "flame.fill",
+                    if streakDays > 0 {
+                        TrainingChip(text: "\(streakDays)-day streak", symbol: "flame.fill",
                                      color: TrainingColor.orange.color(on: theme))
                     }
                 }
                 if let promotion = reward.promotion {
                     Text("Promoted to \(promotion.title)!")
-                        .font(.system(.headline, design: .themed))
+                        .font(.app(.headline))
                         .foregroundStyle(TrainingColor.yellow.color(on: theme))
                 }
                 if let line {
                     HStack(alignment: .top, spacing: 10) {
                         CoachAvatar(theme: theme, size: 32)
                         Text(line)
-                            .font(.system(.subheadline, design: .themed))
+                            .font(.app(.subheadline))
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }

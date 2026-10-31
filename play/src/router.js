@@ -9,6 +9,7 @@
 
 import { parseCreateInput, ACTIONS } from "./game.js";
 import { parseSeekInput } from "./lobby.js";
+import { isDailyDay, parseDailyReport } from "./daily.js";
 import { renderHomePage, renderInvitePage } from "./pages.js";
 import {
   errorResponse,
@@ -30,6 +31,8 @@ export const BUNDLE_ID = "com.chessgamekiller.app";
 
 const GAME_PATH = /^\/api\/games\/([^/]+)(?:\/([a-z_]+))?\/?$/;
 const INVITE_PATH = /^\/c\/([^/]+)\/?$/;
+/** Today's Move: /api/daily/{yyyy-mm-dd}. */
+const DAILY_PATH = /^\/api\/daily\/([^/]+)\/?$/;
 /** The addresses under /api/games/{code} and the method each takes. */
 const METHOD_FOR = new Map([
   ["", "GET"],
@@ -62,6 +65,8 @@ async function route(request, env, url) {
     return method === "POST" ? createGame(request, env, url) : wrongMethod("POST");
   }
   if (path === "/api/lobby" || path.startsWith("/api/lobby/")) return lobbyRequest(request, env, url, path);
+  const daily = DAILY_PATH.exec(path);
+  if (daily) return dailyRequest(request, env, daily[1]);
   const game = GAME_PATH.exec(path);
   if (game) return gameRequest(request, env, url, game[1], game[2] ?? "");
   if (path.startsWith("/api/") || path === "/api") {
@@ -214,6 +219,19 @@ const TAKE_PATH = /^\/api\/lobby\/seeks\/([0-9a-f]{12})\/play\/?$/;
 
 function lobbyRoom(env) {
   return env.LOBBY.get(env.LOBBY.idFromName("lobby"));
+}
+
+/** POST /api/daily/{day}: counts a player's try at Today's Move once and answers the day's tally. */
+async function dailyRequest(request, env, day) {
+  if (request.method !== "POST") return wrongMethod("POST");
+  if (!isDailyDay(day)) return badRequest('The day must be a date like "2026-10-29", within two days of today.');
+  if (await overLimit(env.MOVE_LIMITER, request)) return rateLimited();
+  const body = await readJson(request);
+  if (!body.ok) return badRequest(body.message);
+  const input = parseDailyReport(body.value, { isKey: isToken });
+  if (!input.ok) return badRequest(input.message);
+  const { player, puzzle, found } = input.value;
+  return fromRoom(await lobbyRoom(env).dailyReport({ day, puzzle, found, playerHash: await hashToken(player) }));
 }
 
 async function lobbyRequest(request, env, url, path) {

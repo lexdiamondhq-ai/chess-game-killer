@@ -505,6 +505,20 @@ try {
     assert.equal(friend.made.game.rated, false);
   });
 
+  await scenario("today's move: each player counts once a day", async () => {
+    const day = new Date().toISOString().slice(0, 10);
+    const first = await api(base, "POST", `/api/daily/${day}`, { body: { player: "d".repeat(32), puzzle: "vTa44", found: true } });
+    assert.equal(first.status, 200, first.text);
+    const second = await api(base, "POST", `/api/daily/${day}`, { body: { player: "e".repeat(32), puzzle: "vTa44", found: false } });
+    assert.deepEqual(second.json, { players: first.json.players + 1, found: first.json.found });
+    // The same player again changes nothing.
+    const again = await api(base, "POST", `/api/daily/${day}`, { body: { player: "d".repeat(32), puzzle: "vTa44", found: false } });
+    assert.deepEqual(again.json, second.json);
+    assert.equal((await api(base, "POST", "/api/daily/2001-01-01", { body: { player: "d".repeat(32), puzzle: "vTa44", found: true } })).status, 400);
+    assert.equal((await api(base, "POST", `/api/daily/${day}`, { body: { player: "nope", puzzle: "vTa44", found: true } })).status, 400);
+    assert.equal((await api(base, "GET", `/api/daily/${day}`)).status, 405);
+  });
+
   await scenario("the rate limits work in local dev too", async () => {
     let limited = null;
     for (let i = 0; i < 45 && !limited; i += 1) {

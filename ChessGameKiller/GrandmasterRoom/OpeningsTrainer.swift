@@ -168,7 +168,7 @@ struct OpeningsView: View {
                     .padding(.top, 20)
             } else if matches.isEmpty {
                 Text("No opening matches \u{201C}\(query)\u{201D}.")
-                    .font(.system(.subheadline, design: .themed))
+                    .font(.app(.subheadline))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
                     .padding(.top, 30)
@@ -210,24 +210,24 @@ struct OpeningsView: View {
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 Text("YOUR REPERTOIRE")
-                    .font(.system(.caption, design: .themed).weight(.bold))
+                    .font(.app(.caption, weight: .bold))
                     .tracking(1)
                     .foregroundStyle(theme.trainingAccent)
                 Spacer()
                 if count > 0 {
                     Text(count == 1 ? "1 line" : "\(count) lines")
-                        .font(.system(.footnote, design: .themed).weight(.semibold).monospacedDigit())
+                        .font(.app(.footnote, weight: .semibold).monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
             }
             Text(count == 0 ? "Start your repertoire"
                  : due.isEmpty ? "Nothing due today" : (due.count == 1 ? "1 line to review" : "\(due.count) lines to review"))
-                .font(.system(.title3, design: .themed).weight(.bold))
+                .font(.app(.title3, weight: .bold))
             Text(count == 0
                  ? "Open an opening below, pick a line and tap Add. Reviews come back tomorrow, then in 3, 7, 16 and 35 days."
                  : due.isEmpty ? "Every line is fresh. The next one comes back \(nextDue)."
                  : "Play each line from memory. A clean run sends it further out; a slip brings it back tomorrow.")
-                .font(.system(.subheadline, design: .themed))
+                .font(.app(.subheadline))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             if !due.isEmpty {
@@ -245,11 +245,11 @@ struct OpeningsView: View {
                 } label: {
                     HStack {
                         Text("My repertoire")
-                            .font(.system(.subheadline, design: .themed).weight(.semibold))
+                            .font(.app(.subheadline, weight: .semibold))
                             .foregroundStyle(theme.trainingAccent)
                         Spacer()
                         Image(systemName: "chevron.right")
-                            .font(.caption.weight(.bold))
+                            .font(.app(.caption, weight: .bold))
                             .foregroundStyle(.tertiary)
                     }
                     .contentShape(Rectangle())
@@ -293,16 +293,16 @@ private struct OpeningFamilyRow: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(name)
-                    .font(.system(.subheadline, design: .themed).weight(.semibold))
+                    .font(.app(.subheadline, weight: .semibold))
                     .foregroundStyle(.primary)
                 Text(caption)
-                    .font(.system(.caption, design: .themed))
+                    .font(.app(.caption))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Image(systemName: "chevron.right")
-                .font(.caption.weight(.bold))
+                .font(.app(.caption, weight: .bold))
                 .foregroundStyle(.tertiary)
                 .accessibilityHidden(true)
         }
@@ -352,10 +352,10 @@ private struct OpeningFamilyView: View {
             } label: {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(line.variation)
-                        .font(.system(.subheadline, design: .themed).weight(.semibold))
+                        .font(.app(.subheadline, weight: .semibold))
                     Text("\(line.eco) · " + Notation.numbered(Notation.sanLine(of: line.moves, fen: Position.standard.fen,
                                                                                  limit: 8), blackFirst: false))
-                        .font(.caption.monospaced())
+                        .font(.app(.caption).monospaced())
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
@@ -481,7 +481,7 @@ private struct RepertoireList: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(entry.name)
                     Text("\(entry.color == .white ? "White" : "Black") · next \(entry.due.formatted(.relative(presentation: .named)))")
-                        .font(.caption)
+                        .font(.app(.caption))
                         .foregroundStyle(.secondary)
                 }
                 .swipeActions {

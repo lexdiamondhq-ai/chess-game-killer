@@ -10,6 +10,8 @@ struct TrainingHubView: View {
     @Environment(TrainingStore.self) private var store
     @Environment(PuzzleStore.self) private var puzzles
     @Environment(GameVault.self) private var vault
+    /// The app-wide daily streak, when the app provides it.
+    @Environment(DailyStore.self) private var daily: DailyStore?
     @Environment(\.dismiss) private var dismiss
     @AppStorage("coachVoiceMuted") private var voiceMuted = false
     @AppStorage(CoachReactions.storageKey) private var reactionsOn = true
@@ -117,11 +119,11 @@ struct TrainingHubView: View {
         HStack(alignment: .center, spacing: 12) {
             coachMenu
             Text(greeting)
-                .font(.system(.subheadline, design: .themed))
+                .font(.app(.subheadline))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            StreakPill(streak: store.streak, theme: theme)
+            StreakPill(streak: daily?.streak ?? store.streak, theme: theme)
         }
         .padding(.top, 2)
     }
@@ -254,10 +256,10 @@ struct TrainingHubView: View {
     private var missingContent: some View {
         VStack(spacing: 12) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.largeTitle)
+                .font(.app(.largeTitle))
                 .foregroundStyle(.orange)
             Text("Training content is missing from this build.")
-                .font(.headline)
+                .font(.app(.headline))
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
@@ -281,15 +283,15 @@ struct TodayCard: View {
             HStack(alignment: .top, spacing: 14) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(eyebrow(done: done))
-                        .font(.system(.caption, design: .themed).weight(.bold))
+                        .font(.app(.caption, weight: .bold))
                         .tracking(1)
                         .foregroundStyle(theme.trainingAccent)
                     Text(title)
-                        .font(.system(.title2, design: .themed).weight(.bold))
+                        .font(.app(.title2, weight: .bold))
                         .lineLimit(2)
                         .minimumScaleFactor(0.8)
                     Text(reason)
-                        .font(.system(.subheadline, design: .themed))
+                        .font(.app(.subheadline))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -311,7 +313,7 @@ struct TodayCard: View {
             if offersLevelCheck {
                 Button(action: levelCheck) {
                     Text("Already a strong player? Find your level in 2 minutes")
-                        .font(.system(.footnote, design: .themed).weight(.medium))
+                        .font(.app(.footnote, weight: .medium))
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.plain)

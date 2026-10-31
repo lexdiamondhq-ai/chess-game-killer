@@ -12,10 +12,10 @@ struct ChallengeEntryRow: View {
             HStack(spacing: 12) {
                 GlyphTile(theme: theme) { Glyph(name: Glyphs.challenge, size: 22) }
                 (Text("Challenge a friend")
-                    .font(.system(.callout, design: theme.challengeDesign).weight(.bold))
+                    .font(.app(.callout, weight: .bold))
                     .foregroundStyle(.primary)
                     + Text("  ·  by text or email")
-                    .font(.system(.footnote, design: theme.challengeDesign))
+                    .font(.app(.footnote))
                     .foregroundStyle(.secondary))
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)

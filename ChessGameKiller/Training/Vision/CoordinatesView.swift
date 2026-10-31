@@ -86,7 +86,7 @@ struct CoordinatesView: View {
                 RoomMessage(text: drill.message(sideName: sideName), tone: .coach, theme: theme)
             case .countdown(let count):
                 Text("\(count)")
-                    .font(.system(size: 64, weight: .bold, design: .themed).monospacedDigit())
+                    .font(.app(size: 64, weight: .bold).monospacedDigit())
                     .foregroundStyle(theme.trainingAccent)
                     .id(count)
                     .transition(.scale(scale: 1.4).combined(with: .opacity))
@@ -118,12 +118,12 @@ struct CoordinatesView: View {
                     .contentTransition(.numericText(value: Double(round.score)))
                     .accessibilityLabel("\(round.score) found")
             }
-            .font(.system(.headline, design: .themed).monospacedDigit())
+            .font(.app(.headline).monospacedDigit())
             HStack(alignment: .firstTextBaseline, spacing: 14) {
                 Text(round.target.notation)
-                    .font(.system(size: 64, weight: .bold, design: .themed).monospacedDigit())
+                    .font(.app(size: 64, weight: .bold).monospacedDigit())
                 Text(round.upcoming.notation)
-                    .font(.system(size: 26, weight: .semibold, design: .themed).monospacedDigit())
+                    .font(.app(size: 26, weight: .semibold).monospacedDigit())
                     .foregroundStyle(.secondary)
                     .opacity(0.7)
             }
@@ -139,11 +139,11 @@ struct CoordinatesView: View {
         let round = drill.round
         return VStack(spacing: 6) {
             Text("\(round.score)")
-                .font(.system(size: 64, weight: .bold, design: .themed).monospacedDigit())
+                .font(.app(size: 64, weight: .bold).monospacedDigit())
                 .foregroundStyle(theme.trainingAccent)
             HStack(spacing: 8) {
                 Text(round.score == 1 ? "square in 30 seconds" : "squares in 30 seconds")
-                    .font(.system(.subheadline, design: .themed))
+                    .font(.app(.subheadline))
                     .foregroundStyle(.secondary)
                 if drill.newBest {
                     TrainingChip(text: "New best", symbol: "star.fill", color: theme.trainingAccent)
@@ -151,7 +151,7 @@ struct CoordinatesView: View {
             }
             if round.misses > 0, let accuracy = round.accuracy {
                 Text("\(accuracy)% of your taps were right")
-                    .font(.system(.footnote, design: .themed))
+                    .font(.app(.footnote))
                     .foregroundStyle(.secondary)
             }
         }
@@ -164,7 +164,7 @@ struct CoordinatesView: View {
             PieceImage(piece: Piece(.king, color: drill.side, square: .e1), theme: theme, size: 20)
                 .accessibilityHidden(true)
             Text("\(sideName) at the bottom")
-                .font(.system(.footnote, design: .themed).weight(.medium))
+                .font(.app(.footnote, weight: .medium))
                 .foregroundStyle(.secondary)
         }
         .accessibilityElement(children: .combine)
@@ -202,10 +202,10 @@ struct CoordinatesView: View {
                 PieceImage(piece: Piece(.king, color: side, square: side == .white ? .e1 : .e8), theme: theme, size: 30)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(side.displayName)
-                        .font(.system(.subheadline, design: .themed).weight(.semibold))
+                        .font(.app(.subheadline, weight: .semibold))
                         .lineLimit(1)
                     Text(record)
-                        .font(.system(.caption, design: .themed).monospacedDigit())
+                        .font(.app(.caption).monospacedDigit())
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }

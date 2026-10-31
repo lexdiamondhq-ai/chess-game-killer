@@ -141,7 +141,7 @@ struct RewindView: View {
                 }
             } label: {
                 Image(systemName: "chevron.left")
-                    .font(.title3.weight(.semibold))
+                    .font(.app(.title3, weight: .semibold))
                     .frame(width: 44, height: 44)
             }
             .tint(.primary)
@@ -153,14 +153,14 @@ struct RewindView: View {
             } else {
                 VStack(spacing: 2) {
                     Text("Rewind · vs \(game.opponent)")
-                        .font(.caption2.weight(.semibold))
+                        .font(.app(.caption2, weight: .semibold))
                         .tracking(2.5)
                         .textCase(.uppercase)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                     Text(positionTitle)
-                        .font(.system(.headline, design: .themed))
+                        .font(.app(.headline))
                         .contentTransition(.numericText())
                 }
             }
@@ -171,7 +171,7 @@ struct RewindView: View {
                     Button("Rematch") {
                         if forfeits == nil { onPlayAgain(game) } else { confirmingRematch = true }
                     }
-                    .font(.footnote.weight(.semibold))
+                    .font(.app(.footnote, weight: .semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                     .frame(minHeight: 44)
@@ -211,11 +211,11 @@ struct RewindView: View {
                     Text("\(level.title) review").tracking(2.5)
                     Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
                 }
-                .font(.caption2.weight(.semibold))
+                .font(.app(.caption2, weight: .semibold))
                 .textCase(.uppercase)
                 .foregroundStyle(.secondary)
                 Text(explorer.ownMoveAt == nil ? "What could have been" : "Your line")
-                    .font(.system(.headline, design: .themed))
+                    .font(.app(.headline))
                     .foregroundStyle(.primary)
             }
             .frame(minHeight: 44)
@@ -345,15 +345,15 @@ struct RewindView: View {
                 Tag(text: rewritten ? "Rewritten" : note.tag, symbol: rewritten ? "checkmark" : nil, color: color)
                 Spacer()
                 Text(moment.numbered)
-                    .font(.subheadline.weight(.semibold).monospacedDigit())
+                    .font(.app(.subheadline, weight: .semibold).monospacedDigit())
                     .foregroundStyle(.secondary)
             }
             Text(rewritten ? "You found it." : note.title)
-                .font(.system(.title2, design: .themed).weight(.semibold))
+                .font(.app(.title2, weight: .semibold))
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 10)
             Text(rewritten ? "This moment is rewritten. \(game.leftToRewrite == 0 ? "Every moment in this game is fixed." : "\(game.leftToRewrite) left in this game.")" : note.detail)
-                .font(.body)
+                .font(.app(.body))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 6)
@@ -390,16 +390,16 @@ struct RewindView: View {
     private var plainCard: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(ply == 0 ? "The start" : moveName(ply))
-                .font(.system(.title3, design: .themed).weight(.semibold))
+                .font(.app(.title3, weight: .semibold))
             Text(moments.isEmpty
                  ? "A clean game: nothing here needs rewriting."
                  : "Drag along the line to move through the game, or tap a dot to jump to a moment.")
-                .font(.body)
+                .font(.app(.body))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             if let accuracy = game.accuracy {
                 Text("Accuracy \(accuracy)%  ·  \(game.result.title)")
-                    .font(.subheadline.weight(.semibold).monospacedDigit())
+                    .font(.app(.subheadline, weight: .semibold).monospacedDigit())
                     .foregroundStyle(.secondary)
                     .padding(.top, 4)
             }
@@ -439,7 +439,7 @@ struct RewindView: View {
             }
             .disabled(next == nil)
         }
-        .font(.subheadline.weight(.semibold))
+        .font(.app(.subheadline, weight: .semibold))
         .tint(.primary)
     }
 
@@ -543,23 +543,23 @@ private struct SecondChanceSheet: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Second chance")
-                                    .font(.caption.weight(.semibold))
+                                    .font(.app(.caption, weight: .semibold))
                                     .tracking(2)
                                     .textCase(.uppercase)
                                     .foregroundStyle(.secondary)
                                 Text(chance.moment.numbered)
-                                    .font(.system(.headline, design: .themed))
+                                    .font(.app(.headline))
                             }
                             Spacer()
                             Button(chance.runner.isDone ? "Done" : "Close") { dismiss() }
-                                .font(.headline)
+                                .font(.app(.headline))
                         }
                         .padding(.horizontal, 16)
                         .padding(.top, 16)
                         DrillView(runner: chance.runner, theme: theme, boardSide: side)
                         if solved {
                             Label("Rewritten", systemImage: "checkmark.seal.fill")
-                                .font(.headline)
+                                .font(.app(.headline))
                                 .foregroundStyle(RewindPalette.gold)
                                 .transition(.scale.combined(with: .opacity))
                         }
@@ -602,7 +602,7 @@ private struct ExplorerCard: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     Text(explorer.sentence)
-                        .font(.system(.headline, design: .themed))
+                        .font(.app(.headline))
                         .fixedSize(horizontal: false, vertical: true)
                         .contentTransition(.opacity)
                     outlook.padding(.top, 4)
@@ -611,7 +611,7 @@ private struct ExplorerCard: View {
                     }
                     if explorer.ownMoveAt == nil {
                         Text("Tap a piece on the board to try a move of your own.")
-                            .font(.footnote)
+                            .font(.app(.footnote))
                             .foregroundStyle(.secondary)
                             .padding(.top, 12)
                     }
@@ -658,10 +658,10 @@ private struct ExplorerCard: View {
             action()
         } label: {
             HStack(spacing: 4) {
-                if own { Image(systemName: "hand.point.up.left.fill").font(.caption2) }
+                if own { Image(systemName: "hand.point.up.left.fill").font(.app(.caption2)) }
                 Text(text)
             }
-            .font(.subheadline.weight(.semibold).monospacedDigit())
+            .font(.app(.subheadline, weight: .semibold).monospacedDigit())
             .lineLimit(1)
             .padding(.horizontal, 10)
             .frame(minHeight: 32)
@@ -687,10 +687,10 @@ private struct ExplorerCard: View {
                         .background(Capsule().fill(Color.primary.opacity(0.08)))
                 }
             }
-            .font(.subheadline)
+            .font(.app(.subheadline))
             .foregroundStyle(.secondary)
         } else if explorer.isThinking {
-            Text("Stockfish is looking…").font(.subheadline).foregroundStyle(.secondary)
+            Text("Stockfish is looking…").font(.app(.subheadline)).foregroundStyle(.secondary)
         }
     }
 
@@ -698,7 +698,7 @@ private struct ExplorerCard: View {
     private var branches: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(explorer.playerToMove ? "Or you could play" : "If they try instead")
-                .font(.caption.weight(.semibold))
+                .font(.app(.caption, weight: .semibold))
                 .tracking(1.5)
                 .textCase(.uppercase)
                 .foregroundStyle(.secondary)
@@ -709,19 +709,19 @@ private struct ExplorerCard: View {
                 } label: {
                     HStack(spacing: 10) {
                         Text(branch.san)
-                            .font(.subheadline.weight(.semibold))
+                            .font(.app(.subheadline, weight: .semibold))
                             .frame(minWidth: 54, alignment: .leading)
                         Text(branch.note)
-                            .font(.subheadline)
+                            .font(.app(.subheadline))
                             .foregroundStyle(.secondary)
                         Spacer(minLength: 4)
                         if level.showsNumbers {
                             Text(branch.evaluation.label)
-                                .font(.caption.weight(.semibold).monospacedDigit())
+                                .font(.app(.caption, weight: .semibold).monospacedDigit())
                                 .foregroundStyle(.secondary)
                         }
                         Image(systemName: "arrow.turn.down.right")
-                            .font(.caption.weight(.semibold))
+                            .font(.app(.caption, weight: .semibold))
                             .foregroundStyle(.tertiary)
                     }
                     .padding(.horizontal, 12)
@@ -751,7 +751,7 @@ private struct ExplorerCard: View {
             if canTryIt {
                 Button(action: onTryIt) {
                     Label("Try it myself", systemImage: "arrow.counterclockwise")
-                        .font(.subheadline.weight(.semibold))
+                        .font(.app(.subheadline, weight: .semibold))
                         .padding(.horizontal, 14)
                         .frame(minHeight: 44)
                         .foregroundStyle(.background)
@@ -760,7 +760,7 @@ private struct ExplorerCard: View {
                 .buttonStyle(.plain)
             } else {
                 Label("Rewritten", systemImage: "checkmark.seal.fill")
-                    .font(.subheadline.weight(.semibold))
+                    .font(.app(.subheadline, weight: .semibold))
                     .foregroundStyle(RewindPalette.gold)
             }
         }
@@ -772,7 +772,7 @@ private struct ExplorerCard: View {
             withAnimation(.easeInOut(duration: 0.3)) { action() }
         } label: {
             Image(systemName: symbol)
-                .font(.footnote.weight(.bold))
+                .font(.app(.footnote, weight: .bold))
                 .frame(width: 44, height: 44)
                 .background(Circle().fill(Color.primary.opacity(0.07)))
         }
@@ -803,11 +803,11 @@ private struct Tag: View {
     var body: some View {
         HStack(spacing: 6) {
             if let symbol {
-                Image(systemName: symbol).font(.caption.weight(.bold))
+                Image(systemName: symbol).font(.app(.caption, weight: .bold))
             } else {
                 Circle().fill(color).frame(width: 7, height: 7)
             }
-            Text(text).font(.subheadline.weight(.semibold))
+            Text(text).font(.app(.subheadline, weight: .semibold))
         }
         .foregroundStyle(color)
         .padding(.horizontal, 12)
@@ -826,8 +826,8 @@ private struct CardButton: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 5) {
-                Image(systemName: symbol).font(.body.weight(.semibold))
-                Text(title).font(.footnote.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.8)
+                Image(systemName: symbol).font(.app(.body, weight: .semibold))
+                Text(title).font(.app(.footnote, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity, minHeight: 52)
             .foregroundStyle(prominent ? AnyShapeStyle(.background) : AnyShapeStyle(.primary))

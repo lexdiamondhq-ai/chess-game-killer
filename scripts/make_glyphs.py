@@ -308,6 +308,36 @@ def challenge():
     return svg([rider, plane])
 
 
+def online():
+    """A globe with its equator and two meridians: a game with someone anywhere in the world."""
+    ring = circle(12, 12, 9.5) + " " + circle(12, 12, 7.9, clockwise=False)
+    lines = [
+        ("M3.8 12H20.2", 1.6),
+        ("M12 3.4C8.2 6.4 8.2 17.6 12 20.6", 1.6),
+        ("M12 3.4C15.8 6.4 15.8 17.6 12 20.6", 1.6),
+    ]
+    return svg([ring], lines)
+
+
+def centered_pawn(cx, cy, s):
+    """A pawn of scale `s` centered on (cx, cy): on its own grid it spans y 2.95 to 20.8."""
+    return pawn(dx=cx - 12 * s, dy=cy - 11.875 * s, s=s)
+
+
+def scan():
+    """A pawn in a camera's corner marks: read a real board from a photo."""
+    corners = [("M2.6 7.4V2.6H7.4", 2.0), ("M16.6 2.6H21.4V7.4", 2.0),
+               ("M2.6 16.6V21.4H7.4", 2.0), ("M16.6 21.4H21.4V16.6", 2.0)]
+    return svg([centered_pawn(12, 12, 0.6)], corners)
+
+
+def today():
+    """A calendar page with a pawn on it: the move of the day."""
+    page = rrect(3.0, 4.6, 18.0, 16.8, 3.2) + " " + rrect(4.7, 9.6, 14.6, 10.1, 1.7)
+    rings = rrect(7.0, 2.3, 2.1, 4.6, 1.05) + " " + rrect(14.9, 2.3, 2.1, 4.6, 1.05)
+    return svg([page, rings, centered_pawn(12, 14.75, 0.42)])
+
+
 GLYPHS = {
     "glyph-home": svg([rook()]),
     "glyph-train": svg([knight()]),
@@ -327,6 +357,9 @@ GLYPHS = {
     "glyph-pawn": svg([pawn()]),
     "glyph-coach": coach(),
     "glyph-challenge": challenge(),
+    "glyph-online": online(),
+    "glyph-scan": scan(),
+    "glyph-today": today(),
 }
 
 

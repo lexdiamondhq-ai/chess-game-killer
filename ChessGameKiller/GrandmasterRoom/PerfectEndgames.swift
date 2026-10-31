@@ -74,7 +74,7 @@ struct EndgameView: View {
     private func goalRow(_ runner: EndgameRunner) -> some View {
         HStack(spacing: 8) {
             Label(runner.study.goalText, systemImage: runner.study.goal == .win ? "flag.checkered" : "shield.lefthalf.filled")
-                .font(.system(.headline, design: .themed))
+                .font(.app(.headline))
                 .foregroundStyle(theme.trainingAccent)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
@@ -84,7 +84,7 @@ struct EndgameView: View {
                     .transition(.opacity)
             } else {
                 Text(countText(runner))
-                    .font(.system(.subheadline, design: .themed).weight(.semibold).monospacedDigit())
+                    .font(.app(.subheadline, weight: .semibold).monospacedDigit())
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .contentTransition(.numericText())
@@ -199,7 +199,7 @@ struct EndgameView: View {
             Text(kind?.label ?? "Looking at the position")
                 .contentTransition(.opacity)
         }
-        .font(.caption)
+        .font(.app(.caption))
         .foregroundStyle(.secondary)
         .padding(.bottom, 8)
         .animation(.easeInOut(duration: 0.3), value: kind)

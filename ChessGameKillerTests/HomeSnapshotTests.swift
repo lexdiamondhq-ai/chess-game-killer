@@ -5,19 +5,18 @@ import XCTest
 import simd
 @testable import ChessGameKiller
 
-/// The home screen at iPhone size: at rest, as the camera walks in, with the glass cards over
-/// the board, down the ladder and at the foot; pulled down and with the You panel open; on a
-/// first launch; in the real app; with a timed game under way as Black; with friend games;
-/// and on other looks.
+/// The home screen at iPhone size: at rest, scrolled and at the foot; pulled down and with
+/// the You panel open; on a first launch; in the real app; with a timed game under way as
+/// Black; with friend games; and on other looks.
 /// When SNAPSHOT_DIR is set the pictures are saved there, named to sort last so CI prints them at the log's end.
 @MainActor
 final class HomeSnapshotTests: XCTestCase {
 
     func testHomeScrolling() throws {
         let window = try show(HomeSample.home())
-        // "Closer" is where the camera has come in: the king's head between the status bar and the card.
-        for (name, offset) in [("zz-home-0-top", 0.0), ("zz-home-1-turning", 120.0), ("zz-home-1-closer", 190.0),
-                               ("zz-home-2-cards", 520.0), ("zz-home-3-ladder", 900.0), ("zz-home-3-foot", 2000.0)] {
+        // The page fits on about a screen: at rest, partway (the board turning in its window), and at its foot.
+        for (name, offset) in [("zz-home-0-top", 0.0), ("zz-home-1-turning", 140.0), ("zz-home-2-cards", 260.0),
+                               ("zz-home-3-foot", 2000.0)] {
             scroll(window, to: offset)
             try save(window, name)
         }
@@ -36,13 +35,21 @@ final class HomeSnapshotTests: XCTestCase {
         open.isHidden = true
     }
 
+    /// Holding the gold knight in the dock: the five rivals and the other ways to a game rise
+    /// out of it over the veiled page, and the jewel wears a cross to close them.
+    func testTheJewelsShortcuts() throws {
+        let window = try show(HomeSample.home(showsShortcuts: true))
+        try save(window, "zz-home-9-shortcuts")
+        window.isHidden = true
+    }
+
     func testFirstLaunch() throws {
         let window = try show(HomeSample.home(empty: true))
         try save(window, "zz-home-first-launch")
         window.isHidden = true
     }
 
-    /// A timed game against Pulse, playing Black, left at move 5: the clock card says so.
+    /// A timed game against Pulse, playing Black, left at move 5: the board window says so.
     func testGameUnderWayAsBlack() throws {
         let match = MatchController(engine: nil, sounds: nil)
         let position = try XCTUnwrap(Position(fen: HomeSample.italianFEN))
@@ -50,32 +57,46 @@ final class HomeSnapshotTests: XCTestCase {
         match.suspend()
         let window = try show(HomeSample.home(match: match))
         try save(window, "zz-home-6-black-timed")
-        scroll(window, to: 190)
-        try save(window, "zz-home-6-black-closer")
         window.isHidden = true
     }
 
-    /// Challenge a friend, a sealed envelope, sits right under the clock, with friend games
-    /// still going under it, your move first.
-    func testFriendGamesUnderTheClock() throws {
+    /// Play a person (Online, or A friend by link) sits right under the board window; further
+    /// down, every game still going with a person, with a small board and whose move it is, your move first.
+    func testCurrentGamesUnderTheClock() throws {
         let api = FakeChallengeAPI()
         let now = Date().timeIntervalSince1970 * 1000
         let yourMove = FriendGameState.sample(code: "7KQ2XM", moves: ["e2e4", "c7c5"], black: "Sam", now: now - 60_000)
         let theirMove = FriendGameState.sample(code: "P4HRWN", moves: ["d2d4", "g8f6", "c2c4"],
                                                clock: FriendClock(initial: 300, increment: 0), black: "Jordan",
                                                now: now - 600_000)
+        var online = FriendGameState.sample(code: "R3ATED", moves: ["d2d4", "d7d5", "c2c4", "e7e6", "b1c3"],
+                                            clock: FriendClock(initial: 180, increment: 2), white: "Maya", black: "Alex",
+                                            now: now - 30_000)
+        online.rated = true
+        online.ratings = .init(white: .init(rating: 1342), black: .init(rating: 1262))
         let waiting = FriendGameState.sample(code: "M8TQ3D", status: .waiting,
                                              clock: FriendClock(initial: 180, increment: 2), now: now - 3_600_000)
-        let states = [yourMove, theirMove, waiting]
+        let states = [yourMove, theirMove, online, waiting]
         for state in states {
             api.games[state.code] = state
         }
-        let center = ChallengeCenter(api: api, store: ChallengeStore(games: states.map { FriendGame.sample($0, seat: .white) }),
-                                     sounds: nil)
+        let records = [FriendGame.sample(yourMove, seat: .white), FriendGame.sample(theirMove, seat: .white),
+                       FriendGame.sample(online, seat: .black), FriendGame.sample(waiting, seat: .white)]
+        let center = ChallengeCenter(api: api, store: ChallengeStore(games: records), sounds: nil)
         let window = try show(HomeSample.home().environment(center))
         scroll(window, to: 300)
         try save(window, "zz-home-8-friends")
         window.isHidden = true
+
+        // With a game against the computer under way too.
+        let match = MatchController(engine: nil, sounds: nil)
+        let position = try XCTUnwrap(Position(fen: HomeSample.italianFEN))
+        match.start(MatchController.Setup(playerColor: .black, level: .club, timeControl: .blitz5), from: position)
+        match.suspend()
+        let all = try show(HomeSample.home(match: match).environment(center))
+        scroll(all, to: 300)
+        try save(all, "zz-home-8-current-all")
+        all.isHidden = true
 
         let none = ChallengeCenter(api: FakeChallengeAPI(), store: ChallengeStore(), sounds: nil)
         let quiet = try show(HomeSample.home().environment(none))
@@ -83,6 +104,65 @@ final class HomeSnapshotTests: XCTestCase {
         scroll(quiet, to: 260)
         try save(quiet, "zz-home-8-friends-none")
         quiet.isHidden = true
+    }
+
+    /// Your move first, then theirs, then open challenges; the header counts the games waiting on you.
+    func testCurrentGamesPutYourMoveFirst() {
+        let now = Date().timeIntervalSince1970 * 1000
+        let theirs = FriendGame.sample(.sample(code: "AAAAAA", moves: ["e2e4"], now: now), seat: .white)
+        let open = FriendGame.sample(.sample(code: "BBBBBB", status: .waiting, now: now), seat: .white)
+        var ratedState = FriendGameState.sample(code: "CCCCCC", moves: ["e2e4"], now: now)
+        ratedState.rated = true
+        ratedState.ratings = .init(white: .init(rating: 1300), black: .init(rating: 1200, provisional: true))
+        let yours = FriendGame.sample(ratedState, seat: .black)
+        let list = HomeCurrentGame.sorted([open, theirs, yours].map(HomeCurrentGame.friend))
+        XCTAssertEqual(list.map(\.id), ["CCCCCC", "AAAAAA", "BBBBBB"])
+        XCTAssertEqual(list.map(\.status), [.yourMove, .theirMove, .waiting])
+        XCTAssertEqual(list[0].kind, .online)
+        XCTAssertEqual(list[0].detail, "Online · 1300 · 10+0 · Move 1")
+        XCTAssertTrue(list[0].flipped, "Playing Black, Black is at the bottom")
+        XCTAssertEqual(list[1].detail, "Friend · 10+0 · Move 1")
+        XCTAssertEqual(list[1].shortDetail, "Friend · 10+0")
+        XCTAssertEqual(HomeCurrentGame.note(list), "1 needs your move")
+        XCTAssertEqual(HomeCurrentGame.note([list[1]]), "Waiting on them")
+        XCTAssertNil(HomeCurrentGame.note([]))
+        XCTAssertNotNil(yours.fen)
+    }
+
+    /// The game against the computer is listed with the rest, so Your move shows even when it is
+    /// the only game going; among games that wait on the same side, it comes first.
+    func testCurrentGamesListTheGameAgainstTheComputer() {
+        let now = Date().timeIntervalSince1970 * 1000
+        let start = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+        let yourTurn = HomeUpNext(kind: .resume, level: .club, playerColor: .white, randomSide: false,
+                                  timeControl: .unlimited, yourTime: nil, theirTime: nil, yourMove: true,
+                                  moveNumber: 1, plies: 0)
+        let alone = HomeCurrentGame.list(yourTurn, fen: start, friends: [])
+        XCTAssertEqual(alone.map(\.id), ["computer"], "The only game going still gets its chip")
+        XCTAssertEqual(alone.first?.title, "vs Pulse")
+        XCTAssertEqual(alone.first?.kind, .computer)
+        XCTAssertEqual(alone.first?.status, .yourMove)
+        XCTAssertEqual(alone.first?.detail, "Computer · No clock · Move 1")
+        XCTAssertNil(alone.first?.friendGame, "Its chip resumes the game against the computer")
+        XCTAssertEqual(HomeCurrentGame.note(alone), "1 needs your move")
+
+        let theirs = FriendGame.sample(.sample(code: "AAAAAA", moves: ["e2e4"], now: now), seat: .white)
+        let yours = FriendGame.sample(.sample(code: "CCCCCC", moves: ["e2e4"], now: now), seat: .black)
+        let ended = FriendGame.sample(.sample(code: "DDDDDD", status: .over, moves: ["e2e4"], now: now), seat: .black)
+        let all = HomeCurrentGame.list(yourTurn, fen: start, friends: [theirs, yours, ended])
+        XCTAssertEqual(all.map(\.id), ["computer", "CCCCCC", "AAAAAA"], "Your move first; a game that ended is gone")
+
+        let computersTurn = HomeUpNext(kind: .resume, level: .club, playerColor: .white, randomSide: false,
+                                       timeControl: .unlimited, yourTime: nil, theirTime: nil, yourMove: false,
+                                       moveNumber: 1, plies: 1)
+        let waiting = HomeCurrentGame.list(computersTurn, fen: start, friends: [theirs, yours])
+        XCTAssertEqual(waiting.map(\.id), ["CCCCCC", "computer", "AAAAAA"])
+        XCTAssertEqual(waiting[1].status, .theirMove)
+
+        let ready = HomeUpNext(kind: .ready, level: .club, playerColor: .white, randomSide: false,
+                               timeControl: .unlimited, yourTime: nil, theirTime: nil, yourMove: true,
+                               moveNumber: 1, plies: 0)
+        XCTAssertTrue(HomeCurrentGame.list(ready, fen: start, friends: []).isEmpty, "Nothing under way, nothing listed")
     }
 
     /// The home takes its colors from the board look.
@@ -130,26 +210,82 @@ final class HomeSnapshotTests: XCTestCase {
         XCTAssertLessThan(abs(crown.y), 0.15)
     }
 
-    /// Once the camera has come in, the king's whole head, cross and crown, stands between the
-    /// status bar and the clock card, in the middle of the screen; at rest the board fills the top.
-    func testTheCrownLandsBetweenTheStatusBarAndTheCard() {
-        let screen = CGSize(width: 402, height: 874)
-        let layout = HomeLayout(size: CGSize(width: 402, height: 874 - 62 - 34),
-                                insets: EdgeInsets(top: 62, leading: 0, bottom: 34, trailing: 0), cardHeight: 190)
-        let cardTopThen = layout.cardTop - HomeWorld.arrival * layout.walk
-        XCTAssertGreaterThan(layout.crownLook, layout.safeTop + 30)
-        XCTAssertLessThan(layout.crownLook, cardTopThen - 30)
-        XCTAssertLessThan(layout.restLook, layout.cardTop - 100, "At rest the board stands in the top of the screen")
+    /// Through the board window the pieces stand in its top and its foot is left for the words.
+    /// The camera settles in from higher and further back, and turns as the page scrolls.
+    func testTheWindowFramesThePieces() {
+        let size = CGSize(width: 370, height: 247)
+        let rest = HomeWindowBoard.camera(size: size, scrolled: 0, arrival: 0, black: false)
+        // White's queen, the top of her crown: in the window, right of the middle, in its top half.
+        let queen = rest.screenPoint(SIMD3(-0.5, 1.2, 3.5), in: size)
+        XCTAssertGreaterThan(queen.x, size.width * 0.5)
+        XCTAssertLessThan(queen.x, size.width * 0.95)
+        XCTAssertGreaterThan(queen.y, 8, "The crown clears the window's top")
+        XCTAssertLessThan(queen.y, size.height * 0.45, "and stands above the words at the foot")
+        // The pieces' feet on White's back rank sit above the title too.
+        let foot = rest.screenPoint(SIMD3(-0.5, 0, 3.5), in: size)
+        XCTAssertLessThan(foot.y, size.height * 0.72)
 
-        let camera = HomeHeroCamera.camera(aspect: Float(screen.width / screen.height),
-                                           anchor: Float(1 - 2 * layout.crownLook / screen.height),
-                                           progress: 1, pull: 0)
-        let cross = camera.screenPoint(SIMD3(0.5, SculptedCamera.tallest, 3.5), in: screen)
-        // The foot of the crown, where it meets the king's neck.
-        let crownFoot = camera.screenPoint(SIMD3(0.5, 0.83, 3.5), in: screen)
-        XCTAssertGreaterThan(cross.y, layout.safeTop + 8, "The cross clears the status bar")
-        XCTAssertLessThan(crownFoot.y, cardTopThen - 12, "The crown is clear of the card")
-        XCTAssertEqual(cross.x, screen.width / 2, accuracy: 24, "The king stands in the middle")
+        let start = HomeWindowBoard.camera(size: size, scrolled: 0, arrival: 1, black: false)
+        XCTAssertGreaterThan(start.elevation, rest.elevation, "It settles in from above")
+        XCTAssertGreaterThan(start.distance, rest.distance, "and from further back")
+        let turned = HomeWindowBoard.camera(size: size, scrolled: 1, arrival: 0, black: false)
+        XCTAssertGreaterThan(turned.azimuth - rest.azimuth, 0.3, "Scrolling turns the board")
+        let black = HomeWindowBoard.camera(size: size, scrolled: 0, arrival: 0, black: true)
+        XCTAssertLessThan(black.eye.z, 0, "Playing Black, the window looks from Black's side")
+    }
+
+    // MARK: Someone at the Table
+
+    /// The rival's light hangs in the studio's rig, above the window and out of sight, and
+    /// pools on the board right under the orb in the window's top, from either side.
+    func testTheRivalsLightPoolsUnderTheOrb() {
+        let size = CGSize(width: 370, height: 247)
+        let orb = HomeRivalPresence.center(in: size)
+        let light = HomeWindowBoard.presence(.orange, arrival: 0, leaning: false)
+        let below = SIMD3<Float>(light.position.x, 0, light.position.z)
+        for black in [false, true] {
+            let camera = HomeWindowBoard.camera(size: size, scrolled: 0, arrival: 0, black: black)
+            let turn = simd_quatf(angle: camera.azimuth, axis: SculptedCamera.up)
+            let pool = camera.screenPoint(turn.act(below), in: size)
+            XCTAssertEqual(pool.x, orb.x, accuracy: 30, "The light falls under the orb, across (black: \(black))")
+            XCTAssertEqual(pool.y, orb.y, accuracy: 30, "and down (black: \(black))")
+            let lamp = camera.screenPoint(turn.act(light.position), in: size)
+            XCTAssertLessThan(lamp.y, 0, "The lamp itself hangs above the window")
+        }
+    }
+
+    /// The light comes up as the camera settles in, and leans in while a game waits on your move.
+    func testTheRivalsLightComesUpAsTheCameraSettles() {
+        let arriving = HomeWindowBoard.presence(.orange, arrival: 1, leaning: false)
+        let settled = HomeWindowBoard.presence(.orange, arrival: 0, leaning: false)
+        let leaning = HomeWindowBoard.presence(.orange, arrival: 0, leaning: true)
+        XCTAssertLessThan(arriving.strength, settled.strength * 0.5)
+        XCTAssertEqual(settled.strength, 1, accuracy: 0.001)
+        XCTAssertGreaterThan(leaning.strength, settled.strength)
+        XCTAssertLessThan(SculptedPresence.game(.orange).strength, settled.strength * 0.5, "Softer in a game, where the board is the point")
+    }
+
+    /// In a game the rival's light is low behind its back rank, so its gleam on the polished
+    /// board (where the eye sees the light mirrored) lands past the far edge, not on the squares
+    /// in play, from either side of the board.
+    func testTheRivalsLightInAGameGleamsPastTheFarEdge() {
+        let light = SculptedPresence.game(.orange).position
+        for flipped in [false, true] {
+            let camera = SculptedCamera.fitted(aspect: Float(SculptedCamera.Framing.standing.aspect), flipped: flipped)
+            // The light turns with the camera (it hangs in the studio's rig).
+            let turn = simd_quatf(angle: camera.azimuth, axis: SculptedCamera.up)
+            let lamp: SIMD3<Float> = turn.act(light)
+            // The gleam is where the line from the eye to the lamp's mirror image under the
+            // board crosses the board.
+            let mirrored = SIMD3<Float>(lamp.x, -lamp.y, lamp.z)
+            let eye: SIMD3<Float> = camera.eye
+            let part: Float = eye.y / (eye.y + lamp.y)
+            let toMirror: SIMD3<Float> = mirrored - eye
+            let gleam: SIMD3<Float> = eye + part * toMirror
+            let across: Float = simd_length(SIMD2<Float>(gleam.x, gleam.z))
+            XCTAssertGreaterThan(across, SculptedCamera.boardHalfWidth + 0.5, "The gleam lands past the board (flipped: \(flipped))")
+            XCTAssertLessThan(lamp.y, SculptedCamera.tallest, "Lower than the king's cross, so it edges the pieces rather than lighting them")
+        }
     }
 
     func testTheHeroCameraLooksAtTheBoard() {
@@ -236,7 +372,7 @@ enum HomeSample {
     static let italianFEN = "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQK2R b KQkq - 0 5"
 
     static func home(empty: Bool = false, theme: BoardTheme.ID = .gilded, match: MatchController? = nil,
-                     showsYou: Bool = false) -> some View {
+                     showsYou: Bool = false, showsShortcuts: Bool = false) -> some View {
         let game = match ?? MatchController(engine: nil, sounds: nil)
         let vault = GameVault(games: empty ? [] : games())
         let army = empty ? ArmyStore() : ArmyStore(army: armyRecords())
@@ -253,7 +389,17 @@ enum HomeSample {
             puzzleProgress.streak = 7
         }
         let puzzles = PuzzleStore(progress: puzzleProgress)
-        return HomeView(match: game, theme: .named(theme), actions: HomeActions(), showsYou: showsYou)
+        // Five days in a row up to yesterday, and two of today's three puzzles solved.
+        var daily = DailyRecord()
+        if !empty {
+            daily.streak = Streak(current: 5, best: 9, lastDay: Trainer.dayString(.now.addingTimeInterval(-86_400)))
+            daily.day = Trainer.dayString(.now)
+            daily.puzzlesSolved = 2
+        }
+        daily.seeded = true
+        return HomeView(match: game, theme: .named(theme), actions: HomeActions(), showsYou: showsYou,
+                        showsShortcuts: showsShortcuts)
+            .environment(DailyStore(state: daily))
             .environment(vault)
             .environment(army)
             .environment(training)

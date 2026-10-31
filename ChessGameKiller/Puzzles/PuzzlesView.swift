@@ -79,7 +79,7 @@ struct PuzzlesView: View {
                         Spacer()
                         VStack(spacing: 12) {
                             Text("No puzzles in this theme at your level yet.")
-                                .font(.system(.subheadline, design: .themed))
+                                .font(.app(.subheadline))
                                 .foregroundStyle(.secondary)
                                 .multilineTextAlignment(.center)
                             Button("Pick another theme") { showingThemes = true }
@@ -168,11 +168,11 @@ struct PuzzlesView: View {
 
             VStack(alignment: .trailing, spacing: 0) {
                 Text("\(store.progress.rating)")
-                    .font(.system(.headline, design: .themed).weight(.bold).monospacedDigit())
+                    .font(.app(.headline, weight: .bold).monospacedDigit())
                     .foregroundStyle(theme.trainingAccent)
                     .contentTransition(.numericText(value: Double(store.progress.rating)))
                 Text("rating")
-                    .font(.caption2)
+                    .font(.app(.caption2))
                     .foregroundStyle(.secondary)
             }
             .accessibilityElement(children: .combine)
@@ -193,18 +193,18 @@ struct PuzzlesView: View {
                     .foregroundStyle(theme.trainingAccent)
                     .frame(width: 22)
                 Text(store.theme.name)
-                    .font(.system(.subheadline, design: .themed).weight(.semibold))
+                    .font(.app(.subheadline, weight: .semibold))
                 Spacer()
                 if store.progress.streak > 1 {
                     Label("\(store.progress.streak)", systemImage: "flame.fill")
-                        .font(.caption.weight(.bold).monospacedDigit())
+                        .font(.app(.caption, weight: .bold).monospacedDigit())
                         .foregroundStyle(TrainingColor.orange.color(on: theme))
                 }
                 Text("Theme")
-                    .font(.caption)
+                    .font(.app(.caption))
                     .foregroundStyle(.secondary)
                 Image(systemName: "chevron.right")
-                    .font(.caption.weight(.bold))
+                    .font(.app(.caption, weight: .bold))
                     .foregroundStyle(.tertiary)
             }
             .padding(.horizontal, 14)
@@ -230,14 +230,14 @@ struct PuzzlesView: View {
                 HStack(spacing: 8) {
                     if let change {
                         Text(change >= 0 ? "+\(change)" : "\(change)")
-                            .font(.system(.subheadline, design: .themed).weight(.bold).monospacedDigit())
+                            .font(.app(.subheadline, weight: .bold).monospacedDigit())
                             .foregroundStyle(change >= 0 ? TrainingColor.green.color(on: theme) : TrainingColor.red.color(on: theme))
                     }
                     Text("Puzzle \(puzzle.rating)")
-                        .font(.caption.weight(.semibold).monospacedDigit())
+                        .font(.app(.caption, weight: .semibold).monospacedDigit())
                         .foregroundStyle(.secondary)
                     Text(puzzle.themeNames.prefix(3).joined(separator: " · "))
-                        .font(.caption)
+                        .font(.app(.caption))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                     Spacer(minLength: 0)
@@ -369,12 +369,12 @@ private struct RushBar: View {
             TimelineView(.periodic(from: .now, by: 0.25)) { context in
                 let left = max(0, round.endsAt.timeIntervalSince(context.date))
                 Label(String(format: "%d:%02d", Int(left) / 60, Int(left) % 60), systemImage: "timer")
-                    .font(.system(.headline, design: .themed).monospacedDigit())
+                    .font(.app(.headline).monospacedDigit())
                     .foregroundStyle(left < 20 ? TrainingColor.red.color(on: theme) : Color.primary)
             }
             Spacer()
             Text("\(round.score)")
-                .font(.system(.title2, design: .themed).weight(.heavy).monospacedDigit())
+                .font(.app(.title2, weight: .heavy).monospacedDigit())
                 .foregroundStyle(theme.trainingAccent)
                 .contentTransition(.numericText(value: Double(round.score)))
             Spacer()
@@ -388,7 +388,7 @@ private struct RushBar: View {
             .accessibilityLabel(livesLeft == 1 ? "1 life left" : "\(livesLeft) lives left")
             Button(action: onStop) {
                 Text("End")
-                    .font(.system(.subheadline, design: .themed).weight(.semibold))
+                    .font(.app(.subheadline, weight: .semibold))
                     .padding(.horizontal, 12)
                     .frame(height: 30)
                     .background(Capsule().strokeBorder(Color.secondary.opacity(0.5), lineWidth: 1))
@@ -420,20 +420,20 @@ private struct RushCard: View {
                 .shadow(color: theme.glows ? theme.trainingAccent.opacity(0.7) : .clear, radius: 14)
             if let last, last.isOver {
                 Text(last.newBest ? "New best!" : "Time!")
-                    .font(.system(.title, design: .themed).weight(.bold))
+                    .font(.app(.title, weight: .bold))
                 Text("\(last.score) solved")
-                    .font(.system(.title3, design: .themed).weight(.semibold).monospacedDigit())
+                    .font(.app(.title3, weight: .semibold).monospacedDigit())
                     .foregroundStyle(theme.trainingAccent)
             } else {
                 Text("Puzzle Rush")
-                    .font(.system(.title, design: .themed).weight(.bold))
+                    .font(.app(.title, weight: .bold))
                 Text("Three minutes. The puzzles start easy and get harder with every one you solve. Three mistakes and you're out.")
-                    .font(.system(.subheadline, design: .themed))
+                    .font(.app(.subheadline))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
             Text("Best: \(best)")
-                .font(.system(.headline, design: .themed).monospacedDigit())
+                .font(.app(.headline).monospacedDigit())
                 .foregroundStyle(.secondary)
             Button(action: onStart) {
                 Text(last?.isOver == true ? "Play again" : "Start")
@@ -464,7 +464,7 @@ private struct ThemePicker: View {
                     tile(.all)
                     ForEach(PuzzleTheme.Group.allCases, id: \.self) { group in
                         Text(group.rawValue)
-                            .font(.system(.headline, design: .themed))
+                            .font(.app(.headline))
                             .padding(.leading, 4)
                         LazyVGrid(columns: columns, spacing: 10) {
                             ForEach(PuzzleTheme.choices.filter { $0.group == group }) { tile($0) }
@@ -502,12 +502,12 @@ private struct ThemePicker: View {
                     .frame(width: 24)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(option.name)
-                        .font(.system(.subheadline, design: .themed).weight(.semibold))
+                        .font(.app(.subheadline, weight: .semibold))
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                     if let count = counts[option.id] {
                         Text("\(count) puzzles")
-                            .font(.caption2.monospacedDigit())
+                            .font(.app(.caption2).monospacedDigit())
                             .foregroundStyle(.secondary)
                     }
                 }
