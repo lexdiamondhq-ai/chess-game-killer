@@ -258,6 +258,9 @@ struct HomeView: View {
 
     @ViewBuilder
     private func tiles(upNext: HomeUpNext, ladder: HomeLadder, day: HomeDailyState) -> some View {
+        // Whose move it is in every game going, right under the board, where it's seen first.
+        currentGames(upNext)
+
         playPerson()
 
         HStack(alignment: .top, spacing: Self.gap) {
@@ -273,8 +276,6 @@ struct HomeView: View {
             HomeNoticeCard(daily: day, tone: tone, remind: answerReminder)
                 .transition(.opacity)
         }
-
-        currentGames(upNext)
 
         HomeLadderTile(ladder: ladder, tone: tone, play: { level in actions.playRival(level) })
             .padding(.top, 4)
