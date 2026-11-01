@@ -192,7 +192,7 @@ struct HomeIvoryButtonStyle: ButtonStyle {
             // A compact button still answers a finger's height (44 points) around it.
             .padding(.vertical, compact ? 2 : 0)
             .contentShape(Rectangle())
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .scaleEffect(configuration.isPressed ? 0.93 : 1)
             .opacity(configuration.isPressed ? 0.9 : 1)
             .animation(.spring(response: 0.25, dampingFraction: 0.8), value: configuration.isPressed)
     }
