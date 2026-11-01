@@ -171,6 +171,10 @@ struct TalkPanel: View {
             .padding(.vertical, 12)
             .frame(maxWidth: Self.column)
             .glassPane(shape)
+            .background(alignment: .bottom) {
+                // G1: a warm light rises behind the dock as the panel opens, then rests low.
+                TalkRisingGlow(color: theme.challengeAccent)
+            }
             .background {
                 if theme.glows {
                     // Neon's dock glows in its accent, behind the glass, as on the game screen.
@@ -221,6 +225,9 @@ struct TalkPanel: View {
         let listening: Bool = session.phase == .listening
         let hintColor: Color = listening ? theme.challengeAccent : Color.secondary
         return VStack(spacing: 12) {
+            if session.phase == .ready {
+                TalkStarterChips(theme: theme, pick: startWith)
+            }
             Text(talkHint)
                 .font(theme.talkFont(.footnote, listening ? .semibold : .regular))
                 .foregroundStyle(hintColor)
@@ -447,6 +454,12 @@ struct TalkPanel: View {
         guard canSend else { return }
         fieldFocused = false
         session.sendDraft()
+    }
+
+    /// A starter chip: its words go in the field, ready to finish and send.
+    private func startWith(_ words: String) {
+        session.draft = words
+        session.beginTyping()
     }
 
     private func cancelTyping() {
@@ -775,5 +788,81 @@ private struct TalkPanelButtonBody: View {
     private func alpha(pressed: Bool) -> Double {
         if !isEnabled { return 0.45 }
         return pressed ? 0.88 : 1
+    }
+}
+
+// MARK: - G1 coach glow and starters
+
+/// Three ways to begin, stacking up one by one with a spring (G1 on the Tap Moments page).
+/// A tap puts the words in the field to finish.
+private struct TalkStarterChips: View {
+    let theme: BoardTheme
+    let pick: (String) -> Void
+
+    @State private var shown = false
+    @AppStorage("haptics") private var hapticsOn = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private struct Starter: Identifiable {
+        let title: String
+        let words: String
+        var id: String { title }
+    }
+
+    private static let starters: [Starter] = [
+        Starter(title: "Their threat", words: "Their threat is "),
+        Starter(title: "My idea", words: "My idea is to "),
+        Starter(title: "My move", words: "I'd play "),
+    ]
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(Array(Self.starters.enumerated()), id: \.element.id) { index, starter in
+                chip(starter, index: index)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .onAppear { shown = true }
+        .sensoryFeedback(.impact(weight: .light), trigger: shown) { _, now in now && hapticsOn }
+    }
+
+    private func chip(_ starter: Starter, index: Int) -> some View {
+        let rise: CGFloat = shown || reduceMotion ? 0 : 14
+        let delay: Double = 0.12 + Double(index) * 0.08
+        return Button {
+            pick(starter.words)
+        } label: {
+            Text(starter.title)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .buttonStyle(TalkPanelButtonStyle(kind: .quiet, theme: theme, height: 40))
+        .opacity(shown ? 1 : 0)
+        .offset(y: rise)
+        .animation(.spring(response: 0.45, dampingFraction: 0.7).delay(delay), value: shown)
+        .accessibilityHint("Starts your message with these words")
+    }
+}
+
+/// A soft light in the accent that rises from under the dock, then settles to a glow.
+private struct TalkRisingGlow: View {
+    let color: Color
+
+    @State private var risen = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        let lift: CGFloat = risen || reduceMotion ? 0 : 50
+        let strength: Double = risen ? 0.22 : 0
+        Ellipse()
+            .fill(color.opacity(strength))
+            .frame(height: 140)
+            .blur(radius: 40)
+            .offset(y: 40 + lift)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+            .onAppear {
+                withAnimation(.easeOut(duration: 0.7)) { risen = true }
+            }
     }
 }

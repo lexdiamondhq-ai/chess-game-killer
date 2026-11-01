@@ -209,7 +209,7 @@ struct HomePlayTileFace: View {
             .homePane(shape, tone: tone, weight: .well(lit: false))
             .contentShape(shape)
         }
-        .buttonStyle(HomePressStyle())
+        .buttonStyle(HomeLiftStyle(tone: tone, radius: HomeMetrics.tileRadius - 6))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(label)
         .accessibilityValue(line)
@@ -309,7 +309,8 @@ struct HomeDailyTile: View {
             .homePane(shape, tone: tone)
             .contentShape(shape)
         }
-        .buttonStyle(HomePressStyle())
+        .buttonStyle(HomeLiftStyle(tone: tone))
+        .homeZoomSource(.daily)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Today's Move")
         .accessibilityValue(spoken)
@@ -393,7 +394,8 @@ struct HomeCoachTile: View {
             .homePane(shape, tone: tone)
             .contentShape(shape)
         }
-        .buttonStyle(HomePressStyle())
+        .buttonStyle(HomeLiftStyle(tone: tone))
+        .homeZoomSource(.coach)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Train with \(Coach.current.name)")
         .accessibilityValue(line)
