@@ -19,6 +19,11 @@ struct LiveGameAttributes: ActivityAttributes {
     /// "10+0", or "No clock".
     var clock: String
 
+    /// The rival's portrait in the asset catalogs: "rival-pulse".
+    var portrait: String {
+        glow.hasSuffix("-glow") ? String(glow.dropLast(5)) : glow
+    }
+
     /// What changes with every move.
     struct ContentState: Codable, Hashable {
         /// The position now.
@@ -26,6 +31,8 @@ struct LiveGameAttributes: ActivityAttributes {
         /// The last move in standard notation ("Nf6"), and whether the rival played it.
         var lastMove: String?
         var lastMoveByRival = false
+        /// The same move in engine notation ("g8f6"), so the board can mark where it went.
+        var lastMoveUCI: String?
         var yourMove: Bool
         /// The move number now (1 before Black's first reply).
         var moveNumber: Int
@@ -40,23 +47,25 @@ struct LiveGameAttributes: ActivityAttributes {
 }
 
 extension LiveGameAttributes.ContentState {
-    /// The big line: "Pulse played Nf6", "You played e4", "You won".
+    /// The big line: whose move it is, or how the game ended. "Your move", "Pulse is thinking", "You won".
     func headline(rival: String) -> String {
         if let result { return result }
-        if yourMove {
-            if let lastMove, lastMoveByRival { return "\(rival) played \(lastMove)" }
-            return "Your move"
-        }
-        if let lastMove, !lastMoveByRival { return "You played \(lastMove)" }
-        return "\(rival) to move"
+        return yourMove ? "Your move" : "\(rival) is thinking"
     }
 
-    /// The line under it: "4:11 on your clock", "Your move · Move 14", "Pulse to move".
+    /// The line under it: what just happened and the move number. "Pulse played Nf6 · move 14",
+    /// "You played e4 · move 1", "In 31 moves".
     func detail(rival: String) -> String {
         if result != nil { return moveNumber > 1 ? "In \(moveNumber) moves" : "Game over" }
-        let time = yourSeconds.map { "\(Self.clockText($0)) on your clock" }
-        if yourMove { return time ?? "Your move · Move \(moveNumber)" }
-        return time.map { "\(rival) to move · \($0)" } ?? "\(rival) to move · Move \(moveNumber)"
+        guard let lastMove else { return "Move \(moveNumber)" }
+        let who = lastMoveByRival ? rival : "You"
+        return "\(who) played \(lastMove) · move \(moveNumber)"
+    }
+
+    /// The alert when the rival's move lands while you're away: "Pulse played Nf6".
+    func alertTitle(rival: String) -> String? {
+        guard result == nil, yourMove, lastMoveByRival, let lastMove else { return nil }
+        return "\(rival) played \(lastMove)"
     }
 
     /// The Dynamic Island's few characters: your clock, or whose move it is.

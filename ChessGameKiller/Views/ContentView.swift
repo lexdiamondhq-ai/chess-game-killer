@@ -439,6 +439,8 @@ struct ContentView: View {
 
     private func refreshDaily() {
         DailyUpkeep.refresh(daily: daily, army: army, lastGame: vault.games.map(\.date).max())
+        // Today's Move on the Lock Screen until it's done (never over a game there).
+        DailyActivityKeeper.shared.follow(daily: daily)
     }
 
     /// The game on the Lock Screen was tapped: the game comes forward, over the home and any

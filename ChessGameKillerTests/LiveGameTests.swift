@@ -15,37 +15,91 @@ final class LiveGameTests: XCTestCase {
 
     // MARK: What it says
 
-    func testTheHeadlineSaysWhatJustHappened() {
+    func testTheHeadlineSaysWhoseMoveItIs() {
         let replied = LiveState(fen: "", lastMove: "Nf6", lastMoveByRival: true, yourMove: true, moveNumber: 2)
-        XCTAssertEqual(replied.headline(rival: "Pulse"), "Pulse played Nf6")
+        XCTAssertEqual(replied.headline(rival: "Pulse"), "Your move")
+        XCTAssertEqual(replied.detail(rival: "Pulse"), "Pulse played Nf6 · move 2")
+        XCTAssertEqual(replied.alertTitle(rival: "Pulse"), "Pulse played Nf6")
         let played = LiveState(fen: "", lastMove: "e4", lastMoveByRival: false, yourMove: false, moveNumber: 1)
-        XCTAssertEqual(played.headline(rival: "Pulse"), "You played e4")
+        XCTAssertEqual(played.headline(rival: "Pulse"), "Pulse is thinking")
+        XCTAssertEqual(played.detail(rival: "Pulse"), "You played e4 · move 1")
+        XCTAssertNil(played.alertTitle(rival: "Pulse"))
         let opening = LiveState(fen: "", yourMove: true, moveNumber: 1)
         XCTAssertEqual(opening.headline(rival: "Pulse"), "Your move")
-        let waiting = LiveState(fen: "", yourMove: false, moveNumber: 1)
-        XCTAssertEqual(waiting.headline(rival: "Pulse"), "Pulse to move")
+        XCTAssertEqual(opening.detail(rival: "Pulse"), "Move 1")
+        XCTAssertNil(opening.alertTitle(rival: "Pulse"))
         var over = replied
         over.result = "You won"
+        over.moveNumber = 14
         XCTAssertEqual(over.headline(rival: "Pulse"), "You won")
+        XCTAssertEqual(over.detail(rival: "Pulse"), "In 14 moves")
+        XCTAssertNil(over.alertTitle(rival: "Pulse"))
     }
 
-    func testTheDetailCarriesYourClock() {
-        let timed = LiveState(fen: "", lastMove: "Nf6", lastMoveByRival: true, yourMove: true, moveNumber: 14, yourSeconds: 251)
-        XCTAssertEqual(timed.detail(rival: "Pulse"), "4:11 on your clock")
+    func testTheClockReadsShort() {
+        let timed = LiveState(fen: "", yourMove: true, moveNumber: 14, yourSeconds: 251)
         XCTAssertEqual(timed.shortStatus, "4:11")
-        var theirs = timed
-        theirs.yourMove = false
-        XCTAssertEqual(theirs.detail(rival: "Pulse"), "Pulse to move · 4:11 on your clock")
         let untimed = LiveState(fen: "", yourMove: true, moveNumber: 14)
-        XCTAssertEqual(untimed.detail(rival: "Pulse"), "Your move · Move 14")
         XCTAssertEqual(untimed.shortStatus, "Your move")
+        var waiting = untimed
+        waiting.yourMove = false
+        XCTAssertEqual(waiting.shortStatus, "Their move")
         var over = untimed
         over.result = "Draw"
-        XCTAssertEqual(over.detail(rival: "Pulse"), "In 14 moves")
         XCTAssertEqual(over.shortStatus, "Over")
         XCTAssertEqual(LiveState.clockText(42), "0:42")
         XCTAssertEqual(LiveState.clockText(725), "12:05")
         XCTAssertEqual(LiveState.clockText(-3), "0:00")
+    }
+
+    func testTheBoardMarksTheLastMove() {
+        // Rank 8 first: a8 is 0, h1 is 63.
+        XCTAssertEqual(LiveGameBoard.marked("e2e4"), [52, 36])
+        XCTAssertEqual(LiveGameBoard.marked("g8f6"), [6, 21])
+        XCTAssertEqual(LiveGameBoard.marked("e7e8q"), [12, 4])
+        XCTAssertEqual(LiveGameBoard.marked(nil), [])
+        XCTAssertEqual(LiveGameBoard.marked("zz"), [])
+    }
+
+    func testThePortraitIsTheRivalsOwn() {
+        XCTAssertEqual(pulse.portrait, "rival-pulse")
+        for rival in Rival.all {
+            XCTAssertNotNil(UIImage(named: rival.portraitName), "\(rival.portraitName) is missing")
+        }
+        for piece in ["wK", "wQ", "wR", "wB", "wN", "wP", "bK", "bQ", "bR", "bB", "bN", "bP"] {
+            XCTAssertNotNil(UIImage(named: "flat-" + piece), "flat-\(piece) is missing")
+        }
+    }
+
+    // MARK: Today's Move
+
+    func testTodaysMoveShowsUntilItIsDone() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "America/Chicago"))
+        let now = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 11, day: 1, hour: 9)))
+        let puzzle = try XCTUnwrap(DailyMoves.puzzle(for: now, calendar: calendar))
+
+        let plan = try XCTUnwrap(DailyActivityKeeper.plan(puzzle: puzzle, done: false, streak: 27, gameShowing: false,
+                                                          now: now, calendar: calendar))
+        XCTAssertEqual(plan.state.streak, 27)
+        XCTAssertEqual(plan.puzzle.number, puzzle.number)
+        XCTAssertEqual(plan.puzzle.fen, puzzle.shownFEN)
+        XCTAssertEqual(plan.puzzle.side, puzzle.solverIsWhite ? "White to play" : "Black to play")
+        XCTAssertEqual(plan.puzzle.resets, calendar.date(from: DateComponents(year: 2026, month: 11, day: 2)))
+
+        XCTAssertNil(DailyActivityKeeper.plan(puzzle: puzzle, done: true, streak: 27, gameShowing: false, now: now, calendar: calendar))
+        XCTAssertNil(DailyActivityKeeper.plan(puzzle: puzzle, done: false, streak: 27, gameShowing: true, now: now, calendar: calendar))
+        XCTAssertNil(DailyActivityKeeper.plan(puzzle: nil, done: false, streak: 0, gameShowing: false, now: now, calendar: calendar))
+    }
+
+    func testTodaysMoveTitle() {
+        let mate = DailyPuzzle(number: 3, id: "x", fen: "", moves: [], rating: 1500, themes: ["mateIn2"], shownFEN: "8/8/8/8/8/8/8/8 b - - 0 1")
+        let title = DailyActivityAttributes(puzzle: mate, resets: .now)
+        XCTAssertEqual(title.title, "Mate in two")
+        XCTAssertEqual(title.side, "Black to play")
+        XCTAssertFalse(title.solverIsWhite)
+        let win = DailyPuzzle(number: 4, id: "y", fen: "", moves: [], rating: 1500, themes: ["fork"], shownFEN: "8/8/8/8/8/8/8/8 w - - 0 1")
+        XCTAssertEqual(DailyActivityAttributes(puzzle: win, resets: .now).title, "Find the win")
     }
 
     func testTheLinkOpensTheGame() throws {
@@ -79,9 +133,10 @@ final class LiveGameTests: XCTestCase {
         XCTAssertGreaterThan(seconds, 280)
         XCTAssertLessThanOrEqual(seconds, 300)
         XCTAssertEqual(state.headline(rival: game.rival), "Your move")
+        XCTAssertEqual(state.lastMoveUCI, match.game.lastPlayed?.uci)
     }
 
-    func testEveryRivalsGlowIsInBothCatalogs() {
+    func testEveryRivalsGlowIsInTheAppsCatalog() {
         for rival in Rival.all {
             XCTAssertNotNil(UIImage(named: rival.glowName), "\(rival.glowName) is missing from the app's catalog")
         }
@@ -93,9 +148,13 @@ final class LiveGameTests: XCTestCase {
     /// and folded around the camera.
     func testTheFaces() throws {
         let fen = "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQK2R w KQkq - 1 5"
-        let timed = LiveState(fen: fen, lastMove: "Nf6", lastMoveByRival: true, yourMove: true, moveNumber: 5,
-                          yourSeconds: 251, opening: "Italian Game")
-        let waiting = LiveState(fen: fen, lastMove: "d3", lastMoveByRival: false, yourMove: false, moveNumber: 5)
+        let timed = LiveState(fen: fen, lastMove: "Nf6", lastMoveByRival: true, lastMoveUCI: "g8f6", yourMove: true,
+                              moveNumber: 5, yourSeconds: 251, opening: "Italian Game")
+        var waiting = timed
+        waiting.lastMove = "d3"
+        waiting.lastMoveByRival = false
+        waiting.lastMoveUCI = "d2d3"
+        waiting.yourMove = false
         var won = timed
         won.result = "You won"
         won.moveNumber = 31
@@ -105,14 +164,24 @@ final class LiveGameTests: XCTestCase {
         }
         try render(island(timed), "zz-live-island")
         try render(compact(timed), "zz-live-island-compact")
+
+        let puzzle = DailyActivityAttributes(number: 32, fen: "6k1/5ppp/8/8/8/8/5PPP/3R2K1 w - - 0 1", solverIsWhite: true,
+                                             title: "Mate in one", side: "White to play",
+                                             resets: Date.now.addingTimeInterval(6 * 3600 + 42 * 60))
+        try render(card(DailyActivityLockView(puzzle: puzzle, state: .init(streak: 27))), "zz-live-daily")
     }
 
     private func lockScreen(_ state: LiveState) -> some View {
-        LiveGameLockView(game: pulse, state: state)
-            .background(LiveGamePalette.background.opacity(0.78), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .frame(width: 364)
+        card(LiveGameLockView(game: pulse, state: state))
+    }
+
+    /// A Lock Screen card on a dark wallpaper, 371 points wide as on a 393-point iPhone.
+    private func card(_ face: some View) -> some View {
+        face
+            .background(LiveGamePalette.background.opacity(0.88), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .frame(width: 371)
             .padding(14)
-            .background(LinearGradient(colors: [Color(red: 0.16, green: 0.22, blue: 0.34), Color(red: 0.32, green: 0.2, blue: 0.3)],
+            .background(LinearGradient(colors: [Color(red: 0.09, green: 0.07, blue: 0.05), Color(red: 0.2, green: 0.15, blue: 0.09)],
                                        startPoint: .top, endPoint: .bottom))
             .environment(\.colorScheme, .dark)
     }
@@ -122,7 +191,7 @@ final class LiveGameTests: XCTestCase {
     private func island(_ state: LiveState) -> some View {
         VStack(spacing: 6) {
             HStack(alignment: .top) {
-                LiveGameIsland.Leading(game: pulse)
+                LiveGameIsland.Leading(game: pulse, state: state)
                 Spacer(minLength: 0)
                 LiveGameIsland.Trailing(game: pulse, state: state)
             }
