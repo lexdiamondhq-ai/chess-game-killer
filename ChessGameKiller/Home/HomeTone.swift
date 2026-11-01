@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// The home's colors, taken from the board it stands on: the dark of the room, the stone's
 /// warmth, the pieces' metal and the ivory of the white set. Gilded gives espresso and
@@ -21,6 +22,9 @@ struct HomeTone {
     var ink2: Color { ink.opacity(0.72) }
     var ink3: Color { ink.opacity(0.6) }
     var hairline: Color { ink.opacity(0.12) }
+    /// Something happening right now, like players waiting online: a soft green, the one
+    /// color that isn't the board's, kept to a dot.
+    var live: Color { Color(hex: 0x7FE0A3) }
 
     static func of(_ look: SculptedLook) -> HomeTone {
         switch look.name {
@@ -47,25 +51,42 @@ struct HomeTone {
     }
 }
 
-/// The home's type: New York for what you read as a title or a number on a scoresheet,
-/// SF Pro for everything you tap. All of it follows the reader's text size.
+extension HomeTone {
+    /// The jewel's gold, top to foot: the pieces' metal lit toward white where the light
+    /// catches it, then deepening into shadow.
+    var jewelLight: Color { metal.mixed(with: .white, by: 0.55) }
+    var jewelDeep: Color { metal.mixed(with: .black, by: 0.42) }
+}
+
+extension Color {
+    /// This color taken `amount` of the way toward `other` (0 is this color, 1 is `other`).
+    func mixed(with other: UIColor, by amount: CGFloat) -> Color {
+        var r1: CGFloat = 0, g1: CGFloat = 0, b1: CGFloat = 0, a1: CGFloat = 0
+        var r2: CGFloat = 0, g2: CGFloat = 0, b2: CGFloat = 0, a2: CGFloat = 0
+        UIColor(self).getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
+        other.getRed(&r2, green: &g2, blue: &b2, alpha: &a2)
+        let t: CGFloat = min(max(amount, 0), 1)
+        let red: CGFloat = r1 + (r2 - r1) * t
+        let green: CGFloat = g1 + (g2 - g1) * t
+        let blue: CGFloat = b1 + (b2 - b1) * t
+        return Color(red: Double(red), green: Double(green), blue: Double(blue), opacity: Double(a1))
+    }
+}
+
+/// The home's type, all Geist. It follows the reader's text size.
 enum HomeType {
-    static let section = Font.system(.title2, design: .serif, weight: .medium)
-    static let title = Font.system(.title3, design: .serif, weight: .medium)
-    static let score = Font.system(.body, design: .serif, weight: .medium)
-    /// The date over a column, the way a newspaper's chess column is dated.
-    static let dateline = Font.system(.subheadline, design: .serif).italic()
+    /// A panel's name, like the You panel's.
+    static let section = Font.app(.title2, weight: .semibold)
 }
 
 /// One set of measures for every card, so all their edges and insides line up.
 enum HomeMetrics {
     /// A card's corner.
     static let cardRadius: CGFloat = 30
-    /// What a card keeps between its edge and what it holds. With the page's own margin,
-    /// everything inside a card (and every section's name) starts 32 points from the screen's edge.
+    /// What a card keeps between its edge and what it holds.
     static let inset: CGFloat = 16
-    /// A pane inside a card, so its corner follows the card's.
-    static let innerRadius: CGFloat = cardRadius - inset
+    /// A tile's corner: a touch tighter than the board window's, so the window leads.
+    static let tileRadius: CGFloat = 26
 }
 
 // MARK: - Glass
@@ -161,7 +182,7 @@ struct HomeIvoryButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(compact ? .subheadline.weight(.semibold) : .headline)
+            .font(compact ? .app(.subheadline, weight: .semibold) : .app(.headline))
             .foregroundStyle(tone.onIvory)
             .lineLimit(1)
             .minimumScaleFactor(0.85)
@@ -184,7 +205,7 @@ struct HomeGlassButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(compact ? .subheadline.weight(.semibold) : .headline.weight(.medium))
+            .font(compact ? .app(.subheadline, weight: .semibold) : .app(.headline, weight: .medium))
             .foregroundStyle(tone.ink)
             .lineLimit(1)
             .minimumScaleFactor(0.85)
@@ -229,50 +250,6 @@ struct HomePressStyle: ButtonStyle {
 
 // MARK: - Shared pieces
 
-/// A section's name in New York, with a quiet note, a dateline or a link on the right.
-/// It starts where the cards' insides start, so the name lines up with what it heads.
-struct HomeSectionHeader: View {
-    let title: String
-    let tone: HomeTone
-    var note: String? = nil
-    /// The note set as a dateline, in New York italic.
-    var dateline = false
-    var link: String? = nil
-    var action: (() -> Void)? = nil
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text(title)
-                .font(HomeType.section)
-                .foregroundStyle(tone.ink)
-                .accessibilityAddTraits(.isHeader)
-            Spacer(minLength: 0)
-            if let link, let action {
-                Button(action: action) {
-                    HStack(spacing: 3) {
-                        Text(link)
-                        Image(systemName: "chevron.forward")
-                            .font(.caption.weight(.semibold))
-                    }
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(tone.metal)
-                    .frame(minHeight: 44)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            } else if let note {
-                Text(note)
-                    .font(dateline ? HomeType.dateline : .subheadline)
-                    .foregroundStyle(tone.ink2)
-                    .multilineTextAlignment(.trailing)
-            }
-        }
-        .padding(.horizontal, HomeMetrics.inset)
-        .padding(.top, 30)
-        .padding(.bottom, 8)
-    }
-}
-
 /// A row that opens one thing: a name, a line about it, and a chevron, with a glyph in
 /// front only where it says something the words don't.
 struct HomeLinkRow: View {
@@ -294,16 +271,16 @@ struct HomeLinkRow: View {
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.body.weight(.semibold))
+                        .font(.app(.body, weight: .semibold))
                         .foregroundStyle(tone.ink)
                     Text(detail)
-                        .font(.subheadline)
+                        .font(.app(.subheadline))
                         .foregroundStyle(tone.ink2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: "chevron.forward")
-                    .font(.footnote.weight(.semibold))
+                    .font(.app(.footnote, weight: .semibold))
                     .foregroundStyle(tone.ink3)
             }
             .padding(.vertical, 13)

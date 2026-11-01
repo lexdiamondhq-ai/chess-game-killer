@@ -201,7 +201,7 @@ struct GuessTheMoveView: View {
                         Text("\(runner.movesLeft) moves left")
                             .foregroundStyle(.secondary)
                     }
-                    .font(.system(.subheadline, design: .themed).weight(.semibold).monospacedDigit())
+                    .font(.app(.subheadline, weight: .semibold).monospacedDigit())
                     .padding(.horizontal, 20)
                     TrainingBoardView(game: runner.board, theme: theme, flipped: runner.hero == .black,
                                       arrows: runner.arrows,
@@ -213,16 +213,16 @@ struct GuessTheMoveView: View {
                     if runner.phase == .finished {
                         VStack(spacing: 6) {
                             Text("You scored \(runner.percent)%")
-                                .font(.system(.title3, design: .themed).weight(.bold).monospacedDigit())
+                                .font(.app(.title3, weight: .bold).monospacedDigit())
                                 .foregroundStyle(theme.trainingAccent)
                                 .multilineTextAlignment(.center)
                             if let best = runner.previousBest {
                                 Text(runner.percent > best ? "A new best. Your last best was \(best)%." : "Your best here is \(best)%.")
-                                    .font(.system(.subheadline, design: .themed).weight(.medium))
+                                    .font(.app(.subheadline, weight: .medium))
                                     .foregroundStyle(.secondary)
                             }
                             Text(game.blurb)
-                                .font(.footnote)
+                                .font(.app(.footnote))
                                 .foregroundStyle(.secondary)
                                 .multilineTextAlignment(.center)
                         }
@@ -289,12 +289,12 @@ struct RoomHeader: View {
             .accessibilityLabel("Close")
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(.system(.headline, design: .themed))
+                    .font(.app(.headline))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 if let subtitle {
                     Text(subtitle)
-                        .font(.caption)
+                        .font(.app(.caption))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
@@ -317,7 +317,7 @@ struct RoomMessage: View {
         HStack(alignment: .top, spacing: 12) {
             CoachAvatar(theme: theme, size: 36, tint: tint)
             Text(text)
-                .font(.system(.subheadline, design: .themed).weight(.medium))
+                .font(.app(.subheadline, weight: .medium))
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .id(text)

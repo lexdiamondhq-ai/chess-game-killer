@@ -11,6 +11,8 @@ struct ContentView: View {
     @State private var showingNewGame = true
     @State private var showingSettings = false
     @State private var showingAnalyze = false
+    /// Analyze opens on the camera (the home's Scan a board shortcut).
+    @State private var analyzeWithCamera = false
     @State private var coachExpanded = false
     @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .gilded
     @AppStorage("matchRival") private var matchRival = false
@@ -281,7 +283,7 @@ struct ContentView: View {
             .sheet(isPresented: $showingSettings, onDismiss: refreshDaily) {
                 SettingsSheet()
             }
-            .sheet(isPresented: $showingAnalyze) {
+            .sheet(isPresented: $showingAnalyze, onDismiss: { analyzeWithCamera = false }) {
                 AnalyzeSheet(
                     theme: theme,
                     currentFEN: match.hasStarted ? match.game.fen : nil,
@@ -290,7 +292,8 @@ struct ContentView: View {
                     rival: fromHereSetup.level.rival.name,
                     clock: fromHereSetup.timeControl,
                     forfeits: forfeits,
-                    onAnalyzeGame: analyzeGame
+                    onAnalyzeGame: analyzeGame,
+                    startsWithCamera: analyzeWithCamera
                 ) { draft in
                     play(from: draft)
                 }
@@ -311,6 +314,9 @@ struct ContentView: View {
             .environment(puzzles)
             .environment(daily)
             .onReceive(NotificationCenter.default.publisher(for: DailyLink.notification)) { _ in openDaily() }
+            .onReceive(NotificationCenter.default.publisher(for: LiveGameLink.notification)) { _ in openLiveGame() }
+            // The game under way on the Lock Screen and in the Dynamic Island.
+            .modifier(LiveGameFollow(match: match))
             .onChange(of: match.reelLog.count) { _, _ in
                 // The last grades can land just after the game ends.
                 if match.isOver { recordGame() }
@@ -393,6 +399,10 @@ struct ContentView: View {
             },
             resume: { leaveHome() },
             analyze: { showingAnalyze = true },
+            scan: {
+                analyzeWithCamera = true
+                showingAnalyze = true
+            },
             train: { showingTraining = true },
             trainToday: { plan in coach.presentedSession = plan },
             puzzles: { showingPuzzles = true },
@@ -429,6 +439,23 @@ struct ContentView: View {
 
     private func refreshDaily() {
         DailyUpkeep.refresh(daily: daily, army: army, lastGame: vault.games.map(\.date).max())
+        // Today's Move on the Lock Screen until it's done (never over a game there).
+        DailyActivityKeeper.shared.follow(daily: daily)
+    }
+
+    /// The game on the Lock Screen was tapped: the game comes forward, over the home and any
+    /// screen opened over it. (After a cold start there is no game, and the home stays.)
+    private func openLiveGame() {
+        guard !showingWelcome, match.hasStarted else { return }
+        showingTraining = false
+        showingPuzzles = false
+        showingGames = false
+        showingArmy = false
+        showingDaily = false
+        showingNewGame = false
+        showingSettings = false
+        showingAnalyze = false
+        leaveHome()
     }
 
     /// Opens Today's Move over whatever is showing (from Home, the widget or a reminder).

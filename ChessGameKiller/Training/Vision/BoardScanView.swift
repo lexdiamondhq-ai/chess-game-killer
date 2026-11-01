@@ -78,7 +78,7 @@ struct BoardScanView: View {
                         modeRow(option)
                     }
                     Text("Positions from real games on Lichess.")
-                        .font(.system(.footnote, design: .themed))
+                        .font(.app(.footnote))
                         .foregroundStyle(.tertiary)
                         .padding(.top, 4)
                 }
@@ -114,21 +114,21 @@ struct BoardScanView: View {
                 TrainIcon(symbol: option.symbol, theme: theme, size: 42)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(option.title)
-                        .font(.system(.headline, design: .themed))
+                        .font(.app(.headline))
                     Text(option.detail)
-                        .font(.system(.subheadline, design: .themed))
+                        .font(.app(.subheadline))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 if let best {
                     Text(best)
-                        .font(.system(.subheadline, design: .themed).weight(.semibold).monospacedDigit())
+                        .font(.app(.subheadline, weight: .semibold).monospacedDigit())
                         .foregroundStyle(.secondary)
                         .fixedSize()
                 }
                 Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                    .font(.title3)
+                    .font(.app(.title3))
                     .foregroundStyle(selected ? accent : Color.secondary.opacity(0.5))
             }
             .padding(14)
@@ -171,19 +171,19 @@ struct BoardScanView: View {
         let found = runner.attempt.found.sorted(by: { $0.rawValue < $1.rawValue }).map(\.notation)
         return HStack(alignment: .firstTextBaseline, spacing: 10) {
             Label(kind.title, systemImage: kind.symbol)
-                .font(.system(.title3, design: .themed).weight(.bold))
+                .font(.app(.title3, weight: .bold))
                 .foregroundStyle(theme.trainingAccent)
                 .lineLimit(1)
                 .id(runner.exercise.id)
                 .transition(.opacity)
             Text("\(runner.exercise.player.displayName) to move")
-                .font(.system(.footnote, design: .themed).weight(.medium))
+                .font(.app(.footnote, weight: .medium))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .layoutPriority(-1)
             Spacer(minLength: 8)
             Text(counter(runner))
-                .font(.system(.subheadline, design: .themed).weight(.semibold).monospacedDigit())
+                .font(.app(.subheadline, weight: .semibold).monospacedDigit())
                 .foregroundStyle(runner.phase == .revealed ? Color.secondary : Color.primary)
                 .lineLimit(1)
                 .contentTransition(.numericText())
@@ -295,11 +295,11 @@ struct BoardScanView: View {
         let best = store.scanBest(runner.mode)
         return VStack(spacing: 10) {
             Text(runner.mode.title.uppercased())
-                .font(.system(.caption, design: .themed).weight(.bold))
+                .font(.app(.caption, weight: .bold))
                 .tracking(1)
                 .foregroundStyle(accent)
             Text("\(summary.percent)%")
-                .font(.system(size: 56, weight: .bold, design: .themed).monospacedDigit())
+                .font(.app(size: 56, weight: .bold).monospacedDigit())
             HStack(spacing: 0) {
                 stat("\(summary.found) of \(summary.total)", label: "found")
                 stat("\(summary.slips)", label: summary.slips == 1 ? "slip" : "slips")
@@ -309,7 +309,7 @@ struct BoardScanView: View {
                 TrainingChip(text: "New best", symbol: "star.fill", color: accent)
             } else if let best {
                 Text("Best \(best.percent)%, \(BoardScanRunner.time(best.seconds)) a position")
-                    .font(.system(.footnote, design: .themed))
+                    .font(.app(.footnote))
                     .foregroundStyle(.secondary)
             }
         }
@@ -322,11 +322,11 @@ struct BoardScanView: View {
     private func stat(_ value: String, label: String) -> some View {
         VStack(spacing: 2) {
             Text(value)
-                .font(.system(.headline, design: .themed).monospacedDigit())
+                .font(.app(.headline).monospacedDigit())
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
             Text(label)
-                .font(.system(.caption, design: .themed))
+                .font(.app(.caption))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
@@ -363,18 +363,18 @@ struct BoardScanView: View {
                 .foregroundStyle(theme.trainingAccent)
                 .frame(width: 18)
             Text(kind.title)
-                .font(.system(.subheadline, design: .themed).weight(.medium))
+                .font(.app(.subheadline, weight: .medium))
                 .lineLimit(1)
             Spacer(minLength: 8)
             if slips > 0 {
                 Label("\(slips)", systemImage: "xmark")
-                    .font(.system(.caption, design: .themed).weight(.bold).monospacedDigit())
+                    .font(.app(.caption, weight: .bold).monospacedDigit())
                     .foregroundStyle(TrainingColor.red.color(on: theme))
             }
             Text("\(attempt.found.count)/\(total)")
-                .font(.system(.subheadline, design: .themed).weight(.semibold).monospacedDigit())
+                .font(.app(.subheadline, weight: .semibold).monospacedDigit())
             Text(seconds)
-                .font(.system(.subheadline, design: .themed).monospacedDigit())
+                .font(.app(.subheadline).monospacedDigit())
                 .foregroundStyle(.secondary)
                 .frame(minWidth: 52, alignment: .trailing)
         }

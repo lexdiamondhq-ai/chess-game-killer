@@ -16,7 +16,7 @@ struct CoachPicker: View {
                 }
             }
             Text(choice.coach.blurb)
-                .font(.caption)
+                .font(.app(.caption))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 4)
@@ -48,13 +48,13 @@ private struct CoachCard: View {
             VStack(spacing: 8) {
                 CoachAvatar(theme: theme, size: 56, tint: isSelected ? accent : nil, coach: coach)
                 Text(coach.title)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.app(.subheadline, weight: .semibold))
                     .foregroundStyle(.primary)
                 HStack(spacing: 4) {
                     Image(systemName: "speaker.wave.2.fill")
                     Text(voiceNote)
                 }
-                .font(.caption2.weight(.medium))
+                .font(.app(.caption2, weight: .medium))
                 .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)

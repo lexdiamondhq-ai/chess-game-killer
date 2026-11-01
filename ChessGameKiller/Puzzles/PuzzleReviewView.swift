@@ -95,7 +95,7 @@ struct PuzzleReviewView: View {
                 }
                 Spacer(minLength: 0)
                 Text(puzzle.themeNames.prefix(2).joined(separator: " · "))
-                    .font(.caption)
+                    .font(.app(.caption))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
@@ -180,10 +180,10 @@ private struct ReviewProgressCard: View {
         VStack(spacing: 10) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text("\(min(position, total)) of \(total)")
-                    .font(.system(.headline, design: .themed).monospacedDigit())
+                    .font(.app(.headline).monospacedDigit())
                 Spacer(minLength: 8)
                 Text(left == 0 ? "Last one" : "\(left) left")
-                    .font(.system(.subheadline, design: .themed).monospacedDigit())
+                    .font(.app(.subheadline).monospacedDigit())
                     .foregroundStyle(.secondary)
             }
             PuzzleRunTrack(results: results, total: total, theme: theme)
@@ -223,10 +223,10 @@ private struct ReviewCaughtUpView: View {
                     .accessibilityHidden(true)
                 VStack(spacing: 6) {
                     Text("All caught up")
-                        .font(.system(.title, design: .themed).weight(.bold))
+                        .font(.app(.title, weight: .bold))
                     if reviewed > 0 {
                         Text("\(reviewed) reviewed · \(clean) clean")
-                            .font(.system(.subheadline, design: .themed).monospacedDigit())
+                            .font(.app(.subheadline).monospacedDigit())
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -261,9 +261,9 @@ private struct ReviewCaughtUpView: View {
     private func stat(_ value: String, _ label: String) -> some View {
         VStack(spacing: 4) {
             Text(value)
-                .font(.system(.title3, design: .themed).weight(.bold).monospacedDigit())
+                .font(.app(.title3, weight: .bold).monospacedDigit())
             Text(label)
-                .font(.caption)
+                .font(.app(.caption))
                 .foregroundStyle(.secondary)
         }
         .lineLimit(1)

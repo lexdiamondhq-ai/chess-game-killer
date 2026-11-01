@@ -313,9 +313,9 @@ private struct CycleStatusCard: View {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Cycle \(cycle)")
-                        .font(.system(.headline, design: .themed))
+                        .font(.app(.headline))
                     Text("\(current) of \(total)")
-                        .font(.system(.subheadline, design: .themed).monospacedDigit())
+                        .font(.app(.subheadline).monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 8)
@@ -323,10 +323,10 @@ private struct CycleStatusCard: View {
                     let elapsed = run.elapsed + stopwatch.elapsed(at: context.date)
                     VStack(alignment: .trailing, spacing: 2) {
                         Text(CycleClock.text(elapsed))
-                            .font(.system(.title3, design: .themed).weight(.bold).monospacedDigit())
+                            .font(.app(.title3, weight: .bold).monospacedDigit())
                             .foregroundStyle(isOver(elapsed) ? TrainingColor.orange.color(on: theme) : theme.trainingAccent)
                         Text(run.target.map { "target \(CycleClock.text($0))" } ?? "your pace")
-                            .font(.caption.monospacedDigit())
+                            .font(.app(.caption).monospacedDigit())
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -402,9 +402,9 @@ private struct CycleSetupView: View {
                     .padding(.top, 16)
                 VStack(spacing: 10) {
                     Text("The same puzzles, faster each round")
-                        .font(.system(.title2, design: .themed).weight(.bold))
+                        .font(.app(.title2, weight: .bold))
                     Text("Solve a set at your own pace. Rest a day, then solve it again in half the time. Repeat until you see the answers at a glance.")
-                        .font(.system(.subheadline, design: .themed))
+                        .font(.app(.subheadline))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                     if setsFinished > 0 {
@@ -443,12 +443,12 @@ private struct CycleSetupView: View {
         } label: {
             VStack(spacing: 3) {
                 Text("\(option.count)")
-                    .font(.system(.title2, design: .themed).weight(.bold).monospacedDigit())
+                    .font(.app(.title2, weight: .bold).monospacedDigit())
                     .foregroundStyle(selected ? accent : Color.primary)
                 Text(option.name)
-                    .font(.system(.subheadline, design: .themed).weight(.semibold))
+                    .font(.app(.subheadline, weight: .semibold))
                 Text(option.firstCycle)
-                    .font(.caption)
+                    .font(.app(.caption))
                     .foregroundStyle(.secondary)
             }
             .lineLimit(1)
@@ -481,7 +481,7 @@ private struct CycleSetupView: View {
             Image(systemName: "scope")
                 .foregroundStyle(theme.trainingAccent)
         }
-        .font(.system(.footnote, design: .themed))
+        .font(.app(.footnote))
         .foregroundStyle(.secondary)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -529,7 +529,7 @@ private struct CycleIllustration: View {
                         .fill(accent.opacity(1 - Double(index) * 0.2))
                         .frame(width: 26, height: 80 / CGFloat(1 << index))
                     Text("\(index + 1)")
-                        .font(.caption2.weight(.semibold).monospacedDigit())
+                        .font(.app(.caption2, weight: .semibold).monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
             }
@@ -554,9 +554,9 @@ private struct CycleSummaryView: View {
             VStack(spacing: 18) {
                 VStack(spacing: 6) {
                     Text(title)
-                        .font(.system(.title, design: .themed).weight(.bold))
+                        .font(.app(.title, weight: .bold))
                     Text(subtitle)
-                        .font(.system(.subheadline, design: .themed).monospacedDigit())
+                        .font(.app(.subheadline).monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
                 .multilineTextAlignment(.center)
@@ -676,7 +676,7 @@ private struct CycleBars: View {
             }
             Spacer(minLength: 0)
         }
-        .font(.caption)
+        .font(.app(.caption))
         .foregroundStyle(.secondary)
         .accessibilityHidden(true)
     }
@@ -685,7 +685,7 @@ private struct CycleBars: View {
         let percent = Int((run.accuracy * 100).rounded())
         return HStack(spacing: 12) {
             Text("\(number)")
-                .font(.system(.subheadline, design: .themed).weight(.bold).monospacedDigit())
+                .font(.app(.subheadline, weight: .bold).monospacedDigit())
                 .foregroundStyle(.secondary)
                 .frame(minWidth: 16)
             VStack(spacing: 5) {
@@ -695,9 +695,9 @@ private struct CycleBars: View {
             }
             VStack(alignment: .trailing, spacing: 1) {
                 Text(CycleClock.text(run.elapsed))
-                    .font(.system(.subheadline, design: .themed).weight(.semibold).monospacedDigit())
+                    .font(.app(.subheadline, weight: .semibold).monospacedDigit())
                 Text("\(percent)%")
-                    .font(.caption.monospacedDigit())
+                    .font(.app(.caption).monospacedDigit())
                     .foregroundStyle(green)
             }
             .frame(minWidth: 56, alignment: .trailing)
@@ -709,7 +709,7 @@ private struct CycleBars: View {
     private func targetRow(number: Int, target: TimeInterval, longest: TimeInterval) -> some View {
         HStack(spacing: 12) {
             Text("\(number)")
-                .font(.system(.subheadline, design: .themed).weight(.bold).monospacedDigit())
+                .font(.app(.subheadline, weight: .bold).monospacedDigit())
                 .foregroundStyle(.tertiary)
                 .frame(minWidth: 16)
             GeometryReader { geo in
@@ -720,10 +720,10 @@ private struct CycleBars: View {
             .frame(height: 10)
             VStack(alignment: .trailing, spacing: 1) {
                 Text(CycleClock.text(target))
-                    .font(.system(.subheadline, design: .themed).weight(.semibold).monospacedDigit())
+                    .font(.app(.subheadline, weight: .semibold).monospacedDigit())
                     .foregroundStyle(.secondary)
                 Text("target")
-                    .font(.caption)
+                    .font(.app(.caption))
                     .foregroundStyle(.secondary)
             }
             .frame(minWidth: 56, alignment: .trailing)

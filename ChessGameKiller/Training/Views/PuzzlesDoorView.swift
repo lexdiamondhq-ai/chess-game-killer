@@ -39,7 +39,7 @@ struct PuzzlesDoorView: View {
             }
             .buttonStyle(.plain)
             Text("Puzzles come from the Lichess database, free for everyone.")
-                .font(.system(.footnote, design: .themed))
+                .font(.app(.footnote))
                 .foregroundStyle(.tertiary)
                 .frame(maxWidth: .infinity)
                 .padding(.top, 6)
@@ -76,14 +76,14 @@ struct PuzzlesDoorView: View {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("RATED")
-                        .font(.system(.caption, design: .themed).weight(.bold))
+                        .font(.app(.caption, weight: .bold))
                         .tracking(1)
                         .foregroundStyle(theme.trainingAccent)
                     Text("\(progress.rating)")
-                        .font(.system(size: 44, weight: .bold, design: .themed).monospacedDigit())
+                        .font(.app(size: 44, weight: .bold).monospacedDigit())
                     Text(progress.played == 0 ? "Your puzzle rating moves with every puzzle."
                          : "Best \(progress.highestRating) · \(progress.solved) of \(progress.played) solved")
-                        .font(.system(.footnote, design: .themed))
+                        .font(.app(.footnote))
                         .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 8)
@@ -95,7 +95,7 @@ struct PuzzlesDoorView: View {
                 Image(systemName: puzzles.theme.symbol)
                     .foregroundStyle(theme.trainingAccent)
                 Text(puzzles.theme.id.isEmpty ? "Every theme, picked to your level" : "Theme: \(puzzles.theme.name)")
-                    .font(.system(.subheadline, design: .themed))
+                    .font(.app(.subheadline))
                     .foregroundStyle(.secondary)
             }
             Button {

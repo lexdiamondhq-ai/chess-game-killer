@@ -88,7 +88,7 @@ struct PremiumOfferView: View {
                     Text(title).opacity(busy ? 0 : 1)
                     if busy { ProgressView().tint(.black) }
                 }
-                .font(.system(.headline, design: .themed))
+                .font(.app(.headline))
                 .foregroundStyle(Color.black)
                 .frame(maxWidth: .infinity)
                 .frame(height: 54)
@@ -98,7 +98,7 @@ struct PremiumOfferView: View {
             .disabled(busy)
             if let problem = premium.problem {
                 Text(problem)
-                    .font(.system(.footnote, design: .themed))
+                    .font(.app(.footnote))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
@@ -113,7 +113,7 @@ struct PremiumOfferView: View {
             .disabled(premium.isRestoring)
             Link("Terms of use", destination: PremiumStyle.terms)
         }
-        .font(.system(.footnote, design: .themed).weight(.semibold))
+        .font(.app(.footnote, weight: .semibold))
         .foregroundStyle(.secondary)
     }
 }
@@ -135,9 +135,9 @@ private struct PremiumOfferHeader: View {
                 .frame(width: 68, height: 68)
                 .glassPane(Circle(), tint: accent)
             Text("Premium")
-                .font(.system(size: 34, weight: .bold, design: .themed))
+                .font(.app(size: 34, weight: .bold))
             Text("Get better faster. Your coach learns how you play and builds every session around it.")
-                .font(.system(.body, design: .themed))
+                .font(.app(.body))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
@@ -157,7 +157,7 @@ private struct PremiumReasonCard: View {
                 .foregroundStyle(accent)
                 .padding(.top, 2)
             Text(text)
-                .font(.system(.subheadline, design: .themed).weight(.medium))
+                .font(.app(.subheadline, weight: .medium))
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
@@ -216,9 +216,9 @@ private struct PremiumBenefitRow: View {
                 .background(accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(benefit.title)
-                    .font(.system(.headline, design: .themed))
+                    .font(.app(.headline))
                 Text(benefit.detail)
-                    .font(.system(.subheadline, design: .themed))
+                    .font(.app(.subheadline))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -245,16 +245,16 @@ private struct PremiumPlanCard: View {
                     .foregroundStyle(selected ? accent : Color.secondary)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(plan.name)
-                        .font(.system(.headline, design: .themed))
+                        .font(.app(.headline))
                     if let note {
                         Text(note)
-                            .font(.system(.subheadline, design: .themed).weight(.semibold))
+                            .font(.app(.subheadline, weight: .semibold))
                             .foregroundStyle(accent)
                     }
                 }
                 Spacer(minLength: 8)
                 Text("\(price) \(plan.per)")
-                    .font(.system(.subheadline, design: .themed).weight(.semibold).monospacedDigit())
+                    .font(.app(.subheadline, weight: .semibold).monospacedDigit())
             }
             .padding(16)
             .glassPane(shape)
@@ -276,7 +276,7 @@ private struct PremiumFinePrint: View {
 
     var body: some View {
         Text(words)
-            .font(.system(.footnote, design: .themed))
+            .font(.app(.footnote))
             .foregroundStyle(.secondary)
             .multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)
@@ -311,14 +311,14 @@ struct PremiumLimitCard: View {
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(accent)
             Text(feature.limitLine)
-                .font(.system(.subheadline, design: .themed).weight(.medium))
+                .font(.app(.subheadline, weight: .medium))
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             Button {
                 offer = feature
             } label: {
                 Text("See Premium")
-                    .font(.system(.headline, design: .themed))
+                    .font(.app(.headline))
                     .foregroundStyle(Color.black)
                     .frame(maxWidth: 260)
                     .frame(height: 48)
@@ -339,7 +339,7 @@ struct PremiumTag: View {
 
     var body: some View {
         Label("Premium", systemImage: "crown.fill")
-            .font(.system(.caption, design: .themed).weight(.bold))
+            .font(.app(.caption, weight: .bold))
             .foregroundStyle(accent)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
@@ -366,16 +366,16 @@ struct PremiumSettingsCard: View {
                     .background(accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(active ? "Premium is on" : "Premium")
-                        .font(.body.weight(.semibold))
+                        .font(.app(.body, weight: .semibold))
                         .foregroundStyle(Color.primary)
                     Text(active ? "Thank you. Everything is open." : "A coach that learns you, full Rewind, unlimited puzzles and every look.")
-                        .font(.footnote)
+                        .font(.app(.footnote))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right")
-                    .font(.footnote.weight(.semibold))
+                    .font(.app(.footnote, weight: .semibold))
                     .foregroundStyle(.tertiary)
             }
             .padding(.horizontal, 14)

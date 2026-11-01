@@ -47,13 +47,13 @@ struct OpeningStatsPanel: View {
                     }
                 }
                 Text(footnote(entry))
-                    .font(.system(.caption2, design: .themed))
+                    .font(.app(.caption2))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 Text(stats.isEmpty ? "Game statistics come with the next content update."
                      : "Too few \(book == .masters ? "master games" : "games at this level") reached this position to count.")
-                    .font(.system(.footnote, design: .themed))
+                    .font(.app(.footnote))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -73,7 +73,7 @@ struct OpeningStatsPanel: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Text("HOW PEOPLE PLAY HERE")
-                    .font(.system(.caption2, design: .themed).weight(.bold))
+                    .font(.app(.caption2, weight: .bold))
                     .tracking(0.9)
                     .foregroundStyle(theme.trainingAccent)
                 Spacer(minLength: 4)
@@ -97,9 +97,9 @@ struct OpeningStatsPanel: View {
         } label: {
             HStack(spacing: 3) {
                 Text("Players \(band.range)")
-                Image(systemName: "chevron.down").font(.caption2.weight(.bold))
+                Image(systemName: "chevron.down").font(.app(.caption2, weight: .bold))
             }
-            .font(.system(.caption, design: .themed).weight(.semibold))
+            .font(.app(.caption, weight: .semibold))
             .frame(minHeight: 44)
         }
         .accessibilityLabel("Rating band: players \(band.range)")
@@ -145,12 +145,12 @@ private struct OpeningStatsRow: View {
             }
             .frame(width: 70, alignment: .leading)
             Text("\(share)%")
-                .font(.system(.caption, design: .themed).weight(.semibold).monospacedDigit())
+                .font(.app(.caption, weight: .semibold).monospacedDigit())
                 .frame(width: 38, alignment: .trailing)
             ResultBar(white: move.whiteShare, draw: move.drawShare)
                 .frame(height: 8)
             Text("\(score)")
-                .font(.system(.caption2, design: .themed).monospacedDigit())
+                .font(.app(.caption2).monospacedDigit())
                 .foregroundStyle(.secondary)
                 .frame(width: 24, alignment: .trailing)
         }

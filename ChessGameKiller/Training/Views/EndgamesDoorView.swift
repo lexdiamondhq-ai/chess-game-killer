@@ -30,7 +30,7 @@ struct EndgamesDoorView: View {
                 list(entry.studies)
             }
             Text("Online, every move is judged by the Lichess tablebase, which knows the perfect result. Offline, Stockfish judges.")
-                .font(.system(.footnote, design: .themed))
+                .font(.app(.footnote))
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
@@ -70,23 +70,23 @@ struct EndgamesDoorView: View {
         return VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline) {
                 Text(next == nil ? "ALL LEARNED" : "NEXT UP")
-                    .font(.system(.caption, design: .themed).weight(.bold))
+                    .font(.app(.caption, weight: .bold))
                     .tracking(1)
                     .foregroundStyle(theme.trainingAccent)
                 Spacer()
                 Text("\(progress.doneCount) of \(progress.total)")
-                    .font(.system(.footnote, design: .themed).weight(.semibold).monospacedDigit())
+                    .font(.app(.footnote, weight: .semibold).monospacedDigit())
                     .foregroundStyle(.secondary)
             }
             if let next {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(next.title)
-                        .font(.system(.title3, design: .themed).weight(.bold))
+                        .font(.app(.title3, weight: .bold))
                     Text(next.goalText)
-                        .font(.system(.footnote, design: .themed).weight(.semibold))
+                        .font(.app(.footnote, weight: .semibold))
                         .foregroundStyle(theme.trainingAccent)
                     Text(next.idea)
-                        .font(.system(.subheadline, design: .themed))
+                        .font(.app(.subheadline))
                         .foregroundStyle(.secondary)
                         .lineLimit(3)
                         .fixedSize(horizontal: false, vertical: true)
@@ -94,7 +94,7 @@ struct EndgamesDoorView: View {
                 }
             } else {
                 Text("You've learned every endgame here. They come back for review now and then, so they stay sharp.")
-                    .font(.system(.subheadline, design: .themed))
+                    .font(.app(.subheadline))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -131,16 +131,16 @@ struct EndgamesDoorView: View {
             .frame(width: 30)
             VStack(alignment: .leading, spacing: 2) {
                 Text(study.title)
-                    .font(.system(.subheadline, design: .themed).weight(.semibold))
+                    .font(.app(.subheadline, weight: .semibold))
                     .foregroundStyle(.primary)
                 Text(study.goalText)
-                    .font(.system(.caption, design: .themed))
+                    .font(.app(.caption))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Image(systemName: "chevron.right")
-                .font(.caption.weight(.bold))
+                .font(.app(.caption, weight: .bold))
                 .foregroundStyle(.tertiary)
                 .accessibilityHidden(true)
         }

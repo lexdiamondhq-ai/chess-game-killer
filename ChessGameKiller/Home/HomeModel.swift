@@ -226,6 +226,16 @@ struct HomeGameRow: Identifiable, Equatable {
         return date.formatted(.dateTime.month(.abbreviated).day())
     }
 
+    /// The result as a scoresheet writes it: 1 for a win, ½ for a draw, 0 for a loss.
+    static func score(_ result: SavedGame.Result) -> String {
+        switch result {
+        case .win: return "1"
+        case .draw: return "½"
+        case .loss: return "0"
+        case .unfinished: return "–"
+        }
+    }
+
     /// Games played in the last seven days, today included.
     static func thisWeek(_ games: [SavedGame], now: Date = .now, calendar: Calendar = .current) -> Int {
         guard let start = calendar.date(byAdding: .day, value: -6, to: calendar.startOfDay(for: now)) else { return 0 }

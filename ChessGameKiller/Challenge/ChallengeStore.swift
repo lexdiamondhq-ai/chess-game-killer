@@ -18,6 +18,12 @@ struct FriendGame: Codable, Identifiable, Equatable, Sendable {
     var turn: FriendSeat
     var result: FriendGameState.Result?
     var moveCount: Int
+    /// The position now, for the home's small board; nil in a record from before it was kept.
+    var fen: String?
+    /// Paired online from the lobby, rather than a friend's link.
+    var rated: Bool
+    /// The opponent's rating in a rated game.
+    var opponentRating: String?
     var createdAt: Date
     var updatedAt: Date
     /// Already kept with the player's games, so it is saved once.
@@ -26,7 +32,7 @@ struct FriendGame: Codable, Identifiable, Equatable, Sendable {
     init(id: UUID = UUID(), code: String, token: String, seat: FriendSeat, isCreator: Bool,
          opponentName: String? = nil, clock: FriendClock? = nil, status: FriendGameState.Status = .waiting,
          turn: FriendSeat = .white, result: FriendGameState.Result? = nil, moveCount: Int = 0,
-         createdAt: Date = .now, updatedAt: Date = .now, recorded: Bool = false) {
+         fen: String? = nil, rated: Bool = false, opponentRating: String? = nil, createdAt: Date = .now, updatedAt: Date = .now, recorded: Bool = false) {
         self.id = id
         self.code = code
         self.token = token
@@ -38,6 +44,9 @@ struct FriendGame: Codable, Identifiable, Equatable, Sendable {
         self.turn = turn
         self.result = result
         self.moveCount = moveCount
+        self.fen = fen
+        self.rated = rated
+        self.opponentRating = opponentRating
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.recorded = recorded
@@ -59,6 +68,9 @@ struct FriendGame: Codable, Identifiable, Equatable, Sendable {
         turn = state.turn
         result = state.result
         moveCount = state.moves.count
+        fen = state.fen
+        rated = state.rated
+        opponentRating = state.ratings?[seat.opposite].label
         updatedAt = state.updatedAt > 0 ? Date(timeIntervalSince1970: state.updatedAt / 1000) : .now
     }
 
@@ -93,7 +105,7 @@ struct FriendGame: Codable, Identifiable, Equatable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case id, code, token, seat, isCreator, opponentName, clock, status, turn, result, moveCount
-        case createdAt, updatedAt, recorded
+        case fen, rated, opponentRating, createdAt, updatedAt, recorded
     }
 }
 
@@ -112,6 +124,9 @@ extension FriendGame {
         turn = (try? c.decodeIfPresent(FriendSeat.self, forKey: .turn)) ?? .white
         result = try? c.decodeIfPresent(FriendGameState.Result.self, forKey: .result)
         moveCount = try c.decodeIfPresent(Int.self, forKey: .moveCount) ?? 0
+        fen = try c.decodeIfPresent(String.self, forKey: .fen)
+        rated = try c.decodeIfPresent(Bool.self, forKey: .rated) ?? false
+        opponentRating = try c.decodeIfPresent(String.self, forKey: .opponentRating)
         createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt) ?? .now
         updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt) ?? createdAt
         recorded = try c.decodeIfPresent(Bool.self, forKey: .recorded) ?? false

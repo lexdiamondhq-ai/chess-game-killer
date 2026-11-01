@@ -268,7 +268,7 @@ private struct OrbFace: View {
                     .shadow(color: theme.glows && won ? accent.opacity(0.9) : .clear, radius: 8)
             } else {
                 Text("½")
-                    .font(.system(size: 24, weight: .heavy, design: .themed))
+                    .font(.app(size: 24, weight: .heavy))
                     .foregroundStyle(.secondary)
             }
         } else if let review = match.review {
@@ -277,7 +277,7 @@ private struct OrbFace: View {
                 case .symbol(let name):
                     Image(systemName: name).font(.system(size: 22, weight: .bold))
                 case .text(let text):
-                    Text(text).font(.system(size: 22, weight: .heavy, design: .themed))
+                    Text(text).font(.app(size: 22, weight: .heavy))
                 }
             }
             .foregroundStyle(review.grade.color(on: theme))
@@ -373,7 +373,7 @@ struct EvalChip: View {
 
     var body: some View {
         Text(text)
-            .font(.system(large ? .subheadline : .footnote, design: .themed).weight(.bold).monospacedDigit())
+            .font(.app(large ? .subheadline : .footnote, weight: .bold).monospacedDigit())
             .foregroundStyle(color)
             .padding(.horizontal, large ? 10 : 8)
             .padding(.vertical, large ? 5 : 4)
@@ -475,8 +475,8 @@ private struct CoachPanel: View {
                 let result = ResultText(match: match)
                 resultBadge
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(result.title).font(.headline).foregroundStyle(resultColor)
-                    Text(result.detail).font(.subheadline).foregroundStyle(.secondary)
+                    Text(result.title).font(.app(.headline)).foregroundStyle(resultColor)
+                    Text(result.detail).font(.app(.subheadline)).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 4)
@@ -486,10 +486,10 @@ private struct CoachPanel: View {
             } else if match.isComputerThinking {
                 ThinkingSigil(rival: match.setup.level.rival, size: 40, glows: theme.glows)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(rival) is thinking").font(.headline)
+                    Text("\(rival) is thinking").font(.app(.headline))
                     if gradeIsComing {
                         Text("Your grade comes right after \(rival)'s reply.")
-                            .font(.subheadline).foregroundStyle(.secondary)
+                            .font(.app(.subheadline)).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -497,19 +497,19 @@ private struct CoachPanel: View {
             } else if match.engineFailed {
                 // Ahead of the last grade, which is about a move that is no longer the news.
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.title3).foregroundStyle(accent).frame(width: 40, height: 40)
+                    .font(.app(.title3)).foregroundStyle(accent).frame(width: 40, height: 40)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(Coach.current.name) is offline").font(.headline)
+                    Text("\(Coach.current.name) is offline").font(.app(.headline))
                     Text("The engine didn't answer. Play on: grades and hints come back when it does.")
-                        .font(.subheadline).foregroundStyle(.secondary)
+                        .font(.app(.subheadline)).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 4)
             } else if let review = match.review {
                 GradeBadge(grade: review.grade, glows: theme.glows, theme: theme)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(review.title).font(.headline).foregroundStyle(review.grade.color(on: theme))
-                    Text(review.detail).font(.subheadline).foregroundStyle(.secondary)
+                    Text(review.title).font(.app(.headline)).foregroundStyle(review.grade.color(on: theme))
+                    Text(review.detail).font(.app(.subheadline)).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 4)
@@ -521,9 +521,9 @@ private struct CoachPanel: View {
             } else {
                 CoachAvatar(theme: theme, size: 40)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(Coach.current.name)").font(.headline)
+                    Text("\(Coach.current.name)").font(.app(.headline))
                     Text("Play a move and I'll tell you how it was.")
-                        .font(.subheadline).foregroundStyle(.secondary)
+                        .font(.app(.subheadline)).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 4)
@@ -620,11 +620,11 @@ private struct CoachPanel: View {
         VStack(alignment: .leading, spacing: 6) {
             if showBestMoves {
                 Text("\(Coach.current.name)'s picks")
-                    .font(.caption.weight(.semibold))
+                    .font(.app(.caption, weight: .semibold))
                     .foregroundStyle(.secondary)
                 if match.engineFailed {
                     Text("No picks right now. The engine is offline.")
-                        .font(.footnote.weight(.medium))
+                        .font(.app(.footnote, weight: .medium))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(minHeight: 36)
@@ -633,7 +633,7 @@ private struct CoachPanel: View {
                     HStack(spacing: 8) {
                         ProgressView().controlSize(.small)
                         Text(match.isComputerThinking ? "Waiting for \(rival)…" : "Thinking…")
-                            .font(.footnote.weight(.medium))
+                            .font(.app(.footnote, weight: .medium))
                             .foregroundStyle(.secondary)
                     }
                     .frame(minHeight: 36)
@@ -659,7 +659,7 @@ private struct CoachPanel: View {
                     showBestMoves = true
                 } label: {
                     Label("Show \(Coach.current.name)'s picks", systemImage: "lightbulb.fill")
-                        .font(.footnote.weight(.semibold))
+                        .font(.app(.footnote, weight: .semibold))
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(accent)
@@ -744,7 +744,7 @@ private struct CoachPanel: View {
                 withAnimation(.snappy) { match.rematch() }
             } label: {
                 Label("Rematch", systemImage: "play.fill")
-                    .font(.headline)
+                    .font(.app(.headline))
                     .frame(maxWidth: .infinity)
                     .frame(minHeight: 50)
             }
@@ -759,7 +759,7 @@ private struct CoachPanel: View {
                 newGame()
             } label: {
                 Label("New game", systemImage: "plus")
-                    .font(.headline)
+                    .font(.app(.headline))
                     .frame(maxWidth: .infinity)
                     .frame(minHeight: 50)
             }
@@ -783,7 +783,7 @@ private struct CoachPanel: View {
             rewind = vault?.game(game.id) ?? game
         } label: {
             Label("Review game", systemImage: "backward.circle")
-                .font(.subheadline.weight(.semibold))
+                .font(.app(.subheadline, weight: .semibold))
                 .frame(maxWidth: .infinity)
                 .frame(minHeight: 28)
         }
@@ -810,7 +810,7 @@ private struct CoachPanel: View {
             reel = match.highlightReel(pieceName: { names[$0] }, hero: hero?.line)
         } label: {
             Label("Highlights", systemImage: "film.stack")
-                .font(.subheadline.weight(.semibold))
+                .font(.app(.subheadline, weight: .semibold))
                 .frame(maxWidth: .infinity)
                 .frame(minHeight: 28)
         }
@@ -852,7 +852,7 @@ struct EvalBar: View {
                     .frame(width: 1, height: geo.size.height + 4)
                     .position(x: width / 2, y: geo.size.height / 2)
                 Text(label ?? "—")
-                    .font(.system(size: 11, weight: .bold, design: .themed).monospacedDigit())
+                    .font(.app(size: 11, weight: .bold).monospacedDigit())
                     .foregroundStyle(Color.black)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
@@ -888,14 +888,14 @@ private struct HintRow: View {
                 HStack(spacing: 10) {
                     HintSwatch(color: theme.hint, isBest: isBest, glow: theme.hintGlow)
                     Text(hint.san)
-                        .font(.system(.body, design: .themed).weight(.bold))
+                        .font(.app(.body, weight: .bold))
                         .frame(minWidth: 46, alignment: .leading)
                     Text(rankName)
-                        .font(.footnote)
+                        .font(.app(.footnote))
                         .foregroundStyle(.secondary)
                     Spacer(minLength: 4)
                     Text(score)
-                        .font(.system(.footnote, design: .themed).weight(.bold).monospacedDigit())
+                        .font(.app(.footnote, weight: .bold).monospacedDigit())
                         .foregroundStyle(isBest ? theme.bestArrow : Color.secondary)
                 }
                 .padding(.leading, 12)
@@ -974,7 +974,7 @@ private struct ActionButton: View {
                     .overlay(Circle().strokeBorder(lit ? accent.opacity(0.5) : Color.primary.opacity(0.11), lineWidth: 1))
                     .shadow(color: lit && theme.glows ? accent.opacity(0.25) : .clear, radius: 10)
                 Text(title)
-                    .font(.caption2.weight(.semibold))
+                    .font(.app(.caption2, weight: .semibold))
                     // Six to a row: "New game" shrinks a little rather than break onto two lines.
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
@@ -1000,10 +1000,10 @@ private struct StatTile: View {
     var body: some View {
         VStack(spacing: 2) {
             Text(title)
-                .font(.caption2.weight(.semibold))
+                .font(.app(.caption2, weight: .semibold))
                 .foregroundStyle(.secondary)
             Text(value)
-                .font(.system(.title3, design: .themed).weight(.heavy).monospacedDigit())
+                .font(.app(.title3, weight: .heavy).monospacedDigit())
                 .foregroundStyle(color)
         }
         .frame(maxWidth: .infinity)
