@@ -48,6 +48,14 @@ final class StockfishTests: XCTestCase {
         try XCTSkipUnless(StockfishEngine.hasNetworks)
         await StockfishEngine.shared.warmUp()
         let fen = Position.standard.fen
+        // An earlier test can leave Stockfish still busy with a search whose stop it never
+        // answered, and a new search then waits behind it (see StockfishEngine.search). Short
+        // searches first, until one comes back promptly, so the timed one starts on an idle engine.
+        for _ in 0..<5 {
+            let settling = ContinuousClock.now
+            _ = await StockfishEngine.shared.chooseMove(fen: fen, skill: 10, depth: 1, thinkTimeMs: 100)
+            if ContinuousClock.now - settling < .milliseconds(500) { break }
+        }
         let started = ContinuousClock.now
         let chosen = await StockfishEngine.shared.chooseMove(fen: fen, skill: 10, depth: 5, thinkTimeMs: 5000)
         let elapsed = ContinuousClock.now - started
@@ -84,7 +92,11 @@ final class StockfishTests: XCTestCase {
             let ms = Int(elapsed.components.seconds * 1000) + Int(elapsed.components.attoseconds / 1_000_000_000_000_000)
             NSLog("TIMING reply level=\(level) think=\(level.thinkTimeMs)ms total=\(ms)ms")
             XCTAssertEqual(match.game.plyCount, 2, "\(level) never answered")
-            XCTAssertLessThan(ms, level.thinkTimeMs + 2500, "\(level) took \(ms) ms to answer")
+            // Stockfish now and then never answers the stop that ends the hint search. The
+            // engine then gives that search its grace and waits out its lost answer before the
+            // reply's own search starts (see StockfishEngine.search), so that is allowed for too.
+            let recoveryMs = Int((StockfishEngine.stopGrace + StockfishEngine.lostAnswer) / .milliseconds(1))
+            XCTAssertLessThan(ms, level.thinkTimeMs + recoveryMs + 2500, "\(level) took \(ms) ms to answer")
             // Leave the engine alone for the next level: no grading or hints still running.
             await match.settleEngine()
         }
