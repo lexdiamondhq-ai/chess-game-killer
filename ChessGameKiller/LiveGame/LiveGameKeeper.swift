@@ -2,6 +2,7 @@ import ActivityKit
 import ChessKit
 import Foundation
 import SwiftUI
+import UIKit
 
 /// Keeps the game under way on the Lock Screen, in the Dynamic Island and in StandBy: a Live
 /// Activity that starts on a game's first move, follows every move and ends with the game (or
@@ -25,6 +26,9 @@ final class LiveGameKeeper {
     /// The named openings load once, away from the main thread, the first time a game starts.
     private var openingsReady = false
     private var loadingOpenings = false
+
+    /// A game is on the Lock Screen now (Today's Move waits while it is).
+    var isShowing: Bool { activity != nil && !finished }
 
     /// How long a finished game stays on the Lock Screen.
     static let afterTheGame: TimeInterval = 10 * 60
@@ -63,7 +67,16 @@ final class LiveGameKeeper {
         }
         if let activity {
             let content = ActivityContent(state: state, staleDate: nil)
-            Task { await activity.update(content) }
+            // The rival's move landed while you're away: the screen lights and the island opens.
+            // Every other change updates quietly.
+            if UIApplication.shared.applicationState != .active,
+               let title = state.alertTitle(rival: activity.attributes.rival) {
+                let alert = AlertConfiguration(title: LocalizedStringResource(stringLiteral: title),
+                                               body: "Your move", sound: .default)
+                Task { await activity.update(content, alertConfiguration: alert) }
+            } else {
+                Task { await activity.update(content) }
+            }
         } else {
             start(match, state)
         }
@@ -83,6 +96,8 @@ final class LiveGameKeeper {
 
     private func start(_ match: MatchController, _ state: LiveGameAttributes.ContentState) {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        // One at a time: the game takes the Lock Screen from Today's Move.
+        DailyActivityKeeper.shared.end()
         do {
             activity = try Activity.request(attributes: Self.attributes(of: match),
                                             content: ActivityContent(state: state, staleDate: nil),
@@ -119,6 +134,7 @@ final class LiveGameKeeper {
             fen: game.fen,
             lastMove: last?.san,
             lastMoveByRival: last.map { $0.color != you } ?? false,
+            lastMoveUCI: last?.uci,
             yourMove: !match.isOver && game.sideToMove == you,
             moveNumber: TrainingChess.moveNumber(game.fen),
             yourSeconds: seconds,
