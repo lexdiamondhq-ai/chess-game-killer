@@ -49,7 +49,8 @@ repository root with Blender's Python module (`pip install bpy==5.2.2 numpy scip
    draw that glass: `flat/glass.py -- <out dir>` renders each tile alone in the concept render's glass and light,
    from the flat view's 80 degrees without perspective, 512 px across, its top and the sliver of near side the
    view sees (copy to `Assets.xcassets/Crystal/glass-*.imageset`). The pieces come from the masks in
-   `flat/crystal-masks`.
+   `flat/crystal-masks`. `flat/trace.py` traces the familiar pieces' outlines and inner lines into
+   `flat/glyphs.json`, which the Lock Screen's small board draws its pieces from (`LiveGamePieces/flat-*.svg`).
 
 `pieces.py` holds the turned pieces (lathe profiles, flutes, booleans), `gilded.py` the gilded set
 (stepped bases, gold bands and crowns, the striped-mane knight), `board.py` the marble, frame and inlay.
