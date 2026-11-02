@@ -76,6 +76,9 @@ struct NewGameSheet: View {
 
     @AppStorage("setup.side") private var side: SideChoice = .white
     @AppStorage("setup.level") private var level: MatchController.Level = .club
+    @AppStorage("setup.grudge") private var grudgeOn = false
+    /// The score when you last saw your Grudge ("7-11"), so what changed since plays out.
+    @AppStorage("grudge.lastSeen") private var grudgeLastSeen = ""
     @AppStorage("setup.clock") private var timeControl: TimeControl = .unlimited
     @AppStorage("showBestMoves") private var showBestMoves = false
     @AppStorage("coachVerdicts") private var showVerdicts = true
@@ -85,12 +88,20 @@ struct NewGameSheet: View {
     /// The choices on the sheet, kept only when the game starts.
     @State private var draftSide: SideChoice
     @State private var draftLevel: MatchController.Level
+    /// Your Grudge rather than The Crowd.
+    @State private var draftGrudge: Bool
+    /// The score your Grudge's summons counts up from, read once as it is picked.
+    @State private var grudgeSince: (you: Int, it: Int)?
+    /// The first time you meet it, its birth plays instead.
+    @State private var grudgeBorn = false
     @State private var draftClock: TimeControl
     @State private var draftCoach: CoachMode
     /// The piece the player means to put on the line. Never remembered: every stake is chosen afresh.
     @State private var draftStake: ArmySlot?
     /// The army, for On the line. Absent in tests that draw the sheet without one.
     @Environment(ArmyStore.self) private var army: ArmyStore?
+    /// Your Grudge. Absent in tests and previews: The Crowd only.
+    @Environment(GrudgeStore.self) private var grudges: GrudgeStore?
     @State private var scrolledLevel: MatchController.Level?
     @State private var openRow: MatchRow?
     @State private var confirmingForfeit = false
@@ -109,6 +120,7 @@ struct NewGameSheet: View {
         let level = (defaults.object(forKey: "setup.level") as? Int).flatMap { MatchController.Level(rawValue: $0) } ?? .club
         _draftSide = State(initialValue: defaults.string(forKey: "setup.side").flatMap { SideChoice(rawValue: $0) } ?? .white)
         _draftLevel = State(initialValue: level)
+        _draftGrudge = State(initialValue: defaults.bool(forKey: "setup.grudge"))
         _draftClock = State(initialValue: defaults.string(forKey: "setup.clock").flatMap { TimeControl(rawValue: $0) } ?? .unlimited)
         _draftCoach = State(initialValue: CoachMode(
             hints: defaults.object(forKey: "showBestMoves") as? Bool ?? false,
@@ -127,6 +139,17 @@ struct NewGameSheet: View {
 
     private var accent: Color { theme.accent ?? .accentColor }
 
+    /// The Grudge, when it is picked and exists.
+    private var grudgeRecord: GrudgeRecord? {
+        draftGrudge ? grudges?.record : nil
+    }
+
+    /// Who the game would be against.
+    private var draftRival: Rival {
+        if let grudgeRecord { return .grudge(grudgeRecord.level) }
+        return draftLevel.rival
+    }
+
     /// Keeps the choices for next time, then starts the game.
     private func play() {
         side = draftSide
@@ -134,8 +157,38 @@ struct NewGameSheet: View {
         timeControl = draftClock
         showBestMoves = draftCoach.showsHints
         showVerdicts = draftCoach.showsVerdicts
-        start(MatchController.Setup(playerColor: draftSide.color, level: draftLevel, timeControl: draftClock,
-                                    stake: stake))
+        grudgeOn = grudgeRecord != nil
+        var setup = MatchController.Setup(playerColor: draftSide.color, level: draftLevel, timeControl: draftClock,
+                                          stake: stake)
+        if let grudgeRecord {
+            setup.level = grudgeRecord.level
+            setup.grudge = true
+            setup.grudgeSkill = grudgeRecord.skill
+            setup.stake = nil
+            grudgeLastSeen = "\(grudgeRecord.yourWins)-\(grudgeRecord.itsWins)"
+            grudges?.markSeen()
+        }
+        start(setup)
+    }
+
+    /// Picks the Grudge, and works out what its summons should show since you last met.
+    private func pickGrudge() {
+        guard let record = grudges?.record else { return }
+        let parts = grudgeLastSeen.split(separator: "-").compactMap { Int($0) }
+        grudgeSince = parts.count == 2 ? (you: parts[0], it: parts[1]) : nil
+        grudgeBorn = grudges?.unseen == true
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) { draftGrudge = true }
+        // Seen now: next time the summons counts from here.
+        grudgeLastSeen = "\(record.yourWins)-\(record.itsWins)"
+        grudges?.markSeen()
+    }
+
+    private func pickCrowd(_ level: MatchController.Level) {
+        withAnimation(.snappy) {
+            draftGrudge = false
+            scrolledLevel = level
+            draftLevel = level
+        }
     }
 
     var body: some View {
@@ -146,8 +199,16 @@ struct NewGameSheet: View {
                         ChallengeEntryRow(theme: theme, action: challenge)
                     }
 
-                    section("Your rival") {
+                    if grudges != nil {
+                        section("Your Grudge") {
+                            GrudgeCard(record: grudges?.record, isSelected: grudgeRecord != nil, theme: theme,
+                                       born: grudgeBorn, lastSeen: grudgeSince, select: pickGrudge)
+                        }
+                    }
+
+                    section("The Crowd") {
                         rivalCarousel
+                            .opacity(grudgeRecord != nil ? 0.55 : 1)
                         dots
                     }
 
@@ -161,6 +222,16 @@ struct NewGameSheet: View {
                 .animation(.spring(response: 0.42, dampingFraction: 0.86), value: openRow)
             }
             .sensoryFeedback(.selection, trigger: openRow) { _, _ in hapticsOn }
+            .sensoryFeedback(.selection, trigger: draftLevel) { _, _ in hapticsOn }
+            .onAppear {
+                // Picked last time, or just born: the sheet opens on your Grudge.
+                if grudges?.unseen == true || (draftGrudge && grudges?.record != nil) {
+                    draftGrudge = false
+                    pickGrudge()
+                } else if grudges?.record == nil {
+                    draftGrudge = false
+                }
+            }
             .safeAreaInset(edge: .bottom) {
                 Button {
                     if forfeits == nil { play() } else { confirmingForfeit = true }
@@ -181,7 +252,7 @@ struct NewGameSheet: View {
                 .animation(.snappy, value: draftLevel)
                 .confirmationDialog("Leave your game against \(forfeits ?? "your rival")?",
                                     isPresented: $confirmingForfeit, titleVisibility: .visible) {
-                    Button("Resign and play \(draftLevel.rival.name)", role: .destructive) { play() }
+                    Button("Resign and play \(draftRival.name)", role: .destructive) { play() }
                     Button("Keep playing", role: .cancel) {}
                 } message: {
                     Text("It counts as a loss for your army.")
@@ -340,7 +411,7 @@ struct NewGameSheet: View {
 
     /// The stake that will count: the one picked, if it is still allowed with these choices.
     private var stake: ArmySlot? {
-        guard let army, let draftStake, !draftCoach.showsHints,
+        guard grudgeRecord == nil, let army, let draftStake, !draftCoach.showsHints,
               army.canStake(draftStake, against: draftLevel) else { return nil }
         return draftStake
     }
@@ -352,12 +423,14 @@ struct NewGameSheet: View {
     private var armyColor: Piece.Color { draftSide == .black ? .black : .white }
 
     private var playTitle: String {
+        if grudgeRecord != nil { return "Settle it" }
         if let army, let stake { return "Play for \(army.displayName(of: stake))" }
         if let army, let prisoner { return "Rescue \(army.displayName(of: prisoner))" }
-        return "Play \(draftLevel.rival.name)"
+        return "Play \(draftRival.name)"
     }
 
     private var stakeValue: String {
+        if grudgeRecord != nil { return "Nothing" }
         if let army, let stake { return army.displayName(of: stake) }
         if let army, let prisoner { return "Rescue \(army.displayName(of: prisoner))" }
         return "Nothing"
@@ -375,6 +448,9 @@ struct NewGameSheet: View {
     /// Why nothing can go on the line right now, if that's the case.
     private var stakeBlocked: String? {
         guard let army else { return nil }
+        if grudgeRecord != nil {
+            return "Nothing goes on the line against your Grudge. It plays for the score."
+        }
         let rival = draftLevel.rival.name
         if let prisoner {
             return "\(rival) is holding \(army.displayName(of: prisoner, capitalized: false)). Win this game to get it back. Nothing else can go on the line against \(rival) until then."
@@ -461,7 +537,7 @@ struct NewGameSheet: View {
         ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(spacing: 12) {
                 ForEach(Rival.all) { rival in
-                    RivalCard(rival: rival, isSelected: draftLevel == rival.level, theme: theme,
+                    RivalCard(rival: rival, isSelected: grudgeRecord == nil && draftLevel == rival.level, theme: theme,
                           holding: army?.prisoner(of: rival.level).map { army?.displayName(of: $0) ?? "" })
                         .containerRelativeFrame(.horizontal) { length, _ in length - 50 }
                         .scrollTransition(.interactive, axis: .horizontal) { content, phase in
@@ -470,13 +546,9 @@ struct NewGameSheet: View {
                                 .opacity(phase.isIdentity ? 1 : 0.6)
                         }
                         .id(rival.level)
-                        .onTapGesture {
-                            withAnimation(.snappy) { scrolledLevel = rival.level }
-                        }
+                        .onTapGesture { pickCrowd(rival.level) }
                         .accessibilityAddTraits(.isButton)
-                        .accessibilityAction {
-                            withAnimation(.snappy) { scrolledLevel = rival.level }
-                        }
+                        .accessibilityAction { pickCrowd(rival.level) }
                 }
             }
             .scrollTargetLayout()
@@ -489,7 +561,10 @@ struct NewGameSheet: View {
         .padding(.horizontal, -20)
         .onChange(of: scrolledLevel) { _, scrolled in
             if let scrolled, scrolled != draftLevel {
-                withAnimation(.snappy) { draftLevel = scrolled }
+                withAnimation(.snappy) {
+                    draftGrudge = false
+                    draftLevel = scrolled
+                }
             }
         }
     }
@@ -497,7 +572,7 @@ struct NewGameSheet: View {
     private var dots: some View {
         HStack(spacing: 6) {
             ForEach(Rival.all) { rival in
-                let isOn = rival.level == draftLevel
+                let isOn = grudgeRecord == nil && rival.level == draftLevel
                 Capsule()
                     .fill(isOn ? rival.hue : Color.secondary.opacity(0.3))
                     .frame(width: isOn ? 18 : 6, height: 6)
@@ -597,7 +672,7 @@ private struct RivalCard: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            RivalPortrait(rival: rival, size: 100, glows: theme.glows)
+            CrowdSwarm(rival: rival, size: 100, picked: isSelected)
             VStack(alignment: .leading, spacing: 4) {
                 Text(rival.name)
                     .font(.app(.title2, weight: .heavy))

@@ -62,7 +62,7 @@ private struct PlayerName: View {
     @ViewBuilder
     private var picture: some View {
         if isComputer {
-            RivalPortrait(rival: match.setup.level.rival, size: 18, glows: theme.glows)
+            RivalPortrait(rival: match.setup.rival, size: 18, glows: theme.glows)
         } else {
             PieceImage(piece: Piece(.king, color: color, square: .e1), theme: theme, size: 18)
         }

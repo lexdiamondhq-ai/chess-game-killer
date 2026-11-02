@@ -87,7 +87,7 @@ struct SculptedBoardView: View {
     /// light the home's window shows before the game.
     private var presence: SculptedPresence? {
         guard match.setup.opponent == .computer else { return nil }
-        return .game(match.setup.level.rival.lightUI)
+        return .game(match.setup.rival.lightUI)
     }
 
     var body: some View {

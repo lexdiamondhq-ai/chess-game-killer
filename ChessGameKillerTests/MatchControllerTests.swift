@@ -640,7 +640,7 @@ final class MatchControllerTests: XCTestCase {
                 }
             }
         }
-        XCTAssertEqual(RivalVoice.line(for: .tookPiece(.rook), level: .beginner, pick: 0), "Oh! I took your rook.")
+        XCTAssertEqual(RivalVoice.line(for: .tookPiece(.rook), level: .beginner, pick: 0), "Oh! We took your rook.")
     }
 
     func testTheRivalGreetsAndReactsToACapture() async {

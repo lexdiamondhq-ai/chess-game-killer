@@ -1,48 +1,53 @@
 import SwiftUI
 import UIKit
 
-/// A computer opponent's personality: a name, a look and a rough rating for each level.
+/// Who the person plays against the computer: The Crowd at one rating, or their Grudge.
+///
+/// The Crowd is real people. Its moves come from games real players at that rating played in
+/// the same position (Lichess's database, see `CrowdBook`), and Stockfish takes over at the
+/// same strength once the position is one nobody has reached. The Grudge is one rival that
+/// remembers every game against you (`GrudgeStore`).
 struct Rival: Identifiable {
+    enum Kind: Equatable {
+        case crowd
+        case grudge
+    }
+
     let level: MatchController.Level
+    let kind: Kind
+    /// "The 1600s", "The Masters", "Your Grudge".
     let name: String
-    /// Rough Elo, like "~1500" or "3000+".
+    /// A short name for tight places, like the home's ladder: "1600s", "Masters".
+    let shortName: String
+    /// Names the rival's pictures: "1600s", "masters", "grudge".
+    let slug: String
+    /// Rough Elo, like "~1600" or "2500+".
     let elo: String
     let blurb: String
     let hue: Color
     let hue2: Color
-    /// The board that matches the portrait, used in games when "Match rival" is on.
-    let boardTheme: BoardTheme.ID
+    /// The color its light casts: Someone at the Table, the Lock Screen game.
+    let lightHex: UInt32
 
-    var id: MatchController.Level { level }
+    var id: String { slug }
+
+    var isGrudge: Bool { kind == .grudge }
 
     /// 1 to 5, for the strength bars.
     var strength: Int { level.rawValue + 1 }
 
-    /// The rating as VoiceOver should say it: "about 1500 Elo", "over 3000 Elo".
+    /// The rating as VoiceOver should say it: "about 1600 Elo", "over 2500 Elo".
     var spokenElo: String {
         if elo.hasPrefix("~") { return "about \(elo.dropFirst()) Elo" }
         if elo.hasSuffix("+") { return "over \(elo.dropLast()) Elo" }
         return "\(elo) Elo"
     }
 
-    /// The rival's portrait in Assets.xcassets/Rivals.
-    var portraitName: String { "rival-" + name.lowercased() }
+    /// The rival's portrait in Assets.xcassets/Rivals (scripts/make_rival_portraits.py).
+    var portraitName: String { "rival-" + slug }
 
     /// The portrait as light with no backdrop (scripts/make_rival_glows.py), to lay over the board.
     var glowName: String { portraitName + "-glow" }
-
-    /// The color the portrait glows: Spark burns orange, Drift teal, Pulse blue, Vector violet,
-    /// Singularity a pale violet. Someone at the Table casts it across the board, and the game on
-    /// the Lock Screen wears it.
-    var lightHex: UInt32 {
-        switch level {
-        case .beginner: return 0xFF8A3D
-        case .casual: return 0x3FD0F0
-        case .club: return 0x2FA8FF
-        case .expert: return 0x9A72FF
-        case .grandmaster: return 0xB9A8FF
-        }
-    }
 
     var light: Color { Color(hex: lightHex) }
 
@@ -51,167 +56,115 @@ struct Rival: Identifiable {
                 blue: CGFloat(lightHex & 0xFF) / 255, alpha: 1)
     }
 
+    /// The Crowd, weakest first.
     static let all: [Rival] = MatchController.Level.allCases.map(\.rival)
+
+    /// The Grudge, playing at about `level`'s strength.
+    static func grudge(_ level: MatchController.Level) -> Rival {
+        Rival(level: level, kind: .grudge, name: "Your Grudge", shortName: "Grudge", slug: "grudge",
+              elo: "~\(level.rating)",
+              blurb: "Remembers every game you've played it. Plays at your weak spots.",
+              hue: Color(hex: 0xE0313F), hue2: Color(hex: 0x7A0E1A), lightHex: 0xE0313F)
+    }
+
+    /// Whether a saved game's opponent was your Grudge.
+    static func isGrudge(opponent: String) -> Bool {
+        opponent == grudge(.club).name
+    }
+
+    /// Who a saved game was against, from its opponent and level. Nil for games with people.
+    static func of(saved game: SavedGame) -> Rival? {
+        guard let level = game.level.flatMap(MatchController.Level.init(rawValue:)) else { return nil }
+        return isGrudge(opponent: game.opponent) ? grudge(level) : level.rival
+    }
+
+    /// The rival a saved name stands for: a crowd's slug or name, or "grudge".
+    static func named(_ text: String) -> Rival? {
+        let key = text.lowercased()
+        if key == "grudge" || key == "your grudge" { return grudge(.club) }
+        return all.first { $0.slug == key || $0.name.lowercased() == key || $0.shortName.lowercased() == key }
+    }
 }
 
 extension MatchController.Level {
+    /// The Crowd at this level.
     var rival: Rival {
         switch self {
         case .beginner:
-            return Rival(level: self, name: "Spark", elo: "~800",
-                         blurb: "Misses a lot. Perfect for learning the moves.",
-                         hue: Color(hex: 0xFFD54A), hue2: Color(hex: 0xFF9E3D),
-                         boardTheme: .spark)
+            return Rival(level: self, kind: .crowd, name: "The 1000s", shortName: "1000s", slug: "1000s", elo: "~1000",
+                         blurb: "Real players finding their feet. They leave pieces hanging, like people do.",
+                         hue: Color(hex: 0xEBD3A0), hue2: Color(hex: 0xC9A35E), lightHex: 0xF0C987)
         case .casual:
-            return Rival(level: self, name: "Drift", elo: "~1100",
-                         blurb: "Plays for fun and takes chances.",
-                         hue: Color(hex: 0x5BE0B0), hue2: Color(hex: 0x3DD6C8),
-                         boardTheme: .drift)
+            return Rival(level: self, kind: .crowd, name: "The 1200s", shortName: "1200s", slug: "1200s", elo: "~1200",
+                         blurb: "Weekend players. They know an opening or two, then wander.",
+                         hue: Color(hex: 0xE6C483), hue2: Color(hex: 0xBF9448), lightHex: 0xF2C27A)
         case .club:
-            return Rival(level: self, name: "Pulse", elo: "~1500",
-                         blurb: "Solid and patient. Punishes loose pawns.",
-                         hue: Color(hex: 0x7CF7FF), hue2: Color(hex: 0x4C7BE8),
-                         boardTheme: .pulse)
+            return Rival(level: self, kind: .crowd, name: "The 1600s", shortName: "1600s", slug: "1600s", elo: "~1600",
+                         blurb: "Club players. Solid openings, then the slips real people make.",
+                         hue: Color(hex: 0xDDB46A), hue2: Color(hex: 0xB0823A), lightHex: 0xF0B862)
         case .expert:
-            return Rival(level: self, name: "Vector", elo: "~2000",
-                         blurb: "Sharp and precise. Attacks the moment you slip.",
-                         hue: Color(hex: 0xA66BFF), hue2: Color(hex: 0x7C4DFF),
-                         boardTheme: .vector)
+            return Rival(level: self, kind: .crowd, name: "The 2000s", shortName: "2000s", slug: "2000s", elo: "~2000",
+                         blurb: "Strong players. Sharp, patient, and they rarely hand you a piece.",
+                         hue: Color(hex: 0xD6A24A), hue2: Color(hex: 0xA6722C), lightHex: 0xEDA94E)
         case .grandmaster:
-            return Rival(level: self, name: "Singularity", elo: "3000+",
-                         blurb: "Full engine strength. The ultimate test.",
-                         hue: Color(hex: 0xFF5AC8), hue2: Color(hex: 0xFF3B6B),
-                         boardTheme: .singularity)
+            return Rival(level: self, kind: .crowd, name: "The Masters", shortName: "Masters", slug: "masters", elo: "2500+",
+                         blurb: "Grandmasters' games, then full Stockfish when the book runs out.",
+                         hue: Color(hex: 0xF2DCA8), hue2: Color(hex: 0xD6B26A), lightHex: 0xF6DDA6)
         }
     }
 }
 
-/// A rival's sigil: a small glowing emblem drawn in code, one per level.
-/// Everything is laid out in a 100-point space and scaled to `size`.
+/// A rival's small emblem: for The Crowd a ring of gold dots (more players, more dots), for the
+/// Grudge its onyx king in red light. Drawn in a 100-point space and scaled to `size`.
 struct RivalSigil: View {
     let rival: Rival
     var size: CGFloat = 84
     var glows = true
 
     var body: some View {
-        ZStack {
-            Circle()
-                .fill(RadialGradient(colors: [rival.hue.opacity(0.28), rival.hue.opacity(0)],
-                                     center: .center, startRadius: 0, endRadius: 48))
-                .frame(width: 96, height: 96)
-            switch rival.level {
-            case .beginner: spark
-            case .casual: drift
-            case .club: pulse
-            case .expert: vector
-            case .grandmaster: singularity
+        Group {
+            if rival.isGrudge {
+                GrudgeKing(scars: 3, size: size, light: 0.8)
+            } else {
+                CrowdRing(dots: 26 + rival.strength * 12, hue: rival.hue)
+                    .frame(width: size, height: size)
             }
         }
-        .frame(width: 100, height: 100)
-        .scaleEffect(size / 100)
         .frame(width: size, height: size)
-        .shadow(color: glows ? rival.hue.opacity(0.8) : .clear, radius: size * 0.08)
+        .shadow(color: glows ? rival.hue.opacity(0.6) : .clear, radius: size * 0.06)
         .accessibilityHidden(true)
-    }
-
-    private func core(radius: CGFloat) -> some View {
-        Circle()
-            .fill(RadialGradient(colors: [.white, rival.hue, rival.hue2],
-                                 center: .center, startRadius: 0, endRadius: radius))
-            .frame(width: radius * 2, height: radius * 2)
-    }
-
-    private func dot(_ radius: CGFloat, x: CGFloat, y: CGFloat) -> some View {
-        Circle()
-            .fill(rival.hue)
-            .frame(width: radius * 2, height: radius * 2)
-            .position(x: x, y: y)
-    }
-
-    private var spark: some View {
-        ZStack {
-            core(radius: 12)
-            dot(3, x: 78, y: 34)
-            dot(2.2, x: 30, y: 72)
-            dot(1.8, x: 70, y: 74)
-            dot(1.6, x: 26, y: 36)
-        }
-        .frame(width: 100, height: 100)
-    }
-
-    private var drift: some View {
-        ZStack {
-            core(radius: 9)
-            Circle()
-                .trim(from: 0, to: 0.29)
-                .stroke(rival.hue, style: StrokeStyle(lineWidth: 1.6, lineCap: .round))
-                .frame(width: 44, height: 44)
-                .rotationEffect(.degrees(-30))
-                .opacity(0.7)
-            Circle()
-                .trim(from: 0, to: 0.35)
-                .stroke(rival.hue2, style: StrokeStyle(lineWidth: 1.4, lineCap: .round))
-                .frame(width: 64, height: 64)
-                .rotationEffect(.degrees(120))
-                .opacity(0.55)
-        }
-    }
-
-    private var pulse: some View {
-        ZStack {
-            core(radius: 8)
-            Circle().stroke(rival.hue, lineWidth: 2).frame(width: 38, height: 38).opacity(0.85)
-            Circle().stroke(rival.hue, lineWidth: 1.5).frame(width: 58, height: 58).opacity(0.5)
-            Circle().stroke(rival.hue2, lineWidth: 1).frame(width: 76, height: 76).opacity(0.3)
-        }
-    }
-
-    private var vector: some View {
-        let hexagon = Polygon(points: [
-            CGPoint(x: 50, y: 14), CGPoint(x: 81, y: 32), CGPoint(x: 81, y: 68),
-            CGPoint(x: 50, y: 86), CGPoint(x: 19, y: 68), CGPoint(x: 19, y: 32),
-        ])
-        let triangle = Polygon(points: [CGPoint(x: 50, y: 30), CGPoint(x: 68, y: 60), CGPoint(x: 32, y: 60)])
-        return ZStack {
-            hexagon
-                .stroke(rival.hue2, style: StrokeStyle(lineWidth: 6, lineJoin: .round))
-                .opacity(0.18)
-            hexagon
-                .stroke(rival.hue, style: StrokeStyle(lineWidth: 2.2, lineJoin: .round))
-                .opacity(0.9)
-            triangle
-                .fill(RadialGradient(colors: [.white, rival.hue, rival.hue2],
-                                     center: UnitPoint(x: 0.5, y: 0.45), startRadius: 0, endRadius: 22))
-                .opacity(0.95)
-        }
-        .frame(width: 100, height: 100)
-    }
-
-    private var singularity: some View {
-        ZStack {
-            Circle().fill(Color(hex: 0x07030C)).frame(width: 28, height: 28)
-            Circle()
-                .stroke(LinearGradient(colors: [.white, rival.hue, rival.hue2],
-                                       startPoint: .topLeading, endPoint: .bottomTrailing),
-                        lineWidth: 3.5)
-                .frame(width: 30, height: 30)
-            Ellipse()
-                .trim(from: 0, to: 0.67)
-                .stroke(rival.hue, style: StrokeStyle(lineWidth: 1.6, lineCap: .round))
-                .frame(width: 72, height: 24)
-                .rotationEffect(.degrees(-28))
-                .opacity(0.7)
-            Ellipse()
-                .trim(from: 0, to: 0.17)
-                .stroke(Color.white, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                .frame(width: 72, height: 24)
-                .rotationEffect(.degrees(-28))
-                .opacity(0.25)
-        }
     }
 }
 
-/// A rival's portrait: a rounded square photo with a glowing edge in the rival's color.
+/// A still ring of dots, scattered the same way every time.
+struct CrowdRing: View {
+    let dots: Int
+    let hue: Color
+
+    var body: some View {
+        Canvas { context, size in
+            let side = min(size.width, size.height)
+            let center = CGPoint(x: size.width / 2, y: size.height / 2)
+            var seed: UInt64 = 0x9E37_79B9
+            for _ in 0..<dots {
+                let angle = CrowdRing.next(&seed) * .pi * 2
+                let reach = 0.27 + pow(CrowdRing.next(&seed), 0.7) * 0.2
+                let radius = side * (0.8 + CrowdRing.next(&seed) * 0.9) / 100
+                let point = CGPoint(x: center.x + cos(angle) * side * reach, y: center.y + sin(angle) * side * reach)
+                let dot = CGRect(x: point.x - radius, y: point.y - radius, width: radius * 2, height: radius * 2)
+                context.fill(Path(ellipseIn: dot), with: .color(hue.opacity(0.45 + CrowdRing.next(&seed) * 0.55)))
+            }
+        }
+    }
+
+    /// A number in 0..<1 from a small fixed generator, so the ring never shimmers between draws.
+    static func next(_ state: inout UInt64) -> Double {
+        state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+        return Double(state >> 11) / Double(UInt64(1) << 53)
+    }
+}
+
+/// A rival's portrait: a rounded square picture with a soft edge in the rival's color.
 struct RivalPortrait: View {
     let rival: Rival
     var size: CGFloat = 92
@@ -231,32 +184,13 @@ struct RivalPortrait: View {
     }
 }
 
-/// A closed shape through points given in a 100-by-100 space.
-private struct Polygon: Shape {
-    let points: [CGPoint]
-
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let scale = min(rect.width, rect.height) / 100
-        for (index, point) in points.enumerated() {
-            let scaled = CGPoint(x: rect.minX + point.x * scale, y: rect.minY + point.y * scale)
-            if index == 0 {
-                path.move(to: scaled)
-            } else {
-                path.addLine(to: scaled)
-            }
-        }
-        path.closeSubpath()
-        return path
-    }
-}
-
 #Preview("Sigils") {
     HStack(spacing: 16) {
         ForEach(Rival.all) { rival in
             RivalSigil(rival: rival, size: 64)
         }
+        RivalSigil(rival: .grudge(.club), size: 64)
     }
     .padding(30)
-    .background(NeonBackdrop())
+    .background(Color.black)
 }

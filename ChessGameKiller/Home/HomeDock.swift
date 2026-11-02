@@ -361,7 +361,7 @@ struct HomeShortcutsPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Play a rival")
+            Text("Play a crowd")
                 .font(.app(.footnote, weight: .semibold))
                 .foregroundStyle(tone.ink2)
                 .padding(.leading, 4)
@@ -410,7 +410,7 @@ struct HomeShortcutsPanel: View {
                                 .frame(width: size * 1.5, height: size * 1.5)
                         }
                     }
-                Text(rival.name)
+                Text(rival.shortName)
                     .font(.app(.caption2, weight: .semibold))
                     .foregroundStyle(isNext ? tone.ink : tone.ink2)
                     .lineLimit(1)

@@ -110,7 +110,7 @@ final class LiveGameKeeper {
     // MARK: What it shows
 
     static func attributes(of match: MatchController) -> LiveGameAttributes {
-        let rival = match.setup.level.rival
+        let rival = match.setup.rival
         return LiveGameAttributes(rival: rival.name, lightHex: rival.lightHex, glow: rival.glowName,
                                   youAreWhite: match.setup.playerColor == .white,
                                   clock: match.setup.timeControl.name)
@@ -143,10 +143,10 @@ final class LiveGameKeeper {
         )
     }
 
-    /// "You won", "Pulse won", "Draw".
+    /// "You won", "The 1600s won", "Draw".
     static func result(of match: MatchController) -> String {
         guard let winner = match.winner else { return "Draw" }
-        return winner == match.setup.playerColor ? "You won" : "\(match.setup.level.rival.name) won"
+        return winner == match.setup.playerColor ? "You won" : "\(match.setup.rival.name) won"
     }
 
     private func loadOpenings() {
