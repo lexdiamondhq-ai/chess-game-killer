@@ -37,6 +37,8 @@ struct ContentView: View {
     @State private var rewindOpening: UUID?
     /// The home screen covers the game until a game is started or resumed.
     @State private var showingHome: Bool
+    /// Where the home's tiles and the screens they open meet, so a screen grows out of its tile.
+    @Namespace private var homeZoom
     @AppStorage(HomeScreen.key) private var homeScreenOn = HomeScreen.defaultOn
     @Environment(\.scenePhase) private var scenePhase
     /// Challenge a friend, when the app provides it (tests that draw this screen don't).
@@ -227,6 +229,7 @@ struct ContentView: View {
             .fullScreenCover(isPresented: $showingTraining) {
                 TrainingHubView(theme: chosenTheme).environment(training).environment(puzzles).environment(vault)
                     .environment(daily)
+                    .homeZoom(.coach, in: homeZoom, when: showingHome)
             }
             .fullScreenCover(isPresented: $showingDaily) {
                 DailyMoveView(theme: chosenTheme, morePuzzles: {
@@ -237,6 +240,7 @@ struct ContentView: View {
                     }
                 })
                 .environment(daily).environment(puzzles).environment(training)
+                .homeZoom(.daily, in: homeZoom, when: showingHome)
             }
             .fullScreenCover(isPresented: $showingPuzzles) {
                 PuzzlesView(theme: chosenTheme).environment(puzzles).environment(training)
@@ -261,6 +265,7 @@ struct ContentView: View {
                     .environment(training)
                     .environment(puzzles)
                     .environment(daily)
+                    .homeZoom(.coach, in: homeZoom, when: showingHome)
             }
             .fullScreenCover(item: $talk, onDismiss: playTalkMove) { (session: TalkSession) in
                 TalkPanel(session: session, theme: theme, play: { (uci: String) in
@@ -378,6 +383,7 @@ struct ContentView: View {
         if showingHome {
             // The home is dressed in the player's own look, not a rival's board.
             HomeView(match: match, theme: .named(themeID), actions: homeActions)
+                .environment(\.homeZoom, homeZoom)
                 .transition(.opacity)
         } else {
             gameScreen

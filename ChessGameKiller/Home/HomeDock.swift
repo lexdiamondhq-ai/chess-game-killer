@@ -146,6 +146,12 @@ struct HomeJewel: View {
     var hold: (() -> Void)? = nil
 
     @State private var pressed = false
+    /// Counts the knight's leaps (J1): each tap at rest sends it vaulting before the game opens.
+    @State private var vaults = 0
+    /// Mid-leap: a second tap waits for the first to land.
+    @State private var vaulting = false
+    @AppStorage("haptics") private var hapticsOn = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// The round jewel's width.
     static let size: CGFloat = 62
@@ -160,6 +166,11 @@ struct HomeJewel: View {
             .foregroundStyle(tone.onIvory)
             .frame(width: width, height: height)
             .background { HomeJewelGold(tone: tone, round: !folded, lit: face == .open) }
+            .background {
+                if face == .rest {
+                    JewelLandingRing(color: tone.metal, trigger: vaults)
+                }
+            }
             .scaleEffect(pressed ? 0.93 : 1)
             .animation(.spring(response: 0.25, dampingFraction: 0.75), value: pressed)
             .contentShape(Capsule())
@@ -167,7 +178,8 @@ struct HomeJewel: View {
             .onLongPressGesture(minimumDuration: 0.35, perform: held, onPressingChanged: { pressing in
                 pressed = pressing
             })
-            .onTapGesture(perform: tap)
+            .onTapGesture(perform: tapped)
+            .sensoryFeedback(.impact(weight: .medium), trigger: vaults) { _, _ in hapticsOn }
             .accessibilityElement(children: .ignore)
             .accessibilityAddTraits(.isButton)
             .accessibilityLabel(spokenLabel)
@@ -190,6 +202,22 @@ struct HomeJewel: View {
         hold?()
     }
 
+    /// At rest the knight vaults first and the game opens as it lands; otherwise straight away.
+    private func tapped() {
+        guard face == .rest, !reduceMotion else {
+            tap()
+            return
+        }
+        guard !vaulting else { return }
+        vaulting = true
+        vaults += 1
+        Task { @MainActor in
+            try? await Task.sleep(for: Self.vaultLanding)
+            vaulting = false
+            tap()
+        }
+    }
+
     @ViewBuilder
     private var content: some View {
         switch face {
@@ -199,6 +227,7 @@ struct HomeJewel: View {
         case .rest:
             Glyph(name: Glyphs.train, size: 32)
                 .offset(y: -1)
+                .modifier(KnightVaultEffect(trigger: vaults))
         case .folded:
             // The longest words that fit the bar, down to the knight alone.
             ViewThatFits(in: .horizontal) {
