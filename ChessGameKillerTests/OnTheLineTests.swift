@@ -126,7 +126,7 @@ final class OnTheLineTests: XCTestCase {
         let store = named(.ePawn)
         let staked = store.stakeNews(.ePawn, against: .club)
         XCTAssertEqual(staked.label, "ON THE LINE")
-        XCTAssertEqual(staked.headline, "Piece0 is on the line against The 1600s.")
+        XCTAssertEqual(staked.headline, "Piece0 is on the line against the 1600s.")
         XCTAssertEqual(ArmyNews(slot: .ePawn, rank: .veteran, name: "Kestrel", kind: .captured(rival: "The 1600s")).headline,
                        "The 1600s are holding Kestrel. Beat the 1600s to get it back.")
     }

@@ -233,7 +233,7 @@ final class ArmyTests: XCTestCase {
         let name = store.record(for: .kingsKnight).name
         XCTAssertNotNil(name)
         XCTAssertEqual(hero.name, name)
-        XCTAssertEqual(hero.line, "\(name ?? "") took The 1600s' queen.")
+        XCTAssertEqual(hero.line, "\(name ?? "") took the 1600s' queen.")
         // The honor's 5 XP as this game counted it: half as much again against The 1600s.
         XCTAssertEqual(hero.xp, 8)
         XCTAssertEqual(store.record(for: .kingsKnight).honors, 1)
