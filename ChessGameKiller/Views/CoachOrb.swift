@@ -438,9 +438,22 @@ private struct CoachPanel: View {
             ViewThatFits(in: .vertical) {
                 details
                 ScrollView {
-                    details
+                    details.padding(.bottom, 14)
                 }
                 .scrollBounceBehavior(.basedOnSize)
+                // What runs past the bottom fades out, so it reads as more to scroll, not cut off.
+                .mask {
+                    VStack(spacing: 0) {
+                        Color.black
+                        LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom)
+                            .frame(height: 22)
+                    }
+                }
+            }
+            // The score stays in sight under the scrolling details, never behind the buttons.
+            if !match.isOver {
+                EvalBar(share: match.playerShare, label: evalLabel, theme: theme)
+                    .padding(.top, 12)
             }
             controls
         }
@@ -588,8 +601,6 @@ private struct CoachPanel: View {
                     }
                     .padding(.top, 12)
                 }
-                EvalBar(share: match.playerShare, label: evalLabel, theme: theme)
-                    .padding(.top, 12)
                 bestMoves.padding(.top, 12)
             }
         }
@@ -603,7 +614,8 @@ private struct CoachPanel: View {
     private var summary: some View {
         HStack(spacing: 8) {
             StatTile(title: "Accuracy", value: match.accuracy.map { "\($0)%" } ?? "–",
-                     color: MoveReview.Grade.best.color(on: theme), theme: theme)
+                     color: match.accuracy.map { MoveReview.Grade.forAccuracy($0).color(on: theme) } ?? .secondary,
+                     theme: theme)
             StatTile(title: "Best", value: "\(match.gradeCounts[.best, default: 0] + match.gradeCounts[.checkmate, default: 0])",
                      color: .primary, theme: theme)
             StatTile(title: "Mistakes", value: "\(match.gradeCounts[.mistake, default: 0])",

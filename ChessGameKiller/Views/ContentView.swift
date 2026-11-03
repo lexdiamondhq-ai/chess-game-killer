@@ -141,6 +141,7 @@ struct ContentView: View {
     private static let phoneWidth: CGFloat = 440
     /// How much of the screen the unfolded coach may take, so the board stays usable under it.
     private static let coachShare: CGFloat = 0.45
+    private static let resultShare: CGFloat = 0.53
 
     // The rows grow with the reader's text size, up to a point, and the board makes room.
     @ScaledMetric(relativeTo: .body) private var scaledPlateHeight: CGFloat = 58
@@ -591,7 +592,8 @@ struct ContentView: View {
                         .padding(.bottom, 8)
                 }
                 .safeAreaInset(edge: .bottom, spacing: 0) {
-                    let coachHeight = screen.size.height * Self.coachShare
+                    // A finished game gives the result a little more room: the board has had its say.
+                    let coachHeight = screen.size.height * (match.isOver ? Self.resultShare : Self.coachShare)
                     if boardSheet, !bigBoard {
                         gameSheet(coachHeight: coachHeight, bottom: screen.safeAreaInsets.bottom)
                     } else {

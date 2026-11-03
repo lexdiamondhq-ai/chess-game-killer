@@ -78,6 +78,19 @@ extension MoveReview.Grade {
         }
     }
 
+    /// The grade a whole game's accuracy reads as, so its number takes a fitting color:
+    /// green only when it was good, down to the blunder red for a game that went badly.
+    static func forAccuracy(_ accuracy: Int) -> MoveReview.Grade {
+        switch accuracy {
+        case 90...: return .best
+        case 80..<90: return .excellent
+        case 70..<80: return .good
+        case 55..<70: return .inaccuracy
+        case 40..<55: return .mistake
+        default: return .blunder
+        }
+    }
+
     /// Chess's own marks where they exist: ?! inaccuracy, ? mistake, ?? blunder.
     var mark: Mark {
         switch self {
