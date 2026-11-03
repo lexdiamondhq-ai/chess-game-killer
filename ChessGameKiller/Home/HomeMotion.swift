@@ -117,9 +117,10 @@ struct HomeLipShape: Shape {
 
 // MARK: - B1 the screen grows out of the tile
 
-/// The tiles that grow into the screen they open.
+/// The tiles and rows that grow into the screen they open. On the board home every row of
+/// the sheet does: Puzzles, your games and your pieces as well as Today's Move and the coach.
 enum HomeZoomID: String {
-    case daily, coach
+    case daily, coach, puzzles, games, army
 }
 
 private struct HomeZoomKey: EnvironmentKey {

@@ -244,15 +244,23 @@ struct ArmyView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
+                // Each block rises into place in turn, as on the board home's sheet.
                 VStack(spacing: 18) {
                     header
+                        .homeRise(0)
                     formation
-                    if !decorated.isEmpty { honorRoll }
+                        .homeRise(1)
+                    if !decorated.isEmpty {
+                        honorRoll
+                            .homeRise(2)
+                    }
                     ranksCard
+                        .homeRise(3)
                     Text("Games against the computer from the usual starting position count.")
                         .font(.app(.footnote))
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
+                        .homeRise(4)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)

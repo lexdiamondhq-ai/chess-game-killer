@@ -79,6 +79,30 @@ struct HomeView: View {
     @State private var dockBar: CGRect = .zero
     /// The one-time note that the jewel holds shortcuts.
     @State private var jewelTip = false
+    /// The board home: the 3D board up top and one sheet over it (Settings can turn it off).
+    @AppStorage(HomeLayout.key) private var boardSheet = HomeLayout.defaultOn
+    /// The board home's room: Light, Middle or Dark (the tiles home stays dark).
+    @AppStorage(HomeToneMode.key) private var toneMode = HomeToneMode.defaultMode
+    /// Where the sheet rests, and how far a finger has it from there. The drag springs back by
+    /// itself when a pull is cut short (an alert, a call), so the sheet never parks between rests.
+    @State private var sheetDetent: HomeSheetDetent = .half
+    @GestureState(resetTransaction: Transaction(animation: .spring(response: 0.46, dampingFraction: 0.8)))
+    private var sheetDrag: CGFloat = 0
+    private var sheetDragging: Bool { sheetDrag != 0 }
+    /// The sheet's tab, and whether the last pick moved right (its page comes in from the right).
+    @State private var sheetTab: HomeSheetTab = .today
+    @State private var sheetForward = true
+    /// Back from a game, the sheet starts folded like the game's and rises to here.
+    private let sheetRest: HomeSheetDetent
+    private let rises: Bool
+    /// The rise from the game has played (once per return).
+    @State private var rose = false
+    /// The game is starting or resuming: one start per visit, however many taps land.
+    @State private var launched = false
+    /// The sheet is folding down before the game opens; the home takes no more taps.
+    @State private var pushing = false
+    /// Tells the app which tab is showing, so a redraw of the home (a new look) keeps it.
+    private let onTab: (HomeSheetTab) -> Void
 
     enum YouOrigin { case top, bottom }
 
@@ -90,19 +114,26 @@ struct HomeView: View {
     /// The gap between tiles, and between the tiles and the screen's edge.
     static let gap: CGFloat = 10
 
+    /// `rises`: the player is back from a game, so the sheet comes up out of the game's.
     init(match: MatchController, theme: BoardTheme, actions: HomeActions, showsYou: Bool = false,
-         showsShortcuts: Bool = false) {
+         showsShortcuts: Bool = false, sheet: HomeSheetDetent = .half, tab: HomeSheetTab = .today,
+         rises: Bool = false, onTab: @escaping (HomeSheetTab) -> Void = { _ in }) {
         self.match = match
         self.theme = theme
         self.actions = actions
+        self.sheetRest = sheet
+        self.rises = rises
+        self.onTab = onTab
         _you = State(initialValue: showsYou ? .bottom : nil)
         _shortcutsOpen = State(initialValue: showsShortcuts)
+        _sheetDetent = State(initialValue: rises ? .board : sheet)
+        _sheetTab = State(initialValue: tab)
     }
 
     // MARK: Reading
 
     private var look: SculptedLook { theme.sculptedLook ?? .gilded }
-    private var tone: HomeTone { .of(look) }
+    private var tone: HomeTone { .of(look, mode: boardSheet ? toneMode : .dark) }
     /// The pieces on the small boards match the board in the window.
     private var pieceTheme: BoardTheme { theme.sculptedLook == nil ? .named(.gilded) : theme }
 
@@ -135,13 +166,17 @@ struct HomeView: View {
             ZStack(alignment: .top) {
                 HomeBackdrop(tone: tone)
 
-                page(safeTop: safeTop)
+                if boardSheet {
+                    sheetHome(geo)
+                } else {
+                    page(safeTop: safeTop)
 
-                HomeTopEdge(scroll: scroll, tone: tone, start: 0, height: safeTop + 34)
-                    .ignoresSafeArea(edges: .top)
+                    HomeTopEdge(scroll: scroll, tone: tone, start: 0, height: safeTop + 34)
+                        .ignoresSafeArea(edges: .top)
 
-                HomePullCue(scroll: scroll, tone: tone, threshold: Self.pullToOpen, armed: pullArmed)
-                    .padding(.top, 6)
+                    HomePullCue(scroll: scroll, tone: tone, threshold: Self.pullToOpen, armed: pullArmed)
+                        .padding(.top, 6)
+                }
 
                 if jewelTip, !shortcutsOpen, you == nil {
                     jewelNote(in: geo.size)
@@ -157,12 +192,15 @@ struct HomeView: View {
             }
             .coordinateSpace(.named(Self.root))
         }
-        .environment(\.colorScheme, .dark)
-        .preferredColorScheme(.dark)
+        // The window's own light (status bar, system sheets) is set by the app, which knows when
+        // the welcome is up and waits for the fade from a game to finish.
+        .environment(\.colorScheme, tone.scheme)
         .tint(tone.metal)
         .sensoryFeedback(.impact(weight: .light), trigger: pullArmed) { _, armed in armed && hapticsOn }
         .sensoryFeedback(.impact(weight: .medium), trigger: you != nil) { _, open in open && hapticsOn }
         .sensoryFeedback(.impact(weight: .medium), trigger: shortcutsOpen) { _, open in open && hapticsOn }
+        .sensoryFeedback(.impact(weight: .light), trigger: sheetDetent) { _, _ in hapticsOn }
+        .sensoryFeedback(.selection, trigger: sheetTab) { _, _ in hapticsOn }
         .task {
             await puzzles.load()
             puzzles.prepareUpNext()
@@ -397,6 +435,9 @@ struct HomeView: View {
 
     /// Resume the game under way, or start the next one as set up, against the rival named.
     private func primary(_ upNext: HomeUpNext) {
+        // A double tap, or the strip's Play during the fold, must not start the game twice.
+        guard !launched else { return }
+        launched = true
         if upNext.inProgress {
             actions.resume()
             return
@@ -469,7 +510,7 @@ struct HomeView: View {
     /// Where the jewel stands, in the home's space: the middle of the dock's bar, a little
     /// above it at rest. Before the dock has been measured, where it would be.
     private func jewelCenter(in size: CGSize) -> CGPoint {
-        let lift: CGFloat = windowGone ? 0 : HomeDock.raise
+        let lift: CGFloat = (windowGone || boardSheet) ? 0 : HomeDock.raise
         guard dockBar != .zero else {
             return CGPoint(x: size.width / 2, y: size.height - 38 - lift)
         }
@@ -582,6 +623,415 @@ struct HomeView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: fromTop ? .top : .bottom)
             .transition(reduceMotion ? .opacity : .move(edge: fromTop ? .top : .bottom).combined(with: .opacity))
             .zIndex(2)
+    }
+}
+
+// MARK: - The board home
+
+extension HomeView {
+    /// How the sheet moves between its rests: a soft spring, or a fade for reduced motion.
+    private var sheetSpring: Animation {
+        reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.46, dampingFraction: 0.8)
+    }
+
+    /// The board home: the 3D board fills the top, the greeting floats over it, and the sheet
+    /// rises from the foot. The board turns and steps back as the sheet comes up, and steps in
+    /// when it folds down to play.
+    @ViewBuilder
+    func sheetHome(_ geo: GeometryProxy) -> some View {
+        let safeTop: CGFloat = geo.safeAreaInsets.top
+        let safeBottom: CGFloat = geo.safeAreaInsets.bottom
+        let total: CGFloat = geo.size.height + safeTop + safeBottom
+        let metrics = HomeSheetMetrics(total: total, safeTop: safeTop, safeBottom: safeBottom)
+        let height: CGFloat = metrics.height(sheetDetent, drag: sheetDrag)
+        let lift: CGFloat = metrics.progress(height)
+        let upNext = self.upNext
+        ZStack(alignment: .top) {
+            sheetBoard(upNext, width: geo.size.width, metrics: metrics, lift: lift)
+            if tone.scheme == .light {
+                greetingBacking(height: safeTop + 96, lift: lift)
+            }
+            sheetGreeting(lift: lift)
+                .padding(.top, safeTop + 4)
+                .padding(.horizontal, 16)
+            sheetPanel(upNext, metrics: metrics, height: height, lift: lift)
+                .frame(maxHeight: .infinity, alignment: .bottom)
+                .ignoresSafeArea(edges: .bottom)
+        }
+        .ignoresSafeArea(edges: .top)
+        // With the shortcuts open the home steps back, out of focus.
+        .blur(radius: veiled ? 12 : 0)
+        .accessibilityHidden(veiled)
+        .allowsHitTesting(!veiled && !pushing)
+        .onAppear(perform: riseFromGame)
+    }
+
+    /// Back from a game: the folded sheet, where the game's was, rises to its rest.
+    private func riseFromGame() {
+        guard rises, !rose, sheetDetent == .board, sheetRest != .board else { return }
+        rose = true
+        let rise: Animation = reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.5, dampingFraction: 0.8).delay(0.12)
+        withAnimation(rise) { sheetDetent = sheetRest }
+    }
+
+    /// Push down to play: the sheet folds into its strip, then the game opens.
+    private func pushDownToPlay(_ upNext: HomeUpNext) {
+        guard sheetDetent != .board, !reduceMotion else {
+            primary(upNext)
+            return
+        }
+        pushing = true
+        withAnimation(sheetSpring) { sheetDetent = .board }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(280))
+            primary(upNext)
+        }
+    }
+
+    /// A tap on the grabber: folded or halfway goes a step up; all the way up comes back halfway.
+    private func stepSheet() {
+        let next: HomeSheetDetent
+        switch sheetDetent {
+        case .board: next = .half
+        case .half: next = .full
+        case .full: next = .half
+        }
+        withAnimation(sheetSpring) { sheetDetent = next }
+    }
+
+    /// The board, as tall as two thirds of the screen. It rises with the sheet so it stays in
+    /// sight, steps back and dims a little as the sheet covers it, and leans in when folded.
+    private func sheetBoard(_ upNext: HomeUpNext, width: CGFloat, metrics: HomeSheetMetrics, lift: CGFloat) -> some View {
+        let total: CGFloat = metrics.total
+        let boardHeight: CGFloat = total * 0.68
+        let rise: CGFloat = -lift * total * 0.17
+        let scale: CGFloat = 1.06 - 0.08 * lift
+        let dim: Double = Double(lift) * 0.45
+        let leaning: Bool = upNext.inProgress && upNext.yourMove
+        return HomeSheetScene(look: look, tone: tone, pieces: match.game.pieces.map(\.piece),
+                              black: upNext.playerColor == .black, rival: upNext.rival, leaning: leaning, lift: lift)
+            .overlay { HomeSheetShade(tone: tone) }
+            .overlay { HomeRivalPresence(rival: upNext.rival, leaning: leaning, scroll: scroll) }
+            .overlay { tone.canvas.opacity(dim).allowsHitTesting(false) }
+            .frame(width: width, height: boardHeight)
+            .scaleEffect(scale, anchor: .top)
+            .offset(y: rise)
+            .contentShape(Rectangle())
+            .onTapGesture { pushDownToPlay(upNext) }
+            .gesture(sheetPull(on: .board, metrics: metrics))
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(upNext.inProgress ? "Your game against \(upNext.rival.name)" : "Next game: \(upNext.rival.name)")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction(.magicTap) { primary(upNext) }
+    }
+
+    /// In Light and Middle the greeting's dark ink needs the room behind it once the board
+    /// rises under it (the board's own top fade rises with the board). Folded, the board's
+    /// fade is enough, so this comes in with the sheet.
+    private func greetingBacking(height: CGFloat, lift: CGFloat) -> some View {
+        let shown: Double = Double(min(lift * 2, 1))
+        return LinearGradient(colors: [tone.canvas.opacity(0.9), tone.canvas.opacity(0.6), tone.canvas.opacity(0)],
+                              startPoint: .top, endPoint: .bottom)
+            .frame(height: height)
+            .opacity(shown)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+
+    /// Hello, the streak and the level, over the board. It fades as the sheet rises over it.
+    private func sheetGreeting(lift: CGFloat) -> some View {
+        let day = dailyState
+        let ladder = HomeLadder(games: vault.games)
+        return HomeGreeting(name: playerName, streak: day.streak, doneToday: day.doneToday,
+                            streakDetail: day.detail, level: ladder.yourRating, tone: tone,
+                            openStreak: actions.dailyMove, openLevel: { pickTab(.today) })
+            .opacity(Double(1 - lift * 0.7))
+            .offset(y: -lift * 10)
+    }
+
+    /// The glass sheet. Folded, it is one strip with the game; open, it holds the tab's page
+    /// and the tabs at its foot. It runs past the screen's foot, so only its top corners show.
+    private func sheetPanel(_ upNext: HomeUpNext, metrics: HomeSheetMetrics, height: CGFloat, lift: CGFloat) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 34, style: .continuous)
+        let opened: CGFloat = height - metrics.lowest
+        let stripShown: Double = Double(1 - min(max(opened / 70, 0), 1))
+        let pageShown: Double = Double(min(max((opened - 30) / 90, 0), 1))
+        let overhang: CGFloat = 40
+        return VStack(spacing: 0) {
+            HomeSheetGrabber(tone: tone, dragging: sheetDragging)
+                .gesture(sheetPull(on: .sheet, metrics: metrics))
+                .onTapGesture { stepSheet() }
+            ZStack(alignment: .top) {
+                sheetOpen(upNext, metrics: metrics)
+                    .opacity(pageShown)
+                    // A pull that started here keeps its grip while the page fades.
+                    .allowsHitTesting(pageShown > 0.5 || sheetDragging)
+                HomeSheetStrip(upNext: upNext, tone: tone) { primary(upNext) }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 2)
+                    .contentShape(Rectangle())
+                    .gesture(sheetPull(on: .sheet, metrics: metrics))
+                    .opacity(stripShown)
+                    .offset(y: (1 - CGFloat(stripShown)) * 16)
+                    .allowsHitTesting(stripShown > 0.5 || sheetDragging)
+            }
+            .frame(maxHeight: .infinity, alignment: .top)
+        }
+        .padding(.bottom, overhang)
+        .frame(height: height + overhang)
+        .frame(maxWidth: .infinity)
+        .homePane(shape, tone: tone)
+        .shadow(color: .black.opacity(tone.shadow), radius: 24, y: -6)
+        .offset(y: overhang)
+    }
+
+    /// The open sheet: the tab's name, its page, and the tabs with the gold knight. The sheet
+    /// moves by its grabber and its header; the page under them scrolls.
+    private func sheetOpen(_ upNext: HomeUpNext, metrics: HomeSheetMetrics) -> some View {
+        VStack(spacing: 0) {
+            sheetHeader
+                .padding(.horizontal, 20)
+                .padding(.bottom, 8)
+                .contentShape(Rectangle())
+                .gesture(sheetPull(on: .sheet, metrics: metrics))
+            ScrollViewReader { reader in
+                ScrollView(.vertical) {
+                    VStack(spacing: 0) {
+                        Color.clear
+                            .frame(height: 0)
+                            .id(Self.sheetTop)
+                        // The page going and the page coming share one place while they cross.
+                        ZStack(alignment: .top) {
+                            sheetPage(upNext)
+                                .id(sheetTab)
+                                .transition(.homePage(forward: sheetForward, reduceMotion: reduceMotion))
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
+                }
+                .scrollIndicators(.hidden)
+                .scrollBounceBehavior(.basedOnSize)
+                .mask {
+                    LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.04),
+                                           .init(color: .black, location: 0.94), .init(color: .clear, location: 1)],
+                                   startPoint: .top, endPoint: .bottom)
+                }
+                // Every tab opens at its top, wherever the last one was scrolled to.
+                .onChange(of: sheetTab) { _, _ in
+                    reader.scrollTo(Self.sheetTop, anchor: .top)
+                }
+            }
+            HomeSheetTabBar(tone: tone, selection: sheetTab, pick: pickTab) {
+                HomeJewel(tone: tone, upNext: upNext, face: .rest, tap: { primary(upNext) }, hold: openShortcuts)
+                    .onGeometryChange(for: CGRect.self) { proxy in
+                        proxy.frame(in: .named(Self.root))
+                    } action: { frame in
+                        dockBar = frame
+                    }
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 6)
+            .padding(.bottom, max(metrics.safeBottom, 12))
+        }
+    }
+
+    /// The tab's name, rolling over to the next as the tab changes.
+    private var sheetHeader: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(sheetTab.title)
+                .font(.app(.title, weight: .semibold))
+                .foregroundStyle(tone.ink)
+                .tracking(-0.6)
+                .id(sheetTab)
+                .transition(.homePage(forward: sheetForward, reduceMotion: reduceMotion))
+                .accessibilityAddTraits(.isHeader)
+            Spacer(minLength: 0)
+            Button {
+                withAnimation(sheetSpring) {
+                    sheetDetent = sheetDetent == .full ? .half : .full
+                }
+            } label: {
+                Image(systemName: "chevron.up")
+                    .font(.app(.footnote, weight: .bold))
+                    .foregroundStyle(tone.ink2)
+                    .rotationEffect(.degrees(sheetDetent == .full ? 180 : 0))
+                    .frame(width: 44, height: 36)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(HomePressStyle())
+            .accessibilityLabel(sheetDetent == .full ? "Show more board" : "Show more")
+        }
+        .frame(minHeight: 40)
+    }
+
+    @ViewBuilder
+    private func sheetPage(_ upNext: HomeUpNext) -> some View {
+        switch sheetTab {
+        case .today: sheetToday(upNext)
+        case .learn: sheetLearn
+        case .army: sheetArmy
+        case .you: sheetYou
+        }
+    }
+
+    /// Today: your games going, a person to play, Today's Move and the coach, the rivals.
+    private func sheetToday(_ upNext: HomeUpNext) -> some View {
+        let day = dailyState
+        let ladder = HomeLadder(games: vault.games)
+        return VStack(alignment: .leading, spacing: Self.gap) {
+            currentGames(upNext)
+                .homeRise(0)
+            playPerson()
+                .homeRise(1)
+            HStack(alignment: .top, spacing: Self.gap) {
+                HomeDailyTile(puzzle: dailyPuzzle, daily: day, tone: tone, pieceTheme: pieceTheme,
+                              solve: actions.dailyMove)
+                HomeCoachTile(plan: plan, trainedToday: training.trainedToday, progress: training.rankProgress,
+                              tone: tone, start: actions.trainToday, train: actions.train)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .homeRise(2)
+            if HomeNoticeCard.shows(day) {
+                HomeNoticeCard(daily: day, tone: tone, remind: answerReminder)
+                    .transition(.opacity)
+                    .homeRise(3)
+            }
+            HomeLadderTile(ladder: ladder, tone: tone, play: { level in actions.playRival(level) })
+                .padding(.top, 4)
+                .homeRise(4)
+        }
+    }
+
+    /// Learn: every way to get better, in one card.
+    private var sheetLearn: some View {
+        VStack(alignment: .leading, spacing: Self.gap) {
+            sheetCard {
+                HomeLinkRow(glyph: Glyphs.coach, title: "Train with Coach Leo", detail: "Lessons, drills and today's session", tone: tone, action: actions.train)
+                    .homeZoomSource(.coach)
+                    .homeRise(0)
+                HomeHairline(tone: tone)
+                HomeLinkRow(glyph: Glyphs.today, title: "Today's Move", detail: "The puzzle of the day", tone: tone, action: actions.dailyMove)
+                    .homeZoomSource(.daily)
+                    .homeRise(1)
+                HomeHairline(tone: tone)
+                HomeLinkRow(glyph: Glyphs.puzzles, title: "Puzzles", detail: "Rated puzzles at your level", tone: tone, action: actions.puzzles)
+                    .homeZoomSource(.puzzles)
+                    .homeRise(2)
+                HomeHairline(tone: tone)
+                HomeLinkRow(glyph: Glyphs.games, title: "Rewind", detail: gamesLine, tone: tone, action: actions.rewind)
+                    .homeZoomSource(.games)
+                    .homeRise(3)
+                HomeHairline(tone: tone)
+                HomeLinkRow(glyph: Glyphs.analyze, title: "Analyze", detail: "Study any position with the engine", tone: tone, action: actions.analyze)
+                    .homeRise(4)
+                HomeHairline(tone: tone)
+                HomeLinkRow(glyph: Glyphs.scan, title: "Scan a board", detail: "Read a real board with the camera", tone: tone, action: actions.scan)
+                    .homeRise(5)
+            }
+        }
+    }
+
+    /// Army: your pieces with memory, and the games they played.
+    private var sheetArmy: some View {
+        let played = vault.games
+        return VStack(alignment: .leading, spacing: Self.gap) {
+            sheetCard {
+                HomeLinkRow(glyph: Glyphs.army, title: "Your pieces", detail: piecesLine, tone: tone, action: actions.army)
+                    .homeZoomSource(.army)
+                    .homeRise(0)
+            }
+            if !played.isEmpty {
+                HomeGamesTile(rows: HomeGameRow.rows(played), total: played.count,
+                              week: HomeGameRow.thisWeek(played), tone: tone, openAll: actions.rewind)
+                    .homeZoomSource(.games)
+                    .homeRise(1)
+            }
+        }
+    }
+
+    /// You: the home's colors, your games, Settings and Pro.
+    private var sheetYou: some View {
+        VStack(alignment: .leading, spacing: Self.gap) {
+            sheetCard {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Colors")
+                        .font(.app(.body, weight: .semibold))
+                        .foregroundStyle(tone.ink)
+                    HomeToneSwitch(mode: $toneMode, tone: tone)
+                }
+                .padding(.vertical, 14)
+            }
+            .homeRise(0)
+            sheetCard {
+                HomeLinkRow(glyph: Glyphs.games, title: "Your games", detail: gamesLine, tone: tone, action: actions.rewind)
+                    .homeZoomSource(.games)
+                    .homeRise(0)
+                HomeHairline(tone: tone)
+                HomeLinkRow(glyph: Glyphs.settings, title: "Settings", detail: "Board look, sound, hints", tone: tone, action: actions.settings)
+                    .homeRise(1)
+                if let premium = actions.premium {
+                    HomeHairline(tone: tone)
+                    HomeLinkRow(glyph: Glyphs.king, title: "Chess Game Killer Pro", detail: "Everything, with no limits", tone: tone, action: premium)
+                        .homeRise(2)
+                }
+            }
+        }
+    }
+
+    /// A card of rows on the sheet.
+    private func sheetCard<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        VStack(spacing: 0) {
+            content()
+        }
+        .padding(.horizontal, HomeMetrics.inset)
+        .padding(.vertical, 2)
+        .homePane(RoundedRectangle(cornerRadius: HomeMetrics.tileRadius, style: .continuous), tone: tone)
+    }
+
+    /// A tab picked: its page slides in from that side. From the folded strip, the sheet rises.
+    private func pickTab(_ tab: HomeSheetTab) {
+        let forward: Bool = tab.rawValue >= sheetTab.rawValue
+        sheetForward = forward
+        let spring: Animation = reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.42, dampingFraction: 0.82)
+        withAnimation(spring) {
+            sheetTab = tab
+            if sheetDetent == .board { sheetDetent = .half }
+        }
+        onTab(tab)
+    }
+
+    /// Where a drag starts: on the board above the sheet, or on the sheet.
+    private enum SheetGrip { case board, sheet }
+
+    /// The top of the sheet's page, where a new tab opens.
+    private static var sheetTop: String { "sheet-top" }
+
+    /// Dragging the sheet (or the board above it) moves the sheet with the finger; on release
+    /// it springs to the rest nearest where the flick was heading.
+    private func sheetPull(on grip: SheetGrip, metrics: HomeSheetMetrics) -> some Gesture {
+        DragGesture(minimumDistance: grip == .board ? 14 : 6, coordinateSpace: .global)
+            .updating($sheetDrag) { value, state, _ in
+                state = value.translation.height
+            }
+            .onEnded { value in
+                let start: CGFloat = metrics.height(of: sheetDetent)
+                let landing: CGFloat = start - value.predictedEndTranslation.height
+                let next: HomeSheetDetent = Self.detent(from: sheetDetent, landing: landing, start: start, metrics: metrics)
+                withAnimation(sheetSpring) { sheetDetent = next }
+            }
+    }
+
+    /// The rest a flick lands on: the nearest to where it was heading, one step at least
+    /// when it was a real flick.
+    private static func detent(from current: HomeSheetDetent, landing: CGFloat, start: CGFloat,
+                               metrics: HomeSheetMetrics) -> HomeSheetDetent {
+        let nearest: HomeSheetDetent = metrics.nearest(to: landing)
+        if nearest != current { return nearest }
+        let moved: CGFloat = landing - start
+        if moved > 120, let up = HomeSheetDetent(rawValue: current.rawValue + 1) { return up }
+        if moved < -120, let down = HomeSheetDetent(rawValue: current.rawValue - 1) { return down }
+        return current
     }
 }
 

@@ -777,7 +777,9 @@ struct HomeRivalPortrait: View {
             // A little closer in, so the rival's shape fills the small circle.
             .scaleEffect(1.2)
             .grayscale(1)
-            .colorMultiply(tone.ivory)
+            // In Light and Middle the ivory is the room's dark ink, which would black the
+            // portrait out: the ring takes the room's own light instead.
+            .colorMultiply(tone.scheme == .dark ? tone.ivory : tone.canvas)
             .contrast(1.3)
             .clipShape(Circle())
             .overlay { Circle().strokeBorder(tone.ink.opacity(0.18), lineWidth: 0.5) }

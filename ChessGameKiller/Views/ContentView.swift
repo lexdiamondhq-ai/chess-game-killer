@@ -40,6 +40,18 @@ struct ContentView: View {
     /// Where the home's tiles and the screens they open meet, so a screen grows out of its tile.
     @Namespace private var homeZoom
     @AppStorage(HomeScreen.key) private var homeScreenOn = HomeScreen.defaultOn
+    /// The board style (Alex's pick, 1A): the home's board and sheet, and the same sheet across
+    /// the foot of the game. Settings > Board and sheet turns it off.
+    @AppStorage(HomeLayout.key) private var boardSheet = HomeLayout.defaultOn
+    /// The board home's room: Light, Middle or Dark.
+    @AppStorage(HomeToneMode.key) private var homeTone = HomeToneMode.defaultMode
+    /// Back from a game, the home's sheet rises out of the game's.
+    @State private var homeRises = false
+    /// The board home's tab, kept here so a redraw of the home (a new look) stays on it.
+    @State private var homeTab: HomeSheetTab = .today
+    /// The home has finished fading in, so the window takes its light. Until then the game
+    /// fading out keeps the dark it was drawn for.
+    @State private var homeLit: Bool
     @Environment(\.scenePhase) private var scenePhase
     /// Challenge a friend, when the app provides it (tests that draw this screen don't).
     @Environment(ChallengeCenter.self) private var challenges: ChallengeCenter?
@@ -77,6 +89,7 @@ struct ContentView: View {
         let home = startsAtHome ?? (startsWithNewGame && HomeScreen.isOn())
         let welcome = startsWithNewGame && !Welcome.isUnderTest && Welcome.shouldShow()
         _showingHome = State(initialValue: home)
+        _homeLit = State(initialValue: home)
         _showingWelcome = State(initialValue: welcome)
         _showingNewGame = State(initialValue: startsWithNewGame && !home && !welcome)
         _trayOpen = State(initialValue: trayOpen)
@@ -244,6 +257,7 @@ struct ContentView: View {
             }
             .fullScreenCover(isPresented: $showingPuzzles) {
                 PuzzlesView(theme: chosenTheme).environment(puzzles).environment(training)
+                    .homeZoom(.puzzles, in: homeZoom, when: zoomsFromSheet)
             }
             .onChange(of: showingGames) { _, showing in
                 if !showing { rewindOpening = nil }
@@ -251,9 +265,11 @@ struct ContentView: View {
             .fullScreenCover(isPresented: $showingGames) {
                 RewindGamesView(theme: chosenTheme, opening: rewindOpening, forfeits: forfeits) { game in playAgain(game) }
                     .environment(vault).environment(training)
+                    .homeZoom(.games, in: homeZoom, when: zoomsFromSheet)
             }
             .fullScreenCover(isPresented: $showingArmy) {
                 ArmyView(theme: chosenTheme, color: match.setup.playerColor).environment(army)
+                    .homeZoom(.army, in: homeZoom, when: zoomsFromSheet)
             }
             .fullScreenCover(item: $coach.presentedLesson) { lesson in
                 LessonScreen(lesson: lesson, theme: chosenTheme).environment(training).environment(daily)
@@ -284,9 +300,11 @@ struct ContentView: View {
                     challenges?.compose()
                 }
                 .environment(army)
+                .boardSheetGrabber(boardSheet)
             }
             .sheet(isPresented: $showingSettings, onDismiss: refreshDaily) {
                 SettingsSheet()
+                    .boardSheetGrabber(boardSheet)
             }
             .sheet(isPresented: $showingAnalyze, onDismiss: { analyzeWithCamera = false }) {
                 AnalyzeSheet(
@@ -302,6 +320,7 @@ struct ContentView: View {
                 ) { draft in
                     play(from: draft)
                 }
+                .boardSheetGrabber(boardSheet)
             }
     }
 
@@ -311,7 +330,7 @@ struct ContentView: View {
             // Switching between Neon and the executive look redraws everything in the new type.
             .id(theme.glows)
             .tint(theme.accent)
-            .preferredColorScheme(theme.isDark ? .dark : nil)
+            .preferredColorScheme(windowScheme)
             .environment(training)
             .environment(coach)
             .environment(army)
@@ -382,7 +401,8 @@ struct ContentView: View {
     private var screens: some View {
         if showingHome {
             // The home is dressed in the player's own look, not a rival's board.
-            HomeView(match: match, theme: .named(themeID), actions: homeActions)
+            HomeView(match: match, theme: .named(themeID), actions: homeActions, tab: homeTab, rises: homeRises,
+                     onTab: { tab in homeTab = tab })
                 .environment(\.homeZoom, homeZoom)
                 .transition(.opacity)
         } else {
@@ -507,6 +527,7 @@ struct ContentView: View {
 
     private func leaveHome() {
         guard showingHome else { return }
+        homeLit = false
         withAnimation(.easeInOut(duration: 0.35)) { showingHome = false }
     }
 
@@ -514,8 +535,30 @@ struct ContentView: View {
         setCoach(expanded: false)
         // A victory theme still playing fades as the game leaves the screen.
         SoundPlayer.shared.stopAll(fade: 0.4)
-        withAnimation(.easeInOut(duration: 0.35)) { showingHome = true }
+        homeRises = true
+        homeTab = .today
+        withAnimation(.easeInOut(duration: 0.35)) {
+            showingHome = true
+        } completion: {
+            homeLit = showingHome
+        }
+        // The home has started its rise by now; a later redraw of it (a new look) starts at rest.
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1))
+            homeRises = false
+        }
     }
+
+    /// The window's light: the board home's room while it shows (Light and Middle are light),
+    /// the board's look everywhere else.
+    private var windowScheme: ColorScheme? {
+        if showingHome, homeLit, boardSheet, !showingWelcome { return homeTone.scheme }
+        return theme.isDark ? .dark : nil
+    }
+
+    /// Puzzles, your games and your pieces grow out of the board home's rows that open them.
+    /// The tiles home has no such rows, and the game screen opens them as usual.
+    private var zoomsFromSheet: Bool { showingHome && boardSheet }
 
     /// The board, the players and the dock inside the navigation bar, sized to the screen.
     private var gameScreen: some View {
@@ -546,18 +589,22 @@ struct ContentView: View {
                 }
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     let coachHeight = screen.size.height * Self.coachShare
-                    Group {
-                        if bigBoard {
-                            bigTray(coachHeight: coachHeight)
-                        } else {
-                            dock(coachHeight: coachHeight)
+                    if boardSheet, !bigBoard {
+                        gameSheet(coachHeight: coachHeight, bottom: screen.safeAreaInsets.bottom)
+                    } else {
+                        Group {
+                            if bigBoard {
+                                bigTray(coachHeight: coachHeight)
+                            } else {
+                                dock(coachHeight: coachHeight)
+                            }
                         }
+                        .frame(maxWidth: Self.dockMaxWidth)
+                        .padding(.horizontal, Self.inset)
+                        .padding(.top, 8)
+                        // Above the home indicator; on a phone without one, a little off the edge.
+                        .padding(.bottom, screen.safeAreaInsets.bottom > 0 ? 0 : 8)
                     }
-                    .frame(maxWidth: Self.dockMaxWidth)
-                    .padding(.horizontal, Self.inset)
-                    .padding(.top, 8)
-                    // Above the home indicator; on a phone without one, a little off the edge.
-                    .padding(.bottom, screen.safeAreaInsets.bottom > 0 ? 0 : 8)
                 }
                 .background { SheetBackdrop(theme: theme) }
                 .navigationTitle("Chess Game Killer")
@@ -824,6 +871,17 @@ struct ContentView: View {
                         .blur(radius: 18)
                 }
             }
+    }
+
+    /// The board style's dock: the home's glass sheet across the foot of the screen, with the
+    /// same controls. Pulled up, the coach unfolds into it.
+    private func gameSheet(coachHeight: CGFloat, bottom: CGFloat) -> some View {
+        GameSheet(theme: theme, isOpen: coachExpanded, bottomInset: bottom, setOpen: { opened in
+            setCoach(expanded: opened)
+        }) {
+            dockRow(coachHeight: coachHeight)
+        }
+        .padding(.top, 8)
     }
 
     /// Every control named, three either side of the orb. They step aside while the orb is wide.

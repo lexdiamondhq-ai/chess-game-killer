@@ -30,8 +30,10 @@ struct RewindGamesView: View {
                 LazyVStack(spacing: 12) {
                     if vault.games.isEmpty {
                         empty
+                            .homeRise(0)
                     } else {
                         week
+                            .homeRise(0)
                         ForEach(vault.games) { game in
                             NavigationLink(value: game.id) {
                                 GameCard(game: game, theme: theme)
