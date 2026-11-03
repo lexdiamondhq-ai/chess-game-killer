@@ -15,7 +15,7 @@ extension TrainingLibrary {
 }
 
 extension BoardTheme {
-    /// The looks every player has. Each rival's board opens once that rival is beaten.
+    /// The looks every player has. Each rival board opens once the crowd at its level is beaten.
     static let freeLooks: Set<BoardTheme.ID> = [.gilded, .classic, .noir, .midnight]
 }
 
@@ -41,7 +41,12 @@ enum RivalBoardsEarned {
     @MainActor
     static func opens(_ look: BoardTheme, premium: Premium = .shared, defaults: UserDefaults = .standard) -> Bool {
         if premium.opens(.boardLooks) || BoardTheme.freeLooks.contains(look.id) { return true }
-        guard BoardTheme.rivals.contains(where: { $0.id == look.id }) else { return false }
-        return names(defaults).contains(look.name.lowercased())
+        guard let index = BoardTheme.rivals.firstIndex(where: { $0.id == look.id }) else { return false }
+        let earned = names(defaults)
+        // The board's own name counts for wins from before The Crowd; since then, each rival board
+        // belongs to the crowd at the same level, so beating The 1000s opens the first one.
+        if earned.contains(look.name.lowercased()) { return true }
+        guard let level = MatchController.Level(rawValue: index) else { return false }
+        return earned.contains(level.rival.name.lowercased())
     }
 }

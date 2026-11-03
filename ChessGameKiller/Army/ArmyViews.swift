@@ -650,7 +650,7 @@ struct PieceDetailView: View {
                             .font(.app(.subheadline, weight: .semibold))
                         Text(avenged
                              ? "Took it \(ArmyNews.times(nemesis.times)). Revenge taken."
-                             : "Has taken it \(ArmyNews.times(nemesis.times)). Win against \(rival.name) and take something back for revenge.")
+                             : "Has taken it \(ArmyNews.times(nemesis.times)). Win against \(rival.name.midSentence) and take something back for revenge.")
                             .font(.app(.caption))
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)

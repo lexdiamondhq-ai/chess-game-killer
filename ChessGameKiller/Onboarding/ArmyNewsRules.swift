@@ -6,9 +6,9 @@ extension ArmyNews {
     var rule: String? {
         switch kind {
         case .grudge(let rival, _):
-            return "Beat \(rival) with \(name) making a capture for bonus XP."
+            return "Beat \(rival.midSentence) with \(name) making a capture for bonus XP."
         case .staked(let rival):
-            return "Win: double XP and a trophy. Lose: \(rival) keeps \(name) until you win it back."
+            return "Win: double XP and a trophy. Lose: \(rival) \(rival.agreeing("keeps", "keep")) \(name) until you win it back."
         case .captured:
             return "Until then it earns no XP."
         case .streakMark:

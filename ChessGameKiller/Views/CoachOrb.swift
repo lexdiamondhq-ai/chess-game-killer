@@ -191,15 +191,15 @@ private struct ResultText {
         if let outcome = match.outcome {
             switch outcome {
             case .timeout(let loser):
-                return loser == player ? "\(rival) wins on time" : "You win on time"
+                return loser == player ? "\(rival) \(rival.agreeing("wins", "win")) on time" : "You win on time"
             case .timeoutDraw:
                 return "Draw"
             case .resigned(let loser):
-                return loser == player ? "You resigned" : "\(rival) resigns"
+                return loser == player ? "You resigned" : "\(rival) \(rival.agreeing("resigns", "resign"))"
             }
         }
         guard let winner = match.game.winner else { return "Draw" }
-        return winner == player ? "You win" : "\(rival) wins"
+        return winner == player ? "You win" : "\(rival) \(rival.agreeing("wins", "win"))"
     }
 
     var detail: String {
@@ -209,10 +209,10 @@ private struct ResultText {
                 return loser == player ? "Your clock ran out." : "\(rival.possessive) clock ran out."
             case .timeoutDraw(let flagged):
                 return flagged == player
-                    ? "Your clock ran out, but \(rival) can't checkmate with what's left."
+                    ? "Your clock ran out, but \(rival.midSentence) can't checkmate with what's left."
                     : "\(rival.possessive) clock ran out, but you can't checkmate with what's left."
             case .resigned(let loser):
-                return loser == player ? "\(rival) takes this one." : "You win. There was no way back for \(rival)."
+                return loser == player ? "\(rival) \(rival.agreeing("takes", "take")) this one." : "You win. There was no way back for \(rival.midSentence)."
             }
         }
         if match.game.winner != nil {
@@ -292,7 +292,7 @@ private struct OrbFace: View {
     }
 
     private var accessibilityText: String {
-        if match.isComputerThinking { return "\(match.setup.rival.name) is thinking" }
+        if match.isComputerThinking { return "\(match.setup.rival.name) \(match.setup.rival.name.agreeing("is", "are")) thinking" }
         if match.isOver { return ResultText(match: match).title }
         var text = match.review.map { "\($0.title). \($0.detail)" } ?? "\(Coach.current.name), your coach."
         if let evaluation = match.evaluation {
@@ -486,9 +486,9 @@ private struct CoachPanel: View {
             } else if match.isComputerThinking {
                 ThinkingSigil(rival: match.setup.rival, size: 40, glows: theme.glows)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(rival) is thinking").font(.app(.headline))
+                    Text("\(rival) \(rival.agreeing("is", "are")) thinking").font(.app(.headline))
                     if gradeIsComing {
-                        Text("Your grade comes right after \(rival.possessive) reply.")
+                        Text("Your grade comes right after \(rival.midSentence.possessive) reply.")
                             .font(.app(.subheadline)).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -632,7 +632,7 @@ private struct CoachPanel: View {
                 } else if match.hints.isEmpty {
                     HStack(spacing: 8) {
                         ProgressView().controlSize(.small)
-                        Text(match.isComputerThinking ? "Waiting for \(rival)…" : "Thinking…")
+                        Text(match.isComputerThinking ? "Waiting for \(rival.midSentence)…" : "Thinking…")
                             .font(.app(.footnote, weight: .medium))
                             .foregroundStyle(.secondary)
                     }

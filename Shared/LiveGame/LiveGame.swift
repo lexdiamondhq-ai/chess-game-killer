@@ -47,10 +47,10 @@ struct LiveGameAttributes: ActivityAttributes {
 }
 
 extension LiveGameAttributes.ContentState {
-    /// The big line: whose move it is, or how the game ended. "Your move", "Pulse is thinking", "You won".
+    /// The big line: whose move it is, or how the game ended. "Your move", "The 1600s are thinking", "You won".
     func headline(rival: String) -> String {
         if let result { return result }
-        return yourMove ? "Your move" : "\(rival) is thinking"
+        return yourMove ? "Your move" : "\(rival) \(rival.agreeing("is", "are")) thinking"
     }
 
     /// The line under it: what just happened and the move number. "Pulse played Nf6 · move 14",

@@ -250,7 +250,7 @@ final class ArmyTests: XCTestCase {
         var stats = PieceGameStats()
         stats.taken = [.pawn, .rook]
         XCTAssertEqual(ArmyStore.heroLine(name: "Kestrel", stats: stats, rival: "The 2000s"),
-                       "Kestrel took The 2000s' rook and 1 more.")
+                       "Kestrel took the 2000s' rook and 1 more.")
         stats.promoted = true
         XCTAssertEqual(ArmyStore.heroLine(name: "Kestrel", stats: stats, rival: "The 2000s"),
                        "Kestrel marched all the way and promoted.")
@@ -284,7 +284,7 @@ final class ArmyTests: XCTestCase {
         XCTAssertEqual(grudge?.kind, .grudge(rival: "The 2000s", times: 3))
         // Mid-sentence, a piece without a name is "your d-pawn".
         let name = store.record(for: .dPawn).name ?? "your \(ArmySlot.dPawn.title.lowercased())"
-        XCTAssertEqual(grudge?.headline, "The 2000s has taken \(name) three times.")
+        XCTAssertEqual(grudge?.headline, "The 2000s have taken \(name) three times.")
         XCTAssertNil(store.grudge(against: .beginner))
     }
 
