@@ -18,6 +18,8 @@ struct SettingsSheet: View {
     @AppStorage(Heirloom.settingKey) private var heirloomOn = true
     @AppStorage(BoardTheme.coordinatesKey) private var coordinatesOn = true
     @AppStorage(HomeScreen.key) private var homeScreen = HomeScreen.defaultOn
+    @AppStorage(HomeLayout.key) private var boardSheet = HomeLayout.defaultOn
+    @AppStorage(HomeToneMode.key) private var homeTone = HomeToneMode.defaultMode
     /// Shared with the lessons' speaker button and the highlight reel.
     @AppStorage("coachVoiceMuted") private var voiceMuted = false
     /// Out loud with the ring switch on silent. Read by CoachVoice when a lesson, reel or Leo's reply starts.
@@ -77,6 +79,19 @@ struct SettingsSheet: View {
                             rule
                             ToggleRow(title: "Home screen", subtitle: "Open on a home page: the board up top, your week, and every mode one tap away.",
                                       symbol: "house", isOn: $homeScreen, theme: theme)
+                            rule
+                            ToggleRow(title: "Board and sheet", subtitle: "The 3D board stays on top and one glass sheet holds the rest, at home and in a game. Off brings back the tiles and the floating dock.",
+                                      symbol: "rectangle.bottomhalf.inset.filled", isOn: $boardSheet, theme: theme)
+                            if boardSheet {
+                                rule
+                                PickerRow(title: "Home colors", subtitle: homeTone.blurb, symbol: "circle.lefthalf.filled", theme: theme) {
+                                    Picker("Home colors", selection: $homeTone) {
+                                        ForEach(HomeToneMode.allCases) { mode in
+                                            Text(mode.title).tag(mode)
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
 

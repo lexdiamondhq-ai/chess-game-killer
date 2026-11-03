@@ -149,6 +149,9 @@ jobs:
           }
           # The home as a returning player sees it: no welcome, no tips.
           home home -welcomeSeen YES -tipsOff YES
+          # The board home's Middle and Dark rooms (Light is the default, above).
+          home home-dark -homeTone dark -welcomeSeen YES -tipsOff YES
+          home home-middle -homeTone middle -welcomeSeen YES -tipsOff YES
           home home-today -showcaseHomeAt today -welcomeSeen YES -tipsOff YES
           home home-ladder -showcaseHomeAt ladder -welcomeSeen YES -tipsOff YES
           home home-friends -showcaseHomeAt friends -welcomeSeen YES -tipsOff YES
@@ -217,7 +220,7 @@ jobs:
         # The screens being worked on, once more at the very end and small, so a short tail of the log holds them.
         run: |
           [ -d snapshots ] || exit 0
-          for f in snapshots/device-home.png snapshots/device-home-grudge.png snapshots/device-home-current-rest.png snapshots/device-home-current-all.png; do
+          for f in snapshots/device-home.png snapshots/device-home-middle.png snapshots/device-home-dark.png snapshots/device-gilded-3d.png snapshots/device-coach.png snapshots/device-home-grudge.png; do
             [ -e "$f" ] || continue
             sips -s format jpeg -s formatOptions 70 -Z 1700 "$f" --out /tmp/tiny.jpg >/dev/null
             echo "BEGIN-SCREEN $(basename "$f")"

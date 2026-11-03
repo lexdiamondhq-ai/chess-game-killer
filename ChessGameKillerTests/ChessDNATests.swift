@@ -215,10 +215,11 @@ final class ChessDNATests: XCTestCase {
             return puzzle.themes
         }
         XCTAssertTrue(themes(.warmUp).contains("fork"), "\(themes(.warmUp))")
-        // The day's style theme steps aside when it is also today's main theme (some days
-        // mateIn3 is both), so the puzzle fits one of the style's themes, not always the first.
+        // The style puzzle comes from one of the style's themes. Not always the day's first: when
+        // that one is also the day's focus (every 28 days for the Attacker), the plan moves to the
+        // next, so check against the whole list.
         let style = try XCTUnwrap(dna.style)
-        let tags = style.themes.map(PuzzleTheme.named).reduce(into: Set<String>()) { $0.formUnion($1.tags) }
-        XCTAssertFalse(Set(themes(.mixed)).isDisjoint(with: tags), "\(themes(.mixed)) for \(style.themes)")
+        let styleTags = Set(style.themes.flatMap { PuzzleTheme.named($0).tags })
+        XCTAssertFalse(Set(themes(.mixed)).isDisjoint(with: styleTags), "\(themes(.mixed)) for \(style.rawValue)")
     }
 }

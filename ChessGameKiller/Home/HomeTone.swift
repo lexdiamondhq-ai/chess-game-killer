@@ -1,11 +1,44 @@
 import SwiftUI
 import UIKit
 
+/// The board home's colors, as on the 1A pages: Light (bright and airy, daytime), Middle (soft
+/// stone, dusk and rose: calm, neither white nor black) or Dark (deep night, the pieces
+/// glowing). Light is the default (Alex's pick, 2026-11-03), as the 1A pages opened; Settings
+/// and the sheet's You tab change it.
+enum HomeToneMode: String, CaseIterable, Identifiable {
+    case light, middle, dark
+
+    static let key = "homeTone"
+    static let defaultMode: HomeToneMode = .light
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .light: return "Light"
+        case .middle: return "Middle"
+        case .dark: return "Dark"
+        }
+    }
+
+    var blurb: String {
+        switch self {
+        case .light: return "Bright and airy, like daytime."
+        case .middle: return "Soft stone: calm, neither white nor black."
+        case .dark: return "Deep night, with the pieces glowing."
+        }
+    }
+
+    var scheme: ColorScheme { self == .dark ? .dark : .light }
+}
+
 /// The home's colors, taken from the board it stands on: the dark of the room, the stone's
 /// warmth, the pieces' metal and the ivory of the white set. Gilded gives espresso and
 /// satin gold, Midnight ink blue and gold, Bordeaux wine; so the page belongs to the board.
+/// In Light and Middle the room turns to cream or stone, the ink to the dark of the set, and
+/// the one solid button goes dark.
 struct HomeTone {
-    /// The room: the deepest color, behind everything.
+    /// The room: the deepest color, behind everything (the palest, in Light).
     let canvas: Color
     /// A clock face's solid fill, for a reader who asks for less transparency.
     let smoke: Color
@@ -13,20 +46,35 @@ struct HomeTone {
     let pool: Color
     /// The pieces' metal: the only accent, used sparingly (the side to move, the next rung).
     let metal: Color
-    /// The white pieces' ivory: the one solid button.
+    /// The white pieces' ivory: the one solid button (the black set's ink, in Light and Middle).
     let ivory: Color
     let onIvory: Color
+    /// Text: warm white in the dark, the set's own dark in Light and Middle.
+    var ink: Color = HomeTone.warmWhite
+    /// The scheme the home is drawn in, so the glass and the system's parts match.
+    var scheme: ColorScheme = .dark
 
-    /// Text: warm white, then two quieter steps. The quietest still reads at small sizes.
-    var ink: Color { Color(red: 0.965, green: 0.945, blue: 0.91) }
-    var ink2: Color { ink.opacity(0.72) }
-    var ink3: Color { ink.opacity(0.6) }
+    static let warmWhite = Color(red: 0.965, green: 0.945, blue: 0.91)
+
+    /// Two quieter steps of the ink. The quietest still reads at small sizes on every room.
+    var ink2: Color { ink.opacity(scheme == .dark ? 0.72 : 0.74) }
+    var ink3: Color { ink.opacity(scheme == .dark ? 0.6 : 0.66) }
     var hairline: Color { ink.opacity(0.12) }
     /// Something happening right now, like players waiting online: a soft green, the one
     /// color that isn't the board's, kept to a dot.
-    var live: Color { Color(hex: 0x7FE0A3) }
+    var live: Color { scheme == .dark ? Color(hex: 0x7FE0A3) : Color(hex: 0x2E9E5B) }
+    /// How dark the shadow under the sheet and the cards falls.
+    var shadow: Double { scheme == .dark ? 0.35 : 0.12 }
 
-    static func of(_ look: SculptedLook) -> HomeTone {
+    static func of(_ look: SculptedLook, mode: HomeToneMode = .dark) -> HomeTone {
+        switch mode {
+        case .dark: return dark(look)
+        case .light: return light(look)
+        case .middle: return middle(look)
+        }
+    }
+
+    private static func dark(_ look: SculptedLook) -> HomeTone {
         switch look.name {
         case "Portoro":
             return HomeTone(canvas: Color(hex: 0x0C0C0C), smoke: Color(hex: 0x171614), pool: Color(hex: 0x565554),
@@ -48,6 +96,45 @@ struct HomeTone {
             return HomeTone(canvas: Color(hex: 0x100B08), smoke: Color(hex: 0x1E150F), pool: Color(hex: 0x684F40),
                             metal: Color(hex: 0xE2B577), ivory: Color(hex: 0xF4EDDF), onIvory: Color(hex: 0x15110C))
         }
+    }
+
+    /// Daylight: cream (porcelain sky for Midnight, peach for Bordeaux, chalk for Sculpted),
+    /// with a white pool for the board and a deeper gold that still reads on it.
+    private static func light(_ look: SculptedLook) -> HomeTone {
+        switch look.name {
+        case "Midnight":
+            return lit(canvas: 0xEEF3FA, smoke: 0xE2E9F3, metal: 0xA87A2E, ink: 0x14203D)
+        case "Bordeaux":
+            return lit(canvas: 0xFBF0EA, smoke: 0xF1E2DA, metal: 0xA8732A, ink: 0x2A1714)
+        case "Sculpted":
+            return lit(canvas: 0xF3F3F1, smoke: 0xE7E7E4, metal: 0x6E7078, ink: 0x16181C)
+        default:
+            return lit(canvas: 0xFBF6EC, smoke: 0xF0E8DA, metal: 0xA87A2E, ink: 0x1B1A22)
+        }
+    }
+
+    /// In between: stone (dusk for Midnight, rose stone for Bordeaux, slate for Sculpted),
+    /// a softer pool, and the gold a shade deeper again.
+    private static func middle(_ look: SculptedLook) -> HomeTone {
+        switch look.name {
+        case "Midnight":
+            return lit(canvas: 0xC9CFDD, smoke: 0xBCC3D3, metal: 0x8A6420, ink: 0x161D33, pool: 0xE3E7F0)
+        case "Bordeaux":
+            return lit(canvas: 0xD8C8C2, smoke: 0xCDBBB4, metal: 0x8A5A22, ink: 0x2A1714, pool: 0xECE1DC)
+        case "Sculpted":
+            return lit(canvas: 0xCFD0CF, smoke: 0xC3C5C4, metal: 0x5E6068, ink: 0x16181C, pool: 0xE6E7E6)
+        default:
+            return lit(canvas: 0xD9D0C2, smoke: 0xCEC4B4, metal: 0x8C6224, ink: 0x22201C, pool: 0xEEE7DB)
+        }
+    }
+
+    /// A light room: the set's dark for the ink and the one solid button, the room's own
+    /// color on that button.
+    private static func lit(canvas: UInt32, smoke: UInt32, metal: UInt32, ink: UInt32,
+                            pool: UInt32 = 0xFFFFFF) -> HomeTone {
+        HomeTone(canvas: Color(hex: canvas), smoke: Color(hex: smoke), pool: Color(hex: pool),
+                 metal: Color(hex: metal), ivory: Color(hex: ink), onIvory: Color(hex: canvas),
+                 ink: Color(hex: ink), scheme: .light)
     }
 }
 
