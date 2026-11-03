@@ -12,6 +12,48 @@ import simd
 @MainActor
 final class HomeSnapshotTests: XCTestCase {
 
+    /// These pictures are of the tiles home; the board home has its own test, which turns it on.
+    override func setUp() async throws {
+        try await super.setUp()
+        UserDefaults.standard.set(false, forKey: HomeLayout.key)
+    }
+
+    override func tearDown() async throws {
+        UserDefaults.standard.removeObject(forKey: HomeLayout.key)
+        try await super.tearDown()
+    }
+
+    /// The board home (1A): the sheet halfway on Today, all the way up on Learn, on Army and
+    /// You, and folded down to the strip with the board filling the screen.
+    func testTheBoardHome() throws {
+        UserDefaults.standard.set(true, forKey: HomeLayout.key)
+        let shots: [(HomeSheetDetent, HomeSheetTab, String)] = [
+            (.half, .today, "zz-home-sheet-1-today"), (.full, .learn, "zz-home-sheet-2-learn"),
+            (.half, .army, "zz-home-sheet-3-army"), (.half, .you, "zz-home-sheet-4-you"),
+            (.board, .today, "zz-home-sheet-5-folded"),
+        ]
+        for (detent, tab, name) in shots {
+            let window = try show(HomeSample.home(sheet: detent, tab: tab))
+            try save(window, name)
+            window.isHidden = true
+        }
+    }
+
+    /// The sheet's rests, and the rubber band past them.
+    func testTheSheetSnapsAndStretches() {
+        let metrics = HomeSheetMetrics(total: 852, safeTop: 59, safeBottom: 34)
+        XCTAssertLessThan(metrics.height(of: .board), metrics.height(of: .half))
+        XCTAssertLessThan(metrics.height(of: .half), metrics.height(of: .full))
+        XCTAssertEqual(metrics.progress(metrics.lowest), 0)
+        XCTAssertEqual(metrics.progress(metrics.highest), 1)
+        // Pulled far past the top, it gives only a little.
+        let over = metrics.height(.full, drag: -400)
+        XCTAssertGreaterThan(over, metrics.highest)
+        XCTAssertLessThan(over, metrics.highest + 70)
+        XCTAssertEqual(metrics.nearest(to: metrics.height(of: .half) + 20), .half)
+        XCTAssertEqual(metrics.nearest(to: 0), .board)
+    }
+
     func testHomeScrolling() throws {
         let window = try show(HomeSample.home())
         // The page fits on about a screen: at rest, partway (the board turning in its window), and at its foot.
@@ -372,7 +414,8 @@ enum HomeSample {
     static let italianFEN = "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQK2R b KQkq - 0 5"
 
     static func home(empty: Bool = false, theme: BoardTheme.ID = .gilded, match: MatchController? = nil,
-                     showsYou: Bool = false, showsShortcuts: Bool = false) -> some View {
+                     showsYou: Bool = false, showsShortcuts: Bool = false,
+                     sheet: HomeSheetDetent = .half, tab: HomeSheetTab = .today) -> some View {
         let game = match ?? MatchController(engine: nil, sounds: nil)
         let vault = GameVault(games: empty ? [] : games())
         let army = empty ? ArmyStore() : ArmyStore(army: armyRecords())
@@ -398,7 +441,7 @@ enum HomeSample {
         }
         daily.seeded = true
         return HomeView(match: game, theme: .named(theme), actions: HomeActions(), showsYou: showsYou,
-                        showsShortcuts: showsShortcuts)
+                        showsShortcuts: showsShortcuts, sheet: sheet, tab: tab)
             .environment(DailyStore(state: daily))
             .environment(vault)
             .environment(army)

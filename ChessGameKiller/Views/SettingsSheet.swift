@@ -19,6 +19,7 @@ struct SettingsSheet: View {
     @AppStorage(Heirloom.settingKey) private var heirloomOn = true
     @AppStorage(BoardTheme.coordinatesKey) private var coordinatesOn = true
     @AppStorage(HomeScreen.key) private var homeScreen = HomeScreen.defaultOn
+    @AppStorage(HomeLayout.key) private var boardSheet = HomeLayout.defaultOn
     /// Shared with the lessons' speaker button and the highlight reel.
     @AppStorage("coachVoiceMuted") private var voiceMuted = false
     /// Out loud with the ring switch on silent. Read by CoachVoice when a lesson, reel or Leo's reply starts.
@@ -81,6 +82,10 @@ struct SettingsSheet: View {
                             rule
                             ToggleRow(title: "Home screen", subtitle: "Open on a home page: the board up top, your week, and every mode one tap away.",
                                       symbol: "house", isOn: $homeScreen, theme: theme)
+                            rule
+                            ToggleRow(title: "Board home", subtitle: "The 3D board fills the home, with one sheet over it. Off brings back the tiles.",
+                                      symbol: "rectangle.bottomhalf.inset.filled", isOn: $boardSheet, theme: theme)
+                                .disabled(!homeScreen)
                         }
                     }
 
