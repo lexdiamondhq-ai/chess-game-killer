@@ -260,6 +260,7 @@ struct NewGameSheet: View {
             }
             .navigationTitle("New Game")
             .navigationBarTitleDisplayMode(.inline)
+            .sheetTitleBar()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }

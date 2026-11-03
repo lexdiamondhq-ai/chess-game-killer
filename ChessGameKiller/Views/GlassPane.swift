@@ -122,3 +122,26 @@ extension View {
         modifier(GlassPane(shape: shape, tint: tint, weight: weight))
     }
 }
+
+/// A sheet's title bar with something behind it once the page scrolls under it, so the page's
+/// text never runs through the title and its buttons. iOS 26 frosts the edge firmly; before it,
+/// the bar takes its usual material.
+struct SheetTitleBar: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) {
+            content.scrollEdgeEffectStyle(.hard, for: .top)
+        } else {
+            content.toolbarBackground(.thinMaterial, for: .navigationBar)
+        }
+        #else
+        content.toolbarBackground(.thinMaterial, for: .navigationBar)
+        #endif
+    }
+}
+
+extension View {
+    /// See ``SheetTitleBar``. Goes on the sheet's scroll view.
+    func sheetTitleBar() -> some View { modifier(SheetTitleBar()) }
+}
