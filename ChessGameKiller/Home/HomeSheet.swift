@@ -68,7 +68,8 @@ struct HomeSheetMetrics {
         case .board:
             return Self.stripHeight + safeBottom
         case .half:
-            let half: CGFloat = total * 0.5
+            // Tall enough that the page's first cards clear the tabs, with a game going too.
+            let half: CGFloat = total * 0.56
             return max(half, 380)
         case .full:
             return total - safeTop - Self.peek

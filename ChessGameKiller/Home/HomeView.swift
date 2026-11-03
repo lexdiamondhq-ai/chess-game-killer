@@ -653,7 +653,7 @@ extension HomeView {
         ZStack(alignment: .top) {
             sheetBoard(upNext, width: geo.size.width, metrics: metrics, lift: lift)
             if tone.scheme == .light {
-                greetingBacking(height: safeTop + 96, lift: lift)
+                greetingBacking(height: safeTop + 110, lift: lift)
             }
             sheetGreeting(lift: lift)
                 .padding(.top, safeTop + 4)
@@ -734,7 +734,10 @@ extension HomeView {
     /// fade is enough, so this comes in with the sheet.
     private func greetingBacking(height: CGFloat, lift: CGFloat) -> some View {
         let shown: Double = Double(min(lift * 2, 1))
-        return LinearGradient(colors: [tone.canvas.opacity(0.9), tone.canvas.opacity(0.6), tone.canvas.opacity(0)],
+        // Firm behind the greeting's line, then fading out under it.
+        return LinearGradient(stops: [.init(color: tone.canvas.opacity(0.92), location: 0),
+                                      .init(color: tone.canvas.opacity(0.82), location: 0.6),
+                                      .init(color: tone.canvas.opacity(0), location: 1)],
                               startPoint: .top, endPoint: .bottom)
             .frame(height: height)
             .opacity(shown)
@@ -749,7 +752,8 @@ extension HomeView {
         return HomeGreeting(name: playerName, streak: day.streak, doneToday: day.doneToday,
                             streakDetail: day.detail, level: ladder.yourRating, tone: tone,
                             openStreak: actions.dailyMove, openLevel: { pickTab(.today) })
-            .opacity(Double(1 - lift * 0.7))
+            // Stays readable over the pieces; the sheet itself covers it when it comes all the way up.
+            .opacity(Double(1 - lift * 0.15))
             .offset(y: -lift * 10)
     }
 
