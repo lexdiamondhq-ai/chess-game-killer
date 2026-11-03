@@ -40,14 +40,14 @@ final class HomeSnapshotTests: XCTestCase {
         }
     }
 
-    /// The board home in Light and Middle, as the You tab and Settings set it: halfway on Today,
-    /// on You with the switch, and folded.
-    func testTheBoardHomeInLightAndMiddle() throws {
+    /// The board home in Middle and Dark, as the You tab and Settings set them (Light is the
+    /// default, above): halfway on Today, on You with the switch, and folded.
+    func testTheBoardHomeInMiddleAndDark() throws {
         UserDefaults.standard.set(true, forKey: HomeLayout.key)
         let shots: [(HomeSheetDetent, HomeSheetTab, String)] = [
             (.half, .today, "today"), (.half, .you, "you"), (.board, .today, "folded"),
         ]
-        for mode in [HomeToneMode.light, HomeToneMode.middle] {
+        for mode in [HomeToneMode.middle, HomeToneMode.dark] {
             UserDefaults.standard.set(mode.rawValue, forKey: HomeToneMode.key)
             for (detent, tab, name) in shots {
                 let window = try show(HomeSample.home(sheet: detent, tab: tab))

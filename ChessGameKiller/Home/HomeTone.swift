@@ -3,12 +3,13 @@ import UIKit
 
 /// The board home's colors, as on the 1A pages: Light (bright and airy, daytime), Middle (soft
 /// stone, dusk and rose: calm, neither white nor black) or Dark (deep night, the pieces
-/// glowing). Dark is the home as it has always been; Settings and the sheet's You tab change it.
+/// glowing). Light is the default (Alex's pick, 2026-11-03), as the 1A pages opened; Settings
+/// and the sheet's You tab change it.
 enum HomeToneMode: String, CaseIterable, Identifiable {
     case light, middle, dark
 
     static let key = "homeTone"
-    static let defaultMode: HomeToneMode = .dark
+    static let defaultMode: HomeToneMode = .light
 
     var id: String { rawValue }
 
