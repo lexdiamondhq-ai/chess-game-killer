@@ -83,10 +83,12 @@ struct HomeView: View {
     @AppStorage(HomeLayout.key) private var boardSheet = HomeLayout.defaultOn
     /// The board home's room: Light, Middle or Dark (the tiles home stays dark).
     @AppStorage(HomeToneMode.key) private var toneMode = HomeToneMode.defaultMode
-    /// Where the sheet rests, and how far a finger has it from there.
+    /// Where the sheet rests, and how far a finger has it from there. The drag springs back by
+    /// itself when a pull is cut short (an alert, a call), so the sheet never parks between rests.
     @State private var sheetDetent: HomeSheetDetent = .half
-    @State private var sheetDrag: CGFloat = 0
-    @State private var sheetDragging = false
+    @GestureState(resetTransaction: Transaction(animation: .spring(response: 0.46, dampingFraction: 0.8)))
+    private var sheetDrag: CGFloat = 0
+    private var sheetDragging: Bool { sheetDrag != 0 }
     /// The sheet's tab, and whether the last pick moved right (its page comes in from the right).
     @State private var sheetTab: HomeSheetTab = .today
     @State private var sheetForward = true
@@ -95,6 +97,12 @@ struct HomeView: View {
     private let rises: Bool
     /// The rise from the game has played (once per return).
     @State private var rose = false
+    /// The game is starting or resuming: one start per visit, however many taps land.
+    @State private var launched = false
+    /// The sheet is folding down before the game opens; the home takes no more taps.
+    @State private var pushing = false
+    /// Tells the app which tab is showing, so a redraw of the home (a new look) keeps it.
+    private let onTab: (HomeSheetTab) -> Void
 
     enum YouOrigin { case top, bottom }
 
@@ -109,12 +117,13 @@ struct HomeView: View {
     /// `rises`: the player is back from a game, so the sheet comes up out of the game's.
     init(match: MatchController, theme: BoardTheme, actions: HomeActions, showsYou: Bool = false,
          showsShortcuts: Bool = false, sheet: HomeSheetDetent = .half, tab: HomeSheetTab = .today,
-         rises: Bool = false) {
+         rises: Bool = false, onTab: @escaping (HomeSheetTab) -> Void = { _ in }) {
         self.match = match
         self.theme = theme
         self.actions = actions
         self.sheetRest = sheet
         self.rises = rises
+        self.onTab = onTab
         _you = State(initialValue: showsYou ? .bottom : nil)
         _shortcutsOpen = State(initialValue: showsShortcuts)
         _sheetDetent = State(initialValue: rises ? .board : sheet)
@@ -183,8 +192,9 @@ struct HomeView: View {
             }
             .coordinateSpace(.named(Self.root))
         }
+        // The window's own light (status bar, system sheets) is set by the app, which knows when
+        // the welcome is up and waits for the fade from a game to finish.
         .environment(\.colorScheme, tone.scheme)
-        .preferredColorScheme(tone.scheme)
         .tint(tone.metal)
         .sensoryFeedback(.impact(weight: .light), trigger: pullArmed) { _, armed in armed && hapticsOn }
         .sensoryFeedback(.impact(weight: .medium), trigger: you != nil) { _, open in open && hapticsOn }
@@ -425,6 +435,9 @@ struct HomeView: View {
 
     /// Resume the game under way, or start the next one as set up, against the rival named.
     private func primary(_ upNext: HomeUpNext) {
+        // A double tap, or the strip's Play during the fold, must not start the game twice.
+        guard !launched else { return }
+        launched = true
         if upNext.inProgress {
             actions.resume()
             return
@@ -635,6 +648,9 @@ extension HomeView {
         let upNext = self.upNext
         ZStack(alignment: .top) {
             sheetBoard(upNext, width: geo.size.width, metrics: metrics, lift: lift)
+            if tone.scheme == .light {
+                greetingBacking(height: safeTop + 96, lift: lift)
+            }
             sheetGreeting(lift: lift)
                 .padding(.top, safeTop + 4)
                 .padding(.horizontal, 16)
@@ -646,7 +662,7 @@ extension HomeView {
         // With the shortcuts open the home steps back, out of focus.
         .blur(radius: veiled ? 12 : 0)
         .accessibilityHidden(veiled)
-        .allowsHitTesting(!veiled)
+        .allowsHitTesting(!veiled && !pushing)
         .onAppear(perform: riseFromGame)
     }
 
@@ -664,6 +680,7 @@ extension HomeView {
             primary(upNext)
             return
         }
+        pushing = true
         withAnimation(sheetSpring) { sheetDetent = .board }
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(280))
@@ -708,6 +725,19 @@ extension HomeView {
             .accessibilityAction(.magicTap) { primary(upNext) }
     }
 
+    /// In Light and Middle the greeting's dark ink needs the room behind it once the board
+    /// rises under it (the board's own top fade rises with the board). Folded, the board's
+    /// fade is enough, so this comes in with the sheet.
+    private func greetingBacking(height: CGFloat, lift: CGFloat) -> some View {
+        let shown: Double = Double(min(lift * 2, 1))
+        return LinearGradient(colors: [tone.canvas.opacity(0.9), tone.canvas.opacity(0.6), tone.canvas.opacity(0)],
+                              startPoint: .top, endPoint: .bottom)
+            .frame(height: height)
+            .opacity(shown)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+
     /// Hello, the streak and the level, over the board. It fades as the sheet rises over it.
     private func sheetGreeting(lift: CGFloat) -> some View {
         let day = dailyState
@@ -734,7 +764,8 @@ extension HomeView {
             ZStack(alignment: .top) {
                 sheetOpen(upNext, metrics: metrics)
                     .opacity(pageShown)
-                    .allowsHitTesting(pageShown > 0.5)
+                    // A pull that started here keeps its grip while the page fades.
+                    .allowsHitTesting(pageShown > 0.5 || sheetDragging)
                 HomeSheetStrip(upNext: upNext, tone: tone) { primary(upNext) }
                     .padding(.horizontal, 20)
                     .padding(.top, 2)
@@ -742,7 +773,7 @@ extension HomeView {
                     .gesture(sheetPull(on: .sheet, metrics: metrics))
                     .opacity(stripShown)
                     .offset(y: (1 - CGFloat(stripShown)) * 16)
-                    .allowsHitTesting(stripShown > 0.5)
+                    .allowsHitTesting(stripShown > 0.5 || sheetDragging)
             }
             .frame(maxHeight: .infinity, alignment: .top)
         }
@@ -763,19 +794,33 @@ extension HomeView {
                 .padding(.bottom, 8)
                 .contentShape(Rectangle())
                 .gesture(sheetPull(on: .sheet, metrics: metrics))
-            ScrollView(.vertical) {
-                sheetPage(upNext)
-                    .id(sheetTab)
-                    .transition(.homePage(forward: sheetForward, reduceMotion: reduceMotion))
+            ScrollViewReader { reader in
+                ScrollView(.vertical) {
+                    VStack(spacing: 0) {
+                        Color.clear
+                            .frame(height: 0)
+                            .id(Self.sheetTop)
+                        // The page going and the page coming share one place while they cross.
+                        ZStack(alignment: .top) {
+                            sheetPage(upNext)
+                                .id(sheetTab)
+                                .transition(.homePage(forward: sheetForward, reduceMotion: reduceMotion))
+                        }
+                    }
                     .padding(.horizontal, 16)
                     .padding(.bottom, 16)
-            }
-            .scrollIndicators(.hidden)
-            .scrollBounceBehavior(.basedOnSize)
-            .mask {
-                LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.04),
-                                       .init(color: .black, location: 0.94), .init(color: .clear, location: 1)],
-                               startPoint: .top, endPoint: .bottom)
+                }
+                .scrollIndicators(.hidden)
+                .scrollBounceBehavior(.basedOnSize)
+                .mask {
+                    LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.04),
+                                           .init(color: .black, location: 0.94), .init(color: .clear, location: 1)],
+                                   startPoint: .top, endPoint: .bottom)
+                }
+                // Every tab opens at its top, wherever the last one was scrolled to.
+                .onChange(of: sheetTab) { _, _ in
+                    reader.scrollTo(Self.sheetTop, anchor: .top)
+                }
             }
             HomeSheetTabBar(tone: tone, selection: sheetTab, pick: pickTab) {
                 HomeJewel(tone: tone, upNext: upNext, face: .rest, tap: { primary(upNext) }, hold: openShortcuts)
@@ -953,28 +998,27 @@ extension HomeView {
             sheetTab = tab
             if sheetDetent == .board { sheetDetent = .half }
         }
+        onTab(tab)
     }
 
     /// Where a drag starts: on the board above the sheet, or on the sheet.
     private enum SheetGrip { case board, sheet }
 
+    /// The top of the sheet's page, where a new tab opens.
+    private static var sheetTop: String { "sheet-top" }
+
     /// Dragging the sheet (or the board above it) moves the sheet with the finger; on release
     /// it springs to the rest nearest where the flick was heading.
     private func sheetPull(on grip: SheetGrip, metrics: HomeSheetMetrics) -> some Gesture {
         DragGesture(minimumDistance: grip == .board ? 14 : 6, coordinateSpace: .global)
-            .onChanged { value in
-                if !sheetDragging { sheetDragging = true }
-                sheetDrag = value.translation.height
+            .updating($sheetDrag) { value, state, _ in
+                state = value.translation.height
             }
             .onEnded { value in
                 let start: CGFloat = metrics.height(of: sheetDetent)
                 let landing: CGFloat = start - value.predictedEndTranslation.height
                 let next: HomeSheetDetent = Self.detent(from: sheetDetent, landing: landing, start: start, metrics: metrics)
-                withAnimation(sheetSpring) {
-                    sheetDetent = next
-                    sheetDrag = 0
-                    sheetDragging = false
-                }
+                withAnimation(sheetSpring) { sheetDetent = next }
             }
     }
 

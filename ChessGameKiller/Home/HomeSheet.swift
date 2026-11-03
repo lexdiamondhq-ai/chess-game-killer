@@ -265,6 +265,9 @@ struct HomeSheetTabBar<Jewel: View>: View {
             }
             jewel()
         }
+        // Four tabs and the knight share one row: past this size the labels would cut off.
+        // Held down, a tab shows its name large (the system's large content viewer).
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 
     private func button(_ tab: HomeSheetTab) -> some View {
@@ -297,6 +300,7 @@ struct HomeSheetTabBar<Jewel: View>: View {
         .buttonStyle(HomePressStyle())
         .accessibilityLabel(tab.title)
         .accessibilityAddTraits(on ? .isSelected : [])
+        .accessibilityShowsLargeContentViewer()
     }
 }
 
@@ -323,6 +327,8 @@ struct HomeToneSwitch: View {
                 .overlay { Capsule().strokeBorder(tone.ink.opacity(0.12), lineWidth: 0.75) }
         }
         .sensoryFeedback(.selection, trigger: mode) { (_: HomeToneMode, _: HomeToneMode) -> Bool in hapticsOn }
+        // Three names on one row: past this size they would cut off.
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Home colors")
     }
@@ -402,6 +408,8 @@ struct HomeSheetStrip: View {
             }
             .buttonStyle(HomeIvoryButtonStyle(tone: tone, compact: true))
         }
+        // The folded strip has a set height over the board: past this size it would spill.
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 
     private var dotColor: Color {
@@ -438,7 +446,11 @@ private struct HomeRise: ViewModifier {
             .blur(radius: up ? 0 : 6)
             .scaleEffect(up ? 1 : 0.98, anchor: .top)
             .onAppear {
-                guard !reduceMotion else { return }
+                // Shown already, so turning Reduce Motion off later can't hide it.
+                guard !reduceMotion else {
+                    shown = true
+                    return
+                }
                 let delay: Double = 0.06 + Double(index) * 0.06
                 withAnimation(.spring(response: 0.55, dampingFraction: 0.82).delay(delay)) { shown = true }
             }

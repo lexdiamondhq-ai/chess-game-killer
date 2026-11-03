@@ -47,6 +47,11 @@ struct ContentView: View {
     @AppStorage(HomeToneMode.key) private var homeTone = HomeToneMode.defaultMode
     /// Back from a game, the home's sheet rises out of the game's.
     @State private var homeRises = false
+    /// The board home's tab, kept here so a redraw of the home (a new look) stays on it.
+    @State private var homeTab: HomeSheetTab = .today
+    /// The home has finished fading in, so the window takes its light. Until then the game
+    /// fading out keeps the dark it was drawn for.
+    @State private var homeLit: Bool
     @Environment(\.scenePhase) private var scenePhase
     /// Challenge a friend, when the app provides it (tests that draw this screen don't).
     @Environment(ChallengeCenter.self) private var challenges: ChallengeCenter?
@@ -84,6 +89,7 @@ struct ContentView: View {
         let home = startsAtHome ?? (startsWithNewGame && HomeScreen.isOn())
         let welcome = startsWithNewGame && !Welcome.isUnderTest && Welcome.shouldShow()
         _showingHome = State(initialValue: home)
+        _homeLit = State(initialValue: home)
         _showingWelcome = State(initialValue: welcome)
         _showingNewGame = State(initialValue: startsWithNewGame && !home && !welcome)
         _trayOpen = State(initialValue: trayOpen)
@@ -395,7 +401,8 @@ struct ContentView: View {
     private var screens: some View {
         if showingHome {
             // The home is dressed in the player's own look, not a rival's board.
-            HomeView(match: match, theme: .named(themeID), actions: homeActions, rises: homeRises)
+            HomeView(match: match, theme: .named(themeID), actions: homeActions, tab: homeTab, rises: homeRises,
+                     onTab: { tab in homeTab = tab })
                 .environment(\.homeZoom, homeZoom)
                 .transition(.opacity)
         } else {
@@ -520,6 +527,7 @@ struct ContentView: View {
 
     private func leaveHome() {
         guard showingHome else { return }
+        homeLit = false
         withAnimation(.easeInOut(duration: 0.35)) { showingHome = false }
     }
 
@@ -528,13 +536,23 @@ struct ContentView: View {
         // A victory theme still playing fades as the game leaves the screen.
         SoundPlayer.shared.stopAll(fade: 0.4)
         homeRises = true
-        withAnimation(.easeInOut(duration: 0.35)) { showingHome = true }
+        homeTab = .today
+        withAnimation(.easeInOut(duration: 0.35)) {
+            showingHome = true
+        } completion: {
+            homeLit = showingHome
+        }
+        // The home has started its rise by now; a later redraw of it (a new look) starts at rest.
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1))
+            homeRises = false
+        }
     }
 
     /// The window's light: the board home's room while it shows (Light and Middle are light),
     /// the board's look everywhere else.
     private var windowScheme: ColorScheme? {
-        if showingHome, boardSheet { return homeTone.scheme }
+        if showingHome, homeLit, boardSheet, !showingWelcome { return homeTone.scheme }
         return theme.isDark ? .dark : nil
     }
 

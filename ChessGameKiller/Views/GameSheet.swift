@@ -16,17 +16,19 @@ struct GameSheet<Content: View>: View {
     @ViewBuilder let content: () -> Content
 
     @AppStorage("haptics") private var hapticsOn = true
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// How far the finger has the sheet from its rest.
-    @State private var drag: CGFloat = 0
-    @State private var dragging = false
+    /// How far the finger has the sheet from its rest. It springs back by itself when the pull
+    /// ends or is cut short (the coach opening mid-pull, a call coming in).
+    @GestureState(resetTransaction: Transaction(animation: .spring(response: 0.4, dampingFraction: 0.72)))
+    private var drag: CGFloat = 0
+    private var dragging: Bool { drag != 0 }
     /// Counts the pulls that opened the coach, for a light tap each.
     @State private var pulls = 0
 
     /// The sheet's corner: the home sheet's.
     static var radius: CGFloat { 34 }
-    /// How far the glass runs past the screen's foot, so only its top corners ever show.
-    private static var overhang: CGFloat { 40 }
+    /// How far the glass runs past the screen's foot, so only its top corners ever show: past
+    /// the furthest stretch (56) and the bottom corners' curve with room to spare.
+    private static var overhang: CGFloat { 110 }
     /// How far up a flick must be heading to open the coach.
     private static var flick: CGFloat { 50 }
 
@@ -100,17 +102,11 @@ struct GameSheet<Content: View>: View {
     /// Pulled up and let go heading up: the coach opens. Anything else springs back.
     private var pull: some Gesture {
         DragGesture(minimumDistance: 10, coordinateSpace: .global)
-            .onChanged { value in
-                if !dragging { dragging = true }
-                drag = value.translation.height
+            .updating($drag) { value, state, _ in
+                state = value.translation.height
             }
             .onEnded { value in
                 let heading: CGFloat = value.predictedEndTranslation.height
-                let back: Animation = reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.4, dampingFraction: 0.72)
-                withAnimation(back) {
-                    drag = 0
-                    dragging = false
-                }
                 if heading < -Self.flick { openCoach() }
             }
     }
