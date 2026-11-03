@@ -81,6 +81,8 @@ struct HomeView: View {
     @State private var jewelTip = false
     /// The board home: the 3D board up top and one sheet over it (Settings can turn it off).
     @AppStorage(HomeLayout.key) private var boardSheet = HomeLayout.defaultOn
+    /// The board home's room: Light, Middle or Dark (the tiles home stays dark).
+    @AppStorage(HomeToneMode.key) private var toneMode = HomeToneMode.defaultMode
     /// Where the sheet rests, and how far a finger has it from there.
     @State private var sheetDetent: HomeSheetDetent = .half
     @State private var sheetDrag: CGFloat = 0
@@ -122,7 +124,7 @@ struct HomeView: View {
     // MARK: Reading
 
     private var look: SculptedLook { theme.sculptedLook ?? .gilded }
-    private var tone: HomeTone { .of(look) }
+    private var tone: HomeTone { .of(look, mode: boardSheet ? toneMode : .dark) }
     /// The pieces on the small boards match the board in the window.
     private var pieceTheme: BoardTheme { theme.sculptedLook == nil ? .named(.gilded) : theme }
 
@@ -181,8 +183,8 @@ struct HomeView: View {
             }
             .coordinateSpace(.named(Self.root))
         }
-        .environment(\.colorScheme, .dark)
-        .preferredColorScheme(.dark)
+        .environment(\.colorScheme, tone.scheme)
+        .preferredColorScheme(tone.scheme)
         .tint(tone.metal)
         .sensoryFeedback(.impact(weight: .light), trigger: pullArmed) { _, armed in armed && hapticsOn }
         .sensoryFeedback(.impact(weight: .medium), trigger: you != nil) { _, open in open && hapticsOn }
@@ -748,7 +750,7 @@ extension HomeView {
         .frame(height: height + overhang)
         .frame(maxWidth: .infinity)
         .homePane(shape, tone: tone)
-        .shadow(color: .black.opacity(0.35), radius: 24, y: -6)
+        .shadow(color: .black.opacity(tone.shadow), radius: 24, y: -6)
         .offset(y: overhang)
     }
 
@@ -903,9 +905,19 @@ extension HomeView {
         }
     }
 
-    /// You: your games, Settings and Pro.
+    /// You: the home's colors, your games, Settings and Pro.
     private var sheetYou: some View {
         VStack(alignment: .leading, spacing: Self.gap) {
+            sheetCard {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Colors")
+                        .font(.app(.body, weight: .semibold))
+                        .foregroundStyle(tone.ink)
+                    HomeToneSwitch(mode: $toneMode, tone: tone)
+                }
+                .padding(.vertical, 14)
+            }
+            .homeRise(0)
             sheetCard {
                 HomeLinkRow(glyph: Glyphs.games, title: "Your games", detail: gamesLine, tone: tone, action: actions.rewind)
                     .homeZoomSource(.games)

@@ -20,6 +20,7 @@ final class HomeSnapshotTests: XCTestCase {
 
     override func tearDown() async throws {
         UserDefaults.standard.removeObject(forKey: HomeLayout.key)
+        UserDefaults.standard.removeObject(forKey: HomeToneMode.key)
         try await super.tearDown()
     }
 
@@ -37,6 +38,57 @@ final class HomeSnapshotTests: XCTestCase {
             try save(window, name)
             window.isHidden = true
         }
+    }
+
+    /// The board home in Light and Middle, as the You tab and Settings set it: halfway on Today,
+    /// on You with the switch, and folded.
+    func testTheBoardHomeInLightAndMiddle() throws {
+        UserDefaults.standard.set(true, forKey: HomeLayout.key)
+        let shots: [(HomeSheetDetent, HomeSheetTab, String)] = [
+            (.half, .today, "today"), (.half, .you, "you"), (.board, .today, "folded"),
+        ]
+        for mode in [HomeToneMode.light, HomeToneMode.middle] {
+            UserDefaults.standard.set(mode.rawValue, forKey: HomeToneMode.key)
+            for (detent, tab, name) in shots {
+                let window = try show(HomeSample.home(sheet: detent, tab: tab))
+                try save(window, "zz-home-sheet-\(mode.rawValue)-\(name)")
+                window.isHidden = true
+            }
+        }
+    }
+
+    /// Every look's room in all three tones keeps its text readable: the quietest ink against
+    /// the room passes 3:1 at least, and the main ink 4.5:1.
+    func testTheTonesKeepTextReadable() {
+        for look in SculptedLook.all {
+            let name: String = look.name
+            for mode in HomeToneMode.allCases {
+                let tone = HomeTone.of(look, mode: mode)
+                XCTAssertEqual(tone.scheme, mode.scheme, "\(name) \(mode.title)")
+                XCTAssertGreaterThan(Self.contrast(tone.ink, on: tone.canvas), 4.5, "\(name) \(mode.title) ink")
+                XCTAssertGreaterThan(Self.contrast(tone.ink3, on: tone.canvas), 3, "\(name) \(mode.title) quiet ink")
+            }
+        }
+    }
+
+    /// The contrast ratio of a color (with its opacity laid over the room) against the room.
+    private static func contrast(_ ink: Color, on room: Color) -> Double {
+        var r1: CGFloat = 0, g1: CGFloat = 0, b1: CGFloat = 0, a1: CGFloat = 0
+        var r2: CGFloat = 0, g2: CGFloat = 0, b2: CGFloat = 0, a2: CGFloat = 0
+        UIColor(ink).getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
+        UIColor(room).getRed(&r2, green: &g2, blue: &b2, alpha: &a2)
+        let mixed: [CGFloat] = [r1 * a1 + r2 * (1 - a1), g1 * a1 + g2 * (1 - a1), b1 * a1 + b2 * (1 - a1)]
+        let first: Double = luminance(mixed)
+        let second: Double = luminance([r2, g2, b2])
+        return (max(first, second) + 0.05) / (min(first, second) + 0.05)
+    }
+
+    private static func luminance(_ rgb: [CGFloat]) -> Double {
+        let linear: [Double] = rgb.map { channel in
+            let c = Double(channel)
+            return c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+        }
+        return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
     }
 
     /// The sheet's rests, and the rubber band past them.

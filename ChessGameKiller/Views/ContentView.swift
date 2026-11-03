@@ -43,6 +43,8 @@ struct ContentView: View {
     /// The board style (Alex's pick, 1A): the home's board and sheet, and the same sheet across
     /// the foot of the game. Settings > Board and sheet turns it off.
     @AppStorage(HomeLayout.key) private var boardSheet = HomeLayout.defaultOn
+    /// The board home's room: Light, Middle or Dark.
+    @AppStorage(HomeToneMode.key) private var homeTone = HomeToneMode.defaultMode
     /// Back from a game, the home's sheet rises out of the game's.
     @State private var homeRises = false
     @Environment(\.scenePhase) private var scenePhase
@@ -322,7 +324,7 @@ struct ContentView: View {
             // Switching between Neon and the executive look redraws everything in the new type.
             .id(theme.glows)
             .tint(theme.accent)
-            .preferredColorScheme(theme.isDark ? .dark : nil)
+            .preferredColorScheme(windowScheme)
             .environment(training)
             .environment(coach)
             .environment(army)
@@ -527,6 +529,13 @@ struct ContentView: View {
         SoundPlayer.shared.stopAll(fade: 0.4)
         homeRises = true
         withAnimation(.easeInOut(duration: 0.35)) { showingHome = true }
+    }
+
+    /// The window's light: the board home's room while it shows (Light and Middle are light),
+    /// the board's look everywhere else.
+    private var windowScheme: ColorScheme? {
+        if showingHome, boardSheet { return homeTone.scheme }
+        return theme.isDark ? .dark : nil
     }
 
     /// Puzzles, your games and your pieces grow out of the board home's rows that open them.

@@ -300,6 +300,78 @@ struct HomeSheetTabBar<Jewel: View>: View {
     }
 }
 
+/// Light, Middle or Dark for the board home, as on the 1A pages: a lit pill slides to the pick
+/// and the whole room changes color under the finger.
+struct HomeToneSwitch: View {
+    @Binding var mode: HomeToneMode
+    let tone: HomeTone
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage("haptics") private var hapticsOn = true
+    @Namespace private var pill
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(HomeToneMode.allCases) { choice in
+                segment(choice)
+            }
+        }
+        .padding(4)
+        .background {
+            Capsule()
+                .fill(tone.canvas.opacity(0.35))
+                .overlay { Capsule().strokeBorder(tone.ink.opacity(0.12), lineWidth: 0.75) }
+        }
+        .sensoryFeedback(.selection, trigger: mode) { (_: HomeToneMode, _: HomeToneMode) -> Bool in hapticsOn }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Home colors")
+    }
+
+    private func segment(_ choice: HomeToneMode) -> some View {
+        let on: Bool = choice == mode
+        return Button {
+            let change: Animation = reduceMotion ? .easeOut(duration: 0.2) : .easeInOut(duration: 0.45)
+            withAnimation(change) { mode = choice }
+        } label: {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(swatch(choice))
+                    .overlay { Circle().strokeBorder(tone.ink.opacity(0.25), lineWidth: 0.75) }
+                    .frame(width: 12, height: 12)
+                Text(choice.title)
+                    .font(.app(.subheadline, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .foregroundStyle(on ? tone.ink : tone.ink2)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 40)
+            .background {
+                if on {
+                    Capsule()
+                        .fill(tone.ink.opacity(0.13))
+                        .overlay { Capsule().strokeBorder(tone.metal.opacity(0.35), lineWidth: 0.75) }
+                        .matchedGeometryEffect(id: "pill", in: pill)
+                }
+            }
+            .contentShape(Capsule())
+        }
+        .buttonStyle(HomePressStyle())
+        .accessibilityLabel(choice.title)
+        .accessibilityHint(choice.blurb)
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+
+    /// Each choice's room, as a dot.
+    private func swatch(_ choice: HomeToneMode) -> Color {
+        switch choice {
+        case .light: return Color(hex: 0xFBF6EC)
+        case .middle: return Color(hex: 0xD9D0C2)
+        case .dark: return Color(hex: 0x100B08)
+        }
+    }
+}
+
 /// The sheet folded down: one strip with the game on it, and the way to play.
 struct HomeSheetStrip: View {
     let upNext: HomeUpNext
