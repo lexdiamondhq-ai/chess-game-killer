@@ -215,7 +215,10 @@ final class ChessDNATests: XCTestCase {
             return puzzle.themes
         }
         XCTAssertTrue(themes(.warmUp).contains("fork"), "\(themes(.warmUp))")
-        let style = try XCTUnwrap(dna.styleTheme(on: now))
-        XCTAssertFalse(Set(themes(.mixed)).isDisjoint(with: style.tags), "\(themes(.mixed)) for \(style.id)")
+        // The day's style theme steps aside when it is also today's main theme (some days
+        // mateIn3 is both), so the puzzle fits one of the style's themes, not always the first.
+        let style = try XCTUnwrap(dna.style)
+        let tags = style.themes.map(PuzzleTheme.named).reduce(into: Set<String>()) { $0.formUnion($1.tags) }
+        XCTAssertFalse(Set(themes(.mixed)).isDisjoint(with: tags), "\(themes(.mixed)) for \(style.themes)")
     }
 }
