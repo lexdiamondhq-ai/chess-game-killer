@@ -206,11 +206,11 @@ private struct ResultText {
         if let outcome = match.outcome {
             switch outcome {
             case .timeout(let loser):
-                return loser == player ? "Your clock ran out." : "\(rival)'s clock ran out."
+                return loser == player ? "Your clock ran out." : "\(rival.possessive) clock ran out."
             case .timeoutDraw(let flagged):
                 return flagged == player
                     ? "Your clock ran out, but \(rival) can't checkmate with what's left."
-                    : "\(rival)'s clock ran out, but you can't checkmate with what's left."
+                    : "\(rival.possessive) clock ran out, but you can't checkmate with what's left."
             case .resigned(let loser):
                 return loser == player ? "\(rival) takes this one." : "You win. There was no way back for \(rival)."
             }
@@ -488,7 +488,7 @@ private struct CoachPanel: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(rival) is thinking").font(.app(.headline))
                     if gradeIsComing {
-                        Text("Your grade comes right after \(rival)'s reply.")
+                        Text("Your grade comes right after \(rival.possessive) reply.")
                             .font(.app(.subheadline)).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }

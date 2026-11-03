@@ -233,8 +233,8 @@ final class ArmyTests: XCTestCase {
         let name = store.record(for: .kingsKnight).name
         XCTAssertNotNil(name)
         XCTAssertEqual(hero.name, name)
-        XCTAssertEqual(hero.line, "\(name ?? "") took Pulse's queen.")
-        // The honor's 5 XP as this game counted it: half as much again against Pulse.
+        XCTAssertEqual(hero.line, "\(name ?? "") took The 1600s' queen.")
+        // The honor's 5 XP as this game counted it: half as much again against The 1600s.
         XCTAssertEqual(hero.xp, 8)
         XCTAssertEqual(store.record(for: .kingsKnight).honors, 1)
         XCTAssertEqual(store.record(for: .ePawn).honors, 0)
@@ -249,13 +249,13 @@ final class ArmyTests: XCTestCase {
     func testHeroLineNamesMateAndPromotionFirst() {
         var stats = PieceGameStats()
         stats.taken = [.pawn, .rook]
-        XCTAssertEqual(ArmyStore.heroLine(name: "Kestrel", stats: stats, rival: "Vector"),
-                       "Kestrel took Vector's rook and 1 more.")
+        XCTAssertEqual(ArmyStore.heroLine(name: "Kestrel", stats: stats, rival: "The 2000s"),
+                       "Kestrel took The 2000s' rook and 1 more.")
         stats.promoted = true
-        XCTAssertEqual(ArmyStore.heroLine(name: "Kestrel", stats: stats, rival: "Vector"),
+        XCTAssertEqual(ArmyStore.heroLine(name: "Kestrel", stats: stats, rival: "The 2000s"),
                        "Kestrel marched all the way and promoted.")
         stats.gaveMate = true
-        XCTAssertEqual(ArmyStore.heroLine(name: "Kestrel", stats: stats, rival: "Vector"),
+        XCTAssertEqual(ArmyStore.heroLine(name: "Kestrel", stats: stats, rival: "The 2000s"),
                        "Kestrel delivered checkmate.")
     }
 
@@ -281,10 +281,10 @@ final class ArmyTests: XCTestCase {
         XCTAssertEqual(store.record(for: .dPawn).nemesis?.level, .expert)
         let grudge = store.grudge(against: .expert)
         XCTAssertEqual(grudge?.slot, .dPawn)
-        XCTAssertEqual(grudge?.kind, .grudge(rival: "Vector", times: 3))
+        XCTAssertEqual(grudge?.kind, .grudge(rival: "The 2000s", times: 3))
         // Mid-sentence, a piece without a name is "your d-pawn".
         let name = store.record(for: .dPawn).name ?? "your \(ArmySlot.dPawn.title.lowercased())"
-        XCTAssertEqual(grudge?.headline, "Vector has taken \(name) three times.")
+        XCTAssertEqual(grudge?.headline, "The 2000s has taken \(name) three times.")
         XCTAssertNil(store.grudge(against: .beginner))
     }
 
@@ -309,11 +309,11 @@ final class ArmyTests: XCTestCase {
         let news = store.record(game.ledger!, playerColor: .white, won: true, stakes: vector)
         let pawn = store.record(for: .dPawn)
         XCTAssertTrue(pawn.revenge.contains(MatchController.Level.expert.rawValue))
-        XCTAssertTrue(news.contains { $0.slot == .dPawn && $0.kind == .revenge(rival: "Vector") })
+        XCTAssertTrue(news.contains { $0.slot == .dPawn && $0.kind == .revenge(rival: "The 2000s") })
         XCTAssertEqual(news.first { $0.slot == .dPawn }?.label, "REVENGE")
-        // 1 game + 3 win + 2 survived + 2 for the pawn + 5 hero + 15 revenge, doubled against Vector.
+        // 1 game + 3 win + 2 survived + 2 for the pawn + 5 hero + 15 revenge, doubled against The 2000s.
         XCTAssertEqual(pawn.xp - xpBefore, (1 + 3 + 2 + 2 + 5 + 15) * 2)
-        // Once avenged, Vector no longer opens with a grudge about it.
+        // Once avenged, The 2000s no longer opens with a grudge about it.
         XCTAssertNil(store.grudge(against: .expert))
     }
 

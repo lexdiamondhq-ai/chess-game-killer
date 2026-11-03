@@ -139,7 +139,7 @@ final class HomeSnapshotTests: XCTestCase {
                                   moveNumber: 1, plies: 0)
         let alone = HomeCurrentGame.list(yourTurn, fen: start, friends: [])
         XCTAssertEqual(alone.map(\.id), ["computer"], "The only game going still gets its chip")
-        XCTAssertEqual(alone.first?.title, "vs Pulse")
+        XCTAssertEqual(alone.first?.title, "vs The 1600s")
         XCTAssertEqual(alone.first?.kind, .computer)
         XCTAssertEqual(alone.first?.status, .yourMove)
         XCTAssertEqual(alone.first?.detail, "Computer · No clock · Move 1")

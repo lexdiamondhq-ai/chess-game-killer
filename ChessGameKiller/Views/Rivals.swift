@@ -194,3 +194,8 @@ struct RivalPortrait: View {
     .padding(30)
     .background(Color.black)
 }
+
+extension String {
+    /// The name as an owner: "Your Grudge's", "The 1600s'".
+    var possessive: String { hasSuffix("s") ? self + "'" : self + "'s" }
+}
