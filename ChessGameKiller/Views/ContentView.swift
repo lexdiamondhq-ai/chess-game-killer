@@ -40,6 +40,11 @@ struct ContentView: View {
     /// Where the home's tiles and the screens they open meet, so a screen grows out of its tile.
     @Namespace private var homeZoom
     @AppStorage(HomeScreen.key) private var homeScreenOn = HomeScreen.defaultOn
+    /// The board style (Alex's pick, 1A): the home's board and sheet, and the same sheet across
+    /// the foot of the game. Settings > Board and sheet turns it off.
+    @AppStorage(HomeLayout.key) private var boardSheet = HomeLayout.defaultOn
+    /// Back from a game, the home's sheet rises out of the game's.
+    @State private var homeRises = false
     @Environment(\.scenePhase) private var scenePhase
     /// Challenge a friend, when the app provides it (tests that draw this screen don't).
     @Environment(ChallengeCenter.self) private var challenges: ChallengeCenter?
@@ -244,6 +249,7 @@ struct ContentView: View {
             }
             .fullScreenCover(isPresented: $showingPuzzles) {
                 PuzzlesView(theme: chosenTheme).environment(puzzles).environment(training)
+                    .homeZoom(.puzzles, in: homeZoom, when: zoomsFromSheet)
             }
             .onChange(of: showingGames) { _, showing in
                 if !showing { rewindOpening = nil }
@@ -251,9 +257,11 @@ struct ContentView: View {
             .fullScreenCover(isPresented: $showingGames) {
                 RewindGamesView(theme: chosenTheme, opening: rewindOpening, forfeits: forfeits) { game in playAgain(game) }
                     .environment(vault).environment(training)
+                    .homeZoom(.games, in: homeZoom, when: zoomsFromSheet)
             }
             .fullScreenCover(isPresented: $showingArmy) {
                 ArmyView(theme: chosenTheme, color: match.setup.playerColor).environment(army)
+                    .homeZoom(.army, in: homeZoom, when: zoomsFromSheet)
             }
             .fullScreenCover(item: $coach.presentedLesson) { lesson in
                 LessonScreen(lesson: lesson, theme: chosenTheme).environment(training).environment(daily)
@@ -284,9 +292,11 @@ struct ContentView: View {
                     challenges?.compose()
                 }
                 .environment(army)
+                .boardSheetGrabber(boardSheet)
             }
             .sheet(isPresented: $showingSettings, onDismiss: refreshDaily) {
                 SettingsSheet()
+                    .boardSheetGrabber(boardSheet)
             }
             .sheet(isPresented: $showingAnalyze, onDismiss: { analyzeWithCamera = false }) {
                 AnalyzeSheet(
@@ -302,6 +312,7 @@ struct ContentView: View {
                 ) { draft in
                     play(from: draft)
                 }
+                .boardSheetGrabber(boardSheet)
             }
     }
 
@@ -382,7 +393,7 @@ struct ContentView: View {
     private var screens: some View {
         if showingHome {
             // The home is dressed in the player's own look, not a rival's board.
-            HomeView(match: match, theme: .named(themeID), actions: homeActions)
+            HomeView(match: match, theme: .named(themeID), actions: homeActions, rises: homeRises)
                 .environment(\.homeZoom, homeZoom)
                 .transition(.opacity)
         } else {
@@ -514,8 +525,13 @@ struct ContentView: View {
         setCoach(expanded: false)
         // A victory theme still playing fades as the game leaves the screen.
         SoundPlayer.shared.stopAll(fade: 0.4)
+        homeRises = true
         withAnimation(.easeInOut(duration: 0.35)) { showingHome = true }
     }
+
+    /// Puzzles, your games and your pieces grow out of the board home's rows that open them.
+    /// The tiles home has no such rows, and the game screen opens them as usual.
+    private var zoomsFromSheet: Bool { showingHome && boardSheet }
 
     /// The board, the players and the dock inside the navigation bar, sized to the screen.
     private var gameScreen: some View {
@@ -546,18 +562,22 @@ struct ContentView: View {
                 }
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     let coachHeight = screen.size.height * Self.coachShare
-                    Group {
-                        if bigBoard {
-                            bigTray(coachHeight: coachHeight)
-                        } else {
-                            dock(coachHeight: coachHeight)
+                    if boardSheet, !bigBoard {
+                        gameSheet(coachHeight: coachHeight, bottom: screen.safeAreaInsets.bottom)
+                    } else {
+                        Group {
+                            if bigBoard {
+                                bigTray(coachHeight: coachHeight)
+                            } else {
+                                dock(coachHeight: coachHeight)
+                            }
                         }
+                        .frame(maxWidth: Self.dockMaxWidth)
+                        .padding(.horizontal, Self.inset)
+                        .padding(.top, 8)
+                        // Above the home indicator; on a phone without one, a little off the edge.
+                        .padding(.bottom, screen.safeAreaInsets.bottom > 0 ? 0 : 8)
                     }
-                    .frame(maxWidth: Self.dockMaxWidth)
-                    .padding(.horizontal, Self.inset)
-                    .padding(.top, 8)
-                    // Above the home indicator; on a phone without one, a little off the edge.
-                    .padding(.bottom, screen.safeAreaInsets.bottom > 0 ? 0 : 8)
                 }
                 .background { SheetBackdrop(theme: theme) }
                 .navigationTitle("Chess Game Killer")
@@ -824,6 +844,17 @@ struct ContentView: View {
                         .blur(radius: 18)
                 }
             }
+    }
+
+    /// The board style's dock: the home's glass sheet across the foot of the screen, with the
+    /// same controls. Pulled up, the coach unfolds into it.
+    private func gameSheet(coachHeight: CGFloat, bottom: CGFloat) -> some View {
+        GameSheet(theme: theme, isOpen: coachExpanded, bottomInset: bottom, setOpen: { opened in
+            setCoach(expanded: opened)
+        }) {
+            dockRow(coachHeight: coachHeight)
+        }
+        .padding(.top, 8)
     }
 
     /// Every control named, three either side of the orb. They step aside while the orb is wide.

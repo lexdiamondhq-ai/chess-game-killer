@@ -83,9 +83,8 @@ struct SettingsSheet: View {
                             ToggleRow(title: "Home screen", subtitle: "Open on a home page: the board up top, your week, and every mode one tap away.",
                                       symbol: "house", isOn: $homeScreen, theme: theme)
                             rule
-                            ToggleRow(title: "Board home", subtitle: "The 3D board fills the home, with one sheet over it. Off brings back the tiles.",
+                            ToggleRow(title: "Board and sheet", subtitle: "The 3D board stays on top and one glass sheet holds the rest, at home and in a game. Off brings back the tiles and the floating dock.",
                                       symbol: "rectangle.bottomhalf.inset.filled", isOn: $boardSheet, theme: theme)
-                                .disabled(!homeScreen)
                         }
                     }
 

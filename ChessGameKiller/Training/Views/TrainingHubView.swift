@@ -32,16 +32,21 @@ struct TrainingHubView: View {
         NavigationStack(path: $path) {
             ScrollView {
                 if store.library != nil {
+                    // Each block rises into place in turn, as on the board home's sheet.
                     VStack(alignment: .leading, spacing: 16) {
                         coachLine
+                            .homeRise(0)
                         TodayCard(plan: today, theme: theme, offersLevelCheck: offersLevelCheck) {
                             session = today ?? store.dailyPlan()
                         } levelCheck: {
                             showingLevelCheck = true
                         }
+                        .homeRise(1)
                         doors
+                            .homeRise(2)
                         RankStrip(theme: theme)
                             .padding(.top, 2)
+                            .homeRise(3)
                     }
                     .padding(.horizontal, 16)
                     .padding(.bottom, 28)

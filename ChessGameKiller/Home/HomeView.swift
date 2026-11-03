@@ -88,6 +88,11 @@ struct HomeView: View {
     /// The sheet's tab, and whether the last pick moved right (its page comes in from the right).
     @State private var sheetTab: HomeSheetTab = .today
     @State private var sheetForward = true
+    /// Back from a game, the sheet starts folded like the game's and rises to here.
+    private let sheetRest: HomeSheetDetent
+    private let rises: Bool
+    /// The rise from the game has played (once per return).
+    @State private var rose = false
 
     enum YouOrigin { case top, bottom }
 
@@ -99,14 +104,18 @@ struct HomeView: View {
     /// The gap between tiles, and between the tiles and the screen's edge.
     static let gap: CGFloat = 10
 
+    /// `rises`: the player is back from a game, so the sheet comes up out of the game's.
     init(match: MatchController, theme: BoardTheme, actions: HomeActions, showsYou: Bool = false,
-         showsShortcuts: Bool = false, sheet: HomeSheetDetent = .half, tab: HomeSheetTab = .today) {
+         showsShortcuts: Bool = false, sheet: HomeSheetDetent = .half, tab: HomeSheetTab = .today,
+         rises: Bool = false) {
         self.match = match
         self.theme = theme
         self.actions = actions
+        self.sheetRest = sheet
+        self.rises = rises
         _you = State(initialValue: showsYou ? .bottom : nil)
         _shortcutsOpen = State(initialValue: showsShortcuts)
-        _sheetDetent = State(initialValue: sheet)
+        _sheetDetent = State(initialValue: rises ? .board : sheet)
         _sheetTab = State(initialValue: tab)
     }
 
@@ -636,6 +645,39 @@ extension HomeView {
         .blur(radius: veiled ? 12 : 0)
         .accessibilityHidden(veiled)
         .allowsHitTesting(!veiled)
+        .onAppear(perform: riseFromGame)
+    }
+
+    /// Back from a game: the folded sheet, where the game's was, rises to its rest.
+    private func riseFromGame() {
+        guard rises, !rose, sheetDetent == .board, sheetRest != .board else { return }
+        rose = true
+        let rise: Animation = reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.5, dampingFraction: 0.8).delay(0.12)
+        withAnimation(rise) { sheetDetent = sheetRest }
+    }
+
+    /// Push down to play: the sheet folds into its strip, then the game opens.
+    private func pushDownToPlay(_ upNext: HomeUpNext) {
+        guard sheetDetent != .board, !reduceMotion else {
+            primary(upNext)
+            return
+        }
+        withAnimation(sheetSpring) { sheetDetent = .board }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(280))
+            primary(upNext)
+        }
+    }
+
+    /// A tap on the grabber: folded or halfway goes a step up; all the way up comes back halfway.
+    private func stepSheet() {
+        let next: HomeSheetDetent
+        switch sheetDetent {
+        case .board: next = .half
+        case .half: next = .full
+        case .full: next = .half
+        }
+        withAnimation(sheetSpring) { sheetDetent = next }
     }
 
     /// The board, as tall as two thirds of the screen. It rises with the sheet so it stays in
@@ -656,7 +698,7 @@ extension HomeView {
             .scaleEffect(scale, anchor: .top)
             .offset(y: rise)
             .contentShape(Rectangle())
-            .onTapGesture { primary(upNext) }
+            .onTapGesture { pushDownToPlay(upNext) }
             .gesture(sheetPull(on: .board, metrics: metrics))
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(upNext.inProgress ? "Your game against \(upNext.rival.name)" : "Next game: \(upNext.rival.name)")
@@ -685,13 +727,17 @@ extension HomeView {
         let overhang: CGFloat = 40
         return VStack(spacing: 0) {
             HomeSheetGrabber(tone: tone, dragging: sheetDragging)
+                .gesture(sheetPull(on: .sheet, metrics: metrics))
+                .onTapGesture { stepSheet() }
             ZStack(alignment: .top) {
-                sheetOpen(upNext, bottom: metrics.safeBottom)
+                sheetOpen(upNext, metrics: metrics)
                     .opacity(pageShown)
                     .allowsHitTesting(pageShown > 0.5)
                 HomeSheetStrip(upNext: upNext, tone: tone) { primary(upNext) }
                     .padding(.horizontal, 20)
                     .padding(.top, 2)
+                    .contentShape(Rectangle())
+                    .gesture(sheetPull(on: .sheet, metrics: metrics))
                     .opacity(stripShown)
                     .offset(y: (1 - CGFloat(stripShown)) * 16)
                     .allowsHitTesting(stripShown > 0.5)
@@ -704,15 +750,17 @@ extension HomeView {
         .homePane(shape, tone: tone)
         .shadow(color: .black.opacity(0.35), radius: 24, y: -6)
         .offset(y: overhang)
-        .gesture(sheetPull(on: .sheet, metrics: metrics))
     }
 
-    /// The open sheet: the tab's name, its page, and the tabs with the gold knight.
-    private func sheetOpen(_ upNext: HomeUpNext, bottom: CGFloat) -> some View {
+    /// The open sheet: the tab's name, its page, and the tabs with the gold knight. The sheet
+    /// moves by its grabber and its header; the page under them scrolls.
+    private func sheetOpen(_ upNext: HomeUpNext, metrics: HomeSheetMetrics) -> some View {
         VStack(spacing: 0) {
             sheetHeader
                 .padding(.horizontal, 20)
                 .padding(.bottom, 8)
+                .contentShape(Rectangle())
+                .gesture(sheetPull(on: .sheet, metrics: metrics))
             ScrollView(.vertical) {
                 sheetPage(upNext)
                     .id(sheetTab)
@@ -737,7 +785,7 @@ extension HomeView {
             }
             .padding(.horizontal, 14)
             .padding(.top, 6)
-            .padding(.bottom, max(bottom, 12))
+            .padding(.bottom, max(metrics.safeBottom, 12))
         }
     }
 
@@ -813,15 +861,19 @@ extension HomeView {
         VStack(alignment: .leading, spacing: Self.gap) {
             sheetCard {
                 HomeLinkRow(glyph: Glyphs.coach, title: "Train with Coach Leo", detail: "Lessons, drills and today's session", tone: tone, action: actions.train)
+                    .homeZoomSource(.coach)
                     .homeRise(0)
                 HomeHairline(tone: tone)
                 HomeLinkRow(glyph: Glyphs.today, title: "Today's Move", detail: "The puzzle of the day", tone: tone, action: actions.dailyMove)
+                    .homeZoomSource(.daily)
                     .homeRise(1)
                 HomeHairline(tone: tone)
                 HomeLinkRow(glyph: Glyphs.puzzles, title: "Puzzles", detail: "Rated puzzles at your level", tone: tone, action: actions.puzzles)
+                    .homeZoomSource(.puzzles)
                     .homeRise(2)
                 HomeHairline(tone: tone)
                 HomeLinkRow(glyph: Glyphs.games, title: "Rewind", detail: gamesLine, tone: tone, action: actions.rewind)
+                    .homeZoomSource(.games)
                     .homeRise(3)
                 HomeHairline(tone: tone)
                 HomeLinkRow(glyph: Glyphs.analyze, title: "Analyze", detail: "Study any position with the engine", tone: tone, action: actions.analyze)
@@ -839,11 +891,13 @@ extension HomeView {
         return VStack(alignment: .leading, spacing: Self.gap) {
             sheetCard {
                 HomeLinkRow(glyph: Glyphs.army, title: "Your pieces", detail: piecesLine, tone: tone, action: actions.army)
+                    .homeZoomSource(.army)
                     .homeRise(0)
             }
             if !played.isEmpty {
                 HomeGamesTile(rows: HomeGameRow.rows(played), total: played.count,
                               week: HomeGameRow.thisWeek(played), tone: tone, openAll: actions.rewind)
+                    .homeZoomSource(.games)
                     .homeRise(1)
             }
         }
@@ -854,6 +908,7 @@ extension HomeView {
         VStack(alignment: .leading, spacing: Self.gap) {
             sheetCard {
                 HomeLinkRow(glyph: Glyphs.games, title: "Your games", detail: gamesLine, tone: tone, action: actions.rewind)
+                    .homeZoomSource(.games)
                     .homeRise(0)
                 HomeHairline(tone: tone)
                 HomeLinkRow(glyph: Glyphs.settings, title: "Settings", detail: "Board look, sound, hints", tone: tone, action: actions.settings)
