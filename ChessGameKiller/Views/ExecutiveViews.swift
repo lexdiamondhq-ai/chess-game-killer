@@ -182,7 +182,7 @@ struct ExecutivePlate: View {
     /// How a line names a side: the rival's name or "You"; in a game between two people, the side's color.
     static func displayName(of color: Piece.Color, in match: MatchController, theme: BoardTheme) -> String {
         guard match.setup.opponent == .computer else { return theme.name(of: color) }
-        return match.game.humanColors.contains(color) ? "You" : match.setup.level.rival.name
+        return match.game.humanColors.contains(color) ? "You" : match.setup.rival.name
     }
 
     /// For VoiceOver: "Your clock", or "Pulse's clock".
@@ -194,7 +194,7 @@ struct ExecutivePlate: View {
     @ViewBuilder
     private var avatar: some View {
         if isComputer {
-            RivalPortrait(rival: match.setup.level.rival, size: 40, glows: theme.glows)
+            RivalPortrait(rival: match.setup.rival, size: 40, glows: theme.glows)
         } else {
             let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
             PieceImage(piece: Piece(.king, color: color, square: .e1), theme: theme, size: 32)
@@ -223,7 +223,7 @@ struct ExecutivePlate: View {
         }
         if isComputer {
             if isActive { return match.engineFailed ? "Coach offline" : "Thinking…" }
-            let rival = match.setup.level.rival
+            let rival = match.setup.rival
             return "\(rival.level.name) · \(rival.elo.replacingOccurrences(of: "~", with: ""))"
         }
         return isActive ? "Your move" : ""

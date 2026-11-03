@@ -15,7 +15,6 @@ struct ContentView: View {
     @State private var analyzeWithCamera = false
     @State private var coachExpanded = false
     @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .gilded
-    @AppStorage("matchRival") private var matchRival = false
     @AppStorage("showBestMoves") private var showBestMoves = false
     @AppStorage("showSecondBest") private var showSecondBest = true
     @AppStorage("coachVerdicts") private var showVerdicts = true
@@ -29,6 +28,7 @@ struct ContentView: View {
     @State private var puzzles = PuzzleStore.live()
     @State private var showingPuzzles = false
     @State private var army = ArmyStore.live()
+    @State private var grudges = GrudgeStore()
     @State private var showingArmy = false
     @State private var armyNews: ArmyNews?
     @State private var vault = GameVault.live()
@@ -96,16 +96,10 @@ struct ContentView: View {
         _coachExpanded = State(initialValue: coachOpen)
     }
 
-    /// Against the computer, the board matches the rival's portrait unless the player turned that off.
-    private var theme: BoardTheme {
-        if matchRival, match.setup.opponent == .computer {
-            return .named(match.setup.level.rival.boardTheme)
-        }
-        return .named(themeID)
-    }
+    /// The look picked in Settings, for the game and everything else.
+    private var theme: BoardTheme { .named(themeID) }
 
-    /// The look picked in Settings. Training, puzzles, lessons and the other screens away from the
-    /// game always use it: a rival's board belongs to the game against that rival.
+    /// The same look, for training, puzzles, lessons and the other screens away from the game.
     private var chosenTheme: BoardTheme { .named(themeID) }
     /// The orb is unfolded, so nothing else fits beside it.
     private var coachIsWide: Bool { coachExpanded }
@@ -188,10 +182,16 @@ struct ContentView: View {
                     daily.record(.game)
                 }
                 hookUpDaily()
-                match.onAbandon = { [army] ledger, setup, assisted in
+                match.grudgeRecord = { [grudges] in grudges.record }
+                match.onAbandon = { [army, grudges, weak match] ledger, setup, assisted in
                     // Walking away from a game counts as a loss.
                     army.record(ledger, playerColor: setup.playerColor, won: false,
                                 stakes: GameStakes(level: setup.level, assisted: assisted, staked: setup.stake))
+                    // Your Grudge counts it too. Walking out on a crowd never wakes one.
+                    if setup.grudge, let game = match?.game {
+                        grudges.recordGame(.itWon, moves: game.moves, playerColor: setup.playerColor,
+                                           positions: game.positionFENs)
+                    }
                 }
                 // Every grade reaches the coach, shown or not, so real mistakes are saved to practice.
                 match.onReview = { [weak match, coach, training] review, latest in
@@ -223,6 +223,7 @@ struct ContentView: View {
                 guard over else { return }
                 recordArmy()
                 recordGame()
+                recordGrudge()
                 // A game played to its end makes the day.
                 daily.record(.game)
                 if bigBoard { trayOpen = true }
@@ -300,6 +301,7 @@ struct ContentView: View {
                     challenges?.compose()
                 }
                 .environment(army)
+                .environment(grudges)
                 .boardSheetGrabber(boardSheet)
             }
             .sheet(isPresented: $showingSettings, onDismiss: refreshDaily) {
@@ -312,7 +314,7 @@ struct ContentView: View {
                     currentFEN: match.hasStarted ? match.game.fen : nil,
                     engine: StockfishEngine.shared,
                     reader: CloudBoardReader.live,
-                    rival: fromHereSetup.level.rival.name,
+                    rival: fromHereSetup.rival.name,
                     clock: fromHereSetup.timeControl,
                     forfeits: forfeits,
                     onAnalyzeGame: analyzeGame,
@@ -334,6 +336,7 @@ struct ContentView: View {
             .environment(training)
             .environment(coach)
             .environment(army)
+            .environment(grudges)
             .environment(vault)
             .environment(puzzles)
             .environment(daily)
@@ -1003,6 +1006,27 @@ struct ContentView: View {
             try? await Task.sleep(for: .seconds(6))
             if armyNews == news {
                 withAnimation(.easeOut(duration: 0.3)) { armyNews = nil }
+            }
+        }
+    }
+
+    /// Tells your Grudge how the game went. A loss to a crowd wakes the Grudge the first time.
+    private func recordGrudge() {
+        guard match.setup.opponent == .computer else { return }
+        let you = match.setup.playerColor
+        let result: GrudgeResult = match.winner.map { $0 == you ? .youWon : .itWon } ?? .draw
+        let game = match.game
+        if match.setup.grudge {
+            grudges.recordGame(result, moves: game.moves, playerColor: you, positions: game.positionFENs)
+        } else if result == .itWon,
+                  grudges.crowdWon(level: match.setup.level, moves: game.moves, playerColor: you,
+                                   positions: game.positionFENs) {
+            // After the crowd's own last word.
+            let number = match.gameNumber
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1.6))
+                guard match.gameNumber == number else { return }
+                match.say("Someone took that personally.")
             }
         }
     }

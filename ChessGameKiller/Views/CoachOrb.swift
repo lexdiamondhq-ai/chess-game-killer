@@ -184,7 +184,7 @@ private extension MatchController {
 private struct ResultText {
     let match: MatchController
 
-    private var rival: String { match.setup.level.rival.name }
+    private var rival: String { match.setup.rival.name }
     private var player: Piece.Color { match.setup.playerColor }
 
     var title: String {
@@ -206,11 +206,11 @@ private struct ResultText {
         if let outcome = match.outcome {
             switch outcome {
             case .timeout(let loser):
-                return loser == player ? "Your clock ran out." : "\(rival)'s clock ran out."
+                return loser == player ? "Your clock ran out." : "\(rival.possessive) clock ran out."
             case .timeoutDraw(let flagged):
                 return flagged == player
                     ? "Your clock ran out, but \(rival) can't checkmate with what's left."
-                    : "\(rival)'s clock ran out, but you can't checkmate with what's left."
+                    : "\(rival.possessive) clock ran out, but you can't checkmate with what's left."
             case .resigned(let loser):
                 return loser == player ? "\(rival) takes this one." : "You win. There was no way back for \(rival)."
             }
@@ -258,7 +258,7 @@ private struct OrbFace: View {
     @ViewBuilder
     private var mark: some View {
         if match.isComputerThinking {
-            ThinkingSigil(rival: match.setup.level.rival, size: 36, glows: theme.glows)
+            ThinkingSigil(rival: match.setup.rival, size: 36, glows: theme.glows)
         } else if match.isOver {
             // What the result means to the player, never a side's own color.
             if let won = match.playerWon {
@@ -292,7 +292,7 @@ private struct OrbFace: View {
     }
 
     private var accessibilityText: String {
-        if match.isComputerThinking { return "\(match.setup.level.rival.name) is thinking" }
+        if match.isComputerThinking { return "\(match.setup.rival.name) is thinking" }
         if match.isOver { return ResultText(match: match).title }
         var text = match.review.map { "\($0.title). \($0.detail)" } ?? "\(Coach.current.name), your coach."
         if let evaluation = match.evaluation {
@@ -416,7 +416,7 @@ private struct CoachPanel: View {
     }
 
     private var accent: Color { theme.accent ?? .accentColor }
-    private var rival: String { match.setup.level.rival.name }
+    private var rival: String { match.setup.rival.name }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -484,11 +484,11 @@ private struct CoachPanel: View {
                 EvalChip(text: scoreline, color: resultColor, large: true)
                     .accessibilityHidden(true)
             } else if match.isComputerThinking {
-                ThinkingSigil(rival: match.setup.level.rival, size: 40, glows: theme.glows)
+                ThinkingSigil(rival: match.setup.rival, size: 40, glows: theme.glows)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(rival) is thinking").font(.app(.headline))
                     if gradeIsComing {
-                        Text("Your grade comes right after \(rival)'s reply.")
+                        Text("Your grade comes right after \(rival.possessive) reply.")
                             .font(.app(.subheadline)).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }

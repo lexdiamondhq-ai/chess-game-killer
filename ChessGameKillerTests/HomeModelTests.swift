@@ -8,12 +8,12 @@ final class HomeModelTests: XCTestCase {
 
     // MARK: The clock card
 
-    func testAFirstGameIsAgainstSpark() {
+    func testAFirstGameIsAgainstTheGentlestCrowd() {
         let match = MatchController(engine: nil, sounds: nil)
         let next = HomeUpNext.make(match: match, side: .white, level: nil, timeControl: .unlimited, hasPlayed: false)
         XCTAssertEqual(next.kind, .firstGame)
         XCTAssertEqual(next.level, .beginner)
-        XCTAssertEqual(next.rival.name, "Spark")
+        XCTAssertEqual(next.rival.name, "The 1000s")
         XCTAssertFalse(next.inProgress)
         XCTAssertTrue(next.yourMove, "White moves first")
         XCTAssertEqual(next.moveNumber, 1)
@@ -75,9 +75,9 @@ final class HomeModelTests: XCTestCase {
     }
 
     func testEveryRivalHasARatingAndAWayOfPlaying() {
-        XCTAssertEqual(MatchController.Level.allCases.map(\.rating), [800, 1100, 1500, 2000, 3000])
-        XCTAssertEqual(MatchController.Level.club.spokenRating, "about 1500")
-        XCTAssertEqual(MatchController.Level.grandmaster.spokenRating, "over 3000")
+        XCTAssertEqual(MatchController.Level.allCases.map(\.rating), [1000, 1200, 1600, 2000, 2500])
+        XCTAssertEqual(MatchController.Level.club.spokenRating, "about 1600")
+        XCTAssertEqual(MatchController.Level.grandmaster.spokenRating, "over 2500")
         XCTAssertEqual(Set(MatchController.Level.allCases.map(\.tagline)).count, 5)
     }
 

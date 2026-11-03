@@ -144,7 +144,7 @@ private struct GameCard: View {
     let game: SavedGame
     let theme: BoardTheme
 
-    private var rival: Rival? { game.level.flatMap(MatchController.Level.init(rawValue:))?.rival }
+    private var rival: Rival? { Rival.of(saved: game) }
 
     private var resultColor: Color {
         switch game.result {

@@ -298,7 +298,7 @@ struct ArmyNews: Identifiable, Equatable {
         case .staked(let rival):
             return "\(name) is on the line against \(rival)."
         case .wonStake(let rival):
-            return "\(name) took \(rival)'s crown. Double XP."
+            return "\(name) took \(rival.possessive) crown. Double XP."
         case .captured(let rival):
             return "\(rival) is holding \(name). Beat \(rival) to get it back."
         case .rescued(let rival):
@@ -620,7 +620,7 @@ final class ArmyStore {
         let biggest = stats.taken.max { (PieceLedger.values[$0] ?? 0) < (PieceLedger.values[$1] ?? 0) } ?? .pawn
         let others = stats.taken.count - 1
         let more = others > 0 ? " and \(others) more" : ""
-        return "\(name) took \(rival)'s \(biggest.word)\(more)."
+        return "\(name) took \(rival.possessive) \(biggest.word)\(more)."
     }
 
     // MARK: Private

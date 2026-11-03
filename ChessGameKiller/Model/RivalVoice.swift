@@ -37,13 +37,16 @@ struct RivalLine: Equatable, Identifiable {
     let text: String
 }
 
-/// What each rival says, in its own voice: Spark is eager, Drift laid back,
-/// Pulse competitive, Vector cold and exact, Singularity barely human. Dry, never
-/// chirpy, and short enough to fit the line under its name (48 characters at most).
+/// What each crowd says, as one voice for thousands of players: "we". The 1000s are cheerful
+/// and surprised, the Masters barely speak. Dry, never chirpy, and short enough to fit the line
+/// under its name (48 characters at most). The Grudge has its own voice: `GrudgeVoice`.
 enum RivalVoice {
-    /// A line for `moment`, or nil if this rival keeps quiet. `pick` in 0..<1 chooses among them.
+    /// A line for `moment`, or nil if this crowd keeps quiet. `pick` in 0..<1 chooses among them.
     static func line(for moment: RivalMoment, level: MatchController.Level, pick: Double) -> String? {
-        let options = lines(for: moment, level: level)
+        choose(lines(for: moment, level: level), pick: pick)
+    }
+
+    static func choose(_ options: [String], pick: Double) -> String? {
         guard !options.isEmpty else { return nil }
         let index = max(0, min(options.count - 1, Int(pick * Double(options.count))))
         return options[index]
@@ -52,71 +55,134 @@ enum RivalVoice {
     static func lines(for moment: RivalMoment, level: MatchController.Level) -> [String] {
         switch (moment, level) {
         // MARK: Hello
-        case (.greeting, .beginner): return ["Hello! I'm still learning. Go easy on me.", "A new game! Let's play."]
-        case (.greeting, .casual): return ["Hello. No pressure.", "Let's keep it friendly. Mostly."]
-        case (.greeting, .club): return ["Good luck.", "Loose pawns are mine. Fair warning."]
-        case (.greeting, .expert): return ["Calculating. Begin when ready.", "Every slip is noted."]
-        case (.greeting, .grandmaster): return ["I have seen this game end.", "Proceed."]
+        case (.greeting, .beginner): return ["Hi! There are a lot of us. Go easy.", "We're still learning too."]
+        case (.greeting, .casual): return ["Hello from all of us.", "We play this on weekends. Let's go."]
+        case (.greeting, .club): return ["Good luck. We've seen this before.", "Thousands of us. One move at a time."]
+        case (.greeting, .expert): return ["We know the openings. Do you?", "Begin when ready."]
+        case (.greeting, .grandmaster): return ["The masters are seated.", "Proceed."]
 
         // MARK: Taking a piece
-        case (.tookPiece(let kind), .beginner): return ["Oh! I took your \(kind.word).", "I can take that? Then I will."]
-        case (.tookPiece(let kind), .casual): return ["Your \(kind.word)? Don't mind if I do.", "A free \(kind.word). Thanks."]
+        case (.tookPiece(let kind), .beginner): return ["Oh! We took your \(kind.word).", "Most of us took that. Sorry!"]
+        case (.tookPiece(let kind), .casual): return ["Your \(kind.word)? We'll take it.", "A free \(kind.word). Thanks."]
         case (.tookPiece(let kind), .club): return ["Thanks for the \(kind.word).", "That \(kind.word) was loose."]
-        case (.tookPiece(let kind), .expert): return ["\(kind.word.capitalized) removed.", "As calculated."]
-        case (.tookPiece, .grandmaster): return ["Inevitable.", "Another one."]
+        case (.tookPiece(let kind), .expert): return ["\(kind.word.capitalized) taken.", "Nearly all of us saw that."]
+        case (.tookPiece, .grandmaster): return ["Taken.", "As the masters play it."]
 
         // MARK: Losing a piece
-        case (.lostPiece(let kind), .beginner): return ["Oh no, my \(kind.word).", "I was fond of that \(kind.word)."]
-        case (.lostPiece(let kind), .casual): return ["Ah. Goodbye, \(kind.word).", "I didn't need that \(kind.word) anyway."]
-        case (.lostPiece(let kind), .club): return ["Hm. My \(kind.word). Noted.", "Lucky. I'll want that \(kind.word) back."]
-        case (.lostPiece, .expert): return ["An acceptable loss.", "Interesting. Recalculating."]
-        case (.lostPiece, .grandmaster): return ["Irrelevant.", "Interesting."]
+        case (.lostPiece(let kind), .beginner): return ["Oh no, our \(kind.word).", "Some of us saw that coming."]
+        case (.lostPiece(let kind), .casual): return ["Ah. There goes our \(kind.word).", "We didn't need that \(kind.word)."]
+        case (.lostPiece(let kind), .club): return ["Hm. Our \(kind.word). Noted.", "We'll want that \(kind.word) back."]
+        case (.lostPiece, .expert): return ["Acceptable.", "Some of us would have seen it."]
+        case (.lostPiece, .grandmaster): return ["Interesting.", "Hm."]
 
         // MARK: Check
-        case (.givesCheck, .beginner): return ["Check. Did I say that right?", "Check!"]
-        case (.givesCheck, .casual): return ["Check. Just saying hello to your king.", "Check, my friend."]
+        case (.givesCheck, .beginner): return ["Check! Did we say that right?", "Check!"]
+        case (.givesCheck, .casual): return ["Check. Just saying hello.", "Check, friend."]
         case (.givesCheck, .club): return ["Check. Your move.", "Check. Careful now."]
         case (.givesCheck, .expert): return ["Check.", "Check. Your options narrow."]
-        case (.givesCheck, .grandmaster): return ["Check.", "Your king feels it."]
-        case (.inCheck, .beginner): return ["Oh! My king.", "Careful, king."]
-        case (.inCheck, .casual): return ["Whoa, easy.", "Okay, okay, I see you."]
+        case (.givesCheck, .grandmaster): return ["Check."]
+        case (.inCheck, .beginner): return ["Oh! Our king.", "Careful, king."]
+        case (.inCheck, .casual): return ["Whoa, easy.", "Okay, okay, we see you."]
         case (.inCheck, .club): return ["Annoying.", "That changes nothing."]
         case (.inCheck, .expert): return ["Expected.", "A check is not a plan."]
         case (.inCheck, .grandmaster): return []
 
         // MARK: The person's moves
         case (.playerBlunder, .beginner): return ["Was that on purpose?", "Are you sure about that?"]
-        case (.playerBlunder, .casual): return ["Oops. Is that a gift?", "Not your best, friend."]
-        case (.playerBlunder, .club): return ["That's a mistake. I'll take it.", "That helps me."]
-        case (.playerBlunder, .expert): return ["That's a mistake.", "That move loses. Precisely."]
+        case (.playerBlunder, .casual): return ["Oops. Is that a gift?", "Not your best."]
+        case (.playerBlunder, .club): return ["Most of us wouldn't play that.", "That helps us."]
+        case (.playerBlunder, .expert): return ["That's a mistake.", "Almost none of us play that."]
         case (.playerBlunder, .grandmaster): return ["Careful.", "And there it is."]
-        case (.playerGreatMove, .beginner): return ["How did you see that?", "Teach me that one!"]
+        case (.playerGreatMove, .beginner): return ["How did you see that?", "Teach us that one!"]
         case (.playerGreatMove, .casual): return ["Okay, that was slick.", "Nice one. Seriously."]
-        case (.playerGreatMove, .club): return ["Good move. Annoyingly good.", "Strong. Hm."]
-        case (.playerGreatMove, .expert): return ["Correct.", "The best move. Unexpected."]
+        case (.playerGreatMove, .club): return ["Good move. Annoyingly good.", "Few of us find that."]
+        case (.playerGreatMove, .expert): return ["Correct.", "The best move. Noted."]
         case (.playerGreatMove, .grandmaster): return ["Adequate."]
 
         // MARK: The end
         case (.rivalResigns, .beginner): return ["Okay, you win! Again?"]
-        case (.rivalResigns, .casual): return ["I'm done. Well played."]
-        case (.rivalResigns, .club): return ["I resign. Well played."]
-        case (.rivalResigns, .expert): return ["No path remains. I resign."]
-        case (.rivalResigns, .grandmaster): return ["Impossible. I resign."]
+        case (.rivalResigns, .casual): return ["We're done. Well played."]
+        case (.rivalResigns, .club): return ["We resign. Well played."]
+        case (.rivalResigns, .expert): return ["No way back. We resign."]
+        case (.rivalResigns, .grandmaster): return ["We resign. Well played."]
         case (.playerResigned, .beginner): return ["Oh! Next time, then."]
         case (.playerResigned, .casual): return ["Fair enough. Next time."]
         case (.playerResigned, .club): return ["A wise call."]
         case (.playerResigned, .expert), (.playerResigned, .grandmaster): return ["Accepted."]
-        case (.rivalWins, .beginner): return ["I won? I won! Another?"]
+        case (.rivalWins, .beginner): return ["We won? We won! Another?"]
         case (.rivalWins, .casual): return ["Good game. Another?"]
         case (.rivalWins, .club): return ["Good game. Come back stronger."]
-        case (.rivalWins, .expert): return ["As calculated. Again?"]
-        case (.rivalWins, .grandmaster): return ["As foreseen."]
-        case (.playerWins, .beginner): return ["You got me. Well played!"]
-        case (.playerWins, .casual): return ["You got me. Nicely done."]
-        case (.playerWins, .club): return ["Well played. I want a rematch."]
-        case (.playerWins, .expert): return ["I underestimated you."]
+        case (.rivalWins, .expert): return ["Most of us would win that. Again?"]
+        case (.rivalWins, .grandmaster): return ["As played before."]
+        case (.playerWins, .beginner): return ["You got us. Well played!"]
+        case (.playerWins, .casual): return ["You got us. Nicely done."]
+        case (.playerWins, .club): return ["Well played. You beat the 1600s."]
+        case (.playerWins, .expert): return ["You beat the 2000s. Seriously."]
         case (.playerWins, .grandmaster): return ["Well played. You earned that."]
         case (.draw, _): return ["A draw. Fair enough."]
         }
+    }
+}
+
+/// What your Grudge says. It only ever states true things from your games against it: the
+/// score, its streaks, the piece it took last time. Dry, short, never an insult, and short
+/// enough for the line under its name (48 characters at most).
+enum GrudgeVoice {
+    static func line(for moment: RivalMoment, record: GrudgeRecord?, now: Date = .now, pick: Double) -> String? {
+        RivalVoice.choose(lines(for: moment, record: record, now: now), pick: pick)
+    }
+
+    static func lines(for moment: RivalMoment, record: GrudgeRecord?, now: Date = .now) -> [String] {
+        let mood = record?.mood ?? .even
+        let its = record?.itsWins ?? 0
+        let quiet = mood == .rattled
+        switch moment {
+        case .greeting:
+            if let memory = record?.lastLoss, mood != .respect, let line = recall(memory, now: now) {
+                return [line]
+            }
+            switch mood {
+            case .smug: return ["You again. \(its) to me so far.", "Sit down. I remember you."]
+            case .rattled: return ["Two in a row. Not three."]
+            case .furious: return ["You ended my streak. Sit down."]
+            case .respect: return ["Fine. Let's see if it holds."]
+            case .even: return ["We're level. Not for long.", "I remember you."]
+            }
+        case .tookPiece(let kind):
+            return quiet ? ["Mine."] : ["Your \(kind.word). Like last time.", "I'll remember that \(kind.word)."]
+        case .lostPiece:
+            return quiet ? ["…"] : ["Keep it. For now.", "That changes nothing."]
+        case .givesCheck:
+            return quiet ? ["Check."] : ["Check. Remember this?", "Check."]
+        case .inCheck:
+            return quiet ? [] : ["Hm.", "You've been practising."]
+        case .playerBlunder:
+            return ["There it is.", "Same as last time."]
+        case .playerGreatMove:
+            return quiet ? ["…"] : ["Lucky.", "Who taught you that?"]
+        case .rivalResigns:
+            return ["This one. Not the next."]
+        case .playerResigned:
+            return ["Wise. That's \(its + 1)."]
+        case .rivalWins:
+            return ["Again.", "That's \(its + 1)."]
+        case .playerWins:
+            return quiet ? ["…"] : ["Lucky.", "Enjoy it. It's going on the list."]
+        case .draw:
+            return ["A draw. We'll finish this."]
+        }
+    }
+
+    /// "Tuesday. Move 12. Remember?", or for an older game "Your knight. Move 12. Remember?"
+    static func recall(_ memory: GrudgeRecord.Moment, now: Date) -> String? {
+        let days = Calendar.current.dateComponents([.day], from: memory.date, to: now).day ?? 99
+        if days >= 1 && days < 7 {
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.dateFormat = "EEEE"
+            return "\(formatter.string(from: memory.date)). Move \(memory.move). Remember?"
+        }
+        if days < 1 { return "Move \(memory.move). Your \(memory.piece). Remember?" }
+        return "Your \(memory.piece) on \(memory.square). Remember?"
     }
 }

@@ -723,7 +723,7 @@ struct HomeLadderTile: View {
                         }
                     }
                     .opacity(beaten || isNext || rung.played > 0 ? 1 : 0.72)
-                Text(rival.name)
+                Text(rival.shortName)
                     .font(.app(.caption, weight: .semibold))
                     .foregroundStyle(isNext ? tone.metal : tone.ink)
                     .lineLimit(1)

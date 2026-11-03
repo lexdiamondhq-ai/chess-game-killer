@@ -72,7 +72,7 @@ enum HintsIntroduction {
 /// both sides and you to move. A normal launch never passes it, and then nothing here runs.
 ///
 /// Other arguments: `-showcaseLook midnight` (any look's id), `-showcase3D NO`,
-/// `-showcaseRival spark` (a rival's name), `-showcaseClock 15+10` (or `none`), `-showcaseCoach open`,
+/// `-showcaseRival 1000s` (a crowd, or `grudge`), `-showcaseClock 15+10` (or `none`), `-showcaseCoach open`,
 /// `-showcaseGhost all` (Ghost Vision held, the whole line) or `-showcaseGhost 1` (held, slid back to its second move),
 /// `-showcaseBigBoard YES` (Big Board on), `-showcaseHome YES` (the home, with that game under way).
 /// `-showcaseGames YES`, with or without `-showcase game`, lists a few friend and online games
@@ -101,7 +101,11 @@ struct Showcase {
 
         var setup = MatchController.Setup()
         let rival = defaults.string(forKey: "showcaseRival")?.lowercased()
-        setup.level = Rival.all.first { $0.name.lowercased() == rival }?.level ?? .club
+        if let picked = rival.flatMap(Rival.named) {
+            setup.level = picked.level
+            setup.grudge = picked.isGrudge
+            setup.grudgeSkill = picked.isGrudge ? 11 : nil
+        }
         setup.timeControl = defaults.string(forKey: "showcaseClock").flatMap(TimeControl.init(rawValue:)) ?? .rapid10
         let match = MatchController(engine: StockfishEngine.shared, sounds: nil)
         match.start(setup)

@@ -26,7 +26,11 @@ struct PlateRemark<Status: View>: View {
                     .minimumScaleFactor(0.75)
                     .id("rival-\(line.id)")
                     .transition(.opacity.combined(with: .offset(y: 3)))
-                    .accessibilityLabel("\(match.setup.level.rival.name) says: \(line.text)")
+                    .accessibilityLabel("\(match.setup.rival.name) says: \(line.text)")
+            } else if isRival, let vote = shownVote {
+                CrowdVoteLine(vote: vote, crowd: match.setup.rival.name, theme: theme)
+                    .id("vote-\(match.game.plyCount)")
+                    .transition(.opacity.combined(with: .offset(y: 3)))
             } else if !isRival, let verdict = match.verdictLine {
                 VerdictLine(review: verdict, theme: theme)
                     .id("verdict-\(verdict.id)")
@@ -37,11 +41,20 @@ struct PlateRemark<Status: View>: View {
             }
         }
         .animation(.easeInOut(duration: 0.3), value: isRival ? match.rivalLine?.id : match.verdictLine?.id)
+        .animation(.easeInOut(duration: 0.3), value: shownVote)
         .onChange(of: match.rivalLine?.id) { _, id in
             // VoiceOver hears each remark once, as it is made.
             guard isRival, banterOn, id != nil, let line = match.rivalLine else { return }
-            AccessibilityNotification.Announcement("\(match.setup.level.rival.name): \(line.text)").post()
+            AccessibilityNotification.Announcement("\(match.setup.rival.name): \(line.text)").post()
         }
+    }
+}
+
+extension PlateRemark {
+    /// The vote behind the crowd's last move, while it is your turn to answer it.
+    private var shownVote: CrowdVote? {
+        guard !match.isOver, !match.isComputerThinking, match.game.isHumanTurn else { return nil }
+        return match.crowdVote
     }
 }
 

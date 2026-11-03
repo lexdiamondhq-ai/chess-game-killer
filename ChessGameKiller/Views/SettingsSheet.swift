@@ -5,7 +5,6 @@ import SwiftUI
 /// sound and haptics, and the credits. Every choice is remembered.
 struct SettingsSheet: View {
     @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .gilded
-    @AppStorage("matchRival") private var matchRival = false
     @AppStorage("showBestMoves") private var showBestMoves = false
     @AppStorage("showSecondBest") private var showSecondBest = true
     @AppStorage("coachVerdicts") private var showVerdicts = true
@@ -71,9 +70,6 @@ struct SettingsSheet: View {
                             }
                             ToggleRow(title: "Coordinates", subtitle: "Letters and numbers around the board. Off gives the squares more room.",
                                       symbol: "textformat.abc", isOn: $coordinatesOn, theme: theme)
-                            rule
-                            ToggleRow(title: "Match rival", subtitle: "Computer games use the rival's own board, not the one picked above.",
-                                      symbol: "person.crop.circle.badge.checkmark", isOn: $matchRival, theme: theme)
                             rule
                             ToggleRow(title: "Piece history", subtitle: "Your pieces wear what they've been through: gold seams, a promoted pawn's collar, notches, patina.",
                                       symbol: "seal", isOn: $heirloomOn, theme: theme)
