@@ -285,14 +285,16 @@ struct HomeSheetTabBar<Jewel: View>: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
-            .foregroundStyle(on ? tone.ink : tone.ink3)
+            // The picked tab turns gold, and a small gold dot slides under it.
+            .foregroundStyle(on ? tone.metal : tone.ink3)
             .frame(maxWidth: .infinity)
             .frame(minHeight: 50)
-            .background {
+            .overlay(alignment: .bottom) {
                 if on {
-                    Capsule()
-                        .fill(tone.ink.opacity(0.13))
-                        .overlay { Capsule().strokeBorder(tone.metal.opacity(0.35), lineWidth: 0.75) }
+                    Circle()
+                        .fill(tone.metal)
+                        .frame(width: 4, height: 4)
+                        .offset(y: -1)
                         .matchedGeometryEffect(id: "pill", in: pill)
                 }
             }

@@ -179,9 +179,10 @@ def puzzle():
 
 def analyze():
     """A magnifier over a pawn."""
-    ring = circle(10.2, 10.2, 7.6) + " " + circle(10.2, 10.2, 5.9, clockwise=False)
-    inside = pawn(dx=10.2 - 12 * 0.42, dy=10.2 - 11.4 * 0.42, s=0.42)
-    return svg([ring, inside], [("M15.9 15.9L20.8 20.8", 2.8)])
+    # The ring and handle are as heavy as the pieces' strokes, so it sits with them in a row.
+    ring = circle(10.2, 10.2, 7.8) + " " + circle(10.2, 10.2, 5.4, clockwise=False)
+    inside = pawn(dx=10.2 - 12 * 0.4, dy=10.2 - 11.4 * 0.4, s=0.4)
+    return svg([ring, inside], [("M16.0 16.0L20.6 20.6", 3.6)])
 
 
 def rewind():
@@ -201,18 +202,18 @@ def rewind():
 
 def undo():
     """A knight's move taken back: an L with an arrowhead."""
-    return svg([arrowhead((3.4, 8.6), (-1, 0), length=4.6, half=3.4),
-                circle(18.2, 19.4, 1.9)],
-               [("M18.2 17.2V10.6C18.2 9.5 17.3 8.6 16.2 8.6H6.6", 2.6)])
+    return svg([arrowhead((2.4, 8.4), (-1, 0), length=5.4, half=4.2),
+                circle(18.4, 19.6, 2.3)],
+               [("M18.4 16.8V11.0C18.4 9.6 17.2 8.4 15.8 8.4H7.2", 3.4)])
 
 
 def hints(off=False):
     """The coach's mark for its best move: a dot in a halo ring, as on the board."""
-    paths = [circle(12, 12, 10.0) + " " + circle(12, 12, 7.9, clockwise=False),
-             circle(12, 12, 4.2)]
+    paths = [circle(12, 12, 10.4) + " " + circle(12, 12, 7.6, clockwise=False),
+             circle(12, 12, 5.2)]
     strokes = []
     if off:
-        strokes.append(("M4.4 4.4L19.6 19.6", 2.2))
+        strokes.append(("M4.2 4.2L19.8 19.8", 2.6))
     return svg(paths, strokes)
 
 
@@ -234,7 +235,7 @@ def checker_outline(x, y, size, gap=1.0, radius=0.9, stroke=1.4):
 
 def flip():
     """The board turning around."""
-    tile = checker_tile(7.4, 7.4, 9.2) + checker_outline(7.4, 7.4, 9.2)
+    tile = checker_tile(7.2, 7.2, 9.6) + checker_outline(7.2, 7.2, 9.6, stroke=1.8)
     r, a = 9.8, math.radians(38)
     left_up = (12 - r * math.cos(a), 12 - r * math.sin(a))
     right_up = (12 + r * math.cos(a), 12 - r * math.sin(a))
@@ -247,7 +248,7 @@ def flip():
     t2 = (-math.sin(a), -math.cos(a))
     head1 = arrowhead((right_up[0] + t1[0] * 2.6, right_up[1] + t1[1] * 2.6), t1, length=3.8, half=2.6)
     head2 = arrowhead((left_down[0] + t2[0] * 2.6, left_down[1] + t2[1] * 2.6), t2, length=3.8, half=2.6)
-    return svg(tile + [head1, head2], [(top, 2.0), (bottom, 2.0)])
+    return svg(tile + [head1, head2], [(top, 2.8), (bottom, 2.8)])
 
 
 def settings():
