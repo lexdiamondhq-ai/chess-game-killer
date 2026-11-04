@@ -247,7 +247,7 @@ jobs:
           cat snapshots/device.txt || true
           # The newest effects print last, so the end of the log shows them; the simulator's own screenshots after all.
           LAST="sculpted-finale sculpted-big-capture check hints capture-fall game-end device"
-          ORDERED=$(ls snapshots/*.png | grep -v -E "$(echo $LAST | tr ' ' '|')"; for p in $LAST; do ls snapshots/$p-*.png 2>/dev/null; done)
+          ORDERED=$(ls snapshots/*.png | grep -v -E "$(echo $LAST | tr ' ' '|')"; for p in $LAST; do ls snapshots/$p-*.png 2>/dev/null || true; done)
           for f in $ORDERED; do
             [ -e "$f" ] || continue
             # Look studies and the simulator's screenshots are printed near full size, so they can be judged as on the phone.
