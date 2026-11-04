@@ -620,6 +620,7 @@ struct HomeCurrentStrip: View {
             .padding(8)
             .padding(.trailing, 8)
             .frame(minWidth: 148, alignment: .leading)
+            .modifier(HomeRowShare(count: games.count))
             .homePane(shape, tone: tone)
             .contentShape(shape)
         }
@@ -632,6 +633,20 @@ struct HomeCurrentStrip: View {
     /// The other player's name, without the "vs": "Maya", "Open challenge".
     static func name(_ game: HomeCurrentGame) -> String {
         game.title.hasPrefix("vs ") ? String(game.title.dropFirst(3)) : game.title
+    }
+}
+
+/// One or two current games share the row between them, so a lone game never leaves half
+/// the row empty. Three or more keep their own width and scroll.
+private struct HomeRowShare: ViewModifier {
+    let count: Int
+
+    func body(content: Content) -> some View {
+        if count <= 2 {
+            content.containerRelativeFrame(.horizontal, count: max(count, 1), spacing: 10, alignment: .leading)
+        } else {
+            content
+        }
     }
 }
 

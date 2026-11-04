@@ -260,6 +260,7 @@ struct NewGameSheet: View {
             }
             .navigationTitle("New Game")
             .navigationBarTitleDisplayMode(.inline)
+            .sheetTitleBar()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -453,7 +454,7 @@ struct NewGameSheet: View {
         }
         let rival = draftLevel.rival.name
         if let prisoner {
-            return "\(rival) is holding \(army.displayName(of: prisoner, capitalized: false)). Win this game to get it back. Nothing else can go on the line against \(rival) until then."
+            return "\(rival) \(rival.agreeing("is", "are")) holding \(army.displayName(of: prisoner, capitalized: false)). Win this game to get it back. Nothing else can go on the line against \(rival.midSentence) until then."
         }
         if army.stakeable.isEmpty {
             return "Pieces earn a name at Veteran (25 XP). Named pieces can go on the line."
@@ -481,7 +482,7 @@ struct NewGameSheet: View {
                     }
                     .padding(.vertical, 2)
                 }
-                Text("Win: double XP and a trophy from \(draftLevel.rival.name). Lose: \(draftLevel.rival.name) keeps the piece until you beat \(draftLevel.rival.name) again.")
+                Text("Win: double XP and a trophy from \(draftLevel.rival.name.midSentence). Lose: \(draftLevel.rival.name) \(draftLevel.rival.name.agreeing("keeps", "keep")) the piece until you beat \(draftLevel.rival.name.midSentence) again.")
                     .font(.app(.footnote))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

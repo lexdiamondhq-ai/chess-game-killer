@@ -36,6 +36,17 @@ final class LiveGameTests: XCTestCase {
         XCTAssertNil(over.alertTitle(rival: "Pulse"))
     }
 
+    func testCrowdNamesReadAsManyPlayers() {
+        let played = LiveState(fen: "", lastMove: "e4", lastMoveByRival: false, yourMove: false, moveNumber: 1)
+        XCTAssertEqual(played.headline(rival: "The 1600s"), "The 1600s are thinking")
+        XCTAssertEqual(played.headline(rival: "Your Grudge"), "Your Grudge is thinking")
+        XCTAssertEqual("The Masters".agreeing("wins", "win"), "win")
+        XCTAssertEqual("Your Grudge".agreeing("wins", "win"), "wins")
+        XCTAssertEqual("The Masters".midSentence, "the Masters")
+        XCTAssertEqual("Your Grudge".midSentence.possessive, "your Grudge's")
+        XCTAssertEqual("Kestrel".midSentence, "Kestrel")
+    }
+
     func testTheClockReadsShort() {
         let timed = LiveState(fen: "", yourMove: true, moveNumber: 14, yourSeconds: 251)
         XCTAssertEqual(timed.shortStatus, "4:11")
