@@ -393,7 +393,11 @@ actor StockfishEngine: ChessEngine {
     private func finish(searchID: Int, bestMove: String?) {
         guard let search = pending, search.id == searchID else { return }
         Self.trace?("finish search \(searchID): \(bestMove ?? "no move")")
+        // Each line is kept at its own deepest report, so a line left a depth behind can
+        // still name the move an earlier line has since taken: keep the first only.
+        var seen = Set<String>()
         let lines = search.lines.sorted { $0.key < $1.key }.map { $0.value.line }
+            .filter { line in line.firstMove.map { seen.insert($0).inserted } ?? true }
         search.continuation.yield(SearchResult(bestMove: bestMove ?? lines.first?.firstMove, lines: lines))
         search.continuation.finish()
         pending = nil
