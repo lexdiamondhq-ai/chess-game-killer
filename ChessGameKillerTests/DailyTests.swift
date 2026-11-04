@@ -261,7 +261,10 @@ final class DailyTests: XCTestCase {
         let store = ArmyStore(army: army)
         let daily = DailyStore()
         let now = Date.now
-        let facts = DailyUpkeep.facts(daily: daily, army: store, lastGame: now.addingTimeInterval(-3 * 86_400), now: now)
+        // Three calendar days back, not 72 hours: across a clock change, late in the evening,
+        // 72 hours can land just after midnight two days back.
+        let lastGame = Calendar.current.date(byAdding: .day, value: -3, to: now)!
+        let facts = DailyUpkeep.facts(daily: daily, army: store, lastGame: lastGame, now: now)
         XCTAssertEqual(facts.hero, "Seraphine")
         XCTAssertEqual(facts.heroKind, "queen")
         XCTAssertEqual(facts.nearRank?.xp, 10)
