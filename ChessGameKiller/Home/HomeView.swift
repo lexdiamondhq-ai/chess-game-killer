@@ -128,7 +128,9 @@ struct HomeView: View {
         self.onTab = onTab
         _you = State(initialValue: showsYou ? .bottom : nil)
         _shortcutsOpen = State(initialValue: showsShortcuts)
-        _sheetDetent = State(initialValue: rises ? .board : sheet)
+        // CI's pictures open the home folded with `-showcaseHomeSheet board`; a normal launch never passes it.
+        let shown: HomeSheetDetent? = UserDefaults.standard.string(forKey: "showcaseHomeSheet") == "board" ? .board : nil
+        _sheetDetent = State(initialValue: shown ?? (rises ? .board : sheet))
         _sheetTab = State(initialValue: tab)
     }
 
@@ -658,6 +660,7 @@ extension HomeView {
             sheetGreeting(lift: lift)
                 .padding(.top, safeTop + 4)
                 .padding(.horizontal, 16)
+            pullRow(upNext, metrics: metrics, height: height, lift: lift)
             sheetPanel(upNext, metrics: metrics, height: height, lift: lift)
                 .frame(maxHeight: .infinity, alignment: .bottom)
                 .ignoresSafeArea(edges: .bottom)
@@ -668,6 +671,28 @@ extension HomeView {
         .accessibilityHidden(veiled)
         .allowsHitTesting(!veiled && !pushing)
         .onAppear(perform: riseFromGame)
+    }
+
+    /// Pulled down by its grabber, the sheet leaves the board with a row of quick ways in just
+    /// above the strip. They fade as soon as the sheet starts back up.
+    private func pullRow(_ upNext: HomeUpNext, metrics: HomeSheetMetrics, height: CGFloat, lift: CGFloat) -> some View {
+        let shown: Double = Double(1 - min(max(lift * 4, 0), 1))
+        var items: [HomePullRow.Item] = [
+            .init(id: "new", glyph: Glyphs.play, title: "New game") { secondary(upNext) },
+        ]
+        if let challenges {
+            items.append(.init(id: "friend", glyph: Glyphs.challenge, title: "A friend") { challenges.compose() })
+        }
+        items.append(.init(id: "today", glyph: Glyphs.today, title: "Today's Move") { actions.dailyMove() })
+        items.append(.init(id: "analyze", glyph: Glyphs.analyze, title: "Analyze") { actions.analyze() })
+        return HomePullRow(items: items, tone: tone)
+            .padding(.bottom, height + 24)
+            .frame(maxHeight: .infinity, alignment: .bottom)
+            .ignoresSafeArea(edges: .bottom)
+            .opacity(shown)
+            .offset(y: (1 - CGFloat(shown)) * 12)
+            .allowsHitTesting(shown > 0.6)
+            .accessibilityHidden(shown < 0.6)
     }
 
     /// Back from a game: the folded sheet, where the game's was, rises to its rest.
