@@ -26,8 +26,8 @@ struct BoardViewSwitch: View {
             segment(.tilted, symbol: "perspective")
             segment(.flat, symbol: "square.grid.2x2")
         }
-        .padding(2)
-        .frame(height: 26)
+        .padding(3)
+        .frame(maxHeight: 32)
         .glassPane(Capsule())
         .fixedSize(horizontal: true, vertical: false)
         .dynamicTypeSize(...DynamicTypeSize.xLarge)

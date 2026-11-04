@@ -26,9 +26,9 @@ struct ExecutivePlate: View {
     private var glow: Color? { theme.glows && isActive ? theme.sideColor(color) : nil }
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
         HStack(spacing: 10) {
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 avatar
                     .frame(width: 40, height: 40)
                 VStack(alignment: .leading, spacing: 2) {
@@ -52,10 +52,21 @@ struct ExecutivePlate: View {
                     .layoutPriority(2)
             }
         }
-        .padding(.leading, 9)
-        .padding(.trailing, 10)
+        .padding(.leading, 12)
+        .padding(.trailing, 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .glassPane(shape)
+        .overlay {
+            // Whose move it is: a fine edge of the look's gold, as the Home lights the next rung.
+            if glow == nil, isActive {
+                shape.strokeBorder(
+                    LinearGradient(colors: [accent.opacity(0.7), accent.opacity(0.18), accent.opacity(0.45)],
+                                   startPoint: .topLeading, endPoint: .bottomTrailing),
+                    lineWidth: 1
+                )
+                .transition(.opacity)
+            }
+        }
         .overlay {
             if let glow {
                 shape.strokeBorder(

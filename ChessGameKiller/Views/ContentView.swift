@@ -132,6 +132,8 @@ struct ContentView: View {
     private static let gap: CGFloat = 6
     /// The least room kept above and below the players and the board.
     private static let edgeRoom: CGFloat = 6
+    /// The most a gap grows on a tall screen.
+    private static let maxExtraGap: CGFloat = 14
     /// The dock: the orb and a little air around it.
     private static let dockHeight: CGFloat = CoachOrb.orbSize + 12
     /// On iPad the dock stays about a phone's width.
@@ -144,14 +146,14 @@ struct ContentView: View {
     private static let resultShare: CGFloat = 0.53
 
     // The rows grow with the reader's text size, up to a point, and the board makes room.
-    @ScaledMetric(relativeTo: .body) private var scaledPlateHeight: CGFloat = 58
+    @ScaledMetric(relativeTo: .body) private var scaledPlateHeight: CGFloat = 64
     @ScaledMetric(relativeTo: .footnote) private var scaledStripHeight: CGFloat = 32
-    @ScaledMetric(relativeTo: .footnote) private var scaledRibbonHeight: CGFloat = 24
+    @ScaledMetric(relativeTo: .footnote) private var scaledRibbonHeight: CGFloat = 32
     /// One player's line.
-    private var plateHeight: CGFloat { min(scaledPlateHeight, 66) }
+    private var plateHeight: CGFloat { min(scaledPlateHeight, 72) }
     /// Both players on one line, while the coach is open.
     private var stripHeight: CGFloat { min(scaledStripHeight, 40) }
-    private var ribbonHeight: CGFloat { min(scaledRibbonHeight, 30) }
+    private var ribbonHeight: CGFloat { min(scaledRibbonHeight, 38) }
 
     @Environment(\.horizontalSizeClass) private var sizeClass
     /// The board stops growing here: larger across an iPad, and no phone is this wide.
@@ -634,6 +636,12 @@ struct ContentView: View {
         let byHeight = max(0, size.height - fixed) * aspect / (1 + headroom * aspect)
         let side = max(0, min(size.width, maxBoardSide, byHeight))
         let lineWidth = max(0, max(side, min(size.width, Self.phoneWidth)) - Self.inset * 2)
+        // A tall phone has height to spare once the board fills the width. It is shared out
+        // between the gaps and the edges, like the Home's cards, instead of pooling above and below.
+        let used = fixed + side * headroom + side / max(aspect, 0.01)
+        let spare = max(0, size.height - used)
+        let slots: CGFloat = compact ? 2 : 3
+        let gap = Self.gap + min(spare / (slots + 2), Self.maxExtraGap)
         let topColor: Piece.Color = match.isBoardFlipped ? .white : .black
         return VStack(spacing: 0) {
             Spacer(minLength: Self.edgeRoom)
@@ -646,18 +654,17 @@ struct ContentView: View {
                         .frame(width: lineWidth, height: plateHeight)
                 }
             }
-            Color.clear.frame(height: Self.gap + side * headroom)
+            Color.clear.frame(height: gap + side * headroom)
             board
                 .frame(width: side, height: side / aspect)
-            Color.clear.frame(height: Self.gap)
+            Color.clear.frame(height: gap)
             if !compact {
                 ExecutivePlate(match: match, theme: theme, color: topColor.opposite)
                     .frame(width: lineWidth, height: plateHeight)
-                Color.clear.frame(height: Self.gap)
+                Color.clear.frame(height: gap)
             }
             ribbonRow
-                // In line with the avatars on the players' lines.
-                .frame(width: max(0, lineWidth - 18), height: ribbonHeight)
+                .frame(width: lineWidth, height: ribbonHeight)
             Spacer(minLength: Self.edgeRoom)
         }
         .frame(maxWidth: .infinity)
@@ -689,8 +696,12 @@ struct ContentView: View {
             GhostStrip(line: match.ghostLine, focus: vision.focus, theme: theme)
                 .transition(.opacity)
         } else {
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
+                // The moves on their own glass, like the players' lines above them.
                 movesOrBrowsing
+                    .padding(.horizontal, 14)
+                    .frame(maxHeight: .infinity)
+                    .glassPane(Capsule())
                 BoardViewSwitch(theme: theme, bigBoard: bigBoard)
             }
         }
