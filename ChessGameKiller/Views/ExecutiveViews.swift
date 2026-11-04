@@ -438,6 +438,17 @@ struct DockLabel: View {
                 .font(.app(.caption2, weight: .medium))
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
+                // While on, a small gold dot under the name, as under the home's picked tab.
+                // An overlay, so lighting it never moves the dock.
+                .overlay(alignment: .bottom) {
+                    Circle()
+                        .fill(accent)
+                        .frame(width: 4, height: 4)
+                        .offset(y: 7)
+                        .opacity(lit ? 1 : 0)
+                        .scaleEffect(lit ? 1 : 0.2)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: lit)
+                }
         }
         .foregroundStyle(lit ? accent : Color.primary.opacity(0.78))
         .opacity(isEnabled ? 1 : 0.5)
