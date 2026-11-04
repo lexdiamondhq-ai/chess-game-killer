@@ -55,6 +55,13 @@ struct BoardView: View {
         playsIn3D(theme, setting: setting) ? framing.aspect : 1
     }
 
+    /// The tallest shape the board can take (width over height): a standing 3D board can grow
+    /// into spare height, its camera tipping higher; every other board keeps its one shape.
+    static func tallestAspect(_ theme: BoardTheme, setting: Bool, framing: SculptedCamera.Framing = .standing) -> CGFloat {
+        guard playsIn3D(theme, setting: setting), framing == .standing else { return aspect(theme, setting: setting, framing: framing) }
+        return CGFloat(SculptedCamera.standingAspects.lowerBound)
+    }
+
     private var flatBoard: some View {
         GeometryReader { geo in
             flatBoard(side: min(geo.size.width, geo.size.height))

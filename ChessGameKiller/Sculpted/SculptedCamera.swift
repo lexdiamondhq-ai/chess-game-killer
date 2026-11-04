@@ -102,15 +102,20 @@ struct SculptedCamera: Equatable {
 
     /// Half the board's width including its frame.
     static let boardHalfWidth: Float = 4.55
+    /// Half the width the camera keeps in the picture: the squares and a sliver of the frame's
+    /// inner edge. The rest of the frame runs off the sides, so the squares get the screen
+    /// (Alex, 2026-11-04: "much larger, taking up more of the screen"). The files and ranks sit
+    /// on the edge squares instead of the frame, so none of them are lost.
+    static let fitHalfWidth: Float = 4.1
     /// The tallest piece, the king, with its cross.
     static let tallest: Float = 1.47
 
-    /// What must stay in the picture: the frame's corners (its top and the bottom of its
-    /// near face) and the tops of the tallest pieces on the far rank.
+    /// What must stay in the picture: the squares' corners with a sliver of frame (its top, and
+    /// its near face below them) and the tops of the tallest pieces on the far rank.
     static var keyPoints: [SIMD3<Float>] { keyPoints(tallest: tallest) }
 
     static func keyPoints(tallest: Float) -> [SIMD3<Float>] {
-        let w = boardHalfWidth
+        let w = fitHalfWidth
         var points: [SIMD3<Float>] = []
         for x in [-w, w] {
             for z in [-w, w] {
@@ -135,7 +140,7 @@ struct SculptedCamera: Equatable {
         /// Height above the board, as an angle.
         var elevation: Float {
             switch self {
-            case .standing: return 50 * .pi / 180
+            case .standing: return SculptedCamera.lowestTilt * .pi / 180
             case .seated: return 80 * .pi / 180
             }
         }
@@ -162,7 +167,7 @@ struct SculptedCamera: Equatable {
         /// Width over height of a view that holds the board snugly.
         var aspect: CGFloat {
             switch self {
-            case .standing: return 1.35
+            case .standing: return CGFloat(SculptedCamera.snugAspect(tilt: SculptedCamera.lowestTilt))
             case .seated: return 1.01
             }
         }
@@ -170,10 +175,17 @@ struct SculptedCamera: Equatable {
 
     /// The camera for a view of this shape: the board as wide as the view allows, the
     /// picture centered top to bottom. Flipping turns the same framing to black's side.
+    /// Standing, a view taller than the board needs tips the camera higher (up to 62 degrees),
+    /// so the board fills the height too instead of leaving bands above and below it.
     static func fitted(aspect: Float, flipped: Bool, framing: Framing = .standing) -> SculptedCamera {
+        let elevation = framing == .standing ? standingElevation(forAspect: aspect) : framing.elevation
+        return fitted(aspect: aspect, flipped: flipped, framing: framing, elevation: elevation)
+    }
+
+    private static func fitted(aspect: Float, flipped: Bool, framing: Framing, elevation: Float) -> SculptedCamera {
         var camera = SculptedCamera()
         camera.aspect = aspect
-        camera.elevation = framing.elevation
+        camera.elevation = elevation
         camera.fieldOfView = framing.fieldOfView
         camera.framing = framing
         // Find the look point that centers the picture, then the distance that fits it.
@@ -194,6 +206,46 @@ struct SculptedCamera: Equatable {
     }
 
     private static let margin = SIMD2<Float>(0.012, 0.035)
+
+    /// The chair's height above the board, standing, in degrees: from the classic view across
+    /// the table to a higher one that opens up the far ranks on a tall phone.
+    static let lowestTilt: Float = 50
+    static let highestTilt: Float = 62
+
+    /// Width over height of a view that holds the standing board seen from `tilt` degrees with
+    /// no room to spare: the view is widened until the picture fills it top to bottom too.
+    static func snugAspect(tilt: Float) -> Float {
+        let key = min(max(Int(tilt.rounded()), Int(lowestTilt)), Int(highestTilt))
+        return snugAspects[key - Int(lowestTilt)]
+    }
+
+    /// Worked out once, for each whole degree from the lowest tilt to the highest.
+    private static let snugAspects: [Float] = (Int(lowestTilt)...Int(highestTilt)).map { measureSnugAspect(degrees: $0) }
+
+    private static func measureSnugAspect(degrees: Int) -> Float {
+        let elevation = Float(degrees) * .pi / 180
+        var low: Float = 0.6
+        var high: Float = 2.4
+        for _ in 0..<22 {
+            let mid = (low + high) / 2
+            let camera = fitted(aspect: mid, flipped: false, framing: .standing, elevation: elevation)
+            let reach = keyPoints(tallest: tallest).map { abs(camera.normalized($0).y) }.max() ?? 1
+            // Room left above and below: the view is taller than the picture, so widen it.
+            if reach < 1 - margin.y - 0.002 { low = mid } else { high = mid }
+        }
+        return high
+    }
+
+    /// The tallest and the widest shapes a standing board's view can take.
+    static var standingAspects: ClosedRange<Float> { snugAspect(tilt: highestTilt)...snugAspect(tilt: lowestTilt) }
+
+    /// The highest tilt whose board still fills this view's width: the board as big as the
+    /// view allows, with as little empty band above and below as whole degrees give.
+    static func standingElevation(forAspect aspect: Float) -> Float {
+        var tilt = highestTilt
+        while tilt > lowestTilt, snugAspect(tilt: tilt) < aspect - 0.004 { tilt -= 1 }
+        return tilt * .pi / 180
+    }
 
     /// The nearest distance at which every key point is inside the view's margins.
     private func fittingDistance() -> Float {
