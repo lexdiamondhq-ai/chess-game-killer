@@ -271,7 +271,7 @@ struct SettingsSheet: View {
     private static func earnedBy(_ look: BoardTheme) -> String? {
         guard let index = BoardTheme.rivals.firstIndex(where: { $0.id == look.id }),
               let level = MatchController.Level(rawValue: index) else { return nil }
-        return level.rival.name
+        return level.rival.name.midSentence
     }
 
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
