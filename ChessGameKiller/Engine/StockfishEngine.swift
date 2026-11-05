@@ -87,6 +87,9 @@ actor StockfishEngine: ChessEngine {
         var lines: [Int: (depth: Int, line: EngineLine)] = [:]
         /// Whether the engine has been told to start, and told to stop.
         var goSent = false
+        /// Whether its "go" is on its way. A shallow search can answer before the send of
+        /// its "go" returns, so its "bestmove" is checked against this, not `goSent`.
+        var goIssued = false
         var stopSent = false
         var stoppedAt: ContinuousClock.Instant?
         let continuation: AsyncStream<SearchResult>.Continuation
@@ -202,6 +205,7 @@ actor StockfishEngine: ChessEngine {
         await engine.send(command: .position(.fen(fen)))
         // Counted before it is sent, so its answer can never find the count at zero.
         unansweredGos += 1
+        pending?.goIssued = true
         await engine.send(command: go)
         if pending?.id == id { pending?.goSent = true }
 
@@ -335,8 +339,11 @@ actor StockfishEngine: ChessEngine {
         }
         if case .bestmove = response {
             unansweredGos = max(0, unansweredGos - 1)
-            // An answer for a search already ended: no search has started since, so drop it.
-            guard pending?.goSent == true else {
+            // An answer for a search already ended: no search has sent its "go" since, so drop
+            // it. Not `goSent`: that is set once the send returns, and a shallow search (the
+            // weaker rivals look 5 moves ahead) can answer while it is still returning. Its
+            // answer was dropped, and the move came only when the safety net ended the search.
+            guard pending?.goIssued == true else {
                 Self.trace?("late bestmove from an ended search")
                 return
             }
@@ -393,7 +400,11 @@ actor StockfishEngine: ChessEngine {
     private func finish(searchID: Int, bestMove: String?) {
         guard let search = pending, search.id == searchID else { return }
         Self.trace?("finish search \(searchID): \(bestMove ?? "no move")")
+        // Each line is kept at its own deepest report, so a line left a depth behind can
+        // still name the move an earlier line has since taken: keep the first only.
+        var seen = Set<String>()
         let lines = search.lines.sorted { $0.key < $1.key }.map { $0.value.line }
+            .filter { line in line.firstMove.map { seen.insert($0).inserted } ?? true }
         search.continuation.yield(SearchResult(bestMove: bestMove ?? lines.first?.firstMove, lines: lines))
         search.continuation.finish()
         pending = nil

@@ -1693,20 +1693,33 @@ final class SculptedBoardScene {
         scene.rootNode.addChildNode(board)
     }
 
-    /// Files and ranks engraved along the player's side of the frame, upright for the player.
+    /// Files and ranks in the corners of the edge squares nearest the player, upright for them:
+    /// the letters low on the near rank, the numbers high on the left file. The frame runs off
+    /// the screen's sides now, so they live on the squares.
     private func buildLabels(flipped: Bool) {
         labelsNode.childNodes.forEach { $0.removeFromParentNode() }
         let side: Float = flipped ? -1 : 1
         let turn = simd_quatf(angle: flipped ? .pi : 0, axis: SculptedCamera.up) * Self.flat
         let files = Array("abcdefgh")
+        // From a square's middle to the center of its corner label.
+        let corner: Float = 0.34
         for index in 0..<8 {
-            addLabel(String(files[index]), at: SIMD3(Float(index) - 3.5, 0.0064, 4.3 * side), orientation: turn)
-            addLabel("\(index + 1)", at: SIMD3(-4.3 * side, 0.0064, 3.5 - Float(index)), orientation: turn)
+            // a1 is dark, and the colors alternate along the edge.
+            let onDark = index % 2 == 0
+            let file = Float(index) - 3.5
+            addLabel(String(files[index]), at: SIMD3((file + corner) * side, 0.0064, (3.5 + corner) * side),
+                     orientation: turn, onDark: onDark)
+            let rank = 3.5 - Float(index)
+            addLabel("\(index + 1)", at: SIMD3((-3.5 - corner) * side, 0.0064, (rank - corner) * side),
+                     orientation: turn, onDark: onDark)
         }
     }
 
-    private func addLabel(_ text: String, at position: SIMD3<Float>, orientation: simd_quatf) {
-        let node = SCNNode(geometry: Self.mark(size: 0.4, color: look.platinumMark, alpha: 0.8, mask: MarkImages.label(text)))
+    /// A label in the square's corner: pale on a dark square, deep brown on a light one, so it
+    /// reads on both like the letters on a printed board.
+    private func addLabel(_ text: String, at position: SIMD3<Float>, orientation: simd_quatf, onDark: Bool) {
+        let ink: UIColor = onDark ? look.platinumMark : UIColor(red: 0.24, green: 0.17, blue: 0.11, alpha: 1)
+        let node = SCNNode(geometry: Self.mark(size: 0.3, color: ink, alpha: onDark ? 0.85 : 0.75, mask: MarkImages.label(text)))
         node.simdPosition = position
         node.simdOrientation = orientation
         node.castsShadow = false

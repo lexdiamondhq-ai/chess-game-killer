@@ -132,6 +132,8 @@ struct ContentView: View {
     private static let gap: CGFloat = 6
     /// The least room kept above and below the players and the board.
     private static let edgeRoom: CGFloat = 6
+    /// Height a growing 3D board leaves free for the gaps around the plates.
+    private static let boardAir: CGFloat = 36
     /// The most a gap grows on a tall screen.
     private static let maxExtraGap: CGFloat = 14
     /// The dock: the orb and a little air around it.
@@ -633,12 +635,17 @@ struct ContentView: View {
         let gaps = Self.gap * (compact ? 2 : 3)
         let fixed = lines + gaps + ribbonHeight + Self.edgeRoom * 2
         // The headroom over a flat board grows with the board, so it is solved for with it.
-        let byHeight = max(0, size.height - fixed) * aspect / (1 + headroom * aspect)
+        let room = max(0, size.height - fixed)
+        let byHeight = room * aspect / (1 + headroom * aspect)
         let side = max(0, min(size.width, maxBoardSide, byHeight))
+        // A standing 3D board grows down into spare height (its camera tips higher to fill it),
+        // keeping a little air for the plates around it.
+        let tallest = BoardView.tallestAspect(theme, setting: sculpted3D, framing: framing)
+        let boardHeight = min(side / max(tallest, 0.01), max(side / max(aspect, 0.01), room - side * headroom - Self.boardAir))
         let lineWidth = max(0, max(side, min(size.width, Self.phoneWidth)) - Self.inset * 2)
         // A tall phone has height to spare once the board fills the width. It is shared out
         // between the gaps and the edges, like the Home's cards, instead of pooling above and below.
-        let used = fixed + side * headroom + side / max(aspect, 0.01)
+        let used = fixed + side * headroom + boardHeight
         let spare = max(0, size.height - used)
         let slots: CGFloat = compact ? 2 : 3
         let gap = Self.gap + min(spare / (slots + 2), Self.maxExtraGap)
@@ -656,7 +663,7 @@ struct ContentView: View {
             }
             Color.clear.frame(height: gap + side * headroom)
             board
-                .frame(width: side, height: side / aspect)
+                .frame(width: side, height: boardHeight)
             Color.clear.frame(height: gap)
             if !compact {
                 ExecutivePlate(match: match, theme: theme, color: topColor.opposite)

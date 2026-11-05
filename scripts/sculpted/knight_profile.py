@@ -10,7 +10,7 @@ from scipy import ndimage
 from skimage import measure
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else 'scripts/sculpted'
-RES = float(sys.argv[2]) if len(sys.argv) > 2 else 0.003
+RES = float(sys.argv[2]) if len(sys.argv) > 2 else 0.002   # finer, like the gilded knight (2026-11-04)
 
 # The outline, counterclockwise from the front of the base: chest, throat, jaw, muzzle, face,
 # forehead, ears, poll, mane, back of the neck.
@@ -48,7 +48,7 @@ def signed_distance_2d(curve, x0, z0, x1, z1, step):
     d_out = ndimage.distance_transform_edt(~inside) * step
     d_in = ndimage.distance_transform_edt(inside) * step
     # Smoothed, so the carved surfaces come out without terraces from the raster.
-    return ndimage.gaussian_filter((d_out - d_in).T, 2.0), (x0, z0, step)   # [x, z]
+    return ndimage.gaussian_filter((d_out - d_in).T, 1.0), (x0, z0, step)   # [x, z]
 
 
 def sample(field, meta, X, Z):
@@ -105,32 +105,32 @@ def build(res=RES):
     cheek = np.sqrt(((X2 + 0.055) / 0.088) ** 2 + ((Z2 - 0.585) / 0.082) ** 2)
     w += 0.016 * smooth01(1 - cheek)                                  # round cheek
     w += 0.006 * bump(X2, Z2, -0.090, 0.770, 0.045, 0.016)            # brow over the eye
-    w -= 0.020 * bump(X2, Z2, -0.108, 0.738, 0.028, 0.018)            # eye socket
+    w -= 0.026 * bump(X2, Z2, -0.108, 0.738, 0.028, 0.018)            # eye socket
     w += 0.009 * bump(X2, Z2, -0.111, 0.737, 0.012, 0.009)            # the eye itself
-    w -= 0.012 * bump(X2, Z2, -0.330, 0.535, 0.018, 0.016)            # nostril
+    w -= 0.016 * bump(X2, Z2, -0.330, 0.535, 0.018, 0.016)            # nostril
     w -= 0.007 * segment_bump(X2, Z2, (-0.356, 0.490), (-0.270, 0.484), 0.006)   # mouth line
     # Mane: a raised band along the back of the neck, cut with strands that sweep down and back.
     back = smooth01((X2 - 0.03) / 0.05) * smooth01((Z2 - 0.28) / 0.06) * (1 - smooth01((Z2 - 0.86) / 0.04))
     band = back * smooth01((0.055 + d2) / 0.03)                       # near the outline only
     w += 0.014 * band
     strands = 0.5 + 0.5 * np.cos((Z2 * 0.85 + X2 * 0.55) * 2 * np.pi * 11)
-    w -= 0.006 * band * strands ** 2
+    w -= 0.009 * band * strands ** 2
 
     # Pillowed: full in the middle of the shape, easing thinner toward its outline.
     w *= 0.58 + 0.42 * np.sqrt(smooth01(-d2 / 0.075))
-    w = ndimage.gaussian_filter(w, 1.2)
+    w = ndimage.gaussian_filter(w, 0.7)
 
     X, Y, Z = np.meshgrid(xs, ys, zs, indexing='ij')
     # The strands also cut across the rounded back edge, so they show from behind and in outline.
     D2 = (d2 + 0.014 * band * strands ** 3)[:, None, :]
     W = w[:, None, :]
-    r = 0.028
+    r = 0.018
     qx = D2 + r
     qy = np.abs(Y) - W + r
     d = np.sqrt(np.maximum(qx, 0) ** 2 + np.maximum(qy, 0) ** 2) + np.minimum(np.maximum(qx, qy), 0) - r
 
     # Split the ears with a narrow gap.
-    gap = 0.013 * smooth01((Z - 0.86) / 0.03) * smooth01((X + 0.05) / 0.03)
+    gap = 0.018 * smooth01((Z - 0.86) / 0.03) * smooth01((X + 0.05) / 0.03)
     d = smax(d, gap - np.abs(Y), 0.006)
 
     # Flare into the base, and a flat bottom.
@@ -140,7 +140,7 @@ def build(res=RES):
 
     v, f, _, _ = measure.marching_cubes(d.astype(np.float32), 0.0, spacing=(res, res, res))
     v += np.array([xs[0], ys[0], zs[0]])
-    return taubin(v, f), f
+    return taubin(v, f, rounds=6), f
 
 
 def taubin(v, f, rounds=12, lam=0.5, mu=-0.53):

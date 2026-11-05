@@ -22,25 +22,32 @@ else:
     kv=np.load('scripts/sculpted/kv.npy'); kf=np.load('scripts/sculpted/kf.npy')
     B={'K':P.king,'Q':P.queen,'B':P.bishop,'R':P.rook,'P':P.pawn,'N':lambda m:P.knight(m,kv,kf)}
     NAME='sculpted'
-# triangle budgets per object name prefix (body parts get the most)
-BUDGET={'K':22000,'Q':22000,'B':16000,'R':30000,'P':10000,'Nh':30000,'Nb':5000,'Nmane':18000}
-SMALL={'ring':2400,'gem':700,'p':500,'ball':700,'fin':700,'band':1600,'crown':1600,'mitre':3000,'stripe':1200,'cap':2000}
+# triangle budgets per object name prefix (body parts get the most). Raised on 2026-11-04: the
+# lathe bodies were cut to a fifth of their triangles and the small parts to a tenth, which left
+# soft, wobbly edges on the mitres, crenels, crown points and the knight.
+BUDGET={'K':36000,'Q':36000,'B':28000,'R':44000,'P':16000,'Nh':45000,'Nb':8000,'Nmane':18000}
+SMALL={'ring':4000,'gem':1000,'p':800,'ball':1000,'fin':1000,'band':2600,'crown':2600,'mitre':6000,'stripe':1800,'cap':2800}
 if SET=='gilded':
     # more, finer metal than the classic set: the same board's worth of triangles overall
-    BUDGET.update({'P':8000,'Nh':26000,'Nmane':14000})
-    SMALL.update({'ring':1200,'ball':300,'band':1000,'crown':1000,'stripe':700})
+    BUDGET.update({'P':13000,'Nh':44000,'Nmane':30000})
+    SMALL.update({'ring':2000,'ball':500,'band':1600,'crown':1600,'stripe':1100})
+# A finer knight keeps more of its triangles: KNIGHT_BUDGET=head,mane overrides.
+if 'KNIGHT_BUDGET' in __import__('os').environ:
+    nh,nm=(int(x) for x in __import__('os').environ['KNIGHT_BUDGET'].split(','))
+    BUDGET.update({'Nh':nh,'Nmane':nm})
+VERBOSE='EXPORT_VERBOSE' in __import__('os').environ   # prints how far each part is cut down
 SCALE=1.1
-SHARP=math.radians(float(args[0]) if args else 60)
+SHARP=math.radians(float(args[0]) if args else 48)   # edges sharper than this keep a crisp line
 def budget(name):
     if name in BUDGET: return BUDGET[name]
     low=name.lower()
     if 'bead' in low or 'slit' in low: return None   # already low: small icospheres and flat slabs
     if 'ring' in low: return SMALL['ring']
     if 'gem' in low: return SMALL['gem']
-    if name.startswith('Qtip'): return 400       # the queen's crown: the balls on its points
-    if name.startswith('Qpt'): return 500        # and the points
+    if name.startswith('Qtip'): return 800       # the queen's crown: the balls on its points
+    if name.startswith('Qpt'): return 900        # and the points
     if name.startswith('Qp'): return SMALL['p']
-    if name.startswith('Nmane') and name!='Nmane': return 300
+    if name.startswith('Nmane') and name!='Nmane': return 600
     if 'ball' in low: return SMALL['ball'] if name!='Qtopball' else 700
     if 'fin' in low: return SMALL['fin']
     for key in ('band','crown','mitre','cap'):
@@ -56,6 +63,7 @@ for t,f in B.items():
     for c in g.children:
         e=c.evaluated_get(dg); m0=e.to_mesh(); m0.calc_loop_triangles(); n0=len(m0.loop_triangles); e.to_mesh_clear()
         tgt=budget(c.name)
+        if VERBOSE and tgt and n0>tgt: print('cut', t, c.name, n0, '->', tgt, f'{tgt/n0:.0%}')
         if tgt and n0>tgt:
             d=c.modifiers.new('dec','DECIMATE'); d.decimate_type='COLLAPSE'; d.ratio=tgt/n0; d.use_collapse_triangulate=True
             dg.update()

@@ -327,9 +327,11 @@ final class SculptedBoardTests: XCTestCase {
         XCTAssertEqual(scene.square(at: e2), .e2)
         let kingsChest = scene.camera.screenPoint(SculptedCamera.position(of: .e1) + SIMD3(0, 0.6, 0), in: size)
         XCTAssertEqual(scene.square(at: kingsChest), .e1)
-        // With nothing picked up, the king hides the middle of e2.
+        // With nothing picked up, the king hides the near part of e2 (seen from above the board's
+        // near half, as the camera tips higher, it no longer hides e2's middle).
+        let nearE2 = scene.camera.screenPoint(SculptedCamera.position(of: .e2) + SIMD3(0, 0, 0.4), in: size)
         scene.apply(SculptedBoardState(pieces: pieces), animated: false)
-        XCTAssertEqual(scene.square(at: e2), .e1)
+        XCTAssertEqual(scene.square(at: nearE2), .e1)
         window.isHidden = true
     }
 
