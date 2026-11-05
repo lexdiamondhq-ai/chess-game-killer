@@ -28,6 +28,8 @@ final class DrillRunner {
     let learner: Piece.Color
     private(set) var game: GameModel
     private(set) var phase: Phase = .intro
+    /// The drill has ended, solved or not.
+    var isOver: Bool { if case .done = phase { return true } else { return false } }
     private(set) var message: String
     private(set) var tone: Tone = .coach
     private(set) var arrows: [BoardArrow] = []

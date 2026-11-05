@@ -27,6 +27,19 @@ extension ArmyRank {
     func color(for piece: Piece, theme: BoardTheme) -> Color {
         self == .legend ? Self.gold : theme.ink(for: piece.color)
     }
+
+    /// The same, as text on a page around the board: on the home's light page the side's
+    /// pale ivory would be lost, so it takes the page's ink and the gold the page's metal.
+    func pageColor(for piece: Piece, theme: BoardTheme) -> Color {
+        guard let tone = theme.screenTone, tone.scheme != .dark else { return color(for: piece, theme: theme) }
+        return self == .legend ? tone.metal : (piece.color == .white ? tone.ink2 : tone.ink)
+    }
+
+    /// The gold of a page around the board: the home's metal on its light page.
+    static func pageGold(_ theme: BoardTheme) -> Color {
+        guard let tone = theme.screenTone, tone.scheme != .dark else { return gold }
+        return tone.metal
+    }
 }
 
 // MARK: How a veteran piece looks
@@ -138,7 +151,7 @@ struct ArmyNewsBanner: View {
 
     var body: some View {
         let piece = Piece(news.slot.kind, color: color, square: .a1)
-        let tint = news.rank.color(for: piece, theme: theme)
+        let tint = news.rank.pageColor(for: piece, theme: theme)
         Button(action: open) {
             HStack(spacing: 12) {
                 PieceImage(piece: piece, theme: theme, size: 38)
@@ -184,7 +197,7 @@ struct PieceOfTheMatchCard: View {
     var body: some View {
         let record = store.record(for: hero.slot)
         let piece = Piece(hero.slot.kind, color: color, square: .a1)
-        let tint = record.rank == .recruit ? ArmyRank.gold : record.rank.color(for: piece, theme: theme)
+        let tint = record.rank == .recruit ? ArmyRank.pageGold(theme) : record.rank.pageColor(for: piece, theme: theme)
         HStack(spacing: 12) {
             PieceImage(piece: piece, theme: theme, size: 40, heirloom: store.heirloom(for: hero.slot))
                 .modifier(VeteranAura(rank: max(record.rank, .veteran), piece: piece, theme: theme,
@@ -297,7 +310,7 @@ struct ArmyView: View {
             }
         }
         .tint(theme.trainingAccent)
-        .preferredColorScheme(theme.isDark ? .dark : nil)
+        .screenScheme(theme)
     }
 
     private var header: some View {
@@ -355,8 +368,8 @@ struct ArmyView: View {
                 .font(.app(.caption2, weight: .bold))
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
-                .foregroundStyle(record.rank.color(for: piece, theme: theme))
-            RankPips(rank: record.rank, color: record.rank.color(for: piece, theme: theme))
+                .foregroundStyle(record.rank.pageColor(for: piece, theme: theme))
+            RankPips(rank: record.rank, color: record.rank.pageColor(for: piece, theme: theme))
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(record.name ?? slot.title), \(slot.title), \(record.rank.title), \(record.wins) wins\(heldBy)")
@@ -388,7 +401,7 @@ struct ArmyView: View {
     private func honorRow(_ slot: ArmySlot) -> some View {
         let record = store.record(for: slot)
         let piece = Piece(slot.kind, color: color, square: .a1)
-        let tint = record.rank.color(for: piece, theme: theme)
+        let tint = record.rank.pageColor(for: piece, theme: theme)
         return HStack(spacing: 12) {
             PieceImage(piece: piece, theme: theme, size: 34, heirloom: store.heirloom(for: slot))
                 .modifier(VeteranAura(rank: record.rank, piece: piece, theme: theme, size: 34, onBoard: false))
@@ -483,7 +496,7 @@ struct PieceDetailView: View {
     var body: some View {
         let record = store.record(for: slot)
         let piece = Piece(slot.kind, color: color, square: .a1)
-        let tint = record.rank.color(for: piece, theme: theme)
+        let tint = record.rank.pageColor(for: piece, theme: theme)
         ScrollView {
             VStack(spacing: 18) {
                 PieceImage(piece: piece, theme: theme, size: 110, heirloom: store.heirloom(for: slot))
@@ -525,7 +538,7 @@ struct PieceDetailView: View {
             .padding(.bottom, 24)
         }
         .background { TrainingBackdrop(theme: theme) }
-        .preferredColorScheme(theme.isDark ? .dark : nil)
+        .screenScheme(theme)
         .alert("Rename", isPresented: $renaming) {
             TextField("Name", text: $draftName)
             Button("Save") { store.rename(slot, to: draftName) }

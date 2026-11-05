@@ -15,6 +15,7 @@ struct PositionBoard: View {
     var ghosts: Set<Square> = []
     var ghostColor: Color = .yellow
     @AppStorage(BoardTheme.coordinatesKey) private var showsCoordinates = true
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         GeometryReader { geo in
@@ -73,7 +74,7 @@ struct PositionBoard: View {
                 .frame(width: sq * 8, height: sq * 8)
                 .padding(inset)
                 if theme.boardArt != nil, showsCoordinates {
-                    FrameCoordinates(flipped: flipped, inset: inset, squareSize: sq, color: theme.labelOnDark)
+                    FrameCoordinates(flipped: flipped, inset: inset, squareSize: sq, color: theme.frameLabel(on: colorScheme))
                 }
             }
             .frame(width: side, height: side)

@@ -52,7 +52,7 @@ struct AnalyzeSheet: View {
         _session = State(initialValue: ScanSession(reader: reader))
     }
 
-    private var accent: Color { theme.accent ?? .accentColor }
+    private var accent: Color { theme.trainingAccent }
     private var hasCamera: Bool { UIImagePickerController.isSourceTypeAvailable(.camera) }
     /// The game on the board when it has moves to look at (opened from Home there may be none).
     private var gameFEN: String? {
@@ -183,9 +183,9 @@ struct AnalyzeSheet: View {
         .premiumOffer($offer)
         .tint(accent)
         .presentationBackground {
-            ThemeBackdrop(theme: theme)
+            TrainingBackdrop(theme: theme)
         }
-        .preferredColorScheme(theme.isDark ? .dark : nil)
+        .screenScheme(theme)
     }
 }
 
@@ -200,9 +200,9 @@ private struct StartCard: View {
     var body: some View {
         HStack(spacing: 14) {
             Glyph(name: symbol, size: 28)
-                .foregroundStyle(theme.accent ?? .accentColor)
+                .foregroundStyle(theme.trainingAccent)
                 .frame(width: 44, height: 44)
-                .background((theme.accent ?? .accentColor).opacity(0.15), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(theme.trainingAccent.opacity(0.15), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.app(.headline))
                 Text(detail).font(.app(.subheadline)).foregroundStyle(.secondary)
@@ -254,7 +254,7 @@ struct BoardEditorView: View {
     @State private var tool: Tool = .piece(.init(.pawn, .white))
     @State private var showingPhoto = false
 
-    private var accent: Color { theme.accent ?? .accentColor }
+    private var accent: Color { theme.trainingAccent }
     private var problem: String? {
         session.draft.problems.first?.message(white: "White", black: "Black")
     }
@@ -469,7 +469,7 @@ struct AnalysisView: View {
     /// The side the person takes from here: the one to move.
     private var sideName: String { model.draft.sideToMove == .white ? "White" : "Black" }
 
-    private var accent: Color { theme.accent ?? .accentColor }
+    private var accent: Color { theme.trainingAccent }
 
     var body: some View {
         ScrollView {
@@ -491,7 +491,7 @@ struct AnalysisView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
-                    .foregroundStyle(theme.isDark ? Color.black : Color.white)
+                    .foregroundStyle(theme.screenIsDark ? Color.black : Color.white)
                     .disabled(model.ending != nil || model.draft.position == nil)
                     Text("You play \(sideName) · \(clock.isTimed ? clock.name : "no clock")")
                         .font(.app(.footnote))

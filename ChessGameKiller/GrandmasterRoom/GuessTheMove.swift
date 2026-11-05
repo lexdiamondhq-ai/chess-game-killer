@@ -189,7 +189,7 @@ struct GuessTheMoveView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let side = max(200, min(geo.size.width - 24, geo.size.height * 0.58))
+            let side = max(200, min(geo.size.width - TrainingBoardView.sideRoom, geo.size.height * 0.58))
             VStack(spacing: 12) {
                 RoomHeader(title: game.title, subtitle: game.playedAt) { dismiss() }
                 if let runner {

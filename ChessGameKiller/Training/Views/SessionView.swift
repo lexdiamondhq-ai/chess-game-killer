@@ -46,7 +46,7 @@ struct SessionView: View {
                 }
             }
         }
-        .preferredColorScheme(theme.isDark ? .dark : nil)
+        .screenScheme(theme)
         .tint(theme.trainingAccent)
         .onAppear {
             if runner == nil {
@@ -86,7 +86,7 @@ struct SessionView: View {
 
     private func drills(_ runner: SessionRunner) -> some View {
         GeometryReader { geo in
-            let boardSide = max(200, min(geo.size.width - 32, geo.size.height * 0.54))
+            let boardSide = max(200, min(geo.size.width - TrainingBoardView.sideRoom, geo.size.height * 0.54))
             VStack(spacing: 12) {
                 header(runner)
                 if let note = runner.coachNote {

@@ -17,7 +17,7 @@ struct PremiumOfferView: View {
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            ThemeBackdrop(theme: theme).ignoresSafeArea()
+            TrainingBackdrop(theme: theme).ignoresSafeArea()
             ScrollView {
                 VStack(spacing: 22) {
                     PremiumOfferHeader(accent: accent)
@@ -39,7 +39,7 @@ struct PremiumOfferView: View {
             .scrollBounceBehavior(.basedOnSize)
             closeButton
         }
-        .preferredColorScheme(theme.isDark ? .dark : nil)
+        .screenScheme(theme)
         .tint(accent)
         .task {
             premium.start()

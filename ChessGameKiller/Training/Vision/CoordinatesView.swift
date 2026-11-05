@@ -21,7 +21,7 @@ struct CoordinatesView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let boardSide: CGFloat = max(200, min(geo.size.width - 32, geo.size.height * 0.47, 560))
+            let boardSide: CGFloat = max(200, min(geo.size.width - TrainingBoardView.sideRoom, geo.size.height * 0.47, 560))
             VStack(spacing: 0) {
                 RoomHeader(title: "Coordinates", subtitle: subtitle) { close() }
                 ScrollView {
@@ -50,7 +50,7 @@ struct CoordinatesView: View {
             .frame(width: geo.size.width, height: geo.size.height)
         }
         .background { TrainingBackdrop(theme: theme) }
-        .preferredColorScheme(theme.isDark ? .dark : nil)
+        .screenScheme(theme)
         .tint(theme.trainingAccent)
         .animation(.snappy(duration: 0.25), value: drill.phase)
         .sensoryFeedback(.selection, trigger: drill.round.score) { old, new in hapticsOn && new > old }

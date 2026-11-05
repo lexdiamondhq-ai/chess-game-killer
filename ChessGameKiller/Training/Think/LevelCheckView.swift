@@ -30,7 +30,7 @@ struct LevelCheckView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let side = max(200, min(geo.size.width - 24, geo.size.height * 0.52))
+            let side = max(200, min(geo.size.width - TrainingBoardView.sideRoom, geo.size.height * 0.52))
             VStack(spacing: 10) {
                 RoomHeader(title: "Find my level", subtitle: subtitle) { close() }
                 switch runner?.phase ?? .intro {
@@ -45,7 +45,7 @@ struct LevelCheckView: View {
             .frame(width: geo.size.width)
         }
         .background { TrainingBackdrop(theme: theme) }
-        .preferredColorScheme(theme.isDark ? .dark : nil)
+        .screenScheme(theme)
         .tint(theme.trainingAccent)
         .animation(.snappy, value: runner?.phase)
         .task {

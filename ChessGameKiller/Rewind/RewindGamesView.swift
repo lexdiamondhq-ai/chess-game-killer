@@ -54,7 +54,7 @@ struct RewindGamesView: View {
                 .frame(maxWidth: 680)
                 .frame(maxWidth: .infinity)
             }
-            .background { ThemeBackdrop(theme: theme).ignoresSafeArea() }
+            .background { TrainingBackdrop(theme: theme).ignoresSafeArea() }
             .navigationTitle("Your games")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -75,7 +75,7 @@ struct RewindGamesView: View {
                 }
             }
         }
-        .preferredColorScheme(theme.isDark ? .dark : nil)
+        .screenScheme(theme)
         .tint(theme.accent ?? RewindPalette.gold)
     }
 

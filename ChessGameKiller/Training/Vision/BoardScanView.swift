@@ -30,7 +30,7 @@ struct BoardScanView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let boardSide = max(200, min(geo.size.width - 32, geo.size.height * 0.5, 560))
+            let boardSide = max(200, min(geo.size.width - TrainingBoardView.sideRoom, geo.size.height * 0.5, 560))
             VStack(spacing: 0) {
                 RoomHeader(title: "Board scan", subtitle: subtitle) { close() }
                 if let runner {
@@ -46,7 +46,7 @@ struct BoardScanView: View {
             .frame(width: geo.size.width, height: geo.size.height)
         }
         .background { TrainingBackdrop(theme: theme) }
-        .preferredColorScheme(theme.isDark ? .dark : nil)
+        .screenScheme(theme)
         .tint(theme.trainingAccent)
         .animation(.snappy(duration: 0.25), value: runner?.phase)
         .animation(.snappy(duration: 0.25), value: runner?.index)

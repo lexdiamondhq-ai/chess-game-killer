@@ -35,7 +35,7 @@ struct SettingsSheet: View {
     @State private var showingPremium = false
 
     private var theme: BoardTheme { .named(themeID) }
-    private var accent: Color { theme.accent ?? .accentColor }
+    private var accent: Color { theme.trainingAccent }
 
     var body: some View {
         NavigationStack {
@@ -211,14 +211,14 @@ struct SettingsSheet: View {
         }
         .presentationDetents([.large])
         .presentationBackground {
-            SheetBackdrop(theme: theme)
+            TrainingBackdrop(theme: theme)
         }
         .premiumOffer($offer)
         .sheet(isPresented: $showingPremium) {
             PremiumOfferView(feature: nil)
         }
         .tint(accent)
-        .preferredColorScheme(theme.isDark ? .dark : nil)
+        .screenScheme(theme)
     }
 
     // MARK: Pieces of the screen
@@ -450,7 +450,7 @@ private struct ThemeCard: View {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 17, weight: .semibold))
                                 .symbolRenderingMode(.palette)
-                                .foregroundStyle(Color.black, theme.accent ?? .accentColor)
+                                .foregroundStyle(Color.black, theme.trainingAccent)
                                 .background(Circle().fill(Color.black).padding(-1.5))
                                 .offset(x: 7, y: -7)
                                 .transition(.scale.combined(with: .opacity))
@@ -479,14 +479,14 @@ private struct ThemeCard: View {
                 } else if locked {
                     Image(systemName: "crown.fill")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(theme.accent ?? .accentColor)
+                        .foregroundStyle(theme.trainingAccent)
                         .accessibilityHidden(true)
                 }
             }
             .padding(.horizontal, 14)
             .frame(maxWidth: .infinity)
             .frame(height: 72)
-            .background(SettingsCard(theme: theme, selected: isSelected, color: theme.accent ?? .accentColor))
+            .background(SettingsCard(theme: theme, selected: isSelected, color: theme.trainingAccent))
             .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -558,7 +558,7 @@ private struct ToggleRow: View {
             }
             .opacity(isEnabled ? 1 : 0.4)
         }
-        .tint(theme.accent ?? .accentColor)
+        .tint(theme.trainingAccent)
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
     }
@@ -589,7 +589,7 @@ private struct PickerRow<Choice: View>: View {
             choice
                 .pickerStyle(.menu)
                 .labelsHidden()
-                .tint(theme.accent ?? .accentColor)
+                .tint(theme.trainingAccent)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -625,12 +625,12 @@ private struct IconTile: View {
     let theme: BoardTheme
 
     var body: some View {
-        let accent = theme.accent ?? .accentColor
+        let accent = theme.trainingAccent
         Image(systemName: symbol)
             .font(.system(size: 15, weight: .semibold))
             .foregroundStyle(accent)
             .frame(width: 34, height: 34)
-            .background(accent.opacity(theme.isDark ? 0.14 : 0.12), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .background(accent.opacity(theme.screenIsDark ? 0.14 : 0.12), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
             .accessibilityHidden(true)
     }
 }
@@ -644,7 +644,7 @@ private struct SettingsGroup<Content: View>: View {
         VStack(spacing: 0) {
             content
         }
-        .background(SettingsCard(theme: theme, selected: false, color: theme.accent ?? .accentColor))
+        .background(SettingsCard(theme: theme, selected: false, color: theme.trainingAccent))
     }
 }
 
@@ -666,7 +666,7 @@ private struct SettingsCard: View {
     }
 }
 
-/// The backdrop for a sheet, in the theme's colors.
+/// The backdrop for a sheet, in the theme's colors. The game screen stands on it too.
 struct SheetBackdrop: View {
     let theme: BoardTheme
 
@@ -729,10 +729,10 @@ struct LicensesView: View {
                             Spacer(minLength: 8)
                             Text(credit.license)
                                 .font(.app(.caption, weight: .semibold))
-                                .foregroundStyle(theme.accent ?? .accentColor)
+                                .foregroundStyle(theme.trainingAccent)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
-                                .background((theme.accent ?? .accentColor).opacity(0.14), in: Capsule())
+                                .background(theme.trainingAccent.opacity(0.14), in: Capsule())
                         }
                         Text(credit.detail)
                             .font(.app(.subheadline))
@@ -746,7 +746,7 @@ struct LicensesView: View {
                     }
                     .padding(14)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(SettingsCard(theme: theme, selected: false, color: theme.accent ?? .accentColor))
+                    .background(SettingsCard(theme: theme, selected: false, color: theme.trainingAccent))
                     .accessibilityElement(children: .combine)
                 }
                 Link(destination: URL(string: "https://github.com/lexdiamondhq-ai/chess-game-killer")!) {
@@ -758,7 +758,7 @@ struct LicensesView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
         }
-        .background(SheetBackdrop(theme: theme))
+        .background(TrainingBackdrop(theme: theme))
         .navigationTitle("Licenses")
         .navigationBarTitleDisplayMode(.inline)
     }

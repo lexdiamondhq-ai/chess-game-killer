@@ -44,7 +44,7 @@ struct PuzzleReviewView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .preferredColorScheme(theme.isDark ? .dark : nil)
+        .screenScheme(theme)
         .tint(theme.trainingAccent)
         .animation(.snappy, value: runner?.isDone)
         .animation(.snappy, value: runner == nil)
@@ -62,7 +62,7 @@ struct PuzzleReviewView: View {
 
     private func playing(_ runner: DrillRunner, _ puzzle: LichessPuzzle) -> some View {
         GeometryReader { geo in
-            let boardSide = max(200, min(geo.size.width - 32, geo.size.height * 0.54, 560))
+            let boardSide = max(200, min(geo.size.width - TrainingBoardView.sideRoom, geo.size.height * 0.54, 560))
             VStack(spacing: 12) {
                 ReviewProgressCard(theme: theme, position: index + 1, total: queue.count, results: results)
                     .frame(maxWidth: 560)

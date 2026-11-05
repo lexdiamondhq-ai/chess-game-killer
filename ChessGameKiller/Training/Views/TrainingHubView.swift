@@ -64,7 +64,7 @@ struct TrainingHubView: View {
             }
         }
         .tint(theme.trainingAccent)
-        .preferredColorScheme(theme.isDark ? .dark : nil)
+        .screenScheme(theme)
         .environment(repertoire)
         .environment(endgames)
         .environment(think)
