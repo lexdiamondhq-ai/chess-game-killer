@@ -247,7 +247,7 @@ final class ChallengeSnapshotTests: XCTestCase {
         let center = makeCenter(api, games: listGames(on: api))
         let theme = BoardTheme.named(.gilded)
         let view = ZStack {
-            ThemeBackdrop(theme: theme)
+            TrainingBackdrop(theme: theme)
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
                     FriendGamesList(theme: theme)
@@ -262,7 +262,7 @@ final class ChallengeSnapshotTests: XCTestCase {
         }
         .environment(center)
         .tint(theme.challengeAccent)
-        .preferredColorScheme(.dark)
+        .screenScheme(theme)
         try snapshot("challenge-friend-games", view: view, wait: 1.5)
     }
 

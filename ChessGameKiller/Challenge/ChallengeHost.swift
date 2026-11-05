@@ -64,7 +64,7 @@ extension View {
     }
 }
 
-/// The screens of Challenge a friend, in the player's chosen look.
+/// The screens of Challenge a friend, in the home's colors like the other screens around a board.
 struct ChallengeScreens: View {
     @Environment(ChallengeCenter.self) private var center
     @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .gilded
@@ -72,14 +72,14 @@ struct ChallengeScreens: View {
     var body: some View {
         let theme = BoardTheme.named(themeID)
         ZStack {
-            ThemeBackdrop(theme: theme)
+            TrainingBackdrop(theme: theme)
             screen(theme)
                 .id(center.screen?.key)
                 .transition(.opacity)
         }
         .animation(.easeInOut(duration: 0.3), value: center.screen?.key)
         .tint(theme.challengeAccent)
-        .preferredColorScheme(.dark)
+        .screenScheme(theme)
     }
 
     @ViewBuilder
