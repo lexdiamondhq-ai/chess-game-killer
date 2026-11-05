@@ -8,7 +8,7 @@ struct GuideView: View {
     let replayWelcome: () -> Void
     @State private var tipsReset = false
 
-    private var accent: Color { theme.accent ?? .accentColor }
+    private var accent: Color { theme.trainingAccent }
 
     /// The hidden gestures, by what they do. (Gesture, then what it's called in the app.)
     static let gestures: [(symbol: String, title: String, text: String)] = [
@@ -55,7 +55,7 @@ struct GuideView: View {
             .padding(.vertical, 16)
         }
         .tint(accent)
-        .background { SheetBackdrop(theme: theme).ignoresSafeArea() }
+        .background { TrainingBackdrop(theme: theme).ignoresSafeArea() }
         .navigationTitle("How it works")
         .navigationBarTitleDisplayMode(.inline)
     }

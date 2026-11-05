@@ -91,7 +91,7 @@ struct FriendGamesRows: View {
 
     static var hairline: some View {
         Rectangle()
-            .fill(Color.white.opacity(0.08))
+            .fill(Color.primary.opacity(0.08))
             .frame(height: 0.5)
             .padding(.leading, 64)
     }
@@ -156,7 +156,7 @@ struct FriendGameRow: View {
                 .fill(.tint)
                 .opacity(game.isOver ? 0.1 : 0.22)
             Circle()
-                .strokeBorder(Color.white.opacity(0.14), lineWidth: 0.75)
+                .strokeBorder(Color.primary.opacity(0.14), lineWidth: 0.75)
             if game.status == .waiting {
                 Image(systemName: "paperplane.fill")
                     .font(.system(size: 15, weight: .semibold))
@@ -190,7 +190,7 @@ struct FriendGameRow: View {
 struct FriendRowPressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .background(Color.white.opacity(configuration.isPressed ? 0.07 : 0))
+            .background(Color.primary.opacity(configuration.isPressed ? 0.07 : 0))
             .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
     }
 }

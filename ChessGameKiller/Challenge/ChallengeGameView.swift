@@ -863,13 +863,13 @@ struct FriendClockBox: View {
             let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
             Text(FriendClockMath.label(left))
                 .font(.system(size: 21, weight: .medium).monospacedDigit())
-                .foregroundStyle(running ? Color.black.opacity(0.88) : Color.secondary)
+                .foregroundStyle(running ? (urgent ? Color.black.opacity(0.88) : runningInk) : Color.secondary)
                 .lineLimit(1)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 5)
                 .background {
                     if running {
-                        shape.fill(urgent ? ChallengeColors.urgent : Color.white.opacity(0.92))
+                        shape.fill(urgent ? ChallengeColors.urgent : runningFace)
                     } else {
                         shape.fill(Color.primary.opacity(0.04))
                             .overlay(shape.strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
@@ -879,6 +879,11 @@ struct FriendClockBox: View {
         }
         .animation(.snappy(duration: 0.25), value: running)
     }
+
+    /// A running clock's face: the home's one solid fill (ivory in the dark, the set's ink in
+    /// Light), or bright white on the older home.
+    private var runningFace: Color { theme.screenTone?.ivory ?? Color.white.opacity(0.92) }
+    private var runningInk: Color { theme.screenTone?.onIvory ?? Color.black.opacity(0.88) }
 }
 
 /// A soft dot that breathes while the lobby waits.

@@ -516,8 +516,8 @@ private struct TalkPanelSelection: View {
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
         shape
-            .fill(Color.white.opacity(isOn ? 0.08 : 0))
-            .overlay { shape.strokeBorder(Color.white.opacity(isOn ? 0.14 : 0), lineWidth: 0.75) }
+            .fill(Color.primary.opacity(isOn ? 0.08 : 0))
+            .overlay { shape.strokeBorder(Color.primary.opacity(isOn ? 0.14 : 0), lineWidth: 0.75) }
     }
 }
 
@@ -856,9 +856,9 @@ private struct TalkPanelLamp: View {
                 lit(TalkPanelPalette.bad, symbol: "exclamationmark")
             case .none:
                 Circle()
-                    .fill(Color.white.opacity(0.06))
+                    .fill(Color.primary.opacity(0.06))
                 Circle()
-                    .strokeBorder(Color.white.opacity(0.22), lineWidth: 1)
+                    .strokeBorder(Color.primary.opacity(0.22), lineWidth: 1)
             }
         }
         .frame(width: size, height: size)
@@ -902,18 +902,18 @@ private struct TalkPanelCheckingCard: View {
     private func placeholder(first: CGFloat, second: CGFloat) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Circle()
-                .fill(Color.white.opacity(0.1))
+                .fill(Color.primary.opacity(0.1))
                 .frame(width: 26, height: 26)
             VStack(alignment: .leading, spacing: 9) {
                 HStack(spacing: 0) {
                     Capsule()
-                        .fill(Color.white.opacity(0.11))
+                        .fill(Color.primary.opacity(0.11))
                         .frame(height: 12)
                     Spacer(minLength: first)
                 }
                 HStack(spacing: 0) {
                     Capsule()
-                        .fill(Color.white.opacity(0.07))
+                        .fill(Color.primary.opacity(0.07))
                         .frame(height: 10)
                     Spacer(minLength: second)
                 }

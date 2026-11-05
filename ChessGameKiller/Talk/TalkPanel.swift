@@ -379,8 +379,8 @@ struct TalkPanel: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
-                    .background(Color.white.opacity(0.08), in: Circle())
-                    .overlay { Circle().strokeBorder(Color.white.opacity(0.12), lineWidth: 0.75) }
+                    .background(Color.primary.opacity(0.08), in: Circle())
+                    .overlay { Circle().strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.75) }
                     .contentShape(Circle())
             }
             .buttonStyle(ChallengePressStyle())
@@ -404,8 +404,8 @@ struct TalkPanel: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 11)
             .frame(minHeight: 44)
-            .background { shape.fill(Color.black.opacity(0.24)) }
-            .overlay { shape.strokeBorder(Color.white.opacity(edge), lineWidth: 0.75) }
+            .background { shape.fill(theme.screenIsDark ? Color.black.opacity(0.24) : Color.primary.opacity(0.05)) }
+            .overlay { shape.strokeBorder(Color.primary.opacity(edge), lineWidth: 0.75) }
             .onChange(of: session.draft) { _, text in
                 draftChanged(text)
             }
@@ -422,7 +422,7 @@ struct TalkPanel: View {
         } label: {
             Image(systemName: "arrow.up")
                 .font(.system(size: 17, weight: .bold))
-                .foregroundStyle(Color.black.opacity(0.88))
+                .foregroundStyle(theme.onChallengeAccent)
                 .frame(width: 44, height: 44)
                 .background(theme.challengeAccent, in: Circle())
                 .overlay { Circle().strokeBorder(Color.white.opacity(0.25), lineWidth: 0.75) }
@@ -579,11 +579,11 @@ struct TalkPanel: View {
     private func withLifecycle(_ content: some View) -> some View {
         content
             .background {
-                ThemeBackdrop(theme: theme)
+                TrainingBackdrop(theme: theme)
                     .ignoresSafeArea()
             }
             .tint(theme.challengeAccent)
-            .preferredColorScheme(.dark)
+            .screenScheme(theme)
             // A swipe down mid-sentence shouldn't close the panel.
             .interactiveDismissDisabled(session.phase == .listening)
             .onAppear {
@@ -687,7 +687,7 @@ private struct TalkPanelTalkButton: View {
                 .shadow(color: accent.opacity(glow), radius: radius, y: lift)
             Image(systemName: "mic.fill")
                 .font(.system(size: size * 0.36, weight: .semibold))
-                .foregroundStyle(Color.black.opacity(0.85))
+                .foregroundStyle(theme.onChallengeAccent)
         }
         .frame(width: size, height: size)
         .scaleEffect(buttonScale)
@@ -773,14 +773,14 @@ private struct TalkPanelButtonBody: View {
             shape.fill(theme.challengeAccent)
                 .overlay { shape.strokeBorder(Color.white.opacity(0.25), lineWidth: 0.75) }
         case .quiet:
-            shape.fill(Color.white.opacity(0.09))
-                .overlay { shape.strokeBorder(Color.white.opacity(0.14), lineWidth: 0.75) }
+            shape.fill(Color.primary.opacity(0.08))
+                .overlay { shape.strokeBorder(Color.primary.opacity(0.14), lineWidth: 0.75) }
         }
     }
 
     private var foreground: Color {
         switch kind {
-        case .primary: return Color.black.opacity(0.88)
+        case .primary: return theme.onChallengeAccent
         case .quiet: return Color.primary
         }
     }

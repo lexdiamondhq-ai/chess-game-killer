@@ -85,7 +85,7 @@ struct ChallengeJoinView: View {
                 PositionBoard(draft: draft, theme: theme, flipped: mySeat == .black)
                     .frame(width: side, height: side)
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .shadow(color: .black.opacity(0.45), radius: 18, y: 10)
+                    .shadow(color: .black.opacity(theme.screenIsDark ? 0.45 : 0.18), radius: 18, y: 10)
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
             }
@@ -146,7 +146,7 @@ struct ChallengeJoinView: View {
                             .opacity(invite.isJoining ? 0 : 1)
                         if invite.isJoining {
                             ProgressView()
-                                .tint(Color.black.opacity(0.8))
+                                .tint(theme.screenTone?.onIvory ?? Color.black.opacity(0.8))
                         }
                     }
                 }
