@@ -41,6 +41,9 @@ struct GlassSurface<S: InsettableShape>: View {
     var tint: Color?
     var weight: GlassWeight = .regular
 
+    /// Light only on the board home's Light and Middle rooms: the frost brightens there instead.
+    @Environment(\.colorScheme) private var scheme
+
     var body: some View {
         pane
             .allowsHitTesting(false)
@@ -61,6 +64,13 @@ struct GlassSurface<S: InsettableShape>: View {
         #endif
     }
 
+    /// What the frost is washed with: a little black over a dark room, a little white over a light one.
+    private var frost: Color {
+        let clear: Bool = weight == .clear
+        if scheme == .light { return Color.white.opacity(clear ? 0.08 : 0.34) }
+        return Color.black.opacity(clear ? 0.05 : 0.2)
+    }
+
     #if compiler(>=6.2)
     @available(iOS 26.0, *)
     static func liquidGlass(weight: GlassWeight, tint: Color?) -> Glass {
@@ -70,8 +80,9 @@ struct GlassSurface<S: InsettableShape>: View {
     }
     #endif
 
-    /// Before iOS 26: a frosted pane, a little darkened so light text stays crisp on it,
-    /// with light falling across it from the top left and a polished edge.
+    /// Before iOS 26: a frosted pane, a little darkened so light text stays crisp on it (a
+    /// little brightened, in a light room, for dark text), with light falling across it from
+    /// the top left and a polished edge.
     private var fallback: some View {
         ZStack {
             if weight == .regular {
@@ -83,7 +94,7 @@ struct GlassSurface<S: InsettableShape>: View {
             }
             shape.fill(weight == .clear ? AnyShapeStyle(Material.ultraThinMaterial.opacity(0.6))
                                         : AnyShapeStyle(Material.ultraThinMaterial))
-            shape.fill(Color.black.opacity(weight == .clear ? 0.05 : 0.2))
+            shape.fill(frost)
             if let tint {
                 shape.fill(tint.opacity(0.14))
             }
@@ -110,4 +121,27 @@ extension View {
     func glassPane<S: InsettableShape>(_ shape: S, tint: Color? = nil, weight: GlassWeight = .regular) -> some View {
         modifier(GlassPane(shape: shape, tint: tint, weight: weight))
     }
+}
+
+/// A sheet's title bar with something behind it once the page scrolls under it, so the page's
+/// text never runs through the title and its buttons. iOS 26 frosts the edge firmly; before it,
+/// the bar takes its usual material.
+struct SheetTitleBar: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) {
+            content.scrollEdgeEffectStyle(.hard, for: .top)
+        } else {
+            content.toolbarBackground(.thinMaterial, for: .navigationBar)
+        }
+        #else
+        content.toolbarBackground(.thinMaterial, for: .navigationBar)
+        #endif
+    }
+}
+
+extension View {
+    /// See ``SheetTitleBar``. Goes on the sheet's scroll view.
+    func sheetTitleBar() -> some View { modifier(SheetTitleBar()) }
 }

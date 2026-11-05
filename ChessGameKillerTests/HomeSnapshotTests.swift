@@ -12,6 +12,100 @@ import simd
 @MainActor
 final class HomeSnapshotTests: XCTestCase {
 
+    /// These pictures are of the tiles home; the board home has its own test, which turns it on.
+    override func setUp() async throws {
+        try await super.setUp()
+        UserDefaults.standard.set(false, forKey: HomeLayout.key)
+    }
+
+    override func tearDown() async throws {
+        UserDefaults.standard.removeObject(forKey: HomeLayout.key)
+        UserDefaults.standard.removeObject(forKey: HomeToneMode.key)
+        try await super.tearDown()
+    }
+
+    /// The board home (1A): the sheet halfway on Today, all the way up on Learn, on Army and
+    /// You, and folded down to the strip with the board filling the screen.
+    func testTheBoardHome() throws {
+        UserDefaults.standard.set(true, forKey: HomeLayout.key)
+        let shots: [(HomeSheetDetent, HomeSheetTab, String)] = [
+            (.half, .today, "zz-home-sheet-1-today"), (.full, .learn, "zz-home-sheet-2-learn"),
+            (.half, .army, "zz-home-sheet-3-army"), (.half, .you, "zz-home-sheet-4-you"),
+            (.board, .today, "zz-home-sheet-5-folded"),
+        ]
+        for (detent, tab, name) in shots {
+            let window = try show(HomeSample.home(sheet: detent, tab: tab))
+            try save(window, name)
+            window.isHidden = true
+        }
+    }
+
+    /// The board home in Middle and Dark, as the You tab and Settings set them (Light is the
+    /// default, above): halfway on Today, on You with the switch, and folded.
+    func testTheBoardHomeInMiddleAndDark() throws {
+        UserDefaults.standard.set(true, forKey: HomeLayout.key)
+        let shots: [(HomeSheetDetent, HomeSheetTab, String)] = [
+            (.half, .today, "today"), (.half, .you, "you"), (.board, .today, "folded"),
+        ]
+        for mode in [HomeToneMode.middle, HomeToneMode.dark] {
+            UserDefaults.standard.set(mode.rawValue, forKey: HomeToneMode.key)
+            for (detent, tab, name) in shots {
+                let window = try show(HomeSample.home(sheet: detent, tab: tab))
+                try save(window, "zz-home-sheet-\(mode.rawValue)-\(name)")
+                window.isHidden = true
+            }
+        }
+    }
+
+    /// Every look's room in all three tones keeps its text readable: the quietest ink against
+    /// the room passes 3:1 at least, and the main ink 4.5:1.
+    func testTheTonesKeepTextReadable() {
+        for look in SculptedLook.all {
+            let name: String = look.name
+            for mode in HomeToneMode.allCases {
+                let tone = HomeTone.of(look, mode: mode)
+                XCTAssertEqual(tone.scheme, mode.scheme, "\(name) \(mode.title)")
+                XCTAssertGreaterThan(Self.contrast(tone.ink, on: tone.canvas), 4.5, "\(name) \(mode.title) ink")
+                XCTAssertGreaterThan(Self.contrast(tone.ink3, on: tone.canvas), 3, "\(name) \(mode.title) quiet ink")
+            }
+        }
+    }
+
+    /// The contrast ratio of a color (with its opacity laid over the room) against the room.
+    private static func contrast(_ ink: Color, on room: Color) -> Double {
+        var r1: CGFloat = 0, g1: CGFloat = 0, b1: CGFloat = 0, a1: CGFloat = 0
+        var r2: CGFloat = 0, g2: CGFloat = 0, b2: CGFloat = 0, a2: CGFloat = 0
+        UIColor(ink).getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
+        UIColor(room).getRed(&r2, green: &g2, blue: &b2, alpha: &a2)
+        let mixed: [CGFloat] = [r1 * a1 + r2 * (1 - a1), g1 * a1 + g2 * (1 - a1), b1 * a1 + b2 * (1 - a1)]
+        let first: Double = luminance(mixed)
+        let second: Double = luminance([r2, g2, b2])
+        return (max(first, second) + 0.05) / (min(first, second) + 0.05)
+    }
+
+    private static func luminance(_ rgb: [CGFloat]) -> Double {
+        let linear: [Double] = rgb.map { channel in
+            let c = Double(channel)
+            return c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+        }
+        return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+    }
+
+    /// The sheet's rests, and the rubber band past them.
+    func testTheSheetSnapsAndStretches() {
+        let metrics = HomeSheetMetrics(total: 852, safeTop: 59, safeBottom: 34)
+        XCTAssertLessThan(metrics.height(of: .board), metrics.height(of: .half))
+        XCTAssertLessThan(metrics.height(of: .half), metrics.height(of: .full))
+        XCTAssertEqual(metrics.progress(metrics.lowest), 0)
+        XCTAssertEqual(metrics.progress(metrics.highest), 1)
+        // Pulled far past the top, it gives only a little.
+        let over = metrics.height(.full, drag: -400)
+        XCTAssertGreaterThan(over, metrics.highest)
+        XCTAssertLessThan(over, metrics.highest + 70)
+        XCTAssertEqual(metrics.nearest(to: metrics.height(of: .half) + 20), .half)
+        XCTAssertEqual(metrics.nearest(to: 0), .board)
+    }
+
     func testHomeScrolling() throws {
         let window = try show(HomeSample.home())
         // The page fits on about a screen: at rest, partway (the board turning in its window), and at its foot.
@@ -139,7 +233,7 @@ final class HomeSnapshotTests: XCTestCase {
                                   moveNumber: 1, plies: 0)
         let alone = HomeCurrentGame.list(yourTurn, fen: start, friends: [])
         XCTAssertEqual(alone.map(\.id), ["computer"], "The only game going still gets its chip")
-        XCTAssertEqual(alone.first?.title, "vs Pulse")
+        XCTAssertEqual(alone.first?.title, "vs The 1600s")
         XCTAssertEqual(alone.first?.kind, .computer)
         XCTAssertEqual(alone.first?.status, .yourMove)
         XCTAssertEqual(alone.first?.detail, "Computer · No clock · Move 1")
@@ -372,7 +466,8 @@ enum HomeSample {
     static let italianFEN = "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQK2R b KQkq - 0 5"
 
     static func home(empty: Bool = false, theme: BoardTheme.ID = .gilded, match: MatchController? = nil,
-                     showsYou: Bool = false, showsShortcuts: Bool = false) -> some View {
+                     showsYou: Bool = false, showsShortcuts: Bool = false,
+                     sheet: HomeSheetDetent = .half, tab: HomeSheetTab = .today) -> some View {
         let game = match ?? MatchController(engine: nil, sounds: nil)
         let vault = GameVault(games: empty ? [] : games())
         let army = empty ? ArmyStore() : ArmyStore(army: armyRecords())
@@ -398,7 +493,7 @@ enum HomeSample {
         }
         daily.seeded = true
         return HomeView(match: game, theme: .named(theme), actions: HomeActions(), showsYou: showsYou,
-                        showsShortcuts: showsShortcuts)
+                        showsShortcuts: showsShortcuts, sheet: sheet, tab: tab)
             .environment(DailyStore(state: daily))
             .environment(vault)
             .environment(army)

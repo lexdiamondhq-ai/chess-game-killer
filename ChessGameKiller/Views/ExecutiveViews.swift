@@ -26,9 +26,9 @@ struct ExecutivePlate: View {
     private var glow: Color? { theme.glows && isActive ? theme.sideColor(color) : nil }
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
         HStack(spacing: 10) {
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 avatar
                     .frame(width: 40, height: 40)
                 VStack(alignment: .leading, spacing: 2) {
@@ -52,10 +52,21 @@ struct ExecutivePlate: View {
                     .layoutPriority(2)
             }
         }
-        .padding(.leading, 9)
-        .padding(.trailing, 10)
+        .padding(.leading, 12)
+        .padding(.trailing, 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .glassPane(shape)
+        .overlay {
+            // Whose move it is: a fine edge of the look's gold, as the Home lights the next rung.
+            if glow == nil, isActive {
+                shape.strokeBorder(
+                    LinearGradient(colors: [accent.opacity(0.7), accent.opacity(0.18), accent.opacity(0.45)],
+                                   startPoint: .topLeading, endPoint: .bottomTrailing),
+                    lineWidth: 1
+                )
+                .transition(.opacity)
+            }
+        }
         .overlay {
             if let glow {
                 shape.strokeBorder(
@@ -182,7 +193,7 @@ struct ExecutivePlate: View {
     /// How a line names a side: the rival's name or "You"; in a game between two people, the side's color.
     static func displayName(of color: Piece.Color, in match: MatchController, theme: BoardTheme) -> String {
         guard match.setup.opponent == .computer else { return theme.name(of: color) }
-        return match.game.humanColors.contains(color) ? "You" : match.setup.level.rival.name
+        return match.game.humanColors.contains(color) ? "You" : match.setup.rival.name
     }
 
     /// For VoiceOver: "Your clock", or "Pulse's clock".
@@ -194,7 +205,7 @@ struct ExecutivePlate: View {
     @ViewBuilder
     private var avatar: some View {
         if isComputer {
-            RivalPortrait(rival: match.setup.level.rival, size: 40, glows: theme.glows)
+            RivalPortrait(rival: match.setup.rival, size: 40, glows: theme.glows)
         } else {
             let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
             PieceImage(piece: Piece(.king, color: color, square: .e1), theme: theme, size: 32)
@@ -223,7 +234,7 @@ struct ExecutivePlate: View {
         }
         if isComputer {
             if isActive { return match.engineFailed ? "Coach offline" : "Thinking…" }
-            let rival = match.setup.level.rival
+            let rival = match.setup.rival
             return "\(rival.level.name) · \(rival.elo.replacingOccurrences(of: "~", with: ""))"
         }
         return isActive ? "Your move" : ""
@@ -427,6 +438,17 @@ struct DockLabel: View {
                 .font(.app(.caption2, weight: .medium))
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
+                // While on, a small gold dot under the name, as under the home's picked tab.
+                // An overlay, so lighting it never moves the dock.
+                .overlay(alignment: .bottom) {
+                    Circle()
+                        .fill(accent)
+                        .frame(width: 4, height: 4)
+                        .offset(y: 7)
+                        .opacity(lit ? 1 : 0)
+                        .scaleEffect(lit ? 1 : 0.2)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: lit)
+                }
         }
         .foregroundStyle(lit ? accent : Color.primary.opacity(0.78))
         .opacity(isEnabled ? 1 : 0.5)

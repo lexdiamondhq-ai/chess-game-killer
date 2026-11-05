@@ -62,7 +62,7 @@ private struct PlayerName: View {
     @ViewBuilder
     private var picture: some View {
         if isComputer {
-            RivalPortrait(rival: match.setup.level.rival, size: 18, glows: theme.glows)
+            RivalPortrait(rival: match.setup.rival, size: 18, glows: theme.glows)
         } else {
             PieceImage(piece: Piece(.king, color: color, square: .e1), theme: theme, size: 18)
         }
@@ -147,9 +147,12 @@ struct MoveRibbon: View {
                     }
                 }
                 .mask {
+                    // A long, eased fade, so the oldest move melts away instead of reading as cut.
+                    let width: CGFloat = max(geo.size.width, 1)
                     LinearGradient(stops: [
                         .init(color: overflows ? .clear : .black, location: 0),
-                        .init(color: .black, location: min(1, 28 / max(geo.size.width, 1))),
+                        .init(color: overflows ? .black.opacity(0.45) : .black, location: min(1, 30 / width)),
+                        .init(color: .black, location: min(1, 64 / width)),
                     ], startPoint: .leading, endPoint: .trailing)
                 }
             }

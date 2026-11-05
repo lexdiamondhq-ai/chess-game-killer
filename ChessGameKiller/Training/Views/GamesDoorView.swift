@@ -228,7 +228,7 @@ struct RecentGameRow: View {
     let game: SavedGame
     let theme: BoardTheme
 
-    private var rival: Rival? { game.level.flatMap(MatchController.Level.init(rawValue:))?.rival }
+    private var rival: Rival? { Rival.of(saved: game) }
 
     var body: some View {
         HStack(spacing: 12) {

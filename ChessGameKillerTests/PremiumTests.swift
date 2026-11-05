@@ -196,6 +196,19 @@ final class PremiumTests: XCTestCase {
         XCTAssertTrue(RivalBoardsEarned.opens(.drift, premium: Premium(defaults: defaults, isPremium: true), defaults: defaults))
     }
 
+    func testBeatingACrowdOpensTheRivalBoardAtItsLevel() {
+        let premium = Premium(defaults: defaults, isPremium: false)
+        XCTAssertEqual(BoardTheme.rivals.count, MatchController.Level.allCases.count, "one rival board per crowd")
+        XCTAssertFalse(RivalBoardsEarned.opens(.spark, premium: premium, defaults: defaults))
+        RivalBoardsEarned.note([Self.game(against: "The 1000s", result: .win), Self.game(against: "The Masters", result: .loss)],
+                               defaults: defaults)
+        XCTAssertTrue(RivalBoardsEarned.opens(.spark, premium: premium, defaults: defaults))
+        XCTAssertFalse(RivalBoardsEarned.opens(.drift, premium: premium, defaults: defaults))
+        XCTAssertFalse(RivalBoardsEarned.opens(.singularity, premium: premium, defaults: defaults))
+        RivalBoardsEarned.note([Self.game(against: "The Masters", result: .win)], defaults: defaults)
+        XCTAssertTrue(RivalBoardsEarned.opens(.singularity, premium: premium, defaults: defaults))
+    }
+
     private static func game(against rival: String, result: SavedGame.Result) -> SavedGame {
         SavedGame(id: UUID(), date: .now, opponent: rival, level: 1, playerIsWhite: true, result: result,
                   accuracy: nil, positions: [], moves: [], moments: [])

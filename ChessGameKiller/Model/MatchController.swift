@@ -81,6 +81,29 @@ final class MatchController {
         var timeControl: TimeControl = .unlimited
         /// The army piece put on the line for this game (On the line), if any.
         var stake: ArmySlot? = nil
+        /// Against your Grudge rather than The Crowd. `level` is then the crowd it plays its
+        /// openings from, and `grudgeSkill` how hard it searches.
+        var grudge = false
+        var grudgeSkill: Int? = nil
+
+        /// Who sits across the board.
+        var rival: Rival { grudge ? .grudge(level) : level.rival }
+
+        /// How the computer searches: the crowd's settings, or the Grudge's own skill.
+        var engineSkill: Int {
+            guard grudge, let grudgeSkill else { return level.skill }
+            return max(0, min(20, grudgeSkill))
+        }
+
+        var engineDepth: Int? {
+            guard grudge, let grudgeSkill else { return level.depth }
+            return grudgeSkill >= 18 ? nil : 5
+        }
+
+        var engineThinkTimeMs: Int {
+            guard grudge, let grudgeSkill else { return level.thinkTimeMs }
+            return min(600, 50 + grudgeSkill * 25)
+        }
     }
 
     /// How the game ended when the board itself doesn't say (the clock, or a resignation).
@@ -166,6 +189,15 @@ final class MatchController {
 
     /// The rival's latest remark, shown for a few seconds in its line by the board.
     private(set) var rivalLine: RivalLine?
+    /// The vote behind the crowd's last move ("62% played Nf3"). Nil once Stockfish has taken over.
+    private(set) var crowdVote: CrowdVote?
+    /// Where the crowd's moves come from. Nil in tests and previews: Stockfish plays every move.
+    @ObservationIgnored var crowdBook: CrowdBookSource?
+    /// What the Grudge remembers, read as it speaks and as it picks its openings.
+    @ObservationIgnored var grudgeRecord: @MainActor () -> GrudgeRecord? = { nil }
+    /// Set once the crowd has no answer for this game (a rare position, no connection):
+    /// Stockfish plays the rest, and the crowd isn't asked again.
+    @ObservationIgnored private var bookOver = false
     private var nextLineID = 0
     /// The ply of the rival's last remark, so it doesn't talk over every move.
     private var lastLinePly = -10
@@ -253,6 +285,7 @@ final class MatchController {
     static func live() -> MatchController {
         let match = MatchController(engine: StockfishEngine.shared, sounds: SoundPlayer.shared)
         match.budget = { PowerPolicy.shared.engineBudget }
+        match.crowdBook = LichessCrowdBook.shared
         return match
     }
 
@@ -304,6 +337,8 @@ final class MatchController {
         engineFailed = false
         startClock()
         clearRivalLine()
+        crowdVote = nil
+        bookOver = false
         lastLinePly = -10
         rivalSays(.greeting)
         restartWork()
@@ -318,7 +353,18 @@ final class MatchController {
         if !moment.isBig {
             guard game.plyCount - lastLinePly >= 3, chance() < 0.75 else { return }
         }
-        guard let text = RivalVoice.line(for: moment, level: setup.level, pick: chance()) else { return }
+        let text: String?
+        if setup.grudge {
+            text = GrudgeVoice.line(for: moment, record: grudgeRecord(), pick: chance())
+        } else {
+            text = RivalVoice.line(for: moment, level: setup.level, pick: chance())
+        }
+        guard let text else { return }
+        say(text)
+    }
+
+    /// Puts `text` in the rival's line for a few seconds, longer for a longer line.
+    func say(_ text: String) {
         lastLinePly = game.plyCount
         let line = RivalLine(id: nextLineID, text: text)
         nextLineID += 1
@@ -566,7 +612,7 @@ final class MatchController {
 
     /// The opponent by name, for saved games and the highlight reel.
     var opponentName: String {
-        setup.level.rival.name
+        setup.rival.name
     }
 
     /// An unfinished game this long is kept when a new one starts.
@@ -912,16 +958,34 @@ final class MatchController {
         let clock = ContinuousClock()
         let started = clock.now
         let fen = game.fen
-        let level = setup.level
+        let current = self.setup
+        // The crowd first: the move real players chose here, while the position is a common one.
+        var chosen: String?
+        var vote: CrowdVote?
+        if let book = crowdBook, !bookOver, game.plyCount < (current.grudge ? Self.grudgeBookPlies : Self.crowdBookPlies) {
+            let source = current.level.crowdSource
+            let position = await book.position(fen: fen, source: source)
+            guard gen == generation, !Task.isCancelled else { return }
+            if let position {
+                let played = game.moves
+                let record = current.grudge ? grudgeRecord() : nil
+                vote = CrowdBook.vote(from: position, source: source, pick: chance()) { san in
+                    record?.lean(after: played, toward: san) ?? 1
+                }
+            }
+            if vote == nil { bookOver = true }
+            chosen = vote?.uci
+        }
         // The engine can miss an answer (a search it was still finishing, a stop it
         // never acknowledged). Ask again before giving up, with a little more time.
-        var chosen: String?
-        for attempt in 0..<Self.engineAttempts {
-            chosen = await engine.chooseMove(fen: fen, skill: level.skill, depth: level.depth,
-                                             thinkTimeMs: level.thinkTimeMs * (attempt + 1))
-            guard gen == generation, !Task.isCancelled else { return }
-            if chosen != nil { break }
-            NSLog("Computer move: engine gave no move (attempt %d)", attempt + 1)
+        if chosen == nil {
+            for attempt in 0..<Self.engineAttempts {
+                chosen = await engine.chooseMove(fen: fen, skill: current.engineSkill, depth: current.engineDepth,
+                                                 thinkTimeMs: current.engineThinkTimeMs * (attempt + 1))
+                guard gen == generation, !Task.isCancelled else { return }
+                if chosen != nil { break }
+                NSLog("Computer move: engine gave no move (attempt %d)", attempt + 1)
+            }
         }
         let engineAnswered = chosen != nil
 
@@ -938,6 +1002,7 @@ final class MatchController {
         // `Level.skill` and `Level.depth`), never in a random move laid over it.
         var moved = false
         if let chosen { moved = game.playEngineMove(chosen) }
+        crowdVote = moved && vote?.uci == chosen ? vote : nil
         // The game must never freeze on the computer's turn: with no answer from the
         // engine at all, the rival still plays a sensible move of its own.
         if !moved, let fallback = fallbackMove() { moved = game.playEngineMove(fallback) }
@@ -951,6 +1016,10 @@ final class MatchController {
 
     /// How many times the computer asks the engine for its move before playing one of its own.
     static let engineAttempts = 3
+    /// How deep into a game the crowd is asked; past this the positions are its own anyway.
+    static let crowdBookPlies = 60
+    /// The Grudge plays the crowd's openings, then its own game.
+    static let grudgeBookPlies = 16
 
     /// A move for the side to move when the engine has nothing: mate if there is one,
     /// otherwise the most valuable safe-looking capture, otherwise any legal move.

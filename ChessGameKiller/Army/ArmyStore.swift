@@ -292,17 +292,17 @@ struct ArmyNews: Identifiable, Equatable {
     var headline: String {
         switch kind {
         case .revenge(let rival):
-            return "\(name) got its revenge on \(rival)"
+            return "\(name) got its revenge on \(rival.midSentence)"
         case .grudge(let rival, let times):
-            return "\(rival) has taken \(name) \(Self.times(times))."
+            return "\(rival) \(rival.agreeing("has", "have")) taken \(name) \(Self.times(times))."
         case .staked(let rival):
-            return "\(name) is on the line against \(rival)."
+            return "\(name) is on the line against \(rival.midSentence)."
         case .wonStake(let rival):
-            return "\(name) took \(rival)'s crown. Double XP."
+            return "\(name) took \(rival.midSentence.possessive) crown. Double XP."
         case .captured(let rival):
-            return "\(rival) is holding \(name). Beat \(rival) to get it back."
+            return "\(rival) \(rival.agreeing("is", "are")) holding \(name). Beat \(rival.midSentence) to get it back."
         case .rescued(let rival):
-            return "\(name) escaped from \(rival)."
+            return "\(name) escaped from \(rival.midSentence)."
         case .streakMark(let days):
             return "\(name) carries your \(days)-day streak mark."
         case .promoted:
@@ -469,7 +469,7 @@ final class ArmyStore {
             .max { $0.1 < $1.1 }
         guard let best else { return nil }
         let (slot, times) = best
-        // The name sits mid-sentence: "Spark has taken your queen three times."
+        // The name sits mid-sentence: "The 1600s have taken your queen three times."
         return ArmyNews(slot: slot, rank: record(for: slot).rank, name: displayName(of: slot, capitalized: false),
                         kind: .grudge(rival: rival, times: times))
     }
@@ -620,7 +620,7 @@ final class ArmyStore {
         let biggest = stats.taken.max { (PieceLedger.values[$0] ?? 0) < (PieceLedger.values[$1] ?? 0) } ?? .pawn
         let others = stats.taken.count - 1
         let more = others > 0 ? " and \(others) more" : ""
-        return "\(name) took \(rival)'s \(biggest.word)\(more)."
+        return "\(name) took \(rival.midSentence.possessive) \(biggest.word)\(more)."
     }
 
     // MARK: Private

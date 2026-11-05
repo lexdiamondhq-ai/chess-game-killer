@@ -16,7 +16,14 @@ from scipy import ndimage
 from skimage import measure
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else 'build/sculpted/icon'
-RES = float(sys.argv[2]) if len(sys.argv) > 2 else 0.0028
+
+# How the knight is carved: sharp edges and little smoothing so it reads at board size, a full
+# face with a strong cheek, brow, eye and nostril, split ears, and gold stripes raised well proud
+# of the stone ("Bold", picked by Alex on 2026-11-04 over the softer first knight).
+LOOK = dict(res=0.002, out_blur=0.5, gold_blur=0.3, edge=0.013, edge_head=0.005, w_blur=0.5,
+            face=1.14, cheek=0.021, brow=0.013, eye=0.019, nostril=0.025, ear_gap=0.019,
+            proud=0.006, smooth_k=6, smooth_g=4)
+RES = float(sys.argv[2]) if len(sys.argv) > 2 else LOOK['res']
 
 # Icon pixels to squares: the ear tip (y 45) is 0.8 above the floor, the neck's foot (y 884)
 # stands on the base's round foot at 0.118.
@@ -171,9 +178,9 @@ def sample(field_px, X, Z):
 def build(res=RES, want=('k', 'g', 'e')):
     curve = spline(OUTLINE, 10)
     inside = raster(curve)
-    d_out = ndimage.gaussian_filter(sdf(inside), 1.0 * K)          # icon px
+    d_out = ndimage.gaussian_filter(sdf(inside), LOOK['out_blur'] * K)          # icon px
     gold = gold_pattern(inside)
-    d_gold = ndimage.gaussian_filter(sdf(gold), 0.6 * K)
+    d_gold = ndimage.gaussian_filter(sdf(gold), LOOK['gold_blur'] * K)
 
     xs = np.arange(-0.40, 0.31, res); ys = np.arange(-0.24, 0.24 + res, res); zs = np.arange(FOOT - 0.012, 0.83, res)
     X2, Z2 = np.meshgrid(xs, zs, indexing='ij')
@@ -183,7 +190,7 @@ def build(res=RES, want=('k', 'g', 'e')):
     # Half thickness: a broad neck, narrowing up to the poll and along the face to the muzzle.
     neck = np.interp(Z2, [FOOT, 0.25, 0.45, 0.62, 0.78], [0.13, 0.124, 0.113, 0.1, 0.082])
     head = smooth01((Z2 - 0.40) / 0.16) * smooth01((-0.03 - X2) / 0.12)
-    face = np.interp(X2, [-0.37, -0.31, -0.22, -0.12, 0.0], [0.054, 0.062, 0.079, 0.088, 0.09])
+    face = np.interp(X2, [-0.37, -0.31, -0.22, -0.12, 0.0], [0.054, 0.062, 0.079, 0.088, 0.09]) * LOOK['face']
     w = neck * (1 - head) + face * head
     ex0, ez0 = to_units(650, 180); ex1, ez1 = to_units(731, 45)
     ears = smooth01((Z2 - (ez0 - 0.01)) / 0.03) * smooth01((X2 - ex1 + 0.01) / 0.02) * smooth01((ex0 + 0.03 - X2) / 0.03)
@@ -191,11 +198,11 @@ def build(res=RES, want=('k', 'g', 'e')):
 
     # Carvings: a round cheek, a brow over the eye, the eye socket and the nostril's flare.
     cx, cz = to_units(615, 455)
-    w += 0.013 * bump(X2, Z2, cx, cz, 0.075, 0.07)
+    w += LOOK['cheek'] * bump(X2, Z2, cx, cz, 0.075, 0.07)
     bx, bz = to_units(686, 286)
-    w += 0.007 * bump(X2, Z2, bx, bz, 0.05, 0.017)
+    w += LOOK['brow'] * bump(X2, Z2, bx, bz, 0.05, 0.017)
     eye_d, eye_s, _ = almond(X2, Z2)
-    w -= 0.011 * smooth01(-eye_d / 0.006)
+    w -= LOOK['eye'] * smooth01(-eye_d / 0.006)
     nx, nz = to_units(*NOSTRIL)
     w += 0.006 * bump(X2, Z2, nx, nz, 0.034, 0.032)                   # the flare around it
 
@@ -205,25 +212,25 @@ def build(res=RES, want=('k', 'g', 'e')):
     w = np.minimum(w, w * (1 - near) + np.maximum(plan, 0.06) * near)
     # Rounded and softly chamfered toward the outline, so the faces read as planes.
     w *= 0.62 + 0.38 * smooth01(-d2 / 0.05)
-    w = ndimage.gaussian_filter(w, 0.8)
+    w = ndimage.gaussian_filter(w, LOOK['w_blur'])
 
     X, Y, Z = (a.astype(np.float32) for a in np.meshgrid(xs, ys, zs, indexing='ij'))
     D2 = d2[:, None, :]
     W = w[:, None, :]
     # Crisp edges on the neck and mane, softer down the face.
-    r = (0.022 + 0.008 * head)[:, None, :]
+    r = (LOOK['edge'] + LOOK['edge_head'] * head)[:, None, :]
     qx = D2 + r
     qy = np.abs(Y) - W + r
     d = np.sqrt(np.maximum(qx, 0) ** 2 + np.maximum(qy, 0) ** 2) + np.minimum(np.maximum(qx, qy), 0) - r
     del qx, qy
 
     # Split the ears.
-    gap = 0.012 * smooth01((Z - (ez0 + 0.01)) / 0.03) * smooth01((X - ex1 + 0.01) / 0.02) * smooth01((ex0 + 0.02 - X) / 0.03)
+    gap = LOOK['ear_gap'] * smooth01((Z - (ez0 + 0.01)) / 0.03) * smooth01((X - ex1 + 0.01) / 0.02) * smooth01((ex0 + 0.02 - X) / 0.03)
     d = smax(d, gap - np.abs(Y), 0.005)
     # The nostril: a deep round hole on each side of the muzzle.
     wn = float(ndimage.map_coordinates(w, [[(nx - xs[0]) / res], [(nz - zs[0]) / res]], order=1)[0])
     for sgn in (-1, 1):
-        hole = np.sqrt((X - nx) ** 2 + ((Y - sgn * (wn + 0.004)) / 1.15) ** 2 + (Z - nz) ** 2) - 0.02
+        hole = np.sqrt((X - nx) ** 2 + ((Y - sgn * (wn + 0.004)) / 1.15) ** 2 + (Z - nz) ** 2) - LOOK['nostril']
         d = smax(d, -hole, 0.006)
     # Flare into a thin disc on the foot, then cut flat there.
     collar = np.maximum(np.sqrt(X ** 2 + Y ** 2) - 0.212, np.abs(Z - FOOT) - 0.01)
@@ -231,7 +238,7 @@ def build(res=RES, want=('k', 'g', 'e')):
     d = np.maximum(d, FOOT - Z)
 
     # Gold: a thin shell, just proud of the stone, wherever the pattern lies.
-    G = np.maximum(np.maximum(d - 0.0028, -(d + 0.009)), g2[:, None, :])
+    G = np.maximum(np.maximum(d - LOOK['proud'], -(d + 0.009)), g2[:, None, :])
     G = np.maximum(G, FOOT + 0.004 - Z)
 
     # The eye: a lens filling its socket, rising almost to the face around it.
@@ -239,7 +246,7 @@ def build(res=RES, want=('k', 'g', 'e')):
     E = np.maximum(eye_d[:, None, :], np.maximum(np.abs(Y) - (w[:, None, :] + dome[:, None, :]), (w[:, None, :] - 0.006) - np.abs(Y)))
 
     out = {}
-    for name, field, rounds in (('k', d, 12), ('g', G, 6), ('e', E, 6)):
+    for name, field, rounds in (('k', d, LOOK['smooth_k']), ('g', G, LOOK['smooth_g']), ('e', E, 6)):
         if name not in want:
             continue
         v, f, _, _ = measure.marching_cubes(field.astype(np.float32), 0.0, spacing=(res, res, res))

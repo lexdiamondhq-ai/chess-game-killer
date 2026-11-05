@@ -5,7 +5,6 @@ import SwiftUI
 /// sound and haptics, and the credits. Every choice is remembered.
 struct SettingsSheet: View {
     @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .gilded
-    @AppStorage("matchRival") private var matchRival = false
     @AppStorage("showBestMoves") private var showBestMoves = false
     @AppStorage("showSecondBest") private var showSecondBest = true
     @AppStorage("coachVerdicts") private var showVerdicts = true
@@ -19,6 +18,8 @@ struct SettingsSheet: View {
     @AppStorage(Heirloom.settingKey) private var heirloomOn = true
     @AppStorage(BoardTheme.coordinatesKey) private var coordinatesOn = true
     @AppStorage(HomeScreen.key) private var homeScreen = HomeScreen.defaultOn
+    @AppStorage(HomeLayout.key) private var boardSheet = HomeLayout.defaultOn
+    @AppStorage(HomeToneMode.key) private var homeTone = HomeToneMode.defaultMode
     /// Shared with the lessons' speaker button and the highlight reel.
     @AppStorage("coachVoiceMuted") private var voiceMuted = false
     /// Out loud with the ring switch on silent. Read by CoachVoice when a lesson, reel or Leo's reply starts.
@@ -46,10 +47,11 @@ struct SettingsSheet: View {
 
                     section("Board") {
                         themeGrid(Self.looks)
-                        Text("Rival boards")
-                            .font(.app(.footnote, weight: .semibold))
+                        Text("Rival boards".uppercased())
+                            .font(.app(.caption, weight: .semibold))
                             .foregroundStyle(.secondary)
-                            .padding(.top, 6)
+                            .tracking(1)
+                            .padding(.top, 12)
                         themeGrid(BoardTheme.rivals)
                         SettingsGroup(theme: theme) {
                             if theme.sculptedLook != nil {
@@ -70,9 +72,6 @@ struct SettingsSheet: View {
                             ToggleRow(title: "Coordinates", subtitle: "Letters and numbers around the board. Off gives the squares more room.",
                                       symbol: "textformat.abc", isOn: $coordinatesOn, theme: theme)
                             rule
-                            ToggleRow(title: "Match rival", subtitle: "Computer games use the rival's own board, not the one picked above.",
-                                      symbol: "person.crop.circle.badge.checkmark", isOn: $matchRival, theme: theme)
-                            rule
                             ToggleRow(title: "Piece history", subtitle: "Your pieces wear what they've been through: gold seams, a promoted pawn's collar, notches, patina.",
                                       symbol: "seal", isOn: $heirloomOn, theme: theme)
                             rule
@@ -81,6 +80,19 @@ struct SettingsSheet: View {
                             rule
                             ToggleRow(title: "Home screen", subtitle: "Open on a home page: the board up top, your week, and every mode one tap away.",
                                       symbol: "house", isOn: $homeScreen, theme: theme)
+                            rule
+                            ToggleRow(title: "Board and sheet", subtitle: "The 3D board stays on top and one glass sheet holds the rest, at home and in a game. Off brings back the tiles and the floating dock.",
+                                      symbol: "rectangle.bottomhalf.inset.filled", isOn: $boardSheet, theme: theme)
+                            if boardSheet {
+                                rule
+                                PickerRow(title: "Home colors", subtitle: homeTone.blurb, symbol: "circle.lefthalf.filled", theme: theme) {
+                                    Picker("Home colors", selection: $homeTone) {
+                                        ForEach(HomeToneMode.allCases) { mode in
+                                            Text(mode.title).tag(mode)
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -189,6 +201,7 @@ struct SettingsSheet: View {
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
+            .sheetTitleBar()
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
@@ -242,7 +255,8 @@ struct SettingsSheet: View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
             ForEach(options) { option in
                 let open: Bool = RivalBoardsEarned.opens(option)
-                ThemeCard(option: option, isSelected: option.id == themeID, theme: theme, locked: !open) {
+                ThemeCard(option: option, isSelected: option.id == themeID, theme: theme, locked: !open,
+                          earnedBy: open ? nil : Self.earnedBy(option)) {
                     if open {
                         withAnimation(.easeInOut(duration: 0.35)) { themeID = option.id }
                     } else {
@@ -251,6 +265,13 @@ struct SettingsSheet: View {
                 }
             }
         }
+    }
+
+    /// The crowd whose defeat opens a rival board, like "The 1000s". Nil for any other look.
+    private static func earnedBy(_ look: BoardTheme) -> String? {
+        guard let index = BoardTheme.rivals.firstIndex(where: { $0.id == look.id }),
+              let level = MatchController.Level(rawValue: index) else { return nil }
+        return level.rival.name.midSentence
     }
 
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
@@ -416,6 +437,8 @@ private struct ThemeCard: View {
     let theme: BoardTheme
     /// Premium's, or a rival's not yet beaten: a crown in place of the check.
     var locked = false
+    /// For a rival board not yet won, the crowd that opens it: a lock and "Beat …" in place of the crown.
+    var earnedBy: String? = nil
     let select: () -> Void
 
     var body: some View {
@@ -433,13 +456,27 @@ private struct ThemeCard: View {
                                 .transition(.scale.combined(with: .opacity))
                         }
                     }
-                Text(option.name)
-                    .font(.app(.headline))
-                    .foregroundStyle(locked ? Color.secondary : Color.primary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                if locked {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(option.name)
+                        .font(.app(.headline))
+                        .foregroundStyle(locked ? Color.secondary : Color.primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    if let earnedBy {
+                        Text("Beat \(earnedBy)")
+                            .font(.app(.caption))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if earnedBy != nil {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                } else if locked {
                     Image(systemName: "crown.fill")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(theme.accent ?? .accentColor)
@@ -454,7 +491,8 @@ private struct ThemeCard: View {
         }
         .buttonStyle(.plain)
         .animation(.snappy, value: isSelected)
-        .accessibilityLabel(locked ? "\(option.name) board, Premium" : "\(option.name) board")
+        .accessibilityLabel(earnedBy.map { "\(option.name) board, beat \($0) to open it" }
+                            ?? (locked ? "\(option.name) board, Premium" : "\(option.name) board"))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 

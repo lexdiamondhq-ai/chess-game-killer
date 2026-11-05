@@ -171,6 +171,10 @@ struct DailyMoveView: View {
                     .font(.app(.caption, weight: .semibold))
                     .foregroundStyle(theme.trainingAccent)
             }
+            if daily.streak > 0 {
+                StreakCoins(streak: daily.streak, accent: theme.trainingAccent)
+                    .padding(.vertical, 4)
+            }
             if let mark = daily.markToday {
                 Label("\(mark.piece) now carries your \(mark.days)-day mark, for good.", systemImage: "seal.fill")
                     .font(.app(.subheadline))
@@ -223,6 +227,75 @@ struct DailyMoveView: View {
             } catch {
                 tallyFailed = true
             }
+        }
+    }
+}
+
+/// This week of the streak as seven coins (S1 on the Tap Moments page): the days already kept
+/// are gold, and today's flips over to gold as the result shows. The seventh wears a crown.
+struct StreakCoins: View {
+    let streak: Int
+    let accent: Color
+
+    @State private var flipped = false
+    @AppStorage("haptics") private var hapticsOn = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private static let size: CGFloat = 32
+
+    /// Which day of its week today is, 1 to 7.
+    private var today: Int { streak <= 0 ? 0 : ((streak - 1) % 7) + 1 }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(1...7, id: \.self) { day in
+                coin(day)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+        .task {
+            guard !flipped else { return }
+            if !reduceMotion { try? await Task.sleep(for: .milliseconds(350)) }
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.62)) { flipped = true }
+        }
+        .sensoryFeedback(.success, trigger: flipped) { _, now in now && hapticsOn }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Day \(today) of 7 this week")
+    }
+
+    private func coin(_ day: Int) -> some View {
+        let isToday: Bool = day == today
+        let lit: Bool = day < today || (isToday && flipped)
+        let turn: Double = isToday && !flipped && !reduceMotion ? 180 : 0
+        let number: Int = streak - today + day
+        return VStack(spacing: 4) {
+            ZStack {
+                Circle()
+                    .fill(lit ? accent : Color.primary.opacity(0.08))
+                    .overlay {
+                        Circle().strokeBorder(Color.white.opacity(lit ? 0.35 : 0.12), lineWidth: 0.75)
+                    }
+                face(day, lit: lit)
+            }
+            .frame(width: Self.size, height: Self.size)
+            .rotation3DEffect(.degrees(turn), axis: (x: 0, y: 1, z: 0))
+            .scaleEffect(isToday && flipped && !reduceMotion ? 1.08 : 1)
+            Text("\(number)")
+                .font(.app(.caption2).monospacedDigit())
+                .foregroundStyle(isToday ? AnyShapeStyle(accent) : AnyShapeStyle(HierarchicalShapeStyle.secondary))
+        }
+    }
+
+    @ViewBuilder
+    private func face(_ day: Int, lit: Bool) -> some View {
+        if day == 7 {
+            Image(systemName: "crown.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(lit ? Color.black.opacity(0.8) : Color.secondary)
+        } else if lit {
+            Image(systemName: "checkmark")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(Color.black.opacity(0.8))
         }
     }
 }

@@ -87,7 +87,7 @@ struct SculptedBoardView: View {
     /// light the home's window shows before the game.
     private var presence: SculptedPresence? {
         guard match.setup.opponent == .computer else { return nil }
-        return .game(match.setup.level.rival.lightUI)
+        return .game(match.setup.rival.lightUI)
     }
 
     var body: some View {
@@ -137,7 +137,8 @@ struct SculptedBoardView: View {
                 }
             }
         }
-        .aspectRatio(framing.aspect, contentMode: .fit)
+        // Flat from above it keeps its one shape; standing it may be taller, and the camera tips higher to fill it.
+        .modifier(AspectRange(range: framing == .standing ? SculptedCamera.standingAspects : Float(framing.aspect)...Float(framing.aspect)))
         // One tap as each move's piece touches down: firmer for a capture, a heavy thud as a
         // rook or queen falls and the board shakes, a sharp knock for a check against the player.
         .sensoryFeedback(trigger: touchdown) { _, new in
@@ -316,5 +317,37 @@ struct SculptedStillBoard: View {
             hints: hints,
             matchesPieces: true
         )
+    }
+}
+
+/// Fits a view inside what it is offered at a shape within `range` (width over height): as
+/// `aspectRatio(_:contentMode: .fit)` does for one shape, for a range of them.
+private struct AspectRange: ViewModifier {
+    let range: ClosedRange<Float>
+
+    func body(content: Content) -> some View {
+        AspectRangeLayout(low: CGFloat(range.lowerBound), high: CGFloat(range.upperBound)) { content }
+    }
+}
+
+private struct AspectRangeLayout: Layout {
+    let low: CGFloat
+    let high: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? 390
+        let height = proposal.height ?? width / high
+        guard width > 0, height > 0 else { return .zero }
+        let shape = width / height
+        if shape > high { return CGSize(width: height * high, height: height) }
+        if shape < low { return CGSize(width: width, height: width / low) }
+        return CGSize(width: width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        for subview in subviews {
+            subview.place(at: CGPoint(x: bounds.midX, y: bounds.midY), anchor: .center,
+                          proposal: ProposedViewSize(width: bounds.width, height: bounds.height))
+        }
     }
 }

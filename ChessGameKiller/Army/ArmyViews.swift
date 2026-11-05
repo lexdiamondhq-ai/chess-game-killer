@@ -234,7 +234,7 @@ struct ArmyView: View {
     private static let xpRules = [
         "1 per game, 3 per win, 2 more if the piece is still standing.",
         "2 per pawn's worth taken, 10 per promotion, 20 per checkmate.",
-        "Stronger rivals are worth more, up to 3× against Singularity.",
+        "Stronger rivals are worth more, up to 3× against the Masters.",
         "Games with Undo or a played hint earn half.",
         "Leaving a game unfinished counts as a loss.",
         "Piece of the Match earns 5 more; revenge on a rival that keeps taking a piece earns 15.",
@@ -244,15 +244,23 @@ struct ArmyView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
+                // Each block rises into place in turn, as on the board home's sheet.
                 VStack(spacing: 18) {
                     header
+                        .homeRise(0)
                     formation
-                    if !decorated.isEmpty { honorRoll }
+                        .homeRise(1)
+                    if !decorated.isEmpty {
+                        honorRoll
+                            .homeRise(2)
+                    }
                     ranksCard
+                        .homeRise(3)
                     Text("Games against the computer from the usual starting position count.")
                         .font(.app(.footnote))
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
+                        .homeRise(4)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
@@ -642,7 +650,7 @@ struct PieceDetailView: View {
                             .font(.app(.subheadline, weight: .semibold))
                         Text(avenged
                              ? "Took it \(ArmyNews.times(nemesis.times)). Revenge taken."
-                             : "Has taken it \(ArmyNews.times(nemesis.times)). Win against \(rival.name) and take something back for revenge.")
+                             : "Has taken it \(ArmyNews.times(nemesis.times)). Win against \(rival.name.midSentence) and take something back for revenge.")
                             .font(.app(.caption))
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)

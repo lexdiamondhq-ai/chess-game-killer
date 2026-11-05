@@ -131,6 +131,9 @@ final class SculptedSceneKitView: SCNView {
 /// Legal moves and the coach's hints are marks on the stone, never arrows.
 final class SculptedBoardScene {
     static let pieceCategory = 1 << 1
+    /// Where the key light hangs, seen from White's side: high on the player's left, a little
+    /// toward the player. It turns with the camera (`rig`).
+    static let keyPosition = SIMD3<Float>(-6, 9, 5)
 
     let view: SculptedSceneKitView
     private let scene = SCNScene()
@@ -920,7 +923,7 @@ final class SculptedBoardScene {
 
     /// The studio for the framing. From straight above, the board mirrors whatever is overhead,
     /// so it takes the studio with a dark ceiling: the stone keeps the deep color it shows tilted,
-    /// instead of a milky veil. The fine line round the squares glows like the flat pieces' metal.
+    /// instead of a milky veil. The fine line round the squares glows brighter (`SculptedFlatSet.glow`).
     private func light(for framing: SculptedCamera.Framing) {
         litFromAbove = framing.lying
         scene.lightingEnvironment.contents = assets.environment(look, above: litFromAbove)
@@ -978,6 +981,7 @@ final class SculptedBoardScene {
         keyLight?.intensity = look.key * (dimmed ? 0.5 : 1)
         rimLight?.intensity = look.rim * (dimmed ? 0.6 : 1)
         scene.lightingEnvironment.intensity = look.environment * (dimmed ? 0.55 : 1)
+        SculptedFlatSet.dim(dimmed)
         SCNTransaction.commit()
     }
 
@@ -1604,7 +1608,7 @@ final class SculptedBoardScene {
         let keyNode = SCNNode()
         keyNode.light = key
         keyLight = key
-        keyNode.simdPosition = SIMD3(-6, 9, 5)
+        keyNode.simdPosition = Self.keyPosition
         keyNode.simdLook(at: .zero, up: SculptedCamera.up, localFront: SCNNode.simdLocalFront)
         rig.addChildNode(keyNode)
 
@@ -1689,20 +1693,33 @@ final class SculptedBoardScene {
         scene.rootNode.addChildNode(board)
     }
 
-    /// Files and ranks engraved along the player's side of the frame, upright for the player.
+    /// Files and ranks in the corners of the edge squares nearest the player, upright for them:
+    /// the letters low on the near rank, the numbers high on the left file. The frame runs off
+    /// the screen's sides now, so they live on the squares.
     private func buildLabels(flipped: Bool) {
         labelsNode.childNodes.forEach { $0.removeFromParentNode() }
         let side: Float = flipped ? -1 : 1
         let turn = simd_quatf(angle: flipped ? .pi : 0, axis: SculptedCamera.up) * Self.flat
         let files = Array("abcdefgh")
+        // From a square's middle to the center of its corner label.
+        let corner: Float = 0.34
         for index in 0..<8 {
-            addLabel(String(files[index]), at: SIMD3(Float(index) - 3.5, 0.0064, 4.3 * side), orientation: turn)
-            addLabel("\(index + 1)", at: SIMD3(-4.3 * side, 0.0064, 3.5 - Float(index)), orientation: turn)
+            // a1 is dark, and the colors alternate along the edge.
+            let onDark = index % 2 == 0
+            let file = Float(index) - 3.5
+            addLabel(String(files[index]), at: SIMD3((file + corner) * side, 0.0064, (3.5 + corner) * side),
+                     orientation: turn, onDark: onDark)
+            let rank = 3.5 - Float(index)
+            addLabel("\(index + 1)", at: SIMD3((-3.5 - corner) * side, 0.0064, (rank - corner) * side),
+                     orientation: turn, onDark: onDark)
         }
     }
 
-    private func addLabel(_ text: String, at position: SIMD3<Float>, orientation: simd_quatf) {
-        let node = SCNNode(geometry: Self.mark(size: 0.4, color: look.platinumMark, alpha: 0.8, mask: MarkImages.label(text)))
+    /// A label in the square's corner: pale on a dark square, deep brown on a light one, so it
+    /// reads on both like the letters on a printed board.
+    private func addLabel(_ text: String, at position: SIMD3<Float>, orientation: simd_quatf, onDark: Bool) {
+        let ink: UIColor = onDark ? look.platinumMark : UIColor(red: 0.24, green: 0.17, blue: 0.11, alpha: 1)
+        let node = SCNNode(geometry: Self.mark(size: 0.3, color: ink, alpha: onDark ? 0.85 : 0.75, mask: MarkImages.label(text)))
         node.simdPosition = position
         node.simdOrientation = orientation
         node.castsShadow = false

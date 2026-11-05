@@ -15,7 +15,6 @@ struct ContentView: View {
     @State private var analyzeWithCamera = false
     @State private var coachExpanded = false
     @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .gilded
-    @AppStorage("matchRival") private var matchRival = false
     @AppStorage("showBestMoves") private var showBestMoves = false
     @AppStorage("showSecondBest") private var showSecondBest = true
     @AppStorage("coachVerdicts") private var showVerdicts = true
@@ -29,6 +28,7 @@ struct ContentView: View {
     @State private var puzzles = PuzzleStore.live()
     @State private var showingPuzzles = false
     @State private var army = ArmyStore.live()
+    @State private var grudges = GrudgeStore()
     @State private var showingArmy = false
     @State private var armyNews: ArmyNews?
     @State private var vault = GameVault.live()
@@ -37,7 +37,21 @@ struct ContentView: View {
     @State private var rewindOpening: UUID?
     /// The home screen covers the game until a game is started or resumed.
     @State private var showingHome: Bool
+    /// Where the home's tiles and the screens they open meet, so a screen grows out of its tile.
+    @Namespace private var homeZoom
     @AppStorage(HomeScreen.key) private var homeScreenOn = HomeScreen.defaultOn
+    /// The board style (Alex's pick, 1A): the home's board and sheet, and the same sheet across
+    /// the foot of the game. Settings > Board and sheet turns it off.
+    @AppStorage(HomeLayout.key) private var boardSheet = HomeLayout.defaultOn
+    /// The board home's room: Light, Middle or Dark.
+    @AppStorage(HomeToneMode.key) private var homeTone = HomeToneMode.defaultMode
+    /// Back from a game, the home's sheet rises out of the game's.
+    @State private var homeRises = false
+    /// The board home's tab, kept here so a redraw of the home (a new look) stays on it.
+    @State private var homeTab: HomeSheetTab = .today
+    /// The home has finished fading in, so the window takes its light. Until then the game
+    /// fading out keeps the dark it was drawn for.
+    @State private var homeLit: Bool
     @Environment(\.scenePhase) private var scenePhase
     /// Challenge a friend, when the app provides it (tests that draw this screen don't).
     @Environment(ChallengeCenter.self) private var challenges: ChallengeCenter?
@@ -75,22 +89,17 @@ struct ContentView: View {
         let home = startsAtHome ?? (startsWithNewGame && HomeScreen.isOn())
         let welcome = startsWithNewGame && !Welcome.isUnderTest && Welcome.shouldShow()
         _showingHome = State(initialValue: home)
+        _homeLit = State(initialValue: home)
         _showingWelcome = State(initialValue: welcome)
         _showingNewGame = State(initialValue: startsWithNewGame && !home && !welcome)
         _trayOpen = State(initialValue: trayOpen)
         _coachExpanded = State(initialValue: coachOpen)
     }
 
-    /// Against the computer, the board matches the rival's portrait unless the player turned that off.
-    private var theme: BoardTheme {
-        if matchRival, match.setup.opponent == .computer {
-            return .named(match.setup.level.rival.boardTheme)
-        }
-        return .named(themeID)
-    }
+    /// The look picked in Settings, for the game and everything else.
+    private var theme: BoardTheme { .named(themeID) }
 
-    /// The look picked in Settings. Training, puzzles, lessons and the other screens away from the
-    /// game always use it: a rival's board belongs to the game against that rival.
+    /// The same look, for training, puzzles, lessons and the other screens away from the game.
     private var chosenTheme: BoardTheme { .named(themeID) }
     /// The orb is unfolded, so nothing else fits beside it.
     private var coachIsWide: Bool { coachExpanded }
@@ -123,6 +132,10 @@ struct ContentView: View {
     private static let gap: CGFloat = 6
     /// The least room kept above and below the players and the board.
     private static let edgeRoom: CGFloat = 6
+    /// Height a growing 3D board leaves free for the gaps around the plates.
+    private static let boardAir: CGFloat = 36
+    /// The most a gap grows on a tall screen.
+    private static let maxExtraGap: CGFloat = 14
     /// The dock: the orb and a little air around it.
     private static let dockHeight: CGFloat = CoachOrb.orbSize + 12
     /// On iPad the dock stays about a phone's width.
@@ -132,16 +145,17 @@ struct ContentView: View {
     private static let phoneWidth: CGFloat = 440
     /// How much of the screen the unfolded coach may take, so the board stays usable under it.
     private static let coachShare: CGFloat = 0.45
+    private static let resultShare: CGFloat = 0.53
 
     // The rows grow with the reader's text size, up to a point, and the board makes room.
-    @ScaledMetric(relativeTo: .body) private var scaledPlateHeight: CGFloat = 58
+    @ScaledMetric(relativeTo: .body) private var scaledPlateHeight: CGFloat = 64
     @ScaledMetric(relativeTo: .footnote) private var scaledStripHeight: CGFloat = 32
-    @ScaledMetric(relativeTo: .footnote) private var scaledRibbonHeight: CGFloat = 24
+    @ScaledMetric(relativeTo: .footnote) private var scaledRibbonHeight: CGFloat = 32
     /// One player's line.
-    private var plateHeight: CGFloat { min(scaledPlateHeight, 66) }
+    private var plateHeight: CGFloat { min(scaledPlateHeight, 72) }
     /// Both players on one line, while the coach is open.
     private var stripHeight: CGFloat { min(scaledStripHeight, 40) }
-    private var ribbonHeight: CGFloat { min(scaledRibbonHeight, 30) }
+    private var ribbonHeight: CGFloat { min(scaledRibbonHeight, 38) }
 
     @Environment(\.horizontalSizeClass) private var sizeClass
     /// The board stops growing here: larger across an iPad, and no phone is this wide.
@@ -173,10 +187,16 @@ struct ContentView: View {
                     daily.record(.game)
                 }
                 hookUpDaily()
-                match.onAbandon = { [army] ledger, setup, assisted in
+                match.grudgeRecord = { [grudges] in grudges.record }
+                match.onAbandon = { [army, grudges, weak match] ledger, setup, assisted in
                     // Walking away from a game counts as a loss.
                     army.record(ledger, playerColor: setup.playerColor, won: false,
                                 stakes: GameStakes(level: setup.level, assisted: assisted, staked: setup.stake))
+                    // Your Grudge counts it too. Walking out on a crowd never wakes one.
+                    if setup.grudge, let game = match?.game {
+                        grudges.recordGame(.itWon, moves: game.moves, playerColor: setup.playerColor,
+                                           positions: game.positionFENs)
+                    }
                 }
                 // Every grade reaches the coach, shown or not, so real mistakes are saved to practice.
                 match.onReview = { [weak match, coach, training] review, latest in
@@ -208,6 +228,7 @@ struct ContentView: View {
                 guard over else { return }
                 recordArmy()
                 recordGame()
+                recordGrudge()
                 // A game played to its end makes the day.
                 daily.record(.game)
                 if bigBoard { trayOpen = true }
@@ -227,6 +248,7 @@ struct ContentView: View {
             .fullScreenCover(isPresented: $showingTraining) {
                 TrainingHubView(theme: chosenTheme).environment(training).environment(puzzles).environment(vault)
                     .environment(daily)
+                    .homeZoom(.coach, in: homeZoom, when: showingHome)
             }
             .fullScreenCover(isPresented: $showingDaily) {
                 DailyMoveView(theme: chosenTheme, morePuzzles: {
@@ -237,9 +259,11 @@ struct ContentView: View {
                     }
                 })
                 .environment(daily).environment(puzzles).environment(training)
+                .homeZoom(.daily, in: homeZoom, when: showingHome)
             }
             .fullScreenCover(isPresented: $showingPuzzles) {
                 PuzzlesView(theme: chosenTheme).environment(puzzles).environment(training)
+                    .homeZoom(.puzzles, in: homeZoom, when: zoomsFromSheet)
             }
             .onChange(of: showingGames) { _, showing in
                 if !showing { rewindOpening = nil }
@@ -247,9 +271,11 @@ struct ContentView: View {
             .fullScreenCover(isPresented: $showingGames) {
                 RewindGamesView(theme: chosenTheme, opening: rewindOpening, forfeits: forfeits) { game in playAgain(game) }
                     .environment(vault).environment(training)
+                    .homeZoom(.games, in: homeZoom, when: zoomsFromSheet)
             }
             .fullScreenCover(isPresented: $showingArmy) {
                 ArmyView(theme: chosenTheme, color: match.setup.playerColor).environment(army)
+                    .homeZoom(.army, in: homeZoom, when: zoomsFromSheet)
             }
             .fullScreenCover(item: $coach.presentedLesson) { lesson in
                 LessonScreen(lesson: lesson, theme: chosenTheme).environment(training).environment(daily)
@@ -261,6 +287,7 @@ struct ContentView: View {
                     .environment(training)
                     .environment(puzzles)
                     .environment(daily)
+                    .homeZoom(.coach, in: homeZoom, when: showingHome)
             }
             .fullScreenCover(item: $talk, onDismiss: playTalkMove) { (session: TalkSession) in
                 TalkPanel(session: session, theme: theme, play: { (uci: String) in
@@ -279,9 +306,12 @@ struct ContentView: View {
                     challenges?.compose()
                 }
                 .environment(army)
+                .environment(grudges)
+                .boardSheetGrabber(boardSheet)
             }
             .sheet(isPresented: $showingSettings, onDismiss: refreshDaily) {
                 SettingsSheet()
+                    .boardSheetGrabber(boardSheet)
             }
             .sheet(isPresented: $showingAnalyze, onDismiss: { analyzeWithCamera = false }) {
                 AnalyzeSheet(
@@ -289,7 +319,7 @@ struct ContentView: View {
                     currentFEN: match.hasStarted ? match.game.fen : nil,
                     engine: StockfishEngine.shared,
                     reader: CloudBoardReader.live,
-                    rival: fromHereSetup.level.rival.name,
+                    rival: fromHereSetup.rival.name,
                     clock: fromHereSetup.timeControl,
                     forfeits: forfeits,
                     onAnalyzeGame: analyzeGame,
@@ -297,6 +327,7 @@ struct ContentView: View {
                 ) { draft in
                     play(from: draft)
                 }
+                .boardSheetGrabber(boardSheet)
             }
     }
 
@@ -306,10 +337,11 @@ struct ContentView: View {
             // Switching between Neon and the executive look redraws everything in the new type.
             .id(theme.glows)
             .tint(theme.accent)
-            .preferredColorScheme(theme.isDark ? .dark : nil)
+            .preferredColorScheme(windowScheme)
             .environment(training)
             .environment(coach)
             .environment(army)
+            .environment(grudges)
             .environment(vault)
             .environment(puzzles)
             .environment(daily)
@@ -377,7 +409,9 @@ struct ContentView: View {
     private var screens: some View {
         if showingHome {
             // The home is dressed in the player's own look, not a rival's board.
-            HomeView(match: match, theme: .named(themeID), actions: homeActions)
+            HomeView(match: match, theme: .named(themeID), actions: homeActions, tab: homeTab, rises: homeRises,
+                     onTab: { tab in homeTab = tab })
+                .environment(\.homeZoom, homeZoom)
                 .transition(.opacity)
         } else {
             gameScreen
@@ -439,6 +473,8 @@ struct ContentView: View {
 
     private func refreshDaily() {
         DailyUpkeep.refresh(daily: daily, army: army, lastGame: vault.games.map(\.date).max())
+        // Today's Move on the Lock Screen until it's done (never over a game there).
+        DailyActivityKeeper.shared.follow(daily: daily)
     }
 
     /// The game on the Lock Screen was tapped: the game comes forward, over the home and any
@@ -499,6 +535,7 @@ struct ContentView: View {
 
     private func leaveHome() {
         guard showingHome else { return }
+        homeLit = false
         withAnimation(.easeInOut(duration: 0.35)) { showingHome = false }
     }
 
@@ -506,8 +543,30 @@ struct ContentView: View {
         setCoach(expanded: false)
         // A victory theme still playing fades as the game leaves the screen.
         SoundPlayer.shared.stopAll(fade: 0.4)
-        withAnimation(.easeInOut(duration: 0.35)) { showingHome = true }
+        homeRises = true
+        homeTab = .today
+        withAnimation(.easeInOut(duration: 0.35)) {
+            showingHome = true
+        } completion: {
+            homeLit = showingHome
+        }
+        // The home has started its rise by now; a later redraw of it (a new look) starts at rest.
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1))
+            homeRises = false
+        }
     }
+
+    /// The window's light: the board home's room while it shows (Light and Middle are light),
+    /// the board's look everywhere else.
+    private var windowScheme: ColorScheme? {
+        if showingHome, homeLit, boardSheet, !showingWelcome { return homeTone.scheme }
+        return theme.isDark ? .dark : nil
+    }
+
+    /// Puzzles, your games and your pieces grow out of the board home's rows that open them.
+    /// The tiles home has no such rows, and the game screen opens them as usual.
+    private var zoomsFromSheet: Bool { showingHome && boardSheet }
 
     /// The board, the players and the dock inside the navigation bar, sized to the screen.
     private var gameScreen: some View {
@@ -537,19 +596,24 @@ struct ContentView: View {
                         .padding(.bottom, 8)
                 }
                 .safeAreaInset(edge: .bottom, spacing: 0) {
-                    let coachHeight = screen.size.height * Self.coachShare
-                    Group {
-                        if bigBoard {
-                            bigTray(coachHeight: coachHeight)
-                        } else {
-                            dock(coachHeight: coachHeight)
+                    // A finished game gives the result a little more room: the board has had its say.
+                    let coachHeight = screen.size.height * (match.isOver ? Self.resultShare : Self.coachShare)
+                    if boardSheet, !bigBoard {
+                        gameSheet(coachHeight: coachHeight, bottom: screen.safeAreaInsets.bottom)
+                    } else {
+                        Group {
+                            if bigBoard {
+                                bigTray(coachHeight: coachHeight)
+                            } else {
+                                dock(coachHeight: coachHeight)
+                            }
                         }
+                        .frame(maxWidth: Self.dockMaxWidth)
+                        .padding(.horizontal, Self.inset)
+                        .padding(.top, 8)
+                        // Above the home indicator; on a phone without one, a little off the edge.
+                        .padding(.bottom, screen.safeAreaInsets.bottom > 0 ? 0 : 8)
                     }
-                    .frame(maxWidth: Self.dockMaxWidth)
-                    .padding(.horizontal, Self.inset)
-                    .padding(.top, 8)
-                    // Above the home indicator; on a phone without one, a little off the edge.
-                    .padding(.bottom, screen.safeAreaInsets.bottom > 0 ? 0 : 8)
                 }
                 .background { SheetBackdrop(theme: theme) }
                 .navigationTitle("Chess Game Killer")
@@ -571,9 +635,20 @@ struct ContentView: View {
         let gaps = Self.gap * (compact ? 2 : 3)
         let fixed = lines + gaps + ribbonHeight + Self.edgeRoom * 2
         // The headroom over a flat board grows with the board, so it is solved for with it.
-        let byHeight = max(0, size.height - fixed) * aspect / (1 + headroom * aspect)
+        let room = max(0, size.height - fixed)
+        let byHeight = room * aspect / (1 + headroom * aspect)
         let side = max(0, min(size.width, maxBoardSide, byHeight))
+        // A standing 3D board grows down into spare height (its camera tips higher to fill it),
+        // keeping a little air for the plates around it.
+        let tallest = BoardView.tallestAspect(theme, setting: sculpted3D, framing: framing)
+        let boardHeight = min(side / max(tallest, 0.01), max(side / max(aspect, 0.01), room - side * headroom - Self.boardAir))
         let lineWidth = max(0, max(side, min(size.width, Self.phoneWidth)) - Self.inset * 2)
+        // A tall phone has height to spare once the board fills the width. It is shared out
+        // between the gaps and the edges, like the Home's cards, instead of pooling above and below.
+        let used = fixed + side * headroom + boardHeight
+        let spare = max(0, size.height - used)
+        let slots: CGFloat = compact ? 2 : 3
+        let gap = Self.gap + min(spare / (slots + 2), Self.maxExtraGap)
         let topColor: Piece.Color = match.isBoardFlipped ? .white : .black
         return VStack(spacing: 0) {
             Spacer(minLength: Self.edgeRoom)
@@ -586,18 +661,17 @@ struct ContentView: View {
                         .frame(width: lineWidth, height: plateHeight)
                 }
             }
-            Color.clear.frame(height: Self.gap + side * headroom)
+            Color.clear.frame(height: gap + side * headroom)
             board
-                .frame(width: side, height: side / aspect)
-            Color.clear.frame(height: Self.gap)
+                .frame(width: side, height: boardHeight)
+            Color.clear.frame(height: gap)
             if !compact {
                 ExecutivePlate(match: match, theme: theme, color: topColor.opposite)
                     .frame(width: lineWidth, height: plateHeight)
-                Color.clear.frame(height: Self.gap)
+                Color.clear.frame(height: gap)
             }
             ribbonRow
-                // In line with the avatars on the players' lines.
-                .frame(width: max(0, lineWidth - 18), height: ribbonHeight)
+                .frame(width: lineWidth, height: ribbonHeight)
             Spacer(minLength: Self.edgeRoom)
         }
         .frame(maxWidth: .infinity)
@@ -629,8 +703,12 @@ struct ContentView: View {
             GhostStrip(line: match.ghostLine, focus: vision.focus, theme: theme)
                 .transition(.opacity)
         } else {
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
+                // The moves on their own glass, like the players' lines above them.
                 movesOrBrowsing
+                    .padding(.horizontal, 14)
+                    .frame(maxHeight: .infinity)
+                    .glassPane(Capsule())
                 BoardViewSwitch(theme: theme, bigBoard: bigBoard)
             }
         }
@@ -818,6 +896,17 @@ struct ContentView: View {
             }
     }
 
+    /// The board style's dock: the home's glass sheet across the foot of the screen, with the
+    /// same controls. Pulled up, the coach unfolds into it.
+    private func gameSheet(coachHeight: CGFloat, bottom: CGFloat) -> some View {
+        GameSheet(theme: theme, isOpen: coachExpanded, bottomInset: bottom, setOpen: { opened in
+            setCoach(expanded: opened)
+        }) {
+            dockRow(coachHeight: coachHeight)
+        }
+        .padding(.top, 8)
+    }
+
     /// Every control named, three either side of the orb. They step aside while the orb is wide.
     /// No glass of its own: it sits on the dock's, or on Big Board's tray.
     private func dockRow(coachHeight: CGFloat) -> some View {
@@ -937,6 +1026,27 @@ struct ContentView: View {
             try? await Task.sleep(for: .seconds(6))
             if armyNews == news {
                 withAnimation(.easeOut(duration: 0.3)) { armyNews = nil }
+            }
+        }
+    }
+
+    /// Tells your Grudge how the game went. A loss to a crowd wakes the Grudge the first time.
+    private func recordGrudge() {
+        guard match.setup.opponent == .computer else { return }
+        let you = match.setup.playerColor
+        let result: GrudgeResult = match.winner.map { $0 == you ? .youWon : .itWon } ?? .draw
+        let game = match.game
+        if match.setup.grudge {
+            grudges.recordGame(result, moves: game.moves, playerColor: you, positions: game.positionFENs)
+        } else if result == .itWon,
+                  grudges.crowdWon(level: match.setup.level, moves: game.moves, playerColor: you,
+                                   positions: game.positionFENs) {
+            // After the crowd's own last word.
+            let number = match.gameNumber
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1.6))
+                guard match.gameNumber == number else { return }
+                match.say("Someone took that personally.")
             }
         }
     }

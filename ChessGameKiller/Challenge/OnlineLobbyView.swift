@@ -147,6 +147,11 @@ struct OnlineLobbyView: View {
                     .multilineTextAlignment(.center)
                     .transition(.opacity)
             }
+            if lobby.isSearching || lobby.phase == .starting {
+                // The same seats from waiting to found, so the empty one fills in place.
+                OnlineSeats(name: name, rating: lobby.you?.label, found: lobby.phase == .starting, theme: theme)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
             switch lobby.phase {
             case .searching(let waitingClock, let since):
                 OnlineSearchingBar(clock: waitingClock, since: since, theme: theme) {
@@ -318,5 +323,100 @@ struct OnlineFairPlayCard: View {
         .padding(14)
         .challengeGlass(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// Finding a game (O2 on the Tap Moments page): you, VS, and an empty seat where a gold ring
+/// turns until someone takes it. When a game is found the seat fills and VS flares.
+struct OnlineSeats: View {
+    let name: String
+    /// Your rating, once the lobby knows it.
+    let rating: String?
+    let found: Bool
+    let theme: BoardTheme
+
+    @State private var arrived = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private static let seat: CGFloat = 54
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 18) {
+            yourSeat
+            Text("VS")
+                .font(theme.challengeFont(13, .bold))
+                .foregroundStyle(theme.challengeAccent.opacity(found ? 1 : 0.45))
+                .scaleEffect(found && !reduceMotion ? 1.25 : 1)
+                .frame(height: Self.seat)
+            theirSeat
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
+        .animation(.spring(response: 0.42, dampingFraction: 0.62), value: found)
+        .onAppear {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) { arrived = true }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(found ? "Opponent found" : "Finding an opponent")
+    }
+
+    private var yourSeat: some View {
+        let shift: CGFloat = arrived || reduceMotion ? 0 : -40
+        return VStack(spacing: 6) {
+            ChallengeAvatar(name: name.isEmpty ? nil : name, theme: theme, size: Self.seat)
+            Text(rating.map { "You · \($0)" } ?? "You")
+                .font(theme.challengeFont(12, .semibold).monospacedDigit())
+                .lineLimit(1)
+        }
+        .offset(x: shift)
+        .opacity(arrived ? 1 : 0)
+    }
+
+    private var theirSeat: some View {
+        VStack(spacing: 6) {
+            ZStack {
+                if found {
+                    Circle()
+                        .fill(theme.challengeAccent)
+                        .overlay {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundStyle(Color.black.opacity(0.85))
+                        }
+                        .transition(.scale(scale: 0.3).combined(with: .opacity))
+                } else {
+                    Circle()
+                        .fill(Color.white.opacity(0.06))
+                        .overlay { Circle().strokeBorder(Color.white.opacity(0.14), lineWidth: 1) }
+                    Text("?")
+                        .font(theme.challengeFont(20, .semibold))
+                        .foregroundStyle(.secondary)
+                    OnlineSeekRing(color: theme.challengeAccent, still: reduceMotion)
+                }
+            }
+            .frame(width: Self.seat, height: Self.seat)
+            Text(found ? "Found" : "Finding…")
+                .font(theme.challengeFont(12, .semibold))
+                .foregroundStyle(found ? AnyShapeStyle(theme.challengeAccent) : AnyShapeStyle(HierarchicalShapeStyle.secondary))
+                .lineLimit(1)
+        }
+    }
+}
+
+/// A short gold arc turning round the empty seat.
+private struct OnlineSeekRing: View {
+    let color: Color
+    let still: Bool
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: nil, paused: still)) { context in
+            let seconds: Double = context.date.timeIntervalSinceReferenceDate
+            let turn: Double = still ? 0 : (seconds.truncatingRemainder(dividingBy: 1.1) / 1.1) * 360
+            Circle()
+                .trim(from: 0, to: 0.22)
+                .stroke(color, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                .rotationEffect(.degrees(turn))
+        }
+        .accessibilityHidden(true)
     }
 }

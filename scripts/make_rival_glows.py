@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Turns each rival's portrait (a glowing object on black) into a glow with no backdrop, for
+"""Turns each rival's portrait (light on black, from make_rival_portraits.py) into a glow with no backdrop, for
 Someone at the Table: the orb that floats over the home's board, and the Live Activity's orb.
 
 Brightness becomes coverage, so the glow lies over anything the way light does (much like a
@@ -19,7 +19,7 @@ ROOT = os.path.join(os.path.dirname(__file__), "..")
 SOURCE = os.path.join(ROOT, "ChessGameKiller", "Assets.xcassets", "Rivals")
 APP = SOURCE
 WIDGET = os.path.join(ROOT, "ChessGameKillerWidget", "Assets.xcassets", "Rivals")
-NAMES = ["spark", "drift", "pulse", "vector", "singularity"]
+NAMES = ["1000s", "1200s", "1600s", "2000s", "masters", "grudge"]
 
 
 def glow(name, size):

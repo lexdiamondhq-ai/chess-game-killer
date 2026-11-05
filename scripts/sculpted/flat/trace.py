@@ -1,6 +1,7 @@
-"""Traces the cburnett pieces into polygons for build.py: each piece's outline and its inner
-detail lines, in squares, image-up = +y (away from White). Reads 1024-px height maps of
-play/public/pieces/b?.svg (outline white, detail lines mid-grey) from GLYPH, writes glyphs.json:
+"""Traces the cburnett pieces into polygons: each piece's outline and its inner detail lines, in
+squares, image-up = +y (away from White). The Lock Screen's small board draws its pieces from them
+(LiveGamePieces/flat-*.svg). Reads 1024-px height maps of play/public/pieces/b?.svg (outline white,
+detail lines mid-grey) from GLYPH, writes glyphs.json:
 {kind: {"outline": [[exterior, holes...], ...], "details": [[exterior, holes...], ...]}}."""
 import json, sys, numpy as np
 from PIL import Image

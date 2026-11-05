@@ -209,7 +209,7 @@ struct HomePlayTileFace: View {
             .homePane(shape, tone: tone, weight: .well(lit: false))
             .contentShape(shape)
         }
-        .buttonStyle(HomePressStyle())
+        .buttonStyle(HomeLiftStyle(tone: tone, radius: HomeMetrics.tileRadius - 6))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(label)
         .accessibilityValue(line)
@@ -309,7 +309,8 @@ struct HomeDailyTile: View {
             .homePane(shape, tone: tone)
             .contentShape(shape)
         }
-        .buttonStyle(HomePressStyle())
+        .buttonStyle(HomeLiftStyle(tone: tone))
+        .homeZoomSource(.daily)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Today's Move")
         .accessibilityValue(spoken)
@@ -393,7 +394,8 @@ struct HomeCoachTile: View {
             .homePane(shape, tone: tone)
             .contentShape(shape)
         }
-        .buttonStyle(HomePressStyle())
+        .buttonStyle(HomeLiftStyle(tone: tone))
+        .homeZoomSource(.coach)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Train with \(Coach.current.name)")
         .accessibilityValue(line)
@@ -618,6 +620,7 @@ struct HomeCurrentStrip: View {
             .padding(8)
             .padding(.trailing, 8)
             .frame(minWidth: 148, alignment: .leading)
+            .modifier(HomeRowShare(count: games.count))
             .homePane(shape, tone: tone)
             .contentShape(shape)
         }
@@ -630,6 +633,20 @@ struct HomeCurrentStrip: View {
     /// The other player's name, without the "vs": "Maya", "Open challenge".
     static func name(_ game: HomeCurrentGame) -> String {
         game.title.hasPrefix("vs ") ? String(game.title.dropFirst(3)) : game.title
+    }
+}
+
+/// One or two current games share the row between them, so a lone game never leaves half
+/// the row empty. Three or more keep their own width and scroll.
+private struct HomeRowShare: ViewModifier {
+    let count: Int
+
+    func body(content: Content) -> some View {
+        if count <= 2 {
+            content.containerRelativeFrame(.horizontal, count: max(count, 1), spacing: 10, alignment: .leading)
+        } else {
+            content
+        }
     }
 }
 
@@ -721,7 +738,7 @@ struct HomeLadderTile: View {
                         }
                     }
                     .opacity(beaten || isNext || rung.played > 0 ? 1 : 0.72)
-                Text(rival.name)
+                Text(rival.shortName)
                     .font(.app(.caption, weight: .semibold))
                     .foregroundStyle(isNext ? tone.metal : tone.ink)
                     .lineLimit(1)
@@ -775,7 +792,9 @@ struct HomeRivalPortrait: View {
             // A little closer in, so the rival's shape fills the small circle.
             .scaleEffect(1.2)
             .grayscale(1)
-            .colorMultiply(tone.ivory)
+            // In Light and Middle the ivory is the room's dark ink, which would black the
+            // portrait out: the ring takes the room's own light instead.
+            .colorMultiply(tone.scheme == .dark ? tone.ivory : tone.canvas)
             .contrast(1.3)
             .clipShape(Circle())
             .overlay { Circle().strokeBorder(tone.ink.opacity(0.18), lineWidth: 0.5) }

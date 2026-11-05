@@ -40,7 +40,7 @@ final class OnTheLineTests: XCTestCase {
         // Pieces not on the line earn as usual.
         XCTAssertEqual(store.record(for: .aPawn).xp, 6)
         XCTAssertEqual(store.record(for: .ePawn).trophies, [MatchController.Level.beginner.rawValue])
-        XCTAssertTrue(news.contains { $0.slot == .ePawn && $0.kind == .wonStake(rival: "Spark") })
+        XCTAssertTrue(news.contains { $0.slot == .ePawn && $0.kind == .wonStake(rival: "The 1000s") })
         XCTAssertNil(store.captor(of: .ePawn))
     }
 
@@ -49,9 +49,9 @@ final class OnTheLineTests: XCTestCase {
         let news = store.record(ePawnTakes(), playerColor: .white, won: false, stakes: stakes(.club, .ePawn))
         XCTAssertEqual(store.captor(of: .ePawn), .club)
         XCTAssertEqual(store.prisoner(of: .club), .ePawn)
-        XCTAssertEqual(news.first?.kind, .captured(rival: "Pulse"), "The biggest news of the game")
+        XCTAssertEqual(news.first?.kind, .captured(rival: "The 1600s"), "The biggest news of the game")
         XCTAssertFalse(store.stakeable.contains(.ePawn))
-        // One prisoner per rival: nothing else goes on the line against Pulse until the rescue.
+        // One prisoner per rival: nothing else goes on the line against The 1600s until the rescue.
         XCTAssertFalse(store.canStake(.kingsKnight, against: .club))
         XCTAssertTrue(store.canStake(.kingsKnight, against: .expert))
         XCTAssertEqual(store.rescueNews(against: .club)?.slot, .ePawn)
@@ -63,12 +63,12 @@ final class OnTheLineTests: XCTestCase {
         XCTAssertEqual(store.record(for: .ePawn), held)
         XCTAssertEqual(store.captor(of: .ePawn), .club)
 
-        // Beating Pulse frees it, and it earns from that game.
+        // Beating The 1600s frees it, and it earns from that game.
         let rescue = store.record(ePawnTakes(), playerColor: .white, won: true, stakes: stakes(.club, nil))
         XCTAssertNil(store.captor(of: .ePawn))
         XCTAssertEqual(store.record(for: .ePawn).escapes, 1)
         XCTAssertGreaterThan(store.record(for: .ePawn).xp, held.xp)
-        XCTAssertTrue(rescue.contains { $0.slot == .ePawn && $0.kind == .rescued(rival: "Pulse") })
+        XCTAssertTrue(rescue.contains { $0.slot == .ePawn && $0.kind == .rescued(rival: "The 1600s") })
         XCTAssertTrue(store.canStake(.kingsKnight, against: .club))
     }
 
@@ -126,8 +126,8 @@ final class OnTheLineTests: XCTestCase {
         let store = named(.ePawn)
         let staked = store.stakeNews(.ePawn, against: .club)
         XCTAssertEqual(staked.label, "ON THE LINE")
-        XCTAssertEqual(staked.headline, "Piece0 is on the line against Pulse.")
-        XCTAssertEqual(ArmyNews(slot: .ePawn, rank: .veteran, name: "Kestrel", kind: .captured(rival: "Pulse")).headline,
-                       "Pulse is holding Kestrel. Beat Pulse to get it back.")
+        XCTAssertEqual(staked.headline, "Piece0 is on the line against the 1600s.")
+        XCTAssertEqual(ArmyNews(slot: .ePawn, rank: .veteran, name: "Kestrel", kind: .captured(rival: "The 1600s")).headline,
+                       "The 1600s are holding Kestrel. Beat the 1600s to get it back.")
     }
 }

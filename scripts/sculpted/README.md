@@ -45,8 +45,12 @@ repository root with Blender's Python module (`pip install bpy==5.2.2 numpy scip
    `python scripts/sculpted/frame.py build/sculpted/out/board-art.png build/sculpted/out/board-sculpted.jpg`
    puts the baked squares in a clean lacquer frame (copy to `Assets.xcassets/Boards/board-sculpted.imageset`).
 
-7. The flat view's pieces (the board seen from above): `flat/build.py` builds the Icon set
-   (`Sculpted/flat-icon.dataset`) and `flat/preview.py` shows a set under the app's light first.
+7. The flat view's pieces (the board seen from above) are glass tiles shown as pictures, since SceneKit can't
+   draw that glass: `flat/glass.py -- <out dir>` renders each tile alone in the concept render's glass and light,
+   from the flat view's 80 degrees without perspective, 512 px across, its top and the sliver of near side the
+   view sees (copy to `Assets.xcassets/Crystal/glass-*.imageset`). The pieces come from the masks in
+   `flat/crystal-masks`. `flat/trace.py` traces the familiar pieces' outlines and inner lines into
+   `flat/glyphs.json`, which the Lock Screen's small board draws its pieces from (`LiveGamePieces/flat-*.svg`).
 
 `pieces.py` holds the turned pieces (lathe profiles, flutes, booleans), `gilded.py` the gilded set
 (stepped bases, gold bands and crowns, the striped-mane knight), `board.py` the marble, frame and inlay.

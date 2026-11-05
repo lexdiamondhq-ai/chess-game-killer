@@ -173,23 +173,30 @@ final class SculptedBoardTests: XCTestCase {
         }
     }
 
-    /// The flat set has all six pieces in both colors, each with its stone and its metal foot.
-    func testTheFlatSetHasAllSixPieces() throws {
+    /// The flat set has all six pieces in both colors, each a tile with its picture on top.
+    func testTheFlatSetHasAllSixPieces() {
         for color in [Piece.Color.white, .black] {
             for kind in [Piece.Kind.king, .queen, .rook, .bishop, .knight, .pawn] {
-                let node = try XCTUnwrap(SculptedFlatSet.makePiece(kind, color: color, look: .gilded), "\(color) \(kind)")
-                XCTAssertGreaterThanOrEqual(node.childNodes.count, 2, "\(color) \(kind)")
+                let node = SculptedFlatSet.makePiece(kind, color: color, look: .gilded)
+                XCTAssertEqual(node.childNodes.count, 2, "\(color) \(kind)")
                 XCTAssertTrue(node.childNodes.allSatisfy { $0.geometry != nil }, "\(color) \(kind)")
             }
         }
     }
 
-    /// Every flat piece has its lines drawn on top, the pawn too: without a collar under its head
-    /// and a band round its base it read as a plain blob next to the others.
-    func testEveryFlatPieceHasItsLines() throws {
-        let meshes = try XCTUnwrap(SculptedAssets.loadMeshes(named: SculptedFlatSet.assetName))
-        for kind in Piece.Kind.allCases {
-            XCTAssertTrue(meshes[kind]?.contains { $0.finish == .gem } ?? false, "the flat \(kind) has no lines")
+    /// Every tile has its picture, as wide as the tile and as tall as the flat view sees it, and
+    /// reaches no further than its own square.
+    func testEveryGlassTileHasItsPicture() throws {
+        let elevation = CGFloat(SculptedCamera.Framing.seated.elevation)
+        for color in [Piece.Color.white, .black] {
+            for kind in [Piece.Kind.king, .queen, .rook, .bishop, .knight, .pawn] {
+                let name = SculptedFlatSet.pictureName(kind, color: color)
+                let picture = try XCTUnwrap(UIImage(named: name), "\(name) is missing")
+                let (width, height) = SculptedFlatSet.size(of: kind)
+                let seen = width * sin(elevation) + height * cos(elevation)
+                XCTAssertEqual(picture.size.height / picture.size.width, seen / width, accuracy: 0.005, name)
+                XCTAssertLessThan(width / 2 + SculptedFlatSet.reach(of: kind), 0.5, "\(name) reaches out of its square")
+            }
         }
     }
 
@@ -320,9 +327,11 @@ final class SculptedBoardTests: XCTestCase {
         XCTAssertEqual(scene.square(at: e2), .e2)
         let kingsChest = scene.camera.screenPoint(SculptedCamera.position(of: .e1) + SIMD3(0, 0.6, 0), in: size)
         XCTAssertEqual(scene.square(at: kingsChest), .e1)
-        // With nothing picked up, the king hides the middle of e2.
+        // With nothing picked up, the king hides the near part of e2 (seen from above the board's
+        // near half, as the camera tips higher, it no longer hides e2's middle).
+        let nearE2 = scene.camera.screenPoint(SculptedCamera.position(of: .e2) + SIMD3(0, 0, 0.4), in: size)
         scene.apply(SculptedBoardState(pieces: pieces), animated: false)
-        XCTAssertEqual(scene.square(at: e2), .e1)
+        XCTAssertEqual(scene.square(at: nearE2), .e1)
         window.isHidden = true
     }
 

@@ -54,6 +54,8 @@ targets:
     settings:
       base:
         ENABLE_USER_SCRIPT_SANDBOXING: NO
+        # Satin gold, the Home's metal, for anything the system tints (alerts, menus, links).
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         PRODUCT_BUNDLE_IDENTIFIER: com.chessgamekiller.app
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"

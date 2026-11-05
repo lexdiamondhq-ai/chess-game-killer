@@ -30,8 +30,10 @@ struct RewindGamesView: View {
                 LazyVStack(spacing: 12) {
                     if vault.games.isEmpty {
                         empty
+                            .homeRise(0)
                     } else {
                         week
+                            .homeRise(0)
                         ForEach(vault.games) { game in
                             NavigationLink(value: game.id) {
                                 GameCard(game: game, theme: theme)
@@ -142,7 +144,7 @@ private struct GameCard: View {
     let game: SavedGame
     let theme: BoardTheme
 
-    private var rival: Rival? { game.level.flatMap(MatchController.Level.init(rawValue:))?.rival }
+    private var rival: Rival? { Rival.of(saved: game) }
 
     private var resultColor: Color {
         switch game.result {
