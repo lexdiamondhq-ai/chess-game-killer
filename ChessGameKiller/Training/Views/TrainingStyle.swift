@@ -1,12 +1,68 @@
 import ChessKit
 import SwiftUI
 
-// Shared look for the training screens, drawn in the board theme's style:
+// Shared look for the screens around the board (training, puzzles, Today's Move and the
+// sheets): the home's own room, glass and buttons, in the Light, Middle or Dark the reader
+// picked for the home. On the older home they keep the board theme's style instead:
 // paper and soft shadows on light boards, glass and glow on dark ones.
+
+extension HomeTone {
+    /// The home's colors for a screen around a board drawn in `theme`, or nil on the older
+    /// home, where the screens keep the board's own room.
+    static func screen(for theme: BoardTheme, sheet: Bool, mode: HomeToneMode) -> HomeTone? {
+        guard sheet else { return nil }
+        return .of(theme.sculptedLook ?? .gilded, mode: mode)
+    }
+}
+
+extension BoardTheme {
+    /// The home's colors on the screens around this board (see `HomeTone.screen`), as saved.
+    var screenTone: HomeTone? {
+        let defaults = UserDefaults.standard
+        let mode = defaults.string(forKey: HomeToneMode.key).flatMap(HomeToneMode.init(rawValue:)) ?? .defaultMode
+        return HomeTone.screen(for: self, sheet: HomeLayout.usesSheet(defaults), mode: mode)
+    }
+
+    /// Whether the page around the board is dark: the home's tone, or the board's own room.
+    /// The board itself still goes by `isDark`.
+    var screenIsDark: Bool { screenTone.map { $0.scheme == .dark } ?? isDark }
+
+    /// The frame's letters and numbers: the look's own pale ink, or a dark one where the frame's
+    /// clear glass sits on a light page and the pale ink would be lost.
+    func frameLabel(on scheme: ColorScheme) -> Color {
+        isDark && scheme == .light ? Color.black.opacity(0.5) : labelOnDark
+    }
+}
+
+/// Puts a screen in the home's colors: its light or dark, and the pieces' metal for links and
+/// controls. Follows the home's setting as it changes.
+private struct ScreenScheme: ViewModifier {
+    let theme: BoardTheme
+    @AppStorage(HomeLayout.key) private var sheet = HomeLayout.defaultOn
+    @AppStorage(HomeToneMode.key) private var mode = HomeToneMode.defaultMode
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if let tone = HomeTone.screen(for: theme, sheet: sheet, mode: mode) {
+            content
+                .preferredColorScheme(tone.scheme)
+                .tint(tone.metal)
+        } else {
+            content.screenScheme(theme)
+        }
+    }
+}
+
+extension View {
+    /// The screen's light or dark: the home's, or the board's on the older home.
+    func screenScheme(_ theme: BoardTheme) -> some View {
+        modifier(ScreenScheme(theme: theme))
+    }
+}
 
 extension TrainingColor {
     func color(on theme: BoardTheme) -> Color {
-        if theme.isDark {
+        if theme.screenIsDark {
             switch self {
             case .red: return Color(hex: 0xFF4D6D)
             case .yellow: return Color(hex: 0xF7D046)
@@ -32,8 +88,8 @@ extension TrainingColor {
 }
 
 extension BoardTheme {
-    /// The training screens' main color.
-    var trainingAccent: Color { accent ?? .accentColor }
+    /// The training screens' main color: the home's metal, or the board's own accent.
+    var trainingAccent: Color { screenTone?.metal ?? accent ?? .accentColor }
 
     func trainingTone(_ tone: LessonPlayer.Tone) -> Color {
         switch tone {
@@ -54,26 +110,43 @@ extension BoardTheme {
     }
 }
 
-/// The screen behind the training views: the same backdrop as the game screen.
+/// The room behind the training views: the home's, or on the older home the game screen's.
 struct TrainingBackdrop: View {
     let theme: BoardTheme
+    @AppStorage(HomeLayout.key) private var sheet = HomeLayout.defaultOn
+    @AppStorage(HomeToneMode.key) private var mode = HomeToneMode.defaultMode
 
     var body: some View {
-        ThemeBackdrop(theme: theme)
+        if let tone = HomeTone.screen(for: theme, sheet: sheet, mode: mode) {
+            HomeBackdrop(tone: tone)
+        } else {
+            ThemeBackdrop(theme: theme)
+        }
     }
 }
 
-/// A rounded card: the app's shared glass on the dark boards (see GlassPane), paper with a
-/// soft shadow on light ones. Neon keeps its colored edge and halo.
+/// A rounded card: the home's glass, with a fine edge in the tint when there is one. On the
+/// older home, the app's shared glass on the dark boards (see GlassPane), paper with a soft
+/// shadow on light ones, and Neon keeps its colored edge and halo.
 struct TrainingCard: ViewModifier {
     let theme: BoardTheme
     var tint: Color?
     var cornerRadius: CGFloat = 22
+    @AppStorage(HomeLayout.key) private var sheet = HomeLayout.defaultOn
+    @AppStorage(HomeToneMode.key) private var mode = HomeToneMode.defaultMode
 
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         let edge = tint ?? theme.trainingAccent
-        if theme.isDark, !theme.glows {
+        if let tone = HomeTone.screen(for: theme, sheet: sheet, mode: mode) {
+            content
+                .homePane(shape, tone: tone)
+                .overlay {
+                    if let tint {
+                        shape.strokeBorder(tint.opacity(0.55), lineWidth: 1).allowsHitTesting(false)
+                    }
+                }
+        } else if theme.isDark, !theme.glows {
             content.glassPane(shape, tint: tint)
         } else {
             content.background {
@@ -109,16 +182,67 @@ extension View {
     }
 }
 
-/// A big rounded button in the board's accent: solid on the executive looks, Neon's
-/// glowing gradient on Neon.
+/// A big rounded button: the home's ivory button, or its clear glass one when not prominent
+/// (a tint fills it instead, for an answer's color). On the older home, the board's accent:
+/// solid on the executive looks, Neon's glowing gradient on Neon.
 struct TrainingButtonStyle: ButtonStyle {
     let theme: BoardTheme
     var prominent = true
     var tint: Color?
 
     func makeBody(configuration: Configuration) -> some View {
-        let color = tint ?? theme.trainingAccent
+        TrainingButton(theme: theme, prominent: prominent, tint: tint, configuration: configuration)
+    }
+}
+
+private struct TrainingButton: View {
+    let theme: BoardTheme
+    let prominent: Bool
+    let tint: Color?
+    let configuration: ButtonStyleConfiguration
+    @AppStorage(HomeLayout.key) private var sheet = HomeLayout.defaultOn
+    @AppStorage(HomeToneMode.key) private var mode = HomeToneMode.defaultMode
+
+    var body: some View {
+        if let tone = HomeTone.screen(for: theme, sheet: sheet, mode: mode) {
+            homeButton(tone)
+        } else {
+            boardButton
+        }
+    }
+
+    private func homeButton(_ tone: HomeTone) -> some View {
         configuration.label
+            .font(.app(.headline))
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .padding(.horizontal, 12)
+            // A quiet button keeps the page's ink: a tint (a hint's yellow) only colors its edge
+            // and fill, since a pale tint would be lost as text on a light page.
+            .foregroundStyle(prominent ? (tint == nil ? tone.onIvory : (tone.scheme == .dark ? Color.black : Color.white))
+                             : tone.ink)
+            .background {
+                if prominent, let tint {
+                    Capsule().fill(tint)
+                } else if prominent {
+                    HomeIvoryFill(tone: tone)
+                } else {
+                    Capsule()
+                        .fill((tint ?? tone.ink).opacity(configuration.isPressed ? 0.2 : (tint == nil ? 0.08 : 0.16)))
+                        .overlay { Capsule().strokeBorder((tint ?? tone.ink).opacity(tint == nil ? 0.18 : 0.5), lineWidth: 0.75) }
+                }
+            }
+            .contentShape(Capsule())
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .opacity(configuration.isPressed ? 0.9 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.8), value: configuration.isPressed)
+    }
+
+    private var boardButton: some View {
+        let color = tint ?? theme.trainingAccent
+        return configuration.label
             .font(.app(.headline))
             .lineLimit(1)
             .minimumScaleFactor(0.8)
@@ -159,13 +283,15 @@ struct CoachAvatar: View {
     /// Whose portrait: the picked coach unless one is named (the picker shows both).
     var coach: Coach?
 
+    @Environment(\.colorScheme) private var colorScheme
+
     /// Leo's ring when he isn't reacting: Neon's glass gradient, or the board's own
-    /// accent (gold on Fabergé, amber on Blueprint).
+    /// accent (gold on Fabergé, amber on Blueprint), the page's metal on a light page.
     private var restingRing: [Color] {
         if theme.id == .neon {
             return [Color(hex: 0x19C6CF), Color(hex: 0x9B4BEA), Color(hex: 0xE04BC4), Color(hex: 0x19C6CF)]
         }
-        let accent = theme.trainingAccent
+        let accent = colorScheme == .dark ? (theme.accent ?? theme.trainingAccent) : theme.trainingAccent
         return [accent, accent.opacity(0.55), accent]
     }
 

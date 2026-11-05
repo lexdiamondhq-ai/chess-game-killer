@@ -62,15 +62,15 @@ struct RewindView: View {
 
     var body: some View {
         ZStack {
-            ThemeBackdrop(theme: theme).ignoresSafeArea()
+            TrainingBackdrop(theme: theme).ignoresSafeArea()
             GeometryReader { geo in
-                let side = min(geo.size.width - 24, geo.size.height * 0.46, 620)
+                let side = min(geo.size.width - TrainingBoardView.sideRoom, geo.size.height * 0.46, 620)
                 VStack(spacing: 0) {
                     header
                     board
                         .frame(width: side, height: side)
                         .padding(.top, 8)
-                    Lifeline(game: game, ply: $ply, ghost: ghostBranch, dotFill: theme.isDark ? Color(hex: 0x101114) : .white) { moment in
+                    Lifeline(game: game, ply: $ply, ghost: ghostBranch, dotFill: theme.screenIsDark ? Color(hex: 0x101114) : .white) { moment in
                         jump(to: moment)
                     }
                     .frame(height: explorer == nil ? 78 : 56)
@@ -86,7 +86,7 @@ struct RewindView: View {
                 .frame(width: geo.size.width)
             }
         }
-        .preferredColorScheme(theme.isDark ? .dark : nil)
+        .screenScheme(theme)
         .tint(accent)
         .onChange(of: ply) { _, now in
             if now != ghostAnchor { stopGhost() }
@@ -535,9 +535,9 @@ private struct SecondChanceSheet: View {
 
     var body: some View {
         ZStack {
-            ThemeBackdrop(theme: theme).ignoresSafeArea()
+            TrainingBackdrop(theme: theme).ignoresSafeArea()
             GeometryReader { geo in
-                let side = min(geo.size.width - 32, geo.size.height * 0.56, 600)
+                let side = min(geo.size.width - TrainingBoardView.sideRoom, geo.size.height * 0.56, 600)
                 ScrollView {
                     VStack(spacing: 12) {
                         HStack {
@@ -568,7 +568,7 @@ private struct SecondChanceSheet: View {
                 }
             }
         }
-        .preferredColorScheme(theme.isDark ? .dark : nil)
+        .screenScheme(theme)
         .tint(theme.trainingAccent)
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: solved)
         .sensoryFeedback(.success, trigger: solved) { _, now in now }

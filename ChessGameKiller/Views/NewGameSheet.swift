@@ -137,7 +137,7 @@ struct NewGameSheet: View {
         return MatchController.Setup(playerColor: side.color, level: level, timeControl: clock)
     }
 
-    private var accent: Color { theme.accent ?? .accentColor }
+    private var accent: Color { theme.trainingAccent }
 
     /// The Grudge, when it is picked and exists.
     private var grudgeRecord: GrudgeRecord? {
@@ -237,15 +237,9 @@ struct NewGameSheet: View {
                     if forfeits == nil { play() } else { confirmingForfeit = true }
                 } label: {
                     Label(playTitle, systemImage: "play.fill")
-                        .font(.app(.headline))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 2)
                 }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.capsule)
-                .controlSize(.large)
-                .tint(accent)
-                .foregroundStyle(theme.isDark ? Color.black : Color.white)
+                .buttonStyle(TrainingButtonStyle(theme: theme))
                 .padding(.horizontal, 20)
                 .padding(.bottom, 8)
                 .shadow(color: theme.glows ? accent.opacity(0.6) : .clear, radius: 14)
@@ -269,10 +263,10 @@ struct NewGameSheet: View {
         }
         .presentationDetents([.large])
         .presentationBackground {
-            ThemeBackdrop(theme: theme)
+            TrainingBackdrop(theme: theme)
         }
         .tint(accent)
-        .preferredColorScheme(theme.isDark ? .dark : nil)
+        .screenScheme(theme)
     }
 
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
@@ -351,9 +345,9 @@ struct NewGameSheet: View {
         .background {
             let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
             shape
-                .fill(theme.isDark ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)))
-                .overlay { shape.strokeBorder(Color.primary.opacity(theme.isDark ? 0.12 : 0.08), lineWidth: 1) }
-                .shadow(color: .black.opacity(theme.isDark ? 0.3 : 0.08), radius: 16, y: 6)
+                .fill(theme.screenIsDark ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)))
+                .overlay { shape.strokeBorder(Color.primary.opacity(theme.screenIsDark ? 0.12 : 0.08), lineWidth: 1) }
+                .shadow(color: .black.opacity(theme.screenIsDark ? 0.3 : 0.08), radius: 16, y: 6)
         }
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
@@ -378,7 +372,7 @@ struct NewGameSheet: View {
 
     private var rowDivider: some View {
         Rectangle()
-            .fill(Color.primary.opacity(theme.isDark ? 0.08 : 0.06))
+            .fill(Color.primary.opacity(theme.screenIsDark ? 0.08 : 0.06))
             .frame(height: 1)
             .padding(.leading, 58)
     }
@@ -650,9 +644,9 @@ struct NewGameSheet: View {
     private func card(selected: Bool, color: Color, glow: Color?) -> some View {
         let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
         return shape
-            .fill(selected ? color.opacity(0.1) : Color.primary.opacity(theme.isDark ? 0.05 : 0.03))
+            .fill(selected ? color.opacity(0.1) : Color.primary.opacity(theme.screenIsDark ? 0.05 : 0.03))
             .overlay {
-                shape.strokeBorder(selected ? color : Color.primary.opacity(theme.isDark ? 0.12 : 0.08),
+                shape.strokeBorder(selected ? color : Color.primary.opacity(theme.screenIsDark ? 0.12 : 0.08),
                                    lineWidth: selected ? 1.5 : 1)
             }
             .shadow(color: selected ? (glow ?? color).opacity(theme.glows ? 0.45 : 0.25) : .clear, radius: 12)
@@ -717,9 +711,9 @@ private struct RivalCard: View {
         .background {
             let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
             shape
-                .fill(theme.isDark ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)))
+                .fill(theme.screenIsDark ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)))
                 .overlay {
-                    shape.strokeBorder(isSelected ? rival.hue : Color.primary.opacity(theme.isDark ? 0.12 : 0.08),
+                    shape.strokeBorder(isSelected ? rival.hue : Color.primary.opacity(theme.screenIsDark ? 0.12 : 0.08),
                                        lineWidth: isSelected ? 1.5 : 1)
                 }
                 .shadow(color: isSelected ? rival.hue.opacity(theme.glows ? 0.4 : 0.25) : .clear, radius: 16)
@@ -742,7 +736,7 @@ private struct MatchRowButton<Icon: View>: View {
     @ViewBuilder let icon: () -> Icon
     let action: () -> Void
 
-    private var accent: Color { theme.accent ?? .accentColor }
+    private var accent: Color { theme.trainingAccent }
 
     var body: some View {
         Button(action: action) {
@@ -776,7 +770,7 @@ private struct MatchRowButton<Icon: View>: View {
             .padding(.leading, 12)
             .padding(.trailing, 14)
             .frame(minHeight: 60)
-            .background(isOpen ? Color.primary.opacity(theme.isDark ? 0.04 : 0.03) : .clear)
+            .background(isOpen ? Color.primary.opacity(theme.screenIsDark ? 0.04 : 0.03) : .clear)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -794,7 +788,7 @@ private struct OptionRow: View {
     let theme: BoardTheme
     let action: () -> Void
 
-    private var accent: Color { theme.accent ?? .accentColor }
+    private var accent: Color { theme.trainingAccent }
 
     var body: some View {
         Button(action: action) {
@@ -820,7 +814,7 @@ private struct OptionRow: View {
                         .overlay {
                             Image(systemName: "checkmark")
                                 .font(.system(size: 11, weight: .heavy))
-                                .foregroundStyle(theme.isDark ? Color.black : Color.white)
+                                .foregroundStyle(theme.screenIsDark ? Color.black : Color.white)
                         }
                         .scaleEffect(isOn ? 1 : 0.4)
                         .opacity(isOn ? 1 : 0)

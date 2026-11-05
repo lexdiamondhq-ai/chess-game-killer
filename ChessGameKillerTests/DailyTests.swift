@@ -323,6 +323,7 @@ final class DailyTests: XCTestCase {
         XCTAssertEqual(DailyTally(players: 1284, found: 796).percentFound, 62)
         XCTAssertTrue(DailyTally(players: 1284, found: 796).line.hasPrefix("62% of 1"))
         XCTAssertEqual(DailyTally(players: 8, found: 3).line, "You're one of the first 8 players to try it today.")
+        XCTAssertEqual(DailyTally(players: 1, found: 0).line, "You're the first to try it today.")
         XCTAssertEqual(DailyTally(players: 0, found: 0).line, "You're the first to try it today.")
     }
 

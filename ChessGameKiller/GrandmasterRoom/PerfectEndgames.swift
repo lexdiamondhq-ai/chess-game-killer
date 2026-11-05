@@ -62,7 +62,7 @@ struct EndgameView: View {
     /// The board gets what the header, goal line, Leo's card (up to five lines on a small
     /// phone), buttons and judge line leave.
     private func boardSide(in size: CGSize) -> CGFloat {
-        max(200, min(size.width - 24, size.height - 340))
+        max(200, min(size.width - TrainingBoardView.sideRoom, size.height - 340))
     }
 
     private var subtitle: String {

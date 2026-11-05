@@ -94,7 +94,7 @@ struct GameCoachRow: View {
         .padding(.top, 10)
         .overlay(alignment: .top) {
             Rectangle()
-                .fill(Color.secondary.opacity(theme.isDark ? 0.25 : 0.15))
+                .fill(Color.secondary.opacity(theme.screenIsDark ? 0.25 : 0.15))
                 .frame(height: 0.5)
         }
         .accessibilityElement(children: .contain)
@@ -108,9 +108,9 @@ struct GameCoachRow: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .foregroundStyle(accent)
-                .background(accent.opacity(theme.isDark ? 0.16 : 0.12), in: Capsule())
+                .background(accent.opacity(theme.screenIsDark ? 0.16 : 0.12), in: Capsule())
                 .overlay {
-                    if theme.isDark {
+                    if theme.screenIsDark {
                         Capsule().strokeBorder(accent.opacity(0.4), lineWidth: 1)
                     }
                 }
@@ -144,7 +144,7 @@ struct ThinkActionButton: View {
             VStack(spacing: 5) {
                 TrafficLightDots(theme: theme, size: 7)
                     .frame(width: 44, height: 44)
-                    .background(Color.primary.opacity(theme.isDark ? 0.07 : 0.05), in: Circle())
+                    .background(Color.primary.opacity(theme.screenIsDark ? 0.07 : 0.05), in: Circle())
                     .overlay(Circle().strokeBorder(Color.primary.opacity(0.11), lineWidth: 1))
                 Text("Think")
                     .font(.app(.caption2, weight: .semibold))
@@ -217,7 +217,7 @@ struct ThinkWithMeSheet: View {
             TrainingBackdrop(theme: theme)
         }
         .tint(theme.trainingAccent)
-        .preferredColorScheme(theme.isDark ? .dark : nil)
+        .screenScheme(theme)
     }
 
     private func light(_ color: TrainingColor, title: String, lines: [String]) -> some View {

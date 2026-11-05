@@ -16,6 +16,7 @@ struct TrainingBoardView: View {
 
     @AppStorage("haptics") private var hapticsOn = true
     @AppStorage(BoardTheme.coordinatesKey) private var showsCoordinates = true
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         GeometryReader { geo in
@@ -49,7 +50,7 @@ struct TrainingBoardView: View {
                 .frame(width: sq * 8, height: sq * 8)
                 .padding(inset)
                 if theme.boardArt != nil, showsCoordinates {
-                    FrameCoordinates(flipped: flipped, inset: inset, squareSize: sq, color: theme.labelOnDark)
+                    FrameCoordinates(flipped: flipped, inset: inset, squareSize: sq, color: theme.frameLabel(on: colorScheme))
                 }
             }
             .frame(width: side, height: side)
@@ -400,6 +401,9 @@ struct CoachArrow: View {
 }
 
 extension TrainingBoardView {
+    /// What a screen keeps beside its board, both sides together: nearly edge to edge, as on the game.
+    static let sideRoom: CGFloat = 16
+
     /// How far the tallest piece (a king on the far rank, picked up) rises above a board `side`
     /// points wide, past its frame: a king's cross stands out above the board, most with the thin rim, and a
     /// scroll view right above the board would cut it off.

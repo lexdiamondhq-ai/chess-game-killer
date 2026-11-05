@@ -151,7 +151,7 @@ final class TrainSnapshotTests: XCTestCase {
         func environment(_ view: some View) -> some View {
             view
                 .tint(theme.trainingAccent)
-                .preferredColorScheme(.dark)
+                .screenScheme(theme)
                 .environment(sample.training)
                 .environment(puzzles)
                 .environment(vault)
@@ -314,7 +314,7 @@ struct TrainSample {
             }
         }
         .tint(theme.trainingAccent)
-        .preferredColorScheme(.dark)
+        .screenScheme(theme)
         .environment(training)
         .environment(puzzles)
         .environment(vault)

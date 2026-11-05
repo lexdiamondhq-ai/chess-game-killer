@@ -44,7 +44,7 @@ struct PuzzlesView: View {
         ZStack {
             TrainingBackdrop(theme: theme)
             GeometryReader { geo in
-                let boardSide = max(200, min(geo.size.width - 32, geo.size.height * 0.56))
+                let boardSide = max(200, min(geo.size.width - TrainingBoardView.sideRoom, geo.size.height * 0.56))
                 VStack(spacing: 12) {
                     header
                     if store.library == nil {
@@ -93,7 +93,7 @@ struct PuzzlesView: View {
                 .frame(width: geo.size.width)
             }
         }
-        .preferredColorScheme(theme.isDark ? .dark : nil)
+        .screenScheme(theme)
         .tint(theme.trainingAccent)
         .animation(.snappy, value: runner?.isDone)
         .animation(.snappy, value: mode)
@@ -478,7 +478,7 @@ private struct ThemePicker: View {
             .navigationBarTitleDisplayMode(.inline)
         }
         .tint(theme.trainingAccent)
-        .preferredColorScheme(theme.isDark ? .dark : nil)
+        .screenScheme(theme)
         .task {
             guard let library, counts.isEmpty else { return }
             var found: [String: Int] = [:]

@@ -34,10 +34,8 @@ struct DailyMoveView: View {
         ZStack {
             TrainingBackdrop(theme: theme)
             GeometryReader { geo in
-                let boardSide = max(200, min(geo.size.width - 32, geo.size.height * 0.52))
-                VStack(spacing: 12) {
-                    header
-                    ScrollView {
+                let boardSide = max(200, min(geo.size.width - TrainingBoardView.sideRoom, geo.size.height * 0.52))
+                ScrollView {
                         VStack(spacing: 14) {
                             if let runner {
                                 DrillView(runner: runner, theme: theme, boardSide: boardSide)
@@ -54,14 +52,21 @@ struct DailyMoveView: View {
                                     .transition(.move(edge: .bottom).combined(with: .opacity))
                             }
                         }
+                        .padding(.top, 12)
                         .padding(.bottom, 24)
                     }
                     .scrollBounceBehavior(.basedOnSize)
-                }
-                .frame(width: geo.size.width)
+                    // The title stays over the page, and the board fades out under it as the
+                    // result scrolls up, as the home's top edge does.
+                    .safeAreaInset(edge: .top, spacing: 0) {
+                        header
+                            .padding(.bottom, 10)
+                            .background(alignment: .top) { topFade }
+                    }
+                    .frame(width: geo.size.width)
             }
         }
-        .preferredColorScheme(theme.isDark ? .dark : nil)
+        .screenScheme(theme)
         .tint(theme.trainingAccent)
         .animation(.snappy, value: outcome)
         .task { start() }
@@ -73,6 +78,18 @@ struct DailyMoveView: View {
     }
 
     // MARK: Pieces of the screen
+
+    /// The room's own color behind the title, fading out below it.
+    private var topFade: some View {
+        let room = theme.screenTone?.canvas ?? Color(.systemBackground)
+        return LinearGradient(stops: [.init(color: room, location: 0),
+                                      .init(color: room.opacity(0.97), location: 0.72),
+                                      .init(color: room.opacity(0), location: 1)],
+                              startPoint: .top, endPoint: .bottom)
+            .padding(.bottom, -18)
+            .ignoresSafeArea(edges: .top)
+            .allowsHitTesting(false)
+    }
 
     private var header: some View {
         HStack(spacing: 12) {
@@ -176,12 +193,12 @@ struct DailyMoveView: View {
                     .padding(.vertical, 4)
             }
             if let mark = daily.markToday {
-                Label("\(mark.piece) now carries your \(mark.days)-day mark, for good.", systemImage: "seal.fill")
+                Label("\(mark.piece) now carries your \(mark.days)\u{2011}day mark, for good.", systemImage: "seal.fill")
                     .font(.app(.subheadline))
                     .foregroundStyle(theme.trainingAccent)
             } else if let next = daily.nextMilestone {
-                Text(next.toGo == 1 ? "Tomorrow earns a piece your \(next.days)-day mark."
-                     : "\(next.toGo) more days and a piece earns your \(next.days)-day mark.")
+                Text(next.toGo == 1 ? "Tomorrow earns a piece your \(next.days)\u{2011}day mark."
+                     : "\(next.toGo) more days and a piece earns your \(next.days)\u{2011}day mark.")
                     .font(.app(.subheadline))
                     .foregroundStyle(.secondary)
             }

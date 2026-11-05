@@ -39,7 +39,7 @@ struct PuzzleCyclesView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .preferredColorScheme(theme.isDark ? .dark : nil)
+        .screenScheme(theme)
         .tint(theme.trainingAccent)
         .animation(.snappy, value: runner == nil)
         .animation(.snappy, value: choosingSet)
@@ -107,7 +107,7 @@ struct PuzzleCyclesView: View {
 
     private func playing(_ runner: DrillRunner, _ puzzle: LichessPuzzle) -> some View {
         GeometryReader { geo in
-            let side = max(200, min(geo.size.width - 32, geo.size.height - 270, 560))
+            let side = max(200, min(geo.size.width - TrainingBoardView.sideRoom, geo.size.height - 270, 560))
             ScrollView {
                 VStack(spacing: 14) {
                     if let set = store.cycleSet, let run = set.currentRun {

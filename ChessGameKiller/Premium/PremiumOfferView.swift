@@ -13,11 +13,13 @@ struct PremiumOfferView: View {
     private var premium: Premium { .shared }
 
     private var theme: BoardTheme { .named(themeID) }
-    private var accent: Color { theme.accent ?? PremiumStyle.gold }
+    /// The home's metal on its pages, or the board's own gold.
+    private var accent: Color { theme.screenTone?.metal ?? theme.accent ?? PremiumStyle.gold }
+    private var onAccent: Color { theme.screenIsDark ? .black : .white }
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            ThemeBackdrop(theme: theme).ignoresSafeArea()
+            TrainingBackdrop(theme: theme).ignoresSafeArea()
             ScrollView {
                 VStack(spacing: 22) {
                     PremiumOfferHeader(accent: accent)
@@ -39,7 +41,7 @@ struct PremiumOfferView: View {
             .scrollBounceBehavior(.basedOnSize)
             closeButton
         }
-        .preferredColorScheme(theme.isDark ? .dark : nil)
+        .screenScheme(theme)
         .tint(accent)
         .task {
             premium.start()
@@ -86,10 +88,10 @@ struct PremiumOfferView: View {
             } label: {
                 ZStack {
                     Text(title).opacity(busy ? 0 : 1)
-                    if busy { ProgressView().tint(.black) }
+                    if busy { ProgressView().tint(onAccent) }
                 }
                 .font(.app(.headline))
-                .foregroundStyle(Color.black)
+                .foregroundStyle(onAccent)
                 .frame(maxWidth: .infinity)
                 .frame(height: 54)
                 .background(accent, in: RoundedRectangle(cornerRadius: 16, style: .continuous))

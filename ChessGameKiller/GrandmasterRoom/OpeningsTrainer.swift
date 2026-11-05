@@ -386,7 +386,7 @@ struct OpeningLineView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let boardSide: CGFloat = max(200, min(geo.size.width - 24, geo.size.height * 0.56))
+            let boardSide: CGFloat = max(200, min(geo.size.width - TrainingBoardView.sideRoom, geo.size.height * 0.56))
             ScrollView {
             VStack(spacing: 12) {
                 Picker("Play as", selection: $side) {
@@ -508,7 +508,7 @@ private struct RepertoireReview: View {
 
     var body: some View {
         GeometryReader { geo in
-            let side = max(200, min(geo.size.width - 24, geo.size.height * 0.58))
+            let side = max(200, min(geo.size.width - TrainingBoardView.sideRoom, geo.size.height * 0.58))
             VStack(spacing: 12) {
                 RoomHeader(title: entries.isEmpty ? "Review" : entries[safeIndex].name, subtitle: "Line \(position + 1) of \(entries.count)") { dismiss() }
                 if let runner {

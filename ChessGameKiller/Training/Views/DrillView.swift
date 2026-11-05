@@ -28,8 +28,11 @@ struct DrillView: View {
                 )
                 .frame(width: boardSide, height: boardSide)
                 .boardHeadroom(theme: theme, side: boardSide)
-                // Under the board, never over the back rank; the space is kept so nothing jumps.
-                turnBadge
+                // Under the board, never over the back rank; the space is kept while solving so
+                // nothing jumps, and given back once the puzzle is over.
+                if !runner.isOver {
+                    turnBadge
+                }
             }
 
             messageCard
@@ -272,7 +275,7 @@ struct DrillView: View {
             .padding(.vertical, 12)
             .background {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(color.opacity(tried || revealed ? 0.16 : (theme.isDark ? 0.12 : 0.08)))
+                    .fill(color.opacity(tried || revealed ? 0.16 : (theme.screenIsDark ? 0.12 : 0.08)))
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
