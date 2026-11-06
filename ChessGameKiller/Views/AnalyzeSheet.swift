@@ -473,6 +473,14 @@ struct AnalysisView: View {
         _flipped = State(initialValue: draft.sideToMove == .black)
     }
 
+    /// A board already part way through, for pictures in the tests.
+    init(model: AnalysisModel, theme: BoardTheme, onPlay: @escaping (PositionDraft) -> Void = { _ in }) {
+        self.theme = theme
+        self.onPlay = onPlay
+        _model = State(initialValue: model)
+        _flipped = State(initialValue: model.start.sideToMove == .black)
+    }
+
     /// The side the person takes from here: the one to move.
     private var sideName: String { model.draft.sideToMove == .white ? "White" : "Black" }
 

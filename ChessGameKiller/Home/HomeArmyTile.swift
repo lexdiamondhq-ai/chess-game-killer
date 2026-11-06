@@ -60,8 +60,8 @@ struct HomeArmyTile: View {
         let size: CGFloat = min(pieceSize, 40)
         let pawns: [ArmySlot] = ArmySlot.allCases.filter(\.isPawn)
         let pieces: [ArmySlot] = ArmySlot.allCases.filter { !$0.isPawn }
-        return VStack(spacing: 0) {
-            row(pawns, size: size)
+        return VStack(spacing: 4) {
+            row(pawns, size: size * 0.8)
             row(pieces, size: size)
         }
         .frame(maxWidth: .infinity)
@@ -87,7 +87,8 @@ struct HomeArmyTile: View {
         case .legend: glow = 0.95
         }
         let piece = Piece(slot.kind, color: color, square: slot.square(for: color))
-        return PieceImage(piece: piece, theme: pieceTheme, size: size, onBoard: true)
+        // Fitted into its frame rather than standing on a square, so the two rows don't overlap.
+        return PieceImage(piece: piece, theme: pieceTheme, size: size)
             .frame(width: size, height: size)
             .shadow(color: tone.metal.opacity(glow), radius: rank == .recruit ? 0 : size * 0.22)
             .overlay(alignment: .bottom) {
