@@ -4,7 +4,7 @@ One beautiful iOS chess game, with every feature easy to reach and easy to under
 
 ## Features
 - A first run of four short pages: what the app is, how much chess you've played (which picks your first rival), your board, and the three rules that cost something (help halves the XP, leaving is a loss, rivals hold grudges). Then the first game starts. One-line tips appear the first time a hidden gesture would help, and Settings › How it works lists every gesture and rule
-- Play The Crowd: five computer rivals made of real players by rating, the 1000s, 1200s, 1600s, 2000s and the Masters. Each move is drawn from what real players chose in that exact position (Lichess's opening explorer), shown as a vote under the rival's name; once the position is rare, or there's no connection, Stockfish takes over at the same strength. Beat each crowd to earn its rival board. Starting a new game while one is under way asks first, since leaving counts as a loss
+- Play The Crowd: five computer rivals made of real players by rating, the 1000s, 1200s, 1600s, 2000s and the Masters. Each move is drawn from what real players chose in that exact position (Lichess's opening explorer), shown as a vote under the rival's name; once the position is rare, or there's no connection, Maia takes over: a network trained on millions of Lichess games to play the move a person of that rating would (1100, 1200, 1600 and 1900), running on the phone, so the crowd keeps making human moves, and human mistakes, all game. The Masters hand over to full Stockfish. Beat each crowd to earn its rival board. Starting a new game while one is under way asks first, since leaving counts as a loss
 - Your Grudge: born the first time a crowd beats you, one rival that remembers every game (score, streaks, the openings you lose in, which it steers back into). Your wins carve gold scars into its onyx king, and its strength follows yours
 - Pick your side: White or Black (Gold or Violet on the Neon board), or random
 - Chess clocks: 3+2, 5+0, 10+0 or 15+10, or no clock. A clock starts with the first move and waits whenever another screen covers the board. The last ten seconds count down in tenths, and a fallen flag ends the game
@@ -24,6 +24,7 @@ One beautiful iOS chess game, with every feature easy to reach and easy to under
 - Xcode project generated with [XcodeGen](https://github.com/yonaskolb/XcodeGen)
 - [ChessKit](https://github.com/chesskit-app/chesskit-swift) for the rules
 - [ChessKitEngine](https://github.com/chesskit-app/chesskit-engine) to run Stockfish on the device
+- [Maia](https://github.com/CSSLab/maia-chess) for the crowd rivals past their book: its networks are in `ChessGameKiller/Maia`, run with Accelerate (`ChessGameKiller/Engine/Maia.swift`); `scripts/maia` converts them and works out the reference numbers the tests check
 
 ## Run it
 ```sh
@@ -68,5 +69,6 @@ Everything Leo teaches is data in `ChessGameKiller/Training/Content`: `course.js
 
 ## Credits
 - Piece artwork: "cburnett" set by Colin M.L. Burnett, licensed GPLv2+ (via Lichess). The Neon pieces are recolored from it with `scripts/make_neon_pieces.py`.
+- Maia, GPLv3, by the CSSLab at the University of Toronto (McIlroy-Young, Sen, Kleinberg and Anderson).
 - Stockfish, GPLv3, by the Stockfish developers. Because the app includes Stockfish, the app is open source under the GPL too.
 - Puzzles, master games and opening statistics: the Lichess open database (https://database.lichess.org), released under CC0. About 100,000 puzzles (`scripts/puzzles/build_puzzle_pack.py`, workflow `puzzles.yml`), recent classical broadcast games between people rated 2500+ (engine events left out) and "how people play here" numbers for masters and five rating bands (`scripts/grandmaster/build_masters.py`, workflow `masters.yml`). Named openings from lichess-org/chess-openings (CC0).

@@ -89,6 +89,19 @@ final class MatchController {
         /// Who sits across the board.
         var rival: Rival { grudge ? .grudge(level) : level.rival }
 
+        /// The rating whose Maia network plays the crowd's moves past its book. Nil for the Masters
+        /// (full Stockfish) and the Grudge (its strength follows yours through Stockfish's skill).
+        var humanRating: Int? {
+            guard !grudge else { return nil }
+            switch level {
+            case .beginner: return 1100
+            case .casual: return 1200
+            case .club: return 1600
+            case .expert: return 1900
+            case .grandmaster: return nil
+            }
+        }
+
         /// How the computer searches: the crowd's settings, or the Grudge's own skill.
         var engineSkill: Int {
             guard grudge, let grudgeSkill else { return level.skill }
@@ -189,14 +202,17 @@ final class MatchController {
 
     /// The rival's latest remark, shown for a few seconds in its line by the board.
     private(set) var rivalLine: RivalLine?
-    /// The vote behind the crowd's last move ("62% played Nf3"). Nil once Stockfish has taken over.
+    /// The vote behind the crowd's last move ("62% played Nf3"). Nil once the book has run out.
     private(set) var crowdVote: CrowdVote?
     /// Where the crowd's moves come from. Nil in tests and previews: Stockfish plays every move.
     @ObservationIgnored var crowdBook: CrowdBookSource?
+    /// What the crowd plays once its book runs out: Maia, a person's move at the crowd's rating.
+    /// Nil in tests and previews, and Stockfish plays on; it also plays when Maia has no move.
+    @ObservationIgnored var humanMoves: HumanMovePicking?
     /// What the Grudge remembers, read as it speaks and as it picks its openings.
     @ObservationIgnored var grudgeRecord: @MainActor () -> GrudgeRecord? = { nil }
     /// Set once the crowd has no answer for this game (a rare position, no connection):
-    /// Stockfish plays the rest, and the crowd isn't asked again.
+    /// Maia (or Stockfish) plays the rest, and the crowd isn't asked again.
     @ObservationIgnored private var bookOver = false
     private var nextLineID = 0
     /// The ply of the rival's last remark, so it doesn't talk over every move.
@@ -286,6 +302,7 @@ final class MatchController {
         let match = MatchController(engine: StockfishEngine.shared, sounds: SoundPlayer.shared)
         match.budget = { PowerPolicy.shared.engineBudget }
         match.crowdBook = LichessCrowdBook.shared
+        match.humanMoves = MaiaPlayer.shared
         return match
     }
 
@@ -976,6 +993,11 @@ final class MatchController {
             if vote == nil { bookOver = true }
             chosen = vote?.uci
         }
+        // Past the book, the crowd plays like the people it is made of (Maia at its rating).
+        if chosen == nil, let human = humanMoves, let rating = current.humanRating {
+            chosen = await human.move(fens: game.fenHistory, legal: game.legalEngineMoves(), rating: rating, pick: chance())
+            guard gen == generation, !Task.isCancelled else { return }
+        }
         // The engine can miss an answer (a search it was still finishing, a stop it
         // never acknowledged). Ask again before giving up, with a little more time.
         if chosen == nil {
@@ -998,8 +1020,9 @@ final class MatchController {
         guard gen == generation, !Task.isCancelled else { return }
         isComputerThinking = false
 
-        // The rival plays what its search found: its level is in the search itself (see
-        // `Level.skill` and `Level.depth`), never in a random move laid over it.
+        // The rival plays what the crowd, Maia or its search chose: its level is in where the move
+        // came from (see `Setup.humanRating`, `Level.skill` and `Level.depth`), never in a random
+        // move laid over it.
         var moved = false
         if let chosen { moved = game.playEngineMove(chosen) }
         crowdVote = moved && vote?.uci == chosen ? vote : nil
