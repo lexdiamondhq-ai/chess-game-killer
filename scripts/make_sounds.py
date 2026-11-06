@@ -98,11 +98,39 @@ def louder(audio: bytes, decibels: float, out: str) -> bytes:
     return audio
 
 
+# The longer cues are all brought to this loudness, so GameSound.volume alone sets how they
+# sit against each other and a regenerated file never comes out much louder or quieter.
+CUE_LUFS = -16.0
+# ...without their peaks going past this.
+CUE_PEAK_DB = -1.0
+
+
+def loudness(path: str) -> tuple[float, float] | None:
+    """Integrated loudness (LUFS) and true peak (dBFS) of a file, by ffmpeg's EBU R128 meter."""
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        return None
+    meter = subprocess.run([
+        ffmpeg, "-hide_banner", "-nostats", "-i", path, "-af", "ebur128=peak=true", "-f", "null", "-",
+    ], capture_output=True, text=True)
+    summary = meter.stderr.rsplit("Summary:", 1)[-1]
+    level = peak = None
+    for line in summary.splitlines():
+        words = line.split()
+        if len(words) >= 2 and words[0] == "I:":
+            level = float(words[1])
+        if len(words) >= 2 and words[0] == "Peak:":
+            peak = float(words[1])
+    if level is None or peak is None:
+        return None
+    return level, peak
+
+
 def tidy(audio: bytes, out: str, knock: bool) -> bytes:
     """Starts the sound on its first real sample, so a piece is heard the instant it lands
     (the generated files open with a few hundredths of a second of near silence, and the
     victory theme with a third of a second), with a 4 ms fade in and a short fade out so
-    nothing clicks. Unchanged without ffmpeg."""
+    nothing clicks. A longer cue is also brought to CUE_LUFS. Unchanged without ffmpeg."""
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
         return audio
@@ -111,8 +139,16 @@ def tidy(audio: bytes, out: str, knock: bool) -> bytes:
     with open(source, "wb") as f:
         f.write(audio)
     tail = 0.03 if knock else 0.25
+    gain = ""
+    measured = None if knock else loudness(source)
+    if measured:
+        level, peak = measured
+        change = min(CUE_LUFS - level, CUE_PEAK_DB - peak)
+        if abs(change) >= 0.5:
+            gain = f"volume={change:.1f}dB,"
     chain = (
         "silenceremove=start_periods=1:start_threshold=-52dB:start_silence=0.002,"
+        f"{gain}"
         "afade=t=in:d=0.004,"
         # A fade out on the last stretch: reversed, it is a fade in.
         f"areverse,silenceremove=start_periods=1:start_threshold=-70dB,afade=t=in:d={tail},areverse"

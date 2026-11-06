@@ -460,6 +460,21 @@ final class AnalysisModelTests: XCTestCase {
         let model = AnalysisModel(draft: draft, engine: engine)
         await model.run()
         XCTAssertEqual(model.readable(model.lines[0]), "3. Bb5 a6")
+        // The moves made are numbered from there too.
+        XCTAssertTrue(model.play("f1b5", fromLine: false))
+        XCTAssertEqual(model.movesMade.map { $0.label }, ["3. Bb5"])
+        XCTAssertEqual(TrainingChess.moveNumber(model.draft.fen), 3)
+    }
+
+    func testAGamesFENKeepsItsMoveNumberUntilThePiecesAreEdited() {
+        let middle = "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3"
+        var draft = PositionDraft(fen: middle)!
+        XCTAssertEqual(draft.fen, middle)
+        draft[.a2] = nil
+        XCTAssertTrue(draft.fen.hasSuffix(" - 0 1"))
+        var turned = PositionDraft(fen: middle)!
+        turned.sideToMove = .black
+        XCTAssertTrue(turned.fen.hasSuffix(" - 0 1"))
     }
 }
 
