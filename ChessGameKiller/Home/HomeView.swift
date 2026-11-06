@@ -16,6 +16,8 @@ struct HomeActions {
     var analyzePosition: (String) -> Void = { _ in }
     /// Opens Analyze on the camera, to read a real board.
     var scan: () -> Void = {}
+    /// Opens Analyze on Photos, to read a photo or screenshot of a board.
+    var analyzePhoto: () -> Void = {}
     var train: () -> Void = {}
     /// Starts today's session with Coach Leo.
     var trainToday: (SessionPlan) -> Void = { _ in }
@@ -37,9 +39,9 @@ struct HomeActions {
 /// (Online, or A friend by link); Today's Move and today's session with the coach side by
 /// side; the games still going with people, as a strip of small boards; the ladder of rivals;
 /// and your games. The glass dock holds the four doors and, in their middle, the gold knight:
-/// a tap plays, a hold opens its shortcuts (the five rivals, Online, a friend, Today's Move,
-/// a real board through the camera). Your pieces, your games and Settings are in the You
-/// panel, from the dock or by pulling the page down.
+/// a tap plays, a hold opens its shortcuts (the five rivals, then Online, a friend, Today's
+/// Move, Puzzles, Analyze, a real board through the camera, the coach and your games). Your
+/// pieces, your games and Settings are in the You panel, from the dock or by pulling the page down.
 struct HomeView: View {
     let match: MatchController
     let theme: BoardTheme
@@ -496,23 +498,27 @@ struct HomeView: View {
         actions.start(MatchController.Setup(playerColor: side.color, level: level, timeControl: timeControl))
     }
 
-    /// The jewel's other ways to a game: a person online or a friend (when the app has them),
-    /// Today's Move, and a real board through the camera.
+    /// The jewel's shortcuts under the rivals: Online and A friend (when the app has them),
+    /// Today's Move, Puzzles, Analyze, a real board through the camera, the coach and your games.
     private var shortcutList: [HomeShortcut] {
-        var list: [HomeShortcut] = []
-        if let challenges {
-            let waiting: Int = challenges.onlineWaiting ?? 0
-            list.append(HomeShortcut(title: "Online", glyph: Glyphs.online, hint: "Play someone at your level now",
-                                     live: waiting > 0) { challenges.playOnline() })
-            list.append(HomeShortcut(title: "A friend", glyph: Glyphs.challenge, hint: "Send a friend a game by link") {
-                challenges.compose()
-            })
+        let waiting: Int = challenges?.onlineWaiting ?? 0
+        return HomeShortcutKind.list(online: challenges != nil).map { kind in
+            HomeShortcut(kind: kind, live: kind == .online && waiting > 0) { open(kind) }
         }
-        list.append(HomeShortcut(title: "Today's Move", glyph: Glyphs.today, hint: "The puzzle of the day",
-                                 action: actions.dailyMove))
-        list.append(HomeShortcut(title: "Scan a board", glyph: Glyphs.scan, hint: "Read a real board with the camera",
-                                 action: actions.scan))
-        return list
+    }
+
+    /// Where a shortcut goes.
+    private func open(_ kind: HomeShortcutKind) {
+        switch kind {
+        case .online: challenges?.playOnline()
+        case .friend: challenges?.compose()
+        case .dailyMove: actions.dailyMove()
+        case .puzzles: actions.puzzles()
+        case .analyze: actions.analyze()
+        case .scan: actions.scan()
+        case .train: actions.train()
+        case .games: actions.rewind()
+        }
     }
 
     /// Where the jewel stands, in the home's space: the middle of the dock's bar, a little
@@ -909,8 +915,8 @@ extension HomeView {
         }
     }
 
-    /// Today: your games going, a person to play, Today's Move and the coach, the day's
-    /// masterpiece, your army and the rivals.
+    /// Today: your games going, a person to play, Analyze, Today's Move and the coach, the
+    /// day's masterpiece, your army and the rivals.
     private func sheetToday(_ upNext: HomeUpNext) -> some View {
         let day = dailyState
         let ladder = HomeLadder(games: vault.games)
@@ -919,6 +925,8 @@ extension HomeView {
                 .homeRise(0)
             playPerson()
                 .homeRise(1)
+            HomeAnalyzeTile(tone: tone, analyze: actions.analyze, photo: actions.analyzePhoto)
+                .homeRise(2)
             HStack(alignment: .top, spacing: Self.gap) {
                 HomeDailyTile(puzzle: dailyPuzzle, daily: day, tone: tone, pieceTheme: pieceTheme,
                               solve: actions.dailyMove)
@@ -926,22 +934,22 @@ extension HomeView {
                               tone: tone, start: actions.trainToday, train: actions.train)
             }
             .fixedSize(horizontal: false, vertical: true)
-            .homeRise(2)
+            .homeRise(3)
             if HomeNoticeCard.shows(day) {
                 HomeNoticeCard(daily: day, tone: tone, remind: answerReminder)
                     .transition(.opacity)
-                    .homeRise(3)
+                    .homeRise(4)
             }
             if let masterpiece = HomeMasterpiece.of() {
                 HomeMasterpieceTile(masterpiece: masterpiece, tone: tone, pieceTheme: pieceTheme,
                                     open: actions.analyzePosition)
-                    .homeRise(4)
+                    .homeRise(5)
             }
             HomeArmyTile(army: army, color: upNext.playerColor, pieceTheme: pieceTheme, tone: tone, open: actions.army)
-                .homeRise(5)
+                .homeRise(6)
             HomeLadderTile(ladder: ladder, tone: tone, play: { level in actions.playRival(level) })
                 .padding(.top, 4)
-                .homeRise(6)
+                .homeRise(7)
         }
     }
 

@@ -219,6 +219,34 @@ struct HomePlayTileFace: View {
     }
 }
 
+/// Analyze, out where it's seen on Today (Alex, 2026-11-06: "the analysis needs to be easier
+/// to find on the home screen"). Like the Play tile: the analyzer on one face, and on the
+/// other Photos straight away, for a photo or screenshot of a board to read and analyze.
+struct HomeAnalyzeTile: View {
+    let tone: HomeTone
+    let analyze: () -> Void
+    let photo: () -> Void
+
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        let layout = typeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(spacing: 6)) : AnyLayout(HStackLayout(spacing: 6))
+        layout {
+            HomePlayTileFace(glyph: Glyphs.analyze, title: "Analyze", line: "Find the best move",
+                             live: false, tone: tone, label: "Analyze",
+                             hint: "Snap a board, pick a screenshot or set up any position, and see the best moves.",
+                             inputLabels: ["Analyze", "Analysis", "Best move"], action: analyze)
+            HomePlayTileFace(glyph: "photo.on.rectangle.angled", title: "From a photo", line: "Or a screenshot",
+                             live: false, tone: tone, label: "Analyze a photo",
+                             hint: "Opens your photos. Pick a board, and its best moves come up.",
+                             inputLabels: ["Analyze a photo", "From a photo", "Screenshot"], action: photo)
+        }
+        .padding(6)
+        .homePane(RoundedRectangle(cornerRadius: HomeMetrics.tileRadius, style: .continuous), tone: tone)
+    }
+}
+
 // MARK: - Today
 
 /// Where the daily habit stands: the streak, what's done, and Today's Move.

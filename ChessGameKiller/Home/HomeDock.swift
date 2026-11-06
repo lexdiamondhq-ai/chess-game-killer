@@ -338,22 +338,86 @@ struct HomeJewelGold: View {
     }
 }
 
+/// The jewel's shortcuts under the rivals, in the order they show, four to a row: the ways to
+/// a game first (a person online, a friend, Today's Move, puzzles), then the ways to look
+/// closer (Analyze, a real board through the camera, the coach, your games). Alex asked for
+/// more in it, Analyze among them (2026-11-06).
+enum HomeShortcutKind: String, CaseIterable, Identifiable {
+    case online, friend, dailyMove, puzzles, analyze, scan, train, games
+
+    var id: String { rawValue }
+
+    /// What the jewel offers: Online and A friend only when the app can reach other players.
+    static func list(online: Bool) -> [HomeShortcutKind] {
+        online ? allCases : allCases.filter { !$0.needsOnline }
+    }
+
+    var needsOnline: Bool { self == .online || self == .friend }
+
+    var title: String {
+        switch self {
+        case .online: return "Online"
+        case .friend: return "A friend"
+        case .dailyMove: return "Today's Move"
+        case .puzzles: return "Puzzles"
+        case .analyze: return "Analyze"
+        case .scan: return "Scan a board"
+        case .train: return "Train"
+        case .games: return "Your games"
+        }
+    }
+
+    var glyph: String {
+        switch self {
+        case .online: return Glyphs.online
+        case .friend: return Glyphs.challenge
+        case .dailyMove: return Glyphs.today
+        case .puzzles: return Glyphs.puzzles
+        case .analyze: return Glyphs.analyze
+        case .scan: return Glyphs.scan
+        case .train: return Glyphs.coach
+        case .games: return Glyphs.games
+        }
+    }
+
+    var hint: String {
+        switch self {
+        case .online: return "Play someone at your level now"
+        case .friend: return "Send a friend a game by link"
+        case .dailyMove: return "The puzzle of the day"
+        case .puzzles: return "Rated puzzles at your level"
+        case .analyze: return "Find the best move in any position"
+        case .scan: return "Read a real board with the camera"
+        case .train: return "Lessons, drills and today's session"
+        case .games: return "Look back at the games you've played"
+        }
+    }
+}
+
 /// One of the jewel's shortcuts.
 struct HomeShortcut: Identifiable {
-    let title: String
-    let glyph: String
-    let hint: String
+    let kind: HomeShortcutKind
     /// Something is happening there now (players waiting online): a small green dot.
     var live = false
     let action: () -> Void
 
-    var id: String { title }
+    var id: HomeShortcutKind { kind }
+    var title: String { kind.title }
+    var glyph: String { kind.glyph }
+    var hint: String { kind.hint }
 }
 
 /// What the jewel holds, rising out of it on a long press: the five rivals, to play one at
-/// once, and the other ways to a game (Online, a friend, Today's Move, a real board through the
-/// camera). A pick closes it and goes; so does a tap anywhere around it, or on the jewel.
+/// once, and under them the shortcuts in rows of four (see `HomeShortcutKind`). A pick closes
+/// it and goes; so does a tap anywhere around it, or on the jewel.
 struct HomeShortcutsPanel: View {
+    /// Four to a row, so the eight shortcuts make two even rows under the five rivals.
+    static let perRow = 4
+
+    private static var columns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: 0, alignment: .top), count: perRow)
+    }
+
     let tone: HomeTone
     /// The rival the board window offers: lit among the five.
     let next: MatchController.Level
@@ -382,7 +446,7 @@ struct HomeShortcutsPanel: View {
             HomeHairline(tone: tone)
                 .padding(.horizontal, 4)
                 .padding(.vertical, 2)
-            HStack(alignment: .top, spacing: 0) {
+            LazyVGrid(columns: Self.columns, spacing: 12) {
                 ForEach(shortcuts) { shortcut in
                     shortcutButton(shortcut)
                 }

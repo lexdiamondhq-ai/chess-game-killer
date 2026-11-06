@@ -129,11 +129,22 @@ final class HomeSnapshotTests: XCTestCase {
         open.isHidden = true
     }
 
-    /// Holding the gold knight in the dock: the five rivals and the other ways to a game rise
+    /// Holding the gold knight in the dock: the five rivals and the shortcuts under them rise
     /// out of it over the veiled page, and the jewel wears a cross to close them.
     func testTheJewelsShortcuts() throws {
         let window = try show(HomeSample.home(showsShortcuts: true))
         try save(window, "zz-home-9-shortcuts")
+        window.isHidden = true
+    }
+
+    /// The knight held on the board home, with players to reach online: the five rivals, then
+    /// two rows of four, Online, A friend, Today's Move and Puzzles over Analyze, Scan a board,
+    /// Train and Your games.
+    func testTheKnightsShortcutsOnTheBoardHome() throws {
+        UserDefaults.standard.set(true, forKey: HomeLayout.key)
+        let center = ChallengeCenter(api: FakeChallengeAPI(), store: ChallengeStore(), sounds: nil)
+        let window = try show(HomeSample.home(showsShortcuts: true).environment(center))
+        try save(window, "zz-home-sheet-6-shortcuts")
         window.isHidden = true
     }
 

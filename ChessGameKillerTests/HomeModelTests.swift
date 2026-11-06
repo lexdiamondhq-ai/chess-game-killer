@@ -190,6 +190,27 @@ final class HomeModelTests: XCTestCase {
         XCTAssertNil(store.upNext)
     }
 
+    // MARK: The knight's shortcuts
+
+    /// Held, the knight offers more than ways to a game (Alex, 2026-11-06): two full rows of
+    /// four under the rivals, the ways to play first, then Analyze leading the ways to look closer.
+    func testTheKnightHoldsTwoFullRowsWithAnalyzeLeadingTheSecond() {
+        let shortcuts = HomeShortcutKind.list(online: true)
+        XCTAssertEqual(shortcuts, [.online, .friend, .dailyMove, .puzzles, .analyze, .scan, .train, .games])
+        XCTAssertEqual(shortcuts.count, 2 * HomeShortcutsPanel.perRow, "Two full rows")
+        XCTAssertEqual(shortcuts.firstIndex(of: .analyze), HomeShortcutsPanel.perRow, "Analyze opens the second row")
+        XCTAssertEqual(Set(shortcuts.map(\.title)).count, shortcuts.count, "Each has a name of its own")
+        for kind in shortcuts {
+            XCTAssertTrue(Glyphs.all.contains(kind.glyph), "\(kind.title) wears one of the app's own icons")
+            XCTAssertFalse(kind.hint.isEmpty, "\(kind.title) says where it goes")
+        }
+    }
+
+    /// With no other players to reach, Online and A friend are left out and the rest keep their order.
+    func testWithoutOtherPlayersTheKnightKeepsTheRest() {
+        XCTAssertEqual(HomeShortcutKind.list(online: false), [.dailyMove, .puzzles, .analyze, .scan, .train, .games])
+    }
+
     // MARK: Helpers
 
     private func game(_ level: MatchController.Level, _ result: SavedGame.Result) -> SavedGame {
