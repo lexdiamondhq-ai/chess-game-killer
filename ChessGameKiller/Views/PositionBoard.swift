@@ -19,6 +19,8 @@ struct PositionBoard: View {
     var targets: Set<Square> = []
     @AppStorage(BoardTheme.coordinatesKey) private var showsCoordinates = true
     @Environment(\.colorScheme) private var colorScheme
+    /// Who each piece is, so a move slides it rather than redrawing it on its new square.
+    @State private var identities = PieceIdentities()
 
     var body: some View {
         GeometryReader { geo in
@@ -56,6 +58,12 @@ struct PositionBoard: View {
                         guard let onTap, let tapped = tappedSquare(at: value.location, size: sq) else { return }
                         onTap(tapped)
                     })
+                    GlidingPieces(
+                        arrangement: identities.arrange(draft.pieces, key: draft.placementFEN),
+                        theme: theme, squareSize: sq, flipped: flipped,
+                        ghosts: ghosts, ghostColor: ghostColor, selected: selected
+                    )
+                    marks(size: sq)
                     ZStack {
                         ForEach(Array(hints.reversed())) { hint in
                             MoveArrow(
@@ -144,23 +152,27 @@ struct PositionBoard: View {
                     label(square.file.rawValue, size: size, color: labelColor, alignment: .bottomTrailing)
                 }
             }
-            if let token {
-                let isGhost = ghosts.contains(square)
-                PieceImage(piece: token.piece(at: square), theme: theme, size: size, onBoard: true)
-                    .opacity(isGhost ? 0.62 : 1)
-                    .shadow(color: isGhost ? ghostColor.opacity(0.9) : .clear, radius: size * 0.12)
-                    .scaleEffect(square == selected ? 1.08 : 1)
-                    .transition(.scale(scale: 0.6).combined(with: .opacity))
-            }
-            if targets.contains(square) {
-                targetMark(capture: token != nil, size: size)
-            }
         }
         .frame(width: size, height: size)
         .accessibilityElement()
         .accessibilityLabel(token.map { "\(square.notation), \($0.piece(at: square).spokenName)" } ?? square.notation)
         .accessibilityAddTraits(onTap == nil ? [] : .isButton)
         .accessibilityAction { onTap?(square) }
+    }
+
+    /// The squares the piece picked up can go to, drawn over the pieces so a ring shows round the
+    /// piece it would take.
+    private func marks(size: CGFloat) -> some View {
+        ZStack(alignment: .topLeading) {
+            ForEach(Array(targets).sorted { $0.rawValue < $1.rawValue }, id: \.self) { target in
+                targetMark(capture: draft[target] != nil, size: size)
+                    .frame(width: size, height: size)
+                    .position(center(of: target, size: size))
+            }
+        }
+        .frame(width: size * 8, height: size * 8, alignment: .topLeading)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
     /// Where the piece picked up can go: a soft dot, or a ring around a piece it can take.

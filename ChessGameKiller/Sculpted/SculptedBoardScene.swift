@@ -221,8 +221,30 @@ final class SculptedBoardScene {
     /// Draws at 60 frames a second with 4x smoothing, or at 30 with 2x when the phone should
     /// hold back. `PowerPolicy` says which; the scene follows the same notifications it does.
     func applyPower(constrained: Bool = PowerPolicy.systemConstrained()) {
+        motionEnds = nil
         view.preferredFramesPerSecond = PowerPolicy.framesPerSecond(constrained: constrained)
         view.antialiasingMode = constrained ? .multisampling2X : .multisampling4X
+    }
+
+    /// When the moves under way have all settled, while the board draws at the screen's full rate.
+    private var motionEnds: Date?
+
+    /// A piece in motion draws at the screen's full rate (120 frames a second on a ProMotion
+    /// phone) until it settles; then the board goes back to its usual rate. A still board, and
+    /// a phone that should hold back, never draw faster.
+    private func boostFrameRate(for duration: Double) {
+        guard duration > 0, !PowerPolicy.systemConstrained() else { return }
+        let ends = Date().addingTimeInterval(duration)
+        if let current = motionEnds, current > ends {
+            // An earlier move is still in the air longer: its own reset comes later.
+        } else {
+            motionEnds = ends
+        }
+        view.preferredFramesPerSecond = PowerPolicy.motionFramesPerSecond
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration + 0.05) { [weak self] in
+            guard let self, let ends = self.motionEnds, Date() >= ends else { return }
+            self.applyPower()
+        }
     }
 
     private func watchPower() {
@@ -690,6 +712,8 @@ final class SculptedBoardScene {
         var wobble: Double
         var hop: Float
         var lean: Float
+        /// A big capture: the arc peaks late and comes down hard instead of setting down softly.
+        var slam = false
 
         static let quick = MoveTiming(lift: 0.1, travel: 0.25, land: 0.08, wobble: 0.34, hop: 0, lean: 0)
         static let bulk = MoveTiming(lift: 0.06, travel: 0.42, land: 0.08, wobble: 0, hop: 0.12, lean: 0)
@@ -716,10 +740,12 @@ final class SculptedBoardScene {
             // Knights jump in an arc; a big capture rises high and slams down.
             hop = knight ? 0.58 : (dramatic ? 0.3 : 0)
             lean = (knight ? 6 : (dramatic ? 5 : 2)) * .pi / 180
+            slam = dramatic
             if UIAccessibility.isReduceMotionEnabled {
                 hop = 0
                 lean = 0
                 wobble = 0
+                slam = false
             }
             let stretch = SculptedBoardScene.motionScale
             lift *= stretch
@@ -731,6 +757,8 @@ final class SculptedBoardScene {
         var total: Double { lift + travel + land + wobble }
         /// When the piece touches down, before it rocks to rest.
         var touchdown: Double { lift + travel + land }
+        /// The whole time in the air: the lift, the travel and the set-down are one movement.
+        var flight: Double { touchdown }
     }
 
     private func animateMove(_ node: PieceNode, to square: Square, timing: MoveTiming, dust: Float = 1) {
@@ -747,25 +775,24 @@ final class SculptedBoardScene {
         let lift = Self.travelLift
         let t = timing
 
+        let peak = lift + t.hop
+        let flight = t.flight
+        // One unbroken movement, like a hand carrying the piece: it starts to rise before it starts
+        // across, never stops at the top, and is coming down as it arrives. Across, it eases in and
+        // out (smootherstep); up, it follows a soft arch, or for a big capture peaks late and slams.
         let action = SCNAction.customAction(duration: t.total) { root, elapsed in
             let time = Double(elapsed)
-            var position = start
+            var position = end
             var y: Float = 0
             var tilt: Float = 0
-            if time < t.lift {
-                y = startY + (lift - startY) * Ease.slowEnd(Float(time / t.lift))
-            } else if time < t.lift + t.travel {
-                let u = Float((time - t.lift) / t.travel)
-                let e = Ease.smooth(u)
-                position = start + offset * e
-                y = lift + (0.03 - lift) * e + t.hop * 4 * e * (1 - e)
+            if time < flight {
+                let u = Float(time / flight)
+                position = start + offset * Ease.smoother(u)
+                let arch = t.slam ? sin(.pi * pow(u, 1.6)) : pow(max(0, sin(.pi * u)), 1.3)
+                y = startY * (1 - Ease.smooth(u)) + peak * arch
                 tilt = t.lean * sin(.pi * u)
-            } else if time < t.lift + t.travel + t.land {
-                position = end
-                y = 0.03 * (1 - Ease.slowStart(Float((time - t.lift - t.travel) / t.land)))
             } else {
-                position = end
-                let u = Float((time - t.lift - t.travel - t.land) / max(t.wobble, 0.001))
+                let u = Float((time - flight) / max(t.wobble, 0.001))
                 tilt = 2.2 * .pi / 180 * exp(-4 * u) * sin(3 * .pi * u)
             }
             root.simdPosition = position
@@ -773,10 +800,11 @@ final class SculptedBoardScene {
         }
         node.root.runAction(action, forKey: "pose")
         node.contact.runAction(.sequence([
-            .fadeOpacity(to: 0.45, duration: t.lift),
-            .wait(duration: t.travel * 0.7),
-            .fadeOpacity(to: 1, duration: t.travel * 0.3 + t.land),
+            .fadeOpacity(to: 0.45, duration: flight * 0.35),
+            .wait(duration: flight * 0.25),
+            .fadeOpacity(to: 1, duration: flight * 0.4),
         ]), forKey: "contact")
+        boostFrameRate(for: t.total)
         if dust > 0 {
             // A soft puff of dust as it touches down.
             DispatchQueue.main.asyncAfter(deadline: .now() + t.touchdown) { [weak self] in
@@ -1743,6 +1771,13 @@ enum Ease {
     static func smooth(_ t: Float) -> Float {
         let c = min(max(t, 0), 1)
         return c * c * (3 - 2 * c)
+    }
+
+    /// Smootherstep: starts and stops with no jolt at all (no sudden change of speed or of
+    /// acceleration), for a piece carried across the board.
+    static func smoother(_ t: Float) -> Float {
+        let c = min(max(t, 0), 1)
+        return c * c * c * (c * (c * 6 - 15) + 10)
     }
 }
 

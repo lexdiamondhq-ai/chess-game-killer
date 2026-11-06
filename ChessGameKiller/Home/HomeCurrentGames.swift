@@ -125,6 +125,9 @@ struct HomeMiniBoard: View {
     /// Squares washed in gold, like the last move's.
     var marked: Set<Square> = []
 
+    /// Who each piece is, so a move glides it to its new square.
+    @State private var identities = PieceIdentities()
+
     private var draft: PositionDraft {
         fen.flatMap(PositionDraft.init(fen:)) ?? PositionDraft(fen: Self.start) ?? PositionDraft()
     }
@@ -136,24 +139,25 @@ struct HomeMiniBoard: View {
             let side: CGFloat = min(geo.size.width, geo.size.height)
             let square: CGFloat = side / 8
             let draft = self.draft
-            VStack(spacing: 0) {
-                ForEach(0..<8, id: \.self) { row in
-                    HStack(spacing: 0) {
-                        ForEach(0..<8, id: \.self) { column in
-                            let at = flipped ? Square(file: 7 - column, rank: row) : Square(file: column, rank: 7 - row)
-                            ZStack {
-                                Rectangle().fill((at.fileIndex + at.rankIndex) % 2 == 1 ? theme.light : theme.dark)
-                                if marked.contains(at) {
-                                    Rectangle().fill(tone.metal.opacity(0.5))
+            ZStack(alignment: .topLeading) {
+                VStack(spacing: 0) {
+                    ForEach(0..<8, id: \.self) { row in
+                        HStack(spacing: 0) {
+                            ForEach(0..<8, id: \.self) { column in
+                                let at = flipped ? Square(file: 7 - column, rank: row) : Square(file: column, rank: 7 - row)
+                                ZStack {
+                                    Rectangle().fill((at.fileIndex + at.rankIndex) % 2 == 1 ? theme.light : theme.dark)
+                                    if marked.contains(at) {
+                                        Rectangle().fill(tone.metal.opacity(0.5))
+                                    }
                                 }
-                                if let token = draft[at] {
-                                    PieceImage(piece: token.piece(at: at), theme: theme, size: square, onBoard: true)
-                                }
+                                .frame(width: square, height: square)
                             }
-                            .frame(width: square, height: square)
                         }
                     }
                 }
+                GlidingPieces(arrangement: identities.arrange(draft.pieces, key: draft.placementFEN),
+                              theme: theme, squareSize: square, flipped: flipped)
             }
             .frame(width: side, height: side)
         }
