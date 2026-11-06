@@ -102,16 +102,23 @@ struct SculptedCamera: Equatable {
 
     /// Half the board's width including its frame.
     static let boardHalfWidth: Float = 4.55
-    /// Half the width the camera keeps in the picture: the squares and a sliver of the frame's
-    /// inner edge. The rest of the frame runs off the sides, so the squares get the screen
-    /// (Alex, 2026-11-04: "much larger, taking up more of the screen"). The files and ranks sit
-    /// on the edge squares instead of the frame, so none of them are lost.
+    /// Half the width of the squares with the frame's inner edge and its metal line. The board
+    /// is kept large (Alex, 2026-11-04: "much larger, taking up more of the screen"), so only the
+    /// part of the frame that carries the files and ranks comes into the picture as well.
     static let fitHalfWidth: Float = 4.1
+    /// Where the files and ranks sit on the frame, outside the squares as on a printed board
+    /// (Alex, 2026-11-06): just past the metal line round the squares, nearer it than the
+    /// frame's rounded outer edge, so the squares give up as little of the screen as they can.
+    static let labelBand: Float = 4.25
+    /// How far out the letters and numbers reach, with a little glass beyond them: the frame
+    /// shows this far on the player's side and down both sides, so the board stays centered.
+    static let labelReach: Float = 4.4
     /// The tallest piece, the king, with its cross.
     static let tallest: Float = 1.47
 
     /// What must stay in the picture: the squares' corners with a sliver of frame (its top, and
-    /// its near face below them) and the tops of the tallest pieces on the far rank.
+    /// its near face below them), the files and ranks on the frame, and the tops of the tallest
+    /// pieces on the far rank.
     static var keyPoints: [SIMD3<Float>] { keyPoints(tallest: tallest) }
 
     static func keyPoints(tallest: Float) -> [SIMD3<Float>] {
@@ -122,6 +129,17 @@ struct SculptedCamera: Equatable {
                 points.append(SIMD3(x, 0.005, z))
                 points.append(SIMD3(x, -0.135, z))
             }
+        }
+        // The numbers down the side beside the first and last ranks, the letters along the near
+        // side under the a- and h-files. Seen from Black's side the same points turn with the camera.
+        let reach = labelReach
+        for x in [-reach, reach] {
+            for z: Float in [-3.6, 3.6] {
+                points.append(SIMD3(x, 0.005, z))
+            }
+        }
+        for x: Float in [-3.6, 3.6] {
+            points.append(SIMD3(x, 0.005, reach))
         }
         for x: Float in [-3.5, 0, 3.5] {
             points.append(SIMD3(x, tallest, -3.5))

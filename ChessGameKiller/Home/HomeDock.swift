@@ -146,9 +146,9 @@ struct HomeJewel: View {
     var hold: (() -> Void)? = nil
 
     @State private var pressed = false
-    /// Counts the knight's leaps (J1): each tap at rest sends it vaulting before the game opens.
+    /// Counts the taps at rest: each one sends a glint across the gold before the game opens.
     @State private var vaults = 0
-    /// Mid-leap: a second tap waits for the first to land.
+    /// Mid-glint: a second tap waits for the first.
     @State private var vaulting = false
     @AppStorage("haptics") private var hapticsOn = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -165,7 +165,14 @@ struct HomeJewel: View {
         content
             .foregroundStyle(tone.onIvory)
             .frame(width: width, height: height)
-            .background { HomeJewelGold(tone: tone, round: !folded, lit: face == .open) }
+            .background {
+                HomeJewelGold(tone: tone, round: !folded, lit: face == .open)
+                    .overlay {
+                        if face == .rest {
+                            JewelSheen(trigger: vaults)
+                        }
+                    }
+            }
             .background {
                 if face == .rest {
                     JewelLandingRing(color: tone.metal, trigger: vaults)
@@ -179,7 +186,7 @@ struct HomeJewel: View {
                 pressed = pressing
             })
             .onTapGesture(perform: tapped)
-            .sensoryFeedback(.impact(weight: .medium), trigger: vaults) { _, _ in hapticsOn }
+            .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.75), trigger: vaults) { _, _ in hapticsOn }
             .accessibilityElement(children: .ignore)
             .accessibilityAddTraits(.isButton)
             .accessibilityLabel(spokenLabel)
@@ -202,7 +209,7 @@ struct HomeJewel: View {
         hold?()
     }
 
-    /// At rest the knight vaults first and the game opens as it lands; otherwise straight away.
+    /// At rest the jewel catches the light first and the game opens as it fades; otherwise straight away.
     private func tapped() {
         guard face == .rest, !reduceMotion else {
             tap()
@@ -331,22 +338,84 @@ struct HomeJewelGold: View {
     }
 }
 
+/// The jewel's shortcuts under the rivals, in the order they show, four to a row: the ways to
+/// a game first (a person online, a friend, Today's Move, puzzles), then the ways to look
+/// closer (Analyze, the coach, your games). Alex asked for more in it, Analyze among them, and
+/// then for one Analyze, not several (2026-11-06): a photo, a screenshot or the camera all
+/// start inside it.
+enum HomeShortcutKind: String, CaseIterable, Identifiable {
+    case online, friend, dailyMove, puzzles, analyze, train, games
+
+    var id: String { rawValue }
+
+    /// What the jewel offers: Online and A friend only when the app can reach other players.
+    static func list(online: Bool) -> [HomeShortcutKind] {
+        online ? allCases : allCases.filter { !$0.needsOnline }
+    }
+
+    var needsOnline: Bool { self == .online || self == .friend }
+
+    var title: String {
+        switch self {
+        case .online: return "Online"
+        case .friend: return "A friend"
+        case .dailyMove: return "Today's Move"
+        case .puzzles: return "Puzzles"
+        case .analyze: return "Analyze"
+        case .train: return "Train"
+        case .games: return "Your games"
+        }
+    }
+
+    var glyph: String {
+        switch self {
+        case .online: return Glyphs.online
+        case .friend: return Glyphs.challenge
+        case .dailyMove: return Glyphs.today
+        case .puzzles: return Glyphs.puzzles
+        case .analyze: return Glyphs.analyze
+        case .train: return Glyphs.coach
+        case .games: return Glyphs.games
+        }
+    }
+
+    var hint: String {
+        switch self {
+        case .online: return "Play someone at your level now"
+        case .friend: return "Send a friend a game by link"
+        case .dailyMove: return "The puzzle of the day"
+        case .puzzles: return "Rated puzzles at your level"
+        case .analyze: return "The best moves for a photo, a screenshot or any position"
+        case .train: return "Lessons, drills and today's session"
+        case .games: return "Look back at the games you've played"
+        }
+    }
+}
+
 /// One of the jewel's shortcuts.
 struct HomeShortcut: Identifiable {
-    let title: String
-    let glyph: String
-    let hint: String
+    let kind: HomeShortcutKind
     /// Something is happening there now (players waiting online): a small green dot.
     var live = false
     let action: () -> Void
 
-    var id: String { title }
+    var id: HomeShortcutKind { kind }
+    var title: String { kind.title }
+    var glyph: String { kind.glyph }
+    var hint: String { kind.hint }
 }
 
 /// What the jewel holds, rising out of it on a long press: the five rivals, to play one at
-/// once, and the other ways to a game (Online, a friend, Today's Move, a real board through the
-/// camera). A pick closes it and goes; so does a tap anywhere around it, or on the jewel.
+/// once, and under them the shortcuts in rows of four (see `HomeShortcutKind`). A pick closes
+/// it and goes; so does a tap anywhere around it, or on the jewel.
 struct HomeShortcutsPanel: View {
+    /// Four to a row under the five rivals.
+    static let perRow = 4
+
+    private static var columns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: 0, alignment: .top), count: perRow)
+    }
+
     let tone: HomeTone
     /// The rival the board window offers: lit among the five.
     let next: MatchController.Level
@@ -375,7 +444,7 @@ struct HomeShortcutsPanel: View {
             HomeHairline(tone: tone)
                 .padding(.horizontal, 4)
                 .padding(.vertical, 2)
-            HStack(alignment: .top, spacing: 0) {
+            LazyVGrid(columns: Self.columns, spacing: 12) {
                 ForEach(shortcuts) { shortcut in
                     shortcutButton(shortcut)
                 }
