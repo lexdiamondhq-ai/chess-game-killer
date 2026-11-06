@@ -2,7 +2,7 @@
 """Records each coach's voice for every line in the lessons, and their short
 reactions in puzzles and drills, with ElevenLabs.
 
-Two coaches teach the same course: Leo (Liam's voice) and Vera (Sarah's). The
+Two coaches teach the same course: Leo (Trevor's voice) and Vera (Sarah's). The
 course is written in Leo's words; for Vera his name becomes hers, exactly as
 Coach.personalize does in the app. Reactions ("Nice move.", "Try again.") come
 from Training/Content/reactions.json.
@@ -53,13 +53,17 @@ VOICES = Path(__file__).resolve().parent / "narration-voices.json"
 
 MODEL = "eleven_multilingual_v2"
 OUTPUT_FORMAT = "mp3_44100_64"
-LEO_MODEL = MODEL
-# Leo's settings: steady and clean, no style exaggeration. Changing them doesn't re-record anything.
-VOICE_SETTINGS = {"stability": 0.65, "similarity_boost": 0.9, "style": 0.0, "use_speaker_boost": True, "speed": 0.95}
+# Leo's model: ElevenLabs' newest, the most natural. It paces itself (no speed setting).
+LEO_MODEL = "eleven_v4"
+# Leo's settings: none, so the voice's own, exactly as in the samples Alex chose him from
+# (2026-11-06). Changing them doesn't re-record anything.
+VOICE_SETTINGS = None
 COACHES = {
-    # Liam: a young, articulate American man (an ElevenLabs premade voice).
+    # Trevor ("TrevorT"): a natural, conversational American man, a professional voice from
+    # ElevenLabs' voice library, picked by Alex from samples (2026-11-06). Should its owner ever
+    # withdraw it, the recordings stay; give Leo another voice and push to record them again.
     # Override with ELEVENLABS_VOICE_ID. Recorded at 128 kbps, then levelled (MASTER).
-    "leo": {"name": "Leo", "prefix": "nar-", "voice": os.environ.get("ELEVENLABS_VOICE_ID", "TX3LPaxmHKxFdv7VOQHJ"),
+    "leo": {"name": "Leo", "prefix": "nar-", "voice": os.environ.get("ELEVENLABS_VOICE_ID", "69SAlwj2jajrSXUGnYAA"),
             "model": LEO_MODEL, "settings": VOICE_SETTINGS, "format": "mp3_44100_128", "master": True},
     # Sarah: a confident, warm young American woman. Override with ELEVENLABS_VERA_VOICE_ID.
     # Steady and clean: high stability, no style exaggeration, recorded at 128 kbps.

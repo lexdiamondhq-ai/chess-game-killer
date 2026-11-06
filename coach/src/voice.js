@@ -1,4 +1,4 @@
-// The coach's voice: Leo's answer read aloud by Liam on ElevenLabs, Vera's by
+// The coach's voice: Leo's answer read aloud by Trevor on ElevenLabs, Vera's by
 // Sarah, with the same model and settings as their recorded lessons
 // (scripts/training/make_narration.py), so the coach in a game sounds like the
 // coach in the lessons. When there's no
@@ -6,21 +6,21 @@
 // device's voice instead.
 
 const API = "https://api.elevenlabs.io/v1/text-to-speech";
-/** Liam: a young, articulate American man. */
-const DEFAULT_VOICE_ID = "TX3LPaxmHKxFdv7VOQHJ";
+/** Trevor ("TrevorT" in ElevenLabs' voice library): a natural, conversational American man. */
+const DEFAULT_VOICE_ID = "69SAlwj2jajrSXUGnYAA";
 /** Sarah: a confident, warm young American woman. Vera's voice. */
 const DEFAULT_VERA_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
-const DEFAULT_VOICE_MODEL = "eleven_multilingual_v2";
+/** Leo's model, ElevenLabs' newest and most natural (LEO_MODEL in make_narration.py). */
+const DEFAULT_VOICE_MODEL = "eleven_v4";
+/** Vera's model, which her settings are made for (MODEL in make_narration.py). */
+const DEFAULT_VERA_VOICE_MODEL = "eleven_multilingual_v2";
 /** Leo's lessons are recorded at 128 kbps too (COACHES["leo"] in make_narration.py). */
 const OUTPUT_FORMAT = "mp3_44100_128";
-/** Exactly the lessons' settings (VOICE_SETTINGS in make_narration.py). */
-export const VOICE_SETTINGS = Object.freeze({
-  stability: 0.65,
-  similarity_boost: 0.9,
-  style: 0.0,
-  use_speaker_boost: true,
-  speed: 0.95,
-});
+/**
+ * Exactly the lessons' settings (VOICE_SETTINGS in make_narration.py): none, so ElevenLabs uses
+ * the voice's own, as in the samples Leo's voice was chosen from.
+ */
+export const VOICE_SETTINGS = null;
 /** Vera's lesson settings (COACHES["vera"] in make_narration.py): steady and clean, at 128 kbps. */
 export const VERA_VOICE_SETTINGS = Object.freeze({
   stability: 0.7,
@@ -30,8 +30,11 @@ export const VERA_VOICE_SETTINGS = Object.freeze({
   speed: 0.98,
 });
 const VERA_OUTPUT_FORMAT = "mp3_44100_128";
-/** A spoken answer takes ElevenLabs a second or two; past this, the device's voice is quicker. */
-const DEFAULT_TIMEOUT_MS = 8000;
+/**
+ * A spoken answer takes ElevenLabs a few seconds (the newest model a little longer); past this,
+ * the device's voice is quicker. With Claude's two calls it stays inside the app's 35 s.
+ */
+const DEFAULT_TIMEOUT_MS = 10000;
 /** 320 characters of speech is about 20 seconds, about 160 KB at 64 kbps. Anything far bigger is wrong. */
 const MAX_AUDIO_BYTES = 2 * 1024 * 1024;
 
@@ -43,7 +46,7 @@ export function voiceKey(env) {
 /**
  * The coach ("leo" or "vera") saying `text`, as MP3 bytes. Null when there's no key, or when
  * ElevenLabs fails, answers with something that isn't audio, or takes longer
- * than VOICE_TIMEOUT_MS (8 s; tests shorten it).
+ * than VOICE_TIMEOUT_MS (10 s; tests shorten it).
  */
 export async function speak(env, text, fetchImpl = fetch, coach = "leo") {
   const key = voiceKey(env);
@@ -57,15 +60,16 @@ export async function speak(env, text, fetchImpl = fetch, coach = "leo") {
     return null;
   }
   const timeout = Number(env.VOICE_TIMEOUT_MS) > 0 ? Number(env.VOICE_TIMEOUT_MS) : DEFAULT_TIMEOUT_MS;
+  // VOICE_MODEL is Leo's; Vera keeps the model her settings are made for.
+  const model = String(vera ? env.VERA_VOICE_MODEL || DEFAULT_VERA_VOICE_MODEL : env.VOICE_MODEL || DEFAULT_VOICE_MODEL).trim();
+  const settings = vera ? VERA_VOICE_SETTINGS : VOICE_SETTINGS;
+  const body = { text: words, model_id: model };
+  if (settings) body.voice_settings = settings;
   try {
     const response = await fetchImpl(`${API}/${voice}?output_format=${vera ? VERA_OUTPUT_FORMAT : OUTPUT_FORMAT}`, {
       method: "POST",
       headers: { "xi-api-key": key, "content-type": "application/json", accept: "audio/mpeg" },
-      body: JSON.stringify({
-        text: words,
-        model_id: String(env.VOICE_MODEL || DEFAULT_VOICE_MODEL).trim(),
-        voice_settings: vera ? VERA_VOICE_SETTINGS : VOICE_SETTINGS,
-      }),
+      body: JSON.stringify(body),
       signal: AbortSignal.timeout(timeout),
     });
     const type = (response.headers.get("content-type") || "").toLowerCase();
