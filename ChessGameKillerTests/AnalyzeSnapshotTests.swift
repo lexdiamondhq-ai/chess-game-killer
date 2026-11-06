@@ -49,6 +49,59 @@ final class AnalyzeSnapshotTests: XCTestCase {
         window.isHidden = true
     }
 
+    /// A photo straight after it's read: its analysis, with the photo, what to check and Edit
+    /// pieces over the board. Before that, the photo while the reader checks every square.
+    func testAPhotosAnalysis() async throws {
+        let theme = BoardTheme.named(.gilded)
+        let draft = try XCTUnwrap(PositionDraft(fen: "r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4"))
+        let photo = Self.boardPhoto()
+
+        let session = ScanSession(reader: SlowFakeBoardReader(
+            reading: BoardReading(draft: draft, whiteSide: .bottom, sureOfTurn: false, confidence: .high),
+            delay: .seconds(30)
+        ))
+        session.read(photo)
+        let reading = try show(NavigationStack {
+            PhotoReadingView(session: session, theme: theme)
+        }
+        .background { TrainingBackdrop(theme: theme) }
+        .screenScheme(theme))
+        try save(reading, "zz-analyze-0-reading")
+        reading.isHidden = true
+        session.leaveReading()
+
+        let engine = FakeEngine(scripted: [
+            draft.fen: [
+                EngineLine(moves: ["h5f7"], evaluation: .mate(1)),
+                EngineLine(moves: ["c4f7", "e8e7"], evaluation: .centipawns(180)),
+            ],
+        ])
+        let model = AnalysisModel(draft: draft, engine: engine)
+        await model.run()
+        XCTAssertEqual(model.lines.first?.firstMove, "h5f7")
+        let window = try show(NavigationStack {
+            AnalysisView(model: model, theme: theme, photo: photo, photoDoubts: "I guessed it's White's move.",
+                         onEditPieces: { _ in })
+        }
+        .background { TrainingBackdrop(theme: theme) }
+        .screenScheme(theme))
+        try save(window, "zz-analyze-3-photo")
+        window.isHidden = true
+    }
+
+    /// A stand-in for a photo of a board: light and dark squares.
+    private static func boardPhoto() -> UIImage {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        return UIGraphicsImageRenderer(size: CGSize(width: 480, height: 480), format: format).image { context in
+            for index in 0..<64 {
+                let light = (index / 8 + index % 8) % 2 == 0
+                UIColor(white: light ? 0.86 : 0.42, alpha: 1).setFill()
+                context.fill(CGRect(x: CGFloat(index % 8) * 60, y: CGFloat(index / 8) * 60, width: 60, height: 60))
+            }
+        }
+    }
+
     private func show(_ view: some View, wait: TimeInterval = 2.5) throws -> UIWindow {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let window = UIWindow(windowScene: scene)

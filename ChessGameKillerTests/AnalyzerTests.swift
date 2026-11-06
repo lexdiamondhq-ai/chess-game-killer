@@ -245,29 +245,137 @@ final class ScanSessionTests: XCTestCase {
         XCTAssertTrue(condition())
     }
 
-    func testReadingAPhotoFillsTheEditor() async {
+    /// A photo goes from being read straight to its analysis, with no stop in the editor
+    /// (Alex, 2026-11-06: "Skip the board read and adding pieces and go straight to analyze").
+    func testAPhotoGoesStraightToItsAnalysis() async {
         let draft = PositionDraft(fen: "6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1")!
         let reader = FakeBoardReader(result: .success(
             BoardReading(draft: draft, whiteSide: .bottom, sureOfTurn: false, confidence: .high)
         ))
         let session = ScanSession(reader: reader)
         session.read(UIImage())
-        XCTAssertEqual(session.path, [.editor])
+        XCTAssertEqual(session.path, [.reading])
         XCTAssertTrue(session.isReading)
 
         await waitUntil { !session.isReading }
-        XCTAssertEqual(session.draft, draft)
+        XCTAssertEqual(session.path, [.analysis])
+        XCTAssertEqual(session.analyzed, draft)
+        XCTAssertNotNil(session.photo, "kept, to compare with")
         XCTAssertFalse(session.readingFailed)
-        XCTAssertTrue(session.readingNote?.contains("whose turn") == true)
+        // The analysis says what to check: here, whose turn it is.
+        XCTAssertEqual(session.photoDoubts, "I guessed it's White's move.")
+    }
+
+    func testASureReadHasNothingToCheck() async {
+        let draft = PositionDraft(fen: "6k1/5ppp/8/8/8/8/8/R5K1 b - - 0 1")!
+        let session = ScanSession(reader: FakeBoardReader(result: .success(
+            BoardReading(draft: draft, whiteSide: .bottom, sureOfTurn: true, confidence: .high)
+        )))
+        session.read(UIImage())
+        await waitUntil { !session.isReading }
+        XCTAssertEqual(session.path, [.analysis])
+        XCTAssertNil(session.photoDoubts)
+
+        let blurry = ScanSession(reader: FakeBoardReader(result: .success(
+            BoardReading(draft: draft, whiteSide: .bottom, sureOfTurn: false, confidence: .low)
+        )))
+        blurry.read(UIImage())
+        await waitUntil { !blurry.isReading }
+        XCTAssertEqual(blurry.photoDoubts, "The picture was hard to read, so check the pieces. I guessed it's Black's move.")
+    }
+
+    /// From the photo's analysis, Edit pieces opens the editor on the board, and its Analyze
+    /// comes back to a new analysis of the fixed position.
+    func testFixingAPieceComesBackToTheAnalysis() async {
+        let draft = PositionDraft(fen: "6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1")!
+        let session = ScanSession(reader: FakeBoardReader(result: .success(
+            BoardReading(draft: draft, whiteSide: .bottom, sureOfTurn: false, confidence: .high)
+        )))
+        session.read(UIImage())
+        await waitUntil { !session.isReading }
+        let firstRun = session.analysisRun
+
+        session.editPieces(session.analyzed)
+        XCTAssertEqual(session.path, [.analysis, .editor])
+        XCTAssertEqual(session.draft, draft)
+        XCTAssertTrue(session.readingNote?.contains("tap Analyze") == true)
+
+        // The reader missed a pawn.
+        session.draft[.h2] = .init(.pawn, .white)
+        session.analyzeDraft()
+        XCTAssertEqual(session.path, [.analysis], "back on the analysis, not a second one on top")
+        XCTAssertEqual(session.analyzed[.h2], .init(.pawn, .white))
+        XCTAssertGreaterThan(session.analysisRun, firstRun, "the analysis starts over")
+        XCTAssertNil(session.photoDoubts, "the pieces have been looked over")
+
+        // Backing out of the editor leaves the analysis as it was.
+        session.editPieces(session.analyzed)
+        let run = session.analysisRun
+        session.draft[.a1] = nil
+        session.path.removeLast()
+        XCTAssertEqual(session.analysisRun, run)
+        XCTAssertEqual(session.analyzed[.a1], .init(.rook, .white))
+    }
+
+    /// Pieces read that can't be analyzed (here, no black king) open the editor instead,
+    /// where what's wrong shows under the board.
+    func testPiecesThatCantBeAnalyzedOpenTheEditor() async {
+        let draft = PositionDraft(fen: "8/5ppp/8/8/8/8/8/R5K1 w - - 0 1")!
+        XCTAssertFalse(draft.isValid)
+        let session = ScanSession(reader: FakeBoardReader(result: .success(
+            BoardReading(draft: draft, whiteSide: .bottom, sureOfTurn: true, confidence: .high)
+        )))
+        session.read(UIImage())
+        await waitUntil { !session.isReading }
+        XCTAssertEqual(session.path, [.editor])
+        XCTAssertEqual(session.draft, draft)
+        XCTAssertTrue(session.readingNote?.contains("marked below") == true)
+
+        // Fixed, the editor's Analyze opens the analysis on top.
+        session.draft[.g8] = .init(.king, .black)
+        session.analyzeDraft()
+        XCTAssertEqual(session.path, [.editor, .analysis])
+        XCTAssertEqual(session.analyzed[.g8], .init(.king, .black))
     }
 
     func testAFailedReadLeavesAnEmptyBoardToFillIn() async {
         let session = ScanSession(reader: FakeBoardReader(result: .failure(.noBoard)))
         session.read(UIImage())
         await waitUntil { !session.isReading }
+        XCTAssertEqual(session.path, [.editor])
         XCTAssertTrue(session.readingFailed)
         XCTAssertTrue(session.draft.isEmpty)
         XCTAssertEqual(session.readingNote, BoardReaderError.noBoard.errorDescription)
+    }
+
+    func testStoppingASlowReadOpensTheEditor() {
+        let draft = PositionDraft(fen: "6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1")!
+        let session = ScanSession(reader: SlowFakeBoardReader(
+            reading: BoardReading(draft: draft, whiteSide: .bottom, sureOfTurn: true, confidence: .high)
+        ))
+        session.read(UIImage())
+        session.stopReading()
+        XCTAssertEqual(session.path, [.editor])
+        XCTAssertFalse(session.isReading)
+        XCTAssertNotNil(session.photo, "still there to copy from")
+        XCTAssertTrue(session.readingNote?.contains("Stopped") == true)
+    }
+
+    /// Backing out to the start while the photo is read drops the read: its analysis doesn't
+    /// open later out of nowhere.
+    func testBackingOutWhileReadingDropsTheRead() async throws {
+        let draft = PositionDraft(fen: "6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1")!
+        let session = ScanSession(reader: SlowFakeBoardReader(
+            reading: BoardReading(draft: draft, whiteSide: .bottom, sureOfTurn: true, confidence: .high),
+            delay: .milliseconds(100)
+        ))
+        session.read(UIImage())
+        session.path = []
+        session.leaveReading()
+        XCTAssertFalse(session.isReading)
+        try await Task.sleep(for: .milliseconds(300))
+        XCTAssertEqual(session.path, [])
+        XCTAssertNotEqual(session.analyzed, draft)
     }
 
     func testANewerReadIsNotSpoiledByTheOneItReplaced() async {
@@ -282,6 +390,8 @@ final class ScanSessionTests: XCTestCase {
         await waitUntil { !session.isReading }
         XCTAssertFalse(session.readingFailed)
         XCTAssertEqual(session.draft, draft)
+        XCTAssertEqual(session.analyzed, draft)
+        XCTAssertEqual(session.path, [.analysis])
     }
 
     func testAPhotoThatWontOpenExplainsItself() {
@@ -299,10 +409,22 @@ final class ScanSessionTests: XCTestCase {
         let fen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"
         session.analyze(fen: fen)
         XCTAssertEqual(session.path, [.analysis])
-        XCTAssertEqual(session.draft.sideToMove, .black)
-        XCTAssertEqual(session.draft[.e4], .init(.pawn, .white))
+        XCTAssertEqual(session.analyzed.sideToMove, .black)
+        XCTAssertEqual(session.analyzed[.e4], .init(.pawn, .white))
         // The game's castling rights and en passant square go to Stockfish as they are.
-        XCTAssertEqual(session.draft.fen, fen)
+        XCTAssertEqual(session.analyzed.fen, fen)
+        XCTAssertNil(session.photo)
+    }
+
+    func testABoardSetUpByHandIsAnalyzedFromTheEditor() {
+        let session = ScanSession(reader: UnavailableBoardReader())
+        session.setUpByHand()
+        XCTAssertEqual(session.path, [.editor])
+        session.draft[.e2] = nil
+        session.draft[.e4] = .init(.pawn, .white)
+        session.analyzeDraft()
+        XCTAssertEqual(session.path, [.editor, .analysis])
+        XCTAssertEqual(session.analyzed[.e4], .init(.pawn, .white))
     }
 }
 

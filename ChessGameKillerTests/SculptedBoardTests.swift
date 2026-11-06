@@ -269,7 +269,10 @@ final class SculptedBoardTests: XCTestCase {
             }
 
             let near: Float = flipped ? -1 : 1
+            // A glyph's own up and right, lying on the frame.
             let turn = SculptedBoardScene.labelOrientation(flipped: flipped)
+            let glyphUp = turn.act(SIMD3<Float>(0, 0.1, 0))
+            let glyphRight = turn.act(SIMD3<Float>(0.1, 0, 0))
             let views: [(SculptedCamera.Framing, Float)] = [
                 (.standing, SculptedCamera.standingAspects.lowerBound),
                 (.standing, SculptedCamera.standingAspects.upperBound),
@@ -290,8 +293,8 @@ final class SculptedBoardTests: XCTestCase {
                     }
                     // Its top points up the screen and its right to the right: upright, not mirrored.
                     let here = screen(label.position)
-                    XCTAssertLessThan(screen(label.position + turn.act(SIMD3(0, 0.1, 0))).y, here.y, "\(label.text) \(view)")
-                    XCTAssertGreaterThan(screen(label.position + turn.act(SIMD3(0.1, 0, 0))).x, here.x, "\(label.text) \(view)")
+                    XCTAssertLessThan(screen(label.position + glyphUp).y, here.y, "\(label.text) \(view)")
+                    XCTAssertGreaterThan(screen(label.position + glyphRight).x, here.x, "\(label.text) \(view)")
                 }
                 // Read along the bottom, a to h for White and h to a for Black; up the left side,
                 // 1 to 8 for White and 8 to 1 for Black.

@@ -5,21 +5,33 @@ import UIKit
 
 /// One trip through the analyzer: a picture (maybe), the position being
 /// fixed up in the editor, and Stockfish's view of it.
+///
+/// A photo goes straight from being read to its analysis, with no stop in the editor
+/// (Alex, 2026-11-06: "Skip the board read and adding pieces and go straight to analyze").
+/// The analysis can open the editor to fix a piece, and the editor's Analyze comes back.
 @MainActor
 @Observable
 final class ScanSession {
     enum Step: Hashable {
+        /// The photo, while the reader checks every square.
+        case reading
         case editor
         case analysis
     }
 
     var path: [Step] = []
+    /// The position in the editor.
     var draft = PositionDraft.standard
+    /// The position the analysis looks at. A new analysis starts each time `analysisRun` changes.
+    private(set) var analyzed = PositionDraft.standard
+    private(set) var analysisRun = 0
     private(set) var photo: UIImage?
     private(set) var isReading = false
     /// Shown above the editor: what the reader made of the photo, or why it couldn't.
     private(set) var readingNote: String?
     private(set) var readingFailed = false
+    /// Shown with the photo's analysis when the reader wasn't sure of something: what to check.
+    private(set) var photoDoubts: String?
 
     private let reader: BoardReader
     private var readTask: Task<Void, Never>?
@@ -41,16 +53,18 @@ final class ScanSession {
     func analyze(fen: String) {
         reset()
         draft = PositionDraft(fen: fen) ?? .standard
+        startAnalysis(of: draft)
         path = [.analysis]
     }
 
-    /// Opens the editor straight away and fills it in once the picture is read.
+    /// Shows the picture while it's read, then its analysis. A read that fails, or finds pieces
+    /// that can't be analyzed yet, opens the editor instead, with the photo there to copy from.
     func read(_ image: UIImage) {
         reset()
         photo = image
         draft = .empty
         isReading = true
-        path = [.editor]
+        path = [.reading]
         readID += 1
         let id = readID
         readTask = Task { [weak self, reader] in
@@ -72,6 +86,34 @@ final class ScanSession {
         path = [.editor]
     }
 
+    // MARK: Editing and analyzing
+
+    /// From the analysis: its board's pieces in the editor, to fix and analyze again.
+    func editPieces(_ position: PositionDraft) {
+        draft = position
+        readingFailed = false
+        readingNote = photo == nil ? nil : "Fix any piece I got wrong, then tap Analyze."
+        path.append(.editor)
+    }
+
+    /// The editor's Analyze: the position as it is now. An editor opened from an analysis
+    /// goes back to it, which starts over on the new position; otherwise the analysis opens.
+    func analyzeDraft() {
+        startAnalysis(of: draft)
+        // The person has looked the pieces over.
+        photoDoubts = nil
+        if Array(path.suffix(2)) == [.analysis, .editor] {
+            path.removeLast()
+        } else {
+            path.append(.analysis)
+        }
+    }
+
+    private func startAnalysis(of position: PositionDraft) {
+        analyzed = position
+        analysisRun += 1
+    }
+
     // MARK: Reading
 
     /// Gives up on a slow read and leaves the editor to fill in by hand, with the photo still there to copy from.
@@ -83,6 +125,16 @@ final class ScanSession {
         isReading = false
         readingFailed = false
         readingNote = "Stopped. Set up the pieces by hand (tap the photo to see it), or go back and pick another."
+        if path.last == .reading { path = [.editor] }
+    }
+
+    /// Leaving the photo while it's read, back to the start: the read is dropped.
+    func leaveReading() {
+        guard isReading else { return }
+        readTask?.cancel()
+        readTask = nil
+        readID += 1
+        isReading = false
     }
 
     private func finishReading(_ reading: BoardReading, id: Int) {
@@ -90,10 +142,19 @@ final class ScanSession {
         isReading = false
         draft = reading.draft
         readingFailed = false
-        var notes = ["Check the pieces, fix any that are wrong, then tap Analyze."]
-        if !reading.sureOfTurn { notes.append("Set whose turn it is.") }
-        if reading.confidence == .low { notes.insert("The picture was hard to read.", at: 0) }
-        readingNote = notes.joined(separator: " ")
+        let hardToRead = reading.confidence == .low ? "The picture was hard to read, so check the pieces." : nil
+        guard reading.draft.isValid else {
+            // What's wrong shows under the editor's board.
+            readingNote = [hardToRead, "Fix what's marked below, then tap Analyze."].compactMap { $0 }.joined(separator: " ")
+            if path.last == .reading { path = [.editor] }
+            return
+        }
+        let side = reading.draft.sideToMove == .white ? "White" : "Black"
+        let turn = reading.sureOfTurn ? nil : "I guessed it's \(side)'s move."
+        let doubts = [hardToRead, turn].compactMap { $0 }
+        photoDoubts = doubts.isEmpty ? nil : doubts.joined(separator: " ")
+        startAnalysis(of: reading.draft)
+        if path.last == .reading { path = [.analysis] }
     }
 
     private func failReading(_ error: Error, id: Int) {
@@ -101,6 +162,7 @@ final class ScanSession {
         isReading = false
         readingFailed = true
         readingNote = (error as? LocalizedError)?.errorDescription ?? BoardReaderError.failed.errorDescription
+        if path.last == .reading { path = [.editor] }
     }
 
     private func reset() {
@@ -110,6 +172,7 @@ final class ScanSession {
         isReading = false
         readingNote = nil
         readingFailed = false
+        photoDoubts = nil
     }
 }
 

@@ -148,16 +148,7 @@ struct AnalyzeSheet: View {
                 }
             }
             .navigationDestination(for: ScanSession.Step.self) { step in
-                switch step {
-                case .editor:
-                    BoardEditorView(session: session, theme: theme)
-                case .analysis:
-                    AnalysisView(draft: session.draft, theme: theme, engine: engine,
-                                 rival: rival, clock: clock, forfeits: forfeits) { draft in
-                        onPlay(draft)
-                        dismiss()
-                    }
-                }
+                destination(step)
             }
         }
         .onChange(of: photoItem) { _, item in
@@ -190,6 +181,28 @@ struct AnalyzeSheet: View {
             TrainingBackdrop(theme: theme)
         }
         .screenScheme(theme)
+    }
+}
+
+extension AnalyzeSheet {
+    @ViewBuilder
+    fileprivate func destination(_ step: ScanSession.Step) -> some View {
+        switch step {
+        case .reading:
+            PhotoReadingView(session: session, theme: theme)
+        case .editor:
+            BoardEditorView(session: session, theme: theme)
+        case .analysis:
+            // A photo's analysis can open the editor to fix a piece; coming back starts it over.
+            AnalysisView(draft: session.analyzed, theme: theme, engine: engine,
+                         rival: rival, clock: clock, forfeits: forfeits,
+                         photo: session.photo, photoDoubts: session.photoDoubts,
+                         onEditPieces: { session.editPieces($0) }) { draft in
+                onPlay(draft)
+                dismiss()
+            }
+            .id(session.analysisRun)
+        }
     }
 }
 
@@ -243,6 +256,51 @@ struct Panel: View {
     }
 }
 
+// MARK: - Reading
+
+/// The photo, big, while the reader checks every square; its analysis follows by itself.
+struct PhotoReadingView: View {
+    let session: ScanSession
+    let theme: BoardTheme
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 18) {
+                if let photo = session.photo {
+                    Image(uiImage: photo)
+                        .resizable()
+                        .scaledToFit()
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .frame(maxHeight: 420)
+                        .accessibilityLabel("Your photo")
+                }
+                VStack(spacing: 6) {
+                    HStack(spacing: 10) {
+                        ProgressView()
+                        Text("Reading the board")
+                            .font(.app(.headline))
+                    }
+                    Text("I'm checking every square, then I'll find the best moves. This can take up to a minute.")
+                        .font(.app(.subheadline))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Button("Stop") { withAnimation(.snappy) { session.stopReading() } }
+                    .buttonStyle(.bordered)
+                    .accessibilityLabel("Stop reading the photo")
+                    .accessibilityHint("Then set up the pieces by hand")
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity)
+        }
+        .navigationTitle("Reading your photo")
+        .navigationBarTitleDisplayMode(.inline)
+        // Backing out while it's read drops the read, so its analysis can't open later.
+        .onDisappear { session.leaveReading() }
+    }
+}
+
 // MARK: - Editor
 
 /// Fix up the position: tap a piece below, then tap squares to place it.
@@ -266,31 +324,21 @@ struct BoardEditorView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                if session.photo != nil || session.isReading || session.readingFailed {
+                if session.photo != nil || session.readingFailed {
                     readingBanner
                 }
 
                 PositionBoard(draft: session.draft, theme: theme) { square in
                     place(on: square)
                 }
-                .overlay {
-                    if session.isReading {
-                        ProgressView("Reading the board")
-                            .padding(16)
-                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    }
-                }
-                .disabled(session.isReading)
 
                 palette
 
-                // What the reader finds replaces the whole draft, so hold edits until it's done.
                 Picker("Turn", selection: $session.draft.sideToMove) {
                     Text("White to move").tag(Piece.Color.white)
                     Text("Black to move").tag(Piece.Color.black)
                 }
                 .pickerStyle(.segmented)
-                .disabled(session.isReading)
 
                 HStack(spacing: 10) {
                     // Turns the pieces around, for a photo taken from the other side of the board.
@@ -305,9 +353,8 @@ struct BoardEditorView: View {
                     }
                     .accessibilityLabel("Reset to the starting position")
                 }
-                .disabled(session.isReading)
 
-                if let problem, !session.isReading {
+                if let problem {
                     Label(problem, systemImage: "exclamationmark.triangle.fill")
                         .font(.app(.subheadline, weight: .medium))
                         .foregroundStyle(Color(hex: 0xFF9A3C))
@@ -322,9 +369,9 @@ struct BoardEditorView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button("Analyze") { session.path.append(.analysis) }
+                Button("Analyze") { session.analyzeDraft() }
                     .fontWeight(.semibold)
-                    .disabled(!session.draft.isValid || session.isReading)
+                    .disabled(!session.draft.isValid)
             }
         }
         .sheet(isPresented: $showingPhoto) {
@@ -352,20 +399,16 @@ struct BoardEditorView: View {
                 .accessibilityLabel("Show your photo")
             }
             VStack(alignment: .leading, spacing: 4) {
-                Text(session.isReading ? "Reading your photo" : session.readingFailed ? "Couldn't read it" : "Board read")
+                Text(session.readingFailed ? "Couldn't read it" : "Your photo")
                     .font(.app(.headline))
-                Text(session.isReading ? "I'm checking every square. This can take up to a minute." : session.readingNote ?? "")
-                    .font(.app(.subheadline))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                if let note = session.readingNote {
+                    Text(note)
+                        .font(.app(.subheadline))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             Spacer(minLength: 0)
-            if session.isReading {
-                Button("Stop") { withAnimation(.snappy) { session.stopReading() } }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .accessibilityLabel("Stop reading the photo")
-            }
         }
         .padding(12)
         .background(Panel(theme: theme, highlight: session.readingFailed ? Color(hex: 0xFF9A3C) : nil))
@@ -454,19 +497,30 @@ struct AnalysisView: View {
     var clock: TimeControl = .unlimited
     /// The rival of a game in progress that starting this one would cost.
     var forfeits: String?
+    /// The photo the position was read from, and what the reader wasn't sure of.
+    var photo: UIImage?
+    var photoDoubts: String?
+    /// Opens the editor on the board's pieces, to fix one the reader got wrong. Offered with the photo.
+    var onEditPieces: ((PositionDraft) -> Void)?
     let onPlay: (PositionDraft) -> Void
 
     @State private var model: AnalysisModel
     @State private var flipped: Bool
     @State private var confirmingForfeit = false
+    @State private var showingPhoto = false
     @AppStorage("haptics") private var hapticsOn = true
 
     init(draft: PositionDraft, theme: BoardTheme, engine: ChessEngine?, rival: String = "the computer",
-         clock: TimeControl = .unlimited, forfeits: String? = nil, onPlay: @escaping (PositionDraft) -> Void) {
+         clock: TimeControl = .unlimited, forfeits: String? = nil,
+         photo: UIImage? = nil, photoDoubts: String? = nil, onEditPieces: ((PositionDraft) -> Void)? = nil,
+         onPlay: @escaping (PositionDraft) -> Void) {
         self.theme = theme
         self.rival = rival
         self.clock = clock
         self.forfeits = forfeits
+        self.photo = photo
+        self.photoDoubts = photoDoubts
+        self.onEditPieces = onEditPieces
         self.onPlay = onPlay
         let sounds: SoundPlaying? = engine == nil ? nil : SoundPlayer.shared
         _model = State(initialValue: AnalysisModel(draft: draft, engine: engine, sounds: sounds))
@@ -474,8 +528,12 @@ struct AnalysisView: View {
     }
 
     /// A board already part way through, for pictures in the tests.
-    init(model: AnalysisModel, theme: BoardTheme, onPlay: @escaping (PositionDraft) -> Void = { _ in }) {
+    init(model: AnalysisModel, theme: BoardTheme, photo: UIImage? = nil, photoDoubts: String? = nil,
+         onEditPieces: ((PositionDraft) -> Void)? = nil, onPlay: @escaping (PositionDraft) -> Void = { _ in }) {
         self.theme = theme
+        self.photo = photo
+        self.photoDoubts = photoDoubts
+        self.onEditPieces = onEditPieces
         self.onPlay = onPlay
         _model = State(initialValue: model)
         _flipped = State(initialValue: model.start.sideToMove == .black)
@@ -502,6 +560,7 @@ struct AnalysisView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 14) {
+                photoRow
                 header
                 PositionBoard(draft: model.draft, theme: theme, flipped: flipped,
                               hints: model.selected == nil ? model.hints : [],
@@ -559,6 +618,30 @@ struct AnalysisView: View {
         }
         .task { await model.run() }
         .onDisappear { model.stopLine() }
+        .sheet(isPresented: $showingPhoto) {
+            if let photo {
+                Image(uiImage: photo)
+                    .resizable()
+                    .scaledToFit()
+                    .padding()
+                    .presentationDetents([.medium, .large])
+            }
+        }
+    }
+
+    // MARK: The photo
+
+    /// The photo the position was read from, with the way to fix its pieces.
+    @ViewBuilder
+    private var photoRow: some View {
+        if let photo, let onEditPieces {
+            PhotoSourceRow(photo: photo, doubts: photoDoubts, theme: theme) {
+                showingPhoto = true
+            } onEdit: {
+                model.stopLine()
+                onEditPieces(model.draft)
+            }
+        }
     }
 
     // MARK: Who's better
@@ -741,6 +824,52 @@ struct AnalysisView: View {
 
     private func scoreLabel(_ line: EngineLine) -> String {
         (model.draft.sideToMove == .white ? line.evaluation : line.evaluation.flipped).label
+    }
+}
+
+/// Over the analysis of a photo: the photo to compare with, what the reader wasn't sure of,
+/// and the way to fix a piece it got wrong (Alex, 2026-11-06: "maybe have an option somewhere
+/// to add pieces after analyze").
+private struct PhotoSourceRow: View {
+    let photo: UIImage
+    let doubts: String?
+    let theme: BoardTheme
+    let onShowPhoto: () -> Void
+    let onEdit: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button(action: onShowPhoto) {
+                Image(uiImage: photo)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 40, height: 40)
+                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Show your photo")
+            VStack(alignment: .leading, spacing: 2) {
+                Text("From your photo")
+                    .font(.app(.subheadline, weight: .semibold))
+                if let doubts {
+                    Text(doubts)
+                        .font(.app(.footnote))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 0)
+            Button(action: onEdit) {
+                Label("Edit pieces", systemImage: "square.and.pencil")
+                    .font(.app(.subheadline, weight: .semibold))
+                    .lineLimit(1)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .accessibilityHint("Move, add or take off pieces, or change whose turn it is, then analyze again")
+        }
+        .padding(10)
+        .background(Panel(theme: theme, highlight: doubts == nil ? nil : Color(hex: 0xFF9A3C)))
     }
 }
 
