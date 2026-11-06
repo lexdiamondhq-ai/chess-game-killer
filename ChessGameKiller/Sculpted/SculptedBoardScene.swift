@@ -1889,33 +1889,45 @@ final class SculptedBoardScene {
         scene.rootNode.addChildNode(board)
     }
 
-    /// Files and ranks in the corners of the edge squares nearest the player, upright for them:
-    /// the letters low on the near rank, the numbers high on the left file. The frame runs off
-    /// the screen's sides now, so they live on the squares.
+    /// The files and ranks on the frame, outside the squares as on a printed board, upright for
+    /// the player: the letters along the frame's near side, each under its file, and the numbers
+    /// down its left side, each beside its rank. From Black's side the near side and the left
+    /// are the other ones, and the letters run h to a.
     private func buildLabels(flipped: Bool) {
         labelsNode.childNodes.forEach { $0.removeFromParentNode() }
-        let side: Float = flipped ? -1 : 1
-        let turn = simd_quatf(angle: flipped ? .pi : 0, axis: SculptedCamera.up) * Self.flat
-        let files = Array("abcdefgh")
-        // From a square's middle to the center of its corner label.
-        let corner: Float = 0.34
-        for index in 0..<8 {
-            // a1 is dark, and the colors alternate along the edge.
-            let onDark = index % 2 == 0
-            let file = Float(index) - 3.5
-            addLabel(String(files[index]), at: SIMD3((file + corner) * side, 0.0064, (3.5 + corner) * side),
-                     orientation: turn, onDark: onDark)
-            let rank = 3.5 - Float(index)
-            addLabel("\(index + 1)", at: SIMD3((-3.5 - corner) * side, 0.0064, (rank - corner) * side),
-                     orientation: turn, onDark: onDark)
+        let turn = Self.labelOrientation(flipped: flipped)
+        for label in Self.labelPlacements(flipped: flipped) {
+            addLabel(label.text, at: label.position, orientation: turn)
         }
     }
 
-    /// A label in the square's corner: pale on a dark square, deep brown on a light one, so it
-    /// reads on both like the letters on a printed board.
-    private func addLabel(_ text: String, at position: SIMD3<Float>, orientation: simd_quatf, onDark: Bool) {
-        let ink: UIColor = onDark ? look.platinumMark : UIColor(red: 0.24, green: 0.17, blue: 0.11, alpha: 1)
-        let node = SCNNode(geometry: Self.mark(size: 0.3, color: ink, alpha: onDark ? 0.85 : 0.75, mask: MarkImages.label(text)))
+    /// Lying on the frame, the tops of the letters toward the far side of the board.
+    static func labelOrientation(flipped: Bool) -> simd_quatf {
+        simd_quatf(angle: flipped ? .pi : 0, axis: SculptedCamera.up) * flat
+    }
+
+    /// Where each file letter and rank number sits on the frame, just above the glass's top.
+    static func labelPlacements(flipped: Bool) -> [(text: String, position: SIMD3<Float>)] {
+        // Toward the player: White's side of the board, or Black's.
+        let near: Float = flipped ? -1 : 1
+        let band = SculptedCamera.labelBand
+        let height: Float = 0.011
+        let files = Array("abcdefgh")
+        var placements: [(text: String, position: SIMD3<Float>)] = []
+        for index in 0..<8 {
+            // The file's and the rank's own line on the board, whichever side the player is on.
+            let file = Float(index) - 3.5
+            let rank = 3.5 - Float(index)
+            placements.append((String(files[index]), SIMD3(file, height, band * near)))
+            // The player's left is the a-file's side for White and the h-file's for Black.
+            placements.append(("\(index + 1)", SIMD3(-band * near, height, rank)))
+        }
+        return placements
+    }
+
+    /// A letter or number on the smoked glass frame, pale like the metal line beside it.
+    private func addLabel(_ text: String, at position: SIMD3<Float>, orientation: simd_quatf) {
+        let node = SCNNode(geometry: Self.mark(size: 0.3, color: look.platinumMark, alpha: 0.85, mask: MarkImages.label(text)))
         node.simdPosition = position
         node.simdOrientation = orientation
         node.castsShadow = false
