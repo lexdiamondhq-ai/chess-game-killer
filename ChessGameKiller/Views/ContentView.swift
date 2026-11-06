@@ -13,6 +13,8 @@ struct ContentView: View {
     @State private var showingAnalyze = false
     /// Analyze opens on the camera (the home's Scan a board shortcut).
     @State private var analyzeWithCamera = false
+    /// Analyze opens on this position (the home's masterpiece) instead of its first screen.
+    @State private var analyzeFEN: String?
     @State private var coachExpanded = false
     @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .gilded
     @AppStorage("showBestMoves") private var showBestMoves = false
@@ -313,7 +315,10 @@ struct ContentView: View {
                 SettingsSheet()
                     .boardSheetGrabber(boardSheet)
             }
-            .sheet(isPresented: $showingAnalyze, onDismiss: { analyzeWithCamera = false }) {
+            .sheet(isPresented: $showingAnalyze, onDismiss: {
+                analyzeWithCamera = false
+                analyzeFEN = nil
+            }) {
                 AnalyzeSheet(
                     theme: theme,
                     currentFEN: match.hasStarted ? match.game.fen : nil,
@@ -323,7 +328,8 @@ struct ContentView: View {
                     clock: fromHereSetup.timeControl,
                     forfeits: forfeits,
                     onAnalyzeGame: analyzeGame,
-                    startsWithCamera: analyzeWithCamera
+                    startsWithCamera: analyzeWithCamera,
+                    startsAt: analyzeFEN
                 ) { draft in
                     play(from: draft)
                 }
@@ -433,6 +439,10 @@ struct ContentView: View {
             },
             resume: { leaveHome() },
             analyze: { showingAnalyze = true },
+            analyzePosition: { fen in
+                analyzeFEN = fen
+                showingAnalyze = true
+            },
             scan: {
                 analyzeWithCamera = true
                 showingAnalyze = true

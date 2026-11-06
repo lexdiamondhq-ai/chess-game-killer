@@ -146,9 +146,9 @@ struct HomeJewel: View {
     var hold: (() -> Void)? = nil
 
     @State private var pressed = false
-    /// Counts the knight's leaps (J1): each tap at rest sends it vaulting before the game opens.
+    /// Counts the taps at rest: each one sends a glint across the gold before the game opens.
     @State private var vaults = 0
-    /// Mid-leap: a second tap waits for the first to land.
+    /// Mid-glint: a second tap waits for the first.
     @State private var vaulting = false
     @AppStorage("haptics") private var hapticsOn = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -165,7 +165,14 @@ struct HomeJewel: View {
         content
             .foregroundStyle(tone.onIvory)
             .frame(width: width, height: height)
-            .background { HomeJewelGold(tone: tone, round: !folded, lit: face == .open) }
+            .background {
+                HomeJewelGold(tone: tone, round: !folded, lit: face == .open)
+                    .overlay {
+                        if face == .rest {
+                            JewelSheen(trigger: vaults)
+                        }
+                    }
+            }
             .background {
                 if face == .rest {
                     JewelLandingRing(color: tone.metal, trigger: vaults)
@@ -179,7 +186,7 @@ struct HomeJewel: View {
                 pressed = pressing
             })
             .onTapGesture(perform: tapped)
-            .sensoryFeedback(.impact(weight: .medium), trigger: vaults) { _, _ in hapticsOn }
+            .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.75), trigger: vaults) { _, _ in hapticsOn }
             .accessibilityElement(children: .ignore)
             .accessibilityAddTraits(.isButton)
             .accessibilityLabel(spokenLabel)
@@ -202,7 +209,7 @@ struct HomeJewel: View {
         hold?()
     }
 
-    /// At rest the knight vaults first and the game opens as it lands; otherwise straight away.
+    /// At rest the jewel catches the light first and the game opens as it fades; otherwise straight away.
     private func tapped() {
         guard face == .rest, !reduceMotion else {
             tap()

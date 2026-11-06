@@ -122,6 +122,8 @@ struct HomeMiniBoard: View {
     let tone: HomeTone
     /// Your move: a fine gold rim.
     var lit = false
+    /// Squares washed in gold, like the last move's.
+    var marked: Set<Square> = []
 
     private var draft: PositionDraft {
         fen.flatMap(PositionDraft.init(fen:)) ?? PositionDraft(fen: Self.start) ?? PositionDraft()
@@ -141,6 +143,9 @@ struct HomeMiniBoard: View {
                             let at = flipped ? Square(file: 7 - column, rank: row) : Square(file: column, rank: 7 - row)
                             ZStack {
                                 Rectangle().fill((at.fileIndex + at.rankIndex) % 2 == 1 ? theme.light : theme.dark)
+                                if marked.contains(at) {
+                                    Rectangle().fill(tone.metal.opacity(0.5))
+                                }
                                 if let token = draft[at] {
                                     PieceImage(piece: token.piece(at: at), theme: theme, size: square, onBoard: true)
                                 }

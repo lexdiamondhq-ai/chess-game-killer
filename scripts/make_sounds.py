@@ -6,6 +6,8 @@ then push to the `generate-sounds` branch to regenerate.
 
 Usage: python3 scripts/make_sounds.py <output-dir> [name ...]
 With names, only those sounds are made; the rest are left as they are.
+       python3 scripts/make_sounds.py --tidy <output-dir> [name ...]
+tidies the files already there (see tidy) without calling ElevenLabs.
 Sounds listed in MUSIC are composed with the ElevenLabs Music API, falling
 back to the Sound Effects API if music isn't available on the account.
 """
@@ -34,8 +36,13 @@ SOUNDS = {
     "castle": ("Two weighted wooden chess pieces with felt bases set down on a hardwood board one "
                "right after the other: two soft knocks a fraction of a second apart. Close-up, "
                "dry room, no music", 0.7),
-    "win": ("A triumphant short synthwave victory chime with sparkles", 2.5),
-    "game-over": ("A calm descending synth chime signalling the end of a game", 2.2),
+    # The endings: warm and acoustic like the pieces, never arcade synths.
+    "win": ("A short, elegant success chime: three warm rising notes on a soft celesta and a "
+            "felt piano, a gentle shimmer at the end. Clean, luxurious, understated, no synths, "
+            "no drums", 2.2),
+    "game-over": ("The end of a chess game: two soft, warm, descending notes on a felt piano with "
+                  "a low cello underneath, calm and dignified, not sad, quickly fading. No synths, "
+                  "no drums", 2.2),
     "victory": ("A joyful video game level-complete victory fanfare: a bright rising "
                 "melody on shimmering synths and bells, punchy drums, ending on a big "
                 "triumphant major chord with sparkles, polished modern mobile game music", 6.0),
@@ -91,6 +98,54 @@ def louder(audio: bytes, decibels: float, out: str) -> bytes:
     return audio
 
 
+def tidy(audio: bytes, out: str, knock: bool) -> bytes:
+    """Starts the sound on its first real sample, so a piece is heard the instant it lands
+    (the generated files open with a few hundredths of a second of near silence, and the
+    victory theme with a third of a second), with a 4 ms fade in and a short fade out so
+    nothing clicks. Unchanged without ffmpeg."""
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        return audio
+    source = os.path.join(out, "tidy-in.mp3")
+    target = os.path.join(out, "tidy-out.mp3")
+    with open(source, "wb") as f:
+        f.write(audio)
+    tail = 0.03 if knock else 0.25
+    chain = (
+        "silenceremove=start_periods=1:start_threshold=-52dB:start_silence=0.002,"
+        "afade=t=in:d=0.004,"
+        # A fade out on the last stretch: reversed, it is a fade in.
+        f"areverse,silenceremove=start_periods=1:start_threshold=-70dB,afade=t=in:d={tail},areverse"
+    )
+    subprocess.run([
+        ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", source,
+        "-af", chain, "-ar", "44100", "-b:a", "128k", target,
+    ], check=True)
+    with open(target, "rb") as f:
+        audio = f.read()
+    os.remove(source)
+    os.remove(target)
+    return audio
+
+
+# The short knocks of the pieces; everything else is a longer cue.
+KNOCKS = {"move", "select", "capture", "check", "castle"}
+
+
+def tidy_files(out: str, only: set[str]) -> None:
+    for name in SOUNDS:
+        if only and name not in only:
+            continue
+        path = os.path.join(out, f"{name}.mp3")
+        if not os.path.exists(path):
+            continue
+        with open(path, "rb") as f:
+            audio = tidy(f.read(), out, name in KNOCKS)
+        with open(path, "wb") as f:
+            f.write(audio)
+        print(f"{name}.mp3 tidied: {len(audio)} bytes")
+
+
 def generate(text: str, seconds: float, key: str) -> bytes:
     body = json.dumps({
         "text": text,
@@ -133,11 +188,18 @@ def compose(text: str, seconds: float, key: str) -> bytes | None:
 
 
 def main() -> None:
-    out = sys.argv[1]
-    only = set(sys.argv[2:])
+    args = sys.argv[1:]
+    tidy_only = bool(args) and args[0] == "--tidy"
+    if tidy_only:
+        args = args[1:]
+    out = args[0]
+    only = set(args[1:])
     unknown = only - set(SOUNDS)
     if unknown:
         sys.exit(f"Unknown sounds: {', '.join(sorted(unknown))}")
+    if tidy_only:
+        tidy_files(out, only)
+        return
     key = os.environ.get("ELEVENLABS_API_KEY")
     if not key:
         sys.exit("ELEVENLABS_API_KEY is not set. Add it as a repository secret.")
@@ -152,6 +214,7 @@ def main() -> None:
             audio = generate(text, seconds, key)
         if name in GAIN_DB:
             audio = louder(audio, GAIN_DB[name], out)
+        audio = tidy(audio, out, name in KNOCKS)
         with open(os.path.join(out, f"{name}.mp3"), "wb") as f:
             f.write(audio)
         print(f"{name}.mp3: {len(audio)} bytes")

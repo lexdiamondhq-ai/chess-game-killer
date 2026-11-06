@@ -14,6 +14,9 @@ struct PositionBoard: View {
     /// Pieces drawn as ghosts: moves that could have been, not moves that were.
     var ghosts: Set<Square> = []
     var ghostColor: Color = .yellow
+    /// The piece picked up, and the squares it can go to (drawn as dots, rings on a capture).
+    var selected: Square? = nil
+    var targets: Set<Square> = []
     @AppStorage(BoardTheme.coordinatesKey) private var showsCoordinates = true
     @Environment(\.colorScheme) private var colorScheme
 
@@ -102,7 +105,8 @@ struct PositionBoard: View {
         BoardTapResolver.center(of: square, squareSize: size, flipped: flipped)
     }
 
-    /// The square a tap on the squares means: see `BoardTapResolver`. Nothing is picked up here.
+    /// The square a tap on the squares means: see `BoardTapResolver`. With a piece picked up,
+    /// a tap near one of its dots means that square.
     private func tappedSquare(at point: CGPoint, size: CGFloat) -> Square? {
         var isSolid: ((Piece, CGPoint) -> Bool)?
         if theme.spritePieces {
@@ -111,7 +115,8 @@ struct PositionBoard: View {
         }
         let draft = draft
         return BoardTapResolver.square(
-            at: point, squareSize: size, flipped: flipped, selected: nil, targets: [],
+            at: point, squareSize: size, flipped: flipped,
+            selected: selected, targets: targets,
             piece: { square in draft[square]?.piece(at: square) }, isSolid: isSolid
         )
     }
@@ -144,7 +149,11 @@ struct PositionBoard: View {
                 PieceImage(piece: token.piece(at: square), theme: theme, size: size, onBoard: true)
                     .opacity(isGhost ? 0.62 : 1)
                     .shadow(color: isGhost ? ghostColor.opacity(0.9) : .clear, radius: size * 0.12)
+                    .scaleEffect(square == selected ? 1.08 : 1)
                     .transition(.scale(scale: 0.6).combined(with: .opacity))
+            }
+            if targets.contains(square) {
+                targetMark(capture: token != nil, size: size)
             }
         }
         .frame(width: size, height: size)
@@ -152,6 +161,23 @@ struct PositionBoard: View {
         .accessibilityLabel(token.map { "\(square.notation), \($0.piece(at: square).spokenName)" } ?? square.notation)
         .accessibilityAddTraits(onTap == nil ? [] : .isButton)
         .accessibilityAction { onTap?(square) }
+    }
+
+    /// Where the piece picked up can go: a soft dot, or a ring around a piece it can take.
+    @ViewBuilder
+    private func targetMark(capture: Bool, size: CGFloat) -> some View {
+        let ink: Color = Color.black.opacity(0.28)
+        if capture {
+            Circle()
+                .strokeBorder(ink, lineWidth: size * 0.08)
+                .padding(size * 0.04)
+                .allowsHitTesting(false)
+        } else {
+            Circle()
+                .fill(ink)
+                .frame(width: size * 0.3, height: size * 0.3)
+                .allowsHitTesting(false)
+        }
     }
 
     private func label(_ text: String, size: CGFloat, color: Color, alignment: Alignment) -> some View {

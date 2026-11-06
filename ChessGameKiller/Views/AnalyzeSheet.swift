@@ -3,7 +3,7 @@ import PhotosUI
 import SwiftUI
 
 /// The analyzer: start from a photo, a screenshot, an empty board or the
-/// current game, fix the position, then see Stockfish's two best moves.
+/// current game, fix the position, then see Stockfish's two best moves and play them out.
 struct AnalyzeSheet: View {
     let theme: BoardTheme
     /// The game on the board, if one has started.
@@ -38,6 +38,7 @@ struct AnalyzeSheet: View {
         forfeits: String? = nil,
         onAnalyzeGame: (() -> Void)? = nil,
         startsWithCamera: Bool = false,
+        startsAt: String? = nil,
         onPlay: @escaping (PositionDraft) -> Void
     ) {
         self.theme = theme
@@ -49,7 +50,10 @@ struct AnalyzeSheet: View {
         self.onAnalyzeGame = onAnalyzeGame
         self.startsWithCamera = startsWithCamera
         self.onPlay = onPlay
-        _session = State(initialValue: ScanSession(reader: reader))
+        let session = ScanSession(reader: reader)
+        // Opened on a position (the home's masterpiece): straight to its analysis.
+        if let startsAt { session.analyze(fen: startsAt) }
+        _session = State(initialValue: session)
     }
 
     private var accent: Color { theme.trainingAccent }
@@ -84,7 +88,7 @@ struct AnalyzeSheet: View {
         NavigationStack(path: $session.path) {
             ScrollView {
                 VStack(spacing: 12) {
-                    Text("Snap a real board, pick a screenshot or set one up. I'll find the two best moves.")
+                    Text("Snap a real board, pick a screenshot or set one up. I'll find the best moves, and you can play them out.")
                         .font(.app(.subheadline))
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -441,7 +445,8 @@ struct BoardEditorView: View {
 
 // MARK: - Analysis
 
-/// Stockfish's two best moves for the position, drawn as arrows, with what follows.
+/// Stockfish's two best moves for the position, drawn as arrows, on a board to explore: move
+/// any piece and see the best answer, step through the moves, or play out the best line.
 struct AnalysisView: View {
     let theme: BoardTheme
     /// Who "Play from here" plays, and on what clock.
@@ -454,6 +459,7 @@ struct AnalysisView: View {
     @State private var model: AnalysisModel
     @State private var flipped: Bool
     @State private var confirmingForfeit = false
+    @AppStorage("haptics") private var hapticsOn = true
 
     init(draft: PositionDraft, theme: BoardTheme, engine: ChessEngine?, rival: String = "the computer",
          clock: TimeControl = .unlimited, forfeits: String? = nil, onPlay: @escaping (PositionDraft) -> Void) {
@@ -462,7 +468,8 @@ struct AnalysisView: View {
         self.clock = clock
         self.forfeits = forfeits
         self.onPlay = onPlay
-        _model = State(initialValue: AnalysisModel(draft: draft, engine: engine))
+        let sounds: SoundPlaying? = engine == nil ? nil : SoundPlayer.shared
+        _model = State(initialValue: AnalysisModel(draft: draft, engine: engine, sounds: sounds))
         _flipped = State(initialValue: draft.sideToMove == .black)
     }
 
@@ -471,15 +478,36 @@ struct AnalysisView: View {
 
     private var accent: Color { theme.trainingAccent }
 
+    /// The last move's squares and the piece picked up, tinted.
+    private var tints: [Square: Color] {
+        var tints: [Square: Color] = [:]
+        if let last = model.lastMove {
+            tints[last.from] = accent.opacity(0.22)
+            tints[last.to] = accent.opacity(0.34)
+        }
+        if let selected = model.selected {
+            tints[selected] = accent.opacity(0.45)
+        }
+        return tints
+    }
+
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
+            VStack(spacing: 14) {
                 header
-                PositionBoard(draft: model.draft, theme: theme, flipped: flipped, hints: model.hints)
+                PositionBoard(draft: model.draft, theme: theme, flipped: flipped,
+                              hints: model.selected == nil ? model.hints : [],
+                              onTap: { square in model.tap(square) }, tints: tints,
+                              selected: model.selected, targets: model.targets)
                     .animation(.snappy(duration: 0.4), value: flipped)
+                    .animation(.snappy(duration: 0.22), value: model.draft.fen)
+                    .sensoryFeedback(.selection, trigger: model.selected) { _, new in hapticsOn && new != nil }
+                stepper
+                madeMoves
                 lines
                 VStack(spacing: 6) {
                     Button {
+                        model.stopLine()
                         if forfeits == nil { onPlay(model.draft) } else { confirmingForfeit = true }
                     } label: {
                         Label("Play \(rival) from here", systemImage: "play.fill")
@@ -508,7 +536,7 @@ struct AnalysisView: View {
             .padding(16)
             .animation(.snappy, value: model.lines)
         }
-        .navigationTitle("Best moves")
+        .navigationTitle("Analysis")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -522,6 +550,7 @@ struct AnalysisView: View {
             }
         }
         .task { await model.run() }
+        .onDisappear { model.stopLine() }
     }
 
     // MARK: Who's better
@@ -542,6 +571,7 @@ struct AnalysisView: View {
                     if let evaluation = model.evaluationForWhite {
                         Text(evaluation.label)
                             .font(.app(.headline).monospacedDigit())
+                            .contentTransition(.numericText())
                     }
                 }
                 EvaluationBar(winningChances: model.evaluationForWhite?.winningChances ?? 0, theme: theme)
@@ -560,6 +590,89 @@ struct AnalysisView: View {
         return "Thinking"
     }
 
+    // MARK: Stepping through
+
+    /// Back to the start, a move back, play the best line, a move ahead.
+    private var stepper: some View {
+        HStack(spacing: 10) {
+            stepButton("backward.end.fill", label: "Back to the start", enabled: model.canGoBack) { model.rewind() }
+            stepButton("chevron.backward", label: "Move back", enabled: model.canGoBack) { model.back() }
+            Button {
+                if model.isPlayingLine { model.stopLine() } else { model.playLine() }
+            } label: {
+                Label(model.isPlayingLine ? "Pause" : "Play the line",
+                      systemImage: model.isPlayingLine ? "pause.fill" : "play.fill")
+                    .font(.app(.subheadline, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .contentTransition(.symbolEffect(.replace))
+            }
+            .buttonStyle(.bordered)
+            .disabled(!model.isPlayingLine && !model.canPlayLine)
+            .accessibilityHint("Plays the engine's best line out on the board, a move at a time")
+            stepButton("chevron.forward", label: "Move ahead", enabled: model.canGoForward) { model.forward() }
+        }
+    }
+
+    private func stepButton(_ symbol: String, label: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.app(.body, weight: .semibold))
+                .frame(width: 48, height: 44)
+        }
+        .buttonStyle(.bordered)
+        .disabled(!enabled)
+        .accessibilityLabel(label)
+    }
+
+    /// The moves made on the board, to jump back to; or how to make one.
+    @ViewBuilder
+    private var madeMoves: some View {
+        let made = model.movesMade
+        if made.isEmpty {
+            Text(model.ending == nil
+                 ? "Tap a piece to move it and see the best answer, or tap Play the line to watch the best moves play out."
+                 : "Go back to try another move.")
+                .font(.app(.footnote))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            ScrollViewReader { reader in
+                ScrollView(.horizontal) {
+                    HStack(spacing: 6) {
+                        moveChip("Start", on: model.cursor == 0, ahead: false, id: -1) { model.rewind() }
+                        ForEach(made, id: \.index) { move in
+                            moveChip(move.label, on: model.cursor == move.index + 1, ahead: move.index >= model.cursor,
+                                     id: move.index) { model.jump(to: move.index) }
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+                .scrollIndicators(.hidden)
+                .onChange(of: model.cursor) { _, cursor in
+                    withAnimation(.snappy) { reader.scrollTo(cursor - 1, anchor: .center) }
+                }
+            }
+        }
+    }
+
+    private func moveChip(_ text: String, on: Bool, ahead: Bool, id: Int, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(text)
+                .font(.app(.subheadline, weight: on ? .semibold : .regular).monospacedDigit())
+                .foregroundStyle(on ? accent : (ahead ? Color.secondary.opacity(0.7) : Color.primary))
+                .padding(.horizontal, 10)
+                .frame(minHeight: 34)
+                .background {
+                    Capsule().fill(on ? accent.opacity(0.18) : Color.secondary.opacity(0.1))
+                }
+        }
+        .buttonStyle(.plain)
+        .id(id)
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+
     // MARK: The two lines
 
     @ViewBuilder
@@ -567,27 +680,35 @@ struct AnalysisView: View {
         if model.ending == nil {
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(Array(model.lines.prefix(2).enumerated()), id: \.offset) { index, line in
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 8) {
-                            ArrowSample(color: index == 0 ? theme.bestArrow : theme.secondArrow, dashed: index != 0)
-                            Text(index == 0 ? "Best" : "Next best")
-                                .font(.app(.subheadline))
-                                .foregroundStyle(.secondary)
-                            if index < model.hints.count {
-                                Text(model.hints[index].san)
-                                    .font(.app(.headline))
+                    Button {
+                        if let uci = line.firstMove { model.play(uci, fromLine: true) }
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 8) {
+                                ArrowSample(color: index == 0 ? theme.bestArrow : theme.secondArrow, dashed: index != 0)
+                                Text(index == 0 ? "Best" : "Next best")
+                                    .font(.app(.subheadline))
+                                    .foregroundStyle(.secondary)
+                                if index < model.hints.count {
+                                    Text(model.hints[index].san)
+                                        .font(.app(.headline))
+                                }
+                                Spacer()
+                                Text(scoreLabel(line))
+                                    .font(.app(.subheadline, weight: .semibold).monospacedDigit())
+                                    .foregroundStyle(.secondary)
                             }
-                            Spacer()
-                            Text(scoreLabel(line))
-                                .font(.app(.subheadline, weight: .semibold).monospacedDigit())
+                            Text(model.readable(line))
+                                .font(.app(.footnote))
                                 .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
-                        Text(model.readable(line))
-                            .font(.app(.footnote))
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
+                        .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
                     .accessibilityElement(children: .combine)
+                    .accessibilityHint("Plays this move on the board")
                 }
                 HStack(spacing: 8) {
                     if model.isThinking {
@@ -598,7 +719,7 @@ struct AnalysisView: View {
                         Text("The engine didn't answer. Go back and try again.")
                     } else if model.depth > 0 {
                         Image(systemName: "checkmark.seal.fill").foregroundStyle(accent)
-                        Text("Checked by Stockfish 17")
+                        Text("Checked by Stockfish 17. Tap a line to play its move.")
                     }
                 }
                 .font(.app(.footnote))

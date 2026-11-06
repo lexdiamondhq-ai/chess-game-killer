@@ -24,13 +24,13 @@ final class HomeSnapshotTests: XCTestCase {
         try await super.tearDown()
     }
 
-    /// The board home (1A): the sheet halfway on Today, all the way up on Learn, on Army and
-    /// You, and folded down to the strip with the board filling the screen.
+    /// The board home (1A): the sheet halfway on Today, all the way up on Learn and on Today (the
+    /// masterpiece and the army), on You, and folded down to the strip with the board filling the screen.
     func testTheBoardHome() throws {
         UserDefaults.standard.set(true, forKey: HomeLayout.key)
         let shots: [(HomeSheetDetent, HomeSheetTab, String)] = [
             (.half, .today, "zz-home-sheet-1-today"), (.full, .learn, "zz-home-sheet-2-learn"),
-            (.half, .army, "zz-home-sheet-3-army"), (.half, .you, "zz-home-sheet-4-you"),
+            (.full, .today, "zz-home-sheet-3-today-up"), (.half, .you, "zz-home-sheet-4-you"),
             (.board, .today, "zz-home-sheet-5-folded"),
         ]
         for (detent, tab, name) in shots {

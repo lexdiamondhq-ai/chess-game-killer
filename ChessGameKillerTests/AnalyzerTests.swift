@@ -357,6 +357,110 @@ final class AnalysisModelTests: XCTestCase {
         let model = AnalysisModel(draft: .standard, engine: nil)
         XCTAssertEqual(model.verdict(white: "White", black: "Black"), "")
     }
+
+    /// Waits for the analysis the board's last change started.
+    private func settle(_ model: AnalysisModel) async {
+        for _ in 0..<100 where model.isThinking || model.lines.isEmpty {
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+    }
+
+    func testAPieceCanBeMovedAndTheAnalysisFollows() async {
+        let engine = FakeEngine()
+        let model = AnalysisModel(draft: .standard, engine: engine)
+        await model.run()
+        model.tap(.e2)
+        XCTAssertEqual(model.selected, .e2)
+        XCTAssertEqual(model.targets, [.e3, .e4])
+        model.tap(.e4)
+        XCTAssertNil(model.selected)
+        XCTAssertEqual(model.cursor, 1)
+        XCTAssertEqual(model.draft.sideToMove, .black)
+        XCTAssertEqual(model.draft[.e4], .init(.pawn, .white))
+        XCTAssertEqual(model.movesMade.map { $0.label }, ["1. e4"])
+        await settle(model)
+        // Black's best answers now, from the new position.
+        let analyzed = await engine.analyzed
+        XCTAssertEqual(analyzed.last, model.draft.fen)
+        XCTAssertFalse(model.hints.isEmpty)
+        // A black piece can't be picked up on White's turn, and a white one can't now.
+        model.tap(.d2)
+        XCTAssertNil(model.selected)
+    }
+
+    func testStepsBackAndForwardThroughTheMoves() async {
+        let model = AnalysisModel(draft: .standard, engine: FakeEngine())
+        await model.run()
+        XCTAssertTrue(model.play("e2e4", fromLine: false))
+        XCTAssertTrue(model.play("e7e5", fromLine: false))
+        XCTAssertTrue(model.play("g1f3", fromLine: false))
+        XCTAssertEqual(model.movesMade.map { $0.label }, ["1. e4", "e5", "2. Nf3"])
+        model.back()
+        model.back()
+        XCTAssertEqual(model.cursor, 1)
+        XCTAssertEqual(model.draft.sideToMove, .black)
+        // The moves ahead stay until a different one is played.
+        XCTAssertEqual(model.steps.count, 3)
+        model.forward()
+        XCTAssertEqual(model.cursor, 2)
+        XCTAssertNotNil(model.draft[.e5])
+        model.jump(to: 2)
+        XCTAssertEqual(model.cursor, 3)
+        model.rewind()
+        XCTAssertEqual(model.cursor, 0)
+        XCTAssertEqual(model.draft.fen, PositionDraft.standard.fen)
+        XCTAssertFalse(model.canGoBack)
+        // Another first move replaces the old line.
+        XCTAssertTrue(model.play("d2d4", fromLine: false))
+        XCTAssertEqual(model.movesMade.map { $0.label }, ["1. d4"])
+        XCTAssertFalse(model.play("d4d6", fromLine: false))
+    }
+
+    func testPlaysTheBestLineOutMoveByMove() async {
+        let start = PositionDraft.standard
+        let engine = FakeEngine(scripted: [
+            start.fen: [EngineLine(moves: ["e2e4", "e7e5", "g1f3", "b8c6"], evaluation: .centipawns(30))],
+        ])
+        let model = AnalysisModel(draft: start, engine: engine, lineBeat: .milliseconds(10))
+        await model.run()
+        XCTAssertTrue(model.canPlayLine)
+        model.playLine()
+        XCTAssertTrue(model.isPlayingLine)
+        for _ in 0..<100 where model.isPlayingLine {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertFalse(model.isPlayingLine)
+        XCTAssertEqual(model.movesMade.map { $0.label }, ["1. e4", "e5", "2. Nf3", "Nc6"])
+        XCTAssertEqual(model.cursor, 4)
+        XCTAssertTrue(model.steps.allSatisfy(\.fromLine))
+        // Stepping back past the line keeps it to step through again.
+        model.rewind()
+        model.forward()
+        XCTAssertEqual(model.cursor, 1)
+        XCTAssertEqual(model.steps.count, 4)
+    }
+
+    func testForwardPlaysTheBestMoveWhenNothingIsAhead() async {
+        let start = PositionDraft.standard
+        let engine = FakeEngine(scripted: [
+            start.fen: [EngineLine(moves: ["d2d4", "d7d5"], evaluation: .centipawns(20))],
+        ])
+        let model = AnalysisModel(draft: start, engine: engine)
+        await model.run()
+        XCTAssertTrue(model.canGoForward)
+        model.forward()
+        XCTAssertEqual(model.movesMade.map { $0.label }, ["1. d4"])
+    }
+
+    func testLinesAreNumberedFromThePositionOnTheBoard() async {
+        let draft = PositionDraft(fen: "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3")!
+        let engine = FakeEngine(scripted: [
+            draft.fen: [EngineLine(moves: ["f1b5", "a7a6"], evaluation: .centipawns(30))],
+        ])
+        let model = AnalysisModel(draft: draft, engine: engine)
+        await model.run()
+        XCTAssertEqual(model.readable(model.lines[0]), "3. Bb5 a6")
+    }
 }
 
 @MainActor

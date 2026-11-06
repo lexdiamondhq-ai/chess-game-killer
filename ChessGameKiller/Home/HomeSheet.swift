@@ -4,7 +4,7 @@ import UIKit
 
 /// The board home (Alex picked "1A Sheet With Tabs", 2026-11-03): the real 3D board fills the
 /// top of the screen and never leaves it, and one glass sheet slides over it. The sheet's tabs
-/// (Today, Learn, Army, You) sit at its foot beside the gold knight. Pull the sheet up for
+/// (Today, Learn, You) sit at its foot beside the gold knight; the army lives on Today. Pull the sheet up for
 /// more, push it down to play: it folds into one slim strip with the game on it.
 /// Settings can switch back to the tiles home.
 enum HomeLayout {
@@ -28,7 +28,7 @@ enum HomeSheetDetent: Int, CaseIterable {
 
 /// The sheet's tabs.
 enum HomeSheetTab: Int, CaseIterable, Identifiable {
-    case today, learn, army, you
+    case today, learn, you
 
     var id: Int { rawValue }
 
@@ -36,7 +36,6 @@ enum HomeSheetTab: Int, CaseIterable, Identifiable {
         switch self {
         case .today: return "Today"
         case .learn: return "Learn"
-        case .army: return "Army"
         case .you: return "You"
         }
     }
@@ -45,7 +44,6 @@ enum HomeSheetTab: Int, CaseIterable, Identifiable {
         switch self {
         case .today: return Glyphs.today
         case .learn: return Glyphs.train
-        case .army: return Glyphs.army
         case .you: return Glyphs.king
         }
     }
@@ -266,7 +264,7 @@ struct HomeSheetTabBar<Jewel: View>: View {
             }
             jewel()
         }
-        // Four tabs and the knight share one row: past this size the labels would cut off.
+        // The tabs and the knight share one row: past this size the labels would cut off.
         // Held down, a tab shows its name large (the system's large content viewer).
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }

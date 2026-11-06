@@ -178,85 +178,67 @@ extension View {
 
 // MARK: - J1 knight vault
 
-/// Where the knight is in its leap out of the jewel.
-struct KnightVault {
-    var lift: CGFloat = 0
-    var tilt: Double = 0
+/// Where the jewel is in its catch of the light.
+struct JewelGlint {
+    /// The knight's nod, in degrees.
+    var nod: Double = 0
+    /// The gold face's press and release.
     var scale: CGFloat = 1
-    var squash: CGFloat = 1
-}
-
-/// How far a gold ring has spread from the jewel, from 0 (none) to 1 (gone).
-struct JewelRing {
-    var spread: CGFloat = 0
+    /// The streak of light across the gold: from -1 (off the top left) to 1 (gone past).
+    var sweep: CGFloat = -1
+    /// The soft gold bloom behind the jewel: 0 none, 1 at its fullest.
+    var bloom: CGFloat = 0
 }
 
 extension HomeJewel {
-    /// How long the leap takes before the game opens: the knight has landed by then.
-    static let vaultLanding: Duration = .milliseconds(470)
+    /// How long the glint takes before the game opens: the light has crossed the gold by then.
+    static let vaultLanding: Duration = .milliseconds(380)
 }
 
-/// The knight's leap: crouch, up with a twist, land with a squash and settle.
+/// A tap on the jewel: it presses in like a real button, a streak of light runs across the
+/// gold, the knight gives a small nod, and a soft bloom of light rises behind it. Quiet and
+/// quick, like a watch's crown, rather than a cartoon leap.
 struct KnightVaultEffect: ViewModifier {
     let trigger: Int
 
     func body(content: Content) -> some View {
-        content.keyframeAnimator(initialValue: KnightVault(), trigger: trigger) { view, value in
+        content.keyframeAnimator(initialValue: JewelGlint(), trigger: trigger) { view, value in
             view
-                .scaleEffect(x: value.scale, y: value.scale * value.squash, anchor: .bottom)
-                .rotationEffect(.degrees(value.tilt))
-                .offset(y: value.lift)
+                .rotationEffect(.degrees(value.nod), anchor: .bottom)
+                .scaleEffect(value.scale)
         } keyframes: { _ in
-            KeyframeTrack(\.lift) {
-                CubicKeyframe(2, duration: 0.07)
-                CubicKeyframe(-44, duration: 0.2)
-                CubicKeyframe(0, duration: 0.17)
-                SpringKeyframe(0, duration: 0.2, spring: .bouncy)
-            }
-            KeyframeTrack(\.tilt) {
-                LinearKeyframe(0, duration: 0.07)
-                CubicKeyframe(-14, duration: 0.14)
-                CubicKeyframe(10, duration: 0.12)
-                CubicKeyframe(0, duration: 0.15)
+            KeyframeTrack(\.nod) {
+                LinearKeyframe(0, duration: 0.06)
+                CubicKeyframe(-7, duration: 0.14)
+                SpringKeyframe(0, duration: 0.3, spring: .smooth)
             }
             KeyframeTrack(\.scale) {
-                CubicKeyframe(0.88, duration: 0.07)
-                CubicKeyframe(1.2, duration: 0.2)
-                CubicKeyframe(1, duration: 0.2)
-            }
-            KeyframeTrack(\.squash) {
-                LinearKeyframe(1, duration: 0.42)
-                CubicKeyframe(0.86, duration: 0.06)
-                SpringKeyframe(1, duration: 0.25, spring: .bouncy)
+                CubicKeyframe(0.94, duration: 0.08)
+                SpringKeyframe(1, duration: 0.32, spring: .smooth)
             }
         }
     }
 }
 
-/// The gold ring the knight's landing sends out across the dock.
+/// The soft bloom of gold light that rises behind the jewel as it's tapped, and fades.
 struct JewelLandingRing: View {
     let color: Color
     let trigger: Int
 
     var body: some View {
-        ZStack {
-            Circle()
-                .strokeBorder(color, lineWidth: 2)
-            ForEach(0..<8, id: \.self) { index in
-                JewelSpark(color: color, angle: Double(index) * 45)
-            }
-        }
-            .keyframeAnimator(initialValue: JewelRing(), trigger: trigger) { ring, value in
-                let shown: Double = value.spread > 0 ? Double(1 - value.spread) : 0
-                ring
-                    .environment(\.jewelSpread, value.spread)
-                    .scaleEffect(1 + value.spread * 1.8)
-                    .opacity(shown)
+        Circle()
+            .fill(RadialGradient(colors: [color.opacity(0.6), color.opacity(0)],
+                                 center: .center, startRadius: 0, endRadius: 48))
+            .padding(-22)
+            .blur(radius: 5)
+            .keyframeAnimator(initialValue: JewelGlint(), trigger: trigger) { glow, value in
+                glow
+                    .scaleEffect(0.85 + value.bloom * 0.3)
+                    .opacity(Double(value.bloom))
             } keyframes: { _ in
-                KeyframeTrack(\.spread) {
-                    LinearKeyframe(0, duration: 0.45)
-                    LinearKeyframe(0.01, duration: 0.01)
-                    CubicKeyframe(1, duration: 0.45)
+                KeyframeTrack(\.bloom) {
+                    CubicKeyframe(1, duration: 0.16)
+                    CubicKeyframe(0, duration: 0.55)
                 }
             }
             .allowsHitTesting(false)
@@ -264,33 +246,32 @@ struct JewelLandingRing: View {
     }
 }
 
-private struct JewelSpreadKey: EnvironmentKey {
-    static let defaultValue: CGFloat = 0
-}
-
-extension EnvironmentValues {
-    /// How far the landing ring has spread, for its sparks.
-    var jewelSpread: CGFloat {
-        get { self[JewelSpreadKey.self] }
-        set { self[JewelSpreadKey.self] = newValue }
-    }
-}
-
-/// One spark thrown out from the jewel as the knight lands.
-private struct JewelSpark: View {
-    let color: Color
-    let angle: Double
-
-    @Environment(\.jewelSpread) private var spread
+/// The streak of light that runs across the jewel's gold as it's tapped, under the knight.
+struct JewelSheen: View {
+    let trigger: Int
 
     var body: some View {
-        let radians: Double = angle * .pi / 180
-        let reach: CGFloat = 34 + spread * 26
-        let x: CGFloat = CGFloat(cos(radians)) * reach
-        let y: CGFloat = CGFloat(sin(radians)) * reach
-        Circle()
-            .fill(color)
-            .frame(width: 4, height: 4)
-            .offset(x: x, y: y)
+        GeometryReader { geo in
+            let reach: CGFloat = geo.size.width * 0.85
+            Color.clear
+                .keyframeAnimator(initialValue: JewelGlint(), trigger: trigger) { _, value in
+                    LinearGradient(colors: [Color.white.opacity(0), Color.white.opacity(0.7), Color.white.opacity(0)],
+                                   startPoint: .leading, endPoint: .trailing)
+                        .frame(width: geo.size.width * 0.3, height: geo.size.height * 1.6)
+                        .rotationEffect(.degrees(24))
+                        .offset(x: value.sweep * reach)
+                        .opacity(value.sweep > -1 && value.sweep < 1 ? 1 : 0)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                } keyframes: { _ in
+                    KeyframeTrack(\.sweep) {
+                        LinearKeyframe(-1, duration: 0.04)
+                        CubicKeyframe(1, duration: 0.44)
+                    }
+                }
+        }
+        .clipShape(Capsule())
+        .blendMode(.plusLighter)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
