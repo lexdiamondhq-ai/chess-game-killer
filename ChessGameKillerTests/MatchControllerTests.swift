@@ -99,9 +99,11 @@ final class TimedSounds: SoundPlaying {
 @MainActor
 final class MatchControllerTests: XCTestCase {
 
+    /// Polls until `condition` holds. The deadline only catches a hang: a passing test returns as
+    /// soon as the condition is met, so it is generous for a busy CI simulator.
     private func waitUntil(
         _ what: String,
-        timeout: Duration = .seconds(5),
+        timeout: Duration = .seconds(20),
         _ condition: () -> Bool
     ) async {
         let clock = ContinuousClock()
