@@ -692,8 +692,11 @@ struct LicensesView: View {
 
     private static let credits: [Credit] = [
         Credit(name: "Stockfish 17", license: "GPL v3",
-               detail: "The engine behind every rival and the coach, running on your phone.",
+               detail: "The engine behind the coach, the Masters and your Grudge, running on your phone.",
                url: URL(string: "https://stockfishchess.org")!),
+        Credit(name: "Maia", license: "GPL v3",
+               detail: "The crowd rivals' moves once their book runs out: networks trained on real players by rating.",
+               url: URL(string: "https://github.com/CSSLab/maia-chess")!),
         Credit(name: "ChessKit", license: "MIT",
                detail: "The rules of chess: legal moves, check, checkmate and notation.",
                url: URL(string: "https://github.com/chesskit-app/chesskit-swift")!),

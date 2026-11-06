@@ -128,6 +128,23 @@ final class GameModel {
         return fields.joined(separator: " ")
     }
 
+    /// The position before each move so far and the one now, oldest first, as FEN. Maia reads
+    /// the last eight, and the whole game for repetitions.
+    var fenHistory: [String] { history.map(\.board.position.fen) + [fen] }
+
+    /// Every move the side to move can play, in engine notation ("e2e4"; a pawn reaching the last
+    /// rank as four letters), leaving out a castling whose rook was taken.
+    func legalEngineMoves() -> [String] {
+        board.position.pieces
+            .filter { $0.color == sideToMove }
+            .flatMap { piece in
+                board.legalMoves(forPieceAt: piece.square)
+                    .filter { !isLostCastling(from: piece.square, to: $0) }
+                    .map { piece.square.notation + $0.notation }
+            }
+            .sorted()
+    }
+
     func piece(at square: Square) -> Piece? {
         board.position.piece(at: square)
     }

@@ -61,7 +61,7 @@ function message(text, extra = {}) {
   return {
     type: "message",
     role: "assistant",
-    model: "claude-opus-5-5",
+    model: "claude-sonnet-5-5",
     stop_reason: "end_turn",
     content: [
       { type: "thinking", thinking: "", signature: "sig" },
@@ -120,7 +120,7 @@ test("the schema follows the structured outputs rules", () => {
 
 test("the parse request: structured outputs, low effort, the fallback, and no sampling settings", () => {
   const request = buildParseRequest(INPUT, {});
-  assert.equal(request.model, "claude-opus-5-5");
+  assert.equal(request.model, "claude-sonnet-5-5");
   assert.equal(request.max_tokens, 6000);
   assert.deepEqual(request.betas, ["server-side-fallback-2026-07-01"]);
   assert.equal(request.fallbacks, "default");

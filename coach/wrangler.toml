@@ -11,7 +11,7 @@ workers_dev = true
 [vars]
 # The Claude model that hears the player's claims and words Leo's answer, and
 # how hard it thinks for each (low to max). It always thinks a little.
-MODEL = "claude-opus-5-5"
+MODEL = "claude-sonnet-5-5"
 PARSE_EFFORT = "low"
 ANSWER_EFFORT = "low"
 # How long each Claude call may take, in milliseconds. A slow answer falls back
