@@ -98,4 +98,24 @@ final class DrillBoardTests: XCTestCase {
             XCTAssertGreaterThan(flat, side * 0.95)
         }
     }
+
+    /// A lesson's or a candidate's label on the 3D board sits in the far right corner of its own
+    /// square as the camera sees it, tilted and flat, from either side, and inside the picture.
+    func testLabelsSitOnTheirOwnSquareOnThe3DBoard() {
+        let width = DrillBoard.width3D(side: 374)
+        for framing in [SculptedCamera.Framing.standing, .seated] {
+            let size = CGSize(width: width, height: DrillBoard.height3D(side: width, framing: framing))
+            for flipped in [false, true] {
+                let camera = SculptedCamera.fitted(aspect: Float(size.width / size.height), flipped: flipped, framing: framing)
+                for square in [Square.a1, .h1, .a8, .h8, .e4, .d5] {
+                    let frame = camera.frame(of: square, in: size)
+                    let center = SculptedTrainingBoard.labelCenter(in: frame)
+                    XCTAssertTrue(frame.contains(center), "\(square.notation) \(framing) flipped \(flipped)")
+                    XCTAssertTrue(CGRect(origin: .zero, size: size).contains(center))
+                    XCTAssertGreaterThan(center.x, frame.midX)
+                    XCTAssertLessThan(center.y, frame.midY)
+                }
+            }
+        }
+    }
 }
