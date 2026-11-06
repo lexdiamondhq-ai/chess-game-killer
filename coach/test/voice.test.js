@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { test } from "node:test";
 import { VERA_VOICE_SETTINGS, VOICE_SETTINGS, speak, toBase64, voiceKey } from "../src/voice.js";
 
@@ -124,4 +124,21 @@ test("the voices match the lesson recordings in make_narration.py", () => {
   assert.match(script, /"model": MODEL, "settings": \{"stability": 0\.7/);
   assert.match(script, /"stability": 0\.7, "similarity_boost": 0\.85, "style": 0\.0, "use_speaker_boost": True, "speed": 0\.98/);
   assert.match(script, /"format": "mp3_44100_128"/);
+});
+
+test("every lesson recording is in the voice its coach speaks with now", () => {
+  // scripts/training/narration-voices.json keeps the voice and model of each recording. A coach
+  // given a new voice is recorded again by .github/workflows/narration.yml; until that run has
+  // committed the new files, this fails, so a half-switched voice can't go unnoticed.
+  const voices = JSON.parse(readFileSync(new URL("../../scripts/training/narration-voices.json", import.meta.url), "utf8"));
+  const toml = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8");
+  const leo = `${/^VOICE_ID = "(\w+)"$/m.exec(toml)[1]} ${/^VOICE_MODEL = "(\w+)"$/m.exec(toml)[1]}`;
+  const vera = "EXAVITQu4vr4xnSDxMaL eleven_multilingual_v2";
+  const files = readdirSync(new URL("../../ChessGameKiller/Training/Narration/", import.meta.url)).filter((name) => name.endsWith(".mp3"));
+  assert.ok(files.length > 400, `only ${files.length} recordings`);
+  for (const file of files) {
+    const coach = file.startsWith("nar-") ? leo : file.startsWith("vera-") ? vera : null;
+    assert.ok(coach, `${file} is neither Leo's nor Vera's`);
+    assert.equal(voices[file], coach, `${file} was recorded in another voice`);
+  }
 });
