@@ -26,8 +26,8 @@ import { checkTalk, makeClient } from "../src/index.js";
 import { verifyTalk } from "../src/verify.js";
 import { speak } from "../src/voice.js";
 
-// Opus 5.5's list prices, in dollars per million tokens (5-minute cache writes).
-const PRICE = { input: 4, output: 20, cacheRead: 0.2, cacheWrite: 5 };
+// Sonnet 5.5's list prices, in dollars per million tokens (5-minute cache writes).
+const PRICE = { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 };
 const VERDICTS = new Set(["right", "wrong", "partly", "unclear"]);
 const GRADES = new Set(["checkmate", "best", "excellent", "good", "inaccuracy", "mistake", "blunder", "illegal", "unknown"]);
 const HABITS = new Set(["good", "missed", "none"]);

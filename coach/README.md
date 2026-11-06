@@ -74,15 +74,15 @@ live check when the `ANTHROPIC_API_KEY` secret is set. On pushes to `main` it al
 talk with the live server (`test/smoke.mjs`). It needs `ANTHROPIC_API_KEY` and `CLOUDFLARE_API_TOKEN`;
 `ELEVENLABS_API_KEY` is optional (no voice without it); the account ID is looked up from the token.
 
-Settings (`[vars]` in `wrangler.toml`): `MODEL` (`claude-opus-5-5`), `PARSE_EFFORT` and `ANSWER_EFFORT` (`low`),
+Settings (`[vars]` in `wrangler.toml`): `MODEL` (`claude-sonnet-5-5`), `PARSE_EFFORT` and `ANSWER_EFFORT` (`low`),
 `CLAUDE_TIMEOUT_MS` (12000, for each Claude call), `DAILY_TALKS` (400) and `DAILY_VOICE_CHARS` (40000) across
 everyone per UTC day, `VOICE_ID` (Liam, Leo's voice), `VERA_VOICE_ID` (Sarah, Vera's voice; requests with `coach: "vera"`) and `VOICE_MODEL` (`eleven_multilingual_v2`). Each address can start 12
 talks a minute.
 
 ## What a talk costs
 
-Two Claude Opus 5.5 calls at low effort, with the server-side fallback on, so a request Opus's safety classifiers
+Two Claude Sonnet 5.5 calls at low effort, with the server-side fallback on, so a request Sonnet's safety classifiers
 turn down is answered by another model rather than refused. The first call's instructions (about 1,700 tokens) are cached; the rest is the position, the words and the verdict,
-around 1,500 tokens in all, plus a few hundred tokens out each, thinking included. That comes to about one or two
-cents a talk at list prices, so `DAILY_TALKS` caps Claude at roughly $8 a day. The live check prints the measured
+around 1,500 tokens in all, plus a few hundred tokens out each, thinking included. That comes to about half a cent to a
+cent a talk at list prices, so `DAILY_TALKS` caps Claude at roughly $4 a day. The live check prints the measured
 figure. The voice is 100 to 320 characters of ElevenLabs a talk; `DAILY_VOICE_CHARS` caps it at 40,000 a day.
