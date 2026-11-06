@@ -340,10 +340,11 @@ struct HomeJewelGold: View {
 
 /// The jewel's shortcuts under the rivals, in the order they show, four to a row: the ways to
 /// a game first (a person online, a friend, Today's Move, puzzles), then the ways to look
-/// closer (Analyze, a real board through the camera, the coach, your games). Alex asked for
-/// more in it, Analyze among them (2026-11-06).
+/// closer (Analyze, the coach, your games). Alex asked for more in it, Analyze among them, and
+/// then for one Analyze, not several (2026-11-06): a photo, a screenshot or the camera all
+/// start inside it.
 enum HomeShortcutKind: String, CaseIterable, Identifiable {
-    case online, friend, dailyMove, puzzles, analyze, scan, train, games
+    case online, friend, dailyMove, puzzles, analyze, train, games
 
     var id: String { rawValue }
 
@@ -361,7 +362,6 @@ enum HomeShortcutKind: String, CaseIterable, Identifiable {
         case .dailyMove: return "Today's Move"
         case .puzzles: return "Puzzles"
         case .analyze: return "Analyze"
-        case .scan: return "Scan a board"
         case .train: return "Train"
         case .games: return "Your games"
         }
@@ -374,7 +374,6 @@ enum HomeShortcutKind: String, CaseIterable, Identifiable {
         case .dailyMove: return Glyphs.today
         case .puzzles: return Glyphs.puzzles
         case .analyze: return Glyphs.analyze
-        case .scan: return Glyphs.scan
         case .train: return Glyphs.coach
         case .games: return Glyphs.games
         }
@@ -386,8 +385,7 @@ enum HomeShortcutKind: String, CaseIterable, Identifiable {
         case .friend: return "Send a friend a game by link"
         case .dailyMove: return "The puzzle of the day"
         case .puzzles: return "Rated puzzles at your level"
-        case .analyze: return "Find the best move in any position"
-        case .scan: return "Read a real board with the camera"
+        case .analyze: return "The best moves for a photo, a screenshot or any position"
         case .train: return "Lessons, drills and today's session"
         case .games: return "Look back at the games you've played"
         }
@@ -411,7 +409,7 @@ struct HomeShortcut: Identifiable {
 /// once, and under them the shortcuts in rows of four (see `HomeShortcutKind`). A pick closes
 /// it and goes; so does a tap anywhere around it, or on the jewel.
 struct HomeShortcutsPanel: View {
-    /// Four to a row, so the eight shortcuts make two even rows under the five rivals.
+    /// Four to a row under the five rivals.
     static let perRow = 4
 
     private static var columns: [GridItem] {

@@ -138,8 +138,7 @@ final class HomeSnapshotTests: XCTestCase {
     }
 
     /// The knight held on the board home, with players to reach online: the five rivals, then
-    /// two rows of four, Online, A friend, Today's Move and Puzzles over Analyze, Scan a board,
-    /// Train and Your games.
+    /// Online, A friend, Today's Move and Puzzles over Analyze, Train and Your games.
     func testTheKnightsShortcutsOnTheBoardHome() throws {
         UserDefaults.standard.set(true, forKey: HomeLayout.key)
         let center = ChallengeCenter(api: FakeChallengeAPI(), store: ChallengeStore(), sounds: nil)

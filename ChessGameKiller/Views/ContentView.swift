@@ -11,8 +11,6 @@ struct ContentView: View {
     @State private var showingNewGame = true
     @State private var showingSettings = false
     @State private var showingAnalyze = false
-    /// Analyze opens on the camera (the home's Scan a board) or on Photos (its From a photo).
-    @State private var analyzeStart: AnalyzeSheet.Start = .choices
     /// Analyze opens on this position (the home's masterpiece) instead of its first screen.
     @State private var analyzeFEN: String?
     @State private var coachExpanded = false
@@ -315,10 +313,7 @@ struct ContentView: View {
                 SettingsSheet()
                     .boardSheetGrabber(boardSheet)
             }
-            .sheet(isPresented: $showingAnalyze, onDismiss: {
-                analyzeStart = .choices
-                analyzeFEN = nil
-            }) {
+            .sheet(isPresented: $showingAnalyze, onDismiss: { analyzeFEN = nil }) {
                 AnalyzeSheet(
                     theme: theme,
                     currentFEN: match.hasStarted ? match.game.fen : nil,
@@ -328,7 +323,6 @@ struct ContentView: View {
                     clock: fromHereSetup.timeControl,
                     forfeits: forfeits,
                     onAnalyzeGame: analyzeGame,
-                    startsWith: analyzeStart,
                     startsAt: analyzeFEN
                 ) { draft in
                     play(from: draft)
@@ -441,14 +435,6 @@ struct ContentView: View {
             analyze: { showingAnalyze = true },
             analyzePosition: { fen in
                 analyzeFEN = fen
-                showingAnalyze = true
-            },
-            scan: {
-                analyzeStart = .camera
-                showingAnalyze = true
-            },
-            analyzePhoto: {
-                analyzeStart = .photos
                 showingAnalyze = true
             },
             train: { showingTraining = true },

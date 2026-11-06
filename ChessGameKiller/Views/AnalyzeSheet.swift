@@ -2,8 +2,8 @@ import ChessKit
 import PhotosUI
 import SwiftUI
 
-/// The analyzer: start from a photo, a screenshot, an empty board or the
-/// current game, fix the position, then see Stockfish's two best moves and play them out.
+/// The analyzer, where every Analyze button opens: start from a photo, a screenshot, an empty
+/// board or the current game, then see Stockfish's two best moves and play them out.
 struct AnalyzeSheet: View {
     let theme: BoardTheme
     /// The game on the board, if one has started.
@@ -17,19 +17,11 @@ struct AnalyzeSheet: View {
     /// Called when the person analyzes a game still being played: that counts as help, like Undo.
     let onAnalyzeGame: (() -> Void)?
     let onPlay: (PositionDraft) -> Void
-    let start: Start
-
-    /// Where the analyzer opens: on its choices, or from the home straight on the camera
-    /// (Scan a board) or on Photos (From a photo, on Today).
-    enum Start {
-        case choices, camera, photos
-    }
 
     @State private var session: ScanSession
     @State private var photoItem: PhotosPickerItem?
     @State private var isLoadingPhoto = false
     @State private var showingCamera = false
-    @State private var showingPhotos = false
     /// Photo scans run out (3 a week free, 3 a day with Premium): then the offer shows.
     @State private var offer: PremiumFeature?
     @Environment(\.dismiss) private var dismiss
@@ -43,7 +35,6 @@ struct AnalyzeSheet: View {
         clock: TimeControl,
         forfeits: String? = nil,
         onAnalyzeGame: (() -> Void)? = nil,
-        startsWith start: Start = .choices,
         startsAt: String? = nil,
         onPlay: @escaping (PositionDraft) -> Void
     ) {
@@ -54,7 +45,6 @@ struct AnalyzeSheet: View {
         self.clock = clock
         self.forfeits = forfeits
         self.onAnalyzeGame = onAnalyzeGame
-        self.start = start
         self.onPlay = onPlay
         let session = ScanSession(reader: reader)
         // Opened on a position (the home's masterpiece): straight to its analysis.
@@ -79,22 +69,6 @@ struct AnalyzeSheet: View {
               let allowance = Premium.shared.allowance(.scan) else { return line }
         let when: String = allowance.period == .day ? "today" : "this week"
         return left == 0 ? "\(line). No scans left \(when)" : "\(line). \(left) left \(when)"
-    }
-
-    /// Opened from the home on the camera or Photos: it comes up once the sheet is up (or the
-    /// offer does, with no scans left). Cancel it and the analyzer's choices are underneath.
-    private func openStart() async {
-        switch start {
-        case .choices: return
-        case .camera: guard hasCamera else { return }
-        case .photos: break
-        }
-        try? await Task.sleep(for: .milliseconds(450))
-        guard canScan else {
-            offer = .scan
-            return
-        }
-        if start == .camera { showingCamera = true } else { showingPhotos = true }
     }
 
     /// Reads a picture, if a scan is left; otherwise the offer.
@@ -191,8 +165,6 @@ struct AnalyzeSheet: View {
             CameraPicker { image in scan(image) }
                 .ignoresSafeArea()
         }
-        .photosPicker(isPresented: $showingPhotos, selection: $photoItem, matching: .images)
-        .task { await openStart() }
         .premiumOffer($offer)
         .tint(accent)
         .presentationBackground {
