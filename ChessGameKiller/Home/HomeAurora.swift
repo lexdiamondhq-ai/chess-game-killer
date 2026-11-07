@@ -1131,10 +1131,10 @@ struct HomeAuroraTabBar: View {
     var body: some View {
         HStack(spacing: 12) {
             HStack(spacing: 0) {
-                tab("Today", glyph: Glyphs.today, on: true) {}
-                tab("Learn", glyph: Glyphs.coach, on: false, action: learn)
-                tab("You", glyph: Glyphs.king, on: false, action: you)
-                tab("Rooms", glyph: Glyphs.home, on: false, action: rooms)
+                tab("Today", icon: .today, on: true) {}
+                tab("Learn", icon: .learn, on: false, action: learn)
+                tab("You", icon: .you, on: false, action: you)
+                tab("Rooms", icon: .rooms, on: false, action: rooms)
             }
             .padding(.horizontal, 6)
             .frame(height: 64)
@@ -1171,10 +1171,12 @@ struct HomeAuroraTabBar: View {
                     .accessibilityAction(named: "Rooms", rooms)
     }
 
-    private func tab(_ title: String, glyph: String, on: Bool, action: @escaping () -> Void) -> some View {
+    private func tab(_ title: String, icon: HomeTabIcon.Kind, on: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 3) {
-                Glyph(name: glyph, size: 22, weight: .semibold)
+                HomeTabIcon(kind: icon,
+                            color: on ? (palette.dark ? Color(hex: 0xE8C27A) : Color(hex: 0xB7832E)) : palette.ink3)
+                    .frame(width: 24, height: 24)
                 Text(title)
                     .font(.system(size: 10.5, weight: .semibold))
             }
@@ -1187,5 +1189,88 @@ struct HomeAuroraTabBar: View {
         .buttonStyle(HomeStagePress())
         .accessibilityLabel(title)
         .accessibilityAddTraits(on ? .isSelected : [])
+    }
+}
+
+/// The bottom bar's tab icons (Alex, 2026-11-07: "Do B but make the You and Rooms from A").
+/// Today and Learn are solid chess pieces in gold leaf: a pawn at sunrise and a bishop.
+/// You and Rooms are fine engraved lines: a crowned shield and a castle gate.
+/// Drawn on a 26-point grid; the selected tab shows in gold.
+struct HomeTabIcon: View {
+    enum Kind { case today, learn, you, rooms }
+
+    let kind: Kind
+    let color: Color
+
+    var body: some View {
+        Canvas { context, size in
+            let k = min(size.width, size.height) / 26
+            context.translateBy(x: (size.width - 26 * k) / 2, y: (size.height - 26 * k) / 2)
+            context.scaleBy(x: k, y: k)
+            let shading = GraphicsContext.Shading.color(color)
+            let line = StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round)
+            switch kind {
+            case .today:
+                // A pawn at sunrise.
+                context.fill(Path(ellipseIn: CGRect(x: 9.5, y: 3.5, width: 7, height: 7)), with: shading)
+                context.fill(Path { p in
+                    p.move(to: CGPoint(x: 10, y: 12)); p.addLine(to: CGPoint(x: 16, y: 12))
+                    p.addLine(to: CGPoint(x: 17.5, y: 20)); p.addLine(to: CGPoint(x: 8.5, y: 20)); p.closeSubpath()
+                    p.addRect(CGRect(x: 7, y: 21, width: 12, height: 2.5))
+                }, with: shading)
+                context.stroke(Path { p in
+                    p.move(to: CGPoint(x: 3, y: 7)); p.addLine(to: CGPoint(x: 6, y: 7))
+                    p.move(to: CGPoint(x: 20, y: 7)); p.addLine(to: CGPoint(x: 23, y: 7))
+                    p.move(to: CGPoint(x: 13, y: 1)); p.addLine(to: CGPoint(x: 13, y: 2.5))
+                }, with: shading, style: StrokeStyle(lineWidth: 1.3, lineCap: .round))
+            case .learn:
+                // A bishop, its mitre cut with the slit.
+                context.drawLayer { layer in
+                    layer.fill(Path { p in
+                        p.move(to: CGPoint(x: 13, y: 2))
+                        p.addCurve(to: CGPoint(x: 18, y: 11), control1: CGPoint(x: 16, y: 5), control2: CGPoint(x: 18, y: 8))
+                        p.addCurve(to: CGPoint(x: 15.5, y: 15), control1: CGPoint(x: 18, y: 13), control2: CGPoint(x: 16.5, y: 14.5))
+                        p.addLine(to: CGPoint(x: 17, y: 20)); p.addLine(to: CGPoint(x: 9, y: 20))
+                        p.addLine(to: CGPoint(x: 10.5, y: 15))
+                        p.addCurve(to: CGPoint(x: 8, y: 11), control1: CGPoint(x: 9.5, y: 14.5), control2: CGPoint(x: 8, y: 13))
+                        p.addCurve(to: CGPoint(x: 13, y: 2), control1: CGPoint(x: 8, y: 8), control2: CGPoint(x: 10, y: 5))
+                        p.closeSubpath()
+                        p.addRect(CGRect(x: 7, y: 21, width: 12, height: 2.5))
+                    }, with: shading)
+                    layer.blendMode = .destinationOut
+                    layer.stroke(Path { p in
+                        p.move(to: CGPoint(x: 14.5, y: 6)); p.addLine(to: CGPoint(x: 11.5, y: 10))
+                    }, with: .color(.black), style: StrokeStyle(lineWidth: 1.4, lineCap: .round))
+                }
+            case .you:
+                // A crowned shield, engraved.
+                context.stroke(Path { p in
+                    p.move(to: CGPoint(x: 5, y: 7)); p.addLine(to: CGPoint(x: 21, y: 7)); p.addLine(to: CGPoint(x: 21, y: 13))
+                    p.addCurve(to: CGPoint(x: 13, y: 23), control1: CGPoint(x: 21, y: 18), control2: CGPoint(x: 17, y: 21))
+                    p.addCurve(to: CGPoint(x: 5, y: 13), control1: CGPoint(x: 9, y: 21), control2: CGPoint(x: 5, y: 18))
+                    p.closeSubpath()
+                    p.move(to: CGPoint(x: 9, y: 11)); p.addLine(to: CGPoint(x: 11, y: 9)); p.addLine(to: CGPoint(x: 13, y: 11))
+                    p.addLine(to: CGPoint(x: 15, y: 9)); p.addLine(to: CGPoint(x: 17, y: 11)); p.addLine(to: CGPoint(x: 17, y: 13))
+                    p.addLine(to: CGPoint(x: 9, y: 13)); p.closeSubpath()
+                }, with: shading, style: line)
+            case .rooms:
+                // A castle gate, engraved.
+                context.stroke(Path { p in
+                    p.move(to: CGPoint(x: 4, y: 23))
+                    for (x, y) in [(4, 9), (7, 9), (7, 6), (10, 6), (10, 9), (16, 9), (16, 6), (19, 6), (19, 9), (22, 9), (22, 23)] {
+                        p.addLine(to: CGPoint(x: x, y: y))
+                    }
+                    p.closeSubpath()
+                    p.move(to: CGPoint(x: 10, y: 23)); p.addLine(to: CGPoint(x: 10, y: 17))
+                    p.addArc(center: CGPoint(x: 13, y: 17), radius: 3, startAngle: .degrees(180), endAngle: .degrees(0), clockwise: false)
+                    p.addLine(to: CGPoint(x: 16, y: 23))
+                }, with: shading, style: line)
+                context.stroke(Path { p in
+                    p.move(to: CGPoint(x: 12, y: 17)); p.addLine(to: CGPoint(x: 12, y: 23))
+                    p.move(to: CGPoint(x: 14, y: 17)); p.addLine(to: CGPoint(x: 14, y: 23))
+                }, with: .color(color.opacity(0.7)), style: line)
+            }
+        }
+        .accessibilityHidden(true)
     }
 }
