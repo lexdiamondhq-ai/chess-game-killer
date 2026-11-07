@@ -301,8 +301,10 @@ final class RivalsTests: XCTestCase {
 
         // Its card on Home, resting and opened into the summons.
         try snapshot("grudge-home-card", view: VStack(spacing: 16) {
-            GrudgeCard(record: record, isSelected: false, select: {})
-            GrudgeCard(record: record, isSelected: true, lastSeen: (6, 11), select: {}, settle: {})
+            HomeAuroraGrudge(record: record, isOpen: false, palette: HomeAuroraPalette(dark: false),
+                             select: {}, settle: {})
+            HomeAuroraGrudge(record: record, isOpen: true, palette: HomeAuroraPalette(dark: false),
+                             lastSeen: (6, 11), select: {}, settle: {})
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

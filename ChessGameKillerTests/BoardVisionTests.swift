@@ -605,7 +605,12 @@ final class BoardScanRunnerTests: XCTestCase {
         runner.begin()
         XCTAssertEqual(runner.phase, .intro)
         XCTAssertEqual(TrainingChess.key(runner.game.board.position.fen), TrainingChess.key(exercise.startFEN))
-        try await Task.sleep(for: .milliseconds(1_500))
+        // Their move and the scan start take about 0.9 s; a busy test machine can run late, so
+        // wait for the scan (up to 6 s) rather than a fixed time.
+        let deadline = Date.now.addingTimeInterval(6)
+        while runner.phase != .scanning, Date.now < deadline {
+            try await Task.sleep(for: .milliseconds(100))
+        }
         XCTAssertEqual(runner.phase, .scanning)
         XCTAssertEqual(sounds.played, [.move])
         XCTAssertEqual(runner.game.lastMove, LastMove(from: .f2, to: .f4))
