@@ -84,6 +84,13 @@ final class Premium {
         return took
     }
 
+    /// Where this feature stops for this player: the free limit and its offer, or, for a player
+    /// who has Premium, Premium's own daily cap (never a sales pitch).
+    func limitLine(_ feature: PremiumFeature) -> String {
+        if isPremium, let line = feature.premiumLimitLine { return line }
+        return feature.limitLine
+    }
+
     /// Whether a locked feature is open.
     func opens(_ feature: PremiumFeature) -> Bool {
         unlimited || isPremium || !feature.isLocked
@@ -121,18 +128,25 @@ final class Premium {
     }
 
     /// Asks StoreKit whether a Premium subscription is active now.
-    func refreshEntitlement() async {
+    /// `keepingActive`: right after a purchase, an empty answer means StoreKit hasn't caught up
+    /// yet, not that the subscription ended, so it doesn't turn Premium off.
+    func refreshEntitlement(keepingActive: Bool = false) async {
         var active = false
         for await result in Transaction.currentEntitlements {
-            guard case .verified(let transaction) = result,
-                  PremiumPlan(rawValue: transaction.productID) != nil,
-                  transaction.revocationDate == nil else { continue }
-            if let expires = transaction.expirationDate, expires < .now { continue }
+            guard case .verified(let transaction) = result, Self.grants(transaction) else { continue }
             active = true
         }
         // A screenshot launch forced Premium on; leave it.
         if defaults.string(forKey: "premium") != nil { return }
+        if keepingActive && isPremium && !active { return }
         setPremium(active)
+    }
+
+    /// Whether a transaction is a Premium plan that's live now: not refunded, not expired.
+    static func grants(_ transaction: Transaction) -> Bool {
+        guard PremiumPlan(rawValue: transaction.productID) != nil, transaction.revocationDate == nil else { return false }
+        if let expires = transaction.expirationDate, expires < .now { return false }
+        return true
     }
 
     func buy(_ plan: PremiumPlan) async {
@@ -152,7 +166,10 @@ final class Premium {
                     return
                 }
                 await transaction.finish()
-                await refreshEntitlement()
+                // The App Store just said yes: open Premium now rather than waiting for
+                // currentEntitlements, which can lag behind a fresh purchase (most of all in Sandbox).
+                if Self.grants(transaction) { setPremium(true) }
+                await refreshEntitlement(keepingActive: true)
             case .pending:
                 problem = "Your purchase is waiting for approval. Premium opens once it's approved."
             case .userCancelled:

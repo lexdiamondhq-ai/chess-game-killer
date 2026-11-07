@@ -22,7 +22,7 @@ struct AnalyzeSheet: View {
     @State private var photoItem: PhotosPickerItem?
     @State private var isLoadingPhoto = false
     @State private var showingCamera = false
-    /// Photo scans run out (3 a week free, 3 a day with Premium): then the offer shows.
+    /// Photo scans run out (3 a week free; Premium only meets a high fair-use guard): then the offer shows.
     @State private var offer: PremiumFeature?
     @Environment(\.dismiss) private var dismiss
 
@@ -65,6 +65,8 @@ struct AnalyzeSheet: View {
 
     /// The card's line, with the scans left when there's a limit.
     private func scanDetail(_ line: String) -> String {
+        // Premium feels unlimited: no countdown, the fair-use guard only speaks if it's reached.
+        if Premium.shared.isPremium, Premium.shared.canUse(.scan) { return line }
         guard let left = Premium.shared.remaining(.scan),
               let allowance = Premium.shared.allowance(.scan) else { return line }
         let when: String = allowance.period == .day ? "today" : "this week"
