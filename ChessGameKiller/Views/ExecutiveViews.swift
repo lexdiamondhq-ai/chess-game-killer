@@ -12,6 +12,9 @@ struct ExecutivePlate: View {
     let match: MatchController
     let theme: BoardTheme
     let color: Piece.Color
+    /// In the game's dock, left of the orb: no glass, picture or name, only the status (in bold
+    /// green, Alex 2026-11-07), the captures and the clock.
+    var inDock = false
 
     @ScaledMetric(relativeTo: .footnote) private var scaledStatusHeight: CGFloat = 16
     /// The status row's height. It stops growing where the line's type does.
@@ -26,8 +29,33 @@ struct ExecutivePlate: View {
     private var glow: Color? { theme.glows && isActive ? theme.sideColor(color) : nil }
 
     var body: some View {
+        if inDock { dockLine } else { card }
+    }
+
+    /// A deep, quiet emerald rather than a signal green: brighter on dark looks, deeper on light.
+    private var green: Color { theme.isDark ? Color(hex: 0x5CCB94) : Color(hex: 0x1C7A4E) }
+
+    private var dockLine: some View {
+        HStack(spacing: 8) {
+            statusRow
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(spokenLabel)
+            Spacer(minLength: 4)
+            if let clock = match.clock {
+                ExecutiveClock(clock: clock, color: color, owner: clockOwner, theme: theme)
+                    .fixedSize()
+                    .layoutPriority(2)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .dynamicTypeSize(...DynamicTypeSize.xLarge)
+        .animation(.snappy(duration: 0.3), value: isActive)
+        .animation(.snappy(duration: 0.3), value: inCheck)
+    }
+
+    private var card: some View {
         let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
-        HStack(spacing: 10) {
+        return HStack(spacing: 10) {
             HStack(spacing: 12) {
                 avatar
                     .frame(width: 40, height: 40)
@@ -111,7 +139,7 @@ struct ExecutivePlate: View {
     /// The turn dot and the status, or the selected army piece's name and rank.
     private var statusWords: some View {
         HStack(spacing: 6) {
-            if isActive, !inCheck {
+            if isActive, !inCheck, !inDock {
                 Circle()
                     .fill(glow ?? accent)
                     .frame(width: 6, height: 6)
@@ -140,8 +168,9 @@ struct ExecutivePlate: View {
                     .transition(.opacity)
             } else if !status.isEmpty {
                 Text(status)
-                    .font(.app(.footnote, weight: isActive ? .medium : .regular))
-                    .foregroundStyle(isActive ? Color.primary.opacity(0.86) : Color.secondary)
+                    .font(inDock ? .app(.subheadline, weight: .bold) : .app(.footnote, weight: isActive ? .medium : .regular))
+                    .foregroundStyle(inDock ? (isActive ? green : green.opacity(0.6))
+                                     : (isActive ? Color.primary.opacity(0.86) : Color.secondary))
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
                     .transition(.opacity)
