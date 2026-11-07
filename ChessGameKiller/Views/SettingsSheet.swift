@@ -11,6 +11,8 @@ struct SettingsSheet: View {
     @AppStorage(GhostVision.storageKey) private var ghostVisionOn = true
     @AppStorage("soundEffects") private var soundOn = true
     @AppStorage("haptics") private var hapticsOn = true
+    /// Home's music. Its switch moved here from Home's header (Alex, 2026-11-07).
+    @State private var homeMusic = HomeMusic.shared
     @AppStorage("rivalBanter") private var banterOn = true
     @AppStorage("bigBoard") private var bigBoard = false
     @AppStorage("sculpted3D") private var sculpted3D = true
@@ -139,6 +141,13 @@ struct SettingsSheet: View {
                             rule
                             ToggleRow(title: "Haptics", symbol: "iphone.radiowaves.left.and.right", isOn: $hapticsOn, theme: theme)
                             rule
+                            if homeMusic.available {
+                                ToggleRow(title: "Home music", symbol: "music.note", isOn: Binding(
+                                    get: { homeMusic.on },
+                                    set: { on in if on != homeMusic.on { homeMusic.toggle() } }
+                                ), theme: theme)
+                                rule
+                            }
                             ToggleRow(title: "Daily reminder", subtitle: "At most one a day, around when you usually play, and only if the day isn't done yet.",
                                       symbol: "flame.fill", isOn: $remindersOn, theme: theme)
                                 .onChange(of: remindersOn) { _, on in
