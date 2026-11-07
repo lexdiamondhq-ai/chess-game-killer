@@ -4,7 +4,7 @@
 // Every string a person typed (player names) is escaped before it reaches the HTML, and the
 // GameState inlined for the browser has every "<" escaped, so nothing can close the script tag.
 
-const SITE = 'Chess Game Killer';
+const SITE = 'Beauty of Chess';
 const THEME = '#0F0F10';
 
 /** Escapes text for HTML element content and quoted attribute values. */
@@ -109,7 +109,7 @@ const BRAND = `<header class="top">
 </header>`;
 
 const CREDITS = `<footer class="credits">
-  <p>Chess pieces by Colin M.L. Burnett (cburnett), GPLv2+. Chess Game Killer is open source under the GPL.</p>
+  <p>Chess pieces by Colin M.L. Burnett (cburnett), GPLv2+. Beauty of Chess is open source under the GPL.</p>
 </footer>`;
 
 /** The page for /c/{code}. `game` is the public GameState, or null when there is no such game. */

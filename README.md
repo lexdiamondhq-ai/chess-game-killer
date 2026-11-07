@@ -1,4 +1,4 @@
-# Chess Game Killer
+# Beauty of Chess
 
 One beautiful iOS chess game, with every feature easy to reach and easy to understand.
 
