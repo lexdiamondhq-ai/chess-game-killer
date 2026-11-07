@@ -207,6 +207,9 @@ final class PremiumTests: XCTestCase {
         XCTAssertFalse(RivalBoardsEarned.opens(.singularity, premium: premium, defaults: defaults))
         RivalBoardsEarned.note([Self.game(against: "The Masters", result: .win)], defaults: defaults)
         XCTAssertTrue(RivalBoardsEarned.opens(.singularity, premium: premium, defaults: defaults))
+        // Since the rivals have faces, a win is saved under the new name and opens the same board.
+        RivalBoardsEarned.note([Self.game(against: "The Hunter", result: .win)], defaults: defaults)
+        XCTAssertTrue(RivalBoardsEarned.opens(.drift, premium: premium, defaults: defaults))
     }
 
     private static func game(against rival: String, result: SavedGame.Result) -> SavedGame {

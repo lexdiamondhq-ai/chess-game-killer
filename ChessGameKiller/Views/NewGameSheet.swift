@@ -206,7 +206,7 @@ struct NewGameSheet: View {
                         }
                     }
 
-                    section("The Crowd") {
+                    section("Rivals") {
                         rivalCarousel
                             .opacity(grudgeRecord != nil ? 0.55 : 1)
                         dots
@@ -667,7 +667,10 @@ private struct RivalCard: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            CrowdSwarm(rival: rival, size: 100, picked: isSelected)
+            RivalCoin(rival: rival, size: 92)
+                .scaleEffect(isSelected ? 1 : 0.92)
+                .frame(width: 100, height: 100)
+                .animation(.spring(response: 0.45, dampingFraction: 0.75), value: isSelected)
             VStack(alignment: .leading, spacing: 4) {
                 Text(rival.name)
                     .font(.app(.title2, weight: .heavy))
