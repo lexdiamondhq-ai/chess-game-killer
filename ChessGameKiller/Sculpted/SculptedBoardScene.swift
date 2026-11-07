@@ -1533,14 +1533,18 @@ final class SculptedBoardScene {
     static func arrowLayers(_ arrow: SculptedCoachArrow) -> ArrowLayers {
         // Together solid, as the flat board's crisp arrow; over a piece in front, only the faint one.
         // The next best analysis arrow is quieter, as on the flat board.
-        let strength: CGFloat = arrow.analysis && !arrow.best ? 0.8 : 0.97
-        let seen: CGFloat = 0.35
+        // Analysis's are see-through, as tinted glass; their parts only touch, so none shows darker
+        // where they would overlap, and they have no edge, which would show through them.
+        let strength: CGFloat = arrow.analysis
+            ? CGFloat(arrow.best ? ArrowColors.seeThrough.best : ArrowColors.seeThrough.next) : 0.97
+        let seen: CGFloat = min(0.35, strength * 0.5)
         let p = arrow.proportions
-        let outlines = arrowOutline(from: arrow.from, to: arrow.to, dashed: arrow.dashed, proportions: p)
+        let outlines = arrowOutline(from: arrow.from, to: arrow.to, dashed: arrow.dashed, proportions: p,
+                                    seamless: arrow.analysis)
         let (tail, tip) = ArrowOutline.ends(from: middle(arrow.from), to: middle(arrow.to), unit: 1, proportions: p)
         let tailColor = rgb(ArrowColors.tail(of: arrow.color))
         let headColor = rgb(arrow.color)
-        let edgeColor = rgb(arrow.analysis ? ArrowColors.hairline : ArrowColors.edge)
+        let edgeColor = rgb(ArrowColors.edge)
         func faded(_ point: CGPoint) -> SIMD3<Float> {
             let t = Float(ArrowOutline.along(point, tail: tail, tip: tip))
             return tailColor + (headColor - tailColor) * t
@@ -1550,12 +1554,12 @@ final class SculptedBoardScene {
         }
         // A solid arrow's middle outline is its shaft, one strip down the curve.
         let strips = outlines.indices.map { !arrow.dashed && outlines.count == 3 && $0 == 1 }
-        let edges = outlines.map { ArrowOutline.grown($0, by: arrow.analysis ? 0.022 : 0.03) }
+        let edges = arrow.analysis ? [] : outlines.map { ArrowOutline.grown($0, by: 0.03) }
         let stone = (strength - seen) / (1 - seen)
         var ground: [SCNGeometry] = []
         if p.rise > 0 {
             // The flight's shadow, straight on the stone beneath it, soft at its edges.
-            for (width, alpha) in [(p.shaft * 1.6, 0.08), (p.shaft * 0.9, 0.12)] as [(CGFloat, CGFloat)] {
+            for (width, alpha) in [(p.shaft * 1.6, 0.06), (p.shaft * 0.9, 0.09)] as [(CGFloat, CGFloat)] {
                 let shadow = ArrowOutline.outlines(from: tail, to: tip, unit: 1, dashed: false,
                                                    proportions: .init(shaft: width, headLength: 0, headWidth: 0,
                                                                       startInset: 0, tipInset: 0))[1]
@@ -1570,7 +1574,7 @@ final class SculptedBoardScene {
             let outer = ArrowOutline.circle(target, radius: 0.345), inner = ArrowOutline.circle(target, radius: 0.315)
             for i in outer.indices {
                 let j = (i + 1) % outer.count
-                ground.append(polygon([outer[i], outer[j], inner[j], inner[i]], colors: { _ in tailColor }, alpha: 0.95,
+                ground.append(polygon([outer[i], outer[j], inner[j], inner[i]], colors: { _ in tailColor }, alpha: 0.85,
                                       throughPieces: false))
             }
         }
@@ -1639,9 +1643,9 @@ final class SculptedBoardScene {
     /// Dashed, the shaft is a row of short bars. The last outline is the head. The board's y runs
     /// up, so a flight path is told to bow the other way, to bow as it does on the flat board.
     static func arrowOutline(from: Square, to: Square, dashed: Bool,
-                             proportions: ArrowOutline.Proportions? = nil) -> [[CGPoint]] {
+                             proportions: ArrowOutline.Proportions? = nil, seamless: Bool = false) -> [[CGPoint]] {
         ArrowOutline.outlines(from: middle(from), to: middle(to), unit: 1, dashed: dashed,
-                              proportions: proportions ?? .coach(dashed: dashed), side: -1)
+                              proportions: proportions ?? .coach(dashed: dashed), side: -1, seamless: seamless)
     }
 
     private static func color(_ hex: UInt32) -> UIColor {

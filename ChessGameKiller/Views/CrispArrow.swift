@@ -5,7 +5,9 @@ import UIKit
 /// path, bowing to one side as it goes and, on the 3D board, rising off the stone and landing on
 /// the target. Solid, it is three outlines: the rounded tail, the shaft as one strip (its left side
 /// from tail to head, then its right side back), and the head, always last. Dashed, the shaft is a
-/// row of short bars. The shaft reaches a hair into the head, so no seam shows where they meet.
+/// row of short bars. The shaft reaches a hair into the head, so no seam shows where they meet;
+/// `seamless`, the parts only touch (a half-round tail, the shaft stopping at the head's base),
+/// so a see-through arrow drawn part by part (the 3D board) shows no darker overlaps.
 /// Lengths are in squares, scaled by `unit`. The flat boards and the 3D board draw from it.
 enum ArrowOutline {
     struct Proportions: Hashable {
@@ -62,7 +64,7 @@ enum ArrowOutline {
     }
 
     static func outlines(from start: CGPoint, to end: CGPoint, unit: CGFloat, dashed: Bool,
-                         proportions p: Proportions, side: CGFloat = 1) -> [[CGPoint]] {
+                         proportions p: Proportions, side: CGFloat = 1, seamless: Bool = false) -> [[CGPoint]] {
         let (tail, pull, tip) = path(from: start, to: end, unit: unit, proportions: p, side: side)
         // The head points along the curve as it lands.
         let lean = CGPoint(x: tip.x - pull.x, y: tip.y - pull.y)
@@ -73,7 +75,8 @@ enum ArrowOutline {
         let head = [CGPoint(x: base.x + n.x * half, y: base.y + n.y * half), tip,
                     CGPoint(x: base.x - n.x * half, y: base.y - n.y * half)]
         // The shaft follows the curve to a hair inside the head's base.
-        let into = CGPoint(x: base.x + u.x * 0.03 * unit, y: base.y + u.y * 0.03 * unit)
+        let reach = seamless && !dashed ? 0 : 0.03 * unit
+        let into = CGPoint(x: base.x + u.x * reach, y: base.y + u.y * reach)
         let curved = p.bow > 0
         let steps = curved ? 28 : 1
         // The curve from the tail to the head, solved for where it meets the head's base.
@@ -119,7 +122,16 @@ enum ArrowOutline {
             return bars + [head]
         }
         let strip = spine.indices.map { edgePoint($0, 1) } + spine.indices.reversed().map { edgePoint($0, -1) }
-        return [circle(tail, radius: width / 2), strip, head]
+        guard seamless else { return [circle(tail, radius: width / 2), strip, head] }
+        // The tail's back half only, from the shaft's one side round to the other.
+        let m = normal(at: 0)
+        let back = CGPoint(x: -m.y, y: m.x)
+        let cap = (0...14).map { i -> CGPoint in
+            let angle = CGFloat.pi * CGFloat(i) / 14
+            return CGPoint(x: tail.x + (m.x * cos(angle) + back.x * sin(angle)) * width / 2,
+                           y: tail.y + (m.y * cos(angle) + back.y * sin(angle)) * width / 2)
+        }
+        return [cap, strip, head]
     }
 
     /// Where along the curve (0 to 1) it comes closest to `target`.
@@ -188,17 +200,19 @@ enum ArrowOutline {
     }
 }
 
-/// The colors of the analysis arrows on every board: antique gold for the best move, the gold of
-/// the pieces' edges and the frame, so the arrow belongs to the set; pale champagne for the next
-/// best, slimmer and quieter. Each brightens toward its tail and is drawn with a fine dark
-/// hairline, which holds it on the cream squares.
+/// The colors of the analysis arrows on every board, Dusk Blue (Alex's pick, 2026-11-07): a soft
+/// dusty blue for the best move, like a winter sky, and pearl for the next best, slimmer and
+/// quieter. Each brightens toward its tail and is see-through, as tinted glass with a soft white
+/// rim (`seeThrough`, `rim`), so the squares and pieces show through it.
 enum ArrowColors {
-    static let best: UInt32 = 0xB8893A
-    static let bestTail: UInt32 = 0xF3DCA0
-    static let next: UInt32 = 0xCFC2A4
-    static let nextTail: UInt32 = 0xEFE6D2
-    /// The analysis arrows' fine hairline.
-    static let hairline: UInt32 = 0x2B2012
+    static let best: UInt32 = 0x7F9CC1
+    static let bestTail: UInt32 = 0xD6E2F0
+    static let next: UInt32 = 0xC7C1B7
+    static let nextTail: UInt32 = 0xEFECE6
+    /// How solid the analysis arrows are: the best move's, then the next best's.
+    static let seeThrough: (best: Double, next: Double) = (0.66, 0.5)
+    /// How strong their white rim is, against the arrow's own strength.
+    static let rim: Double = 0.55
     /// The coach's arrows' thin white edge, which keeps them crisp on a light square, a dark one
     /// and over a piece.
     static let edge: UInt32 = 0xFFFFFF
@@ -242,7 +256,10 @@ struct CrispArrow: View {
     var edge: Color = .white
     /// Lands on a ring on its target square.
     var landing = false
+    /// How solid the arrow is; under 1 it is see-through, as tinted glass.
     var opacity: Double = 1
+    /// How strong its edge is, against the arrow's own strength.
+    var rim: Double = 1
 
     var body: some View {
         let p = proportions
@@ -261,31 +278,44 @@ struct CrispArrow: View {
         let fade = Gradient(colors: [tailColor, color])
         let line = max(0.75, squareSize * 0.022)
         Canvas { context, _ in
-            context.opacity = opacity
+            let clear = opacity < 1
             if p.bow > 0 && glow == nil {
                 // The shadow on the board below the flight.
                 var ground = context
                 ground.addFilter(.blur(radius: squareSize * 0.07))
-                ground.stroke(Path { $0.move(to: tail); $0.addLine(to: tip) }, with: .color(.black.opacity(0.22)),
+                ground.stroke(Path { $0.move(to: tail); $0.addLine(to: tip) },
+                              with: .color(.black.opacity(clear ? 0.14 * opacity : 0.22)),
                               style: StrokeStyle(lineWidth: p.shaft * squareSize * 0.8, lineCap: .round))
             }
             if landing {
                 let ring = CGRect(x: to.x - squareSize * 0.33, y: to.y - squareSize * 0.14,
                                   width: squareSize * 0.66, height: squareSize * 0.36)
                 context.fill(Path(ellipseIn: ring), with: .color(color.opacity(0.18)))
-                context.stroke(Path(ellipseIn: ring), with: .color(tailColor), lineWidth: squareSize * 0.03)
+                context.stroke(Path(ellipseIn: ring), with: .color(tailColor.opacity(min(1, opacity + 0.2))),
+                               lineWidth: squareSize * 0.03)
             }
             if let glow {
                 context.addFilter(.shadow(color: glow.opacity(0.85), radius: squareSize * 0.1))
-            } else {
+            } else if !clear {
+                // A see-through arrow has no shadow: it would show through it.
                 context.addFilter(.shadow(color: .black.opacity(0.35), radius: squareSize * 0.03, y: squareSize * 0.015))
             }
-            context.drawLayer { layer in
-                if glow == nil {
+            if glow == nil {
+                // The edge only round the outside, so it doesn't show through a see-through arrow.
+                var rimmed = context
+                rimmed.opacity = rim * opacity
+                rimmed.drawLayer { layer in
                     for part in parts {
                         layer.stroke(part, with: .color(edge), style: StrokeStyle(lineWidth: line * 2, lineJoin: .round))
                     }
+                    layer.blendMode = .destinationOut
+                    for part in parts { layer.fill(part, with: .color(.black)) }
                 }
+            }
+            // The parts together in one layer, so where they overlap is no darker.
+            var body = context
+            body.opacity = opacity
+            body.drawLayer { layer in
                 for part in parts {
                     layer.fill(part, with: .linearGradient(fade, startPoint: tail, endPoint: tip))
                 }

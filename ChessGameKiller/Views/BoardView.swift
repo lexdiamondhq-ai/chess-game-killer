@@ -505,8 +505,8 @@ struct MoveArrow: View {
 
     var body: some View {
         CrispArrow(from: from, to: to, squareSize: squareSize, dashed: false, color: color,
-                   proportions: .analysis(best: isBest), glow: glow, edge: Color(hex: ArrowColors.hairline),
-                   landing: isBest, opacity: isBest ? 1 : 0.8)
+                   proportions: .analysis(best: isBest), glow: glow, edge: .white, landing: isBest,
+                   opacity: isBest ? ArrowColors.seeThrough.best : ArrowColors.seeThrough.next, rim: ArrowColors.rim)
     }
 }
 

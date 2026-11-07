@@ -33,6 +33,16 @@ final class DrillBoardTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(xs.max()) - XCTUnwrap(xs.min()), 0.46, accuracy: 0.0001)
         let shaftXs = shaft.map(\.x)
         XCTAssertEqual(try XCTUnwrap(shaftXs.max()) - XCTUnwrap(shaftXs.min()), 0.15, accuracy: 0.0001)
+
+        // Seamless, the parts only touch: a half-round tail behind the shaft, the shaft up to the
+        // head's base, so a see-through arrow shows no darker overlaps.
+        let seamless = SculptedBoardScene.arrowOutline(from: .a1, to: .a8, dashed: false, seamless: true)
+        XCTAssertEqual(seamless.count, 3)
+        let cap = seamless[0], body = seamless[1], point = seamless[2]
+        XCTAssertEqual(try XCTUnwrap(cap.map(\.y).max()), -3.3, accuracy: 0.0001)
+        XCTAssertEqual(try XCTUnwrap(cap.map(\.y).min()), -3.375, accuracy: 0.0001)
+        XCTAssertEqual(try XCTUnwrap(body.map(\.y).min()), -3.3, accuracy: 0.0001)
+        XCTAssertEqual(try XCTUnwrap(body.map(\.y).max()), try XCTUnwrap(point.map(\.y).min()), accuracy: 0.0001)
     }
 
     /// Analysis's arrows are flight paths: they bow to one side and rise off the stone at their
@@ -75,6 +85,9 @@ final class DrillBoardTests: XCTestCase {
         XCTAssertEqual(bestLayers.stone.count, 3)
         XCTAssertGreaterThan(bestLayers.ground.count, nextLayers.ground.count)
         XCTAssertEqual(nextLayers.ground.count, 2)
+        // They are see-through, with no edge to show through them.
+        XCTAssertTrue(bestLayers.edge.isEmpty)
+        XCTAssertFalse(SculptedBoardScene.arrowLayers(SculptedCoachArrow(from: .e2, to: .e4, color: 0x2E9E48)).edge.isEmpty)
         XCTAssertTrue(SculptedBoardScene.arrowLayers(SculptedCoachArrow(from: .e2, to: .e4, color: 0x2E9E48)).ground.isEmpty)
     }
 
