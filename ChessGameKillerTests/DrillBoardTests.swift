@@ -49,7 +49,13 @@ final class DrillBoardTests: XCTestCase {
     /// middle, landing back on it at the tip. The best is fuller than the next and lands on a ring.
     func testAnalysisArrowsFlyAndTheBestLandsOnARing() throws {
         let best = SculptedCoachArrow(from: .e2, to: .e4, color: ArrowColors.best, analysis: true)
-        let next = SculptedCoachArrow(from: .d2, to: .d4, color: ArrowColors.next, analysis: true, best: false)
+        let next = SculptedCoachArrow(from: .d2, to: .d4, color: ArrowColors.next, dashed: true, analysis: true,
+                                      best: false)
+        // The next best is a row of round dots, then its head.
+        let dots = SculptedBoardScene.arrowOutline(from: .d2, to: .d4, dashed: true, proportions: next.proportions)
+        XCTAssertGreaterThan(dots.count, 4)
+        XCTAssertTrue(dots.dropLast().allSatisfy { $0.count == 16 })
+        XCTAssertEqual(try XCTUnwrap(dots.last).count, 3)
         XCTAssertGreaterThan(best.proportions.shaft, next.proportions.shaft)
         XCTAssertGreaterThan(best.proportions.headWidth, next.proportions.headWidth)
         XCTAssertEqual(ArrowColors.tail(of: ArrowColors.best), ArrowColors.bestTail)
@@ -189,7 +195,7 @@ final class DrillBoardTests: XCTestCase {
             MoveHint(rank: 2, from: .c7, to: .c6, san: "c6", uci: "c7c6", evaluation: .centipawns(10)),
         ]
         XCTAssertEqual(SculptedPositionBoard.arrows(hints), [
-            SculptedCoachArrow(from: .d7, to: .d6, color: ArrowColors.next, analysis: true, best: false),
+            SculptedCoachArrow(from: .d7, to: .d6, color: ArrowColors.next, dashed: true, analysis: true, best: false),
             SculptedCoachArrow(from: .g8, to: .f6, color: ArrowColors.best, analysis: true),
         ])
         let board = SculptedPositionBoard(pieces: Position.standard.pieces, theme: .named(.gilded), flipped: true,

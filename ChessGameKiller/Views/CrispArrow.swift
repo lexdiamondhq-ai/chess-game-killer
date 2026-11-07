@@ -22,6 +22,8 @@ enum ArrowOutline {
         var bow: CGFloat = 0
         /// How high it rises over the board at its middle on the 3D board, as a share of its length.
         var rise: CGFloat = 0
+        /// Drawn dashed, the shaft is a row of round dots in place of bars.
+        var dotted = false
 
         /// The coach's arrows (lessons, drills, puzzles): straight.
         static func coach(dashed: Bool) -> Proportions {
@@ -32,7 +34,8 @@ enum ArrowOutline {
         /// They bow only gently (Alex: "not the curved so much").
         static func analysis(best: Bool) -> Proportions {
             Proportions(shaft: best ? 0.14 : 0.1, headLength: best ? 0.32 : 0.27, headWidth: best ? 0.46 : 0.34,
-                        startInset: 0.24, tipInset: 0.08, bow: best ? 0.08 : 0.06, rise: best ? 0.22 : 0.16)
+                        startInset: 0.24, tipInset: 0.08, bow: best ? 0.08 : 0.06, rise: best ? 0.22 : 0.16,
+                        dotted: !best)
         }
     }
 
@@ -109,6 +112,17 @@ enum ArrowOutline {
                 let d2 = max(hypot(b.x - a.x, b.y - a.y), 0.000001)
                 return (CGPoint(x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t),
                         CGPoint(x: -(b.y - a.y) / d2 * width / 2, y: (b.x - a.x) / d2 * width / 2))
+            }
+            if p.dotted {
+                // Round dots, a little wider than the shaft, a dot's width apart, the last clear of the head.
+                let radius = width * 0.62, spacing = radius * 3.2
+                var dots: [[CGPoint]] = []
+                var d = radius
+                while d + radius <= total - 0.05 * unit {
+                    dots.append(circle(at(d).0, radius: radius, sides: 16))
+                    d += spacing
+                }
+                return dots + [head]
             }
             var bars: [[CGPoint]] = []
             let dash = p.shaft * 1.6 * unit, gap = p.shaft * 1.1 * unit

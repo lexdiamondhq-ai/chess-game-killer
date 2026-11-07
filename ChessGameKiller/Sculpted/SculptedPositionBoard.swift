@@ -58,13 +58,13 @@ struct SculptedPositionBoard: View {
         return state
     }
 
-    /// The analysis lines' arrows for the scene: the best fuller, the next best slimmer and
-    /// quieter, as on the flat analysis board. The next best is drawn first, so the best lies over it.
+    /// The analysis lines' arrows for the scene: the best fuller, the next best dotted, slimmer
+    /// and quieter, as on the flat analysis board. The next best is drawn first, so the best lies over it.
     static func arrows(_ hints: [MoveHint]) -> [SculptedCoachArrow] {
         hints.prefix(2).reversed().map { hint in
             let best = hint.rank == 0
             return SculptedCoachArrow(from: hint.from, to: hint.to, color: best ? ArrowColors.best : ArrowColors.next,
-                                      analysis: true, best: best)
+                                      dashed: !best, analysis: true, best: best)
         }
     }
 
