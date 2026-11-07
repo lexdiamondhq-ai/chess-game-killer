@@ -28,7 +28,6 @@ struct ContentView: View {
     @State private var puzzles = PuzzleStore.live()
     @State private var showingPuzzles = false
     @State private var army = ArmyStore.live()
-    @State private var grudges = GrudgeStore()
     @State private var showingArmy = false
     @State private var armyNews: ArmyNews?
     @State private var vault = GameVault.live()
@@ -65,6 +64,10 @@ struct ContentView: View {
     @AppStorage(GhostVision.storageKey) private var ghostVisionOn = true
     @State private var vision = GhostVision()
     @State private var trayOpen = false
+    /// Resign in the dock asks first.
+    @State private var confirmingResign = false
+    /// Analyze opens straight on the game: Analyze in the dock once a game is over.
+    @State private var analyzeOnGame = false
     /// The position being looked at while the player swipes back through the game; nil is live.
     @State private var browsePly: Int?
     @State private var scrubStart: Int?
@@ -187,16 +190,10 @@ struct ContentView: View {
                     daily.record(.game)
                 }
                 hookUpDaily()
-                match.grudgeRecord = { [grudges] in grudges.record }
-                match.onAbandon = { [army, grudges, weak match] ledger, setup, assisted in
+                match.onAbandon = { [army] ledger, setup, assisted in
                     // Walking away from a game counts as a loss.
                     army.record(ledger, playerColor: setup.playerColor, won: false,
                                 stakes: GameStakes(level: setup.level, assisted: assisted, staked: setup.stake))
-                    // Your Grudge counts it too. Walking out on a crowd never wakes one.
-                    if setup.grudge, let game = match?.game {
-                        grudges.recordGame(.itWon, moves: game.moves, playerColor: setup.playerColor,
-                                           positions: game.positionFENs)
-                    }
                 }
                 // Every grade reaches the coach, shown or not, so real mistakes are saved to practice.
                 match.onReview = { [weak match, coach, training] review, latest in
@@ -228,7 +225,6 @@ struct ContentView: View {
                 guard over else { return }
                 recordArmy()
                 recordGame()
-                recordGrudge()
                 // A game played to its end makes the day.
                 daily.record(.game)
                 if bigBoard { trayOpen = true }
@@ -306,14 +302,16 @@ struct ContentView: View {
                     challenges?.compose()
                 }
                 .environment(army)
-                .environment(grudges)
                 .boardSheetGrabber(boardSheet)
             }
             .sheet(isPresented: $showingSettings, onDismiss: refreshDaily) {
                 SettingsSheet()
                     .boardSheetGrabber(boardSheet)
             }
-            .sheet(isPresented: $showingAnalyze, onDismiss: { analyzeWithCamera = false }) {
+            .sheet(isPresented: $showingAnalyze, onDismiss: {
+                analyzeWithCamera = false
+                analyzeOnGame = false
+            }) {
                 AnalyzeSheet(
                     theme: theme,
                     currentFEN: match.hasStarted ? match.game.fen : nil,
@@ -323,7 +321,8 @@ struct ContentView: View {
                     clock: fromHereSetup.timeControl,
                     forfeits: forfeits,
                     onAnalyzeGame: analyzeGame,
-                    startsWithCamera: analyzeWithCamera
+                    startsWithCamera: analyzeWithCamera,
+                    startsOnGame: analyzeOnGame
                 ) { draft in
                     play(from: draft)
                 }
@@ -341,7 +340,6 @@ struct ContentView: View {
             .environment(training)
             .environment(coach)
             .environment(army)
-            .environment(grudges)
             .environment(vault)
             .environment(puzzles)
             .environment(daily)
@@ -656,6 +654,12 @@ struct ContentView: View {
                 if compact {
                     PlayersStrip(match: match, theme: theme)
                         .frame(width: lineWidth, height: stripHeight)
+                } else if bigBoard {
+                    bigBoardBar {
+                        ExecutivePlate(match: match, theme: theme, color: topColor)
+                            .frame(height: plateHeight)
+                    }
+                    .frame(width: lineWidth)
                 } else {
                     ExecutivePlate(match: match, theme: theme, color: topColor)
                         .frame(width: lineWidth, height: plateHeight)
@@ -793,18 +797,24 @@ struct ContentView: View {
 
     /// The tray at the bottom of Big Board, holding the dock's controls and what the top bar would.
     private func bigTray(coachHeight: CGFloat) -> some View {
-        BigBoardTray(match: match, theme: theme, isOpen: $trayOpen, coachIsWide: coachIsWide,
-                     onNewGame: { showingNewGame = true },
-                     onSettings: { showingSettings = true },
-                     onExit: { withAnimation(.snappy) { bigBoard = false } },
-                     onArmy: { showingArmy = true },
-                     onGames: { showingGames = true },
-                     onHome: homeScreenOn ? { goHome() } : nil) {
+        BigBoardTray(match: match, theme: theme, isOpen: $trayOpen, coachIsWide: coachIsWide) {
             dockRow(coachHeight: coachHeight)
         }
         .onChange(of: trayOpen) { _, open in
             if !open { setCoach(expanded: false) }
         }
+    }
+
+    /// Big Board's way back and its menu, either side of the opponent's line.
+    private func bigBoardBar<Plate: View>(@ViewBuilder plate: @escaping () -> Plate) -> some View {
+        BigBoardBar(theme: theme,
+                    onHome: homeScreenOn ? { goHome() } : nil,
+                    onNewGame: { showingNewGame = true },
+                    onGames: { showingGames = true },
+                    onArmy: { showingArmy = true },
+                    onSettings: { showingSettings = true },
+                    onExit: { withAnimation(.snappy) { bigBoard = false } },
+                    plate: plate)
     }
 
     /// Switches Big Board on.
@@ -907,20 +917,32 @@ struct ContentView: View {
         .padding(.top, 8)
     }
 
-    /// Every control named, three either side of the orb. They step aside while the orb is wide.
-    /// No glass of its own: it sits on the dock's, or on Big Board's tray.
+    /// Only the game, two either side of the orb: Undo and Hints, then Flip and Resign. Once the
+    /// game is over it turns to what comes next: look back at it, play it again, or move on.
+    /// Everything else (Home, New game, Settings) sits in the top bar, or in Big Board on the
+    /// opponent's line. The controls step aside while the orb is wide. No glass of its own: it
+    /// sits on the dock's, or on Big Board's tray.
     private func dockRow(coachHeight: CGFloat) -> some View {
         ZStack {
             HStack(spacing: 0) {
                 HStack(spacing: 0) {
-                    DockButton(title: "Analyze", symbol: Glyphs.analyze, theme: theme) {
-                        showingAnalyze = true
-                    }
-                    DockButton(title: "Train", symbol: Glyphs.train, theme: theme) {
-                        showingTraining = true
-                    }
-                    DockButton(title: "Puzzles", symbol: Glyphs.puzzles, theme: theme) {
-                        showingPuzzles = true
+                    if match.isOver {
+                        DockButton(title: "Analyze", symbol: Glyphs.analyze, theme: theme) {
+                            analyzeOnGame = true
+                            showingAnalyze = true
+                        }
+                        DockButton(title: "Rematch", symbol: "arrow.clockwise", theme: theme) {
+                            withAnimation(.snappy) { match.rematch() }
+                        }
+                    } else {
+                        DockButton(title: "Undo", symbol: Glyphs.undo, theme: theme) {
+                            withAnimation(.snappy(duration: 0.22)) { match.undo() }
+                        }
+                        .disabled(!match.canUndo)
+                        DockButton(title: "Hints", symbol: showBestMoves ? Glyphs.hints : Glyphs.hintsOff,
+                                   isOn: showBestMoves, theme: theme) {
+                            showBestMoves.toggle()
+                        }
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -928,16 +950,30 @@ struct ContentView: View {
                 // height it is offered, which pushed the dock up and squeezed the board to nothing.
                 Color.clear.frame(width: CoachOrb.orbSize + 12, height: 1)
                 HStack(spacing: 0) {
-                    DockButton(title: "Undo", symbol: Glyphs.undo, theme: theme) {
-                        withAnimation(.snappy(duration: 0.22)) { match.undo() }
-                    }
-                    .disabled(!match.canUndo)
-                    DockButton(title: "Hints", symbol: showBestMoves ? Glyphs.hints : Glyphs.hintsOff,
-                               isOn: showBestMoves, theme: theme) {
-                        showBestMoves.toggle()
-                    }
-                    DockButton(title: "Flip", symbol: Glyphs.flip, theme: theme) {
-                        withAnimation(.snappy) { match.flipBoard() }
+                    if match.isOver {
+                        DockButton(title: "New game", symbol: "plus", theme: theme) {
+                            showingNewGame = true
+                        }
+                        if homeScreenOn {
+                            DockButton(title: "Home", symbol: Glyphs.home, theme: theme) { goHome() }
+                        } else {
+                            DockButton(title: "Games", symbol: Glyphs.games, theme: theme) { showingGames = true }
+                        }
+                    } else {
+                        DockButton(title: "Flip", symbol: Glyphs.flip, theme: theme) {
+                            withAnimation(.snappy) { match.flipBoard() }
+                        }
+                        DockButton(title: "Resign", symbol: "flag", theme: theme) {
+                            confirmingResign = true
+                        }
+                        .disabled(!match.canResign)
+                        .confirmationDialog("Resign this game?", isPresented: $confirmingResign,
+                                            titleVisibility: .visible) {
+                            Button("Resign", role: .destructive) {
+                                withAnimation(.snappy) { match.resign() }
+                            }
+                            Button("Keep playing", role: .cancel) {}
+                        }
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -1026,27 +1062,6 @@ struct ContentView: View {
             try? await Task.sleep(for: .seconds(6))
             if armyNews == news {
                 withAnimation(.easeOut(duration: 0.3)) { armyNews = nil }
-            }
-        }
-    }
-
-    /// Tells your Grudge how the game went. A loss to a crowd wakes the Grudge the first time.
-    private func recordGrudge() {
-        guard match.setup.opponent == .computer else { return }
-        let you = match.setup.playerColor
-        let result: GrudgeResult = match.winner.map { $0 == you ? .youWon : .itWon } ?? .draw
-        let game = match.game
-        if match.setup.grudge {
-            grudges.recordGame(result, moves: game.moves, playerColor: you, positions: game.positionFENs)
-        } else if result == .itWon,
-                  grudges.crowdWon(level: match.setup.level, moves: game.moves, playerColor: you,
-                                   positions: game.positionFENs) {
-            // After the crowd's own last word.
-            let number = match.gameNumber
-            Task { @MainActor in
-                try? await Task.sleep(for: .seconds(1.6))
-                guard match.gameNumber == number else { return }
-                match.say("Someone took that personally.")
             }
         }
     }

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""Draws the rivals' portraits: The Crowd as rings of gold dots (more players, more dots) and
-The Grudge as the onyx king from the Gilded set, lit red from behind and scarred in gold.
+"""Draws the rivals' portraits: The Crowd as rings of gold dots (more players, more dots).
 
     python3 scripts/make_rival_portraits.py && python3 scripts/make_rival_glows.py
 
@@ -18,7 +17,6 @@ from PIL import Image, ImageDraw, ImageFilter
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 APP = os.path.join(ROOT, "ChessGameKiller", "Assets.xcassets", "Rivals")
 WIDGET = os.path.join(ROOT, "ChessGameKillerWidget", "Assets.xcassets", "Rivals")
-KING = os.path.join(ROOT, "ChessGameKiller", "Assets.xcassets", "Pieces", "gilded-bK.imageset", "gilded-bK.png")
 
 SIZE = 600
 GROUND = (10, 9, 8)
@@ -26,17 +24,6 @@ GOLD = (226, 190, 120)
 
 # Dots per crowd: a few hundred real players stand behind each one.
 CROWDS = {"1000s": 230, "1200s": 330, "1600s": 470, "2000s": 620, "masters": 820}
-
-# The scars, in the king's own 560 x 760 picture: short broken strokes across the body.
-SCARS = [
-    [(205, 455), (240, 428), (258, 444), (292, 414)],
-    [(340, 505), (315, 528), (325, 548), (300, 574)],
-    [(225, 575), (268, 563), (284, 582)],
-    [(352, 395), (335, 430), (350, 442)],
-    [(200, 640), (232, 618), (255, 630), (283, 610)],
-    [(300, 610), (322, 636), (310, 660)],
-    [(250, 365), (290, 372), (302, 350)],
-]
 
 
 def crowd(name, count):
@@ -64,33 +51,6 @@ def crowd(name, count):
     return image.convert("RGB")
 
 
-def grudge():
-    king = Image.open(KING).convert("RGBA")
-    scale = 430 / king.height
-    king = king.resize((round(king.width * scale), 430), Image.LANCZOS)
-    image = Image.new("RGBA", (SIZE, SIZE), GROUND + (255,))
-    # The red light behind it.
-    light = Image.new("L", (SIZE, SIZE), 0)
-    ImageDraw.Draw(light).ellipse((130, 150, 470, 520), fill=200)
-    light = light.filter(ImageFilter.GaussianBlur(80))
-    image = Image.composite(Image.new("RGBA", (SIZE, SIZE), (150, 22, 34, 255)), image, light)
-    x, y = (SIZE - king.width) // 2, SIZE - king.height - 60
-    # A red rim: the king's outline, blurred and coloured, under the king.
-    alpha = king.split()[3]
-    rim = Image.new("RGBA", king.size, (255, 70, 84, 0))
-    rim.putalpha(alpha.filter(ImageFilter.MaxFilter(9)).filter(ImageFilter.GaussianBlur(7)))
-    image.alpha_composite(rim, (x, y))
-    image.alpha_composite(king, (x, y))
-    # Gold scars, one for each of your wins in the picture.
-    scars = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(scars)
-    for scar in SCARS:
-        points = [(x + px * scale, y + py * scale) for px, py in scar]
-        draw.line(points, fill=(243, 213, 154, 255), width=4, joint="curve")
-    image.alpha_composite(scars.filter(ImageFilter.GaussianBlur(3)))
-    image.alpha_composite(scars)
-    return image.convert("RGB")
-
 
 def write(folder, name, image, ext, contents):
     path = os.path.join(folder, f"rival-{name}.imageset")
@@ -106,7 +66,6 @@ def write(folder, name, image, ext, contents):
 
 def main():
     portraits = {name: crowd(name, count) for name, count in CROWDS.items()}
-    portraits["grudge"] = grudge()
     for name, image in portraits.items():
         write(APP, name, image, "jpg",
               lambda file: {"images": [{"filename": file, "idiom": "universal"}],

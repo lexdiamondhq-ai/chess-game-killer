@@ -56,8 +56,6 @@ struct HomeView: View {
     @AppStorage("setup.side") private var side: SideChoice = .white
     /// Nil until a rival has been picked: a first game is against Spark.
     @AppStorage("setup.level") private var storedLevel: Int?
-    @AppStorage("setup.grudge") private var grudgeOn = false
-    @Environment(GrudgeStore.self) private var grudges: GrudgeStore?
     @AppStorage("setup.clock") private var timeControl: TimeControl = .unlimited
     @AppStorage("haptics") private var hapticsOn = true
     /// The name friends see, from the last challenge: the home says hello with it.
@@ -144,8 +142,7 @@ struct HomeView: View {
     private var upNext: HomeUpNext {
         HomeUpNext.make(match: match, side: side,
                         level: storedLevel.flatMap(MatchController.Level.init(rawValue:)),
-                        timeControl: timeControl, hasPlayed: !vault.games.isEmpty,
-                        grudge: grudgeOn ? grudges?.record : nil)
+                        timeControl: timeControl, hasPlayed: !vault.games.isEmpty)
     }
 
     private var piecesLine: String {
@@ -448,7 +445,7 @@ struct HomeView: View {
             return
         }
         // Remember the rival, so the next visit offers the same one.
-        if !upNext.isGrudge { storedLevel = upNext.level.rawValue }
+        storedLevel = upNext.level.rawValue
         actions.start(upNext.setup(side: side))
     }
 
@@ -485,7 +482,6 @@ struct HomeView: View {
     /// last time. During a game the New Game sheet opens on that rival instead, and asks
     /// before the game under way ends.
     private func playRival(_ level: MatchController.Level) {
-        grudgeOn = false
         if upNext.inProgress {
             actions.playRival(level)
             return

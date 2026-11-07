@@ -19,6 +19,8 @@ struct AnalyzeSheet: View {
     let onPlay: (PositionDraft) -> Void
     /// Opened from the home's Scan a board shortcut: the camera comes up straight away.
     let startsWithCamera: Bool
+    /// Opens straight on the game on the board, as Analyze this game does once a game is over.
+    let startsOnGame: Bool
 
     @State private var session: ScanSession
     @State private var photoItem: PhotosPickerItem?
@@ -38,6 +40,7 @@ struct AnalyzeSheet: View {
         forfeits: String? = nil,
         onAnalyzeGame: (() -> Void)? = nil,
         startsWithCamera: Bool = false,
+        startsOnGame: Bool = false,
         onPlay: @escaping (PositionDraft) -> Void
     ) {
         self.theme = theme
@@ -48,6 +51,7 @@ struct AnalyzeSheet: View {
         self.forfeits = forfeits
         self.onAnalyzeGame = onAnalyzeGame
         self.startsWithCamera = startsWithCamera
+        self.startsOnGame = startsOnGame
         self.onPlay = onPlay
         _session = State(initialValue: ScanSession(reader: reader))
     }
@@ -175,6 +179,10 @@ struct AnalyzeSheet: View {
                 .ignoresSafeArea()
         }
         .task {
+            if startsOnGame, let gameFEN {
+                session.analyze(fen: gameFEN)
+                return
+            }
             // Scan a board: the camera once the sheet is up (or the offer, with no scans left).
             guard startsWithCamera, hasCamera else { return }
             try? await Task.sleep(for: .milliseconds(450))
