@@ -5,7 +5,7 @@ import SwiftUI
 /// stone and the Floating Cut-outs, each with its soft shadow off to the right. For lists and
 /// previews, where a live 3D board in every row would be too heavy. Nothing rises above the
 /// squares. With 3D pieces off, or a look without a 3D board, it is the flat board.
-struct SculptedStillBoard: View {
+struct CutoutStillBoard: View {
     let fen: String
     let theme: BoardTheme
     var flipped = false

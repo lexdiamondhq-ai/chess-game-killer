@@ -156,7 +156,7 @@ private struct GameCard: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
-            SculptedStillBoard(fen: game.finalFEN, theme: theme, flipped: !game.playerIsWhite)
+            CutoutStillBoard(fen: game.finalFEN, theme: theme, flipped: !game.playerIsWhite)
                 .frame(width: 104, height: 104)
                 .allowsHitTesting(false)
             VStack(alignment: .leading, spacing: 8) {

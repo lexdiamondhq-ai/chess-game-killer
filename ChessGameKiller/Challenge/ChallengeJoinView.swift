@@ -82,7 +82,7 @@ struct ChallengeJoinView: View {
             .padding(.top, 18)
 
             // A smaller board when the name is asked for, so the name field shows above the buttons.
-            SculptedStillBoard(fen: Position.standard.fen, theme: theme, flipped: mySeat == .black)
+            CutoutStillBoard(fen: Position.standard.fen, theme: theme, flipped: mySeat == .black)
                 .frame(width: boardSide, height: boardSide)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .shadow(color: .black.opacity(theme.screenIsDark ? 0.45 : 0.18), radius: 18, y: 10)
