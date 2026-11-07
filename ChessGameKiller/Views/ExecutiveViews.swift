@@ -127,7 +127,7 @@ struct ExecutivePlate: View {
                 CheckTag(color: theme.check)
                     .transition(.scale.combined(with: .opacity))
             }
-            PlateRemark(match: match, theme: theme, isRival: isComputer) {
+            PlateRemark(match: match, theme: theme, isRival: isComputer, stacked: inDock) {
                 statusWords
             }
             .layoutPriority(1)
