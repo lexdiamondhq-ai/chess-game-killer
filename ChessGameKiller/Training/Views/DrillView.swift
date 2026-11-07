@@ -16,24 +16,9 @@ struct DrillView: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            VStack(spacing: 6) {
-                TrainingBoardView(
-                    game: runner.game,
-                    theme: theme,
-                    flipped: runner.learner == .black,
-                    arrows: runner.arrows,
-                    marks: runner.marks,
-                    labels: runner.labels,
-                    onTap: runner.acceptsTaps ? { (square: Square) in runner.tap(square) } : nil
-                )
-                .frame(width: boardSide, height: boardSide)
-                .boardHeadroom(theme: theme, side: boardSide)
-                // Under the board, never over the back rank; the space is kept while solving so
-                // nothing jumps, and given back once the puzzle is over.
-                if !runner.isOver {
-                    turnBadge
-                }
-            }
+            // Whose move it is goes under the board, never over the back rank, beside the
+            // Tilted / Flat switch; its place is kept once the puzzle is over, so nothing jumps.
+            DrillBoard(runner: runner, theme: theme, side: boardSide, showsTurn: showsTurn)
 
             messageCard
                 .padding(.horizontal, 16)
@@ -54,10 +39,9 @@ struct DrillView: View {
 
     // MARK: Pieces of the screen
 
-    /// "White to move" in the learner's color, under the board.
-    private var turnBadge: some View {
-        TurnBadge(theme: theme, side: runner.learner,
-                  showing: runner.phase == .solving && (runner.kind == .move || runner.kind == .playout))
+    /// "White to move" in the learner's color, under the board, while there is a move to find.
+    private var showsTurn: Bool {
+        runner.phase == .solving && (runner.kind == .move || runner.kind == .playout)
     }
 
     private var messageCard: some View {

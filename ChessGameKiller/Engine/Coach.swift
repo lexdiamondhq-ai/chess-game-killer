@@ -121,9 +121,10 @@ enum Notation {
     }
 
     /// Numbers a line for reading: "1. Nf3 Nc6 2. d4", or "1... Nc6 2. d4" when black moves first.
-    static func numbered(_ line: [String], blackFirst: Bool) -> String {
+    /// `from` is the move number the line starts on.
+    static func numbered(_ line: [String], blackFirst: Bool, from first: Int = 1) -> String {
         var parts: [String] = []
-        var number = 1
+        var number = max(first, 1)
         var whiteToMove = !blackFirst
         for (index, san) in line.enumerated() {
             if whiteToMove {

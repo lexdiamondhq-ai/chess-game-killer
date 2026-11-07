@@ -351,8 +351,9 @@ struct BoardView: View {
             }
         }
         .frame(width: size * 8, height: size * 8)
-        // The computer's moves arrive without a tap, so animate every change here.
-        .animation(.snappy(duration: 0.3), value: game.pieces)
+        // The computer's moves arrive without a tap, so animate every change here: the same
+        // smooth glide, with no bounce at the end, as the other boards (`PieceGlide`).
+        .animation(PieceGlide.move, value: game.pieces)
         .animation(.snappy(duration: 0.45), value: flipped)
         .allowsHitTesting(false)
         .accessibilityHidden(true)

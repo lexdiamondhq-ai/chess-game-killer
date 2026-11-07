@@ -62,27 +62,32 @@ extension View {
 
 extension TrainingColor {
     func color(on theme: BoardTheme) -> Color {
+        Color(hex: hex(on: theme))
+    }
+
+    /// The color as 0xRRGGBB: brighter on a dark screen. The 3D board takes it this way.
+    func hex(on theme: BoardTheme) -> UInt32 {
         if theme.screenIsDark {
             switch self {
-            case .red: return Color(hex: 0xFF4D6D)
-            case .yellow: return Color(hex: 0xF7D046)
-            case .green: return Color(hex: 0x3DFF9A)
-            case .blue: return Color(hex: 0x5AA9FF)
-            case .violet: return Color(hex: 0xB98CFF)
-            case .teal: return Color(hex: 0x50F0E6)
-            case .orange: return Color(hex: 0xFF9A3C)
-            case .pink: return Color(hex: 0xFF5AC8)
+            case .red: return 0xFF4D6D
+            case .yellow: return 0xF7D046
+            case .green: return 0x3DFF9A
+            case .blue: return 0x5AA9FF
+            case .violet: return 0xB98CFF
+            case .teal: return 0x50F0E6
+            case .orange: return 0xFF9A3C
+            case .pink: return 0xFF5AC8
             }
         }
         switch self {
-        case .red: return Color(hex: 0xD93636)
-        case .yellow: return Color(hex: 0xE9A800)
-        case .green: return Color(hex: 0x2E9E48)
-        case .blue: return Color(hex: 0x2F74E0)
-        case .violet: return Color(hex: 0x7B4AE2)
-        case .teal: return Color(hex: 0x0E9688)
-        case .orange: return Color(hex: 0xEE7A12)
-        case .pink: return Color(hex: 0xDB3F86)
+        case .red: return 0xD93636
+        case .yellow: return 0xE9A800
+        case .green: return 0x2E9E48
+        case .blue: return 0x2F74E0
+        case .violet: return 0x7B4AE2
+        case .teal: return 0x0E9688
+        case .orange: return 0xEE7A12
+        case .pink: return 0xDB3F86
         }
     }
 }
