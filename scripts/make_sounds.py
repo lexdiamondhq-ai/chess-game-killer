@@ -41,10 +41,27 @@ SOUNDS = {
                 "triumphant major chord with sparkles, polished modern mobile game music", 6.0),
     "welcome": ("A short elegant welcoming chime for opening a premium game app: warm "
                 "bell and soft synth pad, three gentle rising notes, clean and luxurious", 2.2),
+    # Background music, in the family of Home's "The Long Winter" (cello, strings, choir):
+    # quiet, even loops that sit under the screen without a climax.
+    "music-puzzles": ("Calm, focused medieval fantasy orchestral underscore, seamless as a background "
+                      "loop: soft pizzicato strings and a gentle harp ostinato, a low sustained cello "
+                      "drone, sparse solo violin phrases in a minor key, no drums. Slow steady tempo "
+                      "around 66 BPM, thoughtful and concentrated, very quiet and even with no climax",
+                      90.0),
+    "music-training": ("Warm, hopeful medieval fantasy orchestral underscore, seamless as a background "
+                       "loop to sit under a spoken voice: soft string pads, a gentle solo cello melody "
+                       "in a major-leaning mode, light celesta and harp touches, nothing in the "
+                       "midrange that competes with speech, no drums. Slow tempo around 68 BPM, "
+                       "encouraging and patient, very soft and even", 90.0),
+    "music-analyze": ("Mysterious, contemplative medieval fantasy orchestral underscore, seamless as a "
+                      "background loop: slow low strings, a distant french horn, a hushed wordless "
+                      "choir pad, soft timpani rolls far in the background, a solo viola line in a "
+                      "minor key. Very slow tempo around 60 BPM, deep and pondering, like studying an "
+                      "old map by candlelight, quiet throughout", 90.0),
 }
 
 # Composed as music rather than as a sound effect: text and length come from SOUNDS.
-MUSIC = {"victory"}
+MUSIC = {"victory", "music-puzzles", "music-training", "music-analyze"}
 
 # Raised after generating, in dB. The check's bell comes out quieter than a plain move,
 # and check is the more important news.
@@ -146,6 +163,8 @@ def main() -> None:
         if only and name not in only:
             continue
         audio = compose(text, seconds, key) if name in MUSIC else None
+        if audio is None and name.startswith("music-"):
+            sys.exit(f"{name}: the Music API is needed for background music")
         if name == "castle":
             audio = castle_from_move(out)
         if audio is None:
