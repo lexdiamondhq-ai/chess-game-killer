@@ -440,7 +440,7 @@ final class TalkSession: Identifiable {
         guard Premium.shared.canUse(.talk) else {
             listener.cancel()
             outOfTalks = true
-            problem = PremiumFeature.talk.limitLine
+            problem = Premium.shared.limitLine(.talk)
             phase = .failed
             return
         }
@@ -480,7 +480,7 @@ final class TalkSession: Identifiable {
         // Each talk costs a server call: free players get 3 a week, Premium 10 a day.
         guard Premium.shared.use(.talk) else {
             outOfTalks = true
-            problem = PremiumFeature.talk.limitLine
+            problem = Premium.shared.limitLine(.talk)
             phase = .failed
             return
         }

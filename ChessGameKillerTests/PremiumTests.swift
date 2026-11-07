@@ -134,6 +134,18 @@ final class PremiumTests: XCTestCase {
         XCTAssertFalse(premium.use(.scan))
     }
 
+    func testPremiumPlayersHearTheirCapNotAnOffer() throws {
+        let free = Premium(defaults: defaults, isPremium: false)
+        let paid = Premium(defaults: defaults, isPremium: true)
+        XCTAssertEqual(free.limitLine(.scan), PremiumFeature.scan.limitLine)
+        XCTAssertEqual(paid.limitLine(.scan), PremiumFeature.scan.premiumLimitLine)
+        XCTAssertEqual(paid.limitLine(.talk), PremiumFeature.talk.premiumLimitLine)
+        for feature in PremiumFeature.allCases where feature.premium != nil {
+            let line = try XCTUnwrap(feature.premiumLimitLine, "\(feature) has a Premium cap, so it needs its own line")
+            XCTAssertFalse(line.contains("Premium"), "\(feature): don't sell Premium to a Premium player")
+        }
+    }
+
     func testLockedFeaturesStayShutForFreePlayers() {
         let premium = Premium(defaults: defaults, isPremium: false)
         XCTAssertFalse(premium.opens(.lessons))

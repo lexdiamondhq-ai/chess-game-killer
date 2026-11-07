@@ -119,6 +119,18 @@ enum PremiumFeature: String, CaseIterable, Identifiable, Codable {
     }
 }
 
+extension PremiumFeature {
+    /// Where Premium's own cap stops, for a player who already has Premium. Nil: no cap.
+    /// Never an offer: they've already bought it.
+    var premiumLimitLine: String? {
+        switch self {
+        case .talk: return "That's today's 10 talks with Leo. He's back tomorrow."
+        case .scan: return "That's today's 3 photo scans. More tomorrow, and setting up by hand is always free."
+        default: return nil
+        }
+    }
+}
+
 /// The plans on sale. The ids must match App Store Connect and Support/Premium.storekit.
 enum PremiumPlan: String, CaseIterable, Identifiable {
     case yearly = "com.chessgamekiller.app.premium.yearly"
