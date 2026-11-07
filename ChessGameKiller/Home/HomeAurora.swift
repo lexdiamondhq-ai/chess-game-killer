@@ -14,6 +14,10 @@ struct HomeAuroraInfo {
     /// The 3D board turning at the top: its look and the game's pieces.
     var look: SculptedLook
     var pieces: [Piece]
+    /// Coach Leo's note at the top of the page.
+    var note: HomeLeoNote? = nil
+    /// Your finest move of the week, framed, when you played one.
+    var finest: HomeFinestMove? = nil
 }
 
 struct HomeAuroraActions {
@@ -26,6 +30,8 @@ struct HomeAuroraActions {
     var playGrudge: () -> Void = {}
     /// Opens Puzzles.
     var puzzles: () -> Void = {}
+    /// Opens one of your finished games in Rewind.
+    var replay: (UUID) -> Void = { _ in }
 }
 
 /// Aurora's colors, night and day.
@@ -251,7 +257,8 @@ struct HomeAuroraView: View {
     // MARK: The page
 
     /// The page that slides up over the board: your games first, then a slim line of numbers,
-    /// then today's things as long rows.
+    /// then today's things as long rows. Leo's note sits on top, and your finest move of the week
+    /// leads today's things.
     private var page: some View {
         let shape = UnevenRoundedRectangle(cornerRadii: .init(topLeading: 34, bottomLeading: 0,
                                                               bottomTrailing: 0, topTrailing: 34),
@@ -261,6 +268,11 @@ struct HomeAuroraView: View {
                 .fill(palette.ink3)
                 .frame(width: 38, height: 4)
                 .padding(.top, 10)
+            if let note = info.note {
+                HomeAuroraLeoNote(note: note, palette: palette)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
+            }
             HomeAuroraSection(title: gamesTitle, palette: palette, note: gamesNote)
             gameRow
             HomeAuroraSection(title: "Face a rival", palette: palette, note: "Up next: \(stage.upNext.level.rival.shortName)")
@@ -268,6 +280,9 @@ struct HomeAuroraView: View {
                 .padding(.horizontal, 12)
             HomeAuroraSection(title: "For today", palette: palette, note: nil)
             VStack(spacing: 10) {
+                if let finest = info.finest {
+                    HomeAuroraFinestMove(finest: finest, palette: palette) { actions.replay(finest.gameID) }
+                }
                 todayRows
             }
             .padding(.horizontal, 16)
