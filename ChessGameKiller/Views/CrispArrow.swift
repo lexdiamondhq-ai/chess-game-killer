@@ -29,9 +29,10 @@ enum ArrowOutline {
         }
 
         /// The analysis arrows, flight paths: the best move fuller and higher, the next best slimmer.
+        /// They bow only gently (Alex: "not the curved so much").
         static func analysis(best: Bool) -> Proportions {
             Proportions(shaft: best ? 0.14 : 0.1, headLength: best ? 0.32 : 0.27, headWidth: best ? 0.46 : 0.34,
-                        startInset: 0.24, tipInset: 0.08, bow: best ? 0.2 : 0.15, rise: best ? 0.22 : 0.16)
+                        startInset: 0.24, tipInset: 0.08, bow: best ? 0.08 : 0.06, rise: best ? 0.22 : 0.16)
         }
     }
 

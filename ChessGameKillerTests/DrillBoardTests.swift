@@ -63,8 +63,8 @@ final class DrillBoardTests: XCTestCase {
         let shaft = outlines[1]
         XCTAssertGreaterThan(shaft.count, 20)
         let off = shaft.map { abs($0.x - 0.5) }.max() ?? 0
-        XCTAssertGreaterThan(off, 0.2)
-        XCTAssertLessThan(off, 0.5)
+        XCTAssertGreaterThan(off, 0.1)
+        XCTAssertLessThan(off, 0.3)
         // Its ends stay on the file.
         let (tail, tip) = ArrowOutline.ends(from: CGPoint(x: 0.5, y: -2.5), to: CGPoint(x: 0.5, y: -0.5), unit: 1,
                                             proportions: best.proportions)
