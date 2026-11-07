@@ -631,22 +631,23 @@ struct HomeAuroraGrudge: View {
     }
 }
 
-/// "Beauty of Chess" incised in the marble under the board, the way a name is cut into a
-/// stone, in a medieval blackletter (Alex, 2026-11-07: "actually in the marble", "more
-/// medieval"). The groove is drawn in multiply over the marble, so the slab's veins run through
-/// the letters; an inner shadow shades it under the top edge and its lower lip catches the
-/// light. "of" is gold leaf.
+/// "Beauty of Chess" carved into the marble under the board in Cinzel Decorative (Alex,
+/// 2026-11-07, option 3). The letters are cut solid into the stone: the slab's veins stop at
+/// their edges rather than running behind them. Each groove is a shade deeper than the
+/// marble, darkened under its top edge by an inner shadow, with a lit lower lip; "of" is laid
+/// in gold leaf.
 struct HomeAuroraCarving: View {
     let palette: HomeAuroraPalette
-    /// How much shows, 0 to 1. Set on each layer, not the whole, so the groove still multiplies
-    /// into the marble while it fades in.
+    /// How much shows, 0 to 1.
     var reveal: Double = 1
 
-    /// UnifrakturMaguntia (SIL OFL), bundled in Home/Fonts.
-    static let fontName = "UnifrakturMaguntia"
+    /// Cinzel Decorative (SIL OFL), bundled in Home/Fonts.
+    static let fontName = "CinzelDecorative-Regular"
 
-    private var groove: Color { palette.dark ? Color(hex: 0x6B6660) : Color(hex: 0xC4BBAE) }
-    private var font: Font { .custom(Self.fontName, size: 44, relativeTo: .largeTitle) }
+    /// The cut stone: the marble's own white, a shade deeper.
+    private var groove: Color { palette.dark ? Color(hex: 0x1E1D1F) : Color(hex: 0xE4DED4) }
+    private static let gold = Color(hex: 0xC4964A)
+    private var font: Font { .custom(Self.fontName, size: 34, relativeTo: .largeTitle) }
 
     private func words(of: Color) -> Text {
         Text("Beauty ") + Text("of").foregroundColor(of) + Text(" Chess")
@@ -654,26 +655,26 @@ struct HomeAuroraCarving: View {
 
     var body: some View {
         ZStack {
-            // The lit lower lip of each groove.
+            // The lit lower lip of each cut.
             words(of: .white).font(font)
-                .foregroundStyle(Color.white.opacity(palette.dark ? 0.1 : 0.8))
-                .offset(y: 1)
-                .opacity(reveal)
-            // The groove, shaded inside, multiplied into the stone.
-            words(of: groove).font(font)
+                .foregroundStyle(Color.white.opacity(palette.dark ? 0.12 : 0.95))
+                .offset(y: 1.2)
+            // The shadowed upper wall, just above.
+            words(of: .black).font(font)
+                .foregroundStyle(Color.black.opacity(palette.dark ? 0.6 : 0.28))
+                .offset(y: -0.7)
+                .blur(radius: 0.3)
+            // The floor of the cut: solid, so no vein runs through it.
+            words(of: Self.gold).font(font)
                 .foregroundStyle(groove
-                    .shadow(.inner(color: .black.opacity(palette.dark ? 0.75 : 0.5), radius: 1.4, x: 0, y: 1.6))
-                    .shadow(.inner(color: .white.opacity(palette.dark ? 0.08 : 0.35), radius: 0.6, x: 0, y: -0.8)))
-                .opacity(reveal)
-                .blendMode(.multiply)
-            // Gold leaf laid into "of".
-            words(of: Color(hex: 0xC09146)).font(font)
-                .foregroundStyle(Color.clear)
-                .opacity(reveal)
+                    .shadow(.inner(color: .black.opacity(palette.dark ? 0.8 : 0.42), radius: 1.6, x: 0, y: 1.8))
+                    .shadow(.inner(color: .white.opacity(palette.dark ? 0.06 : 0.7), radius: 0.8, x: 0, y: -1)))
         }
+        .tracking(1.5)
         .lineLimit(1)
         .minimumScaleFactor(0.6)
         .padding(.horizontal, 20)
+        .opacity(reveal)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
