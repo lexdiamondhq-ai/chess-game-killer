@@ -20,6 +20,7 @@ struct SettingsSheet: View {
     @AppStorage(HomeScreen.key) private var homeScreen = HomeScreen.defaultOn
     @AppStorage(HomeLayout.key) private var boardSheet = HomeLayout.defaultOn
     @AppStorage(HomeToneMode.key) private var homeTone = HomeToneMode.defaultMode
+    @AppStorage(HomeStageLayout.key) private var stageHome = HomeStageLayout.defaultOn
     /// Shared with the lessons' speaker button and the highlight reel.
     @AppStorage("coachVoiceMuted") private var voiceMuted = false
     /// Out loud with the ring switch on silent. Read by CoachVoice when a lesson, reel or Leo's reply starts.
@@ -80,6 +81,9 @@ struct SettingsSheet: View {
                             rule
                             ToggleRow(title: "Home screen", subtitle: "Open on a home page: the board up top, your week, and every mode one tap away.",
                                       symbol: "house", isOn: $homeScreen, theme: theme)
+                            rule
+                            ToggleRow(title: "Stage home", subtitle: "Home in the dark: your board lit on a stage, a deck of cards for what's next, and a floating tab bar. Your game's board doesn't change.",
+                                      symbol: "sparkles", isOn: $stageHome, theme: theme)
                             rule
                             ToggleRow(title: "Board and sheet", subtitle: "The 3D board stays on top and one glass sheet holds the rest, at home and in a game. Off brings back the tiles and the floating dock.",
                                       symbol: "rectangle.bottomhalf.inset.filled", isOn: $boardSheet, theme: theme)
