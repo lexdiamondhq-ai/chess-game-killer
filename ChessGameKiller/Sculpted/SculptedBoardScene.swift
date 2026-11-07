@@ -117,7 +117,7 @@ struct SculptedBoardState: Equatable {
     var finale: SculptedFinale?
     /// Ghost Vision's line, nearest step first, while the player holds the board.
     var ghosts: [SculptedGhostStep] = []
-    /// Seen from the player's chair, or from above with each piece inside its square (Big Board).
+    /// Seen from the player's chair, or from above with each piece inside its square (Flat).
     var framing: SculptedCamera.Framing = .standing
     /// The pieces come without lasting ids (an earlier position of the game, a preview):
     /// the scene matches them to the pieces on the board so each one moves rather than fades.
@@ -551,7 +551,7 @@ final class SculptedBoardScene {
         var heirloomParts: [SCNNode] = []
         /// Turned about its own axis so it reads best (the knight nearly side-on).
         let yaw: Float
-        /// The piece at rest in its own frame: turned by `yaw`, and on Big Board laid down
+        /// The piece at rest in its own frame: turned by `yaw`, and in Flat laid down
         /// on its side. Every pose of the model ends with it.
         var rest: simd_float4x4
         /// Seen flat from above: no tipping over at the end of the game.
@@ -1167,7 +1167,7 @@ final class SculptedBoardScene {
         node.root.simdWorldOrientation.inverse.act(vector)
     }
 
-    /// `yaw` is the piece's rest (`PieceNode.rest`): its turn, and on Big Board its lying down.
+    /// `yaw` is the piece's rest (`PieceNode.rest`): its turn, and in Flat its lying down.
     private static func pose(y: Float, axis: SIMD3<Float>, angle: Float, scale s: Float, yaw: simd_float4x4) -> simd_float4x4 {
         translation(SIMD3(0, y, 0))
             * simd_float4x4(simd_quatf(angle: angle, axis: simd_normalize(axis)))

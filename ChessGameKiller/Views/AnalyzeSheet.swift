@@ -500,7 +500,7 @@ struct AnalysisView: View {
     @State private var showingPhoto = false
     @AppStorage("haptics") private var hapticsOn = true
     @AppStorage("sculpted3D") private var sculpted3D = true
-    @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.auto
+    @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.tilted
 
     init(draft: PositionDraft, theme: BoardTheme, engine: ChessEngine?, rival: String = "the computer",
          clock: TimeControl = .unlimited, forfeits: String? = nil,
@@ -561,9 +561,9 @@ struct AnalysisView: View {
                                       selected: model.selected, targets: model.targets,
                                       lastMove: model.lastMove.map { LastMove(from: $0.from, to: $0.to) },
                                       onTap: { square in model.tap(square) },
-                                      framing: tilt.framing(bigBoard: false))
-                    // Edge to edge, as the game's board runs, its frame going off the sides.
-                    .padding(.horizontal, -8)
+                                      framing: tilt.framing)
+                    // Edge to edge, as the game's board runs: out past the screen's own padding.
+                    .padding(.horizontal, -16)
                 HStack {
                     Text("\(sideName) to move")
                         .font(.app(.caption, weight: .semibold))

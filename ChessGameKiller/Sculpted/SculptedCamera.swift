@@ -150,7 +150,7 @@ struct SculptedCamera: Equatable {
     // MARK: Framing
 
     /// How the board is seen: from the player's chair, pieces standing tall, or from high
-    /// above (Big Board), each piece a flat piece inside its own square.
+    /// above (Flat), each piece a flat piece inside its own square.
     enum Framing: Equatable {
         case standing
         case seated
@@ -293,17 +293,32 @@ struct SculptedCamera: Equatable {
 }
 
 /// The "Board view" setting for the 3D board: tilted with the pieces standing, or flat from
-/// above with each piece cut flat in its square. Auto tilts the usual board and lays Big Board flat.
-enum BoardTilt: String, CaseIterable, Identifiable {
-    case auto, tilted, flat
+/// above with each piece cut flat in its square.
+enum BoardTilt: RawRepresentable, CaseIterable, Identifiable {
+    case tilted, flat
 
     static let storageKey = "boardTilt"
+
+    /// "auto", saved before Big Board went (it tilted every board but Big Board's), reads as Tilted.
+    init?(rawValue: String) {
+        switch rawValue {
+        case "tilted", "auto": self = .tilted
+        case "flat": self = .flat
+        default: return nil
+        }
+    }
+
+    var rawValue: String {
+        switch self {
+        case .tilted: return "tilted"
+        case .flat: return "flat"
+        }
+    }
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .auto: return "Auto"
         case .tilted: return "Tilted"
         case .flat: return "Flat"
         }
@@ -311,15 +326,13 @@ enum BoardTilt: String, CaseIterable, Identifiable {
 
     var blurb: String {
         switch self {
-        case .auto: return "Tilted, with the pieces standing. Flat from above on Big Board."
-        case .tilted: return "Always tilted, with the pieces standing, Big Board too."
-        case .flat: return "Always flat from above, with flat pieces."
+        case .tilted: return "Tilted, with the pieces standing."
+        case .flat: return "Flat from above, with flat pieces."
         }
     }
 
-    func framing(bigBoard: Bool) -> SculptedCamera.Framing {
+    var framing: SculptedCamera.Framing {
         switch self {
-        case .auto: return bigBoard ? .seated : .standing
         case .tilted: return .standing
         case .flat: return .seated
         }

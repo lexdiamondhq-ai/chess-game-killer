@@ -6,11 +6,8 @@ import SwiftUI
 struct BoardViewSwitch: View {
     /// The board in play: the player's look, or a rival's board.
     let theme: BoardTheme
-    /// Big Board, where Auto lays the board flat.
-    var bigBoard = false
-
     @AppStorage("sculpted3D") private var sculpted3D = true
-    @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.auto
+    @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.tilted
     @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .gilded
     @AppStorage("matchRival") private var matchRival = false
     @Namespace private var marker
@@ -18,7 +15,7 @@ struct BoardViewSwitch: View {
     private var accent: Color { theme.accent ?? .accentColor }
 
     private var current: BoardTilt? {
-        Self.showing(theme, threeD: sculpted3D, framing: tilt.framing(bigBoard: bigBoard))
+        Self.showing(theme, threeD: sculpted3D, framing: tilt.framing)
     }
 
     var body: some View {

@@ -132,13 +132,10 @@ jobs:
           shoot ghost-3d -showcaseLook gilded -showcase3D YES -showcaseGhost all
           shoot ghost-flat -showcaseLook gilded -showcase3D NO -showcaseGhost all
           shoot ghost-step -showcaseLook midnight -showcase3D NO -showcaseGhost 1
-          # Big Board on the 3D look: each piece seated in its own square.
-          shoot bigboard-3d -showcaseLook gilded -showcase3D YES -showcaseBigBoard YES
-          shoot bigboard-noir -showcaseLook noir -showcase3D YES -showcaseBigBoard YES
-          # The Board view setting: flat on the usual screen, tilted on Big Board.
+          # The Board view setting: flat from above, each piece seated in its own square.
           shoot flat-3d -showcaseLook gilded -showcase3D YES -boardTilt flat
           shoot sculpted-flat -showcaseLook sculpted -showcase3D YES -boardTilt flat
-          shoot bigboard-tilted -showcaseLook gilded -showcase3D YES -showcaseBigBoard YES -boardTilt tilted
+          shoot noir-flat -showcaseLook noir -showcase3D YES -boardTilt flat
           # The home screen as the app opens on it (in the look the last shot left), then at its sections.
           home() {
             name=$1; shift

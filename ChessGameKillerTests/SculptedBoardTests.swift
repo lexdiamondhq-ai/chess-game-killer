@@ -335,10 +335,11 @@ final class SculptedBoardTests: XCTestCase {
     }
 
     func testBoardViewSetting() {
-        XCTAssertEqual(BoardTilt.auto.framing(bigBoard: false), .standing)
-        XCTAssertEqual(BoardTilt.auto.framing(bigBoard: true), .seated)
-        XCTAssertEqual(BoardTilt.tilted.framing(bigBoard: true), .standing)
-        XCTAssertEqual(BoardTilt.flat.framing(bigBoard: false), .seated)
+        XCTAssertEqual(BoardTilt.tilted.framing, .standing)
+        XCTAssertEqual(BoardTilt.flat.framing, .seated)
+        // "auto", saved before Big Board went, reads as Tilted.
+        XCTAssertEqual(BoardTilt(rawValue: "auto"), .tilted)
+        XCTAssertEqual(BoardTilt.allCases, [.tilted, .flat])
     }
 
     /// The switch under the board shows the view in play, and none while the board is 2D.
