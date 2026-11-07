@@ -13,7 +13,7 @@ struct WelcomeFlow: View {
 
     @State private var page: Int
     @State private var choice = WelcomeChoice()
-    @State private var name = PlayerName.current() ?? ""
+    @State private var name = YourName.current() ?? ""
     @FocusState private var nameFocused: Bool
     @AppStorage("sculpted3D") private var sculpted3D = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -138,7 +138,7 @@ struct WelcomeFlow: View {
 
     private var primaryTitle: String {
         if page == 0 { return "Begin" }
-        if page == Self.namePage, PlayerName.clean(name) == nil { return "Skip for now" }
+        if page == Self.namePage, YourName.clean(name) == nil { return "Skip for now" }
         guard page == Self.pages - 1 else { return "Continue" }
         return canStartGame ? "Play \(rival.name)" : "Done"
     }
@@ -152,7 +152,7 @@ struct WelcomeFlow: View {
     /// given on a challenge stays.
     private func saveName() {
         nameFocused = false
-        if PlayerName.clean(name) != nil { PlayerName.save(name) }
+        if YourName.clean(name) != nil { YourName.save(name) }
     }
 
     private func done(play: Bool) {
@@ -209,21 +209,21 @@ struct WelcomeFlow: View {
                 .focused($nameFocused)
                 .onSubmit(advance)
                 .onChange(of: name) { _, new in
-                    if new.count > PlayerName.maxLength { name = String(new.prefix(PlayerName.maxLength)) }
+                    if new.count > YourName.maxLength { name = String(new.prefix(YourName.maxLength)) }
                 }
                 .padding(.vertical, 12)
                 .overlay(alignment: .bottom) {
                     Rectangle().fill(nameFocused ? accent : TourPalette.ink.opacity(0.25)).frame(height: 1)
                 }
-            if let named = PlayerName.clean(name) {
-                Text(PlayerName.address("Good to see you.", name: named))
+            if let named = YourName.clean(name) {
+                Text(YourName.address("Good to see you.", name: named))
                     .font(.app(.subheadline))
                     .foregroundStyle(TourPalette.gold)
                     .transition(.opacity)
             }
             Spacer(minLength: 0)
         }
-        .animation(.easeOut(duration: 0.2), value: PlayerName.clean(name) == nil)
+        .animation(.easeOut(duration: 0.2), value: YourName.clean(name) == nil)
     }
 
     private var experience: some View {

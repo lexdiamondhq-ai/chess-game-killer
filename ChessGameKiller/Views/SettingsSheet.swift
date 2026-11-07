@@ -30,7 +30,7 @@ struct SettingsSheet: View {
     /// One reminder a day, at the hour you usually play, only on a day not done yet.
     @AppStorage(DailyReminders.enabledKey) private var remindersOn = true
     /// What the home and the coach call you, and the name friends see on a challenge.
-    @AppStorage(PlayerName.key) private var playerName = ""
+    @AppStorage(YourName.key) private var playerName = ""
 
     @Environment(\.dismiss) private var dismiss
     @State private var offer: PremiumFeature?
@@ -52,7 +52,7 @@ struct SettingsSheet: View {
                     .autocorrectionDisabled()
                     .submitLabel(.done)
                     .onChange(of: playerName) { _, new in
-                        if new.count > PlayerName.maxLength { playerName = String(new.prefix(PlayerName.maxLength)) }
+                        if new.count > YourName.maxLength { playerName = String(new.prefix(YourName.maxLength)) }
                     }
             }
         }

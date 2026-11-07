@@ -26,7 +26,7 @@ struct TalkRequest: Encodable, Equatable, Sendable {
     /// Who answers: left out for Leo, "vera" for Vera (her persona and her voice).
     var coach: String?
     /// The player's name, so the coach can use it now and then. Left out when there is none.
-    var name: String? = PlayerName.current()
+    var name: String? = YourName.current()
 }
 
 /// Where the player asked.

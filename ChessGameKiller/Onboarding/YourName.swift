@@ -4,7 +4,7 @@ import Foundation
 /// on a challenge (`ChallengeName`), so it is asked once. The home's hello and the coach's written
 /// lines use it ("Welcome back, Alex."). Recorded lines are never changed, since the recording
 /// can't say it; Talk It Through sends it so Leo can use it in his own words.
-enum PlayerName {
+enum YourName {
     static let key = ChallengeName.key
     static let maxLength = ChallengeName.maxLength
 

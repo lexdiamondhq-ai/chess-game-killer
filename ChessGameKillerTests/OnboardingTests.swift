@@ -62,35 +62,35 @@ final class OnboardingTests: XCTestCase {
     // MARK: Your name
 
     func testTheNameIsTheOneFriendsSee() {
-        XCTAssertEqual(PlayerName.key, ChallengeName.key)
-        XCTAssertNil(PlayerName.current(defaults))
-        PlayerName.save("  Alex   Medina ", defaults)
-        XCTAssertEqual(PlayerName.current(defaults), "Alex Medina")
-        PlayerName.save("   ", defaults)
-        XCTAssertNil(PlayerName.current(defaults))
+        XCTAssertEqual(YourName.key, ChallengeName.key)
+        XCTAssertNil(YourName.current(defaults))
+        YourName.save("  Alex   Medina ", defaults)
+        XCTAssertEqual(YourName.current(defaults), "Alex Medina")
+        YourName.save("   ", defaults)
+        XCTAssertNil(YourName.current(defaults))
     }
 
     func testGreetingsTakeTheName() {
-        XCTAssertEqual(PlayerName.address("Good evening", name: "Alex"), "Good evening, Alex")
-        XCTAssertEqual(PlayerName.address("Welcome back. A few minutes a day is how strong players are made.", name: "Alex"),
+        XCTAssertEqual(YourName.address("Good evening", name: "Alex"), "Good evening, Alex")
+        XCTAssertEqual(YourName.address("Welcome back. A few minutes a day is how strong players are made.", name: "Alex"),
                        "Welcome back, Alex. A few minutes a day is how strong players are made.")
-        XCTAssertEqual(PlayerName.address("Hello again! You remember more than you think.", name: "Alex"),
+        XCTAssertEqual(YourName.address("Hello again! You remember more than you think.", name: "Alex"),
                        "Hello again, Alex! You remember more than you think.")
-        XCTAssertEqual(PlayerName.address("Talk me through your plan. I'll check every idea.", name: "Alex"),
+        XCTAssertEqual(YourName.address("Talk me through your plan. I'll check every idea.", name: "Alex"),
                        "Talk me through your plan, Alex. I'll check every idea.")
         // Lines that don't open with a greeting, and no name, stay as they are.
-        XCTAssertEqual(PlayerName.address("Small steps, every day.", name: "Alex"), "Small steps, every day.")
-        XCTAssertEqual(PlayerName.address("Welcome back.", name: nil), "Welcome back.")
-        XCTAssertEqual(PlayerName.address("Welcome back.", name: "  "), "Welcome back.")
-        XCTAssertEqual(PlayerName.address("Hellothere.", name: "Alex"), "Hellothere.")
+        XCTAssertEqual(YourName.address("Small steps, every day.", name: "Alex"), "Small steps, every day.")
+        XCTAssertEqual(YourName.address("Welcome back.", name: nil), "Welcome back.")
+        XCTAssertEqual(YourName.address("Welcome back.", name: "  "), "Welcome back.")
+        XCTAssertEqual(YourName.address("Hellothere.", name: "Alex"), "Hellothere.")
     }
 
     func testANamedPlayerGetsAGreetingWithTheirName() {
         let lines = ["Small steps, every day.", "Welcome back. Let's go."]
         for _ in 0..<10 {
-            XCTAssertEqual(PlayerName.pick(lines, name: "Alex"), "Welcome back, Alex. Let's go.")
+            XCTAssertEqual(YourName.pick(lines, name: "Alex"), "Welcome back, Alex. Let's go.")
         }
-        XCTAssertNotNil(PlayerName.pick(lines, name: nil))
+        XCTAssertNotNil(YourName.pick(lines, name: nil))
     }
 
     // MARK: The tour
