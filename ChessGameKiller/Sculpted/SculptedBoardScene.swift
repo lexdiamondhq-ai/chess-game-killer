@@ -500,29 +500,58 @@ final class SculptedBoardScene {
         }
     }
 
-    /// A round stone stage under the board, for the stage home. Nil takes it away.
+    /// A faceted stone stage under the board, in two steps, for the stage home. Nil takes it away.
     var plinth: UIColor? {
         didSet {
             guard plinth != oldValue else { return }
             plinthNode?.removeFromParentNode()
             plinthNode = nil
             guard let color = plinth else { return }
-            let height: CGFloat = 1.6
-            let stone = SCNCylinder(radius: 6.4, height: height)
-            stone.radialSegmentCount = 96
             let material = SCNMaterial()
             material.lightingModel = .physicallyBased
-            material.diffuse.contents = color
-            material.roughness.contents = 0.82
-            material.metalness.contents = 0.05
-            stone.materials = [material]
-            let node = SCNNode(geometry: stone)
-            // Its top just under the shadow catcher, so the board's shadow falls on the stone.
-            node.simdPosition = SIMD3(0, -0.145 - Float(height) / 2, 0)
-            node.castsShadow = false
-            node.renderingOrder = -10
-            scene.rootNode.addChildNode(node)
-            plinthNode = node
+            material.diffuse.contents = Self.stone(color)
+            material.roughness.contents = 0.9
+            material.metalness.contents = 0.0
+            let holder = SCNNode()
+            // The top step: its face just under the shadow catcher, so the board's shadow falls on it.
+            let top = SCNCone(topRadius: 6.5, bottomRadius: 7.1, height: 2.0)
+            top.radialSegmentCount = 9
+            top.materials = [material]
+            let topNode = SCNNode(geometry: top)
+            topNode.simdPosition = SIMD3(0, -0.145 - 1.0, 0)
+            holder.addChildNode(topNode)
+            let base = SCNCone(topRadius: 8.0, bottomRadius: 9.2, height: 1.4)
+            base.radialSegmentCount = 10
+            base.materials = [material]
+            let baseNode = SCNNode(geometry: base)
+            baseNode.simdPosition = SIMD3(0, -0.145 - 2.0 - 0.7, 0)
+            baseNode.simdEulerAngles = SIMD3(0, 0.3, 0)
+            holder.addChildNode(baseNode)
+            holder.enumerateHierarchy { node, _ in
+                node.castsShadow = false
+                node.renderingOrder = -10
+            }
+            scene.rootNode.addChildNode(holder)
+            plinthNode = holder
+        }
+    }
+
+    /// Stone: the color, flecked lighter and darker.
+    private static func stone(_ color: UIColor) -> UIImage {
+        let size = CGSize(width: 256, height: 256)
+        return UIGraphicsImageRenderer(size: size).image { context in
+            color.setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+            var generator = SystemRandomNumberGenerator()
+            for _ in 0..<4200 {
+                let light = Bool.random(using: &generator)
+                let alpha = CGFloat.random(in: 0.04...0.22, using: &generator)
+                (light ? UIColor.white : UIColor.black).withAlphaComponent(alpha).setFill()
+                let side = CGFloat.random(in: 1...3, using: &generator)
+                let x = CGFloat.random(in: 0..<size.width, using: &generator)
+                let y = CGFloat.random(in: 0..<size.height, using: &generator)
+                context.fill(CGRect(x: x, y: y, width: side, height: side))
+            }
         }
     }
 

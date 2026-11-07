@@ -648,9 +648,12 @@ extension HomeView {
     /// The stage home: the same game, cards and doors as the other homes, laid out on a dark stage.
     func stageHome() -> some View {
         let upNext = self.upNext
+        let puzzle: HomePuzzle? = dailyPuzzle
         let info = HomeStageInfo(upNext: upNext, day: dailyState, rating: HomeLadder(games: vault.games).yourRating,
-                                 rankProgress: training.rankProgress, plan: plan, trainedToday: training.trainedToday,
-                                 masterpiece: HomeMasterpiece.of(), name: playerName)
+                                 rankNumber: training.rankNumber, plan: plan, trainedToday: training.trainedToday,
+                                 masterpiece: HomeMasterpiece.of(), name: playerName,
+                                 gameFEN: match.game.fen, todayFEN: puzzle?.fen, todaySolver: puzzle?.solver,
+                                 pieceTheme: pieceTheme)
         let stageActions = HomeStageActions(
             play: { primary(upNext) },
             change: { secondary(upNext) },
