@@ -3,11 +3,11 @@ import SwiftUI
 
 /// The stage home (Alex's pick, 2026-11-07): dark, the real 3D board lit on a stage, your
 /// level with three rings, a deck of cards for what's next, and a floating glass tab bar.
-/// Off by default: Alex keeps the current Home (2026-11-07), and Settings > Stage home turns
-/// this on. The game's own board is untouched: only Home looks like this.
+/// On by default (Alex, 2026-11-07); Settings > Stage home turns it off, back to the board
+/// and sheet. The game's own board is untouched: only Home looks like this.
 enum HomeStageLayout {
     static let key = "homeStage"
-    static let defaultOn = false
+    static let defaultOn = true
 
     static func isOn(_ defaults: UserDefaults = .standard) -> Bool {
         defaults.object(forKey: key) as? Bool ?? defaultOn
