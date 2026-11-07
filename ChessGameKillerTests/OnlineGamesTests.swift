@@ -104,8 +104,8 @@ final class OnlineGamesTests: XCTestCase {
 
     // MARK: Grading
 
-    static func scholarsMate(id: String = "abc12345", date: Date = .now) -> OnlineGame {
-        OnlineGame(site: .lichess, gameID: id, white: "Alex", black: "Rook99", whiteRating: 1510, blackRating: 1490,
+    static func scholarsMate(id: String = "abc12345", date: Date = .now) -> ImportedGame {
+        ImportedGame(site: .lichess, gameID: id, white: "Alex", black: "Rook99", whiteRating: 1510, blackRating: 1490,
                    winner: .white, date: date, moves: ["e4", "e5", "Bc4", "Nc6", "Qh5", "Nf6", "Qxf7#"], clock: "3+2")
     }
 
@@ -147,10 +147,10 @@ final class OnlineGamesTests: XCTestCase {
     // MARK: The import
 
     struct FakeSource: OnlineGameSource {
-        let games: [OnlineGame]
+        let games: [ImportedGame]
         var error: GameImportError?
 
-        func recentGames(site: OnlineSite, username: String, count: Int) async throws -> [OnlineGame] {
+        func recentGames(site: OnlineSite, username: String, count: Int) async throws -> [ImportedGame] {
             if let error { throw error }
             return games
         }

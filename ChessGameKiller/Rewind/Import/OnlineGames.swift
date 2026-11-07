@@ -16,7 +16,7 @@ enum OnlineSite: String, Codable, CaseIterable, Identifiable {
 }
 
 /// A finished game from a chess site, before it is graded: who played, how it ended, and the moves.
-struct OnlineGame: Equatable, Identifiable {
+struct ImportedGame: Equatable, Identifiable {
     let site: OnlineSite
     /// The game's id on the site.
     let gameID: String
@@ -77,7 +77,7 @@ enum OnlineGames {
 
     /// Games from Lichess's export (one JSON object per line). Lines that aren't finished games
     /// of standard chess are skipped.
-    static func parseLichess(_ data: Data) -> [OnlineGame] {
+    static func parseLichess(_ data: Data) -> [ImportedGame] {
         guard let text = String(data: data, encoding: .utf8) else { return [] }
         return text.split(whereSeparator: \.isNewline).compactMap { line in
             guard let json = try? JSONDecoder().decode(LichessGame.self, from: Data(line.utf8)) else { return nil }
@@ -123,17 +123,17 @@ enum OnlineGames {
         /// Endings that aren't a finished game.
         static let unfinished: Set<String> = ["created", "started", "aborted", "noStart", "unknownFinish", "cheat"]
 
-        var game: OnlineGame? {
+        var game: ImportedGame? {
             guard variant == nil || variant == "standard", initialFen == nil else { return nil }
             guard let status, !Self.unfinished.contains(status) else { return nil }
             let moves = (moves ?? "").split(separator: " ").map(String.init)
             guard !moves.isEmpty else { return nil }
             let millis = lastMoveAt ?? createdAt ?? 0
-            return OnlineGame(
+            return ImportedGame(
                 site: .lichess, gameID: id,
                 white: players.white.name, black: players.black.name,
                 whiteRating: players.white.rating, blackRating: players.black.rating,
-                winner: winner.flatMap(OnlineGame.Winner.init(rawValue:)),
+                winner: winner.flatMap(ImportedGame.Winner.init(rawValue:)),
                 date: Date(timeIntervalSince1970: millis / 1000),
                 moves: moves,
                 clock: clock.flatMap { OnlineGames.clockName(seconds: $0.initial, increment: $0.increment) }
@@ -156,7 +156,7 @@ enum OnlineGames {
     }
 
     /// One month of a player's Chess.com games, newest first. Games of other variants are skipped.
-    static func parseChessComMonth(_ data: Data) -> [OnlineGame] {
+    static func parseChessComMonth(_ data: Data) -> [ImportedGame] {
         struct Month: Decodable { let games: [Lossy<ChessComGame>] }
         guard let month = try? JSONDecoder().decode(Month.self, from: data) else { return [] }
         return month.games.compactMap { $0.value?.game }.sorted { $0.date > $1.date }
@@ -182,13 +182,13 @@ enum OnlineGames {
         /// Results that end the game level.
         static let draws: Set<String> = ["agreed", "repetition", "stalemate", "insufficient", "50move", "timevsinsufficient"]
 
-        var game: OnlineGame? {
+        var game: ImportedGame? {
             guard rules == nil || rules == "chess" else { return nil }
             if let setup = initial_setup, !setup.isEmpty, !OnlineGames.isStandardStart(setup) { return nil }
             guard let pgn, let id = uuid ?? url?.split(separator: "/").last.map(String.init) else { return nil }
             let moves = PGN.moves(in: pgn)
             guard !moves.isEmpty else { return nil }
-            let winner: OnlineGame.Winner?
+            let winner: ImportedGame.Winner?
             if white.result == "win" {
                 winner = .white
             } else if black.result == "win" {
@@ -199,7 +199,7 @@ enum OnlineGames {
                 // Still being played, or an ending this app doesn't know.
                 return nil
             }
-            return OnlineGame(
+            return ImportedGame(
                 site: .chessCom, gameID: id,
                 white: white.username, black: black.username,
                 whiteRating: white.rating, blackRating: black.rating,

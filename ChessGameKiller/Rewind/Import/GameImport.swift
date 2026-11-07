@@ -31,7 +31,7 @@ enum GameImportError: Error, Equatable {
 /// Where the recent games come from. A protocol so tests can stand in for the sites.
 protocol OnlineGameSource: Sendable {
     /// The player's most recent finished games of standard chess, newest first.
-    func recentGames(site: OnlineSite, username: String, count: Int) async throws -> [OnlineGame]
+    func recentGames(site: OnlineSite, username: String, count: Int) async throws -> [ImportedGame]
 }
 
 /// The sites' public game APIs: Lichess's game export and Chess.com's monthly archives.
@@ -51,9 +51,9 @@ struct OnlineGamesClient: OnlineGameSource {
         return URLSession(configuration: configuration)
     }
 
-    func recentGames(site: OnlineSite, username: String, count: Int) async throws -> [OnlineGame] {
+    func recentGames(site: OnlineSite, username: String, count: Int) async throws -> [ImportedGame] {
         guard let name = OnlineGames.cleaned(username) else { throw GameImportError.badUsername }
-        let games: [OnlineGame]
+        let games: [ImportedGame]
         switch site {
         case .lichess:
             guard let url = OnlineGames.lichessURL(username: name, max: count) else { throw GameImportError.badUsername }
@@ -62,7 +62,7 @@ struct OnlineGamesClient: OnlineGameSource {
         case .chessCom:
             guard let url = OnlineGames.chessComArchivesURL(username: name) else { throw GameImportError.badUsername }
             let months = OnlineGames.parseChessComArchives(try await fetch(url, site: site, name: name))
-            var found: [OnlineGame] = []
+            var found: [ImportedGame] = []
             // Newest month first, until there are enough (a quiet month may have only a few).
             for month in months.reversed().prefix(3) where found.count < count {
                 found += OnlineGames.parseChessComMonth(try await fetch(month, site: site, name: name))
@@ -151,7 +151,7 @@ struct GameImportGrader {
     var afterMs = 200
 
     /// The game as a saved game, or nil if its moves don't replay or the player isn't in it.
-    func grade(_ online: OnlineGame, username: String, isCancelled: @Sendable () -> Bool = { Task.isCancelled }) async -> SavedGame? {
+    func grade(_ online: ImportedGame, username: String, isCancelled: @Sendable () -> Bool = { Task.isCancelled }) async -> SavedGame? {
         guard let playerIsWhite = online.playerIsWhite(username),
               let replay = GameImportBuilder.replay(online.moves) else { return nil }
         var moments: [SavedMoment] = []
@@ -321,7 +321,7 @@ final class GameImporter {
             return
         }
         phase = .fetching(site)
-        let games: [OnlineGame]
+        let games: [ImportedGame]
         do {
             games = try await source.recentGames(site: site, username: name, count: OnlineGames.importCount)
         } catch let error as GameImportError {
