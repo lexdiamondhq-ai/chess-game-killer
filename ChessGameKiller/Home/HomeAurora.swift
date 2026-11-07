@@ -636,8 +636,8 @@ struct HomeAuroraGrudge: View {
 /// "Beauty of Chess" carved into the marble under the board in Cinzel Decorative (Alex,
 /// 2026-11-07, option 3). The letters are cut solid into the stone (Bold, so each stroke has
 /// a floor wide enough to read): a shaded floor a few tones deeper than the marble, darker at
-/// the top where the light can't reach, a thin shadowed upper wall and a lit lower lip, so
-/// the slab's veins stop at the letters. "of" is laid in gold leaf with the same cut.
+/// the top where the light can't reach, a thin shadowed upper wall and a lit lower lip, on
+/// a patch of stone polished clear so the slab's veins fade out before the letters. "of" is laid in gold leaf with the same cut.
 /// Cinzel Decorative's lowercase h carries a swash crossbar that read as broken, so the h is
 /// plain Cinzel's capital H.
 struct HomeAuroraCarving: View {
@@ -683,6 +683,15 @@ struct HomeAuroraCarving: View {
                 .offset(y: -0.6)
             // The floor: solid, so no vein runs through it.
             words()
+        }
+        // The stone is polished clear around the inscription: the big veins fade out before
+        // they reach the letters, so none runs behind them or through an O (Alex, 2026-11-07).
+        .background {
+            Ellipse()
+                .fill(palette.dark ? Color(hex: 0x18171A) : Color(hex: 0xF6F5F0))
+                .padding(.horizontal, -26)
+                .padding(.vertical, -16)
+                .blur(radius: 14)
         }
         .tracking(1.5)
         .lineLimit(1)
