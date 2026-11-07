@@ -11,6 +11,9 @@ struct PlateRemark<Status: View>: View {
     let theme: BoardTheme
     /// The rival's line shows its remarks; the person's line shows the coach's verdicts.
     let isRival: Bool
+    /// In the game's dock, where the line is short: the coach's verdict stacks its grade over
+    /// its advice, so neither is cut (Alex, 2026-11-07).
+    var stacked = false
     @ViewBuilder let status: () -> Status
 
     @AppStorage("rivalBanter") private var banterOn = true
@@ -32,7 +35,7 @@ struct PlateRemark<Status: View>: View {
                     .id("vote-\(match.game.plyCount)")
                     .transition(.opacity.combined(with: .offset(y: 3)))
             } else if !isRival, let verdict = match.verdictLine {
-                VerdictLine(review: verdict, theme: theme)
+                VerdictLine(review: verdict, theme: theme, stacked: stacked)
                     .id("verdict-\(verdict.id)")
                     .transition(.opacity.combined(with: .offset(y: 3)))
             } else {
@@ -62,8 +65,36 @@ extension PlateRemark {
 private struct VerdictLine: View {
     let review: MoveReview
     let theme: BoardTheme
+    var stacked = false
 
     var body: some View {
+        if stacked { stackedLines } else { oneLine }
+    }
+
+    /// The grade in bold in its color, the better move under it.
+    private var stackedLines: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(review.grade.color(on: theme))
+                    .frame(width: 6, height: 6)
+                Text(review.title)
+                    .font(.app(.subheadline, weight: .bold))
+                    .foregroundStyle(review.grade.color(on: theme))
+            }
+            if let advice {
+                Text(advice.replacingOccurrences(of: "· ", with: ""))
+                    .font(.app(.caption, weight: .medium))
+                    .foregroundStyle(Color.primary.opacity(0.72))
+            }
+        }
+        .lineLimit(1)
+        .minimumScaleFactor(0.8)
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var oneLine: some View {
         HStack(spacing: 6) {
             Circle()
                 .fill(review.grade.color(on: theme))

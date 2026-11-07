@@ -941,9 +941,9 @@ struct ContentView: View {
                         ExecutivePlate(match: match, theme: theme, color: bottomColor, inDock: true)
                     }
                 }
-                .frame(height: 36)
-                .padding(.leading, 14)
-                .padding(.trailing, 4)
+                .frame(height: 44)
+                .padding(.leading, 10)
+                .padding(.trailing, 2)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 // The orb's place. Only a width: a bare Color.clear takes every bit of
                 // height it is offered, which pushed the dock up and squeezed the board to nothing.
