@@ -812,7 +812,7 @@ struct ContentView: View {
     /// The tray at the bottom of Big Board, holding the dock's controls and what the top bar would.
     private func bigTray(coachHeight: CGFloat) -> some View {
         BigBoardTray(match: match, theme: theme, isOpen: $trayOpen, coachIsWide: coachIsWide,
-                     onNewGame: { showingNewGame = true },
+                     onNewGame: homeScreenOn ? nil : { showingNewGame = true },
                      onSettings: { showingSettings = true },
                      onExit: { withAnimation(.snappy) { bigBoard = false } },
                      onArmy: { showingArmy = true },
@@ -850,13 +850,16 @@ struct ContentView: View {
         ToolbarItem(placement: .principal) {
             ExecutiveMatchTitle(match: match)
         }
-        ToolbarItem(placement: .topBarTrailing) {
-            Button {
-                showingNewGame = true
-            } label: {
-                Label("New game", systemImage: "plus")
+        if !homeScreenOn {
+            // With Home on, new games start only from Home (Alex, 2026-11-07).
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showingNewGame = true
+                } label: {
+                    Label("New game", systemImage: "plus")
+                }
+                .tint(.primary)
             }
-            .tint(.primary)
         }
         ToolbarItem(placement: .topBarTrailing) {
             moreMenu
@@ -967,7 +970,8 @@ struct ContentView: View {
             .scaleEffect(coachIsWide ? 0.92 : 1)
             .allowsHitTesting(!coachIsWide)
             CoachOrb(match: match, theme: theme, isExpanded: $coachExpanded, expandedMaxHeight: coachHeight,
-                     newGame: { showingNewGame = true }, showGames: { showingGames = true },
+                     newGame: homeScreenOn ? nil : { showingNewGame = true },
+                     home: homeScreenOn ? { goHome() } : nil, showGames: { showingGames = true },
                      talk: { openTalk() }, analyze: { showingAnalyze = true })
                 .padding(.horizontal, coachExpanded ? 0 : 6)
         }
