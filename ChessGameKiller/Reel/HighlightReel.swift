@@ -74,12 +74,12 @@ struct GameReel: Equatable, Identifiable {
     static let lines: [Kind: String] = [
         .brilliant: "What a move. This is the one I'd frame.",
         .turningPoint: "And right here, the whole game turned.",
-        .blunder: "Ouch. This is the one to learn from.",
+        .blunder: "Ah. This is the one to learn from.",
         .finish: "And that's how you finish a game.",
     ]
     static let endLines: [Result: String] = [
         .win: "A win. Well played.",
-        .loss: "Not this time. We'll get them next game.",
+        .loss: "Not this time. We shall have them next game.",
         .draw: "Honours even. A fair result.",
     ]
 

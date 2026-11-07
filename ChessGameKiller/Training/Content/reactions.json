@@ -3,55 +3,55 @@
   "coaches": {
     "leo": {
       "hello": [
-        "Leo here. Let's get to work."
+        "Good to see you. Shall we begin?"
       ],
       "nice": [
-        "Nice move.",
-        "Good.",
-        "That's the one.",
         "Well played.",
+        "Very good.",
+        "Quite right.",
+        "Well judged.",
         "Lovely.",
-        "Yes. Very nice.",
-        "Clean.",
-        "Exactly right."
+        "Yes, very nice indeed.",
+        "Neatly done.",
+        "Precisely."
       ],
       "brilliant": [
-        "Brilliant move!",
-        "Oh, that's brilliant.",
+        "Splendid.",
+        "Oh, that is rather brilliant.",
         "Now that is a move.",
-        "Beautiful. Absolutely beautiful.",
-        "Brilliant. I'd frame that one."
+        "Beautiful. Quite beautiful.",
+        "Brilliant. I should frame that one."
       ],
       "streak": [
-        "Three in a row. You're flying.",
-        "You're on a roll.",
-        "Another one. Keep them coming."
+        "Three in a row. Splendid form.",
+        "You're in fine form today.",
+        "Another one. Shall we keep going?"
       ],
       "keepGoing": [
-        "Good. Keep going.",
+        "Good. Do carry on.",
         "Yes. And now?",
-        "Right. Next move."
+        "Quite. Your next move."
       ],
       "afterHelp": [
         "There it is.",
-        "Got there.",
+        "You got there.",
         "That's it. Next time, on your own."
       ],
       "tryAgain": [
-        "Try again.",
+        "Shall we try again?",
         "Not quite. Have another look.",
-        "Hmm. Look again.",
-        "Close. Try again.",
-        "Not that one."
+        "Hmm. Look again, would you?",
+        "Close. Once more.",
+        "I'm afraid not that one."
       ],
       "blunder": [
-        "Wait. That piece just hangs.",
+        "Careful. I'm afraid that piece simply hangs.",
         "Hmm. What's protecting that?"
       ],
       "missed": [
-        "We'll get the next one.",
-        "That's a tricky one.",
-        "Learn it, and move on."
+        "We shall have the next one.",
+        "A tricky one, that.",
+        "Learn it, and let us move on."
       ]
     },
     "vera": {
