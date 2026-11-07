@@ -549,6 +549,23 @@ struct AnalysisView: View {
         return tints
     }
 
+    /// What a pawn the person moved to the last rank becomes: Queen, Rook, Bishop or Knight,
+    /// as in a game. A tap beside the pieces leaves the pawn where it was.
+    @ViewBuilder
+    private var promotionPicker: some View {
+        if let promotion = model.promoting {
+            GeometryReader { geo in
+                PromotionPicker(
+                    color: promotion.color, theme: theme,
+                    squareSize: min(geo.size.width / 8, geo.size.height / 6),
+                    cancel: { withAnimation(.snappy(duration: 0.2)) { model.cancelPromotion() } },
+                    choose: { kind in withAnimation(.snappy(duration: 0.2)) { model.promote(to: kind) } }
+                )
+            }
+            .transition(.opacity)
+        }
+    }
+
     /// The board, as in a game: the real 3D board, tilted or flat from above, with the Tilted /
     /// Flat switch under it, when the look has one and 3D pieces are on; otherwise the flat board.
     /// Seen from the side to move at first (the toolbar's button turns it round).
@@ -562,6 +579,7 @@ struct AnalysisView: View {
                                       lastMove: model.lastMove.map { LastMove(from: $0.from, to: $0.to) },
                                       onTap: { square in model.tap(square) },
                                       framing: tilt.framing(bigBoard: false))
+                    .overlay { promotionPicker }
                     // Edge to edge, as the game's board runs, its frame going off the sides.
                     .padding(.horizontal, -8)
                 HStack {
@@ -577,6 +595,7 @@ struct AnalysisView: View {
                           hints: hints,
                           onTap: { square in model.tap(square) }, tints: tints,
                           selected: model.selected, targets: model.targets)
+                .overlay { promotionPicker }
                 .animation(.snappy(duration: 0.4), value: flipped)
                 .animation(.snappy(duration: 0.22), value: model.draft.fen)
         }

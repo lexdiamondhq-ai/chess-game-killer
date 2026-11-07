@@ -204,6 +204,8 @@ final class AnalysisModel {
     private(set) var targets: Set<Square> = []
     /// The squares of the last move, for a tint.
     private(set) var lastMove: (from: Square, to: Square)?
+    /// A pawn moved to the last rank by the person, waiting for them to choose its piece.
+    private(set) var promoting: (from: Square, to: Square, color: Piece.Color)?
     private(set) var lines: [EngineLine] = []
     private(set) var hints: [MoveHint] = []
     private(set) var depth = 0
@@ -365,9 +367,16 @@ final class AnalysisModel {
     /// A tap on the board: picks up a piece of the side to move, or moves the one picked up.
     func tap(_ square: Square) {
         stopLine()
+        promoting = nil
         if let from = selected, targets.contains(square) {
-            let promotes = draft[from]?.kind == .pawn && (square.rankIndex == 0 || square.rankIndex == 7)
-            play(from.notation + square.notation + (promotes ? "q" : ""), fromLine: false)
+            if draft[from]?.kind == .pawn, square.rankIndex == 0 || square.rankIndex == 7 {
+                // The person chooses what the pawn becomes; the picker shows over the board.
+                promoting = (from, square, draft.sideToMove)
+                selected = nil
+                targets = []
+                return
+            }
+            play(from.notation + square.notation, fromLine: false)
             return
         }
         guard let token = draft[square], token.color == draft.sideToMove, square != selected,
@@ -380,6 +389,18 @@ final class AnalysisModel {
         let moves = Set(board.legalMoves(forPieceAt: square))
         selected = moves.isEmpty ? nil : square
         targets = moves
+    }
+
+    /// Finishes the person's promotion with the piece they chose.
+    func promote(to kind: Piece.Kind) {
+        guard let promotion = promoting else { return }
+        promoting = nil
+        play(promotion.from.notation + promotion.to.notation + kind.rawValue.lowercased(), fromLine: false)
+    }
+
+    /// A change of mind: the pawn stays where it was.
+    func cancelPromotion() {
+        promoting = nil
     }
 
     /// Plays a move from the position on the board. Moves stepped back past give way to it,
@@ -487,6 +508,7 @@ final class AnalysisModel {
 
     private func settle(on fen: String) {
         draft = PositionDraft(fen: fen) ?? draft
+        promoting = nil
         selected = nil
         targets = []
         reanalyze()

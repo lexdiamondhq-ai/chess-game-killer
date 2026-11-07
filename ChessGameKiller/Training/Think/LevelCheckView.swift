@@ -161,6 +161,7 @@ struct LevelCheckView: View {
                             flipped: drill.learner == .black,
                             onTap: runner.phase == .solving && drill.acceptsTaps
                                 ? { (square: Square) in runner.tap(square) } : nil,
+                            onPromote: { kind in runner.promote(to: kind) },
                             turn: drill.learner,
                             showsTurn: runner.phase == .solving && drill.phase == .solving
                         )
