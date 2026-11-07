@@ -103,7 +103,7 @@ struct CoachReport: Equatable {
     /// Reads games against the computer only: against a friend both sides' moves are
     /// saved, and Leo can't tell which were the player's.
     static func make(games: [SavedGame]) -> CoachReport {
-        let recent = Array(games.filter { $0.level != nil }.sorted { $0.date > $1.date }.prefix(gameLimit))
+        let recent = Array(games.filter(\.isPlayersOwn).sorted { $0.date > $1.date }.prefix(gameLimit))
         var weighted: [Area: Double] = [:]
         var counts: [Area: Int] = [:]
         var moves: [Area: Int] = [:]

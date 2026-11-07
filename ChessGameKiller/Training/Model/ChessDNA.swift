@@ -247,7 +247,7 @@ struct ChessDNA: Equatable {
 
     static func make(games: [SavedGame], puzzleStats: [String: ThemeRecord] = [:], puzzlesPlayed: Int = 0,
                      index: OpeningIndex = .shared) -> ChessDNA {
-        let computer = games.filter { $0.level != nil }.sorted { $0.date > $1.date }.prefix(gameLimit)
+        let computer = games.filter(\.isPlayersOwn).sorted { $0.date > $1.date }.prefix(gameLimit)
         let counted = computer.filter { $0.playerMoments.count >= movesToCount || $0.moves.count >= 2 * movesToCount }
         let habits = counted.map(GameHabits.init)
         let report = CoachReport.make(games: Array(computer))

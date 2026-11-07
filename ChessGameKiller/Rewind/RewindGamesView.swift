@@ -219,7 +219,7 @@ private struct GameCard: View {
                 .frame(width: 32, height: 32)
                 .clipShape(Circle())
         } else {
-            Image(systemName: "person.2.fill")
+            Image(systemName: game.isImported ? "globe" : "person.2.fill")
                 .font(.app(.footnote))
                 .frame(width: 32, height: 32)
                 .background(Circle().fill(Color.primary.opacity(0.08)))
