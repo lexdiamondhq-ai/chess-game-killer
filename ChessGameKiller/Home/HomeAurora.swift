@@ -68,31 +68,38 @@ struct HomeAuroraView: View {
     @State private var boardStage = SculptedStage()
     /// How far the page has been pulled up over the board, in points.
     @State private var pulled: CGFloat = 0
+    /// Which position of the game of the day the turning board shows: it plays itself slowly.
+    @State private var boardFrame = 0
 
     private var palette: HomeAuroraPalette { HomeAuroraPalette(dark: tone.scheme == .dark) }
     private var stage: HomeStageInfo { info.stage }
 
-    /// Your games, or the next game when none is going.
+    /// Your games (or the next game when none is going), then the move and the game of the day.
     private var cards: [HomeAuroraGameCard] {
-        if info.games.isEmpty {
-            return [HomeAuroraGameCard.next(stage.upNext, fen: stage.gameFEN)]
+        var all: [HomeAuroraGameCard] = info.games.isEmpty
+            ? [HomeAuroraGameCard.next(stage.upNext, fen: stage.gameFEN)]
+            : info.games.map(HomeAuroraGameCard.init)
+        all.append(HomeAuroraGameCard.today(stage.day, fen: stage.todayFEN, solver: stage.todaySolver))
+        if let masterpiece = stage.masterpiece {
+            all.append(HomeAuroraGameCard.masterpiece(masterpiece))
         }
-        return info.games.map(HomeAuroraGameCard.init)
+        return all
     }
 
     var body: some View {
         GeometryReader { geo in
-            let boardHeight: CGFloat = max(300, geo.size.height * 0.46)
+            // Small enough that the name and the header sit clear above it.
+            let boardHeight: CGFloat = max(230, geo.size.height * 0.34)
             let lift: CGFloat = min(max(pulled / boardHeight, 0), 1)
             ZStack(alignment: .top) {
                 HomeAuroraBackdrop(palette: palette)
-                spinningBoard(height: boardHeight + geo.safeAreaInsets.top, lift: lift)
-                    .ignoresSafeArea(edges: .top)
+                spinningBoard(height: boardHeight, lift: lift)
+                    .padding(.top, 58)
                 ScrollView(.vertical) {
                     VStack(spacing: 0) {
                         // The board shows through here; a tap on it plays.
                         Color.clear
-                            .frame(height: boardHeight - 70)
+                            .frame(height: boardHeight + 58 - 40)
                             .contentShape(Rectangle())
                             .onTapGesture { actions.stage.play() }
                             .onGeometryChange(for: CGFloat.self) { proxy in
@@ -115,7 +122,7 @@ struct HomeAuroraView: View {
                     }
                 VStack {
                     Spacer()
-                    HomeAuroraTabBar(palette: palette, play: { actions.stage.play() }, learn: actions.stage.learn,
+                    HomeAuroraTabBar(palette: palette, play: actions.stage.analyze, learn: actions.stage.learn,
                                      you: actions.stage.you, rooms: actions.stage.rooms)
                         .padding(.horizontal, 16)
                         .padding(.bottom, 8)
@@ -125,6 +132,28 @@ struct HomeAuroraView: View {
         .environment(\.colorScheme, tone.scheme)
         .onAppear { music.homeAppeared() }
         .onDisappear { music.homeDisappeared() }
+        .task(id: reduceMotion) { await playThrough() }
+    }
+
+    /// The pieces move slowly: the game of the day's finish, a move every few seconds, a rest on
+    /// the final position, then again from the start.
+    private func playThrough() async {
+        guard !reduceMotion else { return }
+        while !Task.isCancelled {
+            let count: Int = stage.masterpiece?.frames.count ?? 0
+            guard count > 1 else { return }
+            let last: Bool = boardFrame >= count - 1
+            try? await Task.sleep(for: .seconds(last ? 6 : 3.2))
+            guard !Task.isCancelled else { return }
+            boardFrame = last ? 0 : boardFrame + 1
+        }
+    }
+
+    /// What stands on the turning board: the game of the day as it plays, or your game's pieces.
+    private var boardPieces: [Piece] {
+        guard let frames = stage.masterpiece?.frames, !frames.isEmpty else { return info.pieces }
+        let fen: String = frames[min(boardFrame, frames.count - 1)]
+        return PositionDraft(fen: fen)?.pieces ?? info.pieces
     }
 
     // MARK: The board
@@ -135,16 +164,17 @@ struct HomeAuroraView: View {
         let upNext: HomeUpNext = stage.upNext
         return ZStack {
             if SculptedAssets.shared.isLoaded {
-                HomeStageBoard(stage: boardStage, look: info.look, pieces: info.pieces,
-                               black: upNext.playerColor == .black, light: upNext.rival.lightUI,
+                HomeStageBoard(stage: boardStage, look: SculptedLook.clay, pieces: boardPieces,
+                               black: stage.masterpiece?.flipped ?? (upNext.playerColor == .black),
+                               light: upNext.rival.lightUI,
                                leaning: upNext.inProgress && upNext.yourMove, plinth: nil,
                                still: reduceMotion, dive: 0)
-                    .id(info.look.name)
+                    .id(SculptedLook.clay.name)
             }
         }
         .frame(height: height)
         .frame(maxWidth: .infinity)
-        .scaleEffect(1 - 0.1 * lift, anchor: .top)
+        .scaleEffect(1 - 0.12 * lift, anchor: .top)
         .opacity(1 - 0.55 * Double(lift))
         .allowsHitTesting(false)
         .accessibilityHidden(true)
@@ -178,6 +208,14 @@ struct HomeAuroraView: View {
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
+        .padding(.bottom, 10)
+        .overlay(alignment: .bottom) {
+            // A slight gold underline, fading at both ends.
+            LinearGradient(colors: [palette.gold.opacity(0), palette.gold.opacity(0.4), palette.gold.opacity(0)],
+                           startPoint: .leading, endPoint: .trailing)
+                .frame(height: 0.75)
+                .padding(.horizontal, 20)
+        }
     }
 
     private func circle<Label: View>(label: String, action: @escaping () -> Void,
@@ -307,10 +345,6 @@ struct HomeAuroraView: View {
 
     @ViewBuilder
     private var todayRows: some View {
-        HomeAuroraRow(eyebrow: "Today's Move", title: todayTitle, detail: todayDetail,
-                      accent: palette.violet, palette: palette, action: actions.stage.dailyMove) {
-            HomeAuroraBoard(fen: stage.todayFEN, flipped: stage.todaySolver == .black, lit: false)
-        }
         HomeAuroraRow(eyebrow: "Coach Leo", title: stage.plan?.title ?? "Today's lesson", detail: coachLine,
                       accent: palette.teal, palette: palette, action: actions.stage.coach) {
             HomeAuroraEmblem(glyph: Glyphs.coach, fill: HomeAuroraPalette.tealTile)
@@ -318,14 +352,6 @@ struct HomeAuroraView: View {
         HomeAuroraRow(eyebrow: "Analyze", title: "Any position", detail: "A photo, a screenshot or a board you set up",
                       accent: palette.gold, palette: palette, action: actions.stage.analyze) {
             HomeAuroraEmblem(glyph: Glyphs.analyze, fill: HomeAuroraPalette.goldTile)
-        }
-        if let masterpiece = stage.masterpiece {
-            HomeAuroraRow(eyebrow: "Masterpiece of the day", title: masterpiece.title, detail: masterpiece.players,
-                          accent: palette.rose, palette: palette, action: {
-                              if let fen = masterpiece.frames.first { actions.stage.analyzePosition(fen) }
-                          }) {
-                HomeAuroraBoard(fen: masterpiece.frames.first, flipped: masterpiece.flipped, lit: false)
-            }
         }
     }
 
@@ -347,10 +373,15 @@ struct HomeAuroraView: View {
     }
 
     private func open(_ card: HomeAuroraGameCard) {
-        if let game = card.game {
-            actions.open(game)
-        } else {
+        switch card.kind {
+        case .game:
+            if let game = card.game { actions.open(game) }
+        case .next:
             actions.stage.play()
+        case .today:
+            actions.stage.dailyMove()
+        case .masterpiece:
+            if let fen = stage.masterpiece?.frames.first { actions.stage.analyzePosition(fen) }
         }
     }
 }
@@ -485,7 +516,12 @@ struct HomeAuroraEmblem: View {
 
 /// One board in the swipe row, and the words around it while it's in front.
 struct HomeAuroraGameCard: Identifiable, Equatable {
+    enum Kind: Equatable {
+        case game, next, today, masterpiece
+    }
+
     let id: String
+    var kind: Kind = .game
     let game: HomeCurrentGame?
     let title: String
     let fen: String?
@@ -531,6 +567,7 @@ struct HomeAuroraGameCard: Identifiable, Equatable {
 
     private init(next upNext: HomeUpNext, fen: String) {
         id = "next"
+        kind = .next
         game = nil
         title = "Play \(upNext.rival.name)"
         self.fen = fen
@@ -546,6 +583,42 @@ struct HomeAuroraGameCard: Identifiable, Equatable {
 
     static func next(_ upNext: HomeUpNext, fen: String) -> HomeAuroraGameCard {
         HomeAuroraGameCard(next: upNext, fen: fen)
+    }
+
+    private init(id: String, kind: Kind, title: String, status: String, fen: String?, flipped: Bool,
+                 button: String, tags: [String]) {
+        self.id = id
+        self.kind = kind
+        game = nil
+        self.title = title
+        self.fen = fen
+        self.flipped = flipped
+        yourMove = false
+        eyebrow = status
+        self.status = status
+        headline = title
+        headlineEnd = ""
+        self.button = button
+        self.tags = tags
+    }
+
+    /// Today's Move, after your games in the swipe row.
+    static func today(_ day: HomeDailyState, fen: String?, solver: Piece.Color?) -> HomeAuroraGameCard {
+        let side: String = solver == .black ? "Black" : "White"
+        let title: String = day.found ? "Found it" : "\(side) to play and win"
+        var tags: [String] = []
+        if !day.difficulty.isEmpty { tags.append(day.difficulty) }
+        if day.streak > 0 { tags.append("\(day.streak)-day streak") }
+        return HomeAuroraGameCard(id: "today", kind: .today, title: title, status: "Move of the day", fen: fen,
+                                  flipped: solver == .black, button: day.played ? "See it again" : "Solve",
+                                  tags: tags.isEmpty ? ["The same for everyone"] : tags)
+    }
+
+    /// The game of the day: a famous finish.
+    static func masterpiece(_ masterpiece: HomeMasterpiece) -> HomeAuroraGameCard {
+        HomeAuroraGameCard(id: "masterpiece", kind: .masterpiece, title: masterpiece.title,
+                           status: "Game of the day", fen: masterpiece.frames.first, flipped: masterpiece.flipped,
+                           button: "Watch it", tags: [masterpiece.players])
     }
 }
 
@@ -650,10 +723,16 @@ struct HomeAuroraSection: View {
     var note: String? = nil
 
     var body: some View {
-        HStack {
-            Text(title)
-                .font(.system(size: 22, weight: .medium, design: .serif))
-                .foregroundStyle(palette.ink)
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(title)
+                    .font(.system(size: 22, weight: .medium, design: .serif))
+                    .foregroundStyle(palette.ink)
+                // A slight gold underline.
+                LinearGradient(colors: [palette.gold.opacity(0.7), palette.gold.opacity(0)],
+                               startPoint: .leading, endPoint: .trailing)
+                    .frame(width: 44, height: 1)
+            }
             Spacer()
             if let note {
                 Text(note)
@@ -813,7 +892,7 @@ struct HomeAuroraTabBar: View {
                     .shadow(color: Color(hex: 0xE8C27A).opacity(0.45), radius: 15, y: 12)
             }
             .buttonStyle(HomeStagePress())
-            .accessibilityLabel("Play")
+            .accessibilityLabel("Analyze")
         }
     }
 

@@ -456,6 +456,19 @@ extension SculptedLook {
         return look
     }()
 
+    /// Home's turning board (Alex, 2026-11-07: "like the clay pieces"): the carved set in matte
+    /// clay, warm cream and deep umber with soft brass marks, on the gilded stone. Home only.
+    static let clay: SculptedLook = {
+        var look = gilded
+        look.name = "Clay"
+        look.ivory = UIColor(red: 0.9, green: 0.84, blue: 0.76, alpha: 1)
+        look.ebony = UIColor(red: 0.3, green: 0.22, blue: 0.17, alpha: 1)
+        look.ivoryPolish = Polish(roughness: 0.82, coat: 0.05, coatRoughness: 0.6)
+        look.ebonyPolish = Polish(roughness: 0.8, coat: 0.05, coatRoughness: 0.6)
+        look.metalRoughness = 0.55
+        return look
+    }()
+
     /// Deep cream and ink-blue stone, a black frame and platinum; the marks in warm gold.
     static let midnight: SculptedLook = {
         var look = lit(SculptedLook())
