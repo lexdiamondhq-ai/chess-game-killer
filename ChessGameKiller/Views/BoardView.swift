@@ -493,7 +493,8 @@ struct NameTagPlacement: Layout {
     }
 }
 
-/// An arrow from one square to another. Solid for the best move, dashed for the runner-up.
+/// A move's flight path from one square to another: the best move fuller, landing on a ring; the
+/// runner-up slimmer and quieter.
 struct MoveArrow: View {
     let from: CGPoint
     let to: CGPoint
@@ -503,9 +504,9 @@ struct MoveArrow: View {
     let glow: Color?
 
     var body: some View {
-        // The best move solid and bold, the next best dashed and lighter, both crisp.
-        CrispArrow(from: from, to: to, squareSize: squareSize, dashed: !isBest, color: color,
-                   proportions: .analysis(best: isBest), glow: glow)
+        CrispArrow(from: from, to: to, squareSize: squareSize, dashed: false, color: color,
+                   proportions: .analysis(best: isBest), glow: glow, edge: Color(hex: ArrowColors.hairline),
+                   landing: isBest, opacity: isBest ? 1 : 0.8)
     }
 }
 

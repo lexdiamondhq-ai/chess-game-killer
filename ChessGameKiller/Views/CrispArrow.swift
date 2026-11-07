@@ -1,77 +1,144 @@
 import SwiftUI
 import UIKit
 
-/// An arrow on a board as outlines: the shaft (one bar, or a row of short bars when dashed) and
-/// the head, each a simple convex shape, the head always last. They meet without overlapping, so
-/// the arrow fills in one even color, lighter toward its tail. At the tail sits a white-ringed
-/// dot, where the move starts. Lengths are in squares, scaled by `unit`. The flat boards and the
-/// 3D board draw their arrows from it.
+/// An arrow on a board as outlines. A coach's arrow runs straight; an analysis arrow is a flight
+/// path, bowing to one side as it goes and, on the 3D board, rising off the stone and landing on
+/// the target. Solid, it is three outlines: the rounded tail, the shaft as one strip (its left side
+/// from tail to head, then its right side back), and the head, always last. Dashed, the shaft is a
+/// row of short bars. The shaft reaches a hair into the head, so no seam shows where they meet.
+/// Lengths are in squares, scaled by `unit`. The flat boards and the 3D board draw from it.
 enum ArrowOutline {
     struct Proportions: Hashable {
         var shaft: CGFloat
         var headLength: CGFloat
         var headWidth: CGFloat
-        /// How far past the start square's middle the tail begins, at the dot.
+        /// How far past the start square's middle the tail begins.
         var startInset: CGFloat
         /// How far short of the target's middle the tip stops.
         var tipInset: CGFloat
-        /// The dot's radius, white ring and all.
-        var dot: CGFloat
+        /// How far the path bows out to the side at its middle, as a share of its length.
+        var bow: CGFloat = 0
+        /// How high it rises over the board at its middle on the 3D board, as a share of its length.
+        var rise: CGFloat = 0
 
-        /// The coach's arrows (lessons, drills, puzzles).
+        /// The coach's arrows (lessons, drills, puzzles): straight.
         static func coach(dashed: Bool) -> Proportions {
-            Proportions(shaft: dashed ? 0.14 : 0.18, headLength: 0.44, headWidth: 0.54, startInset: 0.3, tipInset: 0.08,
-                        dot: dashed ? 0.1 : 0.12)
+            Proportions(shaft: dashed ? 0.12 : 0.15, headLength: 0.4, headWidth: 0.46, startInset: 0.2, tipInset: 0.1)
         }
 
-        /// The analysis arrows: the best move bold, the next best lighter.
+        /// The analysis arrows, flight paths: the best move fuller and higher, the next best slimmer.
         static func analysis(best: Bool) -> Proportions {
-            Proportions(shaft: best ? 0.23 : 0.16, headLength: best ? 0.5 : 0.42, headWidth: best ? 0.66 : 0.52,
-                        startInset: 0.3, tipInset: 0.06, dot: best ? 0.14 : 0.11)
+            Proportions(shaft: best ? 0.14 : 0.1, headLength: best ? 0.32 : 0.27, headWidth: best ? 0.46 : 0.34,
+                        startInset: 0.24, tipInset: 0.08, bow: best ? 0.2 : 0.15, rise: best ? 0.22 : 0.16)
         }
     }
 
-    /// Where the arrow starts (the dot's middle) and where its tip is.
-    static func ends(from start: CGPoint, to end: CGPoint, unit: CGFloat, proportions p: Proportions)
-        -> (tail: CGPoint, tip: CGPoint) {
+    /// The path's three points: where the tail starts, the curve's pull to the side, and the tip.
+    /// The path bows to the left of its travel as `unit`'s coordinates see it; `side` -1 bows it the
+    /// other way (the 3D board's y runs up, the screen's down).
+    static func path(from start: CGPoint, to end: CGPoint, unit: CGFloat, proportions p: Proportions,
+                     side: CGFloat = 1) -> (tail: CGPoint, pull: CGPoint, tip: CGPoint) {
         let length = max(hypot(end.x - start.x, end.y - start.y), 0.001 * unit)
         let u = CGPoint(x: (end.x - start.x) / length, y: (end.y - start.y) / length)
-        return (CGPoint(x: start.x + u.x * p.startInset * unit, y: start.y + u.y * p.startInset * unit),
-                CGPoint(x: end.x - u.x * p.tipInset * unit, y: end.y - u.y * p.tipInset * unit))
+        let tail = CGPoint(x: start.x + u.x * p.startInset * unit, y: start.y + u.y * p.startInset * unit)
+        let tip = CGPoint(x: end.x - u.x * p.tipInset * unit, y: end.y - u.y * p.tipInset * unit)
+        let span = hypot(tip.x - tail.x, tip.y - tail.y)
+        // A quadratic curve's middle sits halfway to its pull.
+        let reach = 2 * p.bow * span * side
+        let pull = CGPoint(x: (tail.x + tip.x) / 2 - u.y * reach, y: (tail.y + tip.y) / 2 + u.x * reach)
+        return (tail, pull, tip)
+    }
+
+    /// Where the arrow's tail starts and where its tip is.
+    static func ends(from start: CGPoint, to end: CGPoint, unit: CGFloat, proportions p: Proportions)
+        -> (tail: CGPoint, tip: CGPoint) {
+        let path = path(from: start, to: end, unit: unit, proportions: p)
+        return (path.tail, path.tip)
+    }
+
+    private static func point(_ a: CGPoint, _ b: CGPoint, _ c: CGPoint, _ t: CGFloat) -> CGPoint {
+        let s = 1 - t
+        return CGPoint(x: s * s * a.x + 2 * s * t * b.x + t * t * c.x, y: s * s * a.y + 2 * s * t * b.y + t * t * c.y)
     }
 
     static func outlines(from start: CGPoint, to end: CGPoint, unit: CGFloat, dashed: Bool,
-                         proportions p: Proportions) -> [[CGPoint]] {
-        let length = max(hypot(end.x - start.x, end.y - start.y), 0.001 * unit)
-        let u = CGPoint(x: (end.x - start.x) / length, y: (end.y - start.y) / length)
-        // Across the arrow, to its left.
-        let n = CGPoint(x: -u.y, y: u.x)
-        func point(_ origin: CGPoint, along: CGFloat, across: CGFloat) -> CGPoint {
-            CGPoint(x: origin.x + (u.x * along + n.x * across) * unit, y: origin.y + (u.y * along + n.y * across) * unit)
+                         proportions p: Proportions, side: CGFloat = 1) -> [[CGPoint]] {
+        let (tail, pull, tip) = path(from: start, to: end, unit: unit, proportions: p, side: side)
+        // The head points along the curve as it lands.
+        let lean = CGPoint(x: tip.x - pull.x, y: tip.y - pull.y)
+        let leanLength = max(hypot(lean.x, lean.y), 0.000001)
+        let u = CGPoint(x: lean.x / leanLength, y: lean.y / leanLength), n = CGPoint(x: -u.y, y: u.x)
+        let base = CGPoint(x: tip.x - u.x * p.headLength * unit, y: tip.y - u.y * p.headLength * unit)
+        let half = p.headWidth / 2 * unit
+        let head = [CGPoint(x: base.x + n.x * half, y: base.y + n.y * half), tip,
+                    CGPoint(x: base.x - n.x * half, y: base.y - n.y * half)]
+        // The shaft follows the curve to a hair inside the head's base.
+        let into = CGPoint(x: base.x + u.x * 0.03 * unit, y: base.y + u.y * 0.03 * unit)
+        let curved = p.bow > 0
+        let steps = curved ? 28 : 1
+        // The curve from the tail to the head, solved for where it meets the head's base.
+        let stop = curved ? closest(to: into, tail, pull, tip) : 1
+        let spine: [CGPoint] = curved
+            ? (0...steps).map { point(tail, pull, tip, stop * CGFloat($0) / CGFloat(steps)) }
+            : [tail, into]
+        let width = p.shaft * unit
+        func normal(at i: Int) -> CGPoint {
+            let a = spine[max(i - 1, 0)], b = spine[min(i + 1, spine.count - 1)]
+            let d = max(hypot(b.x - a.x, b.y - a.y), 0.000001)
+            return CGPoint(x: -(b.y - a.y) / d, y: (b.x - a.x) / d)
         }
-        let shaft = p.shaft
-        let (tail, tip) = ends(from: start, to: end, unit: unit, proportions: p)
-        let base = point(tip, along: -p.headLength, across: 0)
-        let shaftLength = max(0, length / unit - p.startInset - p.tipInset - p.headLength)
-        let head = [point(base, along: 0, across: p.headWidth / 2), tip, point(base, along: 0, across: -p.headWidth / 2)]
-        func bar(_ from: CGFloat, _ to: CGFloat) -> [CGPoint] {
-            [point(tail, along: from, across: shaft / 2), point(tail, along: to, across: shaft / 2),
-             point(tail, along: to, across: -shaft / 2), point(tail, along: from, across: -shaft / 2)]
+        func edgePoint(_ i: Int, _ sign: CGFloat) -> CGPoint {
+            let m = normal(at: i)
+            return CGPoint(x: spine[i].x + m.x * width / 2 * sign, y: spine[i].y + m.y * width / 2 * sign)
         }
-        guard dashed else {
-            return (shaftLength > 0 ? [bar(0, shaftLength)] : []) + [head]
+        if dashed {
+            // Bars along the spine, by distance.
+            var lengths: [CGFloat] = [0]
+            for i in 1..<spine.count {
+                lengths.append(lengths[i - 1] + hypot(spine[i].x - spine[i - 1].x, spine[i].y - spine[i - 1].y))
+            }
+            let total = lengths.last ?? 0
+            func at(_ d: CGFloat) -> (CGPoint, CGPoint) {
+                let i = max(1, lengths.firstIndex { $0 >= d } ?? spine.count - 1)
+                let t = (d - lengths[i - 1]) / max(lengths[i] - lengths[i - 1], 0.000001)
+                let a = spine[i - 1], b = spine[i]
+                let d2 = max(hypot(b.x - a.x, b.y - a.y), 0.000001)
+                return (CGPoint(x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t),
+                        CGPoint(x: -(b.y - a.y) / d2 * width / 2, y: (b.x - a.x) / d2 * width / 2))
+            }
+            var bars: [[CGPoint]] = []
+            let dash = p.shaft * 1.6 * unit, gap = p.shaft * 1.1 * unit
+            var d: CGFloat = 0
+            while d < total - 0.04 * unit {
+                let e = min(d + dash, total - 0.03 * unit)
+                let (a, m1) = at(d), (b, m2) = at(e)
+                bars.append([CGPoint(x: a.x + m1.x, y: a.y + m1.y), CGPoint(x: b.x + m2.x, y: b.y + m2.y),
+                             CGPoint(x: b.x - m2.x, y: b.y - m2.y), CGPoint(x: a.x - m1.x, y: a.y - m1.y)])
+                d = e + gap
+            }
+            return bars + [head]
         }
-        var outlines: [[CGPoint]] = []
-        // The first dash starts past the dot, so the dot stands clear.
-        var at = p.dot + shaft * 0.5
-        let dash = shaft * 1.6
-        let gap = shaft * 1.1
-        while at < shaftLength - 0.01 {
-            let stop = min(at + dash, shaftLength)
-            outlines.append(bar(at, stop))
-            at = stop + gap
+        let strip = spine.indices.map { edgePoint($0, 1) } + spine.indices.reversed().map { edgePoint($0, -1) }
+        return [circle(tail, radius: width / 2), strip, head]
+    }
+
+    /// Where along the curve (0 to 1) it comes closest to `target`.
+    private static func closest(to target: CGPoint, _ a: CGPoint, _ b: CGPoint, _ c: CGPoint) -> CGFloat {
+        var best: CGFloat = 1, nearest = CGFloat.infinity
+        for i in 0...200 {
+            let t = CGFloat(i) / 200
+            let q = point(a, b, c, t)
+            let d = hypot(q.x - target.x, q.y - target.y)
+            if d < nearest { nearest = d; best = t }
         }
-        return outlines + [head]
+        return best
+    }
+
+    /// How high a point of the arrow rises over the board, in `unit`s: nothing at its ends, the
+    /// most at its middle.
+    static func height(of point: CGPoint, tail: CGPoint, tip: CGPoint, proportions p: Proportions) -> CGFloat {
+        let t = along(point, tail: tail, tip: tip)
+        return 4 * t * (1 - t) * p.rise * hypot(tip.x - tail.x, tip.y - tail.y)
     }
 
     /// An outline grown outward by `distance` all round: the white edge under an arrow, where a
@@ -104,7 +171,7 @@ enum ArrowOutline {
         }
     }
 
-    /// A circle as a polygon, for the dot on the 3D board.
+    /// A circle as a polygon: the rounded tail, the landing ring.
     static func circle(_ center: CGPoint, radius: CGFloat, sides: Int = 28) -> [CGPoint] {
         (0..<sides).map { i in
             let angle = 2 * CGFloat.pi * CGFloat(i) / CGFloat(sides)
@@ -121,16 +188,19 @@ enum ArrowOutline {
     }
 }
 
-/// The colors of the arrows on every board. The analysis arrows are a deep royal blue that
-/// brightens to sky blue toward the tail, the next best a softer pair; both stand apart from
-/// wood, stone, ivory, ebony and gold, and both are edged in white.
+/// The colors of the analysis arrows on every board: antique gold for the best move, the gold of
+/// the pieces' edges and the frame, so the arrow belongs to the set; pale champagne for the next
+/// best, slimmer and quieter. Each brightens toward its tail and is drawn with a fine dark
+/// hairline, which holds it on the cream squares.
 enum ArrowColors {
-    static let best: UInt32 = 0x1F4FE0
-    static let bestTail: UInt32 = 0x4AB2FF
-    static let next: UInt32 = 0x5A86EE
-    static let nextTail: UInt32 = 0x9FD0FF
-    /// The thin edge that keeps an arrow crisp on a light square, a dark one and over a piece,
-    /// and the dot's ring.
+    static let best: UInt32 = 0xB8893A
+    static let bestTail: UInt32 = 0xF3DCA0
+    static let next: UInt32 = 0xCFC2A4
+    static let nextTail: UInt32 = 0xEFE6D2
+    /// The analysis arrows' fine hairline.
+    static let hairline: UInt32 = 0x2B2012
+    /// The coach's arrows' thin white edge, which keeps them crisp on a light square, a dark one
+    /// and over a piece.
     static let edge: UInt32 = 0xFFFFFF
 
     /// The color an arrow brightens to at its tail: the analysis pairs' own, or for any other
@@ -156,8 +226,9 @@ enum ArrowColors {
     }
 }
 
-/// An arrow drawn crisp: an even color that brightens toward its tail, a thin white edge, a
-/// white-ringed dot where the move starts, and a soft shadow under it all.
+/// An arrow drawn crisp: an even color that brightens toward its tail, a fine edge, and a soft
+/// shadow under it. An analysis arrow flies: it bows to the side, its shadow lies straight on the
+/// board beneath it, and the best move's lands on a ring.
 struct CrispArrow: View {
     let from: CGPoint
     let to: CGPoint
@@ -167,14 +238,20 @@ struct CrispArrow: View {
     let proportions: ArrowOutline.Proportions
     /// Neon looks: a glow of the arrow's color in place of the edge and shadow.
     var glow: Color? = nil
+    /// The fine line round it.
+    var edge: Color = .white
+    /// Lands on a ring on its target square.
+    var landing = false
+    var opacity: Double = 1
 
     var body: some View {
         let p = proportions
         let outlines = ArrowOutline.outlines(from: from, to: to, unit: squareSize, dashed: dashed, proportions: p)
         let (tail, tip) = ArrowOutline.ends(from: from, to: to, unit: squareSize, proportions: p)
-        let shape = Path { path in
-            for outline in outlines {
-                guard let first = outline.first else { continue }
+        // Each part on its own, so the tail's round cap can't cut a hole in the shaft.
+        let parts = outlines.map { outline in
+            Path { path in
+                guard let first = outline.first else { return }
                 path.move(to: first)
                 for point in outline.dropFirst() { path.addLine(to: point) }
                 path.closeSubpath()
@@ -182,26 +259,36 @@ struct CrispArrow: View {
         }
         let tailColor = Color(hex: ArrowColors.tail(of: ArrowColors.hex(of: color)))
         let fade = Gradient(colors: [tailColor, color])
-        let edge = max(1, squareSize * 0.03)
-        let dot = p.dot * squareSize
-        let ring = Path(ellipseIn: CGRect(x: tail.x - dot, y: tail.y - dot, width: dot * 2, height: dot * 2))
-        let core = dot * 0.6
-        let center = Path(ellipseIn: CGRect(x: tail.x - core, y: tail.y - core, width: core * 2, height: core * 2))
+        let line = max(0.75, squareSize * 0.022)
         Canvas { context, _ in
-            // The shadow (or a neon look's glow) falls from the arrow as one shape.
+            context.opacity = opacity
+            if p.bow > 0 && glow == nil {
+                // The shadow on the board below the flight.
+                var ground = context
+                ground.addFilter(.blur(radius: squareSize * 0.07))
+                ground.stroke(Path { $0.move(to: tail); $0.addLine(to: tip) }, with: .color(.black.opacity(0.22)),
+                              style: StrokeStyle(lineWidth: p.shaft * squareSize * 0.8, lineCap: .round))
+            }
+            if landing {
+                let ring = CGRect(x: to.x - squareSize * 0.33, y: to.y - squareSize * 0.14,
+                                  width: squareSize * 0.66, height: squareSize * 0.36)
+                context.fill(Path(ellipseIn: ring), with: .color(color.opacity(0.18)))
+                context.stroke(Path(ellipseIn: ring), with: .color(tailColor), lineWidth: squareSize * 0.03)
+            }
             if let glow {
                 context.addFilter(.shadow(color: glow.opacity(0.85), radius: squareSize * 0.1))
             } else {
-                context.addFilter(.shadow(color: .black.opacity(0.32), radius: squareSize * 0.035, y: squareSize * 0.018))
+                context.addFilter(.shadow(color: .black.opacity(0.35), radius: squareSize * 0.03, y: squareSize * 0.015))
             }
             context.drawLayer { layer in
                 if glow == nil {
-                    layer.stroke(shape, with: .color(.white.opacity(0.95)),
-                                 style: StrokeStyle(lineWidth: edge * 2, lineJoin: .round))
+                    for part in parts {
+                        layer.stroke(part, with: .color(edge), style: StrokeStyle(lineWidth: line * 2, lineJoin: .round))
+                    }
                 }
-                layer.fill(shape, with: .linearGradient(fade, startPoint: tail, endPoint: tip))
-                layer.fill(ring, with: .color(.white))
-                layer.fill(center, with: .color(tailColor))
+                for part in parts {
+                    layer.fill(part, with: .linearGradient(fade, startPoint: tail, endPoint: tip))
+                }
             }
         }
         .allowsHitTesting(false)

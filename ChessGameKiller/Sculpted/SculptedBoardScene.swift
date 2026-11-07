@@ -20,17 +20,19 @@ struct SculptedCoachMark: Hashable {
 }
 
 /// One of the coach's arrows in a lesson or drill, lying on the stone in its color (0xRRGGBB):
-/// solid, or dashed for a maybe or a threat, as on the flat training board. Analysis's arrows
-/// are bolder, as on the flat analysis board.
+/// solid, or dashed for a maybe or a threat, as on the flat training board. Analysis's arrows are
+/// flight paths that rise off the stone and land on the target, as on the flat analysis board.
 struct SculptedCoachArrow: Hashable {
     let from: Square
     let to: Square
     let color: UInt32
     var dashed = false
     var analysis = false
+    /// For analysis: the best move's fuller arrow, landing on a ring, or the next best's.
+    var best = true
 
     var proportions: ArrowOutline.Proportions {
-        analysis ? .analysis(best: !dashed) : .coach(dashed: dashed)
+        analysis ? .analysis(best: best) : .coach(dashed: dashed)
     }
 }
 
@@ -1476,9 +1478,9 @@ final class SculptedBoardScene {
         for arrow in new.coachArrows where seenArrows.insert(arrow).inserted && arrow.from != arrow.to {
             let fresh = !shownCoachArrows.contains(arrow)
             let layers = coachArrowLayers(arrow)
-            // Its white edge first, then the arrow over it, the dot's ring and its middle, then
-            // the faint copy over the pieces.
-            for (index, parts) in [layers.edge, layers.stone, [layers.ring], [layers.core], layers.through].enumerated() {
+            // Its shadow and landing ring on the stone, its edge, then the arrow over it, then the
+            // faint copy over the pieces.
+            for (index, parts) in [layers.ground, layers.edge, layers.stone, layers.through].enumerated() {
                 for part in parts {
                     let node = SCNNode(geometry: part)
                     node.simdPosition = SIMD3(0, 0.003, 0)
@@ -1508,13 +1510,12 @@ final class SculptedBoardScene {
         return layers
     }
 
-    /// An arrow's layers on the stone: its white edge, the arrow fading from its tail color to its
-    /// own, the dot's white ring and its middle, and the faint copy shown over a piece in front.
+    /// An arrow's layers: its shadow and landing ring on the stone, its edge, the arrow fading from
+    /// its tail color to its own, and the faint copy shown over a piece in front.
     struct ArrowLayers {
+        let ground: [SCNGeometry]
         let edge: [SCNGeometry]
         let stone: [SCNGeometry]
-        let ring: SCNGeometry
-        let core: SCNGeometry
         let through: [SCNGeometry]
     }
 
@@ -1531,34 +1532,65 @@ final class SculptedBoardScene {
 
     static func arrowLayers(_ arrow: SculptedCoachArrow) -> ArrowLayers {
         // Together solid, as the flat board's crisp arrow; over a piece in front, only the faint one.
-        let strength: CGFloat = 0.97
+        // The next best analysis arrow is quieter, as on the flat board.
+        let strength: CGFloat = arrow.analysis && !arrow.best ? 0.8 : 0.97
         let seen: CGFloat = 0.35
         let p = arrow.proportions
         let outlines = arrowOutline(from: arrow.from, to: arrow.to, dashed: arrow.dashed, proportions: p)
         let (tail, tip) = ArrowOutline.ends(from: middle(arrow.from), to: middle(arrow.to), unit: 1, proportions: p)
         let tailColor = rgb(ArrowColors.tail(of: arrow.color))
         let headColor = rgb(arrow.color)
-        let white = SIMD3<Float>(1, 1, 1)
+        let edgeColor = rgb(arrow.analysis ? ArrowColors.hairline : ArrowColors.edge)
         func faded(_ point: CGPoint) -> SIMD3<Float> {
             let t = Float(ArrowOutline.along(point, tail: tail, tip: tip))
             return tailColor + (headColor - tailColor) * t
         }
-        let edges = outlines.map { ArrowOutline.grown($0, by: 0.03) }
-        let ring = ArrowOutline.circle(tail, radius: p.dot)
-        let core = ArrowOutline.circle(tail, radius: p.dot * 0.6)
+        func rise(_ point: CGPoint) -> Float {
+            Float(ArrowOutline.height(of: point, tail: tail, tip: tip, proportions: p))
+        }
+        // A solid arrow's middle outline is its shaft, one strip down the curve.
+        let strips = outlines.indices.map { !arrow.dashed && outlines.count == 3 && $0 == 1 }
+        let edges = outlines.map { ArrowOutline.grown($0, by: arrow.analysis ? 0.022 : 0.03) }
         let stone = (strength - seen) / (1 - seen)
+        var ground: [SCNGeometry] = []
+        if p.rise > 0 {
+            // The flight's shadow, straight on the stone beneath it, soft at its edges.
+            for (width, alpha) in [(p.shaft * 1.6, 0.08), (p.shaft * 0.9, 0.12)] as [(CGFloat, CGFloat)] {
+                let shadow = ArrowOutline.outlines(from: tail, to: tip, unit: 1, dashed: false,
+                                                   proportions: .init(shaft: width, headLength: 0, headWidth: 0,
+                                                                      startInset: 0, tipInset: 0))[1]
+                ground.append(polygon(shadow, colors: { _ in SIMD3(0, 0, 0) }, alpha: alpha, throughPieces: false, strip: true))
+            }
+        }
+        if arrow.analysis && arrow.best {
+            // The ring it lands on.
+            let target = middle(arrow.to)
+            ground.append(polygon(ArrowOutline.circle(target, radius: 0.33), colors: { _ in headColor }, alpha: 0.18,
+                                  throughPieces: false))
+            let outer = ArrowOutline.circle(target, radius: 0.345), inner = ArrowOutline.circle(target, radius: 0.315)
+            for i in outer.indices {
+                let j = (i + 1) % outer.count
+                ground.append(polygon([outer[i], outer[j], inner[j], inner[i]], colors: { _ in tailColor }, alpha: 0.95,
+                                      throughPieces: false))
+            }
+        }
         return ArrowLayers(
-            edge: edges.map { polygon($0, colors: { _ in white }, alpha: 0.95, throughPieces: false) },
-            stone: outlines.map { polygon($0, colors: faded, alpha: stone, throughPieces: false) },
-            ring: polygon(ring, colors: { _ in white }, alpha: 1, throughPieces: false),
-            core: polygon(core, colors: { _ in tailColor }, alpha: 1, throughPieces: false),
-            through: outlines.map { polygon($0, colors: faded, alpha: seen, throughPieces: true) })
+            ground: ground,
+            edge: edges.indices.map { polygon(edges[$0], colors: { _ in edgeColor }, alpha: 0.92, throughPieces: false,
+                                              strip: strips[$0], height: rise) },
+            stone: outlines.indices.map { polygon(outlines[$0], colors: faded, alpha: stone, throughPieces: false,
+                                                  strip: strips[$0], height: rise) },
+            through: outlines.indices.map { polygon(outlines[$0], colors: faded, alpha: seen, throughPieces: true,
+                                                    strip: strips[$0], height: rise) })
     }
 
-    /// A flat convex shape in the board's plane, each corner in its own color (blended between).
+    /// A flat shape in the board's plane, each corner in its own color (blended between) and at its
+    /// own height over the stone. Convex shapes are cut into a fan from the first corner; a `strip`
+    /// (one side's corners, then the other side's back) into a quad between each pair.
     private static func polygon(_ outline: [CGPoint], colors: (CGPoint) -> SIMD3<Float>, alpha: CGFloat,
-                                throughPieces: Bool) -> SCNGeometry {
-        let vertices = outline.map { SCNVector3(Float($0.x), Float($0.y), 0) }
+                                throughPieces: Bool, strip: Bool = false,
+                                height: (CGPoint) -> Float = { _ in 0 }) -> SCNGeometry {
+        let vertices = outline.map { SCNVector3(Float($0.x), Float($0.y), height($0)) }
         let tints = outline.map { colors($0) }
         let colorData = tints.withUnsafeBufferPointer { Data(buffer: $0) }
         let colorSource = SCNGeometrySource(data: colorData, semantic: .color, vectorCount: tints.count,
@@ -1566,10 +1598,17 @@ final class SculptedBoardScene {
                                             bytesPerComponent: MemoryLayout<Float>.size, dataOffset: 0,
                                             dataStride: MemoryLayout<SIMD3<Float>>.stride)
         let normals = Array(repeating: SCNVector3(0, 0, 1), count: outline.count)
-        // A fan from the first corner: the shapes are convex.
         var indices: [UInt16] = []
-        for i in 1..<max(outline.count - 1, 1) {
-            indices += [0, UInt16(i), UInt16(i + 1)]
+        if strip {
+            let count = outline.count, half = count / 2
+            for i in 0..<max(half - 1, 0) {
+                let a = UInt16(i), b = UInt16(i + 1), c = UInt16(count - 2 - i), d = UInt16(count - 1 - i)
+                indices += [a, b, c, a, c, d]
+            }
+        } else {
+            for i in 1..<max(outline.count - 1, 1) {
+                indices += [0, UInt16(i), UInt16(i + 1)]
+            }
         }
         let geometry = SCNGeometry(sources: [SCNGeometrySource(vertices: vertices), SCNGeometrySource(normals: normals),
                                              colorSource],
@@ -1596,12 +1635,13 @@ final class SculptedBoardScene {
     }
 
     /// The arrow as outlines on the board, in squares (a square is 1 wide): the flat board's arrow,
-    /// from its dot just past the middle of its square to a point short of the middle of the
-    /// target. Dashed, the shaft is a row of short bars. The last outline is the head.
+    /// from just past the middle of its square to a point short of the middle of the target.
+    /// Dashed, the shaft is a row of short bars. The last outline is the head. The board's y runs
+    /// up, so a flight path is told to bow the other way, to bow as it does on the flat board.
     static func arrowOutline(from: Square, to: Square, dashed: Bool,
                              proportions: ArrowOutline.Proportions? = nil) -> [[CGPoint]] {
         ArrowOutline.outlines(from: middle(from), to: middle(to), unit: 1, dashed: dashed,
-                              proportions: proportions ?? .coach(dashed: dashed))
+                              proportions: proportions ?? .coach(dashed: dashed), side: -1)
     }
 
     private static func color(_ hex: UInt32) -> UIColor {

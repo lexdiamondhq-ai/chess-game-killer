@@ -3,7 +3,8 @@ import SwiftUI
 
 /// Analysis on the real 3D board: any position (a photo's, one set up by hand, a game's), tilted
 /// with the pieces standing or flat from above (the Board view setting), with Stockfish's best
-/// move as a bold blue arrow lying on the stone and the next best a paler dashed one. Tap a piece and then its square, as on the flat
+/// move as an antique gold flight path rising off the stone and landing on a ring, and the next
+/// best a slimmer champagne one. Tap a piece and then its square, as on the flat
 /// analysis board. The position has no lasting piece ids, so the scene matches each piece to the
 /// one on the board before and moves it, rather than fading pieces in and out.
 struct SculptedPositionBoard: View {
@@ -57,13 +58,13 @@ struct SculptedPositionBoard: View {
         return state
     }
 
-    /// The analysis lines' arrows for the scene: the best solid, the next best dashed and paler,
-    /// as on the flat analysis board. The next best is drawn first, so the best lies over it.
+    /// The analysis lines' arrows for the scene: the best fuller, the next best slimmer and
+    /// quieter, as on the flat analysis board. The next best is drawn first, so the best lies over it.
     static func arrows(_ hints: [MoveHint]) -> [SculptedCoachArrow] {
         hints.prefix(2).reversed().map { hint in
             let best = hint.rank == 0
             return SculptedCoachArrow(from: hint.from, to: hint.to, color: best ? ArrowColors.best : ArrowColors.next,
-                                      dashed: !best, analysis: true)
+                                      analysis: true, best: best)
         }
     }
 
