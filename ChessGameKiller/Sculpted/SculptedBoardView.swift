@@ -293,7 +293,7 @@ struct SculptedBoardView: View {
 
 /// A 3D board that is not for playing, such as the Settings preview: a position, a piece
 /// shown as tapped with its moves, and the coach's hints.
-struct CutoutStillBoard: View {
+struct SculptedStillBoard: View {
     let position: Position
     var look: SculptedLook = .gilded
     var hints: [SculptedHint] = []
