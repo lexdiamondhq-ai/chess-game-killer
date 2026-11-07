@@ -1183,6 +1183,8 @@ final class SculptedBoardScene {
             node.heirloomUndo = []
             node.heirloomParts = []
         }
+        // The flat pieces cast their own shadow, off to the side, as they hover.
+        node.contact.isHidden = node.flat
         if framing.lying {
             node.rest = matrix_identity_float4x4
             let half = (node.flat ? SculptedFlatSet.extent(of: node.piece.kind).reach : node.baseRadius) * 1.24
