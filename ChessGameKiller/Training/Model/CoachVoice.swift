@@ -68,8 +68,9 @@ final class CoachVoice: NSObject {
     var isSpeaking: Bool { player?.isPlaying == true || synthesizer.isSpeaking }
 
     /// Says a line and returns when it's finished, stopped or cancelled.
-    /// Muted, it waits about as long as reading the line takes.
-    func say(_ text: String) async {
+    /// Muted, it waits about as long as reading the line takes. `coach` plays one coach's
+    /// recording whoever is picked (Leo's note on Today is his alone); by default, the picked coach's.
+    func say(_ text: String, coach: Coach? = nil) async {
         stop()
         let line = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !line.isEmpty, !Task.isCancelled else { return }
@@ -80,7 +81,7 @@ final class CoachVoice: NSObject {
         await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
                 waiting = continuation
-                if !play(recordingFor: line) {
+                if !play(recordingFor: line, coach: coach ?? Coach.current) {
                     speak(line)
                 }
             }
@@ -138,9 +139,9 @@ final class CoachVoice: NSObject {
 
     // MARK: Private
 
-    private func play(recordingFor text: String) -> Bool {
+    private func play(recordingFor text: String, coach: Coach) -> Bool {
         guard
-            let url = Self.recording(for: text, coach: Coach.current),
+            let url = Self.recording(for: text, coach: coach),
             let player = try? AVAudioPlayer(contentsOf: url)
         else { return false }
         player.delegate = self
