@@ -11,6 +11,9 @@ struct HomeAuroraInfo {
     var stage: HomeStageInfo
     /// Every game still going, your move first. Empty when none is.
     var games: [HomeCurrentGame]
+    /// The 3D board turning at the top: its look and the game's pieces.
+    var look: SculptedLook
+    var pieces: [Piece]
 }
 
 struct HomeAuroraActions {
@@ -31,7 +34,9 @@ struct HomeAuroraPalette {
     var line: Color { dark ? Color.white.opacity(0.08) : Color(hex: 0x1C1813).opacity(0.08) }
     var glass: Color { dark ? Color.white.opacity(0.06) : Color.white.opacity(0.72) }
     var glassHi: Color { dark ? Color.white.opacity(0.12) : Color.white }
-    var card: Color { dark ? Color(hex: 0x11131A) : Color.white }
+    var card: Color { dark ? Color(hex: 0x15171F) : Color.white }
+    /// The page that slides up over the board.
+    var sheet: Color { dark ? Color(hex: 0x0C0D12).opacity(0.97) : Color(hex: 0xF8F5F0).opacity(0.98) }
     var gold: Color { dark ? Color(hex: 0xE8C27A) : Color(hex: 0xB7832E) }
     var rose: Color { dark ? Color(hex: 0xF0708A) : Color(hex: 0xD9466A) }
     var violet: Color { dark ? Color(hex: 0x8B6CFF) : Color(hex: 0x6A4BE0) }
@@ -56,16 +61,18 @@ struct HomeAuroraView: View {
     let info: HomeAuroraInfo
     let actions: HomeAuroraActions
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("haptics") private var hapticsOn = true
     @AppStorage(HomeToneMode.key) private var toneMode = HomeToneMode.defaultMode
     @State private var music = HomeMusic.shared
-    /// The game in front of the swipe row.
-    @State private var shown: String?
+    @State private var boardStage = SculptedStage()
+    /// How far the page has been pulled up over the board, in points.
+    @State private var pulled: CGFloat = 0
 
     private var palette: HomeAuroraPalette { HomeAuroraPalette(dark: tone.scheme == .dark) }
     private var stage: HomeStageInfo { info.stage }
 
-    /// The boards in the swipe row: your games, or the next game's start when none is going.
+    /// Your games, or the next game when none is going.
     private var cards: [HomeAuroraGameCard] {
         if info.games.isEmpty {
             return [HomeAuroraGameCard.next(stage.upNext, fen: stage.gameFEN)]
@@ -73,98 +80,112 @@ struct HomeAuroraView: View {
         return info.games.map(HomeAuroraGameCard.init)
     }
 
-    private var current: HomeAuroraGameCard {
-        let all: [HomeAuroraGameCard] = cards
-        return all.first { $0.id == shown } ?? all[0]
-    }
-
     var body: some View {
-        ZStack(alignment: .bottom) {
-            HomeAuroraBackdrop(palette: palette)
-            ScrollView(.vertical) {
-                VStack(spacing: 0) {
-                    header
-                    hero
-                    HomeAuroraSection(title: "For today", palette: palette)
-                    bento
-                        .padding(.horizontal, 16)
+        GeometryReader { geo in
+            let boardHeight: CGFloat = max(300, geo.size.height * 0.46)
+            let lift: CGFloat = min(max(pulled / boardHeight, 0), 1)
+            ZStack(alignment: .top) {
+                HomeAuroraBackdrop(palette: palette)
+                spinningBoard(height: boardHeight + geo.safeAreaInsets.top, lift: lift)
+                    .ignoresSafeArea(edges: .top)
+                ScrollView(.vertical) {
+                    VStack(spacing: 0) {
+                        // The board shows through here; a tap on it plays.
+                        Color.clear
+                            .frame(height: boardHeight - 70)
+                            .contentShape(Rectangle())
+                            .onTapGesture { actions.stage.play() }
+                            .onGeometryChange(for: CGFloat.self) { proxy in
+                                -proxy.frame(in: .scrollView).minY
+                            } action: { value in
+                                pulled = value
+                            }
+                        page
+                    }
                 }
-                .padding(.bottom, 130)
+                .scrollIndicators(.hidden)
+                header
+                    .background(alignment: .top) {
+                        // The header gets a soft backing once the page covers the board.
+                        LinearGradient(colors: [palette.bg, palette.bg.opacity(0)], startPoint: .top, endPoint: .bottom)
+                            .frame(height: 120)
+                            .opacity(Double(lift))
+                            .ignoresSafeArea(edges: .top)
+                            .allowsHitTesting(false)
+                    }
+                VStack {
+                    Spacer()
+                    HomeAuroraTabBar(palette: palette, play: { actions.stage.play() }, learn: actions.stage.learn,
+                                     you: actions.stage.you, rooms: actions.stage.rooms)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 8)
+                }
             }
-            .scrollIndicators(.hidden)
-            HomeAuroraTabBar(palette: palette, play: { actions.stage.play() }, learn: actions.stage.learn,
-                             you: actions.stage.you, rooms: actions.stage.rooms)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 8)
         }
         .environment(\.colorScheme, tone.scheme)
-        .sensoryFeedback(.selection, trigger: shown) { _, _ in hapticsOn }
         .onAppear { music.homeAppeared() }
         .onDisappear { music.homeDisappeared() }
+    }
+
+    // MARK: The board
+
+    /// The game's own 3D board turning slowly in the light; it sinks back and dims as the page
+    /// comes up over it.
+    private func spinningBoard(height: CGFloat, lift: CGFloat) -> some View {
+        let upNext: HomeUpNext = stage.upNext
+        return ZStack {
+            if SculptedAssets.shared.isLoaded {
+                HomeStageBoard(stage: boardStage, look: info.look, pieces: info.pieces,
+                               black: upNext.playerColor == .black, light: upNext.rival.lightUI,
+                               leaning: upNext.inProgress && upNext.yourMove, plinth: nil,
+                               still: reduceMotion, dive: 0)
+                    .id(info.look.name)
+            }
+        }
+        .frame(height: height)
+        .frame(maxWidth: .infinity)
+        .scaleEffect(1 - 0.1 * lift, anchor: .top)
+        .opacity(1 - 0.55 * Double(lift))
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
     // MARK: Header
 
     private var header: some View {
-        VStack(spacing: 14) {
-            HStack(spacing: 8) {
-                (Text("Beauty ") + Text("of").italic().foregroundColor(palette.gold) + Text(" Chess"))
-                    .font(.system(size: 22, weight: .medium, design: .serif))
-                    .foregroundStyle(palette.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                Spacer(minLength: 0)
-                if music.available {
-                    circle(label: music.on ? "Music off" : "Music on", action: music.toggle) {
-                        HomeMusicBars(on: music.on, gold: palette.gold, off: palette.ink3)
-                    }
-                }
-                circle(label: palette.dark ? "Light mode" : "Dark mode", action: flipLight) {
-                    Image(systemName: palette.dark ? "sun.max" : "moon")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(palette.gold)
-                }
-                streak
-                circle(label: "You", action: actions.stage.you) {
-                    Image(systemName: "crown")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(palette.gold)
+        HStack(spacing: 8) {
+            (Text("Beauty ") + Text("of").italic().foregroundColor(palette.gold) + Text(" Chess"))
+                .font(.system(size: 22, weight: .medium, design: .serif))
+                .foregroundStyle(palette.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Spacer(minLength: 0)
+            if music.available {
+                circle(label: music.on ? "Music off" : "Music on", action: music.toggle) {
+                    HomeMusicBars(on: music.on, gold: palette.gold, off: palette.ink3)
                 }
             }
-            // A fine gold hairline, fading at both ends.
-            LinearGradient(colors: [palette.gold.opacity(0), palette.gold.opacity(0.45), palette.gold.opacity(0)],
-                           startPoint: .leading, endPoint: .trailing)
-                .frame(height: 0.75)
+            circle(label: palette.dark ? "Light mode" : "Dark mode", action: flipLight) {
+                Image(systemName: palette.dark ? "sun.max" : "moon")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(palette.gold)
+            }
+            circle(label: "You", action: actions.stage.you) {
+                Image(systemName: "crown")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(palette.gold)
+            }
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
-    }
-
-    private var streak: some View {
-        Button(action: actions.stage.dailyMove) {
-            HStack(spacing: 5) {
-                Circle().fill(palette.rose).frame(width: 7, height: 7)
-                    .shadow(color: palette.rose, radius: 4)
-                Text("\(stage.day.streak)")
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(palette.ink)
-                    .monospacedDigit()
-            }
-            .padding(.horizontal, 12)
-            .frame(height: 34)
-            .background(Capsule().fill(palette.glass))
-            .overlay(Capsule().strokeBorder(palette.line, lineWidth: 1))
-        }
-        .buttonStyle(HomeStagePress())
-        .accessibilityLabel("\(stage.day.streak) day streak")
     }
 
     private func circle<Label: View>(label: String, action: @escaping () -> Void,
                                      @ViewBuilder content: () -> Label) -> some View {
         Button(action: action) {
             content()
-                .frame(width: 34, height: 34)
-                .background(Circle().fill(palette.glass))
+                .frame(width: 36, height: 36)
+                .background(Circle().fill(.ultraThinMaterial))
                 .overlay(Circle().strokeBorder(palette.line, lineWidth: 1))
         }
         .buttonStyle(HomeStagePress())
@@ -177,127 +198,152 @@ struct HomeAuroraView: View {
         }
     }
 
-    // MARK: Hero
+    // MARK: The page
 
-    private var hero: some View {
-        let card: HomeAuroraGameCard = current
-        let all: [HomeAuroraGameCard] = cards
+    /// The page that slides up over the board: your games first, then a slim line of numbers,
+    /// then today's things as long rows.
+    private var page: some View {
+        let shape = UnevenRoundedRectangle(cornerRadii: .init(topLeading: 34, bottomLeading: 0,
+                                                              bottomTrailing: 0, topTrailing: 34),
+                                           style: .continuous)
         return VStack(spacing: 0) {
-            Text(card.eyebrow.uppercased())
-                .font(.system(size: 11, weight: .bold))
-                .tracking(1.8)
-                .foregroundStyle(palette.ink2)
+            Capsule()
+                .fill(palette.ink3)
+                .frame(width: 38, height: 4)
+                .padding(.top, 10)
+            HomeAuroraSection(title: gamesTitle, palette: palette, note: gamesNote)
+            gameRow
+            numbers
+                .padding(.horizontal, 20)
                 .padding(.top, 22)
-            headline(card)
-                .padding(.top, 8)
-                .padding(.horizontal, 24)
-            gameRow(all)
-                .padding(.top, 22)
-            if all.count > 1 {
-                dots(all, current: card.id)
-                    .padding(.top, 14)
+            HomeAuroraSection(title: "For today", palette: palette, note: nil)
+            VStack(spacing: 10) {
+                todayRows
             }
-            tags(card)
-                .padding(.top, 16)
-            Button { open(card) } label: {
-                Text(card.button)
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(Color(hex: 0x2A1E0F))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 54)
-                    .background(Capsule().fill(HomeAuroraPalette.goldButton))
-                    .shadow(color: Color(hex: 0xD9B26A).opacity(0.35), radius: 13, y: 10)
-            }
-            .buttonStyle(HomeStagePress())
-            .padding(.horizontal, 24)
-            .padding(.top, 16)
-            Button(action: actions.stage.change) {
-                Text(info.games.isEmpty ? "Change rival" : "New game")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(palette.ink2)
-                    .frame(height: 36)
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 4)
+            .padding(.horizontal, 16)
+        }
+        .padding(.bottom, 130)
+        .frame(maxWidth: .infinity)
+        .background {
+            shape.fill(palette.sheet)
+                .overlay(alignment: .top) {
+                    // A fine gold edge along the top of the page.
+                    shape.strokeBorder(LinearGradient(colors: [palette.gold.opacity(0.5), palette.gold.opacity(0)],
+                                                      startPoint: .top, endPoint: .center), lineWidth: 1)
+                }
+                .shadow(color: .black.opacity(palette.dark ? 0.5 : 0.1), radius: 30, y: -10)
+                .ignoresSafeArea(edges: .bottom)
         }
     }
 
-    private func headline(_ card: HomeAuroraGameCard) -> some View {
-        (Text(card.headline) + Text(card.headlineEnd).italic().foregroundColor(palette.gold))
-            .font(.system(size: 32, weight: .regular, design: .serif))
-            .foregroundStyle(palette.ink)
-            .multilineTextAlignment(.center)
-            .lineLimit(2)
-            .minimumScaleFactor(0.7)
-            .contentTransition(.opacity)
-            .animation(.easeInOut(duration: 0.25), value: card.id)
+    private var gamesTitle: String {
+        if info.games.isEmpty { return "Next game" }
+        return info.games.count == 1 ? "Your game" : "Your games"
     }
 
-    /// Your games side by side: the one in front fills most of the width, the next peeks in at
-    /// the right, and a swipe brings it in.
-    private func gameRow(_ all: [HomeAuroraGameCard]) -> some View {
-        ScrollView(.horizontal) {
-            LazyHStack(spacing: 14) {
+    private var gamesNote: String? {
+        let yours: Int = info.games.filter(\.isYourMove).count
+        guard !info.games.isEmpty else { return nil }
+        return yours == 0 ? "Waiting on them" : (yours == 1 ? "1 needs you" : "\(yours) need you")
+    }
+
+    /// Your games as wide cards, the next one peeking in at the right.
+    private var gameRow: some View {
+        let all: [HomeAuroraGameCard] = cards
+        return ScrollView(.horizontal) {
+            LazyHStack(spacing: 12) {
                 ForEach(all) { card in
-                    HomeAuroraBoard(fen: card.fen, flipped: card.flipped, lit: card.yourMove)
-                        .shadow(color: .black.opacity(palette.dark ? 0.55 : 0.18), radius: 22, y: 18)
-                        .shadow(color: palette.gold.opacity(0.14 * palette.glow), radius: 30)
+                    HomeAuroraGameTile(card: card, palette: palette) { open(card) }
                         .containerRelativeFrame(.horizontal) { width, _ in
-                            all.count > 1 ? width - 84 : width - 48
+                            all.count > 1 ? width - 72 : width - 32
                         }
-                        .onTapGesture { open(card) }
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel("\(card.title), \(card.eyebrow)")
-                        .accessibilityAddTraits(.isButton)
                 }
             }
             .scrollTargetLayout()
         }
         .scrollTargetBehavior(.viewAligned)
-        .scrollPosition(id: $shown)
         .scrollIndicators(.hidden)
         .scrollClipDisabled()
-        .contentMargins(.leading, 24, for: .scrollContent)
-        .contentMargins(.trailing, all.count > 1 ? 60 : 24, for: .scrollContent)
+        .contentMargins(.horizontal, 16, for: .scrollContent)
     }
 
-    private func dots(_ all: [HomeAuroraGameCard], current: String) -> some View {
-        HStack(spacing: 5) {
-            ForEach(all) { card in
-                Capsule()
-                    .fill(card.id == current ? palette.gold : palette.ink3)
-                    .frame(width: card.id == current ? 16 : 5, height: 5)
-            }
+    /// Rating, level and streak in one slim engraved line.
+    private var numbers: some View {
+        HStack(spacing: 0) {
+            number(stage.rating.map { $0.formatted(.number) } ?? "New", label: "Rating", action: actions.stage.you)
+            hairline
+            number("\(stage.rankNumber)", label: "Level", action: actions.stage.learn)
+            hairline
+            number("\(stage.day.streak)", label: "Day streak",
+                   action: actions.stage.dailyMove)
         }
-        .animation(.easeInOut(duration: 0.2), value: current)
-        .accessibilityHidden(true)
+        .padding(.vertical, 14)
+        .overlay(alignment: .top) { palette.line.frame(height: 1) }
+        .overlay(alignment: .bottom) { palette.line.frame(height: 1) }
     }
 
-    private func tags(_ card: HomeAuroraGameCard) -> some View {
-        HStack(spacing: 8) {
-            if let rating = stage.rating {
-                tag("Rating", bold: rating.formatted(.number))
-            }
-            ForEach(card.tags, id: \.self) { text in
-                tag(text, bold: nil)
-            }
-        }
-        .padding(.horizontal, 16)
+    private var hairline: some View {
+        LinearGradient(colors: [palette.gold.opacity(0), palette.gold.opacity(0.5), palette.gold.opacity(0)],
+                       startPoint: .top, endPoint: .bottom)
+            .frame(width: 1, height: 40)
     }
 
-    private func tag(_ text: String, bold: String?) -> some View {
-        HStack(spacing: 5) {
-            Text(text).foregroundStyle(palette.ink2)
-            if let bold {
-                Text(bold).foregroundStyle(palette.ink).monospacedDigit()
+    private func number(_ value: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 3) {
+                Text(value)
+                    .font(.system(size: 26, weight: .regular, design: .serif))
+                    .foregroundStyle(palette.ink)
+                    .monospacedDigit()
+                Text(label.uppercased())
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1.4)
+                    .foregroundStyle(palette.ink2)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(HomeStagePress())
+    }
+
+    @ViewBuilder
+    private var todayRows: some View {
+        HomeAuroraRow(eyebrow: "Today's Move", title: todayTitle, detail: todayDetail,
+                      accent: palette.violet, palette: palette, action: actions.stage.dailyMove) {
+            HomeAuroraBoard(fen: stage.todayFEN, flipped: stage.todaySolver == .black, lit: false)
+        }
+        HomeAuroraRow(eyebrow: "Coach Leo", title: stage.plan?.title ?? "Today's lesson", detail: coachLine,
+                      accent: palette.teal, palette: palette, action: actions.stage.coach) {
+            HomeAuroraEmblem(glyph: Glyphs.coach, fill: HomeAuroraPalette.tealTile)
+        }
+        HomeAuroraRow(eyebrow: "Analyze", title: "Any position", detail: "A photo, a screenshot or a board you set up",
+                      accent: palette.gold, palette: palette, action: actions.stage.analyze) {
+            HomeAuroraEmblem(glyph: Glyphs.analyze, fill: HomeAuroraPalette.goldTile)
+        }
+        if let masterpiece = stage.masterpiece {
+            HomeAuroraRow(eyebrow: "Masterpiece of the day", title: masterpiece.title, detail: masterpiece.players,
+                          accent: palette.rose, palette: palette, action: {
+                              if let fen = masterpiece.frames.first { actions.stage.analyzePosition(fen) }
+                          }) {
+                HomeAuroraBoard(fen: masterpiece.frames.first, flipped: masterpiece.flipped, lit: false)
             }
         }
-        .font(.system(size: 12.5, weight: .semibold))
-        .lineLimit(1)
-        .padding(.horizontal, 12)
-        .frame(height: 30)
-        .background(Capsule().fill(palette.glass))
-        .overlay(Capsule().strokeBorder(palette.line, lineWidth: 1))
+    }
+
+    private var todayTitle: String {
+        if stage.day.found { return "Found it" }
+        return stage.todaySolver == .black ? "Black to play and win" : "White to play and win"
+    }
+
+    private var todayDetail: String {
+        if stage.day.played { return "Back tomorrow for the next one" }
+        let streak: Int = stage.day.streak
+        return streak > 0 ? "Keep your \(streak)-day streak" : "One puzzle, the same for everyone"
+    }
+
+    private var coachLine: String {
+        if stage.trainedToday { return "Done today. Another round?" }
+        guard let plan = stage.plan else { return "Pick up where you stopped" }
+        return "\(plan.minutes) min with Leo"
     }
 
     private func open(_ card: HomeAuroraGameCard) {
@@ -307,97 +353,133 @@ struct HomeAuroraView: View {
             actions.stage.play()
         }
     }
+}
 
-    // MARK: Tiles
+/// One of your games as a wide card: its board on the left, who and where on the right.
+struct HomeAuroraGameTile: View {
+    let card: HomeAuroraGameCard
+    let palette: HomeAuroraPalette
+    let action: () -> Void
 
-    private var bento: some View {
-        let day: HomeDailyState = stage.day
-        return VStack(spacing: 12) {
-            HStack(spacing: 12) {
-                HomeAuroraTile(eyebrow: "Rating", palette: palette, fill: nil, action: actions.stage.you) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(stage.rating.map { $0.formatted(.number) } ?? "New")
-                            .font(.system(size: 38, weight: .regular, design: .serif))
-                            .foregroundStyle(palette.ink)
-                        Text("Level \(stage.rankNumber)")
-                            .font(.system(size: 12.5))
-                            .foregroundStyle(palette.ink2)
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
+        Button(action: action) {
+            HStack(spacing: 14) {
+                HomeAuroraBoard(fen: card.fen, flipped: card.flipped, lit: card.yourMove)
+                    .frame(width: 104, height: 104)
+                    .shadow(color: .black.opacity(0.35), radius: 10, y: 6)
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(card.yourMove ? palette.teal : palette.ink3)
+                            .frame(width: 6, height: 6)
+                        Text(card.status.uppercased())
+                            .font(.system(size: 10.5, weight: .bold))
+                            .tracking(1.2)
+                            .foregroundStyle(card.yourMove ? palette.teal : palette.ink2)
                     }
-                }
-                HomeAuroraTile(eyebrow: "Streak", palette: palette, fill: HomeAuroraPalette.roseTile,
-                               mark: Glyphs.king, action: actions.stage.dailyMove) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("\(day.streak)")
-                            .font(.system(size: 38, weight: .regular, design: .serif))
-                        Text(day.streak == 1 ? "day" : "days in a row")
-                            .font(.system(size: 12.5))
-                            .opacity(0.85)
-                    }
-                }
-            }
-            HStack(spacing: 12) {
-                HomeAuroraTile(eyebrow: "Today's Move", palette: palette, fill: HomeAuroraPalette.violetTile,
-                               action: actions.stage.dailyMove) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HomeAuroraBoard(fen: stage.todayFEN, flipped: stage.todaySolver == .black, lit: false)
-                            .frame(width: 78, height: 78)
-                            .shadow(color: .black.opacity(0.3), radius: 8, y: 6)
-                        Text(todayLine)
-                            .font(.system(size: 12.5))
-                            .opacity(0.85)
-                            .lineLimit(2)
-                    }
-                }
-                HomeAuroraTile(eyebrow: "Coach Leo", palette: palette, fill: HomeAuroraPalette.tealTile,
-                               mark: Glyphs.train, action: actions.stage.coach) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(stage.plan?.title ?? "Today's lesson")
-                            .font(.system(size: 22, weight: .regular, design: .serif))
-                            .lineLimit(2)
-                            .minimumScaleFactor(0.8)
-                        Text(coachLine)
-                            .font(.system(size: 12.5))
-                            .opacity(0.85)
-                    }
-                }
-            }
-            HStack(spacing: 12) {
-                HomeAuroraTile(eyebrow: "Analyze", palette: palette, fill: HomeAuroraPalette.goldTile,
-                               mark: Glyphs.analyze, action: actions.stage.analyze) {
-                    Text("A photo, a screenshot or any board")
+                    Text(card.title)
+                        .font(.system(size: 21, weight: .regular, design: .serif))
+                        .foregroundStyle(palette.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    Text(card.tags.joined(separator: " · "))
                         .font(.system(size: 12.5))
-                        .opacity(0.9)
-                        .lineLimit(3)
-                }
-                if let masterpiece = stage.masterpiece {
-                    HomeAuroraTile(eyebrow: "Masterpiece", palette: palette, fill: nil, action: {
-                        if let fen = masterpiece.frames.first { actions.stage.analyzePosition(fen) }
-                    }) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HomeAuroraBoard(fen: masterpiece.frames.first, flipped: masterpiece.flipped, lit: false)
-                                .frame(width: 78, height: 78)
-                            Text(masterpiece.title)
-                                .font(.system(size: 12.5))
-                                .foregroundStyle(palette.ink2)
-                                .lineLimit(2)
+                        .foregroundStyle(palette.ink2)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                    HStack(spacing: 6) {
+                        Text(card.button)
+                            .font(.system(size: 13, weight: .bold))
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 11, weight: .bold))
+                    }
+                    .foregroundStyle(card.yourMove ? Color(hex: 0x2A1E0F) : palette.ink)
+                    .padding(.horizontal, 12)
+                    .frame(height: 30)
+                    .background {
+                        if card.yourMove {
+                            Capsule().fill(HomeAuroraPalette.goldButton)
+                        } else {
+                            Capsule().strokeBorder(palette.line, lineWidth: 1)
                         }
                     }
                 }
+                Spacer(minLength: 0)
             }
+            .padding(12)
+            .frame(height: 128)
+            .background(shape.fill(palette.card))
+            .overlay(shape.strokeBorder(card.yourMove ? palette.gold.opacity(0.4) : palette.line, lineWidth: 1))
         }
+        .buttonStyle(HomeStagePress())
+        .accessibilityElement(children: .combine)
     }
+}
 
-    private var coachLine: String {
-        if stage.trainedToday { return "Done today" }
-        guard let plan = stage.plan else { return "Pick up where you stopped" }
-        return "\(plan.minutes) min"
+/// A long row for one of today's things: a thin color edge, small caps, a serif title, a line,
+/// and a picture at the right.
+struct HomeAuroraRow<Picture: View>: View {
+    let eyebrow: String
+    let title: String
+    let detail: String
+    let accent: Color
+    let palette: HomeAuroraPalette
+    let action: () -> Void
+    @ViewBuilder let picture: () -> Picture
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+        Button(action: action) {
+            HStack(spacing: 14) {
+                Capsule()
+                    .fill(LinearGradient(colors: [accent, accent.opacity(0.2)], startPoint: .top, endPoint: .bottom))
+                    .frame(width: 3)
+                    .padding(.vertical, 4)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(eyebrow.uppercased())
+                        .font(.system(size: 10.5, weight: .bold))
+                        .tracking(1.3)
+                        .foregroundStyle(accent)
+                    Text(title)
+                        .font(.system(size: 19, weight: .regular, design: .serif))
+                        .foregroundStyle(palette.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    Text(detail)
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(palette.ink2)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                picture()
+                    .frame(width: 64, height: 64)
+            }
+            .padding(.vertical, 12)
+            .padding(.leading, 14)
+            .padding(.trailing, 12)
+            .frame(maxWidth: .infinity)
+            .background(shape.fill(palette.card))
+            .overlay(shape.strokeBorder(palette.line, lineWidth: 1))
+        }
+        .buttonStyle(HomeStagePress())
+        .accessibilityElement(children: .combine)
     }
+}
 
-    private var todayLine: String {
-        let day: HomeDailyState = stage.day
-        if day.found { return "Found it. Back tomorrow." }
-        if day.played { return "See it again" }
-        return stage.todaySolver == .black ? "Black to play and win" : "White to play and win"
+/// A square of color with one of the app's glyphs, for a row without a board.
+struct HomeAuroraEmblem: View {
+    let glyph: String
+    let fill: LinearGradient
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .fill(fill)
+            .overlay {
+                Glyph(name: glyph, size: 30, weight: .bold)
+                    .foregroundStyle(Color.white)
+            }
+            .accessibilityHidden(true)
     }
 }
 
@@ -410,6 +492,8 @@ struct HomeAuroraGameCard: Identifiable, Equatable {
     let flipped: Bool
     let yourMove: Bool
     let eyebrow: String
+    /// "Your move", "Their move", "Up next".
+    let status: String
     let headline: String
     let headlineEnd: String
     let button: String
@@ -425,6 +509,7 @@ struct HomeAuroraGameCard: Identifiable, Equatable {
         flipped = game.flipped
         yourMove = game.isYourMove
         eyebrow = parts.last.map { "\(game.status.words) · \($0)" } ?? game.status.words
+        status = game.status.words
         switch game.status {
         case .yourMove:
             headline = "\(name) is waiting\nfor "
@@ -452,6 +537,7 @@ struct HomeAuroraGameCard: Identifiable, Equatable {
         flipped = upNext.playerColor == .black
         yourMove = false
         eyebrow = "Your next game"
+        status = "Up next"
         headline = "\(upNext.rival.name) is ready\nwhen "
         headlineEnd = "you are"
         button = "Play \(upNext.rival.name)"
@@ -561,6 +647,7 @@ struct HomeAuroraBoard: View {
 struct HomeAuroraSection: View {
     let title: String
     let palette: HomeAuroraPalette
+    var note: String? = nil
 
     var body: some View {
         HStack {
@@ -568,9 +655,14 @@ struct HomeAuroraSection: View {
                 .font(.system(size: 22, weight: .medium, design: .serif))
                 .foregroundStyle(palette.ink)
             Spacer()
+            if let note {
+                Text(note)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(palette.ink2)
+            }
         }
         .padding(.horizontal, 20)
-        .padding(.top, 26)
+        .padding(.top, 22)
         .padding(.bottom, 12)
         .accessibilityAddTraits(.isHeader)
     }

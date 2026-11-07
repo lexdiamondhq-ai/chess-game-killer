@@ -498,7 +498,7 @@ struct HomeStageBoard: View, Animatable {
     let black: Bool
     let light: UIColor
     let leaning: Bool
-    let plinth: UIColor
+    let plinth: UIColor?
     let still: Bool
     var dive: CGFloat
 

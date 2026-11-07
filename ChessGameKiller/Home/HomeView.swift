@@ -666,7 +666,8 @@ extension HomeView {
             analyzePosition: actions.analyzePosition,
             you: { openYou(.bottom) },
             rooms: openShortcuts)
-        let auroraInfo = HomeAuroraInfo(stage: info, games: currentGameList(upNext))
+        let auroraInfo = HomeAuroraInfo(stage: info, games: currentGameList(upNext), look: look,
+                                        pieces: match.game.pieces.map(\.piece))
         let auroraActions = HomeAuroraActions(stage: stageActions, open: { game in
             if let friend = game.friendGame {
                 challenges?.play(friend)
