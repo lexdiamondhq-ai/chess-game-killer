@@ -225,8 +225,9 @@ struct ExecutivePlate: View {
         return "Hint · " + HintWords.phrase(for: best, in: match.game)
     }
 
-    /// The rival's level while it waits, "Thinking…" on its turn; "Your move" on yours, and
-    /// nothing while you wait (your captures say enough). The result once the game is over.
+    /// The rival's taunt while it waits (`RivalTaunt`; the Grudge keeps its level), "Thinking…"
+    /// on its turn; "Your move" on yours, and nothing while you wait (your captures say enough).
+    /// The result once the game is over.
     private var status: String {
         if match.isOver {
             if match.winner == color { return "Won" }
@@ -235,7 +236,10 @@ struct ExecutivePlate: View {
         if isComputer {
             if isActive { return match.engineFailed ? "Coach offline" : "Thinking…" }
             let rival = match.setup.rival
-            return "\(rival.level.name) · \(rival.elo.replacingOccurrences(of: "~", with: ""))"
+            if rival.isGrudge {
+                return "\(rival.level.name) · \(rival.elo.replacingOccurrences(of: "~", with: ""))"
+            }
+            return RivalTaunt.line(for: rival.level, game: match.gameID)
         }
         return isActive ? "Your move" : ""
     }
