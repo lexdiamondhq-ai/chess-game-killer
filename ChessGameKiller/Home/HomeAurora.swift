@@ -210,6 +210,12 @@ struct HomeAuroraView: View {
         }
         .frame(height: height)
         .frame(maxWidth: .infinity)
+        // The board's lower edge melts into the marble instead of stopping on a hard line
+        // where the 3D view ends (Alex, 2026-11-07).
+        .mask(LinearGradient(stops: [.init(color: .black, location: 0),
+                                     .init(color: .black, location: 0.8),
+                                     .init(color: .clear, location: 1)],
+                             startPoint: .top, endPoint: .bottom))
         .scaleEffect(1 - 0.12 * lift, anchor: .top)
         .opacity(1 - 0.55 * Double(lift))
         .allowsHitTesting(false)
@@ -626,51 +632,44 @@ struct HomeAuroraGrudge: View {
 }
 
 /// "Beauty of Chess" incised in the marble under the board, the way a name is cut into a
-/// stone (Alex, 2026-11-07: "actually in the marble"). Roman capitals, widely spaced, with the
-/// slab's own veins running through them: the groove is drawn in multiply over the marble, so
-/// the stone shows through, its floor shaded by an inner shadow from the top edge, its lower
-/// lip catching the light. "of" is a small gold-leaf italic, as on old inscriptions.
+/// stone, in a medieval blackletter (Alex, 2026-11-07: "actually in the marble", "more
+/// medieval"). The groove is drawn in multiply over the marble, so the slab's veins run through
+/// the letters; an inner shadow shades it under the top edge and its lower lip catches the
+/// light. "of" is gold leaf.
 struct HomeAuroraCarving: View {
     let palette: HomeAuroraPalette
     /// How much shows, 0 to 1. Set on each layer, not the whole, so the groove still multiplies
     /// into the marble while it fades in.
     var reveal: Double = 1
 
-    private var groove: Color { palette.dark ? Color(hex: 0x6B6660) : Color(hex: 0xC9C1B5) }
+    /// UnifrakturMaguntia (SIL OFL), bundled in Home/Fonts.
+    static let fontName = "UnifrakturMaguntia"
 
-    private func word(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 30, weight: .regular, design: .serif))
-            .tracking(7)
+    private var groove: Color { palette.dark ? Color(hex: 0x6B6660) : Color(hex: 0xC4BBAE) }
+    private var font: Font { .custom(Self.fontName, size: 44, relativeTo: .largeTitle) }
+
+    private func words(of: Color) -> Text {
+        Text("Beauty ") + Text("of").foregroundColor(of) + Text(" Chess")
     }
 
-    /// One word as a cut: a lit lip under the groove, then the groove itself, shaded inside.
-    private func cut(_ text: String) -> some View {
+    var body: some View {
         ZStack {
-            word(text)
-                .foregroundStyle(Color.white.opacity(palette.dark ? 0.1 : 0.75))
-                .offset(y: 0.9)
+            // The lit lower lip of each groove.
+            words(of: .white).font(font)
+                .foregroundStyle(Color.white.opacity(palette.dark ? 0.1 : 0.8))
+                .offset(y: 1)
                 .opacity(reveal)
-            word(text)
+            // The groove, shaded inside, multiplied into the stone.
+            words(of: groove).font(font)
                 .foregroundStyle(groove
                     .shadow(.inner(color: .black.opacity(palette.dark ? 0.75 : 0.5), radius: 1.4, x: 0, y: 1.6))
                     .shadow(.inner(color: .white.opacity(palette.dark ? 0.08 : 0.35), radius: 0.6, x: 0, y: -0.8)))
                 .opacity(reveal)
                 .blendMode(.multiply)
-        }
-    }
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            cut("BEAUTY")
-            Text("of")
-                .font(.system(size: 21, weight: .regular, design: .serif).italic())
-                .foregroundStyle(LinearGradient(colors: [Color(hex: 0xE9CF8E), Color(hex: 0xA77A35)],
-                                                startPoint: .top, endPoint: .bottom)
-                    .shadow(.inner(color: .black.opacity(0.35), radius: 0.8, x: 0, y: 1)))
-                .shadow(color: .white.opacity(palette.dark ? 0.05 : 0.6), radius: 0, y: 0.8)
+            // Gold leaf laid into "of".
+            words(of: Color(hex: 0xC09146)).font(font)
+                .foregroundStyle(Color.clear)
                 .opacity(reveal)
-            cut("CHESS")
         }
         .lineLimit(1)
         .minimumScaleFactor(0.6)
