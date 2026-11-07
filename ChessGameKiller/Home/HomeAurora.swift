@@ -198,7 +198,9 @@ struct HomeAuroraView: View {
             if SculptedAssets.shared.isLoaded {
                 HomeStageBoard(stage: boardStage, look: SculptedLook.clay, pieces: boardPieces,
                                black: stage.masterpiece?.flipped ?? (upNext.playerColor == .black),
-                               light: upNext.rival.lightUI,
+                               // No rival light over it: its warm pool washed out the middle of
+                               // the board (Alex, 2026-11-07). The clay board keeps its own even light.
+                               light: nil,
                                leaning: upNext.inProgress && upNext.yourMove, plinth: nil,
                                still: reduceMotion, dive: 0)
                     .id(SculptedLook.clay.name)
