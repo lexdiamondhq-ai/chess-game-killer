@@ -10,24 +10,49 @@ final class DrillBoardTests: XCTestCase {
 
     private func distance(_ a: CGPoint, _ b: CGPoint) -> CGFloat { hypot(a.x - b.x, a.y - b.y) }
 
-    /// A solid arrow is one outline, the flat board's arrow: from just past the middle of its
-    /// square, round at the tail, to a point short of the middle of the target.
+    /// A solid arrow is the flat board's arrow: a shaft from the dot just past the middle of its
+    /// square, and a head that stops short of the middle of the target.
     func testASolidArrowIsTheFlatBoardsArrowOnTheStone() throws {
         let outlines = SculptedBoardScene.arrowOutline(from: .a1, to: .a8, dashed: false)
-        XCTAssertEqual(outlines.count, 1)
-        let outline = try XCTUnwrap(outlines.first)
-        // a1's middle is (-3.5, -3.5) and a8's (-3.5, 3.5): the tip stops 0.1 short of it.
-        let tip = try XCTUnwrap(outline.max { $0.y < $1.y })
+        XCTAssertEqual(outlines.count, 2)
+        let shaft = try XCTUnwrap(outlines.first)
+        let head = try XCTUnwrap(outlines.last)
+        XCTAssertEqual(shaft.count, 4)
+        XCTAssertEqual(head.count, 3)
+        // a1's middle is (-3.5, -3.5) and a8's (-3.5, 3.5): the tip stops 0.08 short of it.
+        let tip = try XCTUnwrap(head.max { $0.y < $1.y })
         XCTAssertEqual(tip.x, -3.5, accuracy: 0.0001)
-        XCTAssertEqual(tip.y, 3.4, accuracy: 0.0001)
-        // The round tail reaches back to 0.2 past a1's middle, less half the shaft.
-        let back = try XCTUnwrap(outline.min { $0.y < $1.y })
-        XCTAssertEqual(back.y, -3.5 + 0.2 - 0.075, accuracy: 0.0001)
-        // The head is 0.46 across, the shaft 0.15, as on the flat board.
-        let xs = outline.map(\.x)
-        XCTAssertEqual(try XCTUnwrap(xs.max()) - XCTUnwrap(xs.min()), 0.46, accuracy: 0.0001)
-        let shaft = outline.filter { $0.y < -3 }.map(\.x)
-        XCTAssertEqual(try XCTUnwrap(shaft.max()) - XCTUnwrap(shaft.min()), 0.15, accuracy: 0.0001)
+        XCTAssertEqual(tip.y, 3.42, accuracy: 0.0001)
+        // The shaft starts at the dot, 0.3 past a1's middle, and meets the head's base.
+        XCTAssertEqual(try XCTUnwrap(shaft.map(\.y).min()), -3.5 + 0.3, accuracy: 0.0001)
+        XCTAssertEqual(try XCTUnwrap(shaft.map(\.y).max()), try XCTUnwrap(head.map(\.y).min()), accuracy: 0.0001)
+        // The head is 0.54 across, the shaft 0.18, as on the flat board.
+        let xs = head.map(\.x)
+        XCTAssertEqual(try XCTUnwrap(xs.max()) - XCTUnwrap(xs.min()), 0.54, accuracy: 0.0001)
+        let shaftXs = shaft.map(\.x)
+        XCTAssertEqual(try XCTUnwrap(shaftXs.max()) - XCTUnwrap(shaftXs.min()), 0.18, accuracy: 0.0001)
+    }
+
+    /// Analysis's arrows are bolder, fade from a lighter blue at the tail to their own at the
+    /// tip, and start at a white-ringed dot.
+    func testAnalysisArrowsAreBoldAndFadeFromTheirTail() throws {
+        let best = SculptedCoachArrow(from: .e2, to: .e4, color: ArrowColors.best, analysis: true)
+        XCTAssertGreaterThan(best.proportions.shaft, ArrowOutline.Proportions.coach(dashed: false).shaft)
+        XCTAssertGreaterThan(best.proportions.headWidth, ArrowOutline.Proportions.coach(dashed: false).headWidth)
+        XCTAssertEqual(ArrowColors.tail(of: ArrowColors.best), ArrowColors.bestTail)
+        XCTAssertEqual(ArrowColors.tail(of: ArrowColors.next), ArrowColors.nextTail)
+        // Any other color lifts toward white.
+        XCTAssertEqual(ArrowColors.tail(of: 0x000000), 0x616161)
+        let layers = SculptedBoardScene.arrowLayers(best)
+        XCTAssertEqual(layers.stone.count, 2)
+        XCTAssertEqual(layers.edge.count, 2)
+        XCTAssertEqual(layers.through.count, 2)
+        // Along the arrow: 0 at the dot, 1 at the tip.
+        let (tail, tip) = ArrowOutline.ends(from: CGPoint(x: 0.5, y: -2.5), to: CGPoint(x: 0.5, y: -0.5), unit: 1,
+                                            proportions: best.proportions)
+        XCTAssertEqual(tail.y, -2.2, accuracy: 0.0001)
+        XCTAssertEqual(ArrowOutline.along(tail, tail: tail, tip: tip), 0)
+        XCTAssertEqual(ArrowOutline.along(tip, tail: tail, tip: tip), 1)
     }
 
     /// Dashed, the shaft is a row of short bars, every one between the tail and the head,
@@ -38,13 +63,13 @@ final class DrillBoardTests: XCTestCase {
         let head = try XCTUnwrap(outlines.last)
         XCTAssertEqual(head.count, 3)
         let tip = try XCTUnwrap(head.max { $0.y < $1.y })
-        XCTAssertEqual(tip.y, 2.5 - 0.1, accuracy: 0.0001)
-        let base = 2.4 - 0.4
+        XCTAssertEqual(tip.y, 2.5 - 0.08, accuracy: 0.0001)
+        let base = 2.42 - 0.44
         for bar in outlines.dropLast() {
             XCTAssertEqual(bar.count, 4)
             for corner in bar {
-                XCTAssertEqual(corner.x, 2.5, accuracy: 0.061)
-                XCTAssertGreaterThanOrEqual(corner.y, -3.5 + 0.2 - 0.0001)
+                XCTAssertEqual(corner.x, 2.5, accuracy: 0.071)
+                XCTAssertGreaterThanOrEqual(corner.y, -3.5 + 0.3 - 0.0001)
                 XCTAssertLessThanOrEqual(corner.y, base + 0.0001)
             }
         }
@@ -52,10 +77,10 @@ final class DrillBoardTests: XCTestCase {
 
     /// A knight's arrow runs straight from its square to the target, as on the flat board.
     func testAKnightsArrowGoesStraightToItsSquare() throws {
-        let outline = try XCTUnwrap(SculptedBoardScene.arrowOutline(from: .g1, to: .f3, dashed: false).first)
+        let outline = try XCTUnwrap(SculptedBoardScene.arrowOutline(from: .g1, to: .f3, dashed: false).last)
         let f3 = CGPoint(x: 1.5, y: -1.5)
         let tip = try XCTUnwrap(outline.min { distance($0, f3) < distance($1, f3) })
-        XCTAssertEqual(distance(tip, f3), 0.1, accuracy: 0.0001)
+        XCTAssertEqual(distance(tip, f3), 0.08, accuracy: 0.0001)
     }
 
     /// The coach's squares and arrows keep the colors the flat board gives them on the look,
@@ -128,8 +153,8 @@ final class DrillBoardTests: XCTestCase {
             MoveHint(rank: 2, from: .c7, to: .c6, san: "c6", uci: "c7c6", evaluation: .centipawns(10)),
         ]
         XCTAssertEqual(SculptedPositionBoard.arrows(hints), [
-            SculptedCoachArrow(from: .d7, to: .d6, color: ArrowColors.next, dashed: true),
-            SculptedCoachArrow(from: .g8, to: .f6, color: ArrowColors.best, dashed: false),
+            SculptedCoachArrow(from: .d7, to: .d6, color: ArrowColors.next, dashed: true, analysis: true),
+            SculptedCoachArrow(from: .g8, to: .f6, color: ArrowColors.best, dashed: false, analysis: true),
         ])
         let board = SculptedPositionBoard(pieces: Position.standard.pieces, theme: .named(.gilded), flipped: true,
                                           hints: hints, framing: .seated)
@@ -145,7 +170,7 @@ final class DrillBoardTests: XCTestCase {
         for dashed in [false, true] {
             let outlines = SculptedBoardScene.arrowOutline(from: .b1, to: .b6, dashed: dashed)
             for outline in outlines {
-                let grown = ArrowOutline.grown(outline, by: 0.035)
+                let grown = ArrowOutline.grown(outline, by: 0.03)
                 XCTAssertEqual(grown.count, outline.count)
                 let xs = outline.map(\.x), grownXs = grown.map(\.x)
                 // Straight up the b-file: each side moves out by the edge, a dash's square corners
@@ -153,14 +178,14 @@ final class DrillBoardTests: XCTestCase {
                 let right = try XCTUnwrap(grownXs.max()) - XCTUnwrap(xs.max())
                 let left = try XCTUnwrap(xs.min()) - XCTUnwrap(grownXs.min())
                 for side in [right, left] {
-                    if outline.count == 4 { XCTAssertEqual(side, 0.035, accuracy: 0.001) }
-                    XCTAssertGreaterThanOrEqual(side, 0.035 - 0.001)
+                    if outline.count == 4 { XCTAssertEqual(side, 0.03, accuracy: 0.001) }
+                    XCTAssertGreaterThanOrEqual(side, 0.03 - 0.001)
                     XCTAssertLessThan(side, 0.1)
                 }
             }
             let head = try XCTUnwrap(outlines.last)
             let tip = try XCTUnwrap(head.max { $0.y < $1.y })
-            let grownTip = try XCTUnwrap(ArrowOutline.grown(head, by: 0.035).max { $0.y < $1.y })
+            let grownTip = try XCTUnwrap(ArrowOutline.grown(head, by: 0.03).max { $0.y < $1.y })
             XCTAssertGreaterThan(grownTip.y, tip.y)
             XCTAssertLessThan(grownTip.y, tip.y + 0.12)
         }
