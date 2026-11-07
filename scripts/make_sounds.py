@@ -164,7 +164,9 @@ def main() -> None:
             continue
         audio = compose(text, seconds, key) if name in MUSIC else None
         if audio is None and name.startswith("music-"):
-            sys.exit(f"{name}: the Music API is needed for background music")
+            # Skipped rather than stopping, so the pieces already composed still get committed.
+            print(f"{name}: skipped, the Music API is needed for background music")
+            continue
         if name == "castle":
             audio = castle_from_move(out)
         if audio is None:
