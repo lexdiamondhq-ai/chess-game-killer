@@ -244,6 +244,13 @@ struct ContentView: View {
             }
     }
 
+    /// A screen is open over Home: training, today's move, puzzles, games, the army, a lesson,
+    /// a session, Leo, or Analyze.
+    private var coversHome: Bool {
+        showingTraining || showingDaily || showingPuzzles || showingGames || showingArmy
+            || coach.presentedLesson != nil || coach.presentedSession != nil || talk != nil || showingAnalyze
+    }
+
     /// The game screen with its sheets and full-screen covers.
     private var presented: some View {
         observed
@@ -298,6 +305,10 @@ struct ContentView: View {
                 }, close: { talk = nil })
             }
             .animation(.easeInOut(duration: 0.35), value: theme.id)
+            .onChange(of: coversHome, initial: true) { _, covers in
+                // Home's music rests under any screen opened over it, so Leo is heard alone.
+                HomeMusic.shared.setCovered(covers)
+            }
             .sheet(isPresented: $showingNewGame, onDismiss: startIfNeeded) {
                 NewGameSheet(theme: theme, forfeits: forfeits) { setup in
                     withAnimation(.snappy) { match.start(setup) }

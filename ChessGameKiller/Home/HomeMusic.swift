@@ -18,15 +18,26 @@ final class HomeMusic {
     let available: Bool
     @ObservationIgnored private var player: AVAudioPlayer?
     @ObservationIgnored private var showing = false
+    /// Another screen covers Home (training, lessons, Leo, puzzles, Analyze): the music rests.
+    @ObservationIgnored private var covered = false
 
     private init() {
         on = UserDefaults.standard.object(forKey: Self.key) as? Bool ?? true
         available = Bundle.main.url(forResource: Self.track, withExtension: "mp3") != nil
     }
 
+    private var playing: Bool { showing && on && !covered }
+
     func homeAppeared() {
         showing = true
-        if on { start() }
+        if playing { start() }
+    }
+
+    /// A screen opened over Home, or closed again. Screens where Leo talks are quiet.
+    func setCovered(_ covered: Bool) {
+        guard covered != self.covered else { return }
+        self.covered = covered
+        if playing { start() } else { stop() }
     }
 
     func homeDisappeared() {
@@ -37,7 +48,7 @@ final class HomeMusic {
     func toggle() {
         on.toggle()
         UserDefaults.standard.set(on, forKey: Self.key)
-        if on, showing { start() } else { stop() }
+        if playing { start() } else { stop() }
     }
 
     private func start() {
@@ -62,7 +73,7 @@ final class HomeMusic {
         player.setVolume(0, fadeDuration: 0.8)
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(850))
-            guard let self, !(self.showing && self.on) else { return }
+            guard let self, !self.playing else { return }
             self.player?.pause()
         }
     }
