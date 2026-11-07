@@ -32,6 +32,8 @@ final class ScanSession {
     private(set) var readingFailed = false
     /// Shown with the photo's analysis when the reader wasn't sure of something: what to check.
     private(set) var photoDoubts: String?
+    /// The part of `photoDoubts` about the pieces, which still stands once the turn is settled.
+    private var piecesDoubt: String?
 
     private let reader: BoardReader
     private var readTask: Task<Void, Never>?
@@ -102,11 +104,22 @@ final class ScanSession {
         startAnalysis(of: draft)
         // The person has looked the pieces over.
         photoDoubts = nil
+        piecesDoubt = nil
         if Array(path.suffix(2)) == [.analysis, .editor] {
             path.removeLast()
         } else {
             path.append(.analysis)
         }
+    }
+
+    /// From the analysis: the same pieces with the other side to move, analyzed from the start.
+    /// The reader's guess at whose move it was has been answered.
+    func switchTurn(of position: PositionDraft) {
+        var switched = position
+        switched.sideToMove = switched.sideToMove == .white ? .black : .white
+        draft = switched
+        photoDoubts = piecesDoubt
+        startAnalysis(of: switched)
     }
 
     private func startAnalysis(of position: PositionDraft) {
@@ -151,6 +164,7 @@ final class ScanSession {
         }
         let side = reading.draft.sideToMove == .white ? "White" : "Black"
         let turn = reading.sureOfTurn ? nil : "I guessed it's \(side)'s move."
+        piecesDoubt = hardToRead
         let doubts = [hardToRead, turn].compactMap { $0 }
         photoDoubts = doubts.isEmpty ? nil : doubts.joined(separator: " ")
         startAnalysis(of: reading.draft)
@@ -173,6 +187,7 @@ final class ScanSession {
         readingNote = nil
         readingFailed = false
         photoDoubts = nil
+        piecesDoubt = nil
     }
 }
 
