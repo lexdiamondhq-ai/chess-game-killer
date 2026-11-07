@@ -175,11 +175,11 @@ jobs:
             xcrun simctl io "$UDID" screenshot "snapshots/device-island.png" >/dev/null && echo "device-island.png" || echo "No screenshot for island"
             xcrun simctl terminate "$UDID" com.apple.Preferences 2>/dev/null || true
           fi
-          # The first run's four pages, then a tip on the game screen.
+          # The first run's tour, its name question, then a tip on the game screen.
           home welcome-1 -showcaseWelcome 0
           home welcome-2 -showcaseWelcome 1
-          home welcome-3 -showcaseWelcome 2
-          home welcome-4 -showcaseWelcome 3
+          home welcome-5 -showcaseWelcome 4
+          home welcome-8 -showcaseWelcome 7
           shoot tip-ghost -showcaseLook gilded -showcase3D NO -showcaseTip ghostVision
           xcrun simctl terminate "$UDID" $BUNDLE 2>/dev/null || true
       - name: Upload build log

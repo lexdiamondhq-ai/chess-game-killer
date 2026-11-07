@@ -59,6 +59,61 @@ final class OnboardingTests: XCTestCase {
         XCTAssertEqual(Welcome.looks.first, .gilded, "The default look comes first")
     }
 
+    // MARK: Your name
+
+    func testTheNameIsTheOneFriendsSee() {
+        XCTAssertEqual(YourName.key, ChallengeName.key)
+        XCTAssertNil(YourName.current(defaults))
+        YourName.save("  Alex   Medina ", defaults)
+        XCTAssertEqual(YourName.current(defaults), "Alex Medina")
+        YourName.save("   ", defaults)
+        XCTAssertNil(YourName.current(defaults))
+    }
+
+    func testGreetingsTakeTheName() {
+        XCTAssertEqual(YourName.address("Good evening", name: "Alex"), "Good evening, Alex")
+        XCTAssertEqual(YourName.address("Welcome back. A few minutes a day is how strong players are made.", name: "Alex"),
+                       "Welcome back, Alex. A few minutes a day is how strong players are made.")
+        XCTAssertEqual(YourName.address("Hello again! You remember more than you think.", name: "Alex"),
+                       "Hello again, Alex! You remember more than you think.")
+        XCTAssertEqual(YourName.address("Talk me through your plan. I'll check every idea.", name: "Alex"),
+                       "Talk me through your plan, Alex. I'll check every idea.")
+        // Lines that don't open with a greeting, and no name, stay as they are.
+        XCTAssertEqual(YourName.address("Small steps, every day.", name: "Alex"), "Small steps, every day.")
+        XCTAssertEqual(YourName.address("Welcome back.", name: nil), "Welcome back.")
+        XCTAssertEqual(YourName.address("Welcome back.", name: "  "), "Welcome back.")
+        XCTAssertEqual(YourName.address("Hellothere.", name: "Alex"), "Hellothere.")
+    }
+
+    func testANamedPlayerGetsAGreetingWithTheirName() {
+        let lines = ["Small steps, every day.", "Welcome back. Let's go."]
+        for _ in 0..<10 {
+            XCTAssertEqual(YourName.pick(lines, name: "Alex"), "Welcome back, Alex. Let's go.")
+        }
+        XCTAssertNotNil(YourName.pick(lines, name: nil))
+    }
+
+    // MARK: The tour
+
+    func testTheTourComesBeforeTheQuestions() {
+        XCTAssertEqual(WelcomeFlow.pages, TourPage.allCases.count + 3)
+        XCTAssertEqual(TourPage.allCases.first, .hello)
+    }
+
+    func testTheTourBoardsMovePieces() {
+        var position = TourPosition(fen: "4kb1r/p2rqppp/5n2/1B2p1B1/4P3/1Q6/PPP2PPP/2K4R w k - 0 14")
+        let count = position.pieces.count
+        position.move("b5", "d7")
+        XCTAssertEqual(position.pieces.count, count - 1, "A capture takes the piece that stood there")
+        XCTAssertTrue(position.pieces.contains { $0.square == .d7 && $0.kind == .bishop })
+        let flat = TourBoardGeometry(width: 240, tilt: 0)
+        XCTAssertEqual(flat.center(.a8), CGPoint(x: 15, y: 15))
+        let tilted = TourBoardGeometry(width: 240, tilt: 0.5)
+        XCTAssertLessThan(tilted.scale(row: 0), tilted.scale(row: 7), "The far rank is drawn smaller")
+        XCTAssertEqual(tilted.point(0.5, 1).y, tilted.height, accuracy: 0.001)
+        XCTAssertEqual(tilted.point(0.5, 0).y, 0, accuracy: 0.001)
+    }
+
     // MARK: Tips
 
     func testEachTipShowsOnce() {

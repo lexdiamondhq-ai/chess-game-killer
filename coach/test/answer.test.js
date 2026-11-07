@@ -283,3 +283,11 @@ test("Vera answers as Vera, by the same rules as Leo", () => {
   assert.match(request.messages[0].content, /Say Vera's answer\.$/);
   assert.equal(guardAnswer("Vera: Castling is safe.", {}), "Castling is safe.");
 });
+
+test("the player's name reaches Leo's request only when they gave one", () => {
+  const checked = { understood: true, right: ["The bishop eyes h7."] };
+  const named = buildAnswerRequest(checked, { said: "is h6 safe?" }, {}, "leo", "Alex").messages[0].content;
+  assert.match(named, /The player's name is Alex\. Use it at most once/);
+  const unnamed = buildAnswerRequest(checked, { said: "is h6 safe?" }, {}).messages[0].content;
+  assert.doesNotMatch(unnamed, /player's name/);
+});
