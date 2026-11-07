@@ -11,7 +11,8 @@ enum TalkFailure: Error, Equatable, Sendable {
 }
 
 /// Leo's server over HTTPS, as coach/PROTOCOL.md describes it: one POST, then the answer as
-/// NDJSON lines (checked, answer, voice, done) passed on as they arrive.
+/// NDJSON lines (checked, answer, voice, done) passed on as they arrive; and POST /speak for
+/// hearing an answer when the player taps.
 struct TalkAPI: TalkTransport {
     static let live = TalkAPI(baseURL: URL(string: "https://coach.chess-game-killer.workers.dev")!)
 
@@ -63,6 +64,26 @@ struct TalkAPI: TalkTransport {
                 timer.cancel()
             }
         }
+    }
+
+    /// POST /speak: the answer read aloud, as MP3 bytes.
+    func speak(_ request: TalkSpeakRequest) async throws -> Data {
+        var urlRequest = URLRequest(url: baseURL.appending(path: "speak"))
+        urlRequest.httpMethod = "POST"
+        urlRequest.timeoutInterval = 20
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.setValue("audio/mpeg", forHTTPHeaderField: "Accept")
+        urlRequest.httpBody = try JSONEncoder().encode(request)
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await session.data(for: urlRequest)
+        } catch {
+            throw TalkAPI.failure(for: error)
+        }
+        guard let http = response as? HTTPURLResponse else { throw TalkFailure.badResponse }
+        guard http.statusCode == 200 else { throw TalkAPI.failure(status: http.statusCode, body: data) }
+        guard !data.isEmpty else { throw TalkFailure.badResponse }
+        return data
     }
 
     /// POST /talk with the request as JSON. Optionals that are nil are left out.

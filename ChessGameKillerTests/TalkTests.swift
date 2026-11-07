@@ -56,6 +56,11 @@ private enum TalkTestData {
                          threats: [TalkFactLine(uci: "c5f2", eval: TalkEval(cp: -120), pv: ["c5f2", "e1f2", "f6g4"])])
     )
 
+    /// Leo's answer as the app now asks for it: verdicts, words with the pass to hear them, done.
+    static var quietAnswer: [TalkTestTransport.Step] {
+        [.event(.checked(check)), .event(.answer(TalkAnswer(text: answerText, hear: "pass"))), .event(.done)]
+    }
+
     /// Leo's whole answer: verdicts, words, voice, done.
     static var fullAnswer: [TalkTestTransport.Step] {
         [.event(.checked(check)), .event(.answer(TalkAnswer(text: answerText))), .event(.voice(TalkVoice(audio: mp3))),
@@ -76,10 +81,29 @@ private final class TalkTestTransport: TalkTransport, @unchecked Sendable {
     private let lock = NSLock()
     private let steps: [Step]
     private var sent: [TalkRequest] = []
+    private var asked: [TalkSpeakRequest] = []
     private var cancelled = 0
+    /// What POST /speak answers: Leo's MP3, or nil for a failure.
+    private let voice: Data?
 
-    init(_ steps: [Step]) {
+    init(_ steps: [Step], voice: Data? = TalkTestData.mp3) {
         self.steps = steps
+        self.voice = voice
+    }
+
+    /// Every "Hear Leo" that reached the server.
+    var speakRequests: [TalkSpeakRequest] {
+        lock.lock()
+        defer { lock.unlock() }
+        return asked
+    }
+
+    func speak(_ request: TalkSpeakRequest) async throws -> Data {
+        lock.lock()
+        asked.append(request)
+        lock.unlock()
+        guard let voice else { throw TalkFailure.server("upstream") }
+        return voice
     }
 
     var requests: [TalkRequest] {
@@ -265,8 +289,8 @@ private final class TalkTestRig {
     let engine: TalkTestEngine
     let session: TalkSession
 
-    init(_ steps: [TalkTestTransport.Step], engine: TalkTestEngine = TalkTestEngine()) {
-        transport = TalkTestTransport(steps)
+    init(_ steps: [TalkTestTransport.Step], engine: TalkTestEngine = TalkTestEngine(), voice: Data? = TalkTestData.mp3) {
+        transport = TalkTestTransport(steps, voice: voice)
         listener = TalkTestListener()
         speaker = TalkTestSpeaker()
         self.engine = engine
@@ -370,6 +394,8 @@ final class TalkTests: XCTestCase {
         XCTAssertEqual(TalkTestData.check.rightCount, 2)
         XCTAssertEqual(TalkTestData.check.judgedCount, 2)
 
+        XCTAssertEqual(try TalkEvent.decode(line: #"{"type":"answer","text":"Right.","source":"leo","hear":"c2lnbg=="}"#),
+                       TalkEvent.answer(TalkAnswer(text: "Right.", source: "leo", hear: "c2lnbg==")))
         XCTAssertEqual(try TalkEvent.decode(line: #"{"type":"error","error":"upstream"}"#), TalkEvent.failed("upstream"))
         XCTAssertEqual(try TalkEvent.decode(line: #"{"type":"error"}"#), TalkEvent.failed("internal"))
         XCTAssertNil(try TalkEvent.decode(line: #"{"type":"progress","step":2}"#), "a kind of line this app doesn't know")
@@ -713,8 +739,8 @@ final class TalkTests: XCTestCase {
 
     // MARK: The session
 
-    func testATypedPlanIsCheckedAnsweredAndSpokenInLeosVoice() async throws {
-        let rig = TalkTestRig(TalkTestData.fullAnswer)
+    func testATypedPlanIsCheckedAndAnsweredOnTheScreen() async throws {
+        let rig = TalkTestRig(TalkTestData.quietAnswer)
         let session = rig.session
         session.open()
         await waitUntil("Stockfish's numbers are ready") { session.factsReady }
@@ -727,13 +753,17 @@ final class TalkTests: XCTestCase {
         XCTAssertEqual(session.transcript, "his bishop eyes f2, so I'll castle")
         XCTAssertEqual(session.draft, "")
 
-        await waitUntil("Leo has answered and finished speaking") { session.phase == .answered && !session.isSpeaking }
+        await waitUntil("Leo has answered") { session.phase == .answered }
         XCTAssertEqual(session.check, TalkTestData.check)
         XCTAssertEqual(session.answer, TalkTestData.answerText)
         XCTAssertNil(session.problem)
         XCTAssertNil(session.focus)
-        XCTAssertEqual(rig.speaker.played, [TalkTestData.mp3])
+        // His words are on the screen; his voice waits for a tap, so nothing is paid for yet.
+        XCTAssertFalse(session.isSpeaking)
+        XCTAssertTrue(session.canHear)
+        XCTAssertEqual(rig.speaker.played, [])
         XCTAssertEqual(rig.speaker.said, [])
+        XCTAssertEqual(rig.transport.speakRequests, [])
 
         XCTAssertEqual(rig.transport.requests.count, 1)
         let request = try XCTUnwrap(rig.transport.requests.first)
@@ -743,7 +773,7 @@ final class TalkTests: XCTestCase {
         XCTAssertTrue(request.reveal)
         XCTAssertEqual(request.context, .game)
         XCTAssertEqual(request.lastMove, "f8c5")
-        XCTAssertTrue(request.voice)
+        XCTAssertFalse(request.voice, "the voice isn't sent with the answer")
         let facts = try XCTUnwrap(request.facts)
         XCTAssertEqual(facts.depth, 12)
         XCTAssertFalse(facts.moves.isEmpty)
@@ -935,29 +965,51 @@ final class TalkTests: XCTestCase {
         let rig = TalkTestRig([.event(.checked(TalkTestData.check)), .event(.failed("upstream"))])
         rig.session.open()
         rig.typeAndSend("his bishop eyes f2")
-        await waitUntil("Leo has answered") { rig.session.phase == .answered && !rig.session.isSpeaking }
+        await waitUntil("Leo has answered") { rig.session.phase == .answered }
         XCTAssertEqual(rig.session.check, TalkTestData.check)
         XCTAssertNil(rig.session.problem)
         XCTAssertEqual(rig.session.answer, "You're right about both.")
+        XCTAssertEqual(rig.speaker.said, [])
+        // Without a pass from the server, a tap has the device's voice say it.
+        rig.session.hear()
+        await waitUntil("it was said") { !rig.speaker.said.isEmpty && !rig.session.isSpeaking }
         XCTAssertEqual(rig.speaker.said, ["You're right about both."])
+        XCTAssertEqual(rig.transport.speakRequests, [])
 
-        // The connection drops after Leo's words: they stand too, in the device's voice.
+        // The connection drops after Leo's words: they stand too, a tap away in the device's voice.
         let dropped = TalkTestRig([.event(.checked(TalkTestData.check)),
                                    .event(.answer(TalkAnswer(text: TalkTestData.answerText))),
                                    .fail(TalkFailure.offline)])
         dropped.session.open()
         dropped.typeAndSend("his bishop eyes f2")
-        await waitUntil("Leo has answered") { dropped.session.phase == .answered && !dropped.session.isSpeaking }
+        await waitUntil("Leo has answered") { dropped.session.phase == .answered }
         XCTAssertEqual(dropped.session.answer, TalkTestData.answerText)
         XCTAssertNil(dropped.session.problem)
+        dropped.session.hear()
+        await waitUntil("it was said") { !dropped.speaker.said.isEmpty && !dropped.session.isSpeaking }
         XCTAssertEqual(dropped.speaker.said, [TalkTestData.answerText])
         XCTAssertEqual(dropped.speaker.played, [])
+    }
+
+    func testSpeakingOnArrivalStillWorks() async throws {
+        let rig = TalkTestRig(TalkTestData.fullAnswer)
+        rig.session.speaksOnArrival = true
+        rig.session.open()
+        rig.typeAndSend("his bishop eyes f2")
+        await waitUntil("Leo has answered and finished speaking") { rig.session.phase == .answered && !rig.session.isSpeaking }
+        XCTAssertTrue(try XCTUnwrap(rig.transport.requests.first).voice)
+        XCTAssertEqual(rig.speaker.played, [TalkTestData.mp3])
+        // Hearing it again replays what came, with no second call.
+        rig.session.hear()
+        await waitUntil("it played again") { rig.speaker.played.count == 2 && !rig.session.isSpeaking }
+        XCTAssertEqual(rig.transport.speakRequests, [])
     }
 
     func testTheDeviceVoiceSpeaksWhenLeosVoiceIsMissing() async {
         let unavailable = TalkTestRig([.event(.checked(TalkTestData.check)),
                                        .event(.answer(TalkAnswer(text: TalkTestData.answerText))),
                                        .event(.voice(TalkVoice(audio: nil, unavailable: "budget"))), .event(.done)])
+        unavailable.session.speaksOnArrival = true
         unavailable.session.open()
         unavailable.typeAndSend("his bishop eyes f2")
         await waitUntil("Leo has answered") { unavailable.session.phase == .answered && !unavailable.session.isSpeaking }
@@ -966,6 +1018,7 @@ final class TalkTests: XCTestCase {
 
         let noVoiceLine = TalkTestRig([.event(.checked(TalkTestData.check)),
                                        .event(.answer(TalkAnswer(text: TalkTestData.answerText))), .event(.done)])
+        noVoiceLine.session.speaksOnArrival = true
         noVoiceLine.session.open()
         noVoiceLine.typeAndSend("his bishop eyes f2")
         await waitUntil("Leo has answered") { noVoiceLine.session.phase == .answered && !noVoiceLine.session.isSpeaking }
@@ -984,6 +1037,8 @@ final class TalkTests: XCTestCase {
         XCTAssertFalse(request.voice, "no voice is asked for")
         XCTAssertEqual(rig.session.answer, TalkTestData.answerText)
         XCTAssertFalse(rig.session.isSpeaking)
+        XCTAssertFalse(rig.session.canHear, "muted, there's nothing to tap")
+        rig.session.hear()
         XCTAssertEqual(rig.speaker.said, [])
         XCTAssertEqual(rig.speaker.played, [])
     }
@@ -1035,13 +1090,55 @@ final class TalkTests: XCTestCase {
         await waitUntil("Leo has answered again") { session.phase == .answered && !session.isSpeaking }
     }
 
+    func testHearLeoFetchesHisVoiceOnceAndReplaysIt() async {
+        let rig = TalkTestRig(TalkTestData.quietAnswer)
+        let session = rig.session
+        session.open()
+        rig.typeAndSend("his bishop eyes f2")
+        await waitUntil("Leo has answered") { session.phase == .answered }
+
+        session.hear()
+        await waitUntil("his voice played") { rig.speaker.played.count == 1 && !session.isSpeaking }
+        XCTAssertEqual(rig.transport.speakRequests,
+                       [TalkSpeakRequest(text: TalkTestData.answerText, coach: nil, hear: "pass")])
+        XCTAssertFalse(session.isFetchingVoice)
+        XCTAssertEqual(rig.speaker.said, [])
+
+        session.hear()
+        await waitUntil("it played again") { rig.speaker.played.count == 2 && !session.isSpeaking }
+        XCTAssertEqual(rig.transport.speakRequests.count, 1, "the second tap is free")
+
+        // A new go forgets the old voice.
+        session.talkAgain()
+        rig.typeAndSend("h6")
+        await waitUntil("Leo has answered again") { session.phase == .answered }
+        session.hear()
+        await waitUntil("his new voice played") { rig.speaker.played.count == 3 && !session.isSpeaking }
+        XCTAssertEqual(rig.transport.speakRequests.count, 2)
+    }
+
+    func testHearLeoFallsBackToTheDeviceVoice() async {
+        let rig = TalkTestRig(TalkTestData.quietAnswer, voice: nil)
+        rig.session.open()
+        rig.typeAndSend("his bishop eyes f2")
+        await waitUntil("Leo has answered") { rig.session.phase == .answered }
+        rig.session.hear()
+        await waitUntil("the device said it") { !rig.speaker.said.isEmpty && !rig.session.isSpeaking }
+        XCTAssertEqual(rig.transport.speakRequests.count, 1)
+        XCTAssertEqual(rig.speaker.said, [TalkTestData.answerText])
+        XCTAssertEqual(rig.speaker.played, [])
+        XCTAssertFalse(rig.session.isFetchingVoice)
+    }
+
     func testStopSpeakingQuietsLeo() async {
-        let rig = TalkTestRig(TalkTestData.fullAnswer)
+        let rig = TalkTestRig(TalkTestData.quietAnswer)
         rig.speaker.holds = true
         let session = rig.session
         session.open()
         rig.typeAndSend("his bishop eyes f2")
-        await waitUntil("Leo is speaking") { session.phase == .answered && session.isSpeaking }
+        await waitUntil("Leo has answered") { session.phase == .answered }
+        session.hear()
+        await waitUntil("Leo is speaking") { session.isSpeaking && rig.speaker.played.count == 1 }
         let stops = rig.speaker.stops
         session.stopSpeaking()
         XCTAssertFalse(session.isSpeaking)

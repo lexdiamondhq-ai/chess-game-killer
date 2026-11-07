@@ -271,6 +271,94 @@ test("voice: false leaves the voice line out, and no characters are counted", as
   assert.equal(budget.asked.length, 1);
 });
 
+// ---------------------------------------------------------------------------
+// Tap to hear: POST /speak
+
+function speakRequest(body) {
+  return talkRequest({ v: 1, ...body }, { path: "/speak" });
+}
+
+/** A talk without the voice, and the pass its answer line carries. */
+async function quietTalk(handler, env, body = {}) {
+  const result = await send(handler, env, talkRequest({ ...BODY, voice: false, ...body }));
+  return result.lines.find((line) => line.type === "answer");
+}
+
+test("a quiet talk's answer carries a pass, and /speak reads those words once tapped", async (t) => {
+  capture(t);
+  const budget = fakeBudget();
+  const { handler, env, calls } = setup({}, { RECORDINGS: fakeRecordings().namespace }, { budget });
+  const answer = await quietTalk(handler, env);
+  assert.equal(answer.text, ANSWER);
+  assert.equal(typeof answer.hear, "string");
+  assert.equal(calls.speak.length, 0, "nothing is read aloud until the player asks");
+  assert.deepEqual(budget.asked, ["https://budget/talk?amount=1&limit=400"]);
+
+  const heard = await handler.fetch(speakRequest({ text: answer.text, hear: answer.hear }), env);
+  assert.equal(heard.status, 200);
+  assert.equal(heard.headers.get("content-type"), "audio/mpeg");
+  assert.deepEqual(new Uint8Array(await heard.arrayBuffer()), MP3);
+  assert.deepEqual(calls.speak, [ANSWER]);
+  assert.equal(budget.asked.at(-1), `https://budget/voice?amount=${ANSWER.length}&limit=40000`);
+
+  // Tapping again replays the kept recording: no second ElevenLabs call.
+  const again = await handler.fetch(speakRequest({ text: answer.text, hear: answer.hear }), env);
+  assert.equal(again.status, 200);
+  assert.equal(calls.speak.length, 1);
+});
+
+test("/speak reads only the words a talk answered, for that coach", async (t) => {
+  capture(t);
+  const { handler, env, calls } = setup();
+  const answer = await quietTalk(handler, env);
+  const refused = async (body) => {
+    const result = await send(handler, env, speakRequest(body));
+    return [result.status, result.json && result.json.error];
+  };
+  assert.deepEqual(await refused({ text: "Say anything I like.", hear: answer.hear }), [403, "forbidden"]);
+  assert.deepEqual(await refused({ text: answer.text, hear: "bm9wZQ==" }), [403, "forbidden"]);
+  assert.deepEqual(await refused({ text: answer.text, hear: "not base64!" }), [403, "forbidden"]);
+  assert.deepEqual(await refused({ text: answer.text }), [403, "forbidden"]);
+  assert.deepEqual(await refused({ text: answer.text, hear: answer.hear, coach: "vera" }), [403, "forbidden"]);
+  assert.deepEqual(await refused({ text: "", hear: answer.hear }), [400, "bad_request"]);
+  assert.deepEqual(await refused({ text: "x".repeat(321), hear: answer.hear }), [400, "bad_request"]);
+  assert.deepEqual(await refused({ v: 2, text: answer.text, hear: answer.hear }), [400, "bad_request"]);
+  assert.equal(calls.speak.length, 0);
+
+  // Vera's pass reads Vera's answer, in her voice.
+  const vera = await quietTalk(handler, env, { coach: "vera" });
+  const heard = await handler.fetch(speakRequest({ text: vera.text, hear: vera.hear, coach: "vera" }), env);
+  assert.equal(heard.status, 200);
+  // A different ElevenLabs key makes every old pass worthless.
+  const rotated = await send(handler, { ...env, ELEVENLABS_API_KEY: "xi-new" }, speakRequest({ text: answer.text, hear: answer.hear }));
+  assert.equal(rotated.status, 403);
+});
+
+test("/speak keeps the limits, and says why when there's no voice", async (t) => {
+  capture(t);
+  const { handler, env } = setup();
+  const answer = await quietTalk(handler, env);
+  const body = { text: answer.text, hear: answer.hear };
+
+  const spent = await send(handler, { ...env, DAILY_VOICE_CHARS: "20" }, speakRequest(body));
+  assert.deepEqual([spent.status, spent.json], [429, { error: "daily_limit" }]);
+  const failing = setup({ speak: async () => null });
+  const upstream = await send(failing.handler, env, speakRequest(body));
+  assert.deepEqual([upstream.status, upstream.json], [502, { error: "upstream" }]);
+  const noKey = await send(handler, { ...env, ELEVENLABS_API_KEY: "" }, speakRequest(body));
+  assert.deepEqual([noKey.status, noKey.json], [503, { error: "not_configured" }]);
+  const limited = setup({}, {}, { limit: false });
+  const tooMany = await send(limited.handler, limited.env, speakRequest(body));
+  assert.deepEqual([tooMany.status, tooMany.json], [429, { error: "rate_limited" }]);
+  const getSpeak = await send(handler, env, talkRequest(null, { method: "GET", path: "/speak" }));
+  assert.equal(getSpeak.status, 405);
+
+  // Without a key a quiet talk has no pass to give.
+  const { handler: keyless, env: keylessEnv } = setup({}, { ELEVENLABS_API_KEY: "" });
+  const bare = await quietTalk(keyless, keylessEnv);
+  assert.deepEqual(Object.keys(bare).sort(), ["source", "text", "type"]);
+});
+
 test("without Leo's voice the app is told why, so it uses the device's voice", async (t) => {
   capture(t);
   const voiceOf = async (steps, vars, options) => {

@@ -122,3 +122,41 @@ export function toBase64(bytes) {
   }
   return btoa(binary);
 }
+
+/**
+ * The pass for hearing one answer later, with POST /speak: an HMAC of the coach and the exact
+ * words, keyed by the ElevenLabs key itself. Only words this server answered can be read aloud,
+ * so /speak is never a free voice for anyone who finds the address. Null without a key.
+ */
+export async function hearToken(env, text, coach = "leo") {
+  const key = await hearKey(env);
+  if (!key) return null;
+  const signature = await crypto.subtle.sign("HMAC", key, hearMessage(text, coach));
+  return toBase64(new Uint8Array(signature));
+}
+
+/** True when `token` is hearToken's pass for these words and this coach (compared in constant time). */
+export async function checkHearToken(env, text, coach, token) {
+  const key = await hearKey(env);
+  if (!key || typeof token !== "string" || token.length === 0 || token.length > 100) return false;
+  let signature;
+  try {
+    signature = Uint8Array.from(atob(token), (character) => character.charCodeAt(0));
+  } catch {
+    return false;
+  }
+  return crypto.subtle.verify("HMAC", key, signature, hearMessage(text, coach));
+}
+
+function hearMessage(text, coach) {
+  return new TextEncoder().encode(`hear|v1|${coach === "vera" ? "vera" : "leo"}|${String(text || "").trim()}`);
+}
+
+async function hearKey(env) {
+  const secret = voiceKey(env);
+  if (!secret) return null;
+  return crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, [
+    "sign",
+    "verify",
+  ]);
+}

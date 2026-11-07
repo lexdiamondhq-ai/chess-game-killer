@@ -75,7 +75,7 @@ release ──── POST /talk ───────────────→
 | `reveal` | Optional, default false. May Leo name the best move? True in games when hints are on; false in training, where Leo nudges instead ("Look at your knight."). |
 | `context` | Optional: `"game"` (default), `"session"` (Leo's daily session) or `"analysis"`. |
 | `lastMove` | Optional. The opponent's last move in engine notation (`f8c5`), for "he just…" claims. |
-| `voice` | Optional, default true. False skips the voice line (muted coach). |
+| `voice` | Optional, default true. False skips the voice line: the app shows the answer and the player taps to hear it ([POST /speak](#post-speak)). |
 | `facts` | Optional but expected. Without it, engine-dependent claims come back `unclear`. |
 | `coach` | Optional: `"vera"` for Coach Vera (her persona, Sarah's voice). Anything else, or left out, is Leo (Trevor's voice). |
 | `facts.depth` | The search depth used. |
@@ -183,6 +183,9 @@ check", not "Bxh7+"), so it reads well and speaks well. `source` is `"leo"` (Cla
 `"template"` (the server's own wording, used when Claude is slow, fails, or names a square the checked facts
 don't contain).
 
+When the request had `voice: false` and the server has Leo's voice, the line also carries `"hear": "<pass>"`:
+the pass for reading these exact words aloud later with [POST /speak](#post-speak).
+
 #### `voice`
 
 ```json
@@ -195,6 +198,24 @@ the answer with the device's voice instead.
 #### `done`
 
 `{ "type": "done" }`
+
+## POST /speak
+
+The player tapped "Hear Leo" under an answer from a `voice: false` talk. ElevenLabs is paid only here, for
+answers someone wants to hear.
+
+```json
+{ "v": 1, "text": "Right about the bishop eyeing f2, and castling is the best move here.", "coach": "leo", "hear": "<pass>" }
+```
+
+`text` and `coach` are the answer's, and `hear` is the pass its answer line carried: an HMAC of the coach and
+the words keyed by the ElevenLabs key, so the server reads only words it answered (and a new key retires every
+old pass). A line said before in the same voice is replayed from `TalkRecordings` for free; a new one comes off
+`DAILY_VOICE_CHARS`. Same per-address rate limit as `/talk`.
+
+`200` with `content-type: audio/mpeg` and the MP3 as the body. Otherwise a JSON error: 400 `bad_request`,
+403 `forbidden` (the pass doesn't fit the words), 429 `rate_limited` or `daily_limit` (today's voice is spent),
+502 `upstream` (ElevenLabs failed), 503 `not_configured`. The app then speaks the answer with the device's voice.
 
 ## Claim kinds
 

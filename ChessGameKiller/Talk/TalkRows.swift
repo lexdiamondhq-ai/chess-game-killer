@@ -192,7 +192,8 @@ struct TalkPanelConversation: View {
                     .transition(arrival)
             }
             if showsLeo {
-                TalkPanelLeoBubble(text: leoText, theme: theme, speaking: session.isSpeaking, stop: stopSpeaking)
+                TalkPanelLeoBubble(text: leoText, theme: theme, speaking: session.isSpeaking, stop: stopSpeaking,
+                                   fetching: session.isFetchingVoice, hear: session.canHear ? { session.hear() } : nil)
                     .id(Self.answerID)
                     .transition(arrival)
             }
@@ -201,6 +202,7 @@ struct TalkPanelConversation: View {
         .animation(motion, value: session.check)
         .animation(motion, value: session.answer)
         .animation(motion, value: session.isSpeaking)
+        .animation(motion, value: session.isFetchingVoice)
     }
 
     private var showsGreeting: Bool {
@@ -311,6 +313,10 @@ private struct TalkPanelLeoBubble: View {
     let theme: BoardTheme
     var speaking = false
     var stop: (() -> Void)? = nil
+    /// "Hear Leo" was tapped and his voice is on its way.
+    var fetching = false
+    /// Reads the answer aloud; nil when it can't be heard now (muted, or already speaking).
+    var hear: (() -> Void)? = nil
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -336,6 +342,11 @@ private struct TalkPanelLeoBubble: View {
             }
             if speaking, let stop {
                 stopButton(stop)
+            } else if fetching {
+                hearLabel(fetching: true)
+                    .transition(.opacity)
+            } else if let hear {
+                hearButton(hear)
             }
         }
         .padding(.horizontal, 16)
@@ -345,6 +356,38 @@ private struct TalkPanelLeoBubble: View {
         .onTapGesture {
             if speaking { stop?() }
         }
+    }
+
+    /// Leo's words are on the screen; his voice is a tap away, and only then paid for.
+    private func hearButton(_ hear: @escaping () -> Void) -> some View {
+        Button(action: hear) {
+            hearLabel(fetching: false)
+        }
+        .buttonStyle(ChallengePressStyle())
+        .accessibilityLabel("Hear \(Coach.current.name)")
+        .transition(.opacity)
+    }
+
+    private func hearLabel(fetching: Bool) -> some View {
+        let accent: Color = theme.challengeAccent
+        return HStack(spacing: 7) {
+            if fetching {
+                ProgressView()
+                    .controlSize(.mini)
+                    .tint(accent)
+            } else {
+                Image(systemName: "speaker.wave.2.fill")
+                    .font(.footnote.weight(.semibold))
+            }
+            Text("Hear \(Coach.current.name)")
+                .font(theme.talkFont(.footnote, .semibold))
+        }
+        .foregroundStyle(accent)
+        .padding(.horizontal, 11)
+        .padding(.vertical, 6)
+        .background(accent.opacity(0.14), in: Capsule())
+        .contentShape(Capsule())
+        .accessibilityElement(children: .combine)
     }
 
     private func stopButton(_ stop: @escaping () -> Void) -> some View {

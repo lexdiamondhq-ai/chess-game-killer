@@ -9,6 +9,14 @@ import Observation
 /// Sends the player's words and Stockfish's numbers to Leo's server and streams the answer.
 protocol TalkTransport: Sendable {
     func talk(_ request: TalkRequest) -> AsyncThrowingStream<TalkEvent, Error>
+    /// The answer read aloud in the coach's voice, as MP3 bytes, when the player taps to hear it.
+    func speak(_ request: TalkSpeakRequest) async throws -> Data
+}
+
+extension TalkTransport {
+    func speak(_ request: TalkSpeakRequest) async throws -> Data {
+        throw TalkFailure.server("not_configured")
+    }
 }
 
 /// Turns the player's speech into text, on the device.
@@ -42,7 +50,8 @@ private enum TalkUtterance {
     case words(String)
 }
 
-/// One "talk it through" for one position: listen (or type), send it to Leo, show and speak his answer.
+/// One "talk it through" for one position: listen (or type), send it to Leo, show his answer, and
+/// read it aloud when the player taps "Hear Leo" (only then is his voice paid for).
 @MainActor
 @Observable
 final class TalkSession: Identifiable {
@@ -55,7 +64,7 @@ final class TalkSession: Identifiable {
         case typing
         /// Sent, waiting for Leo. `check` arrives first, then `answer`.
         case checking
-        /// Leo has answered. He may still be speaking (`isSpeaking`).
+        /// Leo has answered. Tapping "Hear Leo" (`hear()`) has him say it (`isSpeaking`).
         case answered
         /// It didn't work; `problem` says why in plain words.
         case failed
@@ -83,6 +92,8 @@ final class TalkSession: Identifiable {
     /// Leo's words, once they arrive.
     private(set) var answer: String?
     private(set) var isSpeaking = false
+    /// "Hear Leo" was tapped and his voice is on its way.
+    private(set) var isFetchingVoice = false
     /// Stockfish's numbers are worked out (or the engine had none to give), so sending won't wait
     /// for them. They're worked out while the player talks.
     private(set) var factsReady = false
@@ -97,6 +108,10 @@ final class TalkSession: Identifiable {
 
     /// Called each time the player's words go to Leo, so a game under way can count the help.
     @ObservationIgnored var onSend: (() -> Void)?
+
+    /// Leo reads each answer aloud as it arrives, without a tap. Off: his voice is paid for only
+    /// when the player asks to hear him.
+    @ObservationIgnored var speaksOnArrival = false
 
     /// How long a send waits for Stockfish's numbers that aren't ready yet before going without them.
     @ObservationIgnored var factsWait: Duration = .seconds(4)
@@ -124,8 +139,13 @@ final class TalkSession: Identifiable {
     @ObservationIgnored private var requestID = 0
     /// Between the button coming up and the request going out, the recognizer's last words still count.
     @ObservationIgnored private var acceptsLateWords = false
-    /// Leo's voice was asked for (the coach isn't muted).
+    /// Leo's voice is wanted for this go: on arrival, or because the player tapped to hear him.
     @ObservationIgnored private var speaksAloud = true
+    /// Who answered this go ("vera", or nil for Leo), and the pass for hearing the answer.
+    @ObservationIgnored private var answeringCoach: String?
+    @ObservationIgnored private var hearPass: String?
+    /// This go's answer in the coach's voice, once heard, so another tap replays it for free.
+    @ObservationIgnored private var recording: Data?
     /// This go's answer was spoken, or the player quieted Leo: nothing more is said.
     @ObservationIgnored private var hasSpoken = false
     @ObservationIgnored private var isOpen = false
@@ -274,6 +294,43 @@ final class TalkSession: Identifiable {
         resetGo()
     }
 
+    /// "Hear Leo" can be tapped: there's an answer, he isn't already saying it, and he isn't muted.
+    var canHear: Bool {
+        phase == .answered && answer != nil && !isSpeaking && !isFetchingVoice && !CoachVoice.shared.isMuted
+    }
+
+    /// The player tapped "Hear Leo": his recording (fetched the first time, then kept for another
+    /// tap), or the device's voice when his can't be had.
+    func hear() {
+        guard canHear, !isClosed, let answer else { return }
+        hasSpoken = false
+        speaksAloud = true
+        if let recording {
+            speak(.recording(recording))
+            return
+        }
+        guard let hearPass else {
+            speak(.words(answer))
+            return
+        }
+        isFetchingVoice = true
+        let id = requestID
+        let request = TalkSpeakRequest(text: answer, coach: answeringCoach, hear: hearPass)
+        speechTask = Task { [weak self] in
+            guard let self else { return }
+            let audio = try? await self.api.speak(request)
+            guard !Task.isCancelled, !self.isClosed, self.requestID == id else { return }
+            self.isFetchingVoice = false
+            self.speechTask = nil
+            if let audio, !audio.isEmpty {
+                self.recording = audio
+                self.speak(.recording(audio))
+            } else {
+                self.speak(.words(answer))
+            }
+        }
+    }
+
     /// Quiet Leo now.
     func stopSpeaking() {
         hasSpoken = true
@@ -281,6 +338,7 @@ final class TalkSession: Identifiable {
         speechTask = nil
         speaker.stop()
         isSpeaking = false
+        isFetchingVoice = false
     }
 
     /// The panel closed: stop listening, speaking, the engine and the request.
@@ -303,6 +361,7 @@ final class TalkSession: Identifiable {
         isListening = false
         speaker.stop()
         isSpeaking = false
+        isFetchingVoice = false
         level = 0
     }
 
@@ -423,7 +482,9 @@ final class TalkSession: Identifiable {
         speechTask = nil
         speaker.stop()
         isSpeaking = false
+        isFetchingVoice = false
         hasSpoken = false
+        forgetVoice()
         phase = .ready
         transcript = ""
         check = nil
@@ -450,6 +511,7 @@ final class TalkSession: Identifiable {
         acceptsLateWords = !typed
         hasSpoken = false
         speaksAloud = true
+        forgetVoice()
         check = nil
         answer = nil
         problem = nil
@@ -485,11 +547,11 @@ final class TalkSession: Identifiable {
             return
         }
         outOfTalks = false
-        let wantsVoice = !CoachVoice.shared.isMuted
+        let wantsVoice = speaksOnArrival && !CoachVoice.shared.isMuted
         speaksAloud = wantsVoice
+        answeringCoach = Coach.current == .leo ? nil : Coach.current.rawValue
         let request = TalkRequest(fen: fen, said: said, typed: typed, reveal: reveal, context: context,
-                                  lastMove: lastMove, voice: wantsVoice, facts: facts,
-                                  coach: Coach.current == .leo ? nil : Coach.current.rawValue)
+                                  lastMove: lastMove, voice: wantsVoice, facts: facts, coach: answeringCoach)
 
         var serverError: String?
         var failure: Error?
@@ -503,7 +565,10 @@ final class TalkSession: Identifiable {
                     focus = nil
                 case .answer(let value):
                     let words = value.text.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !words.isEmpty { answer = words }
+                    if !words.isEmpty {
+                        answer = words
+                        hearPass = value.hear
+                    }
                 case .voice(let value):
                     voiceArrived(value)
                 case .done:
@@ -538,6 +603,7 @@ final class TalkSession: Identifiable {
 
     private func voiceArrived(_ voice: TalkVoice) {
         if let audio = voice.audio, !audio.isEmpty {
+            recording = audio
             speak(.recording(audio))
         } else if let answer {
             speak(.words(answer))
@@ -550,7 +616,7 @@ final class TalkSession: Identifiable {
         if let check {
             if answer == nil { answer = Self.fallbackAnswer(for: check) }
             phase = .answered
-            // No voice line came: the device's voice says it.
+            // Asked to speak, but no voice line came: the device's voice says it.
             if let answer { speak(.words(answer)) }
             return
         }
@@ -565,6 +631,13 @@ final class TalkSession: Identifiable {
             problem = Self.problem(forCode: "internal")
         }
         phase = .failed
+    }
+
+    /// A new go starts without the last one's voice.
+    private func forgetVoice() {
+        answeringCoach = nil
+        hearPass = nil
+        recording = nil
     }
 
     private func speak(_ utterance: TalkUtterance) {

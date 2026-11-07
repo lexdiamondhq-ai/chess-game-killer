@@ -20,7 +20,7 @@ struct TalkRequest: Encodable, Equatable, Sendable {
     var context: TalkContext
     /// The opponent's last move in engine notation, like "f8c5".
     var lastMove: String?
-    /// Whether to send Leo's voice.
+    /// Whether to send Leo's voice with the answer. False: the player taps to hear it (`TalkSpeakRequest`).
     var voice: Bool
     var facts: TalkFacts?
     /// Who answers: left out for Leo, "vera" for Vera (her persona and her voice).
@@ -378,19 +378,32 @@ struct TalkAnswer: Codable, Equatable, Sendable {
     var text: String
     /// "leo" when Claude worded it, "template" for the server's own wording.
     var source: String
+    /// The pass for hearing these words later with POST /speak, when the voice wasn't sent with them.
+    var hear: String?
 
-    init(text: String, source: String = "leo") {
+    init(text: String, source: String = "leo", hear: String? = nil) {
         self.text = text
         self.source = source
+        self.hear = hear
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         text = (try? c.decodeIfPresent(String.self, forKey: .text)) ?? ""
         source = (try? c.decodeIfPresent(String.self, forKey: .source)) ?? "leo"
+        hear = try? c.decodeIfPresent(String.self, forKey: .hear)
     }
 
-    private enum CodingKeys: String, CodingKey { case text, source }
+    private enum CodingKeys: String, CodingKey { case text, source, hear }
+}
+
+/// The player tapped "Hear Leo": one answer's words, its coach and its pass, for POST /speak.
+struct TalkSpeakRequest: Encodable, Equatable, Sendable {
+    var v = 1
+    var text: String
+    /// Left out for Leo, "vera" for Vera, as the talk asked.
+    var coach: String?
+    var hear: String
 }
 
 /// Leo's voice as an MP3, or why the device's own voice should speak instead.

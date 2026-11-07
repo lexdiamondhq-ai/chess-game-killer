@@ -1,6 +1,7 @@
 // Coach Leo's "Talk it through" server. Before moving, the player tells Leo
 // their plan; POST /talk checks every claim and streams Leo's answer back as
-// NDJSON lines: checked, answer, voice, done. PROTOCOL.md is the contract.
+// NDJSON lines: checked, answer, voice, done. POST /speak reads an answer aloud
+// later, when the player taps to hear it. PROTOCOL.md is the contract.
 //
 // - claims.js: Claude call 1, what the player said as typed claims.
 // - verify.js: the rules and Stockfish's numbers decide what is true.
@@ -20,10 +21,12 @@ import { describePosition } from "./board.js";
 import { claudeTimeoutMs, cleanText, failureCode, parseClaims } from "./claims.js";
 import { Chess } from "./vendor/chess.js";
 import { verifyTalk } from "./verify.js";
-import { recordingKey, speak, toBase64, voiceKey } from "./voice.js";
+import { checkHearToken, hearToken, recordingKey, speak, toBase64, voiceKey } from "./voice.js";
 
 const MAX_BODY_BYTES = 32 * 1024;
 const MAX_SAID = 800;
+/** The longest answer Leo gives (answer.js), so the longest /speak reads. */
+const MAX_ANSWER = 320;
 const CONTEXTS = new Set(["game", "session", "analysis"]);
 const UCI = /^[a-h][1-8][a-h][1-8][qrbn]?$/;
 /** More than any position's legal moves (218 at most). */
@@ -66,10 +69,11 @@ export function createHandler(steps = {}) {
         if (request.method === "GET" || request.method === "HEAD") return json({ ok: true });
         return json({ error: "method_not_allowed" }, 405, { allow: "GET, HEAD" });
       }
-      if (url.pathname !== "/talk") return json({ error: "not_found" }, 404);
+      const route = { "/talk": talk, "/speak": speakAnswer }[url.pathname];
+      if (!route) return json({ error: "not_found" }, 404);
       if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
       try {
-        return await talk(request, env, ctx, deps);
+        return await route(request, env, ctx, deps);
       } catch (error) {
         // Only a code: never the body, which holds what the player said.
         console.error(JSON.stringify({ talk: "failed", error: (error && error.name) || "error" }));
@@ -191,7 +195,7 @@ async function runTalk(talk, env, deps, writer) {
     } catch {
       answer = null;
     }
-    if (!answer || typeof answer.text !== "string" || !answer.text.trim() || answer.text.length > 320) {
+    if (!answer || typeof answer.text !== "string" || !answer.text.trim() || answer.text.length > MAX_ANSWER) {
       try {
         answer = { text: deps.templateAnswer(checked, spoken), source: "template" };
       } catch {
@@ -200,7 +204,13 @@ async function runTalk(talk, env, deps, writer) {
     }
     log.answer_ms = deps.now() - answerStarted;
     log.source = answer.source === "leo" ? "leo" : "template";
-    if (!(await send({ type: "answer", text: answer.text, source: log.source }))) return;
+    const answerLine = { type: "answer", text: answer.text, source: log.source };
+    // Not read aloud now: the pass lets the player tap to hear it later with POST /speak.
+    if (!talk.voice) {
+      const hear = await hearToken(env, answer.text, talk.coach);
+      if (hear) answerLine.hear = hear;
+    }
+    if (!(await send(answerLine))) return;
 
     // 4. Leo's voice, when the app wants it.
     if (talk.voice) {
@@ -222,28 +232,75 @@ async function runTalk(talk, env, deps, writer) {
 
 /** The voice line: the coach's MP3, or why there's none so the app uses the device's voice. */
 async function voiceLine(text, env, deps, coach = "leo") {
-  if (!voiceKey(env)) return { type: "voice", unavailable: "not_configured" };
-  // Said before in this voice: play that recording again, free.
+  const { audio, unavailable } = await coachVoice(text, env, deps, coach);
+  return audio ? { type: "voice", format: "mp3", audio: toBase64(audio) } : { type: "voice", unavailable };
+}
+
+/**
+ * The coach saying `text`: { audio } with the MP3, or { unavailable: "not_configured" | "budget" |
+ * "upstream" }. A line said before in this voice is replayed for free; a new one is paid for
+ * from the day's voice characters and kept.
+ */
+async function coachVoice(text, env, deps, coach = "leo") {
+  if (!voiceKey(env)) return { unavailable: "not_configured" };
   const key = await recordingKey(env, text, coach);
   const kept = await recordings(env, "GET", key);
-  if (kept) return { type: "voice", format: "mp3", audio: toBase64(kept) };
+  if (kept) return { audio: kept };
   let allowed;
   try {
     allowed = await takeFromBudget(env, "voice", text.length, dailyLimit(env.DAILY_VOICE_CHARS, DEFAULT_DAILY_VOICE_CHARS));
   } catch (error) {
     console.error(JSON.stringify({ voice: "budget_failed", error: (error && error.name) || "error" }));
-    return { type: "voice", unavailable: "upstream" };
+    return { unavailable: "upstream" };
   }
-  if (!allowed) return { type: "voice", unavailable: "budget" };
+  if (!allowed) return { unavailable: "budget" };
   let audio = null;
   try {
     audio = await deps.speak(env, text, undefined, coach);
   } catch {
     audio = null;
   }
-  if (!(audio instanceof Uint8Array) || audio.length === 0) return { type: "voice", unavailable: "upstream" };
+  if (!(audio instanceof Uint8Array) || audio.length === 0) return { unavailable: "upstream" };
   await recordings(env, "PUT", key, audio);
-  return { type: "voice", format: "mp3", audio: toBase64(audio) };
+  return { audio };
+}
+
+/**
+ * POST /speak { v: 1, text, coach, hear }: the player tapped to hear an answer. Only words with
+ * the pass their answer line carried are read, as MP3 bytes. ElevenLabs is paid only here, for
+ * answers someone wants to hear.
+ */
+async function speakAnswer(request, env, ctx, deps) {
+  if (await overLimit(env.TALK_LIMITER, request)) {
+    return json({ error: "rate_limited" }, 429, { "retry-after": "60" });
+  }
+  const type = (request.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+  if (type !== "application/json") return json({ error: "unsupported_type" }, 415);
+  const body = await readBody(request, 4 * 1024);
+  if (body === null) return json({ error: "too_large" }, 413);
+  let value;
+  try {
+    value = JSON.parse(body);
+  } catch {
+    return badRequest("The body isn't valid JSON.");
+  }
+  if (!isObject(value) || value.v !== 1) return badRequest('"v" must be 1.');
+  const text = typeof value.text === "string" ? value.text.trim() : "";
+  if (text === "" || text.length > MAX_ANSWER) return badRequest(`"text" must be 1 to ${MAX_ANSWER} characters.`);
+  const coach = coachOf(value.coach);
+  if (!voiceKey(env)) return json({ error: "not_configured" }, 503);
+  if (!(await checkHearToken(env, text, coach, value.hear))) return json({ error: "forbidden" }, 403);
+  const started = deps.now();
+  const { audio, unavailable } = await coachVoice(text, env, deps, coach);
+  console.log(JSON.stringify({ speak: audio ? "mp3" : unavailable, voice_ms: deps.now() - started }));
+  if (!audio) {
+    const status = { not_configured: 503, budget: 429 }[unavailable] || 502;
+    return json({ error: unavailable === "budget" ? "daily_limit" : unavailable }, status);
+  }
+  return new Response(audio, {
+    status: 200,
+    headers: { "content-type": "audio/mpeg", "cache-control": "no-store", "x-content-type-options": "nosniff" },
+  });
 }
 
 /**
