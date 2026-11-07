@@ -213,7 +213,7 @@ private struct PremiumBenefitList: View {
         Benefit(symbol: "graduationcap", title: "Every lesson and drill",
                 detail: "All 15 lessons, 3,865 openings, 22 endgames, master games and Blindfold."),
         Benefit(symbol: "eye", title: "Ghost Vision any time",
-                detail: "Plus Talk It Through 10 times a day and 3 photo scans a day."),
+                detail: "Plus Talk It Through and photo scans, as often as you like."),
         Benefit(symbol: "square.grid.3x3", title: "Every board look",
                 detail: "Every set and every rival's board."),
     ]

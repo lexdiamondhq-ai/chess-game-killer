@@ -477,7 +477,7 @@ final class TalkSession: Identifiable {
             phase = .ready
             return
         }
-        // Each talk costs a server call: free players get 3 a week, Premium 10 a day.
+        // Each talk costs a server call: free players get 3 a week; Premium has only a high fair-use guard.
         guard Premium.shared.use(.talk) else {
             outOfTalks = true
             problem = Premium.shared.limitLine(.talk)

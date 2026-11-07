@@ -38,9 +38,9 @@ final class PremiumTests: XCTestCase {
         XCTAssertEqual(PremiumFeature.ghostVision.free, .perDay(3))
         XCTAssertNil(PremiumFeature.ghostVision.premium)
         XCTAssertEqual(PremiumFeature.talk.free, .perWeek(3))
-        XCTAssertEqual(PremiumFeature.talk.premium, .perDay(10))
+        XCTAssertEqual(PremiumFeature.talk.premium, .perDay(50))
         XCTAssertEqual(PremiumFeature.scan.free, .perWeek(3))
-        XCTAssertEqual(PremiumFeature.scan.premium, .perDay(3))
+        XCTAssertEqual(PremiumFeature.scan.premium, .perDay(30))
         XCTAssertEqual(PremiumFeature.ratedPuzzle.free, .perDay(15))
         XCTAssertEqual(PremiumFeature.puzzleRush.free, .perDay(1))
         XCTAssertEqual(PremiumFeature.fullRewind.free, .perDay(1))
@@ -127,10 +127,10 @@ final class PremiumTests: XCTestCase {
 
     func testPremiumStillCapsTheFeaturesThatCostMoney() {
         let premium = Premium(defaults: defaults, isPremium: true)
-        XCTAssertEqual(premium.remaining(.talk), 10)
-        for _ in 0..<10 { XCTAssertTrue(premium.use(.talk)) }
+        XCTAssertEqual(premium.remaining(.talk), 50)
+        for _ in 0..<50 { XCTAssertTrue(premium.use(.talk)) }
         XCTAssertFalse(premium.use(.talk))
-        for _ in 0..<3 { XCTAssertTrue(premium.use(.scan)) }
+        for _ in 0..<30 { XCTAssertTrue(premium.use(.scan)) }
         XCTAssertFalse(premium.use(.scan))
     }
 
