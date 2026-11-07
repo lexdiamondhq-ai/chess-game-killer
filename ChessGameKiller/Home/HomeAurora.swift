@@ -258,6 +258,12 @@ struct HomeAuroraView: View {
             HomeAuroraSection(title: "Face a rival", palette: palette, note: "Up next: \(stage.upNext.level.rival.shortName)")
             HomeAuroraRivals(next: stage.upNext.level, palette: palette, play: actions.playRival)
                 .padding(.horizontal, 12)
+            HomeAuroraSection(title: "For today", palette: palette, note: nil)
+            VStack(spacing: 10) {
+                todayRows
+            }
+            .padding(.horizontal, 16)
+            // Under For today (Alex, 2026-11-07).
             if let grudges {
                 HomeAuroraSection(title: "Your Grudge", palette: palette,
                                   note: grudges.unseen ? "It's waiting" : nil)
@@ -265,11 +271,6 @@ struct HomeAuroraView: View {
                                  born: grudgeBorn, lastSeen: grudgeSince, select: toggleGrudge, settle: settleGrudge)
                     .padding(.horizontal, 16)
             }
-            HomeAuroraSection(title: "For today", palette: palette, note: nil)
-            VStack(spacing: 10) {
-                todayRows
-            }
-            .padding(.horizontal, 16)
         }
         .padding(.bottom, 130)
         .frame(maxWidth: .infinity)
