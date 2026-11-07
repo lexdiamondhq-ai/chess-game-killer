@@ -93,6 +93,10 @@ struct HomeAuroraView: View {
             let lift: CGFloat = min(max(pulled / boardHeight, 0), 1)
             ZStack(alignment: .top) {
                 HomeAuroraBackdrop(palette: palette)
+                HomeAuroraAlcove(palette: palette)
+                    .frame(width: min(geo.size.width * 0.8, 340), height: boardHeight + 26)
+                    .padding(.top, 46)
+                    .opacity(1 - 0.7 * Double(lift))
                 spinningBoard(height: boardHeight, lift: lift)
                     .padding(.top, 58)
                 ScrollView(.vertical) {
@@ -804,11 +808,7 @@ struct HomeAuroraBackdrop: View {
                 LinearGradient(colors: [palette.bg, palette.bgLow], startPoint: .top, endPoint: .bottom)
                 glow(Color(hex: 0x8B6CFF), opacity: 0.42, at: CGPoint(x: w * 0.12, y: 40), size: w * 1.0)
                 glow(Color(hex: 0xF0708A), opacity: 0.34, at: CGPoint(x: w * 0.92, y: 20), size: w * 0.9)
-                glow(Color(hex: 0xE8C27A), opacity: 0.26, at: CGPoint(x: w * 0.5, y: 330), size: w * 1.2)
-                HomeAuroraRings(color: palette.gold, opacity: palette.dark ? 0.07 : 0.1)
-                    .frame(width: w * 1.6, height: w * 1.6)
-                    .position(x: w / 2, y: 330)
-                    .mask(LinearGradient(colors: [.black, .black, .clear], startPoint: .top, endPoint: .bottom))
+                glow(Color(hex: 0xE8C27A), opacity: 0.12, at: CGPoint(x: w * 0.5, y: 420), size: w * 1.2)
             }
         }
         .ignoresSafeArea()
@@ -821,6 +821,65 @@ struct HomeAuroraBackdrop: View {
                                  center: .center, startRadius: 0, endRadius: size / 2))
             .frame(width: size, height: size * 0.8)
             .position(point)
+    }
+}
+
+/// The niche the board turns in, like a gallery alcove: an arch of soft light stone framed by
+/// a double gold hairline, with a pool of shadow on its floor where the board stands.
+struct HomeAuroraAlcove: View {
+    let palette: HomeAuroraPalette
+
+    var body: some View {
+        GeometryReader { geo in
+            let w: CGFloat = geo.size.width
+            let h: CGFloat = geo.size.height
+            ZStack(alignment: .bottom) {
+                HomeAuroraArch()
+                    .fill(LinearGradient(colors: palette.dark
+                                         ? [Color(hex: 0x1A1A22), Color(hex: 0x101017)]
+                                         : [Color.white, Color(hex: 0xEFE7DB)],
+                                         startPoint: .top, endPoint: .bottom))
+                    .shadow(color: .black.opacity(palette.dark ? 0.5 : 0.08), radius: 24, y: 10)
+                HomeAuroraArch()
+                    .stroke(palette.gold.opacity(0.45), lineWidth: 0.75)
+                HomeAuroraArch()
+                    .inset(by: 7)
+                    .stroke(palette.gold.opacity(0.22), lineWidth: 0.5)
+                // The floor: a soft pool of shade under the board.
+                Ellipse()
+                    .fill(RadialGradient(colors: [Color.black.opacity(palette.dark ? 0.45 : 0.12), .clear],
+                                         center: .center, startRadius: 0, endRadius: w * 0.42))
+                    .frame(width: w * 0.9, height: h * 0.16)
+                    .padding(.bottom, h * 0.04)
+            }
+            .frame(width: w, height: h)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// A round-topped arch.
+struct HomeAuroraArch: InsettableShape {
+    var insetAmount: CGFloat = 0
+
+    func path(in rect: CGRect) -> Path {
+        let r: CGRect = rect.insetBy(dx: insetAmount, dy: insetAmount)
+        let radius: CGFloat = r.width / 2
+        var path = Path()
+        path.move(to: CGPoint(x: r.minX, y: r.maxY))
+        path.addLine(to: CGPoint(x: r.minX, y: r.minY + radius))
+        path.addArc(center: CGPoint(x: r.midX, y: r.minY + radius), radius: radius,
+                    startAngle: .degrees(180), endAngle: .degrees(0), clockwise: false)
+        path.addLine(to: CGPoint(x: r.maxX, y: r.maxY))
+        path.closeSubpath()
+        return path
+    }
+
+    func inset(by amount: CGFloat) -> HomeAuroraArch {
+        var arch = self
+        arch.insetAmount += amount
+        return arch
     }
 }
 

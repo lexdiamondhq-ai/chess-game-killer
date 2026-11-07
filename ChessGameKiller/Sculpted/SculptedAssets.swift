@@ -466,6 +466,11 @@ extension SculptedLook {
         look.ivoryPolish = Polish(roughness: 0.82, coat: 0.05, coatRoughness: 0.6)
         look.ebonyPolish = Polish(roughness: 0.8, coat: 0.05, coatRoughness: 0.6)
         look.metalRoughness = 0.55
+        // Honed stone and an even light: no bright pool or glare in the middle of the board.
+        look.stoneRoughness = 0.6
+        look.stoneCoat = 0.06
+        look.spot = nil
+        look.key = 560
         return look
     }()
 
