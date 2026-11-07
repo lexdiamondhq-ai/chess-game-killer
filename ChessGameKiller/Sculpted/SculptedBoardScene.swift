@@ -1988,16 +1988,78 @@ final class SculptedBoardScene {
         return placements
     }
 
-    /// A letter or number on a square: pale on the dark squares, dark on the light ones.
+    /// A letter or number on a square, in the other squares' color so it never matches the
+    /// square under it (Alex, 2026-11-07): the dark squares' stone on a light square, the light
+    /// squares' on a dark one. Settings, Coordinates, takes them all away.
     private func addLabel(_ text: String, at position: SIMD3<Float>, onLightSquare: Bool, orientation: simd_quatf) {
-        let color = onLightSquare ? UIColor(white: 0.12, alpha: 1) : look.platinumMark
-        let node = SCNNode(geometry: Self.mark(size: 0.26, color: color, alpha: onLightSquare ? 0.6 : 0.85,
+        let inks = Self.labelInks(squares: look.squares)
+        let node = SCNNode(geometry: Self.mark(size: 0.26, color: onLightSquare ? inks.onLight : inks.onDark, alpha: 0.95,
                                                mask: MarkImages.label(text)))
         node.simdPosition = position
         node.simdOrientation = orientation
         node.castsShadow = false
         node.renderingOrder = 8
         labelsNode.addChildNode(node)
+    }
+}
+
+extension SculptedBoardScene {
+    /// The colors for the files and ranks on a look's squares: the average of the dark squares
+    /// for the light ones, and of the light squares for the dark ones. Where the two stones are
+    /// too close to tell apart, near-black and near-white instead.
+    static func labelInks(squares name: String) -> (onLight: UIColor, onDark: UIColor) {
+        if let cached = labelInkCache[name] { return cached }
+        let fallback = (onLight: UIColor(white: 0.1, alpha: 1), onDark: UIColor(white: 0.95, alpha: 1))
+        var inks = fallback
+        if let image = UIImage(named: name)?.cgImage, let averages = squareAverages(image) {
+            let (light, dark) = averages
+            if luminance(light) - luminance(dark) > 0.25 {
+                inks = (onLight: color(dark), onDark: color(light))
+            }
+        }
+        labelInkCache[name] = inks
+        return inks
+    }
+
+    private static var labelInkCache: [String: (onLight: UIColor, onDark: UIColor)] = [:]
+
+    /// The average color of the light squares and of the dark ones, the board's picture drawn
+    /// down to 4 pixels a square; whichever group is brighter is the light one.
+    static func squareAverages(_ image: CGImage) -> (light: SIMD3<Float>, dark: SIMD3<Float>)? {
+        let side = 32
+        var pixels = [UInt8](repeating: 0, count: side * side * 4)
+        let drawn = pixels.withUnsafeMutableBytes { buffer -> Bool in
+            guard let context = CGContext(data: buffer.baseAddress, width: side, height: side, bitsPerComponent: 8,
+                                          bytesPerRow: side * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            context.interpolationQuality = .medium
+            context.draw(image, in: CGRect(x: 0, y: 0, width: side, height: side))
+            return true
+        }
+        guard drawn else { return nil }
+        var sums = [SIMD3<Float>(repeating: 0), SIMD3<Float>(repeating: 0)]
+        var counts = [0, 0]
+        let cell = side / 8
+        for y in 0..<side {
+            for x in 0..<side {
+                // Only each square's middle, clear of the blur at its edges.
+                let inX = x % cell, inY = y % cell
+                guard (1...2).contains(inX), (1...2).contains(inY) else { continue }
+                let group = (x / cell + y / cell) % 2
+                let i = (y * side + x) * 4
+                sums[group] += SIMD3(Float(pixels[i]), Float(pixels[i + 1]), Float(pixels[i + 2])) / 255
+                counts[group] += 1
+            }
+        }
+        guard counts[0] > 0, counts[1] > 0 else { return nil }
+        let a = sums[0] / Float(counts[0]), b = sums[1] / Float(counts[1])
+        return luminance(a) >= luminance(b) ? (a, b) : (b, a)
+    }
+
+    static func luminance(_ c: SIMD3<Float>) -> Float { 0.2126 * c.x + 0.7152 * c.y + 0.0722 * c.z }
+
+    private static func color(_ c: SIMD3<Float>) -> UIColor {
+        UIColor(red: CGFloat(c.x), green: CGFloat(c.y), blue: CGFloat(c.z), alpha: 1)
     }
 }
 

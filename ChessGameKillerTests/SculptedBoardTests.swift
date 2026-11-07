@@ -1,5 +1,6 @@
 import ChessKit
 import SceneKit
+import UIKit
 import XCTest
 @testable import ChessGameKiller
 
@@ -338,6 +339,23 @@ final class SculptedBoardTests: XCTestCase {
                     XCTAssertLessThan(screen(number.position).y, middle.y, "\(number.text) \(view)")
                 }
             }
+        }
+    }
+
+    /// The files and ranks never take the color of the square they're on (Alex, 2026-11-07):
+    /// on every look, the ink on a light square is well darker than it, and on a dark square well lighter.
+    func testTheFilesAndRanksStandOutFromTheirSquares() throws {
+        for look in SculptedLook.all {
+            let image = try XCTUnwrap(UIImage(named: look.squares)?.cgImage, look.squares)
+            let squares = try XCTUnwrap(SculptedBoardScene.squareAverages(image), look.squares)
+            let inks = SculptedBoardScene.labelInks(squares: look.squares)
+            func lum(_ color: UIColor) -> Float {
+                var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+                color.getRed(&r, green: &g, blue: &b, alpha: &a)
+                return SculptedBoardScene.luminance(SIMD3(Float(r), Float(g), Float(b)))
+            }
+            XCTAssertGreaterThan(SculptedBoardScene.luminance(squares.light) - lum(inks.onLight), 0.25, "\(look.name) light squares")
+            XCTAssertGreaterThan(lum(inks.onDark) - SculptedBoardScene.luminance(squares.dark), 0.25, "\(look.name) dark squares")
         }
     }
 

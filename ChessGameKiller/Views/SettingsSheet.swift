@@ -68,7 +68,7 @@ struct SettingsSheet: View {
                                     rule
                                 }
                             }
-                            ToggleRow(title: "Coordinates", subtitle: "Letters and numbers around the board. Off gives the squares more room.",
+                            ToggleRow(title: "Coordinates", subtitle: "The letters and numbers along the board's edge. Off hides them.",
                                       symbol: "textformat.abc", isOn: $coordinatesOn, theme: theme)
                             rule
                             ToggleRow(title: "Piece history", subtitle: "Your pieces wear what they've been through: gold seams, a promoted pawn's collar, notches, patina.",
