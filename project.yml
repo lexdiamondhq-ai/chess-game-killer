@@ -32,6 +32,8 @@ targets:
     info:
       path: Support/ChessGameKiller-Info.plist
       properties:
+        # The name under the home screen icon.
+        CFBundleDisplayName: Beauty of Chess
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         CFBundleURLTypes:
