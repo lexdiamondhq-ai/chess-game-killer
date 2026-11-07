@@ -109,9 +109,14 @@ struct HomeAuroraView: View {
                 HomeAuroraBackdrop(palette: palette)
                 // The marble starts just under the header's gold line, never above it.
                 HomeAuroraMarble(palette: palette)
-                    .frame(height: boardHeight + 100)
+                    // Pulled down, the slab grows with the gap so the carving sits in marble.
+                    .frame(height: boardHeight + 100 + max(0, -pulled))
                     .padding(.top, 54)
                     .opacity(1 - 0.6 * Double(lift))
+                // Cut into the marble under the board: it shows as the page is pulled down.
+                HomeAuroraCarving(palette: palette)
+                    .padding(.top, 58 + boardHeight + 4)
+                    .opacity(Double(min(max(-pulled / 70, 0), 1)))
                 spinningBoard(height: boardHeight, lift: lift)
                     .padding(.top, 58)
                 ScrollView(.vertical) {
@@ -290,8 +295,8 @@ struct HomeAuroraView: View {
             if let grudges {
                 HomeAuroraSection(title: "Your Grudge", palette: palette,
                                   note: grudges.unseen ? "It's waiting" : nil)
-                GrudgeCard(record: grudges.record, isSelected: grudgeOpen, dark: palette.dark,
-                           born: grudgeBorn, lastSeen: grudgeSince, select: toggleGrudge, settle: settleGrudge)
+                HomeAuroraGrudge(record: grudges.record, isOpen: grudgeOpen, palette: palette,
+                                 born: grudgeBorn, lastSeen: grudgeSince, select: toggleGrudge, settle: settleGrudge)
                     .padding(.horizontal, 16)
             }
             HomeAuroraSection(title: "For today", palette: palette, note: nil)
@@ -554,6 +559,128 @@ struct HomeAuroraRow<Picture: View>: View {
         }
         .buttonStyle(HomeStagePress())
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// Your Grudge on Home, dressed like the rows for today (Alex, 2026-11-07: "match the other
+/// areas"): a white card with a thin red edge, small caps, a serif line, and the onyx king at the
+/// right. A tap opens it into the summons, with Settle it to start the game; another tap on the
+/// summons closes it. Before the Grudge exists, the card says what wakes it.
+struct HomeAuroraGrudge: View {
+    let record: GrudgeRecord?
+    let isOpen: Bool
+    let palette: HomeAuroraPalette
+    var born = false
+    var lastSeen: (you: Int, it: Int)? = nil
+    let select: () -> Void
+    let settle: () -> Void
+
+    private var red: Color { palette.dark ? Color(hex: 0xF0606C) : Color(hex: 0xC8283A) }
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+        Group {
+            if let record, isOpen {
+                VStack(spacing: 16) {
+                    GrudgeStage(record: record, born: born, lastSeen: lastSeen)
+                    Button(action: settle) {
+                        Label("Settle it", systemImage: "play.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(red)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 48)
+                            .background(Capsule().fill(red.opacity(0.08)))
+                            .overlay(Capsule().strokeBorder(red.opacity(0.55), lineWidth: 1))
+                    }
+                    .buttonStyle(HomeStagePress())
+                }
+                .padding(16)
+                .contentShape(shape)
+                .onTapGesture(perform: select)
+                .transition(.opacity)
+            } else {
+                Button(action: select) { row }
+                    .buttonStyle(HomeStagePress())
+                    .disabled(record == nil)
+                    .accessibilityElement(children: .combine)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .background(shape.fill(palette.card))
+        .overlay(shape.strokeBorder(isOpen ? red.opacity(0.35) : palette.line, lineWidth: 1))
+        .animation(.spring(response: 0.5, dampingFraction: 0.86), value: isOpen)
+    }
+
+    private var row: some View {
+        HStack(spacing: 14) {
+            Capsule()
+                .fill(LinearGradient(colors: [red, red.opacity(0.2)], startPoint: .top, endPoint: .bottom))
+                .frame(width: 3)
+                .padding(.vertical, 4)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(record.map { "\($0.mood.title) · \($0.score)" }?.uppercased() ?? "Not yet")
+                    .font(.system(size: 10.5, weight: .bold).monospacedDigit())
+                    .tracking(1.3)
+                    .foregroundStyle(record == nil ? palette.ink3 : red)
+                Text(record == nil ? "Someone is watching" : "Settle the score")
+                    .font(.system(size: 19, weight: .regular, design: .serif))
+                    .foregroundStyle(palette.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Text(record.map { "Remembers every game. About \($0.rating.formatted()) now." }
+                     ?? "Lose to a rival once and it takes it personally.")
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(palette.ink2)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            GrudgeKing(scars: record?.scars ?? 0, size: 64, light: record == nil ? 0.1 : 0.55)
+                .opacity(record == nil ? 0.45 : 1)
+                .frame(width: 64, height: 64)
+        }
+        .padding(.vertical, 12)
+        .padding(.leading, 14)
+        .padding(.trailing, 12)
+        .contentShape(Rectangle())
+    }
+}
+
+/// "Beauty of Chess" cut into the marble under the board, seen when the page is pulled down
+/// (Alex, 2026-11-07). Each letter is a shallow groove: a dark upper wall, a lit lower lip and
+/// a gold-dusted floor, so it reads as carved rather than printed.
+struct HomeAuroraCarving: View {
+    let palette: HomeAuroraPalette
+
+    private var words: Text {
+        Text("Beauty ") + Text("of").italic() + Text(" Chess")
+    }
+
+    var body: some View {
+        let font = Font.system(size: 34, weight: .medium, design: .serif)
+        ZStack {
+            // The lit lower lip of each groove.
+            words.font(font)
+                .foregroundStyle(Color.white.opacity(palette.dark ? 0.12 : 0.9))
+                .offset(y: 1.2)
+            // The shadowed upper wall.
+            words.font(font)
+                .foregroundStyle(Color.black.opacity(palette.dark ? 0.7 : 0.32))
+                .offset(y: -0.8)
+                .blur(radius: 0.4)
+            // The floor, dusted with old gold.
+            words.font(font)
+                .foregroundStyle(LinearGradient(colors: [palette.gold.opacity(palette.dark ? 0.55 : 0.5),
+                                                         Color(hex: 0x6E5A40).opacity(palette.dark ? 0.6 : 0.42)],
+                                                startPoint: .top, endPoint: .bottom))
+                .blendMode(palette.dark ? .screen : .multiply)
+        }
+        .tracking(1)
+        .lineLimit(1)
+        .minimumScaleFactor(0.6)
+        .padding(.horizontal, 24)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 
