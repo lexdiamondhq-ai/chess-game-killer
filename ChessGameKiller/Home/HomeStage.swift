@@ -872,9 +872,16 @@ struct HomeStageMotes: View {
     let gold: Color
     let still: Bool
 
-    private static let seeds: [(x: CGFloat, y: CGFloat, r: CGFloat, speed: Double)] = (0..<26).map { i in
-        (x: CGFloat((i * 37) % 100) / 100, y: CGFloat((i * 53) % 100) / 100,
-         r: 0.8 + CGFloat(i % 3) * 0.6, speed: 0.02 + Double(i % 5) * 0.006)
+    private typealias Seed = (x: CGFloat, y: CGFloat, r: CGFloat, speed: Double)
+
+    private static let seeds: [Seed] = (0..<26).map(seed)
+
+    private static func seed(_ i: Int) -> Seed {
+        let x = CGFloat((i * 37) % 100) / 100
+        let y = CGFloat((i * 53) % 100) / 100
+        let r: CGFloat = 0.8 + CGFloat(i % 3) * 0.6
+        let speed: Double = 0.02 + Double(i % 5) * 0.006
+        return (x: x, y: y, r: r, speed: speed)
     }
 
     var body: some View {
@@ -995,10 +1002,17 @@ struct HomeMusicBars: View {
                 ForEach(0..<4, id: \.self) { i in
                     Capsule()
                         .fill(on ? gold : off)
-                        .frame(width: 2.5, height: on ? CGFloat(4 + 10 * abs(sin(t * 2.8 + Double(i) * 1.3))) : 4)
+                        .frame(width: 2.5, height: Self.bar(i, time: t, on: on))
                 }
             }
             .frame(height: 14, alignment: .bottom)
         }
+    }
+
+    private static func bar(_ i: Int, time: Double, on: Bool) -> CGFloat {
+        guard on else { return 4 }
+        let phase: Double = time * 2.8 + Double(i) * 1.3
+        let wave: Double = abs(sin(phase))
+        return CGFloat(4 + 10 * wave)
     }
 }
