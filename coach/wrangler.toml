@@ -24,6 +24,9 @@ DAILY_VOICE_CHARS = "40000"
 # Leo's voice on ElevenLabs: Trevor (a natural, conversational American, from the voice library), with the lessons' model, so he sounds the same.
 VOICE_ID = "69SAlwj2jajrSXUGnYAA"
 VOICE_MODEL = "eleven_v4"
+# Live Talk answers are read with ElevenLabs' Flash model, about half the cost per
+# character of the lessons' model, in the same voice. Remove to match the lessons exactly.
+TALK_VOICE_MODEL = "eleven_flash_v2_5"
 
 # At most 12 talks a minute from one address, so a leaked URL can't run up the bill.
 [[ratelimits]]

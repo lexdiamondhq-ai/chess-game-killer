@@ -60,8 +60,11 @@ export async function speak(env, text, fetchImpl = fetch, coach = "leo") {
     return null;
   }
   const timeout = Number(env.VOICE_TIMEOUT_MS) > 0 ? Number(env.VOICE_TIMEOUT_MS) : DEFAULT_TIMEOUT_MS;
-  // VOICE_MODEL is Leo's; Vera keeps the model her settings are made for.
-  const model = String(vera ? env.VERA_VOICE_MODEL || DEFAULT_VERA_VOICE_MODEL : env.VOICE_MODEL || DEFAULT_VOICE_MODEL).trim();
+  // VOICE_MODEL is Leo's; Vera keeps the model her settings are made for. TALK_VOICE_MODEL, when
+  // set, reads every live answer with a cheaper model instead: the lessons are recorded once,
+  // but Talk pays per character on every answer.
+  const lessonModel = vera ? env.VERA_VOICE_MODEL || DEFAULT_VERA_VOICE_MODEL : env.VOICE_MODEL || DEFAULT_VOICE_MODEL;
+  const model = String(env.TALK_VOICE_MODEL || lessonModel).trim();
   const settings = vera ? VERA_VOICE_SETTINGS : VOICE_SETTINGS;
   const body = { text: words, model_id: model };
   if (settings) body.voice_settings = settings;
