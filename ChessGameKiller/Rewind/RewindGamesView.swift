@@ -165,7 +165,7 @@ private struct GameCard: View {
                     // The result sits beside the name, so the moves and the date get the whole line.
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            Text(game.opponent)
+                            Text(game.opponentShown)
                                 .font(.app(.headline))
                                 .lineLimit(1)
                             Spacer(minLength: 4)
@@ -212,11 +212,7 @@ private struct GameCard: View {
     @ViewBuilder
     private var portrait: some View {
         if let rival {
-            Image(rival.portraitName)
-                .resizable()
-                .scaledToFill()
-                .frame(width: 32, height: 32)
-                .clipShape(Circle())
+            RivalCoin(rival: rival, size: 32)
         } else {
             Image(systemName: "person.2.fill")
                 .font(.app(.footnote))

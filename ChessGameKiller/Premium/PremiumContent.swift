@@ -44,9 +44,10 @@ enum RivalBoardsEarned {
         guard let index = BoardTheme.rivals.firstIndex(where: { $0.id == look.id }) else { return false }
         let earned = names(defaults)
         // The board's own name counts for wins from before The Crowd; since then, each rival board
-        // belongs to the crowd at the same level, so beating The 1000s opens the first one.
+        // belongs to the rival at the same level, so beating the Cub (once The 1000s) opens the first one.
         if earned.contains(look.name.lowercased()) { return true }
         guard let level = MatchController.Level(rawValue: index) else { return false }
-        return earned.contains(level.rival.name.lowercased())
+        let rival = level.rival
+        return earned.contains(rival.name.lowercased()) || earned.contains(rival.formerName?.lowercased() ?? "")
     }
 }

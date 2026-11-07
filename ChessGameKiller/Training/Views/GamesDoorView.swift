@@ -235,7 +235,7 @@ struct RecentGameRow: View {
             portrait
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text(game.opponent)
+                    Text(game.opponentShown)
                         .font(.app(.subheadline, weight: .semibold))
                         .foregroundStyle(.primary)
                     Text(game.result.title)
@@ -275,12 +275,7 @@ struct RecentGameRow: View {
     @ViewBuilder
     private var portrait: some View {
         if let rival {
-            Image(rival.portraitName)
-                .resizable()
-                .scaledToFill()
-                .frame(width: 34, height: 34)
-                .clipShape(Circle())
-                .accessibilityHidden(true)
+            RivalCoin(rival: rival, size: 34)
         } else {
             Image(systemName: "person.2.fill")
                 .font(.app(.footnote))

@@ -253,6 +253,29 @@ final class RivalsTests: XCTestCase {
         }
     }
 
+    /// The five rivals climb from the Cub to the Dragonlord, each on its own coin; games saved
+    /// under their former names ("The 1600s") still find them and show the new name.
+    func testRivalsHaveFacesAndKeepTheirFormerNames() {
+        XCTAssertEqual(Rival.all.map(\.name), ["The Cub", "The Hunter", "The Berserker", "The Lionheart", "The Dragonlord"])
+        for rival in Rival.all {
+            XCTAssertNotNil(rival.coinName.flatMap { UIImage(named: $0) }, "\(rival.slug)'s coin is missing")
+            XCTAssertEqual(Rival.named(rival.formerName ?? "")?.level, rival.level)
+        }
+        XCTAssertNil(Rival.grudge(.club).coinName)
+
+        let old = SavedGame(id: UUID(), date: .now, opponent: "The 1600s", level: MatchController.Level.club.rawValue,
+                            playerIsWhite: true, result: .win, accuracy: nil, positions: [], moves: [], moments: [])
+        XCTAssertEqual(old.opponentShown, "The Berserker")
+        let friend = SavedGame(id: UUID(), date: .now, opponent: "Dana", level: nil,
+                               playerIsWhite: true, result: .win, accuracy: nil, positions: [], moves: [], moments: [])
+        XCTAssertEqual(friend.opponentShown, "Dana")
+
+        // One rival is one player: "The Berserker wins", where the old crowds were many.
+        XCTAssertEqual("The Berserker".agreeing("wins", "win"), "wins")
+        XCTAssertEqual("The Dragonlord".midSentence.possessive, "the Dragonlord's")
+        XCTAssertEqual("The 1600s".agreeing("wins", "win"), "win")
+    }
+
     // MARK: Pictures
 
     /// The summons, caught a few seconds in, and the New Game sheet opening on a Grudge.

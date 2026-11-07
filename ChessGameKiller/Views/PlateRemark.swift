@@ -28,7 +28,7 @@ struct PlateRemark<Status: View>: View {
                     .transition(.opacity.combined(with: .offset(y: 3)))
                     .accessibilityLabel("\(match.setup.rival.name) says: \(line.text)")
             } else if isRival, let vote = shownVote {
-                CrowdVoteLine(vote: vote, crowd: match.setup.rival.name, theme: theme)
+                CrowdVoteLine(vote: vote, crowd: "players rated \(match.setup.rival.spokenElo)", theme: theme)
                     .id("vote-\(match.game.plyCount)")
                     .transition(.opacity.combined(with: .offset(y: 3)))
             } else if !isRival, let verdict = match.verdictLine {
