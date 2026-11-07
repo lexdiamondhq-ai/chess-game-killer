@@ -16,6 +16,8 @@ struct SculptedPositionBoard: View {
     var selected: Square?
     var targets: Set<Square> = []
     var lastMove: LastMove?
+    /// Squares lit in their own color on the stone, like where a reviewed move came from and went.
+    var marks: [SculptedCoachMark] = []
     /// Taps on squares. Nil makes the board look-only.
     var onTap: ((Square) -> Void)?
     var framing: SculptedCamera.Framing = .standing
@@ -54,6 +56,7 @@ struct SculptedPositionBoard: View {
             matchesPieces: true
         )
         state.framing = framing
+        state.coachMarks = marks
         state.coachArrows = Self.arrows(hints)
         return state
     }
