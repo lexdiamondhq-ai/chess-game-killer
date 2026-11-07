@@ -354,20 +354,30 @@ final class DrillRunner {
         let movesBefore = game.moveCount
         let selectedBefore = game.selected
         game.tap(square)
-        if game.pendingPromotion != nil {
-            let expected = solution.indices.contains(index) ? solution[index] : nil
-            game.promote(to: expected.flatMap(TrainingChess.promotionKind(of:)) ?? .queen)
-        }
-        if game.moveCount != movesBefore, let played = game.lastPlayed {
-            sound(for: played)
-            marks = []
-            if kind == .playout {
-                playoutMoved()
-            } else {
-                judge(played)
-            }
+        // A pawn on the last rank waits for the learner to choose its piece on the board.
+        if game.pendingPromotion != nil { return }
+        if game.moveCount != movesBefore {
+            moved()
         } else if game.selected != nil, game.selected != selectedBefore {
             sounds?.play(.select)
+        }
+    }
+
+    /// Finishes a promotion with the piece the learner chose, and judges the move.
+    func promote(to kind: Piece.Kind) {
+        guard phase == .solving, game.pendingPromotion != nil else { return }
+        game.promote(to: kind)
+        moved()
+    }
+
+    private func moved() {
+        guard let played = game.lastPlayed else { return }
+        sound(for: played)
+        marks = []
+        if kind == .playout {
+            playoutMoved()
+        } else {
+            judge(played)
         }
     }
 

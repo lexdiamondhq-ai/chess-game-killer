@@ -41,8 +41,20 @@ final class OpeningDrillRunner {
         guard !isDone, board.isHumanTurn else { return }
         let before = board.moveCount
         board.tap(square)
-        if board.pendingPromotion != nil { board.promote(to: .queen) }
+        // A pawn on the last rank waits for the player to choose its piece on the board.
+        if board.pendingPromotion != nil { return }
         guard board.moveCount != before, let played = board.lastPlayed else { return }
+        moved(played)
+    }
+
+    /// Finishes a promotion with the piece the player chose, and checks it against the line.
+    func promote(to kind: Piece.Kind) {
+        guard !isDone, board.pendingPromotion != nil else { return }
+        board.promote(to: kind)
+        if let played = board.lastPlayed { moved(played) }
+    }
+
+    private func moved(_ played: PlayedMove) {
         board.humanColors = []
         if played.uci == moves[index] {
             index += 1
@@ -397,7 +409,8 @@ struct OpeningLineView: View {
                 .padding(.horizontal, 16)
                 if let runner {
                     TrainerBoard(game: runner.board, theme: theme, side: boardSide, flipped: side == .black,
-                                 arrows: runner.arrows, onTap: { (square: Square) in runner.tap(square) })
+                                 arrows: runner.arrows, onTap: { (square: Square) in runner.tap(square) },
+                                 onPromote: { kind in runner.promote(to: kind) })
                     RoomMessage(text: runner.message, tone: runner.tone, theme: theme)
                         .padding(.horizontal, 16)
                 }
@@ -511,7 +524,8 @@ private struct RepertoireReview: View {
                 RoomHeader(title: entries.isEmpty ? "Review" : entries[safeIndex].name, subtitle: "Line \(position + 1) of \(entries.count)") { dismiss() }
                 if let runner {
                     TrainerBoard(game: runner.board, theme: theme, side: side, flipped: runner.side == .black,
-                                 arrows: runner.arrows, onTap: { (square: Square) in runner.tap(square) })
+                                 arrows: runner.arrows, onTap: { (square: Square) in runner.tap(square) },
+                                 onPromote: { kind in runner.promote(to: kind) })
                     RoomMessage(text: runner.message, tone: runner.tone, theme: theme)
                         .padding(.horizontal, 16)
                     if runner.isDone {

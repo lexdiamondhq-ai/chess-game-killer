@@ -278,6 +278,22 @@ struct RewindView: View {
             ghosts: ghosts,
             ghostColor: RewindPalette.gold
         )
+        .overlay {
+            // A pawn of the player's own reaching the last rank: they choose what it becomes.
+            if let explorer, let promotion = explorer.promoting {
+                GeometryReader { geo in
+                    PromotionPicker(
+                        color: promotion.color, theme: theme, squareSize: geo.size.width / 8,
+                        cancel: { withAnimation(.snappy(duration: 0.2)) { explorer.cancelPromotion() } },
+                        choose: { kind in
+                            stopAutoplay()
+                            withAnimation(.snappy(duration: 0.2)) { explorer.promote(to: kind) }
+                        }
+                    )
+                }
+                .transition(.opacity)
+            }
+        }
         .animation(.easeInOut(duration: 0.35), value: fen)
     }
 

@@ -18,6 +18,10 @@ struct TrainerBoard: View {
     var labels: [SquareLabel] = []
     /// Taps on squares. Nil makes the board look-only.
     var onTap: ((Square) -> Void)?
+    /// Finishes a pawn's promotion with the piece chosen. While a pawn waits on the last rank,
+    /// the board shows the picker (Queen, Rook, Bishop, Knight), as a game does; a tap beside
+    /// it puts the pawn back.
+    var onPromote: ((Piece.Kind) -> Void)?
     /// Whose move it is, shown under the board beside the switch. Nil shows none.
     var turn: Piece.Color?
     /// Whether the turn shows now; its place is kept when it doesn't, so nothing jumps.
@@ -32,6 +36,8 @@ struct TrainerBoard: View {
     var body: some View {
         VStack(spacing: 6) {
             board
+                .overlay { promotionPicker }
+                .animation(.snappy(duration: 0.2), value: game.pendingPromotion != nil)
             HStack(spacing: 8) {
                 if let turn {
                     TurnBadge(theme: theme, side: turn, showing: showsTurn)
@@ -40,6 +46,21 @@ struct TrainerBoard: View {
                 BoardViewSwitch(theme: theme)
             }
             .frame(width: side)
+        }
+    }
+
+    @ViewBuilder
+    private var promotionPicker: some View {
+        if let onPromote, let promotion = game.pendingPromotion {
+            GeometryReader { geo in
+                PromotionPicker(
+                    color: promotion.piece.color, theme: theme,
+                    squareSize: min(geo.size.width / 8, geo.size.height / 6),
+                    cancel: { game.undo() },
+                    choose: onPromote
+                )
+            }
+            .transition(.opacity)
         }
     }
 

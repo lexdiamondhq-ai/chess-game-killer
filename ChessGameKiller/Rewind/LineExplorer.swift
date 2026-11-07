@@ -105,6 +105,8 @@ final class LineExplorer {
     private(set) var isThinking = false
     /// A square picked to move from, when the player tries a move of their own.
     private(set) var selected: Square?
+    /// A pawn the player moved to the last rank, waiting for them to choose its piece.
+    private(set) var promoting: (from: Square, to: Square, color: Piece.Color)?
     /// Set when the player has left the engine's line with a move of their own.
     private(set) var ownMoveAt: Int?
 
@@ -184,16 +186,35 @@ final class LineExplorer {
     /// A tap on the board: pick a piece of the side to move, then where it goes.
     func tap(_ square: Square) {
         guard let position = Position(fen: fen) else { return }
+        promoting = nil
         let piece = position.piece(at: square)
         if let from = selected {
             if from == square { selected = nil; return }
             if piece?.color == position.sideToMove { selected = square; return }
-            let uci = from.notation + square.notation + (Self.isPromotion(from: from, to: square, in: position) ? "q" : "")
             selected = nil
-            play(uci)
+            if Self.isPromotion(from: from, to: square, in: position) {
+                // A legal promotion waits for the player to choose its piece over the board.
+                if Board(position: position).canMove(pieceAt: from, to: square) {
+                    promoting = (from, square, position.sideToMove)
+                }
+                return
+            }
+            play(from.notation + square.notation)
         } else if piece?.color == position.sideToMove {
             selected = square
         }
+    }
+
+    /// Finishes the player's promotion with the piece they chose.
+    func promote(to kind: Piece.Kind) {
+        guard let promotion = promoting else { return }
+        promoting = nil
+        play(promotion.from.notation + promotion.to.notation + kind.rawValue.lowercased())
+    }
+
+    /// A change of mind: the pawn stays where it was.
+    func cancelPromotion() {
+        promoting = nil
     }
 
     /// Plays a move of the player's own from the position on the board; the engine carries on from there.
@@ -219,6 +240,7 @@ final class LineExplorer {
     /// Then runs the line on to the level's depth, so there is always more to see.
     func refresh() {
         cancel()
+        promoting = nil
         let gen = generation
         let fen = self.fen
         let wanted = level.branches
