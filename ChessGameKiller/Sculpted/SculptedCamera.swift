@@ -102,23 +102,18 @@ struct SculptedCamera: Equatable {
 
     /// Half the board's width including its frame.
     static let boardHalfWidth: Float = 4.55
-    /// Half the width of the squares with the frame's inner edge and its metal line. The board
-    /// is kept large (Alex, 2026-11-04: "much larger, taking up more of the screen"), so only the
-    /// part of the frame that carries the files and ranks comes into the picture as well.
-    static let fitHalfWidth: Float = 4.1
-    /// Where the files and ranks sit on the frame, outside the squares as on a printed board
-    /// (Alex, 2026-11-06): just past the metal line round the squares, nearer it than the
-    /// frame's rounded outer edge, so the squares give up as little of the screen as they can.
-    static let labelBand: Float = 4.25
-    /// How far out the letters and numbers reach, with a little glass beyond them: the frame
-    /// shows this far on the player's side and down both sides, so the board stays centered.
-    static let labelReach: Float = 4.4
+    /// Half the width of the squares with the metal line round them and a thin rim of frame.
+    /// The board runs edge to edge (Alex, 2026-11-07: other apps' boards look larger), so
+    /// the rest of the frame stays off the sides of the picture.
+    static let fitHalfWidth: Float = 4.06
+    /// How far each file letter and rank number sits in from its corner square's two edges.
+    static let labelInset: Float = 0.15
     /// The tallest piece, the king, with its cross.
     static let tallest: Float = 1.47
 
     /// What must stay in the picture: the squares' corners with a sliver of frame (its top, and
-    /// its near face below them), the files and ranks on the frame, and the tops of the tallest
-    /// pieces on the far rank.
+    /// its near face below them), and the tops of the tallest pieces on the far rank. The files
+    /// and ranks are inside the squares.
     static var keyPoints: [SIMD3<Float>] { keyPoints(tallest: tallest) }
 
     static func keyPoints(tallest: Float) -> [SIMD3<Float>] {
@@ -129,17 +124,6 @@ struct SculptedCamera: Equatable {
                 points.append(SIMD3(x, 0.005, z))
                 points.append(SIMD3(x, -0.135, z))
             }
-        }
-        // The numbers down the side beside the first and last ranks, the letters along the near
-        // side under the a- and h-files. Seen from Black's side the same points turn with the camera.
-        let reach = labelReach
-        for x in [-reach, reach] {
-            for z: Float in [-3.6, 3.6] {
-                points.append(SIMD3(x, 0.005, z))
-            }
-        }
-        for x: Float in [-3.6, 3.6] {
-            points.append(SIMD3(x, 0.005, reach))
         }
         for x: Float in [-3.5, 0, 3.5] {
             points.append(SIMD3(x, tallest, -3.5))
@@ -223,7 +207,7 @@ struct SculptedCamera: Equatable {
         return camera
     }
 
-    private static let margin = SIMD2<Float>(0.012, 0.035)
+    private static let margin = SIMD2<Float>(0.004, 0.035)
 
     /// The chair's height above the board, standing, in degrees: from the classic view across
     /// the table to a higher one that opens up the far ranks on a tall phone.

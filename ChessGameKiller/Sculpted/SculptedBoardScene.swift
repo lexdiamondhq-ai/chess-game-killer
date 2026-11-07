@@ -1930,7 +1930,7 @@ final class SculptedBoardScene {
         let metal = shared.copy() as? SCNMaterial ?? shared
         inlay = metal
         inlayGlow = metal.emission.contents
-        let gap: Float = 0.09
+        let gap: Float = 0.03
         let line: Float = 0.012
         let span = 8 + 2 * gap + line
         let inlay: [(x: Float, z: Float, width: Float, length: Float)] = [
@@ -1948,45 +1948,51 @@ final class SculptedBoardScene {
         scene.rootNode.addChildNode(board)
     }
 
-    /// The files and ranks on the frame, outside the squares as on a printed board, upright for
-    /// the player: the letters along the frame's near side, each under its file, and the numbers
-    /// down its left side, each beside its rank. From Black's side the near side and the left
-    /// are the other ones, and the letters run h to a.
+    /// The files and ranks in the corners of the edge squares, as most boards show them, upright
+    /// for the player: each letter in the bottom-right corner of its file's square on the near
+    /// rank, each number in the top-left corner of its rank's square on the left file. From
+    /// Black's side the near rank and the left file are the other ones, and the letters run h to a.
     private func buildLabels(flipped: Bool) {
         labelsNode.childNodes.forEach { $0.removeFromParentNode() }
         let turn = Self.labelOrientation(flipped: flipped)
         for label in Self.labelPlacements(flipped: flipped) {
-            addLabel(label.text, at: label.position, orientation: turn)
+            addLabel(label.text, at: label.position, onLightSquare: (label.square.fileIndex + label.square.rankIndex) % 2 == 1, orientation: turn)
         }
     }
 
-    /// Lying on the frame, the tops of the letters toward the far side of the board.
+    /// Lying on the squares, the tops of the letters toward the far side of the board.
     static func labelOrientation(flipped: Bool) -> simd_quatf {
         simd_quatf(angle: flipped ? .pi : 0, axis: SculptedCamera.up) * flat
     }
 
-    /// Where each file letter and rank number sits on the frame, just above the glass's top.
-    static func labelPlacements(flipped: Bool) -> [(text: String, position: SIMD3<Float>)] {
+    /// Where each file letter and rank number sits, a hair above the squares, and on which square.
+    static func labelPlacements(flipped: Bool) -> [(text: String, position: SIMD3<Float>, square: Square)] {
         // Toward the player: White's side of the board, or Black's.
         let near: Float = flipped ? -1 : 1
-        let band = SculptedCamera.labelBand
-        let height: Float = 0.011
+        let inset = SculptedCamera.labelInset
+        let height: Float = 0.004
         let files = Array("abcdefgh")
-        var placements: [(text: String, position: SIMD3<Float>)] = []
+        var placements: [(text: String, position: SIMD3<Float>, square: Square)] = []
         for index in 0..<8 {
-            // The file's and the rank's own line on the board, whichever side the player is on.
+            // The near rank's square under each file, and the left file's square beside each rank.
+            let bottom = Square(file: index, rank: flipped ? 7 : 0)
+            let left = Square(file: flipped ? 7 : 0, rank: index)
             let file = Float(index) - 3.5
             let rank = 3.5 - Float(index)
-            placements.append((String(files[index]), SIMD3(file, height, band * near)))
-            // The player's left is the a-file's side for White and the h-file's for Black.
-            placements.append(("\(index + 1)", SIMD3(-band * near, height, rank)))
+            // The player's right is +x for White and -x for Black; the far side -z for White, +z for Black.
+            placements.append((String(files[index]),
+                               SIMD3(file + (0.5 - inset) * near, height, (4 - inset) * near), bottom))
+            placements.append(("\(index + 1)",
+                               SIMD3(-(4 - inset) * near, height, rank - (0.5 - inset) * near), left))
         }
         return placements
     }
 
-    /// A letter or number on the smoked glass frame, pale like the metal line beside it.
-    private func addLabel(_ text: String, at position: SIMD3<Float>, orientation: simd_quatf) {
-        let node = SCNNode(geometry: Self.mark(size: 0.3, color: look.platinumMark, alpha: 0.85, mask: MarkImages.label(text)))
+    /// A letter or number on a square: pale on the dark squares, dark on the light ones.
+    private func addLabel(_ text: String, at position: SIMD3<Float>, onLightSquare: Bool, orientation: simd_quatf) {
+        let color = onLightSquare ? UIColor(white: 0.12, alpha: 1) : look.platinumMark
+        let node = SCNNode(geometry: Self.mark(size: 0.26, color: color, alpha: onLightSquare ? 0.6 : 0.85,
+                                               mask: MarkImages.label(text)))
         node.simdPosition = position
         node.simdOrientation = orientation
         node.castsShadow = false
