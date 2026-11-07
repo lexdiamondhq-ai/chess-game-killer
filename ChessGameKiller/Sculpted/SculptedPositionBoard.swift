@@ -18,6 +18,8 @@ struct SculptedPositionBoard: View {
     var lastMove: LastMove?
     /// Squares lit in their own color on the stone, like where a reviewed move came from and went.
     var marks: [SculptedCoachMark] = []
+    /// The coach's own arrows, lying on the stone, as in lessons and drills (Talk it through's verdicts).
+    var arrows: [SculptedCoachArrow] = []
     /// Taps on squares. Nil makes the board look-only.
     var onTap: ((Square) -> Void)?
     var framing: SculptedCamera.Framing = .standing
@@ -57,7 +59,7 @@ struct SculptedPositionBoard: View {
         )
         state.framing = framing
         state.coachMarks = marks
-        state.coachArrows = Self.arrows(hints)
+        state.coachArrows = Self.arrows(hints) + arrows
         return state
     }
 
