@@ -58,6 +58,8 @@ struct HomeView: View {
     @AppStorage("setup.level") private var storedLevel: Int?
     @AppStorage("setup.grudge") private var grudgeOn = false
     @Environment(GrudgeStore.self) private var grudges: GrudgeStore?
+    /// Your Grudge picked from Home while a game is under way: asks before that game is lost.
+    @State private var confirmingGrudge = false
     @AppStorage("setup.clock") private var timeControl: TimeControl = .unlimited
     @AppStorage("haptics") private var hapticsOn = true
     /// The name friends see, from the last challenge: the home says hello with it.
@@ -674,8 +676,34 @@ extension HomeView {
             } else {
                 actions.resume()
             }
-        }, playRival: { level in playRival(level) })
+        }, playRival: { level in playRival(level) }, playGrudge: playGrudge)
         return HomeAuroraView(tone: tone, info: auroraInfo, actions: auroraActions)
+            .confirmationDialog("Leave your game against \(match.opponentName)?",
+                                isPresented: $confirmingGrudge, titleVisibility: .visible) {
+                Button("Resign and play Your Grudge", role: .destructive) { startGrudge() }
+                Button("Keep playing", role: .cancel) {}
+            } message: {
+                Text("It counts as a loss for your army.")
+            }
+    }
+
+    /// Your Grudge, from Home: the game starts at once on the side and clock picked last time.
+    /// A game under way that would count as a loss is asked about first.
+    private func playGrudge() {
+        if match.newGameForfeits {
+            confirmingGrudge = true
+        } else {
+            startGrudge()
+        }
+    }
+
+    private func startGrudge() {
+        guard let record = grudges?.record else { return }
+        grudgeOn = true
+        var setup = MatchController.Setup(playerColor: side.color, level: record.level, timeControl: timeControl)
+        setup.grudge = true
+        setup.grudgeSkill = record.skill
+        actions.start(setup)
     }
 }
 
