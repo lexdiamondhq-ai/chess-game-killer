@@ -1,8 +1,7 @@
 import Foundation
 
-/// The first run: a short welcome that asks how much chess the player has played, lets them
-/// pick a board, tells them the three rules that cost something, and starts their first game.
-/// It shows once. Settings can bring it back.
+/// The first run: a short animated tour of what the app does, then the player's name, how much
+/// chess they have played and a board, and their first game. It shows once. Settings can bring it back.
 enum Welcome {
     static let key = "welcomeSeen"
 
@@ -28,7 +27,7 @@ enum Welcome {
     /// The looks offered on the welcome: the ones every player has. Gilded, the default, first.
     static let looks: [BoardTheme.ID] = [.gilded, .noir, .midnight]
 
-    /// The page CI asks for with `-showcaseWelcome 2`, counted from 0.
+    /// The page CI asks for with `-showcaseWelcome 2`, counted from 0 (`WelcomeFlow.pages` in all).
     static func showcasePage(_ defaults: UserDefaults = .standard) -> Int {
         Int(defaults.string(forKey: "showcaseWelcome") ?? "") ?? 0
     }

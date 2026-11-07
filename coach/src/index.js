@@ -187,7 +187,7 @@ async function runTalk(talk, env, deps, writer) {
     const answerStarted = deps.now();
     let answer = null;
     try {
-      answer = await deps.wordAnswer(client, env, { checked, spoken, coach: talk.coach });
+      answer = await deps.wordAnswer(client, env, { checked, spoken, coach: talk.coach, name: talk.name });
     } catch {
       answer = null;
     }
@@ -300,8 +300,17 @@ export function checkTalk(body) {
       voice: body.voice !== false,
       facts: cleanFacts(body.facts, legal),
       coach: coachOf(body.coach),
+      name: nameOf(body.name),
     },
   };
+}
+
+/** The player's first name, when they gave one: letters, spaces, hyphens and apostrophes, at most 24. */
+export function nameOf(value) {
+  if (typeof value !== "string") return null;
+  const name = value.normalize("NFC").trim().replace(/\s+/g, " ");
+  if (name === "" || [...name].length > 24 || name.split(" ").length > 3) return null;
+  return /^[\p{L}][\p{L}\p{M} '’-]*$/u.test(name) ? name : null;
 }
 
 function refuse(detail) {

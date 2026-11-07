@@ -29,12 +29,36 @@ struct SettingsSheet: View {
     @AppStorage(ReviewLevel.storageKey) private var reviewLevel = ReviewLevel.club.rawValue
     /// One reminder a day, at the hour you usually play, only on a day not done yet.
     @AppStorage(DailyReminders.enabledKey) private var remindersOn = true
+    /// What the home and the coach call you, and the name friends see on a challenge.
+    @AppStorage(YourName.key) private var playerName = ""
 
     @Environment(\.dismiss) private var dismiss
     @State private var offer: PremiumFeature?
     @State private var showingPremium = false
 
     private var theme: BoardTheme { .named(themeID) }
+
+    /// Your name, typed in place: the home says hello with it and the coach uses it.
+    private var nameRow: some View {
+        HStack(spacing: 12) {
+            IconTile(symbol: "person.fill", theme: theme)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Your name")
+                    .font(.app(.body, weight: .semibold))
+                TextField("What \(Coach.current.name) calls you", text: $playerName)
+                    .font(.app(.subheadline))
+                    .textContentType(.givenName)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
+                    .submitLabel(.done)
+                    .onChange(of: playerName) { _, new in
+                        if new.count > YourName.maxLength { playerName = String(new.prefix(YourName.maxLength)) }
+                    }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+    }
     private var accent: Color { theme.trainingAccent }
 
     var body: some View {
@@ -44,6 +68,12 @@ struct SettingsSheet: View {
                     preview
 
                     PremiumSettingsCard(theme: theme) { showingPremium = true }
+
+                    section("You") {
+                        SettingsGroup(theme: theme) {
+                            nameRow
+                        }
+                    }
 
                     section("Board") {
                         themeGrid(Self.looks)

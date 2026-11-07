@@ -61,7 +61,7 @@ export function coachPrompt(coach = "leo") {
 }
 
 /** The request for call 2: the checked facts in plain words, for the coach to say. */
-export function buildAnswerRequest(checked, spoken, env = {}, coach = "leo") {
+export function buildAnswerRequest(checked, spoken, env = {}, coach = "leo", name = null) {
   return {
     model: modelOf(env),
     // Room for a little thinking as well as the answer.
@@ -70,7 +70,7 @@ export function buildAnswerRequest(checked, spoken, env = {}, coach = "leo") {
     fallbacks: "default",
     output_config: { effort: effortOf(env.ANSWER_EFFORT) },
     system: [{ type: "text", text: coachPrompt(coach), cache_control: { type: "ephemeral" } }],
-    messages: [{ role: "user", content: describeVerdict(checked, spoken, coach) }],
+    messages: [{ role: "user", content: describeVerdict(checked, spoken, coach, name) }],
   };
 }
 
@@ -79,11 +79,11 @@ export function buildAnswerRequest(checked, spoken, env = {}, coach = "leo") {
  * let it through, otherwise { text: templateAnswer(...), source: "template" }.
  * Never throws. When nothing they said was about the position, Claude isn't asked.
  */
-export async function wordAnswer(client, env, { checked, spoken, coach = "leo" }) {
+export async function wordAnswer(client, env, { checked, spoken, coach = "leo", name = null }) {
   const template = () => ({ text: templateAnswer(checked, spoken), source: "template" });
   if (!client || !checked || checked.understood === false) return template();
   try {
-    const message = await callClaude(client, buildAnswerRequest(checked, spoken, env, coach), claudeTimeoutMs(env));
+    const message = await callClaude(client, buildAnswerRequest(checked, spoken, env, coach, name), claudeTimeoutMs(env));
     const text = guardAnswer(messageText(message), spoken);
     if (text) return { text, source: "leo" };
     console.error("answer: the guard turned Claude's wording down");
@@ -93,7 +93,7 @@ export async function wordAnswer(client, env, { checked, spoken, coach = "leo" }
   return template();
 }
 
-function describeVerdict(checked, spoken, coach = "leo") {
+function describeVerdict(checked, spoken, coach = "leo", name = null) {
   const facts = isObject(spoken) ? spoken : {};
   const lines = [];
   const said = typeof facts.said === "string" ? facts.said : "";
@@ -112,7 +112,9 @@ function describeVerdict(checked, spoken, coach = "leo") {
   if (text(facts.habit)) lines.push(`Habit: ${text(facts.habit)}`);
   if (text(facts.nudge)) lines.push(`Hint (give this, not the best move): ${text(facts.nudge)}`);
   if (lines.length === (said ? 3 : 1)) lines.push("Nothing they said could be checked.");
-  lines.push("</checked>", "", `Say ${COACHES[coachOf(coach)].name}'s answer.`);
+  lines.push("</checked>", "");
+  if (name) lines.push(`The player's name is ${name}. Use it at most once, only where a coach naturally would.`);
+  lines.push(`Say ${COACHES[coachOf(coach)].name}'s answer.`);
   return lines.join("\n");
 }
 
