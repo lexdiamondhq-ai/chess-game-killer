@@ -54,17 +54,93 @@ struct MoveReview: Equatable, Identifiable {
         }
     }
 
-    /// Grades a move by how much it lowered the mover's chance of winning
-    /// (Lichess's scale: 0.1 is an inaccuracy, 0.2 a mistake, 0.3 a blunder).
-    static func grade(before: Evaluation, after: Evaluation, playedBest: Bool) -> Grade {
+    /// Grades a move by what it cost the mover, taking the harshest of three readings:
+    ///
+    /// - The drop in winning chances (Lichess's scale: 0.1 is an inaccuracy, 0.2 a mistake,
+    ///   0.3 a blunder). Right in a level game, but the curve goes flat once a side is far
+    ///   ahead (it stops at ten pawns), so on its own it called hanging a piece "Excellent"
+    ///   and walking into mate "Good" whenever the game was already lopsided.
+    /// - Allowing a forced mate is a blunder, however bad things already were.
+    /// - Material the engine's own lines say the move gives away (`materialLoss`, in pawns,
+    ///   from `materialLoss(fen:best:played:)`): a piece is a blunder, two pawns a mistake,
+    ///   a pawn an inaccuracy. It only counts when the engine also scores the move worse,
+    ///   so a sound sacrifice isn't punished. A move that leaves the mover clearly winning
+    ///   is at worst a mistake by this reading: it gave a lot back without throwing the game.
+    static func grade(before: Evaluation, after: Evaluation, playedBest: Bool, materialLoss: Int? = nil) -> Grade {
         if playedBest { return .best }
-        let loss = before.winningChances - after.winningChances
+        var result = grade(chanceLoss: before.winningChances - after.winningChances)
+        if after.isGettingMated, !before.isGettingMated {
+            result = .blunder
+        }
+        if let materialLoss, before.centipawnsForGrading - after.centipawnsForGrading > 20 {
+            var byMaterial: Grade
+            switch materialLoss {
+            case 3...: byMaterial = .blunder
+            case 2: byMaterial = .mistake
+            case 1: byMaterial = .inaccuracy
+            default: byMaterial = .excellent
+            }
+            if after.isClearlyWinning, byMaterial == .blunder { byMaterial = .mistake }
+            result = worse(result, byMaterial)
+        }
+        return result
+    }
+
+    private static func grade(chanceLoss loss: Double) -> Grade {
         switch loss {
         case ..<0.04: return .excellent
         case ..<0.10: return .good
         case ..<0.20: return .inaccuracy
         case ..<0.30: return .mistake
         default: return .blunder
+        }
+    }
+
+    /// Grades are declared from best to worst.
+    private static func worse(_ a: Grade, _ b: Grade) -> Grade {
+        let order = Grade.allCases
+        return (order.firstIndex(of: a) ?? 0) >= (order.firstIndex(of: b) ?? 0) ? a : b
+    }
+
+    /// How many pawns' worth of material the played line ends up behind the best line,
+    /// for the side to move in `fen`. Both lines start from `fen`: `best` is the engine's
+    /// line, `played` is the move played followed by the engine's line after it.
+    ///
+    /// Material is compared after 2, 4 and 6 moves (each side's turn done) and the
+    /// smallest gap counts, so a trade that is just a move further along in one line
+    /// than the other isn't mistaken for a loss. A piece really given away stays missing
+    /// at every step. Nil when either line is too short to tell.
+    static func materialLoss(fen: String, best: [String], played: [String]) -> Int? {
+        let horizon = min(6, best.count, played.count)
+        guard horizon >= 2 else { return nil }
+        var smallest: Int?
+        for plies in stride(from: 2, through: horizon, by: 2) {
+            guard let mine = Notation.materialLead(after: Array(best.prefix(plies)), from: fen),
+                  let theirs = Notation.materialLead(after: Array(played.prefix(plies)), from: fen) else { break }
+            smallest = min(smallest ?? .max, mine - theirs)
+        }
+        return smallest
+    }
+}
+
+private extension Evaluation {
+    /// Centipawns with mates as 20 pawns, to tell whether the engine scores a move worse at all.
+    var centipawnsForGrading: Int {
+        switch self {
+        case .centipawns(let cp): return cp
+        case .mate(let n): return n > 0 ? 2000 : -2000
+        }
+    }
+
+    var isGettingMated: Bool {
+        if case .mate(let n) = self { return n <= 0 }
+        return false
+    }
+
+    var isClearlyWinning: Bool {
+        switch self {
+        case .centipawns(let cp): return cp >= 500
+        case .mate(let n): return n > 0
         }
     }
 }
@@ -139,6 +215,25 @@ enum Notation {
         }
         return parts.joined(separator: " ")
     }
+
+    /// How far the side to move in `fen` is ahead in material, in pawns, once `moves`
+    /// are played. Nil when a move doesn't fit.
+    static func materialLead(after moves: [String], from fen: String) -> Int? {
+        guard let position = Position(fen: fen) else { return nil }
+        let mover = position.sideToMove
+        var board = Board(position: position)
+        for uci in moves {
+            guard let squares = squares(of: uci), board.move(pieceAt: squares.from, to: squares.to) != nil else { return nil }
+            if case .promotion(let pawnMove) = board.state {
+                _ = board.completePromotion(of: pawnMove, to: promotionKind(uci))
+            }
+        }
+        return board.position.pieces.reduce(0) { total, piece in
+            total + (pieceValues[piece.kind] ?? 0) * (piece.color == mover ? 1 : -1)
+        }
+    }
+
+    private static let pieceValues: [Piece.Kind: Int] = [.pawn: 1, .knight: 3, .bishop: 3, .rook: 5, .queen: 9]
 
     private static func promotionKind(_ uci: String) -> Piece.Kind {
         if uci.count == 5, let letter = uci.last, let kind = Piece.Kind(rawValue: letter.uppercased()) {
