@@ -20,6 +20,8 @@ struct HomeAuroraActions {
     var stage: HomeStageActions
     /// Opens one of your games.
     var open: (HomeCurrentGame) -> Void
+    /// Starts a game against one of the five rivals.
+    var playRival: (MatchController.Level) -> Void = { _ in }
 }
 
 /// Aurora's colors, night and day.
@@ -270,6 +272,9 @@ struct HomeAuroraView: View {
             numbers
                 .padding(.horizontal, 20)
                 .padding(.top, 22)
+            HomeAuroraSection(title: "Face a rival", palette: palette, note: "Up next: \(stage.upNext.level.rival.shortName)")
+            HomeAuroraRivals(next: stage.upNext.level, palette: palette, play: actions.playRival)
+                .padding(.horizontal, 12)
             HomeAuroraSection(title: "For today", palette: palette, note: nil)
             VStack(spacing: 10) {
                 todayRows
@@ -760,6 +765,61 @@ struct HomeAuroraSection: View {
         .padding(.top, 22)
         .padding(.bottom, 12)
         .accessibilityAddTraits(.isHeader)
+    }
+}
+
+/// The five rivals on Today, each on its coin, the coins growing from the Cub to the
+/// Dragonlord so the row climbs (Alex, 2026-11-07: "Let's have these visible on the Today
+/// screen"). The rival up next wears a gold ring; a tap starts a game against that rival.
+struct HomeAuroraRivals: View {
+    let next: MatchController.Level
+    let palette: HomeAuroraPalette
+    let play: (MatchController.Level) -> Void
+
+    @ScaledMetric(relativeTo: .caption) private var largest: CGFloat = 64
+
+    private func size(_ rival: Rival) -> CGFloat {
+        min(largest, 72) * (0.72 + 0.07 * CGFloat(rival.level.rawValue))
+    }
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: 0) {
+            ForEach(Rival.all) { rival in
+                coin(rival)
+            }
+        }
+    }
+
+    private func coin(_ rival: Rival) -> some View {
+        let isNext = rival.level == next
+        return Button { play(rival.level) } label: {
+            VStack(spacing: 4) {
+                RivalCoin(rival: rival, size: size(rival))
+                    .padding(2)
+                    .overlay {
+                        if isNext {
+                            Circle()
+                                .strokeBorder(palette.gold, lineWidth: 1.5)
+                                .shadow(color: palette.gold.opacity(0.6), radius: 7)
+                        }
+                    }
+                Text(rival.shortName)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(palette.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                Text(rival.elo.replacingOccurrences(of: "~", with: ""))
+                    .font(.system(size: 10, weight: .bold).monospacedDigit())
+                    .tracking(0.6)
+                    .foregroundStyle(palette.ink2)
+            }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(HomeStagePress())
+        .accessibilityLabel("Play \(rival.name)")
+        .accessibilityValue(rival.spokenElo)
+        .accessibilityHint(isNext ? "Up next" : "")
     }
 }
 

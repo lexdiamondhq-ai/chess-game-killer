@@ -674,7 +674,7 @@ extension HomeView {
             } else {
                 actions.resume()
             }
-        })
+        }, playRival: { level in playRival(level) })
         return HomeAuroraView(tone: tone, info: auroraInfo, actions: auroraActions)
     }
 }
