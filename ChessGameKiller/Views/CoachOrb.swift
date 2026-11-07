@@ -12,7 +12,11 @@ struct CoachOrb: View {
     @Binding var isExpanded: Bool
     /// How tall the unfolded panel may get before its contents scroll, so the board keeps its room.
     var expandedMaxHeight: CGFloat? = nil
-    let newGame: () -> Void
+    /// Opens the New Game sheet. Nil when Home is on: new games start only from Home
+    /// (Alex, 2026-11-07), and the finished game offers Home instead.
+    let newGame: (() -> Void)?
+    /// Goes back to Home, offered beside Rematch once the game is over.
+    var home: (() -> Void)? = nil
     /// Opens the player's saved games.
     let showGames: () -> Void
     /// Opens Talk it through for the position on the board. Nil leaves it out.
@@ -43,7 +47,7 @@ struct CoachOrb: View {
     var body: some View {
         ZStack {
             if isExpanded {
-                CoachPanel(match: match, theme: theme, coachMove: $coachMove, newGame: newGame, showGames: showGames,
+                CoachPanel(match: match, theme: theme, coachMove: $coachMove, newGame: newGame, home: home, showGames: showGames,
                            talk: talk, analyze: analyze, close: { collapse(felt: true) }, collapse: { collapse() })
                     .transition(.opacity.combined(with: .scale(scale: 0.97)))
             } else {
@@ -393,7 +397,8 @@ private struct CoachPanel: View {
     let match: MatchController
     let theme: BoardTheme
     @Binding var coachMove: Int?
-    let newGame: () -> Void
+    let newGame: (() -> Void)?
+    let home: (() -> Void)?
     let showGames: () -> Void
     /// Opens Talk it through. Nil leaves it out.
     let talk: (() -> Void)?
@@ -754,9 +759,11 @@ private struct CoachPanel: View {
                     showGames()
                 }
             }
-            ActionButton(title: "New game", symbol: Glyphs.play, theme: theme) {
-                collapse()
-                newGame()
+            if let newGame {
+                ActionButton(title: "New game", symbol: Glyphs.play, theme: theme) {
+                    collapse()
+                    newGame()
+                }
             }
         }
     }
@@ -778,17 +785,31 @@ private struct CoachPanel: View {
             .foregroundStyle(theme.isDark ? Color.black : Color.white)
             .shadow(color: theme.glows ? accent.opacity(0.5) : .clear, radius: 12)
 
-            Button {
-                collapse()
-                newGame()
-            } label: {
-                Label("New game", systemImage: "plus")
-                    .font(.app(.headline))
-                    .frame(maxWidth: .infinity)
-                    .frame(minHeight: 50)
+            if let newGame {
+                Button {
+                    collapse()
+                    newGame()
+                } label: {
+                    Label("New game", systemImage: "plus")
+                        .font(.app(.headline))
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: 50)
+                }
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.roundedRectangle(radius: 16))
+            } else if let home {
+                Button {
+                    collapse()
+                    home()
+                } label: {
+                    Label("Home", image: Glyphs.home)
+                        .font(.app(.headline))
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: 50)
+                }
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.roundedRectangle(radius: 16))
             }
-            .buttonStyle(.bordered)
-            .buttonBorderShape(.roundedRectangle(radius: 16))
         }
     }
 

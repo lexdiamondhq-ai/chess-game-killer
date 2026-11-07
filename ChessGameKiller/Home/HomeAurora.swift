@@ -22,6 +22,8 @@ struct HomeAuroraActions {
     var open: (HomeCurrentGame) -> Void
     /// Starts a game against one of the five rivals.
     var playRival: (MatchController.Level) -> Void = { _ in }
+    /// Starts a game against your Grudge.
+    var playGrudge: () -> Void = {}
 }
 
 /// Aurora's colors, night and day.
@@ -71,6 +73,16 @@ struct HomeAuroraView: View {
     @State private var pulled: CGFloat = 0
     /// Which position of the game of the day the turning board shows: it plays itself slowly.
     @State private var boardFrame = 0
+    /// Your Grudge. Absent in previews: no Grudge on the page.
+    @Environment(GrudgeStore.self) private var grudges: GrudgeStore?
+    /// The score when you last saw your Grudge ("7-11"), so what changed since plays out.
+    @AppStorage("grudge.lastSeen") private var grudgeLastSeen = ""
+    /// The Grudge's card opened into its summons.
+    @State private var grudgeOpen = false
+    /// The score the summons counts up from, read once as it opens.
+    @State private var grudgeSince: (you: Int, it: Int)?
+    /// The first time you meet it, its birth plays instead.
+    @State private var grudgeBorn = false
 
     private var palette: HomeAuroraPalette { HomeAuroraPalette(dark: tone.scheme == .dark) }
     private var stage: HomeStageInfo { info.stage }
@@ -263,6 +275,13 @@ struct HomeAuroraView: View {
             HomeAuroraSection(title: "Face a rival", palette: palette, note: "Up next: \(stage.upNext.level.rival.shortName)")
             HomeAuroraRivals(next: stage.upNext.level, palette: palette, play: actions.playRival)
                 .padding(.horizontal, 12)
+            if let grudges {
+                HomeAuroraSection(title: "Your Grudge", palette: palette,
+                                  note: grudges.unseen ? "It's waiting" : nil)
+                GrudgeCard(record: grudges.record, isSelected: grudgeOpen, dark: palette.dark,
+                           born: grudgeBorn, lastSeen: grudgeSince, select: toggleGrudge, settle: settleGrudge)
+                    .padding(.horizontal, 16)
+            }
             HomeAuroraSection(title: "For today", palette: palette, note: nil)
             VStack(spacing: 10) {
                 todayRows
@@ -379,6 +398,25 @@ struct HomeAuroraView: View {
         if stage.trainedToday { return "Done today. Another round?" }
         guard let plan = stage.plan else { return "Pick up where you stopped" }
         return "\(plan.minutes) min with Leo"
+    }
+
+    /// Opens the Grudge's card into its summons, counting from when you last met; or closes it.
+    private func toggleGrudge() {
+        guard let grudges, let record = grudges.record else { return }
+        if !grudgeOpen {
+            let parts = grudgeLastSeen.split(separator: "-").compactMap { Int($0) }
+            grudgeSince = parts.count == 2 ? (you: parts[0], it: parts[1]) : nil
+            grudgeBorn = grudges.unseen
+            // Seen now: next time the summons counts from here.
+            grudgeLastSeen = "\(record.yourWins)-\(record.itsWins)"
+            grudges.markSeen()
+        }
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) { grudgeOpen.toggle() }
+    }
+
+    private func settleGrudge() {
+        actions.playGrudge()
+        grudgeOpen = false
     }
 
     private func open(_ card: HomeAuroraGameCard) {

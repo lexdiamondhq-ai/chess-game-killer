@@ -323,26 +323,35 @@ struct GrudgeStage: View {
     }
 }
 
-// MARK: - In the New Game sheet
+// MARK: - On Home
 
-/// The Grudge's place in the New Game sheet. Before it exists, a dark card that says what wakes
-/// it. Once born, its king and score; picked, it opens into the summons.
+/// The Grudge's place on Home (Alex, 2026-11-07: off the New Game sheet, onto Home). Before it
+/// exists, a dark card that says what wakes it. Once born, its king and score; a tap opens it
+/// into the summons, with Settle it to start the game. Another tap on the summons closes it.
 struct GrudgeCard: View {
     let record: GrudgeRecord?
     let isSelected: Bool
-    let theme: BoardTheme
+    /// The room around it is dark: the card lets a little of it through.
+    var dark = false
     var born = false
     var lastSeen: (you: Int, it: Int)? = nil
     let select: () -> Void
+    /// Starts the game against it, from the open summons.
+    var settle: (() -> Void)? = nil
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
         Group {
             if let record {
                 if isSelected {
-                    GrudgeStage(record: record, born: born, lastSeen: lastSeen)
-                        .padding(16)
-                        .transition(.opacity)
+                    VStack(spacing: 16) {
+                        GrudgeStage(record: record, born: born, lastSeen: lastSeen)
+                        if let settle {
+                            settleButton(settle)
+                        }
+                    }
+                    .padding(16)
+                    .transition(.opacity)
                 } else {
                     resting(record)
                 }
@@ -353,7 +362,7 @@ struct GrudgeCard: View {
         .frame(maxWidth: .infinity)
         .background {
             shape
-                .fill(Color(hex: 0x070606).opacity(theme.isDark ? 0.9 : 0.95))
+                .fill(Color(hex: 0x070606).opacity(dark ? 0.9 : 0.95))
                 .overlay {
                     shape.strokeBorder(isSelected ? GrudgeKing.red.opacity(0.8) : Color.white.opacity(0.1),
                                        lineWidth: isSelected ? 1.5 : 1)
@@ -367,6 +376,19 @@ struct GrudgeCard: View {
         .accessibilityElement(children: isSelected ? .contain : .combine)
         .accessibilityAddTraits(record != nil ? [.isButton] : [])
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private func settleButton(_ settle: @escaping () -> Void) -> some View {
+        Button(action: settle) {
+            Label("Settle it", systemImage: "play.fill")
+                .font(.app(.headline, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(Capsule().fill(GrudgeKing.red.opacity(0.22)))
+                .overlay(Capsule().strokeBorder(GrudgeKing.red.opacity(0.8), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 
     private func resting(_ record: GrudgeRecord) -> some View {
