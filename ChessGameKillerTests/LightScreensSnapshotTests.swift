@@ -32,8 +32,9 @@ final class LightScreensSnapshotTests: XCTestCase {
     }
 
     func testWelcomePages() throws {
-        for page in 0..<4 {
-            try snapshot("light-welcome-\(page + 1)", view: WelcomeFlow(page: page) { _, _ in })
+        // Long enough for each page's scene to play to its end.
+        for page in 0..<WelcomeFlow.pages {
+            try snapshot("welcome-\(page + 1)", view: WelcomeFlow(page: page) { _, _ in }, wait: 6)
         }
     }
 

@@ -70,7 +70,9 @@ struct TrainingHubView: View {
         .environment(think)
         .onAppear {
             if greeting.isEmpty {
-                greeting = store.library?.course.lines.greeting.randomElement() ?? "Ready when you are."
+                let name = PlayerName.current()
+                greeting = PlayerName.pick(store.library?.course.lines.greeting ?? [], name: name)
+                    ?? PlayerName.address("Ready when you are.", name: name)
             }
             // On the course, today's plan is ready at once; past it, it waits for the puzzles.
             if today == nil, !isPastTheCourse {

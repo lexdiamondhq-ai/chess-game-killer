@@ -165,7 +165,7 @@ struct TalkPanelConversation: View {
     var body: some View {
         VStack(spacing: 16) {
             if showsGreeting {
-                TalkPanelLeoBubble(text: Self.greeting, theme: theme)
+                TalkPanelLeoBubble(text: PlayerName.address(Self.greeting, name: PlayerName.current()), theme: theme)
                     .transition(arrival)
             }
             if showsWords {

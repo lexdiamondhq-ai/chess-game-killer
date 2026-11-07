@@ -1,9 +1,9 @@
 import ChessKit
 import SwiftUI
 
-/// The first run, four short pages over the chosen board's light: what the app is, how much
-/// chess you've played, which board you like, and the three rules that cost something.
-/// The last page starts the first game. Under a minute, and Skip is always there.
+/// The first run: a tour of what the app does that others don't, seven pages with a moving
+/// scene each, then your name, how much chess you've played and which board you like. The last
+/// page starts the first game. Skip is always there and goes straight to the questions.
 struct WelcomeFlow: View {
     /// False while a game is under way (the tour opened again from Settings): the last page
     /// then just closes, since starting a game would cost the one in progress.
@@ -13,12 +13,17 @@ struct WelcomeFlow: View {
 
     @State private var page: Int
     @State private var choice = WelcomeChoice()
+    @State private var name = PlayerName.current() ?? ""
+    @FocusState private var nameFocused: Bool
     @AppStorage("sculpted3D") private var sculpted3D = true
-    @AppStorage(HomeLayout.key) private var sheet = HomeLayout.defaultOn
-    @AppStorage(HomeToneMode.key) private var toneMode = HomeToneMode.defaultMode
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private static let pages = 4
+    private static let tour = TourPage.allCases.count
+    /// The questions after the tour.
+    private static let namePage = tour
+    private static let experiencePage = tour + 1
+    private static let lookPage = tour + 2
+    static let pages = tour + 3
 
     init(canStartGame: Bool = true, page: Int = 0,
          finish: @escaping (_ play: Bool, _ choice: WelcomeChoice) -> Void) {
@@ -28,23 +33,21 @@ struct WelcomeFlow: View {
     }
 
     private var theme: BoardTheme { .named(choice.look) }
-    private var accent: Color { tone?.metal ?? theme.accent ?? .accentColor }
-    /// The home's colors around the chosen board, as on every screen around a board.
-    private var tone: HomeTone? { HomeTone.screen(for: theme, sheet: sheet, mode: toneMode) }
+    private var accent: Color { TourPalette.gold }
     private var rival: Rival { choice.experience.level.rival }
+    private var tourPage: TourPage? { TourPage(rawValue: page) }
 
     var body: some View {
         ZStack {
-            TrainingBackdrop(theme: theme)
+            TourStage(light: tourPage?.light ?? TourPalette.gold.opacity(0.18))
                 .ignoresSafeArea()
-                .animation(.easeInOut(duration: 0.4), value: choice.look)
             VStack(spacing: 0) {
                 topBar
-                Spacer(minLength: 12)
                 current
                     .id(page)
                     .transition(pageTransition)
-                Spacer(minLength: 12)
+                    .frame(maxHeight: .infinity)
+                    .padding(.vertical, 8)
                 dots
                     .padding(.bottom, 18)
                 buttons
@@ -53,14 +56,26 @@ struct WelcomeFlow: View {
             .padding(.bottom, 12)
             .frame(maxWidth: 520)
         }
-        .environment(\.colorScheme, tone?.scheme ?? .dark)
+        .environment(\.colorScheme, .dark)
+        .foregroundStyle(TourPalette.ink)
         .tint(accent)
-        .animation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.45, dampingFraction: 0.88), value: page)
+        .animation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.5, dampingFraction: 0.88), value: page)
+        .gesture(swipe)
     }
 
     private var pageTransition: AnyTransition {
         reduceMotion ? .opacity : .asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity),
                                               removal: .move(edge: .leading).combined(with: .opacity))
+    }
+
+    /// Through the tour by swiping, as well as with the button.
+    private var swipe: some Gesture {
+        DragGesture(minimumDistance: 30)
+            .onEnded { value in
+                guard abs(value.translation.width) > abs(value.translation.height) * 1.5 else { return }
+                if value.translation.width < -50, page < Self.pages - 1 { advance() }
+                if value.translation.width > 50, page > 0 { page -= 1 }
+            }
     }
 
     // MARK: Chrome
@@ -78,12 +93,12 @@ struct WelcomeFlow: View {
                 .accessibilityLabel("Back")
             }
             Spacer()
-            if page < Self.pages - 1 {
-                Button("Skip") { done(play: false) }
+            if page < Self.tour {
+                Button("Skip") { page = Self.namePage }
                     .font(.app(.body, weight: .semibold))
             }
         }
-        .foregroundStyle(.secondary)
+        .foregroundStyle(TourPalette.ink.opacity(0.64))
         .frame(height: 44)
     }
 
@@ -91,7 +106,7 @@ struct WelcomeFlow: View {
         HStack(spacing: 7) {
             ForEach(0..<Self.pages, id: \.self) { index in
                 Capsule()
-                    .fill(index == page ? accent : Color.primary.opacity(0.22))
+                    .fill(index == page ? accent : TourPalette.ink.opacity(0.22))
                     .frame(width: index == page ? 18 : 6, height: 6)
             }
         }
@@ -104,29 +119,44 @@ struct WelcomeFlow: View {
         let last = page == Self.pages - 1
         VStack(spacing: 6) {
             Button {
-                if last { done(play: canStartGame) } else { page += 1 }
+                if last { done(play: canStartGame) } else { advance() }
             } label: {
                 Text(primaryTitle)
                     .font(.app(.headline))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
             }
-            .modifier(WelcomePrimaryButton(tone: tone, accent: accent))
+            .buttonStyle(TourIvoryStyle())
             if last, canStartGame {
                 Button("Look around first") { done(play: false) }
                     .font(.app(.subheadline, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(TourPalette.ink.opacity(0.64))
                     .padding(.vertical, 6)
             }
         }
     }
 
     private var primaryTitle: String {
+        if page == 0 { return "Begin" }
+        if page == Self.namePage, PlayerName.clean(name) == nil { return "Skip for now" }
         guard page == Self.pages - 1 else { return "Continue" }
         return canStartGame ? "Play \(rival.name)" : "Done"
     }
 
+    private func advance() {
+        if page == Self.namePage { saveName() }
+        page += 1
+    }
+
+    /// A name typed here becomes the one the app and friends use. Left empty, any name already
+    /// given on a challenge stays.
+    private func saveName() {
+        nameFocused = false
+        if PlayerName.clean(name) != nil { PlayerName.save(name) }
+    }
+
     private func done(play: Bool) {
+        saveName()
         choice.apply()
         Welcome.markSeen()
         finish(play, choice)
@@ -136,48 +166,70 @@ struct WelcomeFlow: View {
 
     @ViewBuilder
     private var current: some View {
-        switch page {
-        case 0: hello
-        case 1: experience
-        case 2: look
-        default: rules
+        if let tourPage {
+            TourPageView(page: tourPage)
+        } else {
+            switch page {
+            case Self.namePage: nameQuestion
+            case Self.experiencePage: experience
+            default: look
+            }
         }
     }
 
-    private func heading(_ title: String, _ subtitle: String? = nil) -> some View {
+    private func heading(_ title: String, _ gold: String, _ subtitle: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.app(.largeTitle, weight: .bold))
+            (Text(title + " ") + Text(gold).italic().foregroundColor(TourPalette.gold))
+                .font(.system(size: 34, weight: .medium, design: .serif))
                 .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
             if let subtitle {
                 Text(subtitle)
-                    .font(.app(.body))
-                    .foregroundStyle(.secondary)
+                    .font(.app(.subheadline))
+                    .foregroundStyle(TourPalette.ink.opacity(0.64))
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var hello: some View {
-        VStack(alignment: .leading, spacing: 28) {
-            Glyph(name: Glyphs.king, size: 44)
+    private var nameQuestion: some View {
+        VStack(alignment: .leading, spacing: 26) {
+            Spacer(minLength: 0)
+            Glyph(name: Glyphs.coach, size: 44)
                 .foregroundStyle(accent)
-            heading("Chess, with a coach beside you")
-            VStack(alignment: .leading, spacing: 18) {
-                WelcomeRow(glyph: Glyphs.play, title: "Play",
-                           text: "Five computer rivals, from first moves to grandmaster.", accent: accent)
-                WelcomeRow(glyph: Glyphs.coach, title: "Learn",
-                           text: "\(Coach.current.title) grades every move and shows you a better one.", accent: accent)
-                WelcomeRow(glyph: Glyphs.army, title: "Grow",
-                           text: "Your pieces remember every game, earn experience and get names.", accent: accent)
+            heading("What should \(Coach.current.name)", "call you?",
+                    "Your name on the home, in your coach's notes, and on games with friends.")
+            TextField("", text: $name, prompt: Text("Your first name").foregroundStyle(TourPalette.ink.opacity(0.3)))
+                .font(.system(size: 26, weight: .medium, design: .serif))
+                .textContentType(.givenName)
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled()
+                .submitLabel(.continue)
+                .focused($nameFocused)
+                .onSubmit(advance)
+                .onChange(of: name) { _, new in
+                    if new.count > PlayerName.maxLength { name = String(new.prefix(PlayerName.maxLength)) }
+                }
+                .padding(.vertical, 12)
+                .overlay(alignment: .bottom) {
+                    Rectangle().fill(nameFocused ? accent : TourPalette.ink.opacity(0.25)).frame(height: 1)
+                }
+            if let named = PlayerName.clean(name) {
+                Text(PlayerName.address("Good to see you.", name: named))
+                    .font(.app(.subheadline))
+                    .foregroundStyle(TourPalette.gold)
+                    .transition(.opacity)
             }
+            Spacer(minLength: 0)
         }
+        .animation(.easeOut(duration: 0.2), value: PlayerName.clean(name) == nil)
     }
 
     private var experience: some View {
         VStack(alignment: .leading, spacing: 22) {
-            heading("How much chess have you played?", "This picks your first rival. You can change it before any game.")
+            Spacer(minLength: 0)
+            heading("How much chess", "have you played?", "This picks your first rival. You can change it before any game.")
             VStack(spacing: 10) {
                 ForEach(Experience.allCases) { level in
                     ExperienceCard(level: level, isSelected: choice.experience == level, accent: accent) {
@@ -185,12 +237,14 @@ struct WelcomeFlow: View {
                     }
                 }
             }
+            Spacer(minLength: 0)
         }
     }
 
     private var look: some View {
         VStack(alignment: .leading, spacing: 22) {
-            heading("Pick your board", "More looks wait in Settings.")
+            Spacer(minLength: 0)
+            heading("Pick", "your board.", "More looks wait in Settings.")
             BoardPreview(theme: theme, showBest: false, size: 230,
                          threeD: sculpted3D && SculptedAssets.shared.isLoaded)
                 .frame(maxWidth: .infinity)
@@ -202,83 +256,27 @@ struct WelcomeFlow: View {
                     }
                 }
             }
-        }
-    }
-
-    private var rules: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            heading("Three things to know", "Before they cost you anything.")
-            VStack(alignment: .leading, spacing: 18) {
-                ForEach(HouseRule.onWelcome) { rule in
-                    HouseRuleRow(rule: rule, accent: accent)
-                }
-            }
-            Text("All of this is in Settings under How it works.")
-                .font(.app(.footnote))
-                .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
         }
     }
 }
 
-/// The page's one solid button: the home's ivory button, or the look's accent on the older home.
-private struct WelcomePrimaryButton: ViewModifier {
-    let tone: HomeTone?
-    let accent: Color
-
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if let tone {
-            content
-                .buttonStyle(WelcomeIvoryStyle(tone: tone))
-        } else {
-            content
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.capsule)
-                .controlSize(.large)
-                .tint(accent)
-                .foregroundStyle(Color.black)
-        }
-    }
-}
-
-private struct WelcomeIvoryStyle: ButtonStyle {
-    let tone: HomeTone
-
+/// The welcome's one solid button: ivory on the dark stage.
+private struct TourIvoryStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .foregroundStyle(tone.onIvory)
+            .foregroundStyle(TourPalette.onIvory)
             .padding(.vertical, 6)
             .frame(minHeight: 50)
-            .background { HomeIvoryFill(tone: tone) }
+            .background {
+                Capsule()
+                    .fill(LinearGradient(colors: [Color(hex: 0xF7F0E2), Color(hex: 0xE9DFCB)], startPoint: .top, endPoint: .bottom))
+                    .shadow(color: TourPalette.goldHigh.opacity(0.35), radius: 15, y: 8)
+            }
             .contentShape(Capsule())
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .opacity(configuration.isPressed ? 0.9 : 1)
             .animation(.spring(response: 0.25, dampingFraction: 0.8), value: configuration.isPressed)
-    }
-}
-
-/// An icon, a bold word and one line.
-private struct WelcomeRow: View {
-    let glyph: String
-    let title: String
-    let text: String
-    let accent: Color
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 14) {
-            Glyph(name: glyph, size: 26)
-                .foregroundStyle(accent)
-                .frame(width: 30)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.app(.headline))
-                Text(text)
-                    .font(.app(.subheadline))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .accessibilityElement(children: .combine)
     }
 }
 
