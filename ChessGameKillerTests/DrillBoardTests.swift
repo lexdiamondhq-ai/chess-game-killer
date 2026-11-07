@@ -119,7 +119,7 @@ final class DrillBoardTests: XCTestCase {
         }
     }
 
-    /// Analysis on the 3D board: the best move is the lit arrow and the next best a plain one,
+    /// Analysis on the 3D board: the best move is a solid arrow and the next best a dashed one,
     /// never more than two, and the pieces go to the scene to be matched, as they have no ids.
     func testAnalysisShowsItsTwoBestMovesOnThe3DBoard() {
         let hints = [
@@ -127,9 +127,9 @@ final class DrillBoardTests: XCTestCase {
             MoveHint(rank: 1, from: .d7, to: .d6, san: "d6", uci: "d7d6", evaluation: .centipawns(20)),
             MoveHint(rank: 2, from: .c7, to: .c6, san: "c6", uci: "c7c6", evaluation: .centipawns(10)),
         ]
-        XCTAssertEqual(SculptedPositionBoard.sceneHints(hints), [
-            SculptedHint(from: .g8, to: .f6, isBest: true),
-            SculptedHint(from: .d7, to: .d6, isBest: false),
+        XCTAssertEqual(SculptedPositionBoard.arrows(hints), [
+            SculptedCoachArrow(from: .d7, to: .d6, color: ArrowColors.next, dashed: true),
+            SculptedCoachArrow(from: .g8, to: .f6, color: ArrowColors.best, dashed: false),
         ])
         let board = SculptedPositionBoard(pieces: Position.standard.pieces, theme: .named(.gilded), flipped: true,
                                           hints: hints, framing: .seated)
@@ -137,5 +137,38 @@ final class DrillBoardTests: XCTestCase {
         XCTAssertTrue(board.state.flipped)
         XCTAssertEqual(board.state.framing, .seated)
         XCTAssertEqual(board.state.pieces.count, 32)
+    }
+
+    /// Every arrow, flat or 3D, gets a white edge: its outline grown evenly all round, so each
+    /// side moves out by the edge's width and the tip stays a point just past the arrow's.
+    func testAnArrowsEdgeIsItsOutlineGrownAllRound() throws {
+        for dashed in [false, true] {
+            let outlines = SculptedBoardScene.arrowOutline(from: .b1, to: .b6, dashed: dashed)
+            for outline in outlines {
+                let grown = ArrowOutline.grown(outline, by: 0.035)
+                XCTAssertEqual(grown.count, outline.count)
+                let xs = outline.map(\.x), grownXs = grown.map(\.x)
+                // Straight up the b-file: each side moves out by the edge, a dash's square corners
+                // exactly, the head's sharp corners a little further, short of a spike.
+                let right = try XCTUnwrap(grownXs.max()) - XCTUnwrap(xs.max())
+                let left = try XCTUnwrap(xs.min()) - XCTUnwrap(grownXs.min())
+                for side in [right, left] {
+                    if outline.count == 4 { XCTAssertEqual(side, 0.035, accuracy: 0.001) }
+                    XCTAssertGreaterThanOrEqual(side, 0.035 - 0.001)
+                    XCTAssertLessThan(side, 0.1)
+                }
+            }
+            let head = try XCTUnwrap(outlines.last)
+            let tip = try XCTUnwrap(head.max { $0.y < $1.y })
+            let grownTip = try XCTUnwrap(ArrowOutline.grown(head, by: 0.035).max { $0.y < $1.y })
+            XCTAssertGreaterThan(grownTip.y, tip.y)
+            XCTAssertLessThan(grownTip.y, tip.y + 0.12)
+        }
+        // The flat boards draw the same arrow, in points.
+        let flat = ArrowOutline.outlines(from: .zero, to: CGPoint(x: 0, y: 500), unit: 100, dashed: false,
+                                         proportions: .coach(dashed: false))
+        let inSquares = SculptedBoardScene.arrowOutline(from: .a1, to: .a6, dashed: false)
+        XCTAssertEqual(flat.count, inSquares.count)
+        XCTAssertEqual(try XCTUnwrap(flat.first).count, try XCTUnwrap(inSquares.first).count)
     }
 }

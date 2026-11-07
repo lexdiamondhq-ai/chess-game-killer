@@ -503,40 +503,9 @@ struct MoveArrow: View {
     let glow: Color?
 
     var body: some View {
-        let dx = to.x - from.x
-        let dy = to.y - from.y
-        let length = max(hypot(dx, dy), 1)
-        let ux = dx / length
-        let uy = dy / length
-        let headLength = squareSize * (isBest ? 0.42 : 0.36)
-        let headWidth = squareSize * (isBest ? 0.5 : 0.42)
-        let shaftWidth = squareSize * (isBest ? 0.17 : 0.11)
-        // Start a little off the piece's center, stop at the arrowhead.
-        let start = CGPoint(x: from.x + ux * squareSize * 0.18, y: from.y + uy * squareSize * 0.18)
-        let tip = CGPoint(x: to.x - ux * squareSize * 0.08, y: to.y - uy * squareSize * 0.08)
-        let base = CGPoint(x: tip.x - ux * headLength, y: tip.y - uy * headLength)
-
-        ZStack {
-            Path { path in
-                path.move(to: start)
-                path.addLine(to: base)
-            }
-            .stroke(color, style: StrokeStyle(
-                lineWidth: shaftWidth,
-                lineCap: isBest ? .round : .butt,
-                dash: isBest ? [] : [shaftWidth * 1.6, shaftWidth * 1.1]
-            ))
-
-            Path { path in
-                path.move(to: tip)
-                path.addLine(to: CGPoint(x: base.x - uy * headWidth / 2, y: base.y + ux * headWidth / 2))
-                path.addLine(to: CGPoint(x: base.x + uy * headWidth / 2, y: base.y - ux * headWidth / 2))
-                path.closeSubpath()
-            }
-            .fill(color)
-        }
-        .shadow(color: glow?.opacity(isBest ? 0.9 : 0.6) ?? .black.opacity(0.15),
-                radius: glow == nil ? 1 : squareSize * (isBest ? 0.12 : 0.08))
+        // The best move solid and bold, the next best dashed and lighter, both crisp.
+        CrispArrow(from: from, to: to, squareSize: squareSize, dashed: !isBest, color: color,
+                   proportions: .analysis(best: isBest), glow: glow)
     }
 }
 

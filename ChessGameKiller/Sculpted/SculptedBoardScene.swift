@@ -1468,12 +1468,13 @@ final class SculptedBoardScene {
         for arrow in new.coachArrows where seenArrows.insert(arrow).inserted && arrow.from != arrow.to {
             let fresh = !shownCoachArrows.contains(arrow)
             let layers = coachArrowLayers(arrow)
-            for (index, parts) in [layers.stone, layers.through].enumerated() {
+            // Its white edge first, then the arrow over it, then the faint copy over the pieces.
+            for (index, parts) in [layers.edge, layers.stone, layers.through].enumerated() {
                 for part in parts {
                     let node = SCNNode(geometry: part)
                     node.simdPosition = SIMD3(0, 0.003, 0)
                     node.simdOrientation = Self.flat
-                    node.renderingOrder = 17 + index
+                    node.renderingOrder = 16 + index
                     node.castsShadow = false
                     if fresh {
                         node.opacity = 0
@@ -1499,17 +1500,17 @@ final class SculptedBoardScene {
     }
 
     /// Each arrow's shapes, made once: a lesson shows the same few over and over.
-    private var coachArrowShapes: [SculptedCoachArrow: (stone: [SCNGeometry], through: [SCNGeometry])] = [:]
+    private var coachArrowShapes: [SculptedCoachArrow: (edge: [SCNGeometry], stone: [SCNGeometry], through: [SCNGeometry])] = [:]
 
-    private func coachArrowLayers(_ arrow: SculptedCoachArrow) -> (stone: [SCNGeometry], through: [SCNGeometry]) {
+    private func coachArrowLayers(_ arrow: SculptedCoachArrow) -> (edge: [SCNGeometry], stone: [SCNGeometry], through: [SCNGeometry]) {
         if let layers = coachArrowShapes[arrow] { return layers }
         if coachArrowShapes.count > 64 { coachArrowShapes.removeAll() }
         let color = Self.color(arrow.color)
-        // Together as strong as the flat board's arrow; over a piece in front, only the faint one.
-        let strength: CGFloat = 0.9
+        // Together solid, as the flat board's crisp arrow; over a piece in front, only the faint one.
+        let strength: CGFloat = 0.97
         let seen: CGFloat = 0.35
         let outlines = Self.arrowOutline(from: arrow.from, to: arrow.to, dashed: arrow.dashed)
-        func shapes(alpha: CGFloat, throughPieces: Bool) -> [SCNGeometry] {
+        func shapes(_ outlines: [[CGPoint]], color: UIColor, alpha: CGFloat, throughPieces: Bool) -> [SCNGeometry] {
             outlines.map { outline in
                 let path = UIBezierPath()
                 path.move(to: outline[0])
@@ -1528,8 +1529,11 @@ final class SculptedBoardScene {
                 return shape
             }
         }
-        let layers = (stone: shapes(alpha: (strength - seen) / (1 - seen), throughPieces: false),
-                      through: shapes(alpha: seen, throughPieces: true))
+        // The thin white edge the flat boards stroke round an arrow, as a slightly bigger copy under it.
+        let edges = outlines.map { ArrowOutline.grown($0, by: 0.035) }
+        let layers = (edge: shapes(edges, color: Self.color(ArrowColors.edge), alpha: 0.95, throughPieces: false),
+                      stone: shapes(outlines, color: color, alpha: (strength - seen) / (1 - seen), throughPieces: false),
+                      through: shapes(outlines, color: color, alpha: seen, throughPieces: true))
         coachArrowShapes[arrow] = layers
         return layers
     }
@@ -1542,51 +1546,8 @@ final class SculptedBoardScene {
         func middle(_ square: Square) -> CGPoint {
             CGPoint(x: CGFloat(square.fileIndex) - 3.5, y: CGFloat(square.rankIndex) - 3.5)
         }
-        let start = middle(from)
-        let end = middle(to)
-        let length = max(hypot(end.x - start.x, end.y - start.y), 0.001)
-        let u = CGPoint(x: (end.x - start.x) / length, y: (end.y - start.y) / length)
-        // Across the arrow, to its left.
-        let n = CGPoint(x: -u.y, y: u.x)
-        func point(_ origin: CGPoint, along: CGFloat, across: CGFloat) -> CGPoint {
-            CGPoint(x: origin.x + u.x * along + n.x * across, y: origin.y + u.y * along + n.y * across)
-        }
-        // The flat board's proportions (CoachArrow), a square being 1.
-        let headLength: CGFloat = 0.4
-        let headWidth: CGFloat = 0.46
-        let shaft: CGFloat = dashed ? 0.12 : 0.15
-        let tail = point(start, along: 0.2, across: 0)
-        let tip = point(end, along: -0.1, across: 0)
-        let base = point(tip, along: -headLength, across: 0)
-        let shaftLength = max(0, length - 0.3 - headLength)
-        let head = [point(base, along: 0, across: headWidth / 2), tip, point(base, along: 0, across: -headWidth / 2)]
-        if dashed {
-            var outlines: [[CGPoint]] = []
-            let dash = shaft * 1.6
-            let gap = shaft * 1.1
-            var at: CGFloat = 0
-            while at < shaftLength - 0.01 {
-                let stop = min(at + dash, shaftLength)
-                outlines.append([
-                    point(tail, along: at, across: shaft / 2), point(tail, along: stop, across: shaft / 2),
-                    point(tail, along: stop, across: -shaft / 2), point(tail, along: at, across: -shaft / 2),
-                ])
-                at = stop + gap
-            }
-            return outlines + [head]
-        }
-        // One outline, so nothing overlaps itself: down the left side, round the head, back up
-        // the right side and round the tail.
-        var outline = [point(tail, along: 0, across: shaft / 2), point(base, along: 0, across: shaft / 2),
-                       head[0], head[1], head[2],
-                       point(base, along: 0, across: -shaft / 2), point(tail, along: 0, across: -shaft / 2)]
-        let steps = 10
-        for step in 1..<steps {
-            let angle = CGFloat.pi * CGFloat(step) / CGFloat(steps)
-            // From the right side, behind the tail, to the left side.
-            outline.append(point(tail, along: -sin(angle) * shaft / 2, across: -cos(angle) * shaft / 2))
-        }
-        return [outline]
+        return ArrowOutline.outlines(from: middle(from), to: middle(to), unit: 1, dashed: dashed,
+                                     proportions: .coach(dashed: dashed))
     }
 
     private static func color(_ hex: UInt32) -> UIColor {
