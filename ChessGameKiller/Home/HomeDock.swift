@@ -424,26 +424,46 @@ struct HomeShortcutsPanel: View {
     let shortcuts: [HomeShortcut]
     let playRival: (MatchController.Level) -> Void
     let close: () -> Void
+    /// Rooms on the Aurora home: no rivals here (they have their own row on the page, Alex
+    /// 2026-11-07), and a grabber in place of the jewel's cross; a drag down closes it.
+    var asRooms = false
 
     @AccessibilityFocusState private var titleFocused: Bool
+    @State private var drag: CGFloat = 0
     @ScaledMetric(relativeTo: .caption2) private var orb: CGFloat = 46
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Face a rival")
-                .font(.app(.footnote, weight: .semibold))
-                .foregroundStyle(tone.ink2)
-                .padding(.leading, 4)
-                .accessibilityAddTraits(.isHeader)
-                .accessibilityFocused($titleFocused)
-            HStack(alignment: .top, spacing: 0) {
-                ForEach(Rival.all) { rival in
-                    rivalButton(rival)
+            if asRooms {
+                Capsule()
+                    .fill(tone.ink.opacity(0.25))
+                    .frame(width: 38, height: 4)
+                    .frame(maxWidth: .infinity)
+                    .padding(.bottom, 2)
+                    .accessibilityHidden(true)
+                Text("Rooms")
+                    .font(.system(size: 20, weight: .medium, design: .serif))
+                    .foregroundStyle(tone.ink)
+                    .padding(.leading, 6)
+                    .padding(.bottom, 4)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityFocused($titleFocused)
+            } else {
+                Text("Face a rival")
+                    .font(.app(.footnote, weight: .semibold))
+                    .foregroundStyle(tone.ink2)
+                    .padding(.leading, 4)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityFocused($titleFocused)
+                HStack(alignment: .top, spacing: 0) {
+                    ForEach(Rival.all) { rival in
+                        rivalButton(rival)
+                    }
                 }
+                HomeHairline(tone: tone)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 2)
             }
-            HomeHairline(tone: tone)
-                .padding(.horizontal, 4)
-                .padding(.vertical, 2)
             LazyVGrid(columns: Self.columns, spacing: 12) {
                 ForEach(shortcuts) { shortcut in
                     shortcutButton(shortcut)
@@ -454,6 +474,17 @@ struct HomeShortcutsPanel: View {
         .padding(.top, 14)
         .padding(.bottom, 12)
         .homePane(RoundedRectangle(cornerRadius: HomeMetrics.cardRadius, style: .continuous), tone: tone)
+        .offset(y: drag)
+        .gesture(DragGesture(minimumDistance: 8)
+            .onChanged { value in if asRooms { drag = max(0, value.translation.height) } }
+            .onEnded { value in
+                guard asRooms else { return }
+                if value.translation.height > 70 || value.predictedEndTranslation.height > 160 {
+                    close()
+                } else {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { drag = 0 }
+                }
+            })
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(.isModal)

@@ -24,6 +24,8 @@ struct HomeAuroraActions {
     var playRival: (MatchController.Level) -> Void = { _ in }
     /// Starts a game against your Grudge.
     var playGrudge: () -> Void = {}
+    /// Opens Puzzles.
+    var puzzles: () -> Void = {}
 }
 
 /// Aurora's colors, night and day.
@@ -359,6 +361,14 @@ struct HomeAuroraView: View {
 
     @ViewBuilder
     private var todayRows: some View {
+        HomeAuroraRow(eyebrow: "Today's Move", title: todayTitle, detail: todayDetail,
+                      accent: palette.rose, palette: palette, action: actions.stage.dailyMove) {
+            HomeAuroraEmblem(glyph: Glyphs.today, fill: HomeAuroraPalette.roseTile)
+        }
+        HomeAuroraRow(eyebrow: "Puzzles", title: "Sharpen your eye", detail: "Tactics at your level, one after another",
+                      accent: palette.violet, palette: palette, action: actions.puzzles) {
+            HomeAuroraEmblem(glyph: Glyphs.puzzles, fill: HomeAuroraPalette.violetTile)
+        }
         HomeAuroraRow(eyebrow: "Coach Leo", title: stage.plan?.title ?? "Today's lesson", detail: coachLine,
                       accent: palette.teal, palette: palette, action: actions.stage.coach) {
             HomeAuroraEmblem(glyph: Glyphs.coach, fill: HomeAuroraPalette.tealTile)
