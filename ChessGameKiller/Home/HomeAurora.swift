@@ -211,10 +211,12 @@ struct HomeAuroraView: View {
         .frame(height: height)
         .frame(maxWidth: .infinity)
         // The board's lower edge melts into the marble instead of stopping on a hard line
-        // where the 3D view ends (Alex, 2026-11-07).
+        // where the 3D view ends (Alex, 2026-11-07). It is gone a little before the view's
+        // edge, so the corners of the frame that reach the bottom fade with it.
         .mask(LinearGradient(stops: [.init(color: .black, location: 0),
-                                     .init(color: .black, location: 0.8),
-                                     .init(color: .clear, location: 1)],
+                                     .init(color: .black, location: 0.74),
+                                     .init(color: .black.opacity(0.4), location: 0.86),
+                                     .init(color: .clear, location: 0.94)],
                              startPoint: .top, endPoint: .bottom))
         .scaleEffect(1 - 0.12 * lift, anchor: .top)
         .opacity(1 - 0.55 * Double(lift))
@@ -632,43 +634,55 @@ struct HomeAuroraGrudge: View {
 }
 
 /// "Beauty of Chess" carved into the marble under the board in Cinzel Decorative (Alex,
-/// 2026-11-07, option 3). The letters are cut solid into the stone: the slab's veins stop at
-/// their edges rather than running behind them. Each groove is a shade deeper than the
-/// marble, darkened under its top edge by an inner shadow, with a lit lower lip; "of" is laid
-/// in gold leaf.
+/// 2026-11-07, option 3). The letters are cut solid into the stone (Bold, so each stroke has
+/// a floor wide enough to read): a shaded floor a few tones deeper than the marble, darker at
+/// the top where the light can't reach, a thin shadowed upper wall and a lit lower lip, so
+/// the slab's veins stop at the letters. "of" is laid in gold leaf with the same cut.
+/// Cinzel Decorative's lowercase h carries a swash crossbar that read as broken, so the h is
+/// plain Cinzel's capital H.
 struct HomeAuroraCarving: View {
     let palette: HomeAuroraPalette
     /// How much shows, 0 to 1.
     var reveal: Double = 1
 
-    /// Cinzel Decorative (SIL OFL), bundled in Home/Fonts.
-    static let fontName = "CinzelDecorative-Regular"
+    /// Cinzel Decorative Bold and Cinzel Bold (both SIL OFL), bundled in Home/Fonts.
+    static let fontName = "CinzelDecorative-Bold"
+    static let plainFontName = "Cinzel-Bold"
 
-    /// The cut stone: the marble's own white, a shade deeper.
-    private var groove: Color { palette.dark ? Color(hex: 0x1E1D1F) : Color(hex: 0xE4DED4) }
-    private static let gold = Color(hex: 0xC4964A)
-    private var font: Font { .custom(Self.fontName, size: 34, relativeTo: .largeTitle) }
+    private static let size: CGFloat = 32
+    private var font: Font { .custom(Self.fontName, size: Self.size, relativeTo: .largeTitle) }
+    private var plain: Font { .custom(Self.plainFontName, size: Self.size, relativeTo: .largeTitle) }
 
-    private func words(of: Color) -> Text {
-        Text("Beauty ") + Text("of").foregroundColor(of) + Text(" Chess")
+    /// The floor of the cut, deeper at the top.
+    private var stone: LinearGradient {
+        LinearGradient(colors: palette.dark ? [Color(hex: 0x0E0E10), Color(hex: 0x29282B)]
+                                            : [Color(hex: 0xB4AA9B), Color(hex: 0xD8D0C2)],
+                       startPoint: .top, endPoint: .bottom)
+    }
+    private static let gold = LinearGradient(colors: [Color(hex: 0x946A2A), Color(hex: 0xD9AE62)],
+                                             startPoint: .top, endPoint: .bottom)
+
+    /// The words in one style throughout, or with their faces filled (stone and gold).
+    private func words(_ style: AnyShapeStyle? = nil) -> Text {
+        let body = style ?? AnyShapeStyle(stone)
+        let of = style ?? AnyShapeStyle(Self.gold)
+        return Text("Beauty ").font(font).foregroundStyle(body)
+            + Text("of").font(font).foregroundStyle(of)
+            + Text(" C").font(font).foregroundStyle(body)
+            + Text("H").font(plain).foregroundStyle(body)
+            + Text("ess").font(font).foregroundStyle(body)
     }
 
     var body: some View {
         ZStack {
             // The lit lower lip of each cut.
-            words(of: .white).font(font)
-                .foregroundStyle(Color.white.opacity(palette.dark ? 0.12 : 0.95))
-                .offset(y: 1.2)
+            words(AnyShapeStyle(Color.white.opacity(palette.dark ? 0.14 : 0.95)))
+                .offset(y: 1.1)
             // The shadowed upper wall, just above.
-            words(of: .black).font(font)
-                .foregroundStyle(Color.black.opacity(palette.dark ? 0.6 : 0.28))
-                .offset(y: -0.7)
-                .blur(radius: 0.3)
-            // The floor of the cut: solid, so no vein runs through it.
-            words(of: Self.gold).font(font)
-                .foregroundStyle(groove
-                    .shadow(.inner(color: .black.opacity(palette.dark ? 0.8 : 0.42), radius: 1.6, x: 0, y: 1.8))
-                    .shadow(.inner(color: .white.opacity(palette.dark ? 0.06 : 0.7), radius: 0.8, x: 0, y: -1)))
+            words(AnyShapeStyle(Color(hex: 0x463723).opacity(palette.dark ? 0.7 : 0.35)))
+                .offset(y: -0.6)
+            // The floor: solid, so no vein runs through it.
+            words()
         }
         .tracking(1.5)
         .lineLimit(1)
