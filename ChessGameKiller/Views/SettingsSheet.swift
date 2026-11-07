@@ -46,6 +46,21 @@ struct SettingsSheet: View {
 
                     PremiumSettingsCard(theme: theme) { showingPremium = true }
 
+                    if boardSheet || stageHome {
+                        // Light or dark lives here, not on the Today screen (Alex, 2026-11-07).
+                        section("Appearance") {
+                            SettingsGroup(theme: theme) {
+                                PickerRow(title: "Light or dark", subtitle: homeTone.blurb, symbol: "circle.lefthalf.filled", theme: theme) {
+                                    Picker("Light or dark", selection: $homeTone) {
+                                        ForEach(HomeToneMode.allCases) { mode in
+                                            Text(mode.title).tag(mode)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     section("Board") {
                         themeGrid(Self.looks)
                         Text("Rival boards".uppercased())
@@ -87,16 +102,6 @@ struct SettingsSheet: View {
                             rule
                             ToggleRow(title: "Board and sheet", subtitle: "The 3D board stays on top and one glass sheet holds the rest, at home and in a game. Off brings back the tiles and the floating dock.",
                                       symbol: "rectangle.bottomhalf.inset.filled", isOn: $boardSheet, theme: theme)
-                            if boardSheet || stageHome {
-                                rule
-                                PickerRow(title: "Home colors", subtitle: homeTone.blurb, symbol: "circle.lefthalf.filled", theme: theme) {
-                                    Picker("Home colors", selection: $homeTone) {
-                                        ForEach(HomeToneMode.allCases) { mode in
-                                            Text(mode.title).tag(mode)
-                                        }
-                                    }
-                                }
-                            }
                         }
                     }
 
