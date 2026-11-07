@@ -93,8 +93,10 @@ struct HomeAuroraView: View {
             let lift: CGFloat = min(max(pulled / boardHeight, 0), 1)
             ZStack(alignment: .top) {
                 HomeAuroraBackdrop(palette: palette)
+                // The marble starts just under the header's gold line, never above it.
                 HomeAuroraMarble(palette: palette)
-                    .frame(height: boardHeight + 150)
+                    .frame(height: boardHeight + 100)
+                    .padding(.top, 54)
                     .opacity(1 - 0.6 * Double(lift))
                 spinningBoard(height: boardHeight, lift: lift)
                     .padding(.top, 58)
@@ -838,7 +840,6 @@ struct HomeAuroraMarble: View {
                                          .init(color: .black, location: 0.72),
                                          .init(color: .clear, location: 1)],
                                  startPoint: .top, endPoint: .bottom))
-            .ignoresSafeArea(edges: .top)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
     }
