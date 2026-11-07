@@ -884,12 +884,15 @@ final class MatchController {
         let after: Evaluation
         // The opponent's best answer, so the coach can say what the move allows.
         var reply: String?
+        // The move played and the engine's line after it, to see what material it gives away.
+        var playedLine: [String] = []
         if playedBest {
             after = bestLine.evaluation
             reply = bestLine.moves.dropFirst().first
         } else if before.count > 1, before[1].firstMove == move.uci {
             after = before[1].evaluation
             reply = before[1].moves.dropFirst().first
+            playedLine = before[1].moves
         } else if played.endedGame {
             after = .centipawns(0)
         } else {
@@ -898,9 +901,11 @@ final class MatchController {
             guard let line = answer.first else { return true }
             after = line.evaluation.flipped
             reply = line.firstMove
+            playedLine = [move.uci] + line.moves
         }
 
-        let grade = MoveReview.grade(before: bestLine.evaluation, after: after, playedBest: playedBest)
+        let materialLoss = MoveReview.materialLoss(fen: move.fenBefore, best: bestLine.moves, played: playedLine)
+        let grade = MoveReview.grade(before: bestLine.evaluation, after: after, playedBest: playedBest, materialLoss: materialLoss)
         let bestSAN = playedBest ? nil : Notation.san(of: bestMove, fen: move.fenBefore)
         publishReview(grade, move: move, ply: played.ply, fenAfter: played.fenAfter, best: bestSAN, evaluation: after,
                       bestUCI: bestMove, before: bestLine.evaluation, reply: reply, origin: played.origin,
