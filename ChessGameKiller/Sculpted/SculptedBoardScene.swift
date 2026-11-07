@@ -500,6 +500,34 @@ final class SculptedBoardScene {
         }
     }
 
+    /// A round stone stage under the board, for the stage home. Nil takes it away.
+    var plinth: UIColor? {
+        didSet {
+            guard plinth != oldValue else { return }
+            plinthNode?.removeFromParentNode()
+            plinthNode = nil
+            guard let color = plinth else { return }
+            let height: CGFloat = 1.6
+            let stone = SCNCylinder(radius: 6.4, height: height)
+            stone.radialSegmentCount = 96
+            let material = SCNMaterial()
+            material.lightingModel = .physicallyBased
+            material.diffuse.contents = color
+            material.roughness.contents = 0.82
+            material.metalness.contents = 0.05
+            stone.materials = [material]
+            let node = SCNNode(geometry: stone)
+            // Its top just under the shadow catcher, so the board's shadow falls on the stone.
+            node.simdPosition = SIMD3(0, -0.145 - Float(height) / 2, 0)
+            node.castsShadow = false
+            node.renderingOrder = -10
+            scene.rootNode.addChildNode(node)
+            plinthNode = node
+        }
+    }
+
+    private var plinthNode: SCNNode?
+
     private func layout(_ newSize: CGSize) {
         guard newSize.width > 1, newSize.height > 1, newSize != size else { return }
         size = newSize

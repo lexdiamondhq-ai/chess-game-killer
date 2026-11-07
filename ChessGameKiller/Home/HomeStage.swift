@@ -3,8 +3,8 @@ import SwiftUI
 
 /// The stage home (Alex's pick, 2026-11-07): the real 3D board lit on a stage, your level with
 /// three rings, a deck of cards for what's next, and a floating glass tab bar. It follows
-/// Settings > Home colors (Light, Middle or Dark). Every way out zooms back, swirls into a
-/// chessboard and opens (HomeStageSwirl).
+/// Settings > Home colors (Light, Middle or Dark). The board turns slowly on a stone stage, and
+/// every way out swoops the camera down into the board as the page fades, then opens.
 /// On by default (Alex, 2026-11-07); Settings > Stage home turns it off, back to the board
 /// and sheet. The game's own board is untouched: only Home looks like this.
 enum HomeStageLayout {
@@ -64,9 +64,8 @@ struct HomeStagePalette {
     var track: Color { dark ? Color.white.opacity(0.1) : tone.ink.opacity(0.08) }
     var dot: Color { dark ? Color.white.opacity(0.22) : tone.ink.opacity(0.18) }
     var shadow: Double { dark ? 0.5 : 0.14 }
-    /// The board the swirl turns into.
-    var lightSquare: Color { dark ? Color(hex: 0xD9C49A) : Color(hex: 0xF0E2C6) }
-    var darkSquare: Color { dark ? Color(hex: 0x3A2A1C) : Color(hex: 0x8A6243) }
+    /// The stone stage under the board.
+    var plinth: UIColor { dark ? UIColor(red: 0.2, green: 0.17, blue: 0.145, alpha: 1) : UIColor(red: 0.9, green: 0.855, blue: 0.795, alpha: 1) }
 
     var goldFill: LinearGradient {
         LinearGradient(colors: [goldHi, goldLo], startPoint: .top, endPoint: .bottom)
@@ -89,9 +88,10 @@ struct HomeStageView: View {
     @State private var music = HomeMusic.shared
     /// Settings > Home colors, also switched by the sun and moon in the top bar.
     @AppStorage(HomeToneMode.key) private var toneMode = HomeToneMode.defaultMode
-    /// 0 at rest, 1 with the home zoomed away into the chessboard.
-    @State private var swirl: CGFloat = 0
+    /// 0 at rest, 1 with the camera swooped down into the board and the page faded away.
+    @State private var dive: CGFloat = 0
     @State private var swirling = false
+    @State private var boardStage = SculptedStage()
 
     private var palette: HomeStagePalette { HomeStagePalette(tone: tone) }
     private var gold: Color { tone.metal }
@@ -105,24 +105,17 @@ struct HomeStageView: View {
                 HomeStageBackdrop(tone: tone)
                     .ignoresSafeArea()
 
-                ZStack(alignment: .top) {
-                    stage(width: width, height: stageHeight + safeTop)
-                        .ignoresSafeArea(edges: .top)
-                    page(stageHeight: stageHeight)
-                }
-                .modifier(HomeStageZoom(swirl: swirl))
+                stage(width: width, height: stageHeight + safeTop)
+                    .scaleEffect(1 + 0.5 * dive, anchor: UnitPoint(x: 0.5, y: 0.35))
+                    .ignoresSafeArea(edges: .top)
+                page(stageHeight: stageHeight)
+                    .opacity(Double(1 - dive))
+                    .scaleEffect(1 + 0.06 * dive)
 
                 if fanned {
                     fan(safeTop: safeTop)
                         .transition(.opacity)
                         .zIndex(2)
-                }
-
-                if swirl > 0 {
-                    HomeStageSwirl(swirl: swirl, palette: palette)
-                        .ignoresSafeArea()
-                        .allowsHitTesting(false)
-                        .zIndex(4)
                 }
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -131,8 +124,8 @@ struct HomeStageView: View {
                                 rooms: { go(actions.rooms) }, you: { go(actions.you) })
                     .padding(.horizontal, 14)
                     .padding(.bottom, 4)
-                    .opacity(fanned ? 0 : 1)
-                    .modifier(HomeStageZoom(swirl: swirl))
+                    .opacity(fanned ? 0 : Double(1 - dive))
+                    .offset(y: 50 * dive)
             }
         }
         .environment(\.colorScheme, tone.scheme)
@@ -142,7 +135,7 @@ struct HomeStageView: View {
         .sensoryFeedback(.impact(weight: .medium), trigger: swirling) { _, now in now && hapticsOn }
         .onAppear {
             music.homeAppeared()
-            if swirl > 0 { settle() }
+            if dive > 0 { settle() }
         }
         .onDisappear { music.homeDisappeared() }
     }
@@ -165,10 +158,10 @@ struct HomeStageView: View {
         .allowsHitTesting(!fanned)
     }
 
-    // MARK: The swirl
+    // MARK: The way out
 
-    /// Zooms the home back, swirls it into a chessboard and opens the place, then settles back
-    /// in behind it, so the home is at rest when the player comes back.
+    /// The camera swirls down into the board as the page fades and the tab bar drops away, the
+    /// place opens, and the home settles back behind it, so it's at rest when the player returns.
     private func go(_ action: @escaping () -> Void) {
         guard !swirling else { return }
         guard !reduceMotion else {
@@ -176,17 +169,17 @@ struct HomeStageView: View {
             return
         }
         swirling = true
-        withAnimation(.timingCurve(0.5, 0, 0.75, 0.4, duration: 0.34)) { swirl = 1 }
+        withAnimation(.timingCurve(0.55, 0, 0.3, 1, duration: 0.5)) { dive = 1 }
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(320))
+            try? await Task.sleep(for: .milliseconds(440))
             action()
-            try? await Task.sleep(for: .milliseconds(140))
+            try? await Task.sleep(for: .milliseconds(450))
             settle()
         }
     }
 
     private func settle() {
-        withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) { swirl = 0 }
+        withAnimation(.spring(response: 0.7, dampingFraction: 0.9)) { dive = 0 }
         swirling = false
     }
 
@@ -196,10 +189,14 @@ struct HomeStageView: View {
         let upNext: HomeUpNext = info.upNext
         let leaning: Bool = upNext.inProgress && upNext.yourMove
         return ZStack {
-            HomeSheetScene(look: look, tone: tone, pieces: pieces, black: upNext.playerColor == .black,
-                           rival: upNext.rival, leaning: leaning, lift: 0)
             HomeStageHalo(gold: gold, dark: palette.dark)
                 .allowsHitTesting(false)
+            if SculptedAssets.shared.isLoaded {
+                HomeStageBoard(stage: boardStage, look: look, pieces: pieces, black: upNext.playerColor == .black,
+                               light: upNext.rival.lightUI, leaning: leaning, plinth: palette.plinth,
+                               still: reduceMotion, dive: dive)
+                    .id(look.name)
+            }
             HomeStageMotes(gold: gold, still: reduceMotion)
                 .allowsHitTesting(false)
         }
@@ -470,46 +467,51 @@ struct HomeStageView: View {
     }
 }
 
-// MARK: - The swirl
+// MARK: - The board on its stage
 
-/// The home zooms back and turns a little as the chessboard swirls in over it.
-struct HomeStageZoom: ViewModifier {
-    let swirl: CGFloat
+/// The real 3D board on a round stone stage, the camera circling it slowly. `dive` swoops the
+/// camera down and around into the board, for the way out of the home.
+struct HomeStageBoard: View, Animatable {
+    let stage: SculptedStage
+    let look: SculptedLook
+    let pieces: [Piece]
+    let black: Bool
+    let light: UIColor
+    let leaning: Bool
+    let plinth: UIColor
+    let still: Bool
+    var dive: CGFloat
 
-    func body(content: Content) -> some View {
-        content
-            .scaleEffect(1 - 0.16 * swirl)
-            .rotationEffect(.degrees(Double(swirl) * -10))
-            .blur(radius: swirl * 6)
+    var animatableData: CGFloat {
+        get { dive }
+        set { dive = newValue }
     }
-}
-
-/// A chessboard that spins in from the middle and grows past the screen's edges.
-struct HomeStageSwirl: View {
-    let swirl: CGFloat
-    let palette: HomeStagePalette
 
     var body: some View {
         GeometryReader { geo in
-            let side: CGFloat = max(geo.size.width, geo.size.height)
-            Canvas { gc, size in
-                let square: CGFloat = size.width / 8
-                for row in 0..<8 {
-                    for col in 0..<8 {
-                        let rect = CGRect(x: CGFloat(col) * square, y: CGFloat(row) * square, width: square, height: square)
-                        let color: Color = (row + col).isMultiple(of: 2) ? palette.lightSquare : palette.darkSquare
-                        gc.fill(Path(rect), with: .color(color))
-                    }
-                }
+            TimelineView(.animation(minimumInterval: 1 / 30, paused: still)) { context in
+                let time: Double = still ? 0 : context.date.timeIntervalSinceReferenceDate
+                HomeHeroBoard(stage: stage, look: look, pieces: pieces,
+                              camera: Self.camera(size: geo.size, time: time, dive: dive, black: black),
+                              presence: HomeWindowBoard.presence(light, arrival: 0, leaning: leaning),
+                              plinth: plinth)
             }
-            .frame(width: side, height: side)
-            .overlay(Rectangle().strokeBorder(palette.gold, lineWidth: side / 60))
-            .scaleEffect(0.12 + 1.6 * swirl)
-            .rotationEffect(.degrees(Double(1 - swirl) * 300))
-            .opacity(Double(min(swirl * 2.2, 1)))
-            .position(x: geo.size.width / 2, y: geo.size.height / 2)
         }
-        .accessibilityHidden(true)
+    }
+
+    /// About two minutes a turn, a little above the board, the whole stage in view.
+    static func camera(size: CGSize, time: Double, dive: CGFloat, black: Bool) -> SculptedCamera {
+        let d: Float = Float(min(max(dive, 0), 1))
+        let ease: Float = d * d * (3 - 2 * d)
+        let orbit: Float = Float((time * 0.05).truncatingRemainder(dividingBy: 2 * Double.pi))
+        var camera = SculptedCamera()
+        camera.fieldOfView = 22 * .pi / 180
+        camera.aspect = Float(size.width / max(size.height, 1))
+        camera.azimuth = -0.45 + orbit + 1.8 * ease + (black ? Float.pi : 0)
+        camera.elevation = (30 + 52 * ease) * .pi / 180
+        camera.distance = 36 - 24 * ease
+        camera.focus = SIMD3<Float>(0, -0.5 * (1 - ease), 0)
+        return camera
     }
 }
 
