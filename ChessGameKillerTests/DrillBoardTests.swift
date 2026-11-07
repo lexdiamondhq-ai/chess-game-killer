@@ -118,4 +118,24 @@ final class DrillBoardTests: XCTestCase {
             }
         }
     }
+
+    /// Analysis on the 3D board: the best move is the lit arrow and the next best a plain one,
+    /// never more than two, and the pieces go to the scene to be matched, as they have no ids.
+    func testAnalysisShowsItsTwoBestMovesOnThe3DBoard() {
+        let hints = [
+            MoveHint(rank: 0, from: .g8, to: .f6, san: "Nf6", uci: "g8f6", evaluation: .centipawns(30)),
+            MoveHint(rank: 1, from: .d7, to: .d6, san: "d6", uci: "d7d6", evaluation: .centipawns(20)),
+            MoveHint(rank: 2, from: .c7, to: .c6, san: "c6", uci: "c7c6", evaluation: .centipawns(10)),
+        ]
+        XCTAssertEqual(SculptedPositionBoard.sceneHints(hints), [
+            SculptedHint(from: .g8, to: .f6, isBest: true),
+            SculptedHint(from: .d7, to: .d6, isBest: false),
+        ])
+        let board = SculptedPositionBoard(pieces: Position.standard.pieces, theme: .named(.gilded), flipped: true,
+                                          hints: hints, framing: .seated)
+        XCTAssertTrue(board.state.matchesPieces)
+        XCTAssertTrue(board.state.flipped)
+        XCTAssertEqual(board.state.framing, .seated)
+        XCTAssertEqual(board.state.pieces.count, 32)
+    }
 }
