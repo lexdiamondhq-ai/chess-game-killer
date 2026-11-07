@@ -41,7 +41,6 @@ struct TipBanner: View {
 struct GameTips: View {
     let match: MatchController
     let theme: BoardTheme
-    let bigBoard: Bool
     /// Ghost Vision is switched on in Settings.
     let ghostVisionOn: Bool
     /// Something else has the spot right now (the army's news, the coach unfolded, a held board).
@@ -83,7 +82,6 @@ struct GameTips: View {
             consider()
         }
         .onChange(of: match.ghostLine != nil) { _, _ in consider() }
-        .onChange(of: bigBoard) { _, _ in consider() }
         .onChange(of: blocked) { _, isBlocked in
             // A tip under a held board has done its job: the player found it.
             if isBlocked, shown == .ghostVision { shown = nil }
@@ -94,7 +92,7 @@ struct GameTips: View {
         guard shown == nil, !blocked, !Welcome.isUnderTest, match.hasStarted, !match.isOver else { return }
         let tip = TipBook.next(playerMoves: playerMoves,
                                lineReady: ghostVisionOn && match.ghostLine != nil,
-                               justUndid: justUndid, bigBoard: bigBoard)
+                               justUndid: justUndid)
         justUndid = false
         guard let tip else { return }
         TipBook.markSeen(tip)

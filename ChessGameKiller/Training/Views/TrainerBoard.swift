@@ -24,10 +24,10 @@ struct TrainerBoard: View {
     var showsTurn = true
 
     @AppStorage("sculpted3D") private var sculpted3D = true
-    @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.auto
+    @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.tilted
 
     private var threeD: Bool { BoardView.playsIn3D(theme, setting: sculpted3D) }
-    private var framing: SculptedCamera.Framing { tilt.framing(bigBoard: false) }
+    private var framing: SculptedCamera.Framing { tilt.framing }
 
     var body: some View {
         VStack(spacing: 6) {

@@ -159,7 +159,7 @@ struct CoachOrb: View {
 // MARK: - The game from the player's side
 
 private extension MatchController {
-    /// The engine's score turned to the player's side, as the Big Board strip shows it:
+    /// The engine's score turned to the player's side, as an eval strip shows it:
     /// plus is good for them. `whiteView` is from White's side, like `evaluation`.
     func forPlayer(_ whiteView: Evaluation) -> Evaluation {
         setup.playerColor == .white ? whiteView : whiteView.flipped
