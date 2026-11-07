@@ -136,10 +136,7 @@ private struct CandidatePositionView: View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(spacing: 18) {
-                    VStack(spacing: 6) {
-                        board
-                        turnBadge
-                    }
+                    board
                     RoomMessage(text: runner.message, tone: runner.tone, theme: theme)
                         .padding(.horizontal, 16)
                     if let report = runner.report {
@@ -165,22 +162,19 @@ private struct CandidatePositionView: View {
         .sensoryFeedback(.selection, trigger: runner.candidates.count) { _, _ in hapticsOn }
     }
 
+    /// The board, with "White to move" in the player's color under it while the list is made.
     private var board: some View {
-        TrainingBoardView(
+        TrainerBoard(
             game: runner.game,
             theme: theme,
+            side: boardSide,
             flipped: runner.learner == .black,
             arrows: runner.arrows,
             labels: runner.labels,
-            onTap: runner.phase == .listing ? { (square: Square) in runner.tap(square) } : nil
+            onTap: runner.phase == .listing ? { (square: Square) in runner.tap(square) } : nil,
+            turn: runner.learner,
+            showsTurn: runner.phase == .listing
         )
-        .frame(width: boardSide, height: boardSide)
-        .boardHeadroom(theme: theme, side: boardSide)
-    }
-
-    /// "White to move" in the player's color, under the board while the list is made.
-    private var turnBadge: some View {
-        TurnBadge(theme: theme, side: runner.learner, showing: runner.phase == .listing)
     }
 
     @ViewBuilder
