@@ -54,6 +54,11 @@ final class DrillRunner {
     /// Hears right and wrong answers, for the coach's spoken reactions ("Nice move", "Try again").
     /// Nil when the drill plays no sound, and in the level check, which is a test.
     @ObservationIgnored var reactions: Reacting?
+    /// Seconds from a move until its piece touches down, so its sound is heard then: on the 3D
+    /// board the piece glides first (the board sets this), on the flat one it is there at once.
+    @ObservationIgnored var landingDelay: @MainActor (PlayedMove) -> TimeInterval = { _ in 0 }
+    /// The move sounds. Nil when the drill plays none.
+    @ObservationIgnored var sounds: SoundPlaying?
 
     private let startFEN: String
     private let setup: String?
@@ -66,7 +71,6 @@ final class DrillRunner {
     private let explain: String?
     private let lines: CoachLines?
     private let engine: ChessEngine?
-    private let sounds: SoundPlaying?
     @ObservationIgnored private var index = 0
     @ObservationIgnored private var found: Set<String> = []
     @ObservationIgnored private var pending: Task<Void, Never>?
@@ -671,16 +675,18 @@ final class DrillRunner {
         sound(for: played)
     }
 
+    /// The move's sound, as its piece touches down.
     private func sound(for move: PlayedMove) {
         guard let sounds else { return }
+        let landing = landingDelay(move)
         if move.isCapture {
-            sounds.play(.capture)
+            sounds.play(.capture, after: landing)
         } else if move.givesCheck {
-            sounds.play(.check)
+            sounds.play(.check, after: landing)
         } else if move.isCastle {
-            sounds.play(.castle)
+            sounds.play(.castle, after: landing)
         } else {
-            sounds.play(.move)
+            sounds.play(.move, after: landing)
         }
     }
 
