@@ -24,6 +24,8 @@ struct HomeAuroraActions {
     var playRival: (MatchController.Level) -> Void = { _ in }
     /// Starts a game against your Grudge.
     var playGrudge: () -> Void = {}
+    /// Opens Puzzles.
+    var puzzles: () -> Void = {}
 }
 
 /// Aurora's colors, night and day.
@@ -208,6 +210,12 @@ struct HomeAuroraView: View {
         }
         .frame(height: height)
         .frame(maxWidth: .infinity)
+        // The board's lower edge melts into the marble instead of stopping on a hard line
+        // where the 3D view ends (Alex, 2026-11-07).
+        .mask(LinearGradient(stops: [.init(color: .black, location: 0),
+                                     .init(color: .black, location: 0.8),
+                                     .init(color: .clear, location: 1)],
+                             startPoint: .top, endPoint: .bottom))
         .scaleEffect(1 - 0.12 * lift, anchor: .top)
         .opacity(1 - 0.55 * Double(lift))
         .allowsHitTesting(false)
@@ -359,6 +367,14 @@ struct HomeAuroraView: View {
 
     @ViewBuilder
     private var todayRows: some View {
+        HomeAuroraRow(eyebrow: "Today's Move", title: todayTitle, detail: todayDetail,
+                      accent: palette.rose, palette: palette, action: actions.stage.dailyMove) {
+            HomeAuroraEmblem(glyph: Glyphs.today, fill: HomeAuroraPalette.roseTile)
+        }
+        HomeAuroraRow(eyebrow: "Puzzles", title: "Sharpen your eye", detail: "Tactics at your level, one after another",
+                      accent: palette.violet, palette: palette, action: actions.puzzles) {
+            HomeAuroraEmblem(glyph: Glyphs.puzzles, fill: HomeAuroraPalette.violetTile)
+        }
         HomeAuroraRow(eyebrow: "Coach Leo", title: stage.plan?.title ?? "Today's lesson", detail: coachLine,
                       accent: palette.teal, palette: palette, action: actions.stage.coach) {
             HomeAuroraEmblem(glyph: Glyphs.coach, fill: HomeAuroraPalette.tealTile)
@@ -615,56 +631,50 @@ struct HomeAuroraGrudge: View {
     }
 }
 
-/// "Beauty of Chess" incised in the marble under the board, the way a name is cut into a
-/// stone (Alex, 2026-11-07: "actually in the marble"). Roman capitals, widely spaced, with the
-/// slab's own veins running through them: the groove is drawn in multiply over the marble, so
-/// the stone shows through, its floor shaded by an inner shadow from the top edge, its lower
-/// lip catching the light. "of" is a small gold-leaf italic, as on old inscriptions.
+/// "Beauty of Chess" carved into the marble under the board in Cinzel Decorative (Alex,
+/// 2026-11-07, option 3). The letters are cut solid into the stone: the slab's veins stop at
+/// their edges rather than running behind them. Each groove is a shade deeper than the
+/// marble, darkened under its top edge by an inner shadow, with a lit lower lip; "of" is laid
+/// in gold leaf.
 struct HomeAuroraCarving: View {
     let palette: HomeAuroraPalette
-    /// How much shows, 0 to 1. Set on each layer, not the whole, so the groove still multiplies
-    /// into the marble while it fades in.
+    /// How much shows, 0 to 1.
     var reveal: Double = 1
 
-    private var groove: Color { palette.dark ? Color(hex: 0x6B6660) : Color(hex: 0xC9C1B5) }
+    /// Cinzel Decorative (SIL OFL), bundled in Home/Fonts.
+    static let fontName = "CinzelDecorative-Regular"
 
-    private func word(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 30, weight: .regular, design: .serif))
-            .tracking(7)
-    }
+    /// The cut stone: the marble's own white, a shade deeper.
+    private var groove: Color { palette.dark ? Color(hex: 0x1E1D1F) : Color(hex: 0xE4DED4) }
+    private static let gold = Color(hex: 0xC4964A)
+    private var font: Font { .custom(Self.fontName, size: 34, relativeTo: .largeTitle) }
 
-    /// One word as a cut: a lit lip under the groove, then the groove itself, shaded inside.
-    private func cut(_ text: String) -> some View {
-        ZStack {
-            word(text)
-                .foregroundStyle(Color.white.opacity(palette.dark ? 0.1 : 0.75))
-                .offset(y: 0.9)
-                .opacity(reveal)
-            word(text)
-                .foregroundStyle(groove
-                    .shadow(.inner(color: .black.opacity(palette.dark ? 0.75 : 0.5), radius: 1.4, x: 0, y: 1.6))
-                    .shadow(.inner(color: .white.opacity(palette.dark ? 0.08 : 0.35), radius: 0.6, x: 0, y: -0.8)))
-                .opacity(reveal)
-                .blendMode(.multiply)
-        }
+    private func words(of: Color) -> Text {
+        Text("Beauty ") + Text("of").foregroundColor(of) + Text(" Chess")
     }
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            cut("BEAUTY")
-            Text("of")
-                .font(.system(size: 21, weight: .regular, design: .serif).italic())
-                .foregroundStyle(LinearGradient(colors: [Color(hex: 0xE9CF8E), Color(hex: 0xA77A35)],
-                                                startPoint: .top, endPoint: .bottom)
-                    .shadow(.inner(color: .black.opacity(0.35), radius: 0.8, x: 0, y: 1)))
-                .shadow(color: .white.opacity(palette.dark ? 0.05 : 0.6), radius: 0, y: 0.8)
-                .opacity(reveal)
-            cut("CHESS")
+        ZStack {
+            // The lit lower lip of each cut.
+            words(of: .white).font(font)
+                .foregroundStyle(Color.white.opacity(palette.dark ? 0.12 : 0.95))
+                .offset(y: 1.2)
+            // The shadowed upper wall, just above.
+            words(of: .black).font(font)
+                .foregroundStyle(Color.black.opacity(palette.dark ? 0.6 : 0.28))
+                .offset(y: -0.7)
+                .blur(radius: 0.3)
+            // The floor of the cut: solid, so no vein runs through it.
+            words(of: Self.gold).font(font)
+                .foregroundStyle(groove
+                    .shadow(.inner(color: .black.opacity(palette.dark ? 0.8 : 0.42), radius: 1.6, x: 0, y: 1.8))
+                    .shadow(.inner(color: .white.opacity(palette.dark ? 0.06 : 0.7), radius: 0.8, x: 0, y: -1)))
         }
+        .tracking(1.5)
         .lineLimit(1)
         .minimumScaleFactor(0.6)
         .padding(.horizontal, 20)
+        .opacity(reveal)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
@@ -1121,10 +1131,10 @@ struct HomeAuroraTabBar: View {
     var body: some View {
         HStack(spacing: 12) {
             HStack(spacing: 0) {
-                tab("Today", glyph: Glyphs.today, on: true) {}
-                tab("Learn", glyph: Glyphs.coach, on: false, action: learn)
-                tab("You", glyph: Glyphs.king, on: false, action: you)
-                tab("Rooms", glyph: Glyphs.home, on: false, action: rooms)
+                tab("Today", icon: .today, on: true) {}
+                tab("Learn", icon: .learn, on: false, action: learn)
+                tab("You", icon: .you, on: false, action: you)
+                tab("Rooms", icon: .rooms, on: false, action: rooms)
             }
             .padding(.horizontal, 6)
             .frame(height: 64)
@@ -1135,7 +1145,12 @@ struct HomeAuroraTabBar: View {
                     .overlay(Capsule().strokeBorder(palette.gold.opacity(0.35), lineWidth: 0.75))
                     .shadow(color: .black.opacity(palette.dark ? 0.5 : 0.14), radius: 20, y: 10)
             }
-            Button(action: play) {
+            // A tap opens Analyze; a press and hold brings up the Rooms panel (Alex, 2026-11-07).
+            knight
+        }
+    }
+
+    private var knight: some View {
                 Glyph(name: Glyphs.train, size: 32, weight: .bold)
                     .foregroundStyle(Color(hex: 0x2A1C08))
                     .frame(width: 64, height: 64)
@@ -1147,16 +1162,21 @@ struct HomeAuroraTabBar: View {
                     }
                     .overlay(Circle().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
                     .shadow(color: .black.opacity(palette.dark ? 0.5 : 0.18), radius: 14, y: 8)
-            }
-            .buttonStyle(HomeStagePress())
-            .accessibilityLabel("Analyze")
-        }
+                    .contentShape(Circle())
+                    .onTapGesture(perform: play)
+                    .onLongPressGesture(minimumDuration: 0.35, perform: rooms)
+                    .accessibilityElement()
+                    .accessibilityLabel("Analyze")
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction(named: "Rooms", rooms)
     }
 
-    private func tab(_ title: String, glyph: String, on: Bool, action: @escaping () -> Void) -> some View {
+    private func tab(_ title: String, icon: HomeTabIcon.Kind, on: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 3) {
-                Glyph(name: glyph, size: 22, weight: .semibold)
+                HomeTabIcon(kind: icon,
+                            color: on ? (palette.dark ? Color(hex: 0xE8C27A) : Color(hex: 0xB7832E)) : palette.ink3)
+                    .frame(width: 24, height: 24)
                 Text(title)
                     .font(.system(size: 10.5, weight: .semibold))
             }
@@ -1169,5 +1189,88 @@ struct HomeAuroraTabBar: View {
         .buttonStyle(HomeStagePress())
         .accessibilityLabel(title)
         .accessibilityAddTraits(on ? .isSelected : [])
+    }
+}
+
+/// The bottom bar's tab icons (Alex, 2026-11-07: "Do B but make the You and Rooms from A").
+/// Today and Learn are solid chess pieces in gold leaf: a pawn at sunrise and a bishop.
+/// You and Rooms are fine engraved lines: a crowned shield and a castle gate.
+/// Drawn on a 26-point grid; the selected tab shows in gold.
+struct HomeTabIcon: View {
+    enum Kind { case today, learn, you, rooms }
+
+    let kind: Kind
+    let color: Color
+
+    var body: some View {
+        Canvas { context, size in
+            let k = min(size.width, size.height) / 26
+            context.translateBy(x: (size.width - 26 * k) / 2, y: (size.height - 26 * k) / 2)
+            context.scaleBy(x: k, y: k)
+            let shading = GraphicsContext.Shading.color(color)
+            let line = StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round)
+            switch kind {
+            case .today:
+                // A pawn at sunrise.
+                context.fill(Path(ellipseIn: CGRect(x: 9.5, y: 3.5, width: 7, height: 7)), with: shading)
+                context.fill(Path { p in
+                    p.move(to: CGPoint(x: 10, y: 12)); p.addLine(to: CGPoint(x: 16, y: 12))
+                    p.addLine(to: CGPoint(x: 17.5, y: 20)); p.addLine(to: CGPoint(x: 8.5, y: 20)); p.closeSubpath()
+                    p.addRect(CGRect(x: 7, y: 21, width: 12, height: 2.5))
+                }, with: shading)
+                context.stroke(Path { p in
+                    p.move(to: CGPoint(x: 3, y: 7)); p.addLine(to: CGPoint(x: 6, y: 7))
+                    p.move(to: CGPoint(x: 20, y: 7)); p.addLine(to: CGPoint(x: 23, y: 7))
+                    p.move(to: CGPoint(x: 13, y: 1)); p.addLine(to: CGPoint(x: 13, y: 2.5))
+                }, with: shading, style: StrokeStyle(lineWidth: 1.3, lineCap: .round))
+            case .learn:
+                // A bishop, its mitre cut with the slit.
+                context.drawLayer { layer in
+                    layer.fill(Path { p in
+                        p.move(to: CGPoint(x: 13, y: 2))
+                        p.addCurve(to: CGPoint(x: 18, y: 11), control1: CGPoint(x: 16, y: 5), control2: CGPoint(x: 18, y: 8))
+                        p.addCurve(to: CGPoint(x: 15.5, y: 15), control1: CGPoint(x: 18, y: 13), control2: CGPoint(x: 16.5, y: 14.5))
+                        p.addLine(to: CGPoint(x: 17, y: 20)); p.addLine(to: CGPoint(x: 9, y: 20))
+                        p.addLine(to: CGPoint(x: 10.5, y: 15))
+                        p.addCurve(to: CGPoint(x: 8, y: 11), control1: CGPoint(x: 9.5, y: 14.5), control2: CGPoint(x: 8, y: 13))
+                        p.addCurve(to: CGPoint(x: 13, y: 2), control1: CGPoint(x: 8, y: 8), control2: CGPoint(x: 10, y: 5))
+                        p.closeSubpath()
+                        p.addRect(CGRect(x: 7, y: 21, width: 12, height: 2.5))
+                    }, with: shading)
+                    layer.blendMode = .destinationOut
+                    layer.stroke(Path { p in
+                        p.move(to: CGPoint(x: 14.5, y: 6)); p.addLine(to: CGPoint(x: 11.5, y: 10))
+                    }, with: .color(.black), style: StrokeStyle(lineWidth: 1.4, lineCap: .round))
+                }
+            case .you:
+                // A crowned shield, engraved.
+                context.stroke(Path { p in
+                    p.move(to: CGPoint(x: 5, y: 7)); p.addLine(to: CGPoint(x: 21, y: 7)); p.addLine(to: CGPoint(x: 21, y: 13))
+                    p.addCurve(to: CGPoint(x: 13, y: 23), control1: CGPoint(x: 21, y: 18), control2: CGPoint(x: 17, y: 21))
+                    p.addCurve(to: CGPoint(x: 5, y: 13), control1: CGPoint(x: 9, y: 21), control2: CGPoint(x: 5, y: 18))
+                    p.closeSubpath()
+                    p.move(to: CGPoint(x: 9, y: 11)); p.addLine(to: CGPoint(x: 11, y: 9)); p.addLine(to: CGPoint(x: 13, y: 11))
+                    p.addLine(to: CGPoint(x: 15, y: 9)); p.addLine(to: CGPoint(x: 17, y: 11)); p.addLine(to: CGPoint(x: 17, y: 13))
+                    p.addLine(to: CGPoint(x: 9, y: 13)); p.closeSubpath()
+                }, with: shading, style: line)
+            case .rooms:
+                // A castle gate, engraved.
+                context.stroke(Path { p in
+                    p.move(to: CGPoint(x: 4, y: 23))
+                    for (x, y) in [(4, 9), (7, 9), (7, 6), (10, 6), (10, 9), (16, 9), (16, 6), (19, 6), (19, 9), (22, 9), (22, 23)] {
+                        p.addLine(to: CGPoint(x: x, y: y))
+                    }
+                    p.closeSubpath()
+                    p.move(to: CGPoint(x: 10, y: 23)); p.addLine(to: CGPoint(x: 10, y: 17))
+                    p.addArc(center: CGPoint(x: 13, y: 17), radius: 3, startAngle: .degrees(180), endAngle: .degrees(0), clockwise: false)
+                    p.addLine(to: CGPoint(x: 16, y: 23))
+                }, with: shading, style: line)
+                context.stroke(Path { p in
+                    p.move(to: CGPoint(x: 12, y: 17)); p.addLine(to: CGPoint(x: 12, y: 23))
+                    p.move(to: CGPoint(x: 14, y: 17)); p.addLine(to: CGPoint(x: 14, y: 23))
+                }, with: .color(color.opacity(0.7)), style: line)
+            }
+        }
+        .accessibilityHidden(true)
     }
 }

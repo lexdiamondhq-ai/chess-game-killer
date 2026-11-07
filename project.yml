@@ -37,8 +37,9 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLName: com.chessgamekiller.app
             CFBundleURLSchemes: [chessgamekiller]
-        # Geist, the app's typeface (Shared/Fonts, Shared/AppFont.swift).
-        UIAppFonts: [Geist-Regular.ttf, Geist-Medium.ttf, Geist-SemiBold.ttf, Geist-Bold.ttf]
+        # Geist, the app's typeface (Shared/Fonts, Shared/AppFont.swift); Cinzel Decorative, the
+        # inscription carved into Home's marble (ChessGameKiller/Home/Fonts, OFL).
+        UIAppFonts: [Geist-Regular.ttf, Geist-Medium.ttf, Geist-SemiBold.ttf, Geist-Bold.ttf, CinzelDecorative-Regular.ttf]
         # The game under way on the Lock Screen and in the Dynamic Island (Shared/LiveGame).
         NSSupportsLiveActivities: true
         # Lets the app animate at 120 frames a second on ProMotion iPhones (iOS caps it at 60 without).
