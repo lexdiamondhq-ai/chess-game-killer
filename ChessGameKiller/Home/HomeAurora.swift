@@ -22,6 +22,8 @@ struct HomeAuroraActions {
     var open: (HomeCurrentGame) -> Void
     /// Starts a game against one of the five rivals.
     var playRival: (MatchController.Level) -> Void = { _ in }
+    /// Opens the rivals' hall, on this rival or on the one up next.
+    var rivals: (MatchController.Level?) -> Void = { _ in }
     /// Starts a game against your Grudge.
     var playGrudge: () -> Void = {}
     /// Opens Puzzles.
@@ -266,8 +268,13 @@ struct HomeAuroraView: View {
             HomeAuroraSection(title: gamesTitle, palette: palette, note: gamesNote)
             gameRow
             HomeAuroraSection(title: "Face a rival", palette: palette, note: "Up next: \(stage.upNext.level.rival.shortName)")
-            HomeAuroraRivals(next: stage.upNext.level, palette: palette, play: actions.playRival)
+            // A coin opens its rival's card in the hall, where its film plays and the locks hold
+            // (Alex, 2026-11-07).
+            HomeAuroraRivals(next: stage.upNext.level, palette: palette, play: { actions.rivals($0) })
                 .padding(.horizontal, 12)
+            HomeAuroraRivalsButton(palette: palette) { actions.rivals(nil) }
+                .padding(.horizontal, 16)
+                .padding(.top, 14)
             HomeAuroraSection(title: "For today", palette: palette, note: nil)
             VStack(spacing: 10) {
                 todayRows
@@ -995,6 +1002,52 @@ struct HomeAuroraRivals: View {
         .accessibilityLabel("Play \(rival.name)")
         .accessibilityValue(rival.spokenElo)
         .accessibilityHint(isNext ? "Up next" : "")
+    }
+}
+
+/// Rivals, under the coins: opens the rivals' hall, where each rival's card is swiped through
+/// and its welcome film plays before the game (Alex, 2026-11-07).
+struct HomeAuroraRivalsButton: View {
+    let palette: HomeAuroraPalette
+    let action: () -> Void
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: "shield.lefthalf.filled")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Color(hex: 0xE8C27A))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("RIVALS")
+                        .font(.custom("Cinzel-Bold", size: 16, relativeTo: .headline))
+                        .tracking(3)
+                        .foregroundStyle(Color(hex: 0xF2EEE6))
+                    Text("Five warriors. Beat each one to climb.")
+                        .font(.system(size: 13, weight: .regular, design: .serif))
+                        .italic()
+                        .foregroundStyle(Color(hex: 0xF2EEE6).opacity(0.6))
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Color(hex: 0xE8C27A).opacity(0.8))
+            }
+            .padding(.horizontal, 18)
+            .frame(maxWidth: .infinity, minHeight: 64)
+            .background {
+                shape.fill(LinearGradient(colors: [Color(hex: 0x17151A), Color(hex: 0x0B0A0D)],
+                                          startPoint: .topLeading, endPoint: .bottomTrailing))
+            }
+            .overlay {
+                shape.strokeBorder(LinearGradient(colors: [Color(hex: 0xE8C27A).opacity(0.6), Color(hex: 0xE8C27A).opacity(0.1)],
+                                                  startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1)
+            }
+            .shadow(color: palette.shadow, radius: 12, y: 6)
+        }
+        .buttonStyle(HomeStagePress())
+        .accessibilityLabel("Rivals")
+        .accessibilityHint("Swipe through the five rivals and face one")
     }
 }
 

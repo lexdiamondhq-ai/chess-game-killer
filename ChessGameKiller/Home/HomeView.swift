@@ -60,6 +60,9 @@ struct HomeView: View {
     @Environment(GrudgeStore.self) private var grudges: GrudgeStore?
     /// Your Grudge picked from Home while a game is under way: asks before that game is lost.
     @State private var confirmingGrudge = false
+    /// The rivals' hall is open, on this rival (nil: the one up next).
+    @State private var showingHall = false
+    @State private var hallStart: MatchController.Level?
     @AppStorage("setup.clock") private var timeControl: TimeControl = .unlimited
     @AppStorage("haptics") private var hapticsOn = true
     /// The name friends see, from the last challenge: the home says hello with it.
@@ -683,8 +686,20 @@ extension HomeView {
             } else {
                 actions.resume()
             }
-        }, playRival: { level in playRival(level) }, playGrudge: playGrudge, puzzles: actions.puzzles)
+        }, playRival: { level in playRival(level) }, rivals: { level in
+            hallStart = level
+            showingHall = true
+        }, playGrudge: playGrudge, puzzles: actions.puzzles)
         return HomeAuroraView(tone: tone, info: auroraInfo, actions: auroraActions)
+            .fullScreenCover(isPresented: $showingHall) {
+                RivalsHall(start: hallStart, begin: { level in
+                    // The film's last frame gives way to the game: the hall closes at once.
+                    var quiet = Transaction()
+                    quiet.disablesAnimations = true
+                    withTransaction(quiet) { showingHall = false }
+                    playRival(level)
+                }, close: { showingHall = false })
+            }
             .confirmationDialog("Leave your game against \(match.opponentName)?",
                                 isPresented: $confirmingGrudge, titleVisibility: .visible) {
                 Button("Resign and play Your Grudge", role: .destructive) { startGrudge() }

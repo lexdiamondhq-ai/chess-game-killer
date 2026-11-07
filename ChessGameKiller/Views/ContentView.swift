@@ -228,6 +228,7 @@ struct ContentView: View {
             }
             .onChange(of: match.isOver) { _, over in
                 guard over else { return }
+                RivalTheme.shared.stop(fade: 2)
                 recordArmy()
                 recordGame()
                 recordGrudge()
@@ -367,6 +368,8 @@ struct ContentView: View {
                 if match.isOver { recordGame() }
             }
             .onChange(of: match.gameNumber) { _, _ in
+                // A game begun from a rival's film plays its theme; any other game is quiet.
+                RivalTheme.shared.gameStarted(level: match.setup.level, grudge: match.setup.grudge)
                 coach.gameStarted()
                 announceGrudge()
                 // Nothing on screen carries over from the last game.
@@ -556,6 +559,7 @@ struct ContentView: View {
         setCoach(expanded: false)
         // A victory theme still playing fades as the game leaves the screen.
         SoundPlayer.shared.stopAll(fade: 0.4)
+        RivalTheme.shared.stop(fade: 0.6)
         homeRises = true
         homeTab = .today
         withAnimation(.easeInOut(duration: 0.35)) {
