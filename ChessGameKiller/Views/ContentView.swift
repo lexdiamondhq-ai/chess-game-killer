@@ -707,8 +707,8 @@ struct ContentView: View {
         }
     }
 
-    /// The moves, or in Big Board while looking back, where the game was and the way back;
-    /// beside them the Tilted / Flat switch.
+    /// The Tilted / Flat switch; in Big Board while looking back, where the game was and the
+    /// way back beside it.
     @ViewBuilder
     private var ribbonRow: some View {
         if ghostVisionOn, vision.isHolding {
@@ -717,12 +717,18 @@ struct ContentView: View {
                 .transition(.opacity)
         } else {
             HStack(spacing: 8) {
-                // The moves on their own glass, like the players' lines above them.
-                movesOrBrowsing
-                    .padding(.horizontal, 14)
-                    .frame(maxHeight: .infinity)
-                    .glassPane(Capsule())
+                // The moves live in the dock now. In Big Board, looking back, where the game
+                // was and the way back keep their glass here.
+                if bigBoard, browsePly != nil {
+                    movesOrBrowsing
+                        .padding(.horizontal, 14)
+                        .frame(maxHeight: .infinity)
+                        .glassPane(Capsule())
+                } else {
+                    Spacer(minLength: 0)
+                }
                 BoardViewSwitch(theme: theme, bigBoard: bigBoard)
+                if !(bigBoard && browsePly != nil) { Spacer(minLength: 0) }
             }
         }
     }
@@ -920,23 +926,18 @@ struct ContentView: View {
         .padding(.top, 8)
     }
 
-    /// Every control named, three either side of the orb. They step aside while the orb is wide.
+    /// The moves on the left of the orb, three controls on its right. They step aside while the orb is wide.
     /// No glass of its own: it sits on the dock's, or on Big Board's tray.
     private func dockRow(coachHeight: CGFloat) -> some View {
         ZStack {
             HStack(spacing: 0) {
-                HStack(spacing: 0) {
-                    DockButton(title: "Analyze", symbol: Glyphs.analyze, theme: theme) {
-                        showingAnalyze = true
-                    }
-                    DockButton(title: "Train", symbol: Glyphs.train, theme: theme) {
-                        showingTraining = true
-                    }
-                    DockButton(title: "Puzzles", symbol: Glyphs.puzzles, theme: theme) {
-                        showingPuzzles = true
-                    }
-                }
-                .frame(maxWidth: .infinity)
+                // The moves so far, in bold green (Alex, 2026-11-07). Analyze lives in the orb;
+                // Train and Puzzles wait off the game screen.
+                MoveRibbon(moves: match.game.moves, theme: theme, style: .dock)
+                    .frame(height: 30)
+                    .padding(.leading, 12)
+                    .padding(.trailing, 4)
+                    .frame(maxWidth: .infinity)
                 // The orb's place. Only a width: a bare Color.clear takes every bit of
                 // height it is offered, which pushed the dock up and squeezed the board to nothing.
                 Color.clear.frame(width: CoachOrb.orbSize + 12, height: 1)
@@ -963,7 +964,7 @@ struct ContentView: View {
             .allowsHitTesting(!coachIsWide)
             CoachOrb(match: match, theme: theme, isExpanded: $coachExpanded, expandedMaxHeight: coachHeight,
                      newGame: { showingNewGame = true }, showGames: { showingGames = true },
-                     talk: { openTalk() })
+                     talk: { openTalk() }, analyze: { showingAnalyze = true })
                 .padding(.horizontal, coachExpanded ? 0 : 6)
         }
         .frame(minHeight: Self.dockHeight)

@@ -17,6 +17,8 @@ struct CoachOrb: View {
     let showGames: () -> Void
     /// Opens Talk it through for the position on the board. Nil leaves it out.
     var talk: (() -> Void)? = nil
+    /// Opens Analyze on the position. Nil leaves it out.
+    var analyze: (() -> Void)? = nil
 
     @AppStorage("haptics") private var hapticsOn = true
     /// Counts the times the person opened or closed the panel, for a light tap each.
@@ -42,7 +44,7 @@ struct CoachOrb: View {
         ZStack {
             if isExpanded {
                 CoachPanel(match: match, theme: theme, coachMove: $coachMove, newGame: newGame, showGames: showGames,
-                           talk: talk, close: { collapse(felt: true) }, collapse: { collapse() })
+                           talk: talk, analyze: analyze, close: { collapse(felt: true) }, collapse: { collapse() })
                     .transition(.opacity.combined(with: .scale(scale: 0.97)))
             } else {
                 OrbFace(match: match, theme: theme, open: { expand() })
@@ -395,6 +397,8 @@ private struct CoachPanel: View {
     let showGames: () -> Void
     /// Opens Talk it through. Nil leaves it out.
     let talk: (() -> Void)?
+    /// Opens Analyze. Nil leaves it out, and Flip takes its place.
+    let analyze: (() -> Void)?
     /// Closes the panel when the person closes it themselves, with a light tap.
     let close: () -> Void
     /// Closes the panel quietly, on the way to something else.
@@ -722,8 +726,16 @@ private struct CoachPanel: View {
             if gameCoach != nil {
                 ThinkActionButton(match: match, theme: theme)
             }
-            ActionButton(title: "Flip", symbol: Glyphs.flip, theme: theme) {
-                withAnimation(.snappy(duration: 0.45)) { match.flipBoard() }
+            if let analyze {
+                // Analyze moved here from the dock; Flip is still on the dock.
+                ActionButton(title: "Analyze", symbol: Glyphs.analyze, theme: theme) {
+                    collapse()
+                    analyze()
+                }
+            } else {
+                ActionButton(title: "Flip", symbol: Glyphs.flip, theme: theme) {
+                    withAnimation(.snappy(duration: 0.45)) { match.flipBoard() }
+                }
             }
             if match.canResign {
                 // While a game is on, Resign takes the place of Games (also in the dock).

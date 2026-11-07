@@ -108,8 +108,16 @@ struct ClockLabel: View {
 /// scrolls to keep the newest move in view, and the oldest fade out at the left edge.
 /// Before the first move it says how to begin.
 struct MoveRibbon: View {
+    enum Style {
+        /// Under the board: the newest move in the text color, underlined in the accent.
+        case plain
+        /// In the game's dock: every move in bold green, the newest brightest (Alex, 2026-11-07).
+        case dock
+    }
+
     let moves: [String]
     let theme: BoardTheme
+    var style: Style = .plain
 
     @State private var lineWidth: CGFloat = 0
 
@@ -118,7 +126,7 @@ struct MoveRibbon: View {
     var body: some View {
         GeometryReader { geo in
             if moves.isEmpty {
-                Text("Tap a piece to see where it can go")
+                Text(style == .dock ? "Tap a piece to begin" : "Tap a piece to see where it can go")
                     .font(.app(.footnote))
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
@@ -172,11 +180,11 @@ struct MoveRibbon: View {
                             .foregroundStyle(.tertiary)
                     }
                     Text(san)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(isLast ? Color.primary : Color.secondary)
+                        .fontWeight(style == .dock ? .bold : .semibold)
+                        .foregroundStyle(moveColor(isLast: isLast))
                         .overlay(alignment: .bottom) {
                             // The newest move is marked with a fine accent line.
-                            if isLast {
+                            if isLast, style == .plain {
                                 Rectangle()
                                     .fill(accent)
                                     .frame(height: 1.5)
@@ -188,7 +196,17 @@ struct MoveRibbon: View {
                 .id(index)
             }
         }
-        .font(Font.app(.footnote).monospacedDigit())
+        .font(Font.app(style == .dock ? .subheadline : .footnote).monospacedDigit())
         .padding(.vertical, 2)
+    }
+
+    /// A deep, quiet emerald rather than a signal green: brighter on dark boards, deeper on light.
+    private var green: Color { theme.isDark ? Color(hex: 0x5CCB94) : Color(hex: 0x1C7A4E) }
+
+    private func moveColor(isLast: Bool) -> Color {
+        switch style {
+        case .plain: return isLast ? Color.primary : Color.secondary
+        case .dock: return isLast ? green : green.opacity(0.62)
+        }
     }
 }
