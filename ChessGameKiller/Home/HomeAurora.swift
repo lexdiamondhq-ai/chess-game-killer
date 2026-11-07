@@ -107,15 +107,13 @@ struct HomeAuroraView: View {
             ZStack(alignment: .top) {
                 HomeAuroraBackdrop(palette: palette)
                 // The marble starts just under the header's gold line, never above it.
-                HomeAuroraMarble(palette: palette)
-                    // Pulled down, the slab grows with the gap so the carving sits in marble.
-                    .frame(height: boardHeight + 100 + max(0, -pulled))
+                // "Beauty of Chess" is cut into the slab under the board; it shows as the page
+                // is pulled down.
+                HomeAuroraMarble(palette: palette, carvingTop: boardHeight + 10,
+                                 carving: Double(min(max(-pulled / 70, 0), 1)))
+                    .frame(height: boardHeight + 130)
                     .padding(.top, 54)
                     .opacity(1 - 0.6 * Double(lift))
-                // Cut into the marble under the board: it shows as the page is pulled down.
-                HomeAuroraCarving(palette: palette)
-                    .padding(.top, 58 + boardHeight + 4)
-                    .opacity(Double(min(max(-pulled / 70, 0), 1)))
                 spinningBoard(height: boardHeight, lift: lift)
                     .padding(.top, 58)
                 ScrollView(.vertical) {
@@ -223,17 +221,10 @@ struct HomeAuroraView: View {
                 .foregroundStyle(palette.ink)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
-            Spacer(minLength: 0)
-            if music.available {
-                circle(label: music.on ? "Music off" : "Music on", action: music.toggle) {
-                    HomeMusicBars(on: music.on, gold: palette.gold, off: palette.ink3)
-                }
-            }
-            circle(label: "You", action: actions.stage.you) {
-                Image(systemName: "crown")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(palette.gold)
-            }
+            Spacer(minLength: 8)
+            // Your numbers sit at the top right, in place of the music and crown buttons
+            // (Alex, 2026-11-07); Home music is in Settings > Sound & feel.
+            numbers
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
@@ -245,18 +236,6 @@ struct HomeAuroraView: View {
                 .frame(height: 0.75)
                 .padding(.horizontal, 20)
         }
-    }
-
-    private func circle<Label: View>(label: String, action: @escaping () -> Void,
-                                     @ViewBuilder content: () -> Label) -> some View {
-        Button(action: action) {
-            content()
-                .frame(width: 36, height: 36)
-                .background(Circle().fill(.ultraThinMaterial))
-                .overlay(Circle().strokeBorder(palette.line, lineWidth: 1))
-        }
-        .buttonStyle(HomeStagePress())
-        .accessibilityLabel(label)
     }
 
     // MARK: The page
@@ -274,9 +253,6 @@ struct HomeAuroraView: View {
                 .padding(.top, 10)
             HomeAuroraSection(title: gamesTitle, palette: palette, note: gamesNote)
             gameRow
-            numbers
-                .padding(.horizontal, 20)
-                .padding(.top, 22)
             HomeAuroraSection(title: "Face a rival", palette: palette, note: "Up next: \(stage.upNext.level.rival.shortName)")
             HomeAuroraRivals(next: stage.upNext.level, palette: palette, play: actions.playRival)
                 .padding(.horizontal, 12)
@@ -338,42 +314,44 @@ struct HomeAuroraView: View {
         .contentMargins(.horizontal, 16, for: .scrollContent)
     }
 
-    /// Rating, level and streak in one slim engraved line.
+    /// Rating, level and streak, small in the header: serif figures over fine caps, parted by
+    /// gold hairlines. Each opens what it counts.
     private var numbers: some View {
         HStack(spacing: 0) {
             number(stage.rating.map { $0.formatted(.number) } ?? "New", label: "Rating", action: actions.stage.you)
             hairline
             number("\(stage.rankNumber)", label: "Level", action: actions.stage.learn)
             hairline
-            number("\(stage.day.streak)", label: "Day streak",
-                   action: actions.stage.dailyMove)
+            number("\(stage.day.streak)", label: "Streak", action: actions.stage.dailyMove)
         }
-        .padding(.vertical, 14)
-        .overlay(alignment: .top) { palette.line.frame(height: 1) }
-        .overlay(alignment: .bottom) { palette.line.frame(height: 1) }
+        .fixedSize()
     }
 
     private var hairline: some View {
-        LinearGradient(colors: [palette.gold.opacity(0), palette.gold.opacity(0.5), palette.gold.opacity(0)],
+        LinearGradient(colors: [palette.gold.opacity(0), palette.gold.opacity(0.55), palette.gold.opacity(0)],
                        startPoint: .top, endPoint: .bottom)
-            .frame(width: 1, height: 40)
+            .frame(width: 1, height: 26)
     }
 
     private func number(_ value: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 3) {
+            VStack(spacing: 1) {
                 Text(value)
-                    .font(.system(size: 26, weight: .regular, design: .serif))
+                    .font(.system(size: 17, weight: .regular, design: .serif))
                     .foregroundStyle(palette.ink)
                     .monospacedDigit()
+                    .lineLimit(1)
                 Text(label.uppercased())
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(1.4)
-                    .foregroundStyle(palette.ink2)
+                    .font(.system(size: 7.5, weight: .bold))
+                    .tracking(1.2)
+                    .foregroundStyle(palette.gold)
             }
-            .frame(maxWidth: .infinity)
+            .frame(minWidth: 40)
+            .padding(.horizontal, 7)
+            .contentShape(Rectangle())
         }
         .buttonStyle(HomeStagePress())
+        .accessibilityLabel("\(label) \(value)")
     }
 
     @ViewBuilder
@@ -634,39 +612,56 @@ struct HomeAuroraGrudge: View {
     }
 }
 
-/// "Beauty of Chess" cut into the marble under the board, seen when the page is pulled down
-/// (Alex, 2026-11-07). Each letter is a shallow groove: a dark upper wall, a lit lower lip and
-/// a gold-dusted floor, so it reads as carved rather than printed.
+/// "Beauty of Chess" incised in the marble under the board, the way a name is cut into a
+/// stone (Alex, 2026-11-07: "actually in the marble"). Roman capitals, widely spaced, with the
+/// slab's own veins running through them: the groove is drawn in multiply over the marble, so
+/// the stone shows through, its floor shaded by an inner shadow from the top edge, its lower
+/// lip catching the light. "of" is a small gold-leaf italic, as on old inscriptions.
 struct HomeAuroraCarving: View {
     let palette: HomeAuroraPalette
+    /// How much shows, 0 to 1. Set on each layer, not the whole, so the groove still multiplies
+    /// into the marble while it fades in.
+    var reveal: Double = 1
 
-    private var words: Text {
-        Text("Beauty ") + Text("of").italic() + Text(" Chess")
+    private var groove: Color { palette.dark ? Color(hex: 0x6B6660) : Color(hex: 0xC9C1B5) }
+
+    private func word(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 30, weight: .regular, design: .serif))
+            .tracking(7)
+    }
+
+    /// One word as a cut: a lit lip under the groove, then the groove itself, shaded inside.
+    private func cut(_ text: String) -> some View {
+        ZStack {
+            word(text)
+                .foregroundStyle(Color.white.opacity(palette.dark ? 0.1 : 0.75))
+                .offset(y: 0.9)
+                .opacity(reveal)
+            word(text)
+                .foregroundStyle(groove
+                    .shadow(.inner(color: .black.opacity(palette.dark ? 0.75 : 0.5), radius: 1.4, x: 0, y: 1.6))
+                    .shadow(.inner(color: .white.opacity(palette.dark ? 0.08 : 0.35), radius: 0.6, x: 0, y: -0.8)))
+                .opacity(reveal)
+                .blendMode(.multiply)
+        }
     }
 
     var body: some View {
-        let font = Font.system(size: 34, weight: .medium, design: .serif)
-        ZStack {
-            // The lit lower lip of each groove.
-            words.font(font)
-                .foregroundStyle(Color.white.opacity(palette.dark ? 0.12 : 0.9))
-                .offset(y: 1.2)
-            // The shadowed upper wall.
-            words.font(font)
-                .foregroundStyle(Color.black.opacity(palette.dark ? 0.7 : 0.32))
-                .offset(y: -0.8)
-                .blur(radius: 0.4)
-            // The floor, dusted with old gold.
-            words.font(font)
-                .foregroundStyle(LinearGradient(colors: [palette.gold.opacity(palette.dark ? 0.55 : 0.5),
-                                                         Color(hex: 0x6E5A40).opacity(palette.dark ? 0.6 : 0.42)],
-                                                startPoint: .top, endPoint: .bottom))
-                .blendMode(palette.dark ? .screen : .multiply)
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            cut("BEAUTY")
+            Text("of")
+                .font(.system(size: 21, weight: .regular, design: .serif).italic())
+                .foregroundStyle(LinearGradient(colors: [Color(hex: 0xE9CF8E), Color(hex: 0xA77A35)],
+                                                startPoint: .top, endPoint: .bottom)
+                    .shadow(.inner(color: .black.opacity(0.35), radius: 0.8, x: 0, y: 1)))
+                .shadow(color: .white.opacity(palette.dark ? 0.05 : 0.6), radius: 0, y: 0.8)
+                .opacity(reveal)
+            cut("CHESS")
         }
-        .tracking(1)
         .lineLimit(1)
         .minimumScaleFactor(0.6)
-        .padding(.horizontal, 24)
+        .padding(.horizontal, 20)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
@@ -1053,6 +1048,9 @@ struct HomeAuroraBackdrop: View {
 /// the turning board, melting softly into the room below it.
 struct HomeAuroraMarble: View {
     let palette: HomeAuroraPalette
+    /// Where "Beauty of Chess" is cut, from the top of the slab, and how much of it shows (0 to 1).
+    var carvingTop: CGFloat = 0
+    var carving: Double = 0
 
     var body: some View {
         // The slab is exactly its frame: the image fills it from the top and nothing spills
@@ -1063,9 +1061,16 @@ struct HomeAuroraMarble: View {
                     .resizable()
                     .scaledToFill()
             }
+            .overlay(alignment: .top) {
+                // Part of the slab: cut, clipped and faded with it.
+                if carving > 0 {
+                    HomeAuroraCarving(palette: palette, reveal: carving)
+                        .padding(.top, carvingTop)
+                }
+            }
             .clipped()
             .mask(LinearGradient(stops: [.init(color: .black, location: 0),
-                                         .init(color: .black, location: 0.72),
+                                         .init(color: .black, location: 0.84),
                                          .init(color: .clear, location: 1)],
                                  startPoint: .top, endPoint: .bottom))
             .allowsHitTesting(false)
