@@ -52,19 +52,13 @@ export async function speak(env, text, fetchImpl = fetch, coach = "leo") {
   const key = voiceKey(env);
   const words = String(text || "").trim();
   if (!key || !words) return null;
-  const vera = coach === "vera";
-  const voice = String(vera ? env.VERA_VOICE_ID || DEFAULT_VERA_VOICE_ID : env.VOICE_ID || DEFAULT_VOICE_ID).trim();
+  const { vera, voice, model } = voiceChoice(env, coach);
   // The voice goes into the address, so only a plain ID is used.
   if (!/^[A-Za-z0-9]{1,64}$/.test(voice)) {
     console.error("voice: VOICE_ID isn't a plain voice ID");
     return null;
   }
   const timeout = Number(env.VOICE_TIMEOUT_MS) > 0 ? Number(env.VOICE_TIMEOUT_MS) : DEFAULT_TIMEOUT_MS;
-  // VOICE_MODEL is Leo's; Vera keeps the model her settings are made for. TALK_VOICE_MODEL, when
-  // set, reads every live answer with a cheaper model instead: the lessons are recorded once,
-  // but Talk pays per character on every answer.
-  const lessonModel = vera ? env.VERA_VOICE_MODEL || DEFAULT_VERA_VOICE_MODEL : env.VOICE_MODEL || DEFAULT_VOICE_MODEL;
-  const model = String(env.TALK_VOICE_MODEL || lessonModel).trim();
   const settings = vera ? VERA_VOICE_SETTINGS : VOICE_SETTINGS;
   const body = { text: words, model_id: model };
   if (settings) body.voice_settings = settings;
@@ -93,6 +87,30 @@ export async function speak(env, text, fetchImpl = fetch, coach = "leo") {
     console.error(`voice: ${timedOut ? "timed out" : "failed"}`);
     return null;
   }
+}
+
+/** Which voice and model read for this coach. */
+function voiceChoice(env, coach) {
+  const vera = coach === "vera";
+  const voice = String(vera ? env.VERA_VOICE_ID || DEFAULT_VERA_VOICE_ID : env.VOICE_ID || DEFAULT_VOICE_ID).trim();
+  // VOICE_MODEL is Leo's; Vera keeps the model her settings are made for. TALK_VOICE_MODEL, when
+  // set, reads every live answer with a cheaper model instead: the lessons are recorded once,
+  // but Talk pays per character on every answer.
+  const lessonModel = vera ? env.VERA_VOICE_MODEL || DEFAULT_VERA_VOICE_MODEL : env.VOICE_MODEL || DEFAULT_VOICE_MODEL;
+  const model = String(env.TALK_VOICE_MODEL || lessonModel).trim();
+  return { vera, voice, model };
+}
+
+/**
+ * The name a recording of `text` is kept under: the voice, model and exact words, hashed. Any
+ * change to the voice or model gives new names, so an old recording is never played by mistake.
+ */
+export async function recordingKey(env, text, coach = "leo") {
+  const { vera, voice, model } = voiceChoice(env, coach);
+  const settings = JSON.stringify(vera ? VERA_VOICE_SETTINGS : VOICE_SETTINGS);
+  const words = String(text || "").trim();
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${voice}|${model}|${settings}|${words}`));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 /** Base64 without Node's Buffer, in chunks so long recordings don't overflow the call stack. */

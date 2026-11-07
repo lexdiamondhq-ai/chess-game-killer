@@ -39,6 +39,15 @@ simple = { limit = 12, period = 60 }
 name = "BUDGET"
 class_name = "TalkBudget"
 
+# Keeps Leo's spoken answers, so a line he has said before plays again for free.
+[[durable_objects.bindings]]
+name = "RECORDINGS"
+class_name = "TalkRecordings"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["TalkBudget"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["TalkRecordings"]
