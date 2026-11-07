@@ -1145,7 +1145,12 @@ struct HomeAuroraTabBar: View {
                     .overlay(Capsule().strokeBorder(palette.gold.opacity(0.35), lineWidth: 0.75))
                     .shadow(color: .black.opacity(palette.dark ? 0.5 : 0.14), radius: 20, y: 10)
             }
-            Button(action: play) {
+            // A tap opens Analyze; a press and hold brings up the Rooms panel (Alex, 2026-11-07).
+            knight
+        }
+    }
+
+    private var knight: some View {
                 Glyph(name: Glyphs.train, size: 32, weight: .bold)
                     .foregroundStyle(Color(hex: 0x2A1C08))
                     .frame(width: 64, height: 64)
@@ -1157,10 +1162,13 @@ struct HomeAuroraTabBar: View {
                     }
                     .overlay(Circle().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
                     .shadow(color: .black.opacity(palette.dark ? 0.5 : 0.18), radius: 14, y: 8)
-            }
-            .buttonStyle(HomeStagePress())
-            .accessibilityLabel("Analyze")
-        }
+                    .contentShape(Circle())
+                    .onTapGesture(perform: play)
+                    .onLongPressGesture(minimumDuration: 0.35, perform: rooms)
+                    .accessibilityElement()
+                    .accessibilityLabel("Analyze")
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction(named: "Rooms", rooms)
     }
 
     private func tab(_ title: String, glyph: String, on: Bool, action: @escaping () -> Void) -> some View {
