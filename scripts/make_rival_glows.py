@@ -19,7 +19,7 @@ ROOT = os.path.join(os.path.dirname(__file__), "..")
 SOURCE = os.path.join(ROOT, "ChessGameKiller", "Assets.xcassets", "Rivals")
 APP = SOURCE
 WIDGET = os.path.join(ROOT, "ChessGameKillerWidget", "Assets.xcassets", "Rivals")
-NAMES = ["1000s", "1200s", "1600s", "2000s", "masters", "grudge"]
+NAMES = ["1000s", "1200s", "1600s", "2000s", "masters"]
 
 
 def glow(name, size):

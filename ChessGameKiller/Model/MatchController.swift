@@ -81,18 +81,13 @@ final class MatchController {
         var timeControl: TimeControl = .unlimited
         /// The army piece put on the line for this game (On the line), if any.
         var stake: ArmySlot? = nil
-        /// Against your Grudge rather than The Crowd. `level` is then the crowd it plays its
-        /// openings from, and `grudgeSkill` how hard it searches.
-        var grudge = false
-        var grudgeSkill: Int? = nil
 
         /// Who sits across the board.
-        var rival: Rival { grudge ? .grudge(level) : level.rival }
+        var rival: Rival { level.rival }
 
         /// The rating whose Maia network plays the crowd's moves past its book. Nil for the Masters
-        /// (full Stockfish) and the Grudge (its strength follows yours through Stockfish's skill).
+        /// (full Stockfish).
         var humanRating: Int? {
-            guard !grudge else { return nil }
             switch level {
             case .beginner: return 1100
             case .casual: return 1200
@@ -102,21 +97,10 @@ final class MatchController {
             }
         }
 
-        /// How the computer searches: the crowd's settings, or the Grudge's own skill.
-        var engineSkill: Int {
-            guard grudge, let grudgeSkill else { return level.skill }
-            return max(0, min(20, grudgeSkill))
-        }
-
-        var engineDepth: Int? {
-            guard grudge, let grudgeSkill else { return level.depth }
-            return grudgeSkill >= 18 ? nil : 5
-        }
-
-        var engineThinkTimeMs: Int {
-            guard grudge, let grudgeSkill else { return level.thinkTimeMs }
-            return min(600, 50 + grudgeSkill * 25)
-        }
+        /// How the computer searches: the crowd's settings.
+        var engineSkill: Int { level.skill }
+        var engineDepth: Int? { level.depth }
+        var engineThinkTimeMs: Int { level.thinkTimeMs }
     }
 
     /// How the game ended when the board itself doesn't say (the clock, or a resignation).
@@ -209,8 +193,6 @@ final class MatchController {
     /// What the crowd plays once its book runs out: Maia, a person's move at the crowd's rating.
     /// Nil in tests and previews, and Stockfish plays on; it also plays when Maia has no move.
     @ObservationIgnored var humanMoves: HumanMovePicking?
-    /// What the Grudge remembers, read as it speaks and as it picks its openings.
-    @ObservationIgnored var grudgeRecord: @MainActor () -> GrudgeRecord? = { nil }
     /// Set once the crowd has no answer for this game (a rare position, no connection):
     /// Maia (or Stockfish) plays the rest, and the crowd isn't asked again.
     @ObservationIgnored private var bookOver = false
@@ -370,13 +352,7 @@ final class MatchController {
         if !moment.isBig {
             guard game.plyCount - lastLinePly >= 3, chance() < 0.75 else { return }
         }
-        let text: String?
-        if setup.grudge {
-            text = GrudgeVoice.line(for: moment, record: grudgeRecord(), pick: chance())
-        } else {
-            text = RivalVoice.line(for: moment, level: setup.level, pick: chance())
-        }
-        guard let text else { return }
+        guard let text = RivalVoice.line(for: moment, level: setup.level, pick: chance()) else { return }
         say(text)
     }
 
@@ -979,16 +955,12 @@ final class MatchController {
         // The crowd first: the move real players chose here, while the position is a common one.
         var chosen: String?
         var vote: CrowdVote?
-        if let book = crowdBook, !bookOver, game.plyCount < (current.grudge ? Self.grudgeBookPlies : Self.crowdBookPlies) {
+        if let book = crowdBook, !bookOver, game.plyCount < Self.crowdBookPlies {
             let source = current.level.crowdSource
             let position = await book.position(fen: fen, source: source)
             guard gen == generation, !Task.isCancelled else { return }
             if let position {
-                let played = game.moves
-                let record = current.grudge ? grudgeRecord() : nil
-                vote = CrowdBook.vote(from: position, source: source, pick: chance()) { san in
-                    record?.lean(after: played, toward: san) ?? 1
-                }
+                vote = CrowdBook.vote(from: position, source: source, pick: chance())
             }
             if vote == nil { bookOver = true }
             chosen = vote?.uci
@@ -1041,8 +1013,6 @@ final class MatchController {
     static let engineAttempts = 3
     /// How deep into a game the crowd is asked; past this the positions are its own anyway.
     static let crowdBookPlies = 60
-    /// The Grudge plays the crowd's openings, then its own game.
-    static let grudgeBookPlies = 16
 
     /// A move for the side to move when the engine has nothing: mate if there is one,
     /// otherwise the most valuable safe-looking capture, otherwise any legal move.

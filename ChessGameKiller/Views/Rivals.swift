@@ -1,25 +1,18 @@
 import SwiftUI
 import UIKit
 
-/// Who the person plays against the computer: The Crowd at one rating, or their Grudge.
+/// Who the person plays against the computer: The Crowd at one rating.
 ///
 /// The Crowd is real people. Its moves come from games real players at that rating played in
 /// the same position (Lichess's database, see `CrowdBook`), and Maia, a network trained on
-/// players of that rating (see `Maia`), takes over once the position is one nobody has reached. The Grudge is one rival that
-/// remembers every game against you (`GrudgeStore`).
+/// players of that rating (see `Maia`), takes over once the position is one nobody has reached.
 struct Rival: Identifiable {
-    enum Kind: Equatable {
-        case crowd
-        case grudge
-    }
-
     let level: MatchController.Level
-    let kind: Kind
-    /// "The 1600s", "The Masters", "Your Grudge".
+    /// "The 1600s", "The Masters".
     let name: String
     /// A short name for tight places, like the home's ladder: "1600s", "Masters".
     let shortName: String
-    /// Names the rival's pictures: "1600s", "masters", "grudge".
+    /// Names the rival's pictures: "1600s", "masters".
     let slug: String
     /// Rough Elo, like "~1600" or "2500+".
     let elo: String
@@ -30,8 +23,6 @@ struct Rival: Identifiable {
     let lightHex: UInt32
 
     var id: String { slug }
-
-    var isGrudge: Bool { kind == .grudge }
 
     /// 1 to 5, for the strength bars.
     var strength: Int { level.rawValue + 1 }
@@ -59,29 +50,15 @@ struct Rival: Identifiable {
     /// The Crowd, weakest first.
     static let all: [Rival] = MatchController.Level.allCases.map(\.rival)
 
-    /// The Grudge, playing at about `level`'s strength.
-    static func grudge(_ level: MatchController.Level) -> Rival {
-        Rival(level: level, kind: .grudge, name: "Your Grudge", shortName: "Grudge", slug: "grudge",
-              elo: "~\(level.rating)",
-              blurb: "Remembers every game you've played it. Plays at your weak spots.",
-              hue: Color(hex: 0xE0313F), hue2: Color(hex: 0x7A0E1A), lightHex: 0xE0313F)
-    }
-
-    /// Whether a saved game's opponent was your Grudge.
-    static func isGrudge(opponent: String) -> Bool {
-        opponent == grudge(.club).name
-    }
-
-    /// Who a saved game was against, from its opponent and level. Nil for games with people.
+    /// Who a saved game was against, from its level. Nil for games with people.
     static func of(saved game: SavedGame) -> Rival? {
         guard let level = game.level.flatMap(MatchController.Level.init(rawValue:)) else { return nil }
-        return isGrudge(opponent: game.opponent) ? grudge(level) : level.rival
+        return level.rival
     }
 
-    /// The rival a saved name stands for: a crowd's slug or name, or "grudge".
+    /// The rival a saved name stands for: a crowd's slug or name.
     static func named(_ text: String) -> Rival? {
         let key = text.lowercased()
-        if key == "grudge" || key == "your grudge" { return grudge(.club) }
         return all.first { $0.slug == key || $0.name.lowercased() == key || $0.shortName.lowercased() == key }
     }
 }
@@ -91,45 +68,37 @@ extension MatchController.Level {
     var rival: Rival {
         switch self {
         case .beginner:
-            return Rival(level: self, kind: .crowd, name: "The 1000s", shortName: "1000s", slug: "1000s", elo: "~1000",
+            return Rival(level: self, name: "The 1000s", shortName: "1000s", slug: "1000s", elo: "~1000",
                          blurb: "Real players finding their feet. They leave pieces hanging, like people do.",
                          hue: Color(hex: 0xEBD3A0), hue2: Color(hex: 0xC9A35E), lightHex: 0xF0C987)
         case .casual:
-            return Rival(level: self, kind: .crowd, name: "The 1200s", shortName: "1200s", slug: "1200s", elo: "~1200",
+            return Rival(level: self, name: "The 1200s", shortName: "1200s", slug: "1200s", elo: "~1200",
                          blurb: "Weekend players. They know an opening or two, then wander.",
                          hue: Color(hex: 0xE6C483), hue2: Color(hex: 0xBF9448), lightHex: 0xF2C27A)
         case .club:
-            return Rival(level: self, kind: .crowd, name: "The 1600s", shortName: "1600s", slug: "1600s", elo: "~1600",
+            return Rival(level: self, name: "The 1600s", shortName: "1600s", slug: "1600s", elo: "~1600",
                          blurb: "Club players. Solid openings, then the slips real people make.",
                          hue: Color(hex: 0xDDB46A), hue2: Color(hex: 0xB0823A), lightHex: 0xF0B862)
         case .expert:
-            return Rival(level: self, kind: .crowd, name: "The 2000s", shortName: "2000s", slug: "2000s", elo: "~2000",
+            return Rival(level: self, name: "The 2000s", shortName: "2000s", slug: "2000s", elo: "~2000",
                          blurb: "Strong players. Sharp, patient, and they rarely hand you a piece.",
                          hue: Color(hex: 0xD6A24A), hue2: Color(hex: 0xA6722C), lightHex: 0xEDA94E)
         case .grandmaster:
-            return Rival(level: self, kind: .crowd, name: "The Masters", shortName: "Masters", slug: "masters", elo: "2500+",
+            return Rival(level: self, name: "The Masters", shortName: "Masters", slug: "masters", elo: "2500+",
                          blurb: "Grandmasters' games, then full Stockfish when the book runs out.",
                          hue: Color(hex: 0xF2DCA8), hue2: Color(hex: 0xD6B26A), lightHex: 0xF6DDA6)
         }
     }
 }
 
-/// A rival's small emblem: for The Crowd a ring of gold dots (more players, more dots), for the
-/// Grudge its onyx king in red light. Drawn in a 100-point space and scaled to `size`.
+/// A rival's small emblem: a ring of gold dots, more players, more dots. Drawn in a 100-point space and scaled to `size`.
 struct RivalSigil: View {
     let rival: Rival
     var size: CGFloat = 84
     var glows = true
 
     var body: some View {
-        Group {
-            if rival.isGrudge {
-                GrudgeKing(scars: 3, size: size, light: 0.8)
-            } else {
-                CrowdRing(dots: 26 + rival.strength * 12, hue: rival.hue)
-                    .frame(width: size, height: size)
-            }
-        }
+        CrowdRing(dots: 26 + rival.strength * 12, hue: rival.hue)
         .frame(width: size, height: size)
         .shadow(color: glows ? rival.hue.opacity(0.6) : .clear, radius: size * 0.06)
         .accessibilityHidden(true)
@@ -189,13 +158,12 @@ struct RivalPortrait: View {
         ForEach(Rival.all) { rival in
             RivalSigil(rival: rival, size: 64)
         }
-        RivalSigil(rival: .grudge(.club), size: 64)
     }
     .padding(30)
     .background(Color.black)
 }
 
 extension String {
-    /// The name as an owner: "Your Grudge's", "The 1600s'".
+    /// The name as an owner: "The 1600s'", "Leo's".
     var possessive: String { hasSuffix("s") ? self + "'" : self + "'s" }
 }

@@ -78,8 +78,8 @@ enum CrowdBook {
 
     /// The crowd's move from `position`: drawn in proportion to how often real players chose
     /// it, so the most played move comes most often but a game never repeats itself exactly.
-    /// `pick` is in 0..<1. `weight`, given each move in standard notation, leans the draw, as the
-    /// Grudge does toward lines that have gone badly for you; 1 leaves it alone. Nil when the
+    /// `pick` is in 0..<1. `weight`, given each move in standard notation, leans the draw; 1 leaves
+    /// it alone. Nil when the
     /// position is too rare.
     static func vote(from position: CrowdPosition, source: CrowdSource, pick: Double,
                      weight: (String) -> Double = { _ in 1 }) -> CrowdVote? {

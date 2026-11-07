@@ -48,7 +48,7 @@ enum TourPage: Int, CaseIterable, Identifiable {
         case .today:
             return "The same move for every player. Find it, keep your streak and see how the world did. It waits on your Lock Screen too."
         case .rivals:
-            return "Crowd rivals choose moves the way real players at their rating do. Your Grudge remembers how it beat you, and wants a rematch."
+            return "Crowd rivals choose moves the way real players at their rating do. Take the same piece three times and they hold a grudge."
         case .pieces:
             return "Your pieces earn names and experience game by game. Gold seams mark each comeback, the way a real set wears its years."
         }
@@ -899,7 +899,7 @@ private struct TourBar: View {
 // MARK: - 6 Rivals
 
 /// What the 1600s answer to 1. e4 fills in from their real games, the favourite lights, and then
-/// your Grudge shows up.
+/// a grudge shows up.
 struct TourRivalsScene: View {
     @State private var step = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -963,8 +963,8 @@ struct TourRivalsScene: View {
                 } animation: { _ in .easeInOut(duration: 0.55) }
                 .frame(width: 32)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Your Grudge remembers").font(.app(.subheadline, weight: .semibold))
-                Text("It took your queen on move 23 last time. It wants a rematch.")
+                Text("The 1600s hold a grudge").font(.app(.subheadline, weight: .semibold))
+                Text("They've taken your queen three times. Win with it for bonus XP.")
                     .font(.app(.caption))
                     .foregroundStyle(TourPalette.ink.opacity(0.55))
                     .fixedSize(horizontal: false, vertical: true)

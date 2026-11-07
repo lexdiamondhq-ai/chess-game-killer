@@ -3,21 +3,12 @@ import SwiftUI
 
 /// Big Board's tray at the bottom, on the same glass as the dock. Closed, it is a grabber over a
 /// thin strip that shows how the game stands. Pulled up (or tapped), it opens the dock's controls
-/// with the coach orb, and under them what the hidden top bar holds and the way back.
+/// with the coach orb. What the hidden top bar holds sits on the opponent's line (`BigBoardBar`).
 struct BigBoardTray<Dock: View>: View {
     let match: MatchController
     let theme: BoardTheme
     @Binding var isOpen: Bool
-    /// While the coach is unfolded in the tray, the second row steps aside for it.
     var coachIsWide = false
-    let onNewGame: () -> Void
-    let onSettings: () -> Void
-    let onExit: () -> Void
-    var onArmy: (() -> Void)?
-    /// Your saved games, to rewind.
-    var onGames: (() -> Void)?
-    /// Back to the home screen, when it is on.
-    var onHome: (() -> Void)?
     @ViewBuilder let dock: () -> Dock
 
     @GestureState private var drag: CGFloat = 0
@@ -26,19 +17,9 @@ struct BigBoardTray<Dock: View>: View {
         VStack(spacing: 0) {
             handle
             if isOpen {
-                VStack(spacing: 0) {
-                    dock()
-                    if !coachIsWide {
-                        Rectangle()
-                            .fill(Color.primary.opacity(0.1))
-                            .frame(height: 0.5)
-                            .padding(.horizontal, 18)
-                        extras
-                            .padding(.top, 4)
-                            .transition(.opacity)
-                    }
-                }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                dock()
+                    .padding(.bottom, 4)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .frame(maxWidth: .infinity)
@@ -77,31 +58,6 @@ struct BigBoardTray<Dock: View>: View {
         .accessibilityLabel(isOpen ? "Hide controls" : "Show controls")
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { isOpen.toggle() }
-    }
-
-    /// What the hidden top bar holds, the same way round, and the way back to the normal screen.
-    private var extras: some View {
-        HStack(spacing: 0) {
-            if let onHome {
-                DockButton(title: "Home", symbol: Glyphs.home, theme: theme, action: onHome)
-            }
-            DockButton(title: "New game", symbol: "plus", theme: theme, action: onNewGame)
-            Menu {
-                if let onGames {
-                    Button(action: onGames) { Label("Your games", image: Glyphs.games) }
-                }
-                if let onArmy {
-                    Button(action: onArmy) { Label("Your pieces", image: Glyphs.army) }
-                }
-                Button(action: onSettings) { Label("Settings", image: Glyphs.settings) }
-            } label: {
-                DockLabel(title: "More", symbol: "ellipsis", theme: theme)
-            }
-            .accessibilityLabel("More")
-            DockButton(title: "Exit Big Board", symbol: Glyphs.normalView, theme: theme, action: onExit)
-        }
-        .padding(.horizontal, 6)
-        .padding(.bottom, 6)
     }
 }
 
@@ -207,5 +163,62 @@ struct BrowsePill: View {
         let number = (ply + 1) / 2
         let dots = ply % 2 == 0 ? "…" : "."
         return "\(number)\(dots) \(san ?? "")"
+    }
+}
+
+/// Big Board's top bar, folded around the opponent's line: a way back on the left (Home, or out
+/// of Big Board when the home screen is off) and everything else that leaves the board in one
+/// menu on the right. The tray at the bottom then holds only the game.
+struct BigBoardBar<Plate: View>: View {
+    let theme: BoardTheme
+    /// Home, when the home screen is on.
+    var onHome: (() -> Void)?
+    let onNewGame: () -> Void
+    let onGames: () -> Void
+    var onArmy: (() -> Void)?
+    let onSettings: () -> Void
+    let onExit: () -> Void
+    @ViewBuilder let plate: () -> Plate
+
+    static var buttonSize: CGFloat { 44 }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Button {
+                (onHome ?? onExit)()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(width: Self.buttonSize, height: Self.buttonSize)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .glassPane(Circle())
+            .accessibilityLabel(onHome == nil ? "Exit Big Board" : "Home")
+            plate()
+            Menu {
+                Button(action: onNewGame) { Label("New game", systemImage: "plus") }
+                Section {
+                    Button(action: onGames) { Label("Your games", image: Glyphs.games) }
+                    if let onArmy {
+                        Button(action: onArmy) { Label("Your pieces", image: Glyphs.army) }
+                    }
+                    Button(action: onSettings) { Label("Settings", image: Glyphs.settings) }
+                }
+                if onHome != nil {
+                    Button(action: onExit) { Label("Exit Big Board", image: Glyphs.normalView) }
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(width: Self.buttonSize, height: Self.buttonSize)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .glassPane(Circle())
+            .accessibilityLabel("More")
+        }
+        .foregroundStyle(.primary)
+        .tint(.primary)
     }
 }

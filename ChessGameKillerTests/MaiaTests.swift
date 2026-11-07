@@ -184,13 +184,10 @@ final class MaiaTests: XCTestCase {
         XCTAssertFalse(match.engineFailed)
     }
 
-    /// The Masters play full Stockfish past their book, and the Grudge searches at its own strength.
-    func testTheMastersAndTheGrudgeKeepStockfish() async {
-        var grudge = MatchController.Setup(opponent: .computer, playerColor: .black, level: .club)
-        grudge.grudge = true
-        grudge.grudgeSkill = 12
+    /// The Masters play full Stockfish past their book.
+    func testTheMastersKeepStockfish() async {
         let masters = MatchController.Setup(opponent: .computer, playerColor: .black, level: .grandmaster)
-        for setup in [grudge, masters] {
+        for setup in [masters] {
             XCTAssertNil(setup.humanRating)
             let engine = FakeEngine()
             let human = FakeHumanMoves(answer: "d2d4")
