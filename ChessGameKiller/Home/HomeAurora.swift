@@ -65,7 +65,6 @@ struct HomeAuroraView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("haptics") private var hapticsOn = true
-    @AppStorage(HomeToneMode.key) private var toneMode = HomeToneMode.defaultMode
     @State private var music = HomeMusic.shared
     @State private var boardStage = SculptedStage()
     /// How far the page has been pulled up over the board, in points.
@@ -213,11 +212,6 @@ struct HomeAuroraView: View {
                     HomeMusicBars(on: music.on, gold: palette.gold, off: palette.ink3)
                 }
             }
-            circle(label: palette.dark ? "Light mode" : "Dark mode", action: flipLight) {
-                Image(systemName: palette.dark ? "sun.max" : "moon")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(palette.gold)
-            }
             circle(label: "You", action: actions.stage.you) {
                 Image(systemName: "crown")
                     .font(.system(size: 14, weight: .semibold))
@@ -246,12 +240,6 @@ struct HomeAuroraView: View {
         }
         .buttonStyle(HomeStagePress())
         .accessibilityLabel(label)
-    }
-
-    private func flipLight() {
-        withAnimation(.easeInOut(duration: 0.4)) {
-            toneMode = palette.dark ? .light : .dark
-        }
     }
 
     // MARK: The page

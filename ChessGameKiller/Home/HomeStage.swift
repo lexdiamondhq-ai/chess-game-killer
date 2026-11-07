@@ -5,7 +5,7 @@ import SwiftUI
 /// music, streak and You up top; the real 3D board turning slowly on a faceted stone stage in a
 /// dark room; the rating with three pills under it; a deck of cards (swipe down for the next,
 /// All for every one); and a floating glass tab bar with the gold knight. It follows
-/// Settings > Home colors, with a sun and moon to switch. Going to a board swoops the camera in.
+/// Settings > Appearance. Going to a board swoops the camera in.
 /// On by default; Settings > Stage home turns it off. The game's own board is untouched.
 enum HomeStageLayout {
     static let key = "homeStage"
@@ -98,8 +98,6 @@ struct HomeStageView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("haptics") private var hapticsOn = true
-    /// Settings > Home colors, also switched by the sun and moon in the top bar.
-    @AppStorage(HomeToneMode.key) private var toneMode = HomeToneMode.defaultMode
     /// The deck's order: the first is in front.
     @State private var order: [HomeStageCard] = HomeStageCard.allCases
     @State private var fanned = false
@@ -244,11 +242,6 @@ struct HomeStageView: View {
                     HomeMusicBars(on: music.on, gold: palette.goldHi, off: palette.ink3)
                 }
             }
-            roundButton(label: palette.dark ? "Light mode" : "Dark mode", action: flipLight) {
-                Image(systemName: palette.dark ? "sun.max.fill" : "moon.fill")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(palette.goldHi)
-            }
             Button { toBoard(actions.dailyMove) } label: {
                 HStack(spacing: 5) {
                     Image(systemName: "flame.fill")
@@ -285,12 +278,6 @@ struct HomeStageView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
-    }
-
-    private func flipLight() {
-        withAnimation(.easeInOut(duration: 0.45)) {
-            toneMode = palette.dark ? .light : .dark
-        }
     }
 
     // MARK: Rating and pills
