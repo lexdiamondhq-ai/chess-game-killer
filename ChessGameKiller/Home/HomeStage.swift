@@ -483,7 +483,9 @@ struct HomeStageBoard: View, Animatable {
     let look: SculptedLook
     let pieces: [Piece]
     let black: Bool
-    let light: UIColor
+    /// The rival's colored light hovering over the board. Nil for none: the board in its own
+    /// even light, as on the Aurora home.
+    let light: UIColor?
     let leaning: Bool
     let plinth: UIColor?
     let still: Bool
@@ -500,7 +502,7 @@ struct HomeStageBoard: View, Animatable {
                 let time: Double = still ? 0 : context.date.timeIntervalSinceReferenceDate
                 HomeHeroBoard(stage: stage, look: look, pieces: pieces,
                               camera: Self.camera(size: geo.size, time: time, dive: dive, black: black),
-                              presence: HomeWindowBoard.presence(light, arrival: 0, leaning: leaning),
+                              presence: light.map { HomeWindowBoard.presence($0, arrival: 0, leaning: leaning) },
                               plinth: plinth)
             }
         }

@@ -198,7 +198,9 @@ struct HomeAuroraView: View {
             if SculptedAssets.shared.isLoaded {
                 HomeStageBoard(stage: boardStage, look: SculptedLook.clay, pieces: boardPieces,
                                black: stage.masterpiece?.flipped ?? (upNext.playerColor == .black),
-                               light: upNext.rival.lightUI,
+                               // No rival light over it: its warm pool washed out the middle of
+                               // the board (Alex, 2026-11-07). The clay board keeps its own even light.
+                               light: nil,
                                leaning: upNext.inProgress && upNext.yourMove, plinth: nil,
                                still: reduceMotion, dive: 0)
                     .id(SculptedLook.clay.name)
@@ -256,6 +258,12 @@ struct HomeAuroraView: View {
             HomeAuroraSection(title: "Face a rival", palette: palette, note: "Up next: \(stage.upNext.level.rival.shortName)")
             HomeAuroraRivals(next: stage.upNext.level, palette: palette, play: actions.playRival)
                 .padding(.horizontal, 12)
+            HomeAuroraSection(title: "For today", palette: palette, note: nil)
+            VStack(spacing: 10) {
+                todayRows
+            }
+            .padding(.horizontal, 16)
+            // Under For today (Alex, 2026-11-07).
             if let grudges {
                 HomeAuroraSection(title: "Your Grudge", palette: palette,
                                   note: grudges.unseen ? "It's waiting" : nil)
@@ -263,11 +271,6 @@ struct HomeAuroraView: View {
                                  born: grudgeBorn, lastSeen: grudgeSince, select: toggleGrudge, settle: settleGrudge)
                     .padding(.horizontal, 16)
             }
-            HomeAuroraSection(title: "For today", palette: palette, note: nil)
-            VStack(spacing: 10) {
-                todayRows
-            }
-            .padding(.horizontal, 16)
         }
         .padding(.bottom, 130)
         .frame(maxWidth: .infinity)
