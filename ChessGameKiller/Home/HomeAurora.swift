@@ -125,12 +125,23 @@ struct HomeAuroraView: View {
                             .ignoresSafeArea(edges: .top)
                             .allowsHitTesting(false)
                     }
-                VStack {
+                VStack(spacing: 0) {
                     Spacer()
                     HomeAuroraTabBar(palette: palette, play: actions.stage.analyze, learn: actions.stage.learn,
                                      you: actions.stage.you, rooms: actions.stage.rooms)
                         .padding(.horizontal, 16)
                         .padding(.bottom, 8)
+                        .background(alignment: .bottom) {
+                            // The cards fade into the room before they reach the bar, so nothing
+                            // shows through or clashes behind it.
+                            LinearGradient(stops: [.init(color: palette.bg.opacity(0), location: 0),
+                                                   .init(color: palette.bg.opacity(0.94), location: 0.45),
+                                                   .init(color: palette.bg, location: 1)],
+                                           startPoint: .top, endPoint: .bottom)
+                                .frame(height: 150)
+                                .ignoresSafeArea(edges: .bottom)
+                                .allowsHitTesting(false)
+                        }
                 }
             }
         }
@@ -831,10 +842,14 @@ struct HomeAuroraMarble: View {
     let palette: HomeAuroraPalette
 
     var body: some View {
-        Image(palette.dark ? "home-marble-dark" : "home-marble")
-            .resizable()
-            .scaledToFill()
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        // The slab is exactly its frame: the image fills it from the top and nothing spills
+        // above (a bare scaled-to-fill image would grow past its frame and creep up behind the header).
+        Color.clear
+            .overlay(alignment: .top) {
+                Image(palette.dark ? "home-marble-dark" : "home-marble")
+                    .resizable()
+                    .scaledToFill()
+            }
             .clipped()
             .mask(LinearGradient(stops: [.init(color: .black, location: 0),
                                          .init(color: .black, location: 0.72),
@@ -895,9 +910,9 @@ struct HomeAuroraTabBar: View {
             .background {
                 Capsule()
                     .fill(.ultraThinMaterial)
-                    .overlay(Capsule().fill(palette.dark ? Color(hex: 0x14161E).opacity(0.55) : Color.white.opacity(0.6)))
-                    .overlay(Capsule().strokeBorder(palette.line, lineWidth: 1))
-                    .shadow(color: palette.shadow, radius: 18, y: 12)
+                    .overlay(Capsule().fill(palette.dark ? Color(hex: 0x14161E).opacity(0.85) : Color.white.opacity(0.92)))
+                    .overlay(Capsule().strokeBorder(palette.gold.opacity(0.35), lineWidth: 0.75))
+                    .shadow(color: .black.opacity(palette.dark ? 0.5 : 0.14), radius: 20, y: 10)
             }
             Button(action: play) {
                 Glyph(name: Glyphs.train, size: 32, weight: .bold)
@@ -909,8 +924,8 @@ struct HomeAuroraTabBar: View {
                                                              .init(color: Color(hex: 0xA66F25), location: 1)],
                                                      center: UnitPoint(x: 0.32, y: 0.26), startRadius: 0, endRadius: 40))
                     }
-                    .overlay(Circle().strokeBorder(Color.white.opacity(0.25), lineWidth: 1))
-                    .shadow(color: Color(hex: 0xE8C27A).opacity(0.45), radius: 15, y: 12)
+                    .overlay(Circle().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
+                    .shadow(color: .black.opacity(palette.dark ? 0.5 : 0.18), radius: 14, y: 8)
             }
             .buttonStyle(HomeStagePress())
             .accessibilityLabel("Analyze")
