@@ -195,7 +195,8 @@ REEL_LINES = [
 
 
 # Leo's note on Today. Keep in step with HomeLeoNote in
-# ChessGameKiller/Home/HomeTodayNotes.swift (allLines).
+# ChessGameKiller/Home/HomeTodayNotes.swift (allLines). Leo's alone: the app always plays
+# them in his voice, so no other coach records them (half the cost).
 NOTE_LINES = [
     "Before you let go of a piece, ask one question: can they take it for free?",
     "Count the guards. If a piece has more attackers than defenders, it needs help.",
@@ -234,7 +235,7 @@ def lesson_lines() -> list[str]:
         for line in spoken_lines(lesson):
             if line not in lines:
                 lines.append(line)
-    for line in REEL_LINES + NOTE_LINES:
+    for line in REEL_LINES:
         if line not in lines:
             lines.append(line)
     return lines
@@ -254,7 +255,8 @@ def reaction_lines(coach: str) -> list[str]:
 def all_lines(coach: str = "leo") -> list[str]:
     """Everything the coach says: reactions first (they're short and heard most), then the lessons."""
     lines: list[str] = []
-    for line in reaction_lines(coach) + [personalize(line, coach) for line in lesson_lines()]:
+    own = NOTE_LINES if coach == "leo" else []
+    for line in reaction_lines(coach) + [personalize(line, coach) for line in lesson_lines()] + own:
         if line not in lines:
             lines.append(line)
     return lines

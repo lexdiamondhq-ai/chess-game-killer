@@ -2,16 +2,16 @@ import SwiftUI
 import UIKit
 
 /// Leo's note at the top of Today: the greeting in small teal caps, his line in serif italic, and
-/// what in the games it comes from. "Hear Leo" shows once the line is recorded in his voice; the
-/// home music rests while he talks.
+/// what in the games it comes from. "Hear Leo" shows once the line is recorded in his voice (his
+/// alone: Vera never records these); the home music rests while he talks.
 struct HomeAuroraLeoNote: View {
     let note: HomeLeoNote
     let palette: HomeAuroraPalette
 
-    @State private var speaker = LeoSpeaker()
     @State private var speaking = false
 
-    private var recorded: Bool { CoachVoice.hasRecording(for: note.line) }
+    /// Recorded in Leo's own voice only: the note is his, whichever coach is picked.
+    private var recorded: Bool { CoachVoice.hasRecording(for: note.line, coach: .leo) }
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
@@ -70,18 +70,23 @@ struct HomeAuroraLeoNote: View {
         .overlay(shape.strokeBorder(palette.teal.opacity(0.28), lineWidth: 1))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Coach Leo. \(note.line) \(note.evidence ?? "")")
-        .onDisappear { if speaking { speaker.stop() } }
+        .onDisappear { if speaking { CoachVoice.shared.stop() } }
     }
 
     private func hear() {
+        let voice = CoachVoice.shared
         if speaking {
-            speaker.stop()
+            voice.stop()
             return
         }
         speaking = true
         HomeMusic.shared.setCovered(true)
         Task { @MainActor in
-            await speaker.say(note.line)
+            // The lesson audio (louder, others turned down) unless something already holds it.
+            let holds: Bool = !voice.lessonAudioActive
+            if holds { voice.beginLesson() }
+            await voice.say(note.line, coach: .leo)
+            if holds { voice.endLesson() }
             speaking = false
             HomeMusic.shared.setCovered(false)
         }
