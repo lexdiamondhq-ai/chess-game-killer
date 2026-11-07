@@ -120,8 +120,8 @@ struct HomeStageView: View {
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 HomeStageTabBar(tone: tone, upNext: info.upNext,
-                                learn: { go(actions.learn) }, play: { go(actions.play) },
-                                rooms: { go(actions.rooms) }, you: { go(actions.you) })
+                                learn: actions.learn, play: { toBoard(actions.play) },
+                                rooms: actions.rooms, you: actions.you)
                     .padding(.horizontal, 14)
                     .padding(.bottom, 4)
                     .opacity(fanned ? 0 : Double(1 - dive))
@@ -160,9 +160,10 @@ struct HomeStageView: View {
 
     // MARK: The way out
 
-    /// The camera swirls down into the board as the page fades and the tab bar drops away, the
-    /// place opens, and the home settles back behind it, so it's at rest when the player returns.
-    private func go(_ action: @escaping () -> Void) {
+    /// Only on the way to a board (a game, Today's Move, a masterpiece; Alex, 2026-11-07): the
+    /// camera swirls down into the board as the page fades and the tab bar drops away, the board
+    /// opens, and the home settles back behind it. Every other place opens straight away.
+    private func toBoard(_ action: @escaping () -> Void) {
         guard !swirling else { return }
         guard !reduceMotion else {
             action()
@@ -209,7 +210,7 @@ struct HomeStageView: View {
                            startPoint: .top, endPoint: .bottom)
         }
         .contentShape(Rectangle())
-        .onTapGesture { go(actions.play) }
+        .onTapGesture { toBoard(actions.play) }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(upNext.inProgress ? "Your game against \(upNext.rival.name)" : "Next game: \(upNext.rival.name)")
         .accessibilityAddTraits(.isButton)
@@ -242,7 +243,7 @@ struct HomeStageView: View {
                     .contentTransition(.symbolEffect(.replace))
             }
             streakChip
-            HomeStageCircleButton(palette: palette, label: "You", action: { go(actions.you) }) {
+            HomeStageCircleButton(palette: palette, label: "You", action: actions.you) {
                 Text(initial)
                     .font(.system(size: 16, weight: .semibold, design: .serif))
                     .foregroundStyle(tone.onIvory)
@@ -259,7 +260,7 @@ struct HomeStageView: View {
     }
 
     private var streakChip: some View {
-        Button { go(actions.dailyMove) } label: {
+        Button { toBoard(actions.dailyMove) } label: {
             HStack(spacing: 5) {
                 Image(systemName: "flame.fill")
                     .font(.system(size: 13, weight: .semibold))
@@ -400,7 +401,7 @@ struct HomeStageView: View {
     private func secondary(for card: HomeStageCard) -> (() -> Void)? {
         guard card == .game else { return nil }
         let change: () -> Void = actions.change
-        return { go(change) }
+        return change
     }
 
     private var spring: Animation {
@@ -409,14 +410,14 @@ struct HomeStageView: View {
 
     private func open(_ card: HomeStageCard) {
         switch card {
-        case .game: go(actions.play)
-        case .today: go(actions.dailyMove)
-        case .coach: go(actions.coach)
+        case .game: toBoard(actions.play)
+        case .today: toBoard(actions.dailyMove)
+        case .coach: actions.coach()
         case .masterpiece:
             if let masterpiece = info.masterpiece, let fen = masterpiece.frames.first {
-                go { actions.analyzePosition(fen) }
+                toBoard { actions.analyzePosition(fen) }
             }
-        case .analyze: go(actions.analyze)
+        case .analyze: actions.analyze()
         }
     }
 
