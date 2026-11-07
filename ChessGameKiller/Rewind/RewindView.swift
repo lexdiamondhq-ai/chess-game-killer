@@ -152,7 +152,7 @@ struct RewindView: View {
                 levelMenu(explorer)
             } else {
                 VStack(spacing: 2) {
-                    Text("Rewind · vs \(game.opponent)")
+                    Text("Rewind · vs \(game.opponentShown)")
                         .font(.app(.caption2, weight: .semibold))
                         .tracking(2.5)
                         .textCase(.uppercase)
@@ -176,10 +176,10 @@ struct RewindView: View {
                     .minimumScaleFactor(0.8)
                     .frame(minHeight: 44)
                     .tint(.primary)
-                    .accessibilityLabel("Rematch \(game.opponent)")
-                    .confirmationDialog("Leave your game against \(forfeits ?? game.opponent)?",
+                    .accessibilityLabel("Rematch \(game.opponentShown)")
+                    .confirmationDialog("Leave your game against \(forfeits ?? game.opponentShown)?",
                                         isPresented: $confirmingRematch, titleVisibility: .visible) {
-                        Button("Resign and play \(game.opponent)", role: .destructive) { onPlayAgain(game) }
+                        Button("Resign and play \(game.opponentShown)", role: .destructive) { onPlayAgain(game) }
                         Button("Keep playing", role: .cancel) {}
                     } message: {
                         Text("It counts as a loss for your army.")
