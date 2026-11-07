@@ -562,8 +562,7 @@ struct ContentView: View {
     /// The window's light: the board home's room while it shows (Light and Middle are light),
     /// the board's look everywhere else.
     private var windowScheme: ColorScheme? {
-        if showingHome, homeLit, stageHome, !showingWelcome { return .dark }
-        if showingHome, homeLit, boardSheet, !showingWelcome { return homeTone.scheme }
+        if showingHome, homeLit, boardSheet || stageHome, !showingWelcome { return homeTone.scheme }
         return theme.isDark ? .dark : nil
     }
 

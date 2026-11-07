@@ -139,7 +139,7 @@ struct HomeView: View {
     // MARK: Reading
 
     private var look: SculptedLook { theme.sculptedLook ?? .gilded }
-    private var tone: HomeTone { .of(look, mode: (boardSheet && !stageOn) ? toneMode : .dark) }
+    private var tone: HomeTone { .of(look, mode: (boardSheet || stageOn) ? toneMode : .dark) }
     /// The pieces on the small boards match the board in the window.
     private var pieceTheme: BoardTheme { theme.sculptedLook == nil ? .named(.gilded) : theme }
 

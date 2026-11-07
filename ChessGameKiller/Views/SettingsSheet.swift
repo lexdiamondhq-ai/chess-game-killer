@@ -82,12 +82,12 @@ struct SettingsSheet: View {
                             ToggleRow(title: "Home screen", subtitle: "Open on a home page: the board up top, your week, and every mode one tap away.",
                                       symbol: "house", isOn: $homeScreen, theme: theme)
                             rule
-                            ToggleRow(title: "Stage home", subtitle: "Home in the dark: your board lit on a stage, a deck of cards for what's next, and a floating tab bar. Your game's board doesn't change.",
+                            ToggleRow(title: "Stage home", subtitle: "Your board lit on a stage, a deck of cards for what's next, and a floating tab bar, in light or dark. Your game's board doesn't change.",
                                       symbol: "sparkles", isOn: $stageHome, theme: theme)
                             rule
                             ToggleRow(title: "Board and sheet", subtitle: "The 3D board stays on top and one glass sheet holds the rest, at home and in a game. Off brings back the tiles and the floating dock.",
                                       symbol: "rectangle.bottomhalf.inset.filled", isOn: $boardSheet, theme: theme)
-                            if boardSheet {
+                            if boardSheet || stageHome {
                                 rule
                                 PickerRow(title: "Home colors", subtitle: homeTone.blurb, symbol: "circle.lefthalf.filled", theme: theme) {
                                     Picker("Home colors", selection: $homeTone) {

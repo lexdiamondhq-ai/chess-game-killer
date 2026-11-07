@@ -1,8 +1,10 @@
 import ChessKit
 import SwiftUI
 
-/// The stage home (Alex's pick, 2026-11-07): dark, the real 3D board lit on a stage, your
-/// level with three rings, a deck of cards for what's next, and a floating glass tab bar.
+/// The stage home (Alex's pick, 2026-11-07): the real 3D board lit on a stage, your level with
+/// three rings, a deck of cards for what's next, and a floating glass tab bar. It follows
+/// Settings > Home colors (Light, Middle or Dark). Every way out zooms back, swirls into a
+/// chessboard and opens (HomeStageSwirl).
 /// On by default (Alex, 2026-11-07); Settings > Stage home turns it off, back to the board
 /// and sheet. The game's own board is untouched: only Home looks like this.
 enum HomeStageLayout {
@@ -46,6 +48,31 @@ enum HomeStageCard: Int, CaseIterable, Identifiable {
     var id: Int { rawValue }
 }
 
+/// The stage's colors in the room's light: dark glass at night, milk glass by day.
+struct HomeStagePalette {
+    let tone: HomeTone
+
+    var dark: Bool { tone.scheme == .dark }
+    var gold: Color { tone.metal }
+    /// The bright end of the gold gradients.
+    var goldHi: Color { dark ? Color(hex: 0xF4DDA4) : Color(hex: 0xE2B56A) }
+    var goldLo: Color { dark ? Color(hex: 0xC99B4E) : Color(hex: 0xA8732A) }
+    var glassFill: Color { dark ? Color(hex: 0x201B16).opacity(0.55) : Color.white.opacity(0.66) }
+    var glassLine: Color { dark ? Color(hex: 0xFFF8EB).opacity(0.11) : tone.ink.opacity(0.08) }
+    var chipFill: Color { dark ? Color.white.opacity(0.07) : Color.white.opacity(0.78) }
+    var chipLine: Color { dark ? Color.white.opacity(0.1) : tone.ink.opacity(0.08) }
+    var track: Color { dark ? Color.white.opacity(0.1) : tone.ink.opacity(0.08) }
+    var dot: Color { dark ? Color.white.opacity(0.22) : tone.ink.opacity(0.18) }
+    var shadow: Double { dark ? 0.5 : 0.14 }
+    /// The board the swirl turns into.
+    var lightSquare: Color { dark ? Color(hex: 0xD9C49A) : Color(hex: 0xF0E2C6) }
+    var darkSquare: Color { dark ? Color(hex: 0x3A2A1C) : Color(hex: 0x8A6243) }
+
+    var goldFill: LinearGradient {
+        LinearGradient(colors: [goldHi, goldLo], startPoint: .top, endPoint: .bottom)
+    }
+}
+
 struct HomeStageView: View {
     let tone: HomeTone
     let look: SculptedLook
@@ -60,7 +87,13 @@ struct HomeStageView: View {
     @State private var fanned = false
     @GestureState private var deckDrag: CGFloat = 0
     @State private var music = HomeMusic.shared
+    /// Settings > Home colors, also switched by the sun and moon in the top bar.
+    @AppStorage(HomeToneMode.key) private var toneMode = HomeToneMode.defaultMode
+    /// 0 at rest, 1 with the home zoomed away into the chessboard.
+    @State private var swirl: CGFloat = 0
+    @State private var swirling = false
 
+    private var palette: HomeStagePalette { HomeStagePalette(tone: tone) }
     private var gold: Color { tone.metal }
 
     var body: some View {
@@ -72,44 +105,89 @@ struct HomeStageView: View {
                 HomeStageBackdrop(tone: tone)
                     .ignoresSafeArea()
 
-                stage(width: width, height: stageHeight + safeTop)
-                    .ignoresSafeArea(edges: .top)
-
-                VStack(spacing: 0) {
-                    topBar
-                        .padding(.horizontal, 18)
-                        .padding(.top, 6)
-                    Spacer(minLength: 0)
-                        .frame(height: max(stageHeight - 70, 120))
-                    levelRow
-                        .padding(.horizontal, 20)
-                    deck
-                        .padding(.horizontal, 16)
-                        .padding(.top, 18)
-                    Spacer(minLength: 0)
+                ZStack(alignment: .top) {
+                    stage(width: width, height: stageHeight + safeTop)
+                        .ignoresSafeArea(edges: .top)
+                    page(stageHeight: stageHeight)
                 }
-                .blur(radius: fanned ? 14 : 0)
-                .allowsHitTesting(!fanned)
+                .modifier(HomeStageZoom(swirl: swirl))
 
                 if fanned {
                     fan(safeTop: safeTop)
                         .transition(.opacity)
                         .zIndex(2)
                 }
+
+                if swirl > 0 {
+                    HomeStageSwirl(swirl: swirl, palette: palette)
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
+                        .zIndex(4)
+                }
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                HomeStageTabBar(tone: tone, upNext: info.upNext, learn: actions.learn, play: actions.play,
-                                rooms: actions.rooms, you: actions.you)
-                    .padding(.horizontal, 18)
+                HomeStageTabBar(tone: tone, upNext: info.upNext,
+                                learn: { go(actions.learn) }, play: { go(actions.play) },
+                                rooms: { go(actions.rooms) }, you: { go(actions.you) })
+                    .padding(.horizontal, 14)
                     .padding(.bottom, 4)
                     .opacity(fanned ? 0 : 1)
+                    .modifier(HomeStageZoom(swirl: swirl))
             }
         }
-        .environment(\.colorScheme, .dark)
+        .environment(\.colorScheme, tone.scheme)
+        .allowsHitTesting(!swirling)
         .sensoryFeedback(.selection, trigger: order) { _, _ in hapticsOn }
         .sensoryFeedback(.impact(weight: .light), trigger: fanned) { _, _ in hapticsOn }
-        .onAppear { music.homeAppeared() }
+        .sensoryFeedback(.impact(weight: .medium), trigger: swirling) { _, now in now && hapticsOn }
+        .onAppear {
+            music.homeAppeared()
+            if swirl > 0 { settle() }
+        }
         .onDisappear { music.homeDisappeared() }
+    }
+
+    private func page(stageHeight: CGFloat) -> some View {
+        VStack(spacing: 0) {
+            topBar
+                .padding(.horizontal, 18)
+                .padding(.top, 6)
+            Spacer(minLength: 0)
+                .frame(height: max(stageHeight - 70, 120))
+            levelRow
+                .padding(.horizontal, 20)
+            deck
+                .padding(.horizontal, 16)
+                .padding(.top, 18)
+            Spacer(minLength: 0)
+        }
+        .blur(radius: fanned ? 14 : 0)
+        .allowsHitTesting(!fanned)
+    }
+
+    // MARK: The swirl
+
+    /// Zooms the home back, swirls it into a chessboard and opens the place, then settles back
+    /// in behind it, so the home is at rest when the player comes back.
+    private func go(_ action: @escaping () -> Void) {
+        guard !swirling else { return }
+        guard !reduceMotion else {
+            action()
+            return
+        }
+        swirling = true
+        withAnimation(.timingCurve(0.5, 0, 0.75, 0.4, duration: 0.34)) { swirl = 1 }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(320))
+            action()
+            try? await Task.sleep(for: .milliseconds(140))
+            settle()
+        }
+    }
+
+    private func settle() {
+        withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) { swirl = 0 }
+        swirling = false
     }
 
     // MARK: The stage
@@ -120,7 +198,7 @@ struct HomeStageView: View {
         return ZStack {
             HomeSheetScene(look: look, tone: tone, pieces: pieces, black: upNext.playerColor == .black,
                            rival: upNext.rival, leaning: leaning, lift: 0)
-            HomeStageHalo(gold: gold)
+            HomeStageHalo(gold: gold, dark: palette.dark)
                 .allowsHitTesting(false)
             HomeStageMotes(gold: gold, still: reduceMotion)
                 .allowsHitTesting(false)
@@ -134,7 +212,7 @@ struct HomeStageView: View {
                            startPoint: .top, endPoint: .bottom)
         }
         .contentShape(Rectangle())
-        .onTapGesture(perform: actions.play)
+        .onTapGesture { go(actions.play) }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(upNext.inProgress ? "Your game against \(upNext.rival.name)" : "Next game: \(upNext.rival.name)")
         .accessibilityAddTraits(.isButton)
@@ -152,37 +230,54 @@ struct HomeStageView: View {
                     .font(.system(size: 19, weight: .medium, design: .serif))
                     .foregroundStyle(tone.ink)
             }
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
             Spacer(minLength: 0)
             if music.available {
-                HomeStageCircleButton(tone: tone, label: music.on ? "Music off" : "Music on", action: music.toggle) {
-                    HomeMusicBars(on: music.on, gold: gold)
+                HomeStageCircleButton(palette: palette, label: music.on ? "Music off" : "Music on", action: music.toggle) {
+                    HomeMusicBars(on: music.on, gold: gold, off: tone.ink3)
                 }
             }
-            Button(action: actions.dailyMove) {
-                HStack(spacing: 5) {
-                    Image(systemName: "flame.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(gold)
-                    Text("\(info.day.streak)")
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundStyle(tone.ink)
-                }
-                .padding(.horizontal, 12)
-                .frame(height: 40)
-                .background(Capsule().fill(Color.white.opacity(0.07)))
-                .overlay(Capsule().strokeBorder(Color.white.opacity(0.1)))
+            HomeStageCircleButton(palette: palette, label: palette.dark ? "Light mode" : "Dark mode", action: flipLight) {
+                Image(systemName: palette.dark ? "sun.max.fill" : "moon.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(gold)
+                    .contentTransition(.symbolEffect(.replace))
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("\(info.day.streak) day streak")
-            HomeStageCircleButton(tone: tone, label: "You", action: actions.you) {
+            streakChip
+            HomeStageCircleButton(palette: palette, label: "You", action: { go(actions.you) }) {
                 Text(initial)
                     .font(.system(size: 16, weight: .semibold, design: .serif))
                     .foregroundStyle(tone.onIvory)
                     .frame(width: 40, height: 40)
-                    .background(Circle().fill(LinearGradient(colors: [Color(hex: 0xF4DDA4), Color(hex: 0xC99B4E)],
-                                                             startPoint: .top, endPoint: .bottom)))
+                    .background(Circle().fill(palette.goldFill))
             }
         }
+    }
+
+    private func flipLight() {
+        withAnimation(.easeInOut(duration: 0.45)) {
+            toneMode = palette.dark ? .light : .dark
+        }
+    }
+
+    private var streakChip: some View {
+        Button { go(actions.dailyMove) } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "flame.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(gold)
+                Text("\(info.day.streak)")
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(tone.ink)
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 40)
+            .background(Capsule().fill(palette.chipFill))
+            .overlay(Capsule().strokeBorder(palette.chipLine))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(info.day.streak) day streak")
     }
 
     private var greeting: String {
@@ -204,18 +299,26 @@ struct HomeStageView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(info.rating.map { $0.formatted(.number) } ?? "New")
                     .font(.system(size: 44, weight: .regular, design: .serif))
-                    .foregroundStyle(LinearGradient(colors: [Color(hex: 0xFFF3D2), gold], startPoint: .top, endPoint: .bottom))
+                    .foregroundStyle(palette.goldFill)
                     .monospacedDigit()
                 Text(info.rating == nil ? "Play a few games for your level" : "Your level")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(tone.ink2)
             }
             Spacer(minLength: 0)
-            HomeStageRing(value: Double(min(info.day.streak, 7)) / 7, label: "Streak", text: "\(info.day.streak)", gold: gold, tone: tone)
-            HomeStageRing(value: Double(min(info.day.puzzlesToday, DailyRules.puzzlesForTheDay)) / Double(DailyRules.puzzlesForTheDay),
-                          label: "Puzzles", text: "\(info.day.puzzlesToday)", gold: gold, tone: tone)
-            HomeStageRing(value: info.rankProgress, label: "Rank", text: "\(Int((info.rankProgress * 100).rounded()))%",
-                          gold: gold, tone: tone)
+            rings
+        }
+    }
+
+    private var rings: some View {
+        let day: HomeDailyState = info.day
+        let need: Int = DailyRules.puzzlesForTheDay
+        let rank: Double = info.rankProgress
+        return HStack(spacing: 14) {
+            HomeStageRing(value: Double(min(day.streak, 7)) / 7, label: "Streak", text: "\(day.streak)", palette: palette)
+            HomeStageRing(value: Double(min(day.puzzlesToday, need)) / Double(need), label: "Puzzles",
+                          text: "\(day.puzzlesToday)", palette: palette)
+            HomeStageRing(value: rank, label: "Rank", text: "\(Int((rank * 100).rounded()))%", palette: palette)
         }
     }
 
@@ -237,38 +340,42 @@ struct HomeStageView: View {
                 HStack(spacing: 5) {
                     ForEach(HomeStageCard.allCases) { card in
                         Capsule()
-                            .fill(card == order.first ? gold : Color.white.opacity(0.22))
+                            .fill(card == order.first ? gold : palette.dot)
                             .frame(width: card == order.first ? 16 : 6, height: 6)
                     }
                 }
                 Spacer()
-                Button {
-                    withAnimation(spring) { fanned = true }
-                } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "square.stack.3d.down.right")
-                        Text("All")
-                    }
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(tone.ink)
-                    .padding(.horizontal, 12)
-                    .frame(height: 30)
-                    .background(Capsule().fill(Color.white.opacity(0.08)))
-                    .overlay(Capsule().strokeBorder(Color.white.opacity(0.1)))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Show all cards")
+                allButton
             }
             .padding(.horizontal, 4)
         }
+    }
+
+    private var allButton: some View {
+        Button {
+            withAnimation(spring) { fanned = true }
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "square.stack.3d.down.right")
+                Text("All")
+            }
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(tone.ink)
+            .padding(.horizontal, 12)
+            .frame(height: 30)
+            .background(Capsule().fill(palette.chipFill))
+            .overlay(Capsule().strokeBorder(palette.chipLine))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Show all cards")
     }
 
     private func deckCard(_ card: HomeStageCard, depth: Int) -> some View {
         let lift: CGFloat = CGFloat(depth) * -11
         let scale: CGFloat = 1 - CGFloat(depth) * 0.05
         let drag: CGFloat = depth == 0 ? max(deckDrag, -40) : 0
-        return HomeStageCardView(card: card, info: info, tone: tone, compact: false, open: { open(card) },
-                                 secondary: card == .game ? actions.change : nil)
+        return HomeStageCardView(card: card, info: info, tone: tone, open: { open(card) },
+                                 secondary: secondary(for: card))
             .frame(height: Self.deckHeight)
             .scaleEffect(scale, anchor: .top)
             .offset(y: lift + drag)
@@ -292,20 +399,27 @@ struct HomeStageView: View {
             }
     }
 
+    /// The game card's Change (or New during a game).
+    private func secondary(for card: HomeStageCard) -> (() -> Void)? {
+        guard card == .game else { return nil }
+        let change: () -> Void = actions.change
+        return { go(change) }
+    }
+
     private var spring: Animation {
         reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.42, dampingFraction: 0.82)
     }
 
     private func open(_ card: HomeStageCard) {
         switch card {
-        case .game: actions.play()
-        case .today: actions.dailyMove()
-        case .coach: actions.coach()
+        case .game: go(actions.play)
+        case .today: go(actions.dailyMove)
+        case .coach: go(actions.coach)
         case .masterpiece:
             if let masterpiece = info.masterpiece, let fen = masterpiece.frames.first {
-                actions.analyzePosition(fen)
+                go { actions.analyzePosition(fen) }
             }
-        case .analyze: actions.analyze()
+        case .analyze: go(actions.analyze)
         }
     }
 
@@ -313,18 +427,18 @@ struct HomeStageView: View {
 
     private func fan(safeTop: CGFloat) -> some View {
         ZStack(alignment: .top) {
-            Color.black.opacity(0.55)
+            Color.black.opacity(palette.dark ? 0.55 : 0.25)
                 .ignoresSafeArea()
                 .onTapGesture { withAnimation(spring) { fanned = false } }
             ScrollView {
                 VStack(spacing: 12) {
                     ForEach(Array(order.enumerated()), id: \.element) { index, card in
-                        HomeStageCardView(card: card, info: info, tone: tone, compact: false,
+                        HomeStageCardView(card: card, info: info, tone: tone,
                                           open: {
                                               withAnimation(spring) { fanned = false }
                                               open(card)
                                           },
-                                          secondary: card == .game ? actions.change : nil)
+                                          secondary: secondary(for: card))
                             .frame(height: Self.deckHeight)
                             .transition(.offset(y: CGFloat(-index) * 40).combined(with: .opacity))
                     }
@@ -347,13 +461,55 @@ struct HomeStageView: View {
                     .foregroundStyle(tone.onIvory)
                     .padding(.horizontal, 22)
                     .frame(height: 46)
-                    .background(Capsule().fill(LinearGradient(colors: [Color(hex: 0xF4DDA4), Color(hex: 0xC99B4E)],
-                                                              startPoint: .top, endPoint: .bottom)))
+                    .background(Capsule().fill(palette.goldFill))
                 }
                 .buttonStyle(.plain)
                 .padding(.bottom, 24)
             }
         }
+    }
+}
+
+// MARK: - The swirl
+
+/// The home zooms back and turns a little as the chessboard swirls in over it.
+struct HomeStageZoom: ViewModifier {
+    let swirl: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(1 - 0.16 * swirl)
+            .rotationEffect(.degrees(Double(swirl) * -10))
+            .blur(radius: swirl * 6)
+    }
+}
+
+/// A chessboard that spins in from the middle and grows past the screen's edges.
+struct HomeStageSwirl: View {
+    let swirl: CGFloat
+    let palette: HomeStagePalette
+
+    var body: some View {
+        GeometryReader { geo in
+            let side: CGFloat = max(geo.size.width, geo.size.height)
+            Canvas { gc, size in
+                let square: CGFloat = size.width / 8
+                for row in 0..<8 {
+                    for col in 0..<8 {
+                        let rect = CGRect(x: CGFloat(col) * square, y: CGFloat(row) * square, width: square, height: square)
+                        let color: Color = (row + col).isMultiple(of: 2) ? palette.lightSquare : palette.darkSquare
+                        gc.fill(Path(rect), with: .color(color))
+                    }
+                }
+            }
+            .frame(width: side, height: side)
+            .overlay(Rectangle().strokeBorder(palette.gold, lineWidth: side / 60))
+            .scaleEffect(0.12 + 1.6 * swirl)
+            .rotationEffect(.degrees(Double(1 - swirl) * 300))
+            .opacity(Double(min(swirl * 2.2, 1)))
+            .position(x: geo.size.width / 2, y: geo.size.height / 2)
+        }
+        .accessibilityHidden(true)
     }
 }
 
@@ -363,10 +519,10 @@ struct HomeStageCardView: View {
     let card: HomeStageCard
     let info: HomeStageInfo
     let tone: HomeTone
-    let compact: Bool
     let open: () -> Void
     var secondary: (() -> Void)? = nil
 
+    private var palette: HomeStagePalette { HomeStagePalette(tone: tone) }
     private var gold: Color { tone.metal }
 
     var body: some View {
@@ -393,7 +549,7 @@ struct HomeStageCardView: View {
             }
             .padding(.horizontal, 16)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(HomeStageGlass(corner: 26))
+            .background(HomeStageGlass(corner: 26, palette: palette))
             .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
         }
         .buttonStyle(HomeStagePress())
@@ -404,14 +560,14 @@ struct HomeStageCardView: View {
     private var orb: some View {
         ZStack {
             Circle()
-                .fill(RadialGradient(colors: [Color(hex: 0xF4DDA4).opacity(0.35), gold.opacity(0.06)],
+                .fill(RadialGradient(colors: [palette.goldHi.opacity(palette.dark ? 0.35 : 0.45), gold.opacity(0.06)],
                                      center: UnitPoint(x: 0.35, y: 0.3), startRadius: 2, endRadius: 34))
             Circle().strokeBorder(gold.opacity(0.35), lineWidth: 1)
             Glyph(name: glyph, size: 26)
-                .foregroundStyle(Color(hex: 0xF4DDA4))
+                .foregroundStyle(palette.dark ? palette.goldHi : palette.goldLo)
         }
         .frame(width: 58, height: 58)
-        .shadow(color: gold.opacity(0.35), radius: 12)
+        .shadow(color: gold.opacity(palette.dark ? 0.35 : 0.2), radius: 12)
     }
 
     @ViewBuilder
@@ -423,8 +579,7 @@ struct HomeStageCardView: View {
                     .foregroundStyle(tone.onIvory)
                     .padding(.horizontal, 16)
                     .frame(height: 34)
-                    .background(Capsule().fill(LinearGradient(colors: [Color(hex: 0xF4DDA4), Color(hex: 0xC99B4E)],
-                                                              startPoint: .top, endPoint: .bottom)))
+                    .background(Capsule().fill(palette.goldFill))
                 if let secondary {
                     Button(action: secondary) {
                         Text(info.upNext.inProgress ? "New" : "Change")
@@ -496,15 +651,23 @@ struct HomeStageCardView: View {
 
 // MARK: - Pieces of the stage
 
-/// The dark room: warm smoke at the top falling to black.
+/// The room: warm smoke falling to black at night, a soft white glow on cream by day.
 struct HomeStageBackdrop: View {
     let tone: HomeTone
 
     var body: some View {
-        ZStack {
-            Color(hex: 0x0A0807)
-            RadialGradient(colors: [Color(hex: 0x2A2018), Color(hex: 0x0A0807).opacity(0)],
-                           center: UnitPoint(x: 0.5, y: 0.18), startRadius: 10, endRadius: 520)
+        if tone.scheme == .dark {
+            ZStack {
+                Color(hex: 0x0A0807)
+                RadialGradient(colors: [Color(hex: 0x2A2018), Color(hex: 0x0A0807).opacity(0)],
+                               center: UnitPoint(x: 0.5, y: 0.18), startRadius: 10, endRadius: 520)
+            }
+        } else {
+            ZStack {
+                tone.canvas
+                RadialGradient(colors: [Color.white.opacity(0.85), tone.canvas.opacity(0)],
+                               center: UnitPoint(x: 0.5, y: 0.2), startRadius: 10, endRadius: 520)
+            }
         }
     }
 }
@@ -512,16 +675,17 @@ struct HomeStageBackdrop: View {
 /// The gold light the board stands in.
 struct HomeStageHalo: View {
     let gold: Color
+    let dark: Bool
 
     var body: some View {
         GeometryReader { geo in
             let w: CGFloat = geo.size.width
             Ellipse()
-                .fill(RadialGradient(colors: [gold.opacity(0.32), gold.opacity(0.08), .clear],
+                .fill(RadialGradient(colors: [gold.opacity(dark ? 0.32 : 0.16), gold.opacity(dark ? 0.08 : 0.04), .clear],
                                      center: .center, startRadius: 4, endRadius: w * 0.55))
                 .frame(width: w * 1.1, height: w * 0.7)
                 .position(x: w / 2, y: geo.size.height * 0.62)
-                .blendMode(.plusLighter)
+                .blendMode(dark ? .plusLighter : .multiply)
         }
     }
 }
@@ -557,17 +721,18 @@ struct HomeStageMotes: View {
     }
 }
 
-/// Dark glass with a warm hairline.
+/// Glass with a hairline: dark and warm at night, milky by day.
 struct HomeStageGlass: View {
     let corner: CGFloat
+    let palette: HomeStagePalette
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: corner, style: .continuous)
         shape
             .fill(.ultraThinMaterial)
-            .overlay(shape.fill(Color(hex: 0x201B16).opacity(0.55)))
-            .overlay(shape.strokeBorder(Color(hex: 0xFFF8EB).opacity(0.11), lineWidth: 1))
-            .shadow(color: .black.opacity(0.5), radius: 18, y: 12)
+            .overlay(shape.fill(palette.glassFill))
+            .overlay(shape.strokeBorder(palette.glassLine, lineWidth: 1))
+            .shadow(color: .black.opacity(palette.shadow), radius: 18, y: 12)
     }
 }
 
@@ -575,14 +740,14 @@ struct HomeStageGlass: View {
 struct HomeStagePress: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(.spring(response: 0.25, dampingFraction: 0.8), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? 0.95 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
     }
 }
 
 /// A round glass button in the top bar.
 struct HomeStageCircleButton<Content: View>: View {
-    let tone: HomeTone
+    let palette: HomeStagePalette
     let label: String
     let action: () -> Void
     @ViewBuilder let content: () -> Content
@@ -591,8 +756,8 @@ struct HomeStageCircleButton<Content: View>: View {
         Button(action: action) {
             content()
                 .frame(width: 40, height: 40)
-                .background(Circle().fill(Color.white.opacity(0.07)))
-                .overlay(Circle().strokeBorder(Color.white.opacity(0.1)))
+                .background(Circle().fill(palette.chipFill))
+                .overlay(Circle().strokeBorder(palette.chipLine))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
@@ -604,35 +769,34 @@ struct HomeStageRing: View {
     let value: Double
     let label: String
     let text: String
-    let gold: Color
-    let tone: HomeTone
+    let palette: HomeStagePalette
 
     var body: some View {
         VStack(spacing: 5) {
             ZStack {
-                Circle().stroke(Color.white.opacity(0.1), lineWidth: 4)
+                Circle().stroke(palette.track, lineWidth: 4)
                 Circle()
                     .trim(from: 0, to: max(min(value, 1), 0.001))
-                    .stroke(LinearGradient(colors: [Color(hex: 0xF4DDA4), gold], startPoint: .top, endPoint: .bottom),
-                            style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                    .stroke(palette.goldFill, style: StrokeStyle(lineWidth: 4, lineCap: .round))
                     .rotationEffect(.degrees(-90))
-                    .shadow(color: gold.opacity(0.6), radius: 4)
+                    .shadow(color: palette.gold.opacity(palette.dark ? 0.6 : 0.25), radius: 4)
                 Text(text)
                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(tone.ink)
+                    .foregroundStyle(palette.tone.ink)
                     .minimumScaleFactor(0.7)
             }
             .frame(width: 46, height: 46)
             Text(label)
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(tone.ink2)
+                .foregroundStyle(palette.tone.ink2)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(label): \(text)")
     }
 }
 
-/// The floating glass tab bar: Today, Learn, the gold Play jewel, You, and Rooms (everything).
+/// The floating glass tab bar: Today, Learn, the gold knight to play, You, and Rooms (everything).
+/// Each icon is the app's own chess glyph on a raised tile, like the game's tool buttons.
 struct HomeStageTabBar: View {
     let tone: HomeTone
     let upNext: HomeUpNext
@@ -641,33 +805,19 @@ struct HomeStageTabBar: View {
     let rooms: () -> Void
     let you: () -> Void
 
+    private var palette: HomeStagePalette { HomeStagePalette(tone: tone) }
+
     var body: some View {
         HStack(spacing: 0) {
-            tab("Today", glyph: Glyphs.today, on: true) {}
-            tab("Learn", glyph: Glyphs.train, on: false, action: learn)
+            HomeStageTab(title: "Today", glyph: Glyphs.today, on: true, palette: palette) {}
+            HomeStageTab(title: "Learn", glyph: Glyphs.coach, on: false, palette: palette, action: learn)
             jewel
-            tab("You", glyph: "person.crop.circle", on: false, action: you)
-            tab("Rooms", glyph: "square.stack.3d.up", on: false, action: rooms)
+            HomeStageTab(title: "You", glyph: Glyphs.king, on: false, palette: palette, action: you)
+            HomeStageTab(title: "Rooms", glyph: Glyphs.home, on: false, palette: palette, action: rooms)
         }
         .padding(.horizontal, 6)
-        .frame(height: 64)
-        .background(HomeStageGlass(corner: 32))
-    }
-
-    private func tab(_ title: String, glyph: String, on: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(spacing: 3) {
-                Glyph(name: glyph, size: 22)
-                Text(title)
-                    .font(.system(size: 10.5, weight: .semibold))
-            }
-            .foregroundStyle(on ? tone.metal : tone.ink2)
-            .frame(maxWidth: .infinity)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(title)
-        .accessibilityAddTraits(on ? .isSelected : [])
+        .frame(height: 74)
+        .background(HomeStageGlass(corner: 30, palette: palette))
     }
 
     private var jewel: some View {
@@ -676,12 +826,15 @@ struct HomeStageTabBar: View {
                 Circle()
                     .fill(RadialGradient(colors: [Color(hex: 0xFCEBC0), Color(hex: 0xD7A957), Color(hex: 0x8A6125)],
                                          center: UnitPoint(x: 0.35, y: 0.3), startRadius: 2, endRadius: 40))
-                Glyph(name: Glyphs.play, size: 26)
+                Circle()
+                    .strokeBorder(LinearGradient(colors: [Color.white.opacity(0.8), Color(hex: 0x8A6125).opacity(0.4)],
+                                                 startPoint: .top, endPoint: .bottom), lineWidth: 1.5)
+                Glyph(name: Glyphs.train, size: 32)
                     .foregroundStyle(Color(hex: 0x2E200C))
             }
-            .frame(width: 60, height: 60)
-            .shadow(color: Color(hex: 0xD9B26A).opacity(0.7), radius: 16)
-            .offset(y: -12)
+            .frame(width: 64, height: 64)
+            .shadow(color: Color(hex: 0xD9B26A).opacity(palette.dark ? 0.7 : 0.5), radius: 16)
+            .offset(y: -14)
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(HomeStagePress())
@@ -689,10 +842,55 @@ struct HomeStageTabBar: View {
     }
 }
 
+/// One tab: a bold glyph on a raised, rounded tile, gold when it's the page showing.
+struct HomeStageTab: View {
+    let title: String
+    let glyph: String
+    let on: Bool
+    let palette: HomeStagePalette
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                Glyph(name: glyph, size: 24, weight: .bold)
+                    .foregroundStyle(on ? palette.tone.onIvory : palette.tone.ink)
+                    .frame(width: 44, height: 38)
+                    .background(tile)
+                Text(title)
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(on ? palette.gold : palette.tone.ink2)
+            }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(HomeStagePress())
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+
+    @ViewBuilder
+    private var tile: some View {
+        let shape = RoundedRectangle(cornerRadius: 13, style: .continuous)
+        if on {
+            shape
+                .fill(palette.goldFill)
+                .overlay(shape.strokeBorder(Color.white.opacity(0.45), lineWidth: 1))
+                .shadow(color: palette.gold.opacity(0.45), radius: 8, y: 3)
+        } else {
+            shape
+                .fill(palette.chipFill)
+                .overlay(shape.strokeBorder(palette.chipLine, lineWidth: 1))
+                .shadow(color: .black.opacity(palette.dark ? 0.35 : 0.08), radius: 4, y: 2)
+        }
+    }
+}
+
 /// Three little bars that dance while the music plays.
 struct HomeMusicBars: View {
     let on: Bool
     let gold: Color
+    let off: Color
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1 / 12, paused: !on)) { context in
@@ -701,7 +899,7 @@ struct HomeMusicBars: View {
                 ForEach(0..<3, id: \.self) { i in
                     let h: Double = on ? 6 + 6 * abs(sin(t * 3 + Double(i) * 1.7)) : 4
                     Capsule()
-                        .fill(on ? gold : Color.white.opacity(0.5))
+                        .fill(on ? gold : off)
                         .frame(width: 3, height: CGFloat(h))
                 }
             }
