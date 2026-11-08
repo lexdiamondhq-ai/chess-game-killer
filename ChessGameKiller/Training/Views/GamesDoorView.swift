@@ -18,7 +18,7 @@ struct GamesDoorView: View {
     private static let recentCount = 3
 
     var body: some View {
-        TrainScreen(theme: theme, title: "Your games",
+        TrainScreen(theme: theme, title: "Chess DNA",
                     intro: "\(Coach.current.title) reads every move of your recent games and finds where the points go.") {
             // The full Chess DNA is Premium's; the top weakness below stays free.
             if let dna, dna.gamesRead > 0, Premium.shared.opens(.coachProfile) {
@@ -237,7 +237,7 @@ struct RecentGameRow: View {
             portrait
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text(game.opponent)
+                    Text(game.opponentShown)
                         .font(.app(.subheadline, weight: .semibold))
                         .foregroundStyle(.primary)
                     Text(game.result.title)
@@ -277,12 +277,7 @@ struct RecentGameRow: View {
     @ViewBuilder
     private var portrait: some View {
         if let rival {
-            Image(rival.portraitName)
-                .resizable()
-                .scaledToFill()
-                .frame(width: 34, height: 34)
-                .clipShape(Circle())
-                .accessibilityHidden(true)
+            RivalCoin(rival: rival, size: 34)
         } else {
             Image(systemName: game.isImported ? "globe" : "person.2.fill")
                 .font(.app(.footnote))

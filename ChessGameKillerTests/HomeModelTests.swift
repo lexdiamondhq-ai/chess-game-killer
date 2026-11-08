@@ -13,7 +13,7 @@ final class HomeModelTests: XCTestCase {
         let next = HomeUpNext.make(match: match, side: .white, level: nil, timeControl: .unlimited, hasPlayed: false)
         XCTAssertEqual(next.kind, .firstGame)
         XCTAssertEqual(next.level, .beginner)
-        XCTAssertEqual(next.rival.name, "The 1000s")
+        XCTAssertEqual(next.rival.name, "The Cub")
         XCTAssertFalse(next.inProgress)
         XCTAssertTrue(next.yourMove, "White moves first")
         XCTAssertEqual(next.moveNumber, 1)
@@ -188,6 +188,38 @@ final class HomeModelTests: XCTestCase {
         // Changing theme drops the puzzle picked for the old one.
         store.theme = PuzzleTheme.choices[0]
         XCTAssertNil(store.upNext)
+    }
+
+    // MARK: Rooms
+
+    /// Rooms holds only what the Today page doesn't (Alex, 2026-11-08): the ways to play a
+    /// person, a new game on your own side and clock, and your games. Today's Move, Puzzles,
+    /// Analyze and the coach are on Today, so they aren't repeated here.
+    func testRoomsHoldOnlyWhatTodayDoesNot() {
+        let rooms = HomeShortcutKind.list(online: true)
+        XCTAssertEqual(rooms, [.online, .friend, .newGame, .games])
+        XCTAssertEqual(rooms.count, HomeShortcutsPanel.perRow, "One row of four")
+        XCTAssertEqual(Set(rooms.map(\.title)).count, rooms.count, "Each has a name of its own")
+        for kind in rooms {
+            XCTAssertTrue(Glyphs.all.contains(kind.glyph), "\(kind.title) wears one of the app's own icons")
+            XCTAssertFalse(kind.hint.isEmpty, "\(kind.title) says where it goes")
+        }
+    }
+
+    /// With no other players to reach, Online and A friend are left out and the rest keep their order.
+    func testWithoutOtherPlayersRoomsKeepTheRest() {
+        XCTAssertEqual(HomeShortcutKind.list(online: false), [.newGame, .games])
+    }
+
+    /// The app has one home: a switch for an earlier home turned off before goes back to its default.
+    func testEveryoneLandsOnTheOneHome() {
+        let defaults = UserDefaults(suiteName: "HomeLayoutsTests")!
+        defer { defaults.removePersistentDomain(forName: "HomeLayoutsTests") }
+        for key in HomeLayouts.keys { defaults.set(false, forKey: key) }
+        HomeLayouts.settle(defaults)
+        XCTAssertTrue(HomeScreen.isOn(defaults))
+        XCTAssertTrue(HomeStageLayout.isOn(defaults))
+        XCTAssertTrue(HomeLayout.usesSheet(defaults))
     }
 
     // MARK: Helpers

@@ -510,6 +510,29 @@ final class DrillRunnerTests: XCTestCase {
         XCTAssertEqual(runner.outcome, .firstTry)
     }
 
+    /// On the 3D board a move is heard as its piece touches down, as in a game; on the flat
+    /// board, where it is there at once, straight away.
+    func testAMoveIsHeardAsItsPieceLands() async throws {
+        for threeD in [true, false] {
+            let runner = try runner(backRank)
+            let sounds = TimedSounds()
+            runner.sounds = sounds
+            DrillBoard.timeSounds(of: runner, threeD: threeD)
+            try await started(runner)
+            move(runner, "a1a8")
+            XCTAssertEqual(runner.outcome, .firstTry)
+            let last = try XCTUnwrap(sounds.played.last)
+            XCTAssertEqual(last.sound, .check)
+            if threeD {
+                // The rook glides seven squares: about half a second.
+                XCTAssertGreaterThan(last.delay, 0.3)
+                XCTAssertLessThan(last.delay, 1)
+            } else {
+                XCTAssertEqual(last.delay, 0)
+            }
+        }
+    }
+
     func testAWrongMoveIsTakenBackForAnotherTry() async throws {
         let runner = try runner(backRank)
         try await started(runner)

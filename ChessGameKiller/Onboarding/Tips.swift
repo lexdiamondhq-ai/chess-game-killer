@@ -36,7 +36,7 @@ enum AppTip: String, CaseIterable, Identifiable {
         case .bigBoard:
             return "Swipe the board sideways to replay moves. Swipe up for the tools."
         case .jewelShortcuts:
-            return "Hold the gold knight for shortcuts: your rivals, Online, a friend and more."
+            return "Hold the gold knight for shortcuts: your rivals, Online, Analyze and more."
         }
     }
 

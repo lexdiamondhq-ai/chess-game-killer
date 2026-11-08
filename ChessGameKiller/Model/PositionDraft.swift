@@ -69,17 +69,28 @@ struct PositionDraft: Equatable {
         didSet {
             castling = nil
             enPassant = nil
+            counters = nil
         }
     }
     var sideToMove: Piece.Color = .white {
-        // An en passant capture is only there for the side whose turn it is.
-        didSet { if sideToMove != oldValue { enPassant = nil } }
+        // An en passant capture is only there for the side whose turn it is, and the move
+        // number no longer fits the other side's turn.
+        didSet {
+            if sideToMove != oldValue {
+                enPassant = nil
+                counters = nil
+            }
+        }
     }
     /// From a FEN: castling rights as the game has them, when they are fewer than
     /// the squares allow (like "-" or "Kq"). Nil when `castlingFEN` has it right.
     private(set) var castling: String?
     /// From a FEN: the en passant square, like "e3".
     private(set) var enPassant: String?
+    /// From a FEN: its last two fields, the moves since a capture or pawn move and the move
+    /// number ("2 17"), so an analysis numbers its moves as the game did and Stockfish counts
+    /// toward the fifty-move rule. Nil ("0 1") once the pieces or the turn are changed by hand.
+    private(set) var counters: String?
 
     init(placement: [Square: Token] = [:], sideToMove: Piece.Color = .white) {
         self.placement = placement
@@ -89,8 +100,8 @@ struct PositionDraft: Equatable {
     static let empty = PositionDraft()
     static let standard = PositionDraft(fen: Position.standard.fen)!
 
-    /// Reads a FEN. Castling rights and the en passant square are kept until the
-    /// pieces are edited; the clocks are worked out again.
+    /// Reads a FEN. Castling rights, the en passant square and the move counters are kept
+    /// until the pieces are edited.
     init?(fen: String) {
         let fields = fen.split(separator: " ")
         guard let first = fields.first, let draft = PositionDraft(placement: String(first)) else { return nil }
@@ -106,6 +117,10 @@ struct PositionDraft: Equatable {
         }
         if fields.count > 3, Self.isEnPassantSquare(fields[3]) {
             enPassant = String(fields[3])
+        }
+        if fields.count > 5, let sinceCapture = Int(fields[4]), let number = Int(fields[5]),
+           sinceCapture >= 0, number >= 1, sinceCapture != 0 || number != 1 {
+            counters = "\(sinceCapture) \(number)"
         }
     }
 
@@ -305,7 +320,7 @@ struct PositionDraft: Equatable {
     }
 
     var fen: String {
-        "\(placementFEN) \(sideToMove == .white ? "w" : "b") \(castling ?? castlingFEN) \(enPassant ?? "-") 0 1"
+        "\(placementFEN) \(sideToMove == .white ? "w" : "b") \(castling ?? castlingFEN) \(enPassant ?? "-") \(counters ?? "0 1")"
     }
 
     /// The position as a game can use it, when it is valid.

@@ -12,6 +12,30 @@ struct SculptedHint: Equatable {
     let isBest: Bool
 }
 
+/// One of the coach's squares in a lesson or drill: the square glows in its color, ringed, as
+/// on the flat training board. The color is 0xRRGGBB.
+struct SculptedCoachMark: Hashable {
+    let square: Square
+    let color: UInt32
+}
+
+/// One of the coach's arrows in a lesson or drill, lying on the stone in its color (0xRRGGBB):
+/// solid, or dashed for a maybe or a threat, as on the flat training board. Analysis's arrows are
+/// flight paths that rise off the stone and land on the target, as on the flat analysis board.
+struct SculptedCoachArrow: Hashable {
+    let from: Square
+    let to: Square
+    let color: UInt32
+    var dashed = false
+    var analysis = false
+    /// For analysis: the best move's fuller arrow, landing on a ring, or the next best's.
+    var best = true
+
+    var proportions: ArrowOutline.Proportions {
+        analysis ? .analysis(best: best) : .coach(dashed: dashed)
+    }
+}
+
 /// The glow under a veteran of the player's army.
 struct SculptedHalo: Equatable {
     enum Tone: Equatable {
@@ -98,6 +122,9 @@ struct SculptedBoardState: Equatable {
     /// The pieces come without lasting ids (an earlier position of the game, a preview):
     /// the scene matches them to the pieces on the board so each one moves rather than fades.
     var matchesPieces = false
+    /// A lesson's or drill's own marks: the coach's glowing squares and arrows.
+    var coachMarks: [SculptedCoachMark] = []
+    var coachArrows: [SculptedCoachArrow] = []
 
     /// The parts that decide the marks on the stone.
     fileprivate var marks: [String] {
@@ -221,8 +248,30 @@ final class SculptedBoardScene {
     /// Draws at 60 frames a second with 4x smoothing, or at 30 with 2x when the phone should
     /// hold back. `PowerPolicy` says which; the scene follows the same notifications it does.
     func applyPower(constrained: Bool = PowerPolicy.systemConstrained()) {
+        motionEnds = nil
         view.preferredFramesPerSecond = PowerPolicy.framesPerSecond(constrained: constrained)
         view.antialiasingMode = constrained ? .multisampling2X : .multisampling4X
+    }
+
+    /// When the moves under way have all settled, while the board draws at the screen's full rate.
+    private var motionEnds: Date?
+
+    /// A piece in motion draws at the screen's full rate (120 frames a second on a ProMotion
+    /// phone) until it settles; then the board goes back to its usual rate. A still board, and
+    /// a phone that should hold back, never draw faster.
+    private func boostFrameRate(for duration: Double) {
+        guard duration > 0, !PowerPolicy.systemConstrained() else { return }
+        let ends = Date().addingTimeInterval(duration)
+        if let current = motionEnds, current > ends {
+            // An earlier move is still in the air longer: its own reset comes later.
+        } else {
+            motionEnds = ends
+        }
+        view.preferredFramesPerSecond = PowerPolicy.motionFramesPerSecond
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration + 0.05) { [weak self] in
+            guard let self, let ends = self.motionEnds, Date() >= ends else { return }
+            self.applyPower()
+        }
     }
 
     private func watchPower() {
@@ -341,7 +390,8 @@ final class SculptedBoardScene {
             // A new check shows as the checking piece lands.
             checkShowsAt = new.checkedKing != nil && animate && landing > 0 ? Date().addingTimeInterval(landing) : nil
         }
-        if old.marks != new.marks || old.pieces.isEmpty {
+        if old.marks != new.marks || old.coachMarks != new.coachMarks || old.coachArrows != new.coachArrows
+            || old.pieces.isEmpty {
             updateMarks(new)
         }
         if old.halos != new.halos || old.pieces != new.pieces {
@@ -457,6 +507,63 @@ final class SculptedBoardScene {
             place(held)
         }
     }
+
+    /// A faceted stone stage under the board, in two steps, for the stage home. Nil takes it away.
+    var plinth: UIColor? {
+        didSet {
+            guard plinth != oldValue else { return }
+            plinthNode?.removeFromParentNode()
+            plinthNode = nil
+            guard let color = plinth else { return }
+            let material = SCNMaterial()
+            material.lightingModel = .physicallyBased
+            material.diffuse.contents = Self.stone(color)
+            material.roughness.contents = 0.9
+            material.metalness.contents = 0.0
+            let holder = SCNNode()
+            // The top step: its face just under the shadow catcher, so the board's shadow falls on it.
+            let top = SCNCone(topRadius: 6.5, bottomRadius: 7.1, height: 2.0)
+            top.radialSegmentCount = 9
+            top.materials = [material]
+            let topNode = SCNNode(geometry: top)
+            topNode.simdPosition = SIMD3(0, -0.145 - 1.0, 0)
+            holder.addChildNode(topNode)
+            let base = SCNCone(topRadius: 8.0, bottomRadius: 9.2, height: 1.4)
+            base.radialSegmentCount = 10
+            base.materials = [material]
+            let baseNode = SCNNode(geometry: base)
+            baseNode.simdPosition = SIMD3(0, -0.145 - 2.0 - 0.7, 0)
+            baseNode.simdEulerAngles = SIMD3(0, 0.3, 0)
+            holder.addChildNode(baseNode)
+            holder.enumerateHierarchy { node, _ in
+                node.castsShadow = false
+                node.renderingOrder = -10
+            }
+            scene.rootNode.addChildNode(holder)
+            plinthNode = holder
+        }
+    }
+
+    /// Stone: the color, flecked lighter and darker.
+    private static func stone(_ color: UIColor) -> UIImage {
+        let size = CGSize(width: 256, height: 256)
+        return UIGraphicsImageRenderer(size: size).image { context in
+            color.setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+            var generator = SystemRandomNumberGenerator()
+            for _ in 0..<4200 {
+                let light = Bool.random(using: &generator)
+                let alpha = CGFloat.random(in: 0.04...0.22, using: &generator)
+                (light ? UIColor.white : UIColor.black).withAlphaComponent(alpha).setFill()
+                let side = CGFloat.random(in: 1...3, using: &generator)
+                let x = CGFloat.random(in: 0..<size.width, using: &generator)
+                let y = CGFloat.random(in: 0..<size.height, using: &generator)
+                context.fill(CGRect(x: x, y: y, width: side, height: side))
+            }
+        }
+    }
+
+    private var plinthNode: SCNNode?
 
     private func layout(_ newSize: CGSize) {
         guard newSize.width > 1, newSize.height > 1, newSize != size else { return }
@@ -690,6 +797,8 @@ final class SculptedBoardScene {
         var wobble: Double
         var hop: Float
         var lean: Float
+        /// A big capture: the arc peaks late and comes down hard instead of setting down softly.
+        var slam = false
 
         static let quick = MoveTiming(lift: 0.1, travel: 0.25, land: 0.08, wobble: 0.34, hop: 0, lean: 0)
         static let bulk = MoveTiming(lift: 0.06, travel: 0.42, land: 0.08, wobble: 0, hop: 0.12, lean: 0)
@@ -716,10 +825,12 @@ final class SculptedBoardScene {
             // Knights jump in an arc; a big capture rises high and slams down.
             hop = knight ? 0.58 : (dramatic ? 0.3 : 0)
             lean = (knight ? 6 : (dramatic ? 5 : 2)) * .pi / 180
+            slam = dramatic
             if UIAccessibility.isReduceMotionEnabled {
                 hop = 0
                 lean = 0
                 wobble = 0
+                slam = false
             }
             let stretch = SculptedBoardScene.motionScale
             lift *= stretch
@@ -731,6 +842,8 @@ final class SculptedBoardScene {
         var total: Double { lift + travel + land + wobble }
         /// When the piece touches down, before it rocks to rest.
         var touchdown: Double { lift + travel + land }
+        /// The whole time in the air: the lift, the travel and the set-down are one movement.
+        var flight: Double { touchdown }
     }
 
     private func animateMove(_ node: PieceNode, to square: Square, timing: MoveTiming, dust: Float = 1) {
@@ -747,25 +860,24 @@ final class SculptedBoardScene {
         let lift = Self.travelLift
         let t = timing
 
+        let peak = lift + t.hop
+        let flight = t.flight
+        // One unbroken movement, like a hand carrying the piece: it starts to rise before it starts
+        // across, never stops at the top, and is coming down as it arrives. Across, it eases in and
+        // out (smootherstep); up, it follows a soft arch, or for a big capture peaks late and slams.
         let action = SCNAction.customAction(duration: t.total) { root, elapsed in
             let time = Double(elapsed)
-            var position = start
+            var position = end
             var y: Float = 0
             var tilt: Float = 0
-            if time < t.lift {
-                y = startY + (lift - startY) * Ease.slowEnd(Float(time / t.lift))
-            } else if time < t.lift + t.travel {
-                let u = Float((time - t.lift) / t.travel)
-                let e = Ease.smooth(u)
-                position = start + offset * e
-                y = lift + (0.03 - lift) * e + t.hop * 4 * e * (1 - e)
+            if time < flight {
+                let u = Float(time / flight)
+                position = start + offset * Ease.smoother(u)
+                let arch = t.slam ? sin(.pi * pow(u, 1.6)) : pow(max(0, sin(.pi * u)), 1.3)
+                y = startY * (1 - Ease.smooth(u)) + peak * arch
                 tilt = t.lean * sin(.pi * u)
-            } else if time < t.lift + t.travel + t.land {
-                position = end
-                y = 0.03 * (1 - Ease.slowStart(Float((time - t.lift - t.travel) / t.land)))
             } else {
-                position = end
-                let u = Float((time - t.lift - t.travel - t.land) / max(t.wobble, 0.001))
+                let u = Float((time - flight) / max(t.wobble, 0.001))
                 tilt = 2.2 * .pi / 180 * exp(-4 * u) * sin(3 * .pi * u)
             }
             root.simdPosition = position
@@ -773,10 +885,11 @@ final class SculptedBoardScene {
         }
         node.root.runAction(action, forKey: "pose")
         node.contact.runAction(.sequence([
-            .fadeOpacity(to: 0.45, duration: t.lift),
-            .wait(duration: t.travel * 0.7),
-            .fadeOpacity(to: 1, duration: t.travel * 0.3 + t.land),
+            .fadeOpacity(to: 0.45, duration: flight * 0.35),
+            .wait(duration: flight * 0.25),
+            .fadeOpacity(to: 1, duration: flight * 0.4),
         ]), forKey: "contact")
+        boostFrameRate(for: t.total)
         if dust > 0 {
             // A soft puff of dust as it touches down.
             DispatchQueue.main.asyncAfter(deadline: .now() + t.touchdown) { [weak self] in
@@ -1135,6 +1248,8 @@ final class SculptedBoardScene {
             node.heirloomUndo = []
             node.heirloomParts = []
         }
+        // The flat pieces cast their own shadow, off to the side, as they hover.
+        node.contact.isHidden = node.flat
         if framing.lying {
             node.rest = matrix_identity_float4x4
             let half = (node.flat ? SculptedFlatSet.extent(of: node.piece.kind).reach : node.baseRadius) * 1.24
@@ -1396,6 +1511,203 @@ final class SculptedBoardScene {
                 addMark(layer, at: target, height: 0.0023, order: 11 + index, fade: true)
             }
         }
+        addCoachMarks(new)
+    }
+
+    // MARK: The coach's squares and arrows
+
+    /// The coach's squares and arrows shown last time, so only new ones fade in.
+    private var shownCoachMarks: Set<SculptedCoachMark> = []
+    private var shownCoachArrows: Set<SculptedCoachArrow> = []
+
+    /// A lesson's or drill's squares and arrows. A square glows in its color with a ring round
+    /// it, under the move marks. An arrow lies on the stone over every other mark; a piece
+    /// standing in front of it hides it, and a faint copy drawn over that piece keeps it whole.
+    private func addCoachMarks(_ new: SculptedBoardState) {
+        var seenMarks: Set<SculptedCoachMark> = []
+        for mark in new.coachMarks where seenMarks.insert(mark).inserted {
+            let fresh = !shownCoachMarks.contains(mark)
+            let layers = coachSquareLayers(mark.color)
+            addMark(layers.fill, at: mark.square, height: 0.0018, fade: fresh, fadeTime: 0.25)
+            addMark(layers.ring, at: mark.square, height: 0.0018, fade: fresh, fadeTime: 0.25)
+        }
+        var seenArrows: Set<SculptedCoachArrow> = []
+        for arrow in new.coachArrows where seenArrows.insert(arrow).inserted && arrow.from != arrow.to {
+            let fresh = !shownCoachArrows.contains(arrow)
+            let layers = coachArrowLayers(arrow)
+            // Its shadow and landing ring on the stone, its edge, then the arrow over it, then the
+            // faint copy over the pieces.
+            for (index, parts) in [layers.ground, layers.edge, layers.stone, layers.through].enumerated() {
+                for part in parts {
+                    let node = SCNNode(geometry: part)
+                    node.simdPosition = SIMD3(0, 0.003, 0)
+                    node.simdOrientation = Self.flat
+                    node.renderingOrder = 15 + index
+                    node.castsShadow = false
+                    if fresh {
+                        node.opacity = 0
+                        node.runAction(.fadeIn(duration: 0.25))
+                    }
+                    marksNode.addChildNode(node)
+                }
+            }
+        }
+        shownCoachMarks = seenMarks
+        shownCoachArrows = seenArrows
+    }
+
+    private var coachSquares: [UInt32: (fill: SCNGeometry, ring: SCNGeometry)] = [:]
+
+    private func coachSquareLayers(_ hex: UInt32) -> (fill: SCNGeometry, ring: SCNGeometry) {
+        if let layers = coachSquares[hex] { return layers }
+        let color = Self.color(hex)
+        let layers = (fill: Self.mark(size: 1, color: color, alpha: 0.32, mask: nil),
+                      ring: Self.mark(size: 1, color: color, alpha: 0.95, mask: MarkImages.squareRing))
+        coachSquares[hex] = layers
+        return layers
+    }
+
+    /// An arrow's layers: its shadow and landing ring on the stone, its edge, the arrow fading from
+    /// its tail color to its own, and the faint copy shown over a piece in front.
+    struct ArrowLayers {
+        let ground: [SCNGeometry]
+        let edge: [SCNGeometry]
+        let stone: [SCNGeometry]
+        let through: [SCNGeometry]
+    }
+
+    /// Each arrow's shapes, made once: a lesson shows the same few over and over.
+    private var coachArrowShapes: [SculptedCoachArrow: ArrowLayers] = [:]
+
+    private func coachArrowLayers(_ arrow: SculptedCoachArrow) -> ArrowLayers {
+        if let layers = coachArrowShapes[arrow] { return layers }
+        if coachArrowShapes.count > 64 { coachArrowShapes.removeAll() }
+        let layers = Self.arrowLayers(arrow)
+        coachArrowShapes[arrow] = layers
+        return layers
+    }
+
+    static func arrowLayers(_ arrow: SculptedCoachArrow) -> ArrowLayers {
+        // Together solid, as the flat board's crisp arrow; over a piece in front, only the faint one.
+        // The next best analysis arrow is quieter, as on the flat board.
+        // Analysis's are see-through, as tinted glass; their parts only touch, so none shows darker
+        // where they would overlap, and they have no edge, which would show through them.
+        let strength: CGFloat = arrow.analysis
+            ? CGFloat(arrow.best ? ArrowColors.seeThrough.best : ArrowColors.seeThrough.next) : 0.97
+        let seen: CGFloat = min(0.35, strength * 0.5)
+        let p = arrow.proportions
+        let outlines = arrowOutline(from: arrow.from, to: arrow.to, dashed: arrow.dashed, proportions: p,
+                                    seamless: arrow.analysis)
+        let (tail, tip) = ArrowOutline.ends(from: middle(arrow.from), to: middle(arrow.to), unit: 1, proportions: p)
+        let tailColor = rgb(ArrowColors.tail(of: arrow.color))
+        let headColor = rgb(arrow.color)
+        let edgeColor = rgb(ArrowColors.edge)
+        func faded(_ point: CGPoint) -> SIMD3<Float> {
+            let t = Float(ArrowOutline.along(point, tail: tail, tip: tip))
+            return tailColor + (headColor - tailColor) * t
+        }
+        func rise(_ point: CGPoint) -> Float {
+            Float(ArrowOutline.height(of: point, tail: tail, tip: tip, proportions: p))
+        }
+        // A solid arrow's middle outline is its shaft, one strip down the curve.
+        let strips = outlines.indices.map { !arrow.dashed && outlines.count == 3 && $0 == 1 }
+        let edges = arrow.analysis ? [] : outlines.map { ArrowOutline.grown($0, by: 0.03) }
+        let stone = (strength - seen) / (1 - seen)
+        var ground: [SCNGeometry] = []
+        if p.rise > 0 {
+            // The flight's shadow, straight on the stone beneath it, soft at its edges.
+            for (width, alpha) in [(p.shaft * 1.6, 0.06), (p.shaft * 0.9, 0.09)] as [(CGFloat, CGFloat)] {
+                let shadow = ArrowOutline.outlines(from: tail, to: tip, unit: 1, dashed: false,
+                                                   proportions: .init(shaft: width, headLength: 0, headWidth: 0,
+                                                                      startInset: 0, tipInset: 0))[1]
+                ground.append(polygon(shadow, colors: { _ in SIMD3(0, 0, 0) }, alpha: alpha, throughPieces: false, strip: true))
+            }
+        }
+        if arrow.analysis && arrow.best {
+            // The ring it lands on.
+            let target = middle(arrow.to)
+            ground.append(polygon(ArrowOutline.circle(target, radius: 0.33), colors: { _ in headColor }, alpha: 0.18,
+                                  throughPieces: false))
+            let outer = ArrowOutline.circle(target, radius: 0.345), inner = ArrowOutline.circle(target, radius: 0.315)
+            for i in outer.indices {
+                let j = (i + 1) % outer.count
+                ground.append(polygon([outer[i], outer[j], inner[j], inner[i]], colors: { _ in tailColor }, alpha: 0.85,
+                                      throughPieces: false))
+            }
+        }
+        return ArrowLayers(
+            ground: ground,
+            edge: edges.indices.map { polygon(edges[$0], colors: { _ in edgeColor }, alpha: 0.92, throughPieces: false,
+                                              strip: strips[$0], height: rise) },
+            stone: outlines.indices.map { polygon(outlines[$0], colors: faded, alpha: stone, throughPieces: false,
+                                                  strip: strips[$0], height: rise) },
+            through: outlines.indices.map { polygon(outlines[$0], colors: faded, alpha: seen, throughPieces: true,
+                                                    strip: strips[$0], height: rise) })
+    }
+
+    /// A flat shape in the board's plane, each corner in its own color (blended between) and at its
+    /// own height over the stone. Convex shapes are cut into a fan from the first corner; a `strip`
+    /// (one side's corners, then the other side's back) into a quad between each pair.
+    private static func polygon(_ outline: [CGPoint], colors: (CGPoint) -> SIMD3<Float>, alpha: CGFloat,
+                                throughPieces: Bool, strip: Bool = false,
+                                height: (CGPoint) -> Float = { _ in 0 }) -> SCNGeometry {
+        let vertices = outline.map { SCNVector3(Float($0.x), Float($0.y), height($0)) }
+        let tints = outline.map { colors($0) }
+        let colorData = tints.withUnsafeBufferPointer { Data(buffer: $0) }
+        let colorSource = SCNGeometrySource(data: colorData, semantic: .color, vectorCount: tints.count,
+                                            usesFloatComponents: true, componentsPerVector: 3,
+                                            bytesPerComponent: MemoryLayout<Float>.size, dataOffset: 0,
+                                            dataStride: MemoryLayout<SIMD3<Float>>.stride)
+        let normals = Array(repeating: SCNVector3(0, 0, 1), count: outline.count)
+        var indices: [UInt16] = []
+        if strip {
+            let count = outline.count, half = count / 2
+            for i in 0..<max(half - 1, 0) {
+                let a = UInt16(i), b = UInt16(i + 1), c = UInt16(count - 2 - i), d = UInt16(count - 1 - i)
+                indices += [a, b, c, a, c, d]
+            }
+        } else {
+            for i in 1..<max(outline.count - 1, 1) {
+                indices += [0, UInt16(i), UInt16(i + 1)]
+            }
+        }
+        let geometry = SCNGeometry(sources: [SCNGeometrySource(vertices: vertices), SCNGeometrySource(normals: normals),
+                                             colorSource],
+                                   elements: [SCNGeometryElement(indices: indices, primitiveType: .triangles)])
+        let material = SCNMaterial()
+        material.lightingModel = .constant
+        material.diffuse.contents = UIColor.white
+        material.transparency = alpha
+        material.writesToDepthBuffer = false
+        material.readsFromDepthBuffer = !throughPieces
+        material.blendMode = .alpha
+        material.isDoubleSided = true
+        geometry.materials = [material]
+        return geometry
+    }
+
+    private static func rgb(_ hex: UInt32) -> SIMD3<Float> {
+        SIMD3(Float((hex >> 16) & 0xFF) / 255, Float((hex >> 8) & 0xFF) / 255, Float(hex & 0xFF) / 255)
+    }
+
+    /// A square's middle on the board, in squares: a1's at (-3.5, -3.5), h8's at (3.5, 3.5).
+    private static func middle(_ square: Square) -> CGPoint {
+        CGPoint(x: CGFloat(square.fileIndex) - 3.5, y: CGFloat(square.rankIndex) - 3.5)
+    }
+
+    /// The arrow as outlines on the board, in squares (a square is 1 wide): the flat board's arrow,
+    /// from just past the middle of its square to a point short of the middle of the target.
+    /// Dashed, the shaft is a row of short bars. The last outline is the head. The board's y runs
+    /// up, so a flight path is told to bow the other way, to bow as it does on the flat board.
+    static func arrowOutline(from: Square, to: Square, dashed: Bool,
+                             proportions: ArrowOutline.Proportions? = nil, seamless: Bool = false) -> [[CGPoint]] {
+        ArrowOutline.outlines(from: middle(from), to: middle(to), unit: 1, dashed: dashed,
+                              proportions: proportions ?? .coach(dashed: dashed), side: -1, seamless: seamless)
+    }
+
+    private static func color(_ hex: UInt32) -> UIColor {
+        UIColor(red: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255,
+                blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
     }
 
     @discardableResult
@@ -1693,33 +2005,45 @@ final class SculptedBoardScene {
         scene.rootNode.addChildNode(board)
     }
 
-    /// Files and ranks in the corners of the edge squares nearest the player, upright for them:
-    /// the letters low on the near rank, the numbers high on the left file. The frame runs off
-    /// the screen's sides now, so they live on the squares.
+    /// The files and ranks on the frame, outside the squares as on a printed board, upright for
+    /// the player: the letters along the frame's near side, each under its file, and the numbers
+    /// down its left side, each beside its rank. From Black's side the near side and the left
+    /// are the other ones, and the letters run h to a.
     private func buildLabels(flipped: Bool) {
         labelsNode.childNodes.forEach { $0.removeFromParentNode() }
-        let side: Float = flipped ? -1 : 1
-        let turn = simd_quatf(angle: flipped ? .pi : 0, axis: SculptedCamera.up) * Self.flat
-        let files = Array("abcdefgh")
-        // From a square's middle to the center of its corner label.
-        let corner: Float = 0.34
-        for index in 0..<8 {
-            // a1 is dark, and the colors alternate along the edge.
-            let onDark = index % 2 == 0
-            let file = Float(index) - 3.5
-            addLabel(String(files[index]), at: SIMD3((file + corner) * side, 0.0064, (3.5 + corner) * side),
-                     orientation: turn, onDark: onDark)
-            let rank = 3.5 - Float(index)
-            addLabel("\(index + 1)", at: SIMD3((-3.5 - corner) * side, 0.0064, (rank - corner) * side),
-                     orientation: turn, onDark: onDark)
+        let turn = Self.labelOrientation(flipped: flipped)
+        for label in Self.labelPlacements(flipped: flipped) {
+            addLabel(label.text, at: label.position, orientation: turn)
         }
     }
 
-    /// A label in the square's corner: pale on a dark square, deep brown on a light one, so it
-    /// reads on both like the letters on a printed board.
-    private func addLabel(_ text: String, at position: SIMD3<Float>, orientation: simd_quatf, onDark: Bool) {
-        let ink: UIColor = onDark ? look.platinumMark : UIColor(red: 0.24, green: 0.17, blue: 0.11, alpha: 1)
-        let node = SCNNode(geometry: Self.mark(size: 0.3, color: ink, alpha: onDark ? 0.85 : 0.75, mask: MarkImages.label(text)))
+    /// Lying on the frame, the tops of the letters toward the far side of the board.
+    static func labelOrientation(flipped: Bool) -> simd_quatf {
+        simd_quatf(angle: flipped ? .pi : 0, axis: SculptedCamera.up) * flat
+    }
+
+    /// Where each file letter and rank number sits on the frame, just above the glass's top.
+    static func labelPlacements(flipped: Bool) -> [(text: String, position: SIMD3<Float>)] {
+        // Toward the player: White's side of the board, or Black's.
+        let near: Float = flipped ? -1 : 1
+        let band = SculptedCamera.labelBand
+        let height: Float = 0.011
+        let files = Array("abcdefgh")
+        var placements: [(text: String, position: SIMD3<Float>)] = []
+        for index in 0..<8 {
+            // The file's and the rank's own line on the board, whichever side the player is on.
+            let file = Float(index) - 3.5
+            let rank = 3.5 - Float(index)
+            placements.append((String(files[index]), SIMD3(file, height, band * near)))
+            // The player's left is the a-file's side for White and the h-file's for Black.
+            placements.append(("\(index + 1)", SIMD3(-band * near, height, rank)))
+        }
+        return placements
+    }
+
+    /// A letter or number on the smoked glass frame, pale like the metal line beside it.
+    private func addLabel(_ text: String, at position: SIMD3<Float>, orientation: simd_quatf) {
+        let node = SCNNode(geometry: Self.mark(size: 0.3, color: look.platinumMark, alpha: 0.85, mask: MarkImages.label(text)))
         node.simdPosition = position
         node.simdOrientation = orientation
         node.castsShadow = false
@@ -1743,6 +2067,13 @@ enum Ease {
     static func smooth(_ t: Float) -> Float {
         let c = min(max(t, 0), 1)
         return c * c * (3 - 2 * c)
+    }
+
+    /// Smootherstep: starts and stops with no jolt at all (no sudden change of speed or of
+    /// acceleration), for a piece carried across the board.
+    static func smoother(_ t: Float) -> Float {
+        let c = min(max(t, 0), 1)
+        return c * c * c * (c * (c * 6 - 15) + 10)
     }
 }
 

@@ -57,6 +57,13 @@ final class TrainingStore {
 
     var nextRank: Rank? { library?.nextRank(afterXP: progress.xp) }
 
+    /// The rank's place on the ladder, from 1: the home's Level.
+    var rankNumber: Int {
+        guard let rank, let ranks = library?.course.ranks,
+              let index = ranks.firstIndex(where: { $0.id == rank.id }) else { return 1 }
+        return index + 1
+    }
+
     /// From 0 to 1, how far along to the next rank.
     var rankProgress: Double {
         guard let rank, let next = nextRank else { return 1 }

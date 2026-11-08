@@ -71,4 +71,10 @@ final class PowerPolicyTests: XCTestCase {
         XCTAssertEqual(PowerPolicy.framesPerSecond(constrained: false), 60)
         XCTAssertEqual(PowerPolicy.framesPerSecond(constrained: true), 30)
     }
+
+    func testMovesDrawAtTheScreensFullRate() {
+        XCTAssertEqual(PowerPolicy.motionFramesPerSecond, 120)
+        // Without this key iOS holds an iPhone app's animations to 60 frames a second.
+        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CADisableMinimumFrameDurationOnPhone") as? Bool, true)
+    }
 }

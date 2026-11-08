@@ -11,8 +11,9 @@ struct ContentView: View {
     @State private var showingNewGame = true
     @State private var showingSettings = false
     @State private var showingAnalyze = false
-    /// Analyze opens on the camera (the home's Scan a board shortcut).
-    @State private var analyzeWithCamera = false
+    /// The analyzer, kept while the app runs: closing Analyze and opening it again finds the same board.
+    @State private var analyzer = ScanSession(reader: CloudBoardReader.live, engine: StockfishEngine.shared,
+                                              sounds: SoundPlayer.shared)
     @State private var coachExpanded = false
     @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .gilded
     @AppStorage("showBestMoves") private var showBestMoves = false
@@ -45,6 +46,8 @@ struct ContentView: View {
     @AppStorage(HomeLayout.key) private var boardSheet = HomeLayout.defaultOn
     /// The board home's room: Light, Middle or Dark.
     @AppStorage(HomeToneMode.key) private var homeTone = HomeToneMode.defaultMode
+    /// The stage home is always dark.
+    @AppStorage(HomeStageLayout.key) private var stageHome = HomeStageLayout.defaultOn
     /// Back from a game, the home's sheet rises out of the game's.
     @State private var homeRises = false
     /// The board home's tab, kept here so a redraw of the home (a new look) stays on it.
@@ -226,6 +229,7 @@ struct ContentView: View {
             }
             .onChange(of: match.isOver) { _, over in
                 guard over else { return }
+                RivalTheme.shared.stop(fade: 2)
                 recordArmy()
                 recordGame()
                 recordGrudge()
@@ -240,6 +244,13 @@ struct ContentView: View {
                     setCoach(expanded: true)
                 }
             }
+    }
+
+    /// A screen is open over Home: training, today's move, puzzles, games, the army, a lesson,
+    /// a session, Leo, or Analyze.
+    private var coversHome: Bool {
+        showingTraining || showingDaily || showingPuzzles || showingGames || showingArmy
+            || coach.presentedLesson != nil || coach.presentedSession != nil || talk != nil || showingAnalyze
     }
 
     /// The game screen with its sheets and full-screen covers.
@@ -296,6 +307,10 @@ struct ContentView: View {
                 }, close: { talk = nil })
             }
             .animation(.easeInOut(duration: 0.35), value: theme.id)
+            .onChange(of: coversHome, initial: true) { _, covers in
+                // Home's music rests under any screen opened over it, so Leo is heard alone.
+                HomeMusic.shared.setCovered(covers)
+            }
             .sheet(isPresented: $showingNewGame, onDismiss: startIfNeeded) {
                 NewGameSheet(theme: theme, forfeits: forfeits) { setup in
                     withAnimation(.snappy) { match.start(setup) }
@@ -313,17 +328,16 @@ struct ContentView: View {
                 SettingsSheet()
                     .boardSheetGrabber(boardSheet)
             }
-            .sheet(isPresented: $showingAnalyze, onDismiss: { analyzeWithCamera = false }) {
+            .sheet(isPresented: $showingAnalyze) {
                 AnalyzeSheet(
                     theme: theme,
                     currentFEN: match.hasStarted ? match.game.fen : nil,
                     engine: StockfishEngine.shared,
-                    reader: CloudBoardReader.live,
+                    session: analyzer,
                     rival: fromHereSetup.rival.name,
                     clock: fromHereSetup.timeControl,
                     forfeits: forfeits,
-                    onAnalyzeGame: analyzeGame,
-                    startsWithCamera: analyzeWithCamera
+                    onAnalyzeGame: analyzeGame
                 ) { draft in
                     play(from: draft)
                 }
@@ -354,6 +368,8 @@ struct ContentView: View {
                 if match.isOver { recordGame() }
             }
             .onChange(of: match.gameNumber) { _, _ in
+                // A game begun from a rival's film plays its theme; any other game is quiet.
+                RivalTheme.shared.gameStarted(level: match.setup.level, grudge: match.setup.grudge)
                 coach.gameStarted()
                 announceGrudge()
                 // Nothing on screen carries over from the last game.
@@ -433,8 +449,9 @@ struct ContentView: View {
             },
             resume: { leaveHome() },
             analyze: { showingAnalyze = true },
-            scan: {
-                analyzeWithCamera = true
+            analyzePosition: { fen in
+                // Opened on a position (the home's masterpiece): straight to its analysis.
+                analyzer.analyze(fen: fen)
                 showingAnalyze = true
             },
             train: { showingTraining = true },
@@ -543,6 +560,7 @@ struct ContentView: View {
         setCoach(expanded: false)
         // A victory theme still playing fades as the game leaves the screen.
         SoundPlayer.shared.stopAll(fade: 0.4)
+        RivalTheme.shared.stop(fade: 0.6)
         homeRises = true
         homeTab = .today
         withAnimation(.easeInOut(duration: 0.35)) {
@@ -560,7 +578,7 @@ struct ContentView: View {
     /// The window's light: the board home's room while it shows (Light and Middle are light),
     /// the board's look everywhere else.
     private var windowScheme: ColorScheme? {
-        if showingHome, homeLit, boardSheet, !showingWelcome { return homeTone.scheme }
+        if showingHome, homeLit, boardSheet || stageHome, !showingWelcome { return homeTone.scheme }
         return theme.isDark ? .dark : nil
     }
 
@@ -615,8 +633,15 @@ struct ContentView: View {
                         .padding(.bottom, screen.safeAreaInsets.bottom > 0 ? 0 : 8)
                     }
                 }
-                .background { SheetBackdrop(theme: theme) }
-                .navigationTitle("Chess Game Killer")
+                .background {
+                    SheetBackdrop(theme: theme)
+                        .overlay {
+                            // The Ashen King plays in his storm (Alex, 2026-11-08).
+                            if stormy { DragonStorm().transition(.opacity) }
+                        }
+                        .animation(.easeInOut(duration: 1.2), value: stormy)
+                }
+                .navigationTitle("Beauty of Chess")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar { toolbarContent }
                 .toolbar(bigBoard ? .hidden : .visible, for: .navigationBar)
@@ -624,15 +649,25 @@ struct ContentView: View {
         }
     }
 
-    /// The opponent's line above the board and yours below it, hugging it, with the moves under
-    /// yours; the whole block sits in the middle of the space. The board runs edge to edge on a
+    /// The opponent's line above the board and the moves under it (your own line is in the dock;
+    /// Big Board keeps it under the board); the whole block sits in the middle of the space. The board runs edge to edge on a
     /// phone. While the coach is open the two players fold into one line. Big Board uses the same
     /// layout without the top bar, and the board there can be swiped to look back through the game.
+    /// The side whose line is under the board: yours, unless the board is flipped.
+    /// Against the Ashen King, rain and lightning fill the backdrop behind the board.
+    private var stormy: Bool {
+        !match.setup.grudge && match.setup.level == .grandmaster
+    }
+
+    private var bottomColor: Piece.Color { match.isBoardFlipped ? .black : .white }
+
     private func boardLayout(in size: CGSize) -> some View {
         let compact = coachExpanded
         let aspect = boardAspect
-        let lines = compact ? stripHeight : plateHeight * 2
-        let gaps = Self.gap * (compact ? 2 : 3)
+        // Your own line sits in the dock, except in Big Board.
+        let ownPlate = !compact && bigBoard
+        let lines = compact ? stripHeight : plateHeight * (ownPlate ? 2 : 1)
+        let gaps = Self.gap * (ownPlate ? 3 : 2)
         let fixed = lines + gaps + ribbonHeight + Self.edgeRoom * 2
         // The headroom over a flat board grows with the board, so it is solved for with it.
         let room = max(0, size.height - fixed)
@@ -647,9 +682,9 @@ struct ContentView: View {
         // between the gaps and the edges, like the Home's cards, instead of pooling above and below.
         let used = fixed + side * headroom + boardHeight
         let spare = max(0, size.height - used)
-        let slots: CGFloat = compact ? 2 : 3
+        let slots: CGFloat = ownPlate ? 3 : 2
         let gap = Self.gap + min(spare / (slots + 2), Self.maxExtraGap)
-        let topColor: Piece.Color = match.isBoardFlipped ? .white : .black
+        let topColor = bottomColor.opposite
         return VStack(spacing: 0) {
             Spacer(minLength: Self.edgeRoom)
             Group {
@@ -665,8 +700,8 @@ struct ContentView: View {
             board
                 .frame(width: side, height: boardHeight)
             Color.clear.frame(height: gap)
-            if !compact {
-                ExecutivePlate(match: match, theme: theme, color: topColor.opposite)
+            if ownPlate {
+                ExecutivePlate(match: match, theme: theme, color: bottomColor)
                     .frame(width: lineWidth, height: plateHeight)
                 Color.clear.frame(height: gap)
             }
@@ -794,7 +829,7 @@ struct ContentView: View {
     /// The tray at the bottom of Big Board, holding the dock's controls and what the top bar would.
     private func bigTray(coachHeight: CGFloat) -> some View {
         BigBoardTray(match: match, theme: theme, isOpen: $trayOpen, coachIsWide: coachIsWide,
-                     onNewGame: { showingNewGame = true },
+                     onNewGame: homeScreenOn ? nil : { showingNewGame = true },
                      onSettings: { showingSettings = true },
                      onExit: { withAnimation(.snappy) { bigBoard = false } },
                      onArmy: { showingArmy = true },
@@ -832,13 +867,16 @@ struct ContentView: View {
         ToolbarItem(placement: .principal) {
             ExecutiveMatchTitle(match: match)
         }
-        ToolbarItem(placement: .topBarTrailing) {
-            Button {
-                showingNewGame = true
-            } label: {
-                Label("New game", systemImage: "plus")
+        if !homeScreenOn {
+            // With Home on, new games start only from Home (Alex, 2026-11-07).
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showingNewGame = true
+                } label: {
+                    Label("New game", systemImage: "plus")
+                }
+                .tint(.primary)
             }
-            .tint(.primary)
         }
         ToolbarItem(placement: .topBarTrailing) {
             moreMenu
@@ -854,11 +892,7 @@ struct ContentView: View {
             } label: {
                 Label("Big Board", image: Glyphs.bigBoard)
             }
-            Button {
-                withAnimation(.snappy) { match.flipBoard() }
-            } label: {
-                Label("Flip board", image: Glyphs.flip)
-            }
+            // Flip is in the dock, so it isn't repeated here (Alex, 2026-11-08).
             Section {
                 Button {
                     showingGames = true
@@ -907,23 +941,24 @@ struct ContentView: View {
         .padding(.top, 8)
     }
 
-    /// Every control named, three either side of the orb. They step aside while the orb is wide.
+    /// Your line on the left of the orb, three controls on its right. They step aside while the orb is wide.
     /// No glass of its own: it sits on the dock's, or on Big Board's tray.
     private func dockRow(coachHeight: CGFloat) -> some View {
         ZStack {
             HStack(spacing: 0) {
-                HStack(spacing: 0) {
-                    DockButton(title: "Analyze", symbol: Glyphs.analyze, theme: theme) {
-                        showingAnalyze = true
-                    }
-                    DockButton(title: "Train", symbol: Glyphs.train, theme: theme) {
-                        showingTraining = true
-                    }
-                    DockButton(title: "Puzzles", symbol: Glyphs.puzzles, theme: theme) {
-                        showingPuzzles = true
+                // Your line ("Your move", captures, clock) in bold green, in place of the card
+                // that sat under the board (Alex, 2026-11-07). Analyze lives in the orb; Train and
+                // Puzzles wait off the game screen. Big Board keeps the card, as its tray can close.
+                Group {
+                    if !bigBoard {
+                        ExecutivePlate(match: match, theme: theme, color: bottomColor, inDock: true)
                     }
                 }
-                .frame(maxWidth: .infinity)
+                // Room for the grade, its advice and your captures under them, inside the dock.
+                .frame(height: 60)
+                .padding(.leading, 10)
+                .padding(.trailing, 2)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 // The orb's place. Only a width: a bare Color.clear takes every bit of
                 // height it is offered, which pushed the dock up and squeezed the board to nothing.
                 Color.clear.frame(width: CoachOrb.orbSize + 12, height: 1)
@@ -949,8 +984,9 @@ struct ContentView: View {
             .scaleEffect(coachIsWide ? 0.92 : 1)
             .allowsHitTesting(!coachIsWide)
             CoachOrb(match: match, theme: theme, isExpanded: $coachExpanded, expandedMaxHeight: coachHeight,
-                     newGame: { showingNewGame = true }, showGames: { showingGames = true },
-                     talk: { openTalk() })
+                     newGame: homeScreenOn ? nil : { showingNewGame = true },
+                     home: homeScreenOn ? { goHome() } : nil, showGames: { showingGames = true },
+                     talk: { openTalk() }, analyze: { showingAnalyze = true })
                 .padding(.horizontal, coachExpanded ? 0 : 6)
         }
         .frame(minHeight: Self.dockHeight)

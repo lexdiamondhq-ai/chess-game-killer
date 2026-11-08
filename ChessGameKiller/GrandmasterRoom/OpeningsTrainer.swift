@@ -396,10 +396,8 @@ struct OpeningLineView: View {
                 .pickerStyle(.segmented)
                 .padding(.horizontal, 16)
                 if let runner {
-                    TrainingBoardView(game: runner.board, theme: theme, flipped: side == .black, arrows: runner.arrows,
-                                      onTap: { (square: Square) in runner.tap(square) })
-                        .frame(width: boardSide, height: boardSide)
-                        .boardHeadroom(theme: theme, side: boardSide)
+                    TrainerBoard(game: runner.board, theme: theme, side: boardSide, flipped: side == .black,
+                                 arrows: runner.arrows, onTap: { (square: Square) in runner.tap(square) })
                     RoomMessage(text: runner.message, tone: runner.tone, theme: theme)
                         .padding(.horizontal, 16)
                 }
@@ -512,10 +510,8 @@ private struct RepertoireReview: View {
             VStack(spacing: 12) {
                 RoomHeader(title: entries.isEmpty ? "Review" : entries[safeIndex].name, subtitle: "Line \(position + 1) of \(entries.count)") { dismiss() }
                 if let runner {
-                    TrainingBoardView(game: runner.board, theme: theme, flipped: runner.side == .black, arrows: runner.arrows,
-                                      onTap: { (square: Square) in runner.tap(square) })
-                        .frame(width: side, height: side)
-                        .boardHeadroom(theme: theme, side: side)
+                    TrainerBoard(game: runner.board, theme: theme, side: side, flipped: runner.side == .black,
+                                 arrows: runner.arrows, onTap: { (square: Square) in runner.tap(square) })
                     RoomMessage(text: runner.message, tone: runner.tone, theme: theme)
                         .padding(.horizontal, 16)
                     if runner.isDone {
