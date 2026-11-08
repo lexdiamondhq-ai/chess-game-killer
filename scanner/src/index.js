@@ -88,7 +88,7 @@ export default {
     if (!(await withinDailyBudget(env))) return json({ error: "daily_limit" }, 429);
 
     try {
-      return json(await readBoard(bytes, type, env));
+      return json(await readBoard(bytes, type, env, settingsFor(request, env)));
     } catch (error) {
       console.error("reading failed:", error && error.message);
       return json({ error: "upstream", status: (error && error.status) || null }, 502);
@@ -97,7 +97,7 @@ export default {
 };
 
 /** Asks Claude to read the board and returns the cleaned-up answer. */
-export async function readBoard(bytes, type, env) {
+export async function readBoard(bytes, type, env, settings = { model: env.MODEL, effort: env.EFFORT }) {
   const started = Date.now();
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -106,7 +106,7 @@ export async function readBoard(bytes, type, env) {
       "anthropic-version": "2023-06-01",
       "content-type": "application/json",
     },
-    body: JSON.stringify(buildRequest(bytes, type, env.MODEL, env.EFFORT)),
+    body: JSON.stringify(buildRequest(bytes, type, settings.model, settings.effort)),
   });
   if (!response.ok) {
     const detail = (await response.text()).slice(0, 300);
@@ -123,6 +123,18 @@ export async function readBoard(bytes, type, env) {
   // Shows in the Worker's logs, to see where a slow read's time went.
   console.log(`read in ${Date.now() - started} ms, ${message.usage?.output_tokens ?? "?"} output tokens`);
   return normalize(JSON.parse(text.text));
+}
+
+/** A player's first FAST_SCANS scans each month (the app counts them in X-Scan-Count)
+ * read with FAST_MODEL, which answers in about 2 seconds; later ones, and
+ * older apps that send no count, use MODEL. */
+export function settingsFor(request, env) {
+  const count = Number(request.headers.get("x-scan-count"));
+  const fastScans = Number(env.FAST_SCANS) || 0;
+  if (env.FAST_MODEL && Number.isInteger(count) && count >= 1 && count <= fastScans) {
+    return { model: env.FAST_MODEL, effort: env.FAST_EFFORT };
+  }
+  return { model: env.MODEL, effort: env.EFFORT };
 }
 
 /** The key without stray spaces or line breaks from pasting it into a secret. */

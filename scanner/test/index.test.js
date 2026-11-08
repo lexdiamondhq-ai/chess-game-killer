@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
-import worker, { SCHEMA, buildRequest, normalize, orient, toBase64, whiteView } from "../src/index.js";
+import worker, { SCHEMA, buildRequest, normalize, orient, settingsFor, toBase64, whiteView } from "../src/index.js";
 
 const realFetch = globalThis.fetch;
 afterEach(() => {
@@ -237,4 +237,23 @@ test("pawns on the first or last rank give the side away", () => {
   const sideways = ["........", "...k....", "........", "P......p", "P......p", "........", "....K...", "........"];
   // Seen with White on the left, these pawns stand on ranks 1 and 8: impossible.
   assert.notEqual(orient(sideways, "left"), "left");
+});
+
+test("a player's first 100 scans a month read with the fast model", async () => {
+  const fastEnv = { ...env, EFFORT: "high", FAST_MODEL: "claude-fast", FAST_EFFORT: "low", FAST_SCANS: "100" };
+  const sent = async (count) => {
+    const capture = {};
+    claudeAnswers({ found: true, rows: ROWS, white_side: "bottom", side_to_move: "white", confidence: "high" }, capture);
+    const request = post();
+    if (count !== undefined) request.headers.set("x-scan-count", String(count));
+    assert.equal((await worker.fetch(request, fastEnv)).status, 200);
+    const body = JSON.parse(capture.options.body);
+    return `${body.model}:${body.output_config.effort}`;
+  };
+  assert.equal(await sent(1), "claude-fast:low");
+  assert.equal(await sent(100), "claude-fast:low");
+  assert.equal(await sent(101), "claude-test:high");
+  assert.equal(await sent(undefined), "claude-test:high");
+  assert.equal(await sent("lots"), "claude-test:high");
+  assert.equal(settingsFor(post(), env).model, "claude-test");
 });

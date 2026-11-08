@@ -183,6 +183,18 @@ final class BoardReaderTests: XCTestCase {
         XCTAssertEqual(reading.draft[.d1], .init(.king, .black))
     }
 
+    func testScanCountStartsAgainEachMonth() {
+        let defaults = UserDefaults(suiteName: "ScanCountTests")!
+        defaults.removePersistentDomain(forName: "ScanCountTests")
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let november = Date(timeIntervalSince1970: 1_793_836_800) // 2026-11-05
+        let december = Date(timeIntervalSince1970: 1_796_428_800) // 2026-12-05
+        XCTAssertEqual(ScanCount.next(defaults: defaults, now: november, calendar: calendar), 1)
+        XCTAssertEqual(ScanCount.next(defaults: defaults, now: november, calendar: calendar), 2)
+        XCTAssertEqual(ScanCount.next(defaults: defaults, now: december, calendar: calendar), 1)
+    }
+
     func testOnlyNetworkTroubleBlamesTheConnection() {
         XCTAssertEqual(CloudBoardReader.readerError(for: URLError(.notConnectedToInternet)), .offline)
         XCTAssertEqual(CloudBoardReader.readerError(for: URLError(.timedOut)), .offline)

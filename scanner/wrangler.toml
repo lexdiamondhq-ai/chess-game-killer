@@ -12,6 +12,12 @@ workers_dev = true
 # screenshots take about 2 s on any effort.
 MODEL = "claude-sonnet-5-5"
 EFFORT = "high"
+# Each player's first 100 scans a month (the app counts them) read with Opus on
+# low (Alex, 2026-11-08): it read every test board right in about 2 s, photos
+# too, at about 1.2 cents a scan.
+FAST_MODEL = "claude-opus-5-5"
+FAST_EFFORT = "low"
+FAST_SCANS = "100"
 # The most scans a day across everyone. The address is public, so this caps the bill.
 DAILY_LIMIT = "300"
 
