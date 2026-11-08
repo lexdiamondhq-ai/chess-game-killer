@@ -88,7 +88,7 @@ struct TalkPanelBoard: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(BoardTheme.coordinatesKey) private var showsCoordinates = true
     @AppStorage("sculpted3D") private var sculpted3D = true
-    @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.auto
+    @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.tilted
 
     var body: some View {
         if BoardView.playsIn3D(theme, setting: sculpted3D) {
@@ -113,7 +113,7 @@ struct TalkPanelBoard: View {
     /// The verdict's squares and arrows lie on the stone, as the coach's do in lessons and drills.
     private var sculptedBoard: some View {
         let width: CGFloat = DrillBoard.width3D(side: side)
-        let framing: SculptedCamera.Framing = tilt.framing(bigBoard: false)
+        let framing: SculptedCamera.Framing = tilt.framing
         return VStack(spacing: 6) {
             SculptedPositionBoard(
                 pieces: draft.pieces,

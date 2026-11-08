@@ -14,10 +14,9 @@ final class ScreenSnapshotTests: XCTestCase {
     private var saved: [String: Any?] = [:]
 
     override func setUp() async throws {
-        for key in ["boardTheme", "matchRival", "bigBoard", "sculpted3D", "showBestMoves", "showSecondBest", "rivalBanter"] {
+        for key in ["boardTheme", "matchRival", "sculpted3D", "showBestMoves", "showSecondBest", "rivalBanter"] {
             saved[key] = defaults.object(forKey: key)
         }
-        defaults.set(false, forKey: "bigBoard")
         // The rival's greeting would stand in for its line in every picture.
         defaults.set(false, forKey: "rivalBanter")
     }
@@ -33,14 +32,6 @@ final class ScreenSnapshotTests: XCTestCase {
         defaults.set(false, forKey: "matchRival")
         defaults.set(true, forKey: "sculpted3D")
         try snapshot("gilded")
-    }
-
-    func testBigBoardGilded() throws {
-        defaults.set("gilded", forKey: "boardTheme")
-        defaults.set(false, forKey: "matchRival")
-        defaults.set(true, forKey: "sculpted3D")
-        defaults.set(true, forKey: "bigBoard")
-        try snapshot("bigboard-gilded")
     }
 
     /// The same set drawn flat, as small boards and the "3D pieces" switch show it.
@@ -61,20 +52,6 @@ final class ScreenSnapshotTests: XCTestCase {
             defaults.set(id, forKey: "boardTheme")
             try snapshot("study-screen-\(id)")
         }
-    }
-
-    func testBigBoardNeon() throws {
-        defaults.set("neon", forKey: "boardTheme")
-        defaults.set(false, forKey: "matchRival")
-        defaults.set(true, forKey: "bigBoard")
-        try snapshot("bigboard-neon")
-    }
-
-    func testBigBoardFabergeTrayOpen() throws {
-        defaults.set("faberge", forKey: "boardTheme")
-        defaults.set(false, forKey: "matchRival")
-        defaults.set(true, forKey: "bigBoard")
-        try snapshot("bigboard-faberge-tray", trayOpen: true)
     }
 
     func testRivalBoardScreen() throws {
@@ -246,14 +223,14 @@ final class ScreenSnapshotTests: XCTestCase {
     /// `play` runs once the screen is up, so whatever the game screen does in answer to a
     /// move (a check, the end of the game) happens as it would for a person; then the picture
     /// waits `settle` seconds more.
-    private func snapshot(_ name: String, startsWithNewGame: Bool = false, trayOpen: Bool = false,
+    private func snapshot(_ name: String, startsWithNewGame: Bool = false,
                           match: MatchController? = nil, coachOpen: Bool = false, size: CGSize? = nil,
                           wait: TimeInterval = 3, vision: GhostVision? = nil, then play: (() -> Void)? = nil, settle: TimeInterval = 0) throws {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let window = UIWindow(windowScene: scene)
         window.frame = size.map { CGRect(origin: .zero, size: $0) } ?? scene.coordinateSpace.bounds
         window.rootViewController = UIHostingController(rootView: ContentView(
-            startsWithNewGame: startsWithNewGame, trayOpen: trayOpen, startsAtHome: false,
+            startsWithNewGame: startsWithNewGame, startsAtHome: false,
             match: match ?? Self.gameInProgress(), coachOpen: coachOpen, vision: vision))
         window.makeKeyAndVisible()
         RunLoop.main.run(until: Date().addingTimeInterval(wait))

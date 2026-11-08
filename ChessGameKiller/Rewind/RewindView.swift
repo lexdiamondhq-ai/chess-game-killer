@@ -28,7 +28,7 @@ struct RewindView: View {
     @State private var ghostAnchor: Int?
     @AppStorage(ReviewLevel.storageKey) private var levelID = ReviewLevel.club.rawValue
     @AppStorage("sculpted3D") private var sculpted3D = true
-    @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.auto
+    @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.tilted
     private let engine: ChessEngine?
     private let opensLine: Bool
     @State private var chance: SecondChance?
@@ -236,7 +236,7 @@ struct RewindView: View {
         let shown = shownPosition
         if BoardView.playsIn3D(theme, setting: sculpted3D) {
             let width = DrillBoard.width3D(side: side)
-            let framing = tilt.framing(bigBoard: false)
+            let framing = tilt.framing
             VStack(spacing: 6) {
                 SculptedPositionBoard(
                     pieces: (PositionDraft(fen: shown.fen) ?? .standard).pieces,

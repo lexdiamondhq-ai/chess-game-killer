@@ -15,9 +15,8 @@ struct SettingsSheet: View {
     @State private var homeMusic = HomeMusic.shared
     @State private var rivalTheme = RivalTheme.shared
     @AppStorage("rivalBanter") private var banterOn = true
-    @AppStorage("bigBoard") private var bigBoard = false
     @AppStorage("sculpted3D") private var sculpted3D = true
-    @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.auto
+    @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.tilted
     @AppStorage(Heirloom.settingKey) private var heirloomOn = true
     @AppStorage(BoardTheme.coordinatesKey) private var coordinatesOn = true
     @AppStorage(HomeToneMode.key) private var homeTone = HomeToneMode.defaultMode
@@ -86,14 +85,11 @@ struct SettingsSheet: View {
                                     rule
                                 }
                             }
-                            ToggleRow(title: "Coordinates", subtitle: "Letters and numbers around the board. Off gives the squares more room.",
+                            ToggleRow(title: "Coordinates", subtitle: "The letters and numbers along the board's edge. Off hides them.",
                                       symbol: "textformat.abc", isOn: $coordinatesOn, theme: theme)
                             rule
                             ToggleRow(title: "Piece history", subtitle: "Your pieces wear what they've been through: gold seams, a promoted pawn's collar, notches, patina.",
                                       symbol: "seal", isOn: $heirloomOn, theme: theme)
-                            rule
-                            ToggleRow(title: "Big Board", subtitle: "The board fills the screen. Swipe up from the bottom for the tools, sideways on the board to replay moves.",
-                                      symbol: "arrow.up.left.and.arrow.down.right", isOn: $bigBoard, theme: theme)
                             // The switches for the earlier homes are gone (Alex, 2026-11-08): the
                             // app has one home. HomeLayouts.settle() puts anyone who turned them off back.
                         }

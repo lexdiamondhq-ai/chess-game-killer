@@ -214,7 +214,7 @@ private struct GameCard: View {
         if let rival {
             RivalCoin(rival: rival, size: 32)
         } else {
-            Image(systemName: "person.2.fill")
+            Image(systemName: game.isImported ? "globe" : "person.2.fill")
                 .font(.app(.footnote))
                 .frame(width: 32, height: 32)
                 .background(Circle().fill(Color.primary.opacity(0.08)))

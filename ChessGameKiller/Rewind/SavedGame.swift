@@ -82,6 +82,18 @@ struct SavedGame: Codable, Equatable, Identifiable {
     var rewritten: Set<Int> = []
     /// The time control, like "3+2", so a rematch is the same game. Nil in games saved before it was kept.
     var clock: String? = nil
+    /// Where a game brought in from a chess site was played ("lichess" or "chess.com"). Nil for games played here.
+    var source: String? = nil
+    /// The game's id on that site, so the same game is never brought in twice.
+    var sourceID: String? = nil
+    /// The opponent's rating on that site, when it gave one.
+    var opponentRating: Int? = nil
+
+    /// A game the player played on Lichess or Chess.com and brought in.
+    var isImported: Bool { source != nil }
+    /// One side's game: against a rival here, or the player's own game from a chess site.
+    /// A game with a friend on this phone is both sides' and isn't read as the player's.
+    var isPlayersOwn: Bool { level != nil || isImported }
 
     var playerColor: Piece.Color { playerIsWhite ? .white : .black }
     var finalFEN: String { positions.last ?? "" }
@@ -90,7 +102,7 @@ struct SavedGame: Codable, Equatable, Identifiable {
     /// The player's moves, in order. Against a friend both sides count.
     var playerMoments: [SavedMoment] {
         moments
-            .filter { level == nil || $0.byWhite == playerIsWhite }
+            .filter { !isPlayersOwn || $0.byWhite == playerIsWhite }
             .sorted { $0.ply < $1.ply }
     }
 
@@ -183,6 +195,19 @@ struct SavedGame: Codable, Equatable, Identifiable {
     }
 
     static let maxToRewrite = 5
+
+    /// A rough quality score for a set of graded moves, 0 to 100. Nil with nothing graded.
+    static func accuracy(of counts: [MoveReview.Grade: Int]) -> Int? {
+        let weights: [MoveReview.Grade: Int] = [
+            .checkmate: 100, .best: 100, .excellent: 95, .good: 85, .inaccuracy: 60, .mistake: 35, .blunder: 10,
+        ]
+        let graded = counts.reduce(into: (sum: 0, count: 0)) { acc, entry in
+            acc.sum += (weights[entry.key] ?? 0) * entry.value
+            acc.count += entry.value
+        }
+        guard graded.count > 0 else { return nil }
+        return graded.sum / graded.count
+    }
 }
 
 extension SavedGame {
