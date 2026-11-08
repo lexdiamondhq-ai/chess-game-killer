@@ -19,6 +19,8 @@ struct ExecutivePlate: View {
     @ScaledMetric(relativeTo: .footnote) private var scaledStatusHeight: CGFloat = 16
     /// The status row's height. It stops growing where the line's type does.
     private var statusHeight: CGFloat { min(scaledStatusHeight, 21) * lineScale }
+    /// A rival (not Your Grudge) speaks in blood red dripping letters (Alex, 2026-11-08).
+    private var speaksInBlood: Bool { isComputer && !inDock && !match.setup.grudge }
     /// The line under the rival's name (its taunt, remarks and captures) is half again as large
     /// as the rest (Alex, 2026-11-08).
     private var lineScale: CGFloat { isComputer && !inDock ? 1.5 : 1 }
@@ -70,7 +72,10 @@ struct ExecutivePlate: View {
                         .minimumScaleFactor(0.8)
                     statusRow
                         // The row keeps its height when it has nothing to say, so the name never jumps.
-                        .frame(height: statusHeight, alignment: .leading)
+                        // The rival's may grow to a second line, so its whole taunt shows (the card
+                        // above the board has room for it; Alex, 2026-11-08).
+                        .frame(minHeight: statusHeight, maxHeight: speaksInBlood ? nil : statusHeight, alignment: .leading)
+                        .animation(.snappy(duration: 0.3), value: status)
                 }
             }
             // The clock is its own element, so VoiceOver reads its time as it stands.
@@ -130,7 +135,7 @@ struct ExecutivePlate: View {
                 CheckTag(color: theme.check)
                     .transition(.scale.combined(with: .opacity))
             }
-            PlateRemark(match: match, theme: theme, isRival: isComputer, scale: lineScale) {
+            PlateRemark(match: match, theme: theme, isRival: isComputer, scale: lineScale, blood: speaksInBlood) {
                 statusWords
             }
             .layoutPriority(1)
@@ -194,6 +199,10 @@ struct ExecutivePlate: View {
                     .foregroundStyle(theme.isDark ? HintSpotlight.gold : Color(red: 0.6, green: 0.43, blue: 0.06))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
+                    .transition(.opacity)
+            } else if !status.isEmpty, isTaunt {
+                Text(status)
+                    .bloodLetters(theme)
                     .transition(.opacity)
             } else if !status.isEmpty {
                 Text(status)
@@ -283,6 +292,9 @@ struct ExecutivePlate: View {
         guard !isComputer, isActive, !match.isOver, let best = match.bestHint else { return nil }
         return "Hint · " + HintWords.phrase(for: best, in: match.game)
     }
+
+    /// The status is the rival's taunt, waiting for your move.
+    private var isTaunt: Bool { speaksInBlood && !match.isOver && !isActive }
 
     /// The rival's taunt while it waits (`RivalTaunt`; the Grudge keeps its level), "Thinking…"
     /// on its turn; "Your move" on yours, and nothing while you wait (your captures say enough).

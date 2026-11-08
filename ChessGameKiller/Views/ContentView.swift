@@ -149,6 +149,14 @@ struct ContentView: View {
     @ScaledMetric(relativeTo: .footnote) private var scaledRibbonHeight: CGFloat = 32
     /// One player's line.
     private var plateHeight: CGFloat { min(scaledPlateHeight, 72) }
+    @ScaledMetric(relativeTo: .footnote) private var scaledTauntRoom: CGFloat = 24
+    /// The rival's line above the board is a line taller, so its taunt can run to two
+    /// (Alex, 2026-11-08: the whole taunt, never cut off).
+    private var topPlateHeight: CGFloat {
+        let rivalOnTop = match.setup.opponent == .computer && !match.setup.grudge
+            && !match.game.humanColors.contains(bottomColor.opposite)
+        return plateHeight + (rivalOnTop ? min(scaledTauntRoom, 32) : 0)
+    }
     /// Both players on one line, while the coach is open.
     private var stripHeight: CGFloat { min(scaledStripHeight, 40) }
     private var ribbonHeight: CGFloat { min(scaledRibbonHeight, 38) }
@@ -643,7 +651,7 @@ struct ContentView: View {
         let compact = coachExpanded
         let aspect = boardAspect
         // Your own line sits in the dock.
-        let lines = compact ? stripHeight : plateHeight
+        let lines = compact ? stripHeight : topPlateHeight
         let gaps = Self.gap * 2
         let fixed = lines + gaps + ribbonHeight + Self.edgeRoom * 2
         // The headroom over a flat board grows with the board, so it is solved for with it.
@@ -670,7 +678,7 @@ struct ContentView: View {
                         .frame(width: lineWidth, height: stripHeight)
                 } else {
                     ExecutivePlate(match: match, theme: theme, color: topColor)
-                        .frame(width: lineWidth, height: plateHeight)
+                        .frame(width: lineWidth, height: topPlateHeight)
                 }
             }
             Color.clear.frame(height: gap + side * headroom)
