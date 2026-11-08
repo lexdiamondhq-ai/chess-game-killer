@@ -11,8 +11,9 @@ struct ContentView: View {
     @State private var showingNewGame = true
     @State private var showingSettings = false
     @State private var showingAnalyze = false
-    /// Analyze opens on this position (the home's masterpiece) instead of its first screen.
-    @State private var analyzeFEN: String?
+    /// The analyzer, kept while the app runs: closing Analyze and opening it again finds the same board.
+    @State private var analyzer = ScanSession(reader: CloudBoardReader.live, engine: StockfishEngine.shared,
+                                              sounds: SoundPlayer.shared)
     @State private var coachExpanded = false
     @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .gilded
     @AppStorage("showBestMoves") private var showBestMoves = false
@@ -326,17 +327,16 @@ struct ContentView: View {
                 SettingsSheet()
                     .boardSheetGrabber(boardSheet)
             }
-            .sheet(isPresented: $showingAnalyze, onDismiss: { analyzeFEN = nil }) {
+            .sheet(isPresented: $showingAnalyze) {
                 AnalyzeSheet(
                     theme: theme,
                     currentFEN: match.hasStarted ? match.game.fen : nil,
                     engine: StockfishEngine.shared,
-                    reader: CloudBoardReader.live,
+                    session: analyzer,
                     rival: fromHereSetup.rival.name,
                     clock: fromHereSetup.timeControl,
                     forfeits: forfeits,
-                    onAnalyzeGame: analyzeGame,
-                    startsAt: analyzeFEN
+                    onAnalyzeGame: analyzeGame
                 ) { draft in
                     play(from: draft)
                 }
@@ -447,7 +447,8 @@ struct ContentView: View {
             resume: { leaveHome() },
             analyze: { showingAnalyze = true },
             analyzePosition: { fen in
-                analyzeFEN = fen
+                // Opened on a position (the home's masterpiece): straight to its analysis.
+                analyzer.analyze(fen: fen)
                 showingAnalyze = true
             },
             train: { showingTraining = true },

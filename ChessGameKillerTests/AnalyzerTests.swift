@@ -414,6 +414,29 @@ final class ScanSessionTests: XCTestCase {
         XCTAssertNotEqual(session.analyzed, draft)
     }
 
+    /// Closing Analyze and opening it again finds the same board, with the moves played on it.
+    func testTheAnalysisBoardOutlivesTheSheet() {
+        let session = ScanSession(reader: UnavailableBoardReader(), engine: FakeEngine())
+        session.analyze(fen: PositionDraft.standard.fen)
+        let board = session.analysis
+        XCTAssertNotNil(board)
+        board?.play("e2e4", fromLine: false)
+        XCTAssertTrue(session.analysis === board)
+        XCTAssertEqual(session.path, [.analysis])
+        XCTAssertEqual(session.analysis?.cursor, 1)
+    }
+
+    /// Analyze closed while a photo is read: next time it opens on its first screen.
+    func testClosingWhileReadingOpensOnTheStartNextTime() {
+        let draft = PositionDraft(fen: "6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1")!
+        let session = ScanSession(reader: SlowFakeBoardReader(
+            reading: BoardReading(draft: draft, whiteSide: .bottom, sureOfTurn: true, confidence: .high)
+        ))
+        session.read(UIImage())
+        session.leaveReading()
+        XCTAssertEqual(session.path, [])
+    }
+
     func testANewerReadIsNotSpoiledByTheOneItReplaced() async {
         let draft = PositionDraft(fen: "6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1")!
         let reader = SlowFakeBoardReader(reading: BoardReading(draft: draft, whiteSide: .bottom, sureOfTurn: true, confidence: .high))
@@ -492,6 +515,22 @@ final class AnalysisModelTests: XCTestCase {
         XCTAssertFalse(model.isThinking)
         XCTAssertEqual(model.hints.first?.uci, "e2e4")
         XCTAssertEqual(model.depth, AnalysisModel.fullDepth)
+    }
+
+    /// A search cut off by closing Analyze picks up again when it opens.
+    func testASearchCutOffCarriesOnWhenOpenedAgain() async {
+        let model = AnalysisModel(draft: .standard, engine: DeepeningEngine())
+        let first = Task { await model.run() }
+        for _ in 0..<100 where model.hints.isEmpty {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        first.cancel()
+        await first.value
+        XCTAssertFalse(model.isThinking)
+        XCTAssertLessThan(model.depth, AnalysisModel.fullDepth)
+        await model.run()
+        XCTAssertEqual(model.depth, AnalysisModel.fullDepth)
+        XCTAssertEqual(model.hints.first?.uci, "e2e4")
     }
 
     func testScoresAreShownFromWhitesSide() async {
