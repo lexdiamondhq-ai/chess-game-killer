@@ -360,8 +360,8 @@ struct ContentView: View {
                 if match.isOver { recordGame() }
             }
             .onChange(of: match.gameNumber) { _, _ in
-                // A game begun from a rival's film plays its theme; any other game is quiet.
-                RivalTheme.shared.gameStarted(level: match.setup.level, grudge: match.setup.grudge)
+                // Every rival game plays its rival's theme, rematches too; Your Grudge is quiet.
+                RivalTheme.shared.gameStarted(match.setup)
                 coach.gameStarted()
                 announceGrudge()
                 // Nothing on screen carries over from the last game.
@@ -538,6 +538,8 @@ struct ContentView: View {
         guard showingHome else { return }
         homeLit = false
         withAnimation(.easeInOut(duration: 0.35)) { showingHome = false }
+        // Back to a rival game under way: its theme picks up where going home faded it.
+        if match.hasStarted, !match.isOver { RivalTheme.shared.resume(match.setup) }
     }
 
     private func goHome() {
