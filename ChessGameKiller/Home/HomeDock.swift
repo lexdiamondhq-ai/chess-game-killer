@@ -146,9 +146,9 @@ struct HomeJewel: View {
     var hold: (() -> Void)? = nil
 
     @State private var pressed = false
-    /// Counts the knight's leaps (J1): each tap at rest sends it vaulting before the game opens.
+    /// Counts the taps at rest: each one sends a glint across the gold before the game opens.
     @State private var vaults = 0
-    /// Mid-leap: a second tap waits for the first to land.
+    /// Mid-glint: a second tap waits for the first.
     @State private var vaulting = false
     @AppStorage("haptics") private var hapticsOn = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -165,7 +165,14 @@ struct HomeJewel: View {
         content
             .foregroundStyle(tone.onIvory)
             .frame(width: width, height: height)
-            .background { HomeJewelGold(tone: tone, round: !folded, lit: face == .open) }
+            .background {
+                HomeJewelGold(tone: tone, round: !folded, lit: face == .open)
+                    .overlay {
+                        if face == .rest {
+                            JewelSheen(trigger: vaults)
+                        }
+                    }
+            }
             .background {
                 if face == .rest {
                     JewelLandingRing(color: tone.metal, trigger: vaults)
@@ -179,7 +186,7 @@ struct HomeJewel: View {
                 pressed = pressing
             })
             .onTapGesture(perform: tapped)
-            .sensoryFeedback(.impact(weight: .medium), trigger: vaults) { _, _ in hapticsOn }
+            .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.75), trigger: vaults) { _, _ in hapticsOn }
             .accessibilityElement(children: .ignore)
             .accessibilityAddTraits(.isButton)
             .accessibilityLabel(spokenLabel)
@@ -202,7 +209,7 @@ struct HomeJewel: View {
         hold?()
     }
 
-    /// At rest the knight vaults first and the game opens as it lands; otherwise straight away.
+    /// At rest the jewel catches the light first and the game opens as it fades; otherwise straight away.
     private func tapped() {
         guard face == .rest, !reduceMotion else {
             tap()
@@ -331,22 +338,74 @@ struct HomeJewelGold: View {
     }
 }
 
+/// Rooms, from the bar or a hold on the gold knight: only the ways to a game that the Today
+/// page doesn't already hold (Alex, 2026-11-08: "Lets go with all"). A person online, a friend,
+/// a new game on your own side and clock, and your games. Today's Move, Puzzles, Analyze and
+/// the coach live on Today, so they are not repeated here.
+enum HomeShortcutKind: String, CaseIterable, Identifiable {
+    case online, friend, newGame, games
+
+    var id: String { rawValue }
+
+    /// What Rooms offers: Online and A friend only when the app can reach other players.
+    static func list(online: Bool) -> [HomeShortcutKind] {
+        online ? allCases : allCases.filter { !$0.needsOnline }
+    }
+
+    var needsOnline: Bool { self == .online || self == .friend }
+
+    var title: String {
+        switch self {
+        case .online: return "Online"
+        case .friend: return "A friend"
+        case .newGame: return "New game"
+        case .games: return "Your games"
+        }
+    }
+
+    var glyph: String {
+        switch self {
+        case .online: return Glyphs.online
+        case .friend: return Glyphs.challenge
+        case .newGame: return Glyphs.play
+        case .games: return Glyphs.games
+        }
+    }
+
+    var hint: String {
+        switch self {
+        case .online: return "Play someone at your level now"
+        case .friend: return "Send a friend a game by link"
+        case .newGame: return "Pick your side, clock and rival"
+        case .games: return "Look back at the games you've played"
+        }
+    }
+}
+
 /// One of the jewel's shortcuts.
 struct HomeShortcut: Identifiable {
-    let title: String
-    let glyph: String
-    let hint: String
+    let kind: HomeShortcutKind
     /// Something is happening there now (players waiting online): a small green dot.
     var live = false
     let action: () -> Void
 
-    var id: String { title }
+    var id: HomeShortcutKind { kind }
+    var title: String { kind.title }
+    var glyph: String { kind.glyph }
+    var hint: String { kind.hint }
 }
 
 /// What the jewel holds, rising out of it on a long press: the five rivals, to play one at
-/// once, and the other ways to a game (Online, a friend, Today's Move, a real board through the
-/// camera). A pick closes it and goes; so does a tap anywhere around it, or on the jewel.
+/// once, and under them the shortcuts in rows of four (see `HomeShortcutKind`). A pick closes
+/// it and goes; so does a tap anywhere around it, or on the jewel.
 struct HomeShortcutsPanel: View {
+    /// Four to a row under the five rivals.
+    static let perRow = 4
+
+    private static var columns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: 0, alignment: .top), count: perRow)
+    }
+
     let tone: HomeTone
     /// The rival the board window offers: lit among the five.
     let next: MatchController.Level
@@ -355,27 +414,47 @@ struct HomeShortcutsPanel: View {
     let shortcuts: [HomeShortcut]
     let playRival: (MatchController.Level) -> Void
     let close: () -> Void
+    /// Rooms on the Aurora home: no rivals here (they have their own row on the page, Alex
+    /// 2026-11-07), and a grabber in place of the jewel's cross; a drag down closes it.
+    var asRooms = false
 
     @AccessibilityFocusState private var titleFocused: Bool
+    @State private var drag: CGFloat = 0
     @ScaledMetric(relativeTo: .caption2) private var orb: CGFloat = 46
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Play a crowd")
-                .font(.app(.footnote, weight: .semibold))
-                .foregroundStyle(tone.ink2)
-                .padding(.leading, 4)
-                .accessibilityAddTraits(.isHeader)
-                .accessibilityFocused($titleFocused)
-            HStack(alignment: .top, spacing: 0) {
-                ForEach(Rival.all) { rival in
-                    rivalButton(rival)
+            if asRooms {
+                Capsule()
+                    .fill(tone.ink.opacity(0.25))
+                    .frame(width: 38, height: 4)
+                    .frame(maxWidth: .infinity)
+                    .padding(.bottom, 2)
+                    .accessibilityHidden(true)
+                Text("Rooms")
+                    .font(.system(size: 20, weight: .medium, design: .serif))
+                    .foregroundStyle(tone.ink)
+                    .padding(.leading, 6)
+                    .padding(.bottom, 4)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityFocused($titleFocused)
+            } else {
+                Text("Face a rival")
+                    .font(.app(.footnote, weight: .semibold))
+                    .foregroundStyle(tone.ink2)
+                    .padding(.leading, 4)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityFocused($titleFocused)
+                HStack(alignment: .top, spacing: 0) {
+                    ForEach(Rival.all) { rival in
+                        rivalButton(rival)
+                    }
                 }
+                HomeHairline(tone: tone)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 2)
             }
-            HomeHairline(tone: tone)
-                .padding(.horizontal, 4)
-                .padding(.vertical, 2)
-            HStack(alignment: .top, spacing: 0) {
+            LazyVGrid(columns: Self.columns, spacing: 12) {
                 ForEach(shortcuts) { shortcut in
                     shortcutButton(shortcut)
                 }
@@ -385,6 +464,17 @@ struct HomeShortcutsPanel: View {
         .padding(.top, 14)
         .padding(.bottom, 12)
         .homePane(RoundedRectangle(cornerRadius: HomeMetrics.cardRadius, style: .continuous), tone: tone)
+        .offset(y: drag)
+        .gesture(DragGesture(minimumDistance: 8)
+            .onChanged { value in if asRooms { drag = max(0, value.translation.height) } }
+            .onEnded { value in
+                guard asRooms else { return }
+                if value.translation.height > 70 || value.predictedEndTranslation.height > 160 {
+                    close()
+                } else {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { drag = 0 }
+                }
+            })
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(.isModal)
@@ -392,27 +482,37 @@ struct HomeShortcutsPanel: View {
         .onAppear { titleFocused = true }
     }
 
+    /// Each rival's coin a little bigger than the one before, so the row climbs toward the
+    /// Ashen King.
+    private func coinSize(_ rival: Rival) -> CGFloat {
+        min(orb, 56) * (0.8 + 0.07 * CGFloat(rival.level.rawValue))
+    }
+
     private func rivalButton(_ rival: Rival) -> some View {
         let isNext = rival.level == next
-        let size: CGFloat = min(orb, 56)
+        let size = coinSize(rival)
         return Button { pick { playRival(rival.level) } } label: {
-            VStack(spacing: 5) {
-                Image(rival.glowName)
-                    .resizable()
-                    .interpolation(.high)
-                    .scaledToFit()
-                    .frame(width: size, height: size)
-                    .background {
+            VStack(spacing: 3) {
+                RivalCoin(rival: rival, size: size)
+                    .padding(2)
+                    .overlay {
+                        // The rival up next wears a gold ring.
                         if isNext {
                             Circle()
-                                .fill(RadialGradient(colors: [rival.light.opacity(0.34), rival.light.opacity(0)],
-                                                     center: .center, startRadius: 0, endRadius: size * 0.75))
-                                .frame(width: size * 1.5, height: size * 1.5)
+                                .strokeBorder(tone.metal, lineWidth: 1.5)
+                                .shadow(color: tone.metal.opacity(0.5), radius: 6)
                         }
                     }
+                    // The coins sit on one line however big they grow.
+                    .frame(height: coinSize(Rival.all[Rival.all.count - 1]) + 4, alignment: .bottom)
                 Text(rival.shortName)
                     .font(.app(.caption2, weight: .semibold))
-                    .foregroundStyle(isNext ? tone.ink : tone.ink2)
+                    .foregroundStyle(tone.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                Text(rival.elo.replacingOccurrences(of: "~", with: ""))
+                    .font(.app(.caption2).monospacedDigit())
+                    .foregroundStyle(tone.ink2)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }
@@ -543,7 +643,7 @@ struct HomeYouPanel: View {
                 HomeLinkRow(title: "Settings", detail: "Board look, sound, hints", tone: tone) { go(actions.settings) }
                 if let premium = actions.premium {
                     HomeHairline(tone: tone)
-                    HomeLinkRow(title: "Chess Game Killer Pro", detail: "Everything, with no limits", tone: tone) { go(premium) }
+                    HomeLinkRow(title: "Beauty of Chess Pro", detail: "Everything, with no limits", tone: tone) { go(premium) }
                 }
             }
         }

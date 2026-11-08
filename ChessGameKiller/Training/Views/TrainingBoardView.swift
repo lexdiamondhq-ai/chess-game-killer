@@ -365,38 +365,8 @@ struct CoachArrow: View {
     let glows: Bool
 
     var body: some View {
-        let dx = to.x - from.x
-        let dy = to.y - from.y
-        let length = max(hypot(dx, dy), 1)
-        let ux = dx / length
-        let uy = dy / length
-        let headLength = squareSize * 0.4
-        let headWidth = squareSize * 0.46
-        let shaftWidth = squareSize * (dashed ? 0.12 : 0.15)
-        let start = CGPoint(x: from.x + ux * squareSize * 0.2, y: from.y + uy * squareSize * 0.2)
-        let tip = CGPoint(x: to.x - ux * squareSize * 0.1, y: to.y - uy * squareSize * 0.1)
-        let base = CGPoint(x: tip.x - ux * headLength, y: tip.y - uy * headLength)
-
-        ZStack {
-            Path { path in
-                path.move(to: start)
-                path.addLine(to: base)
-            }
-            .stroke(color, style: StrokeStyle(
-                lineWidth: shaftWidth,
-                lineCap: dashed ? .butt : .round,
-                dash: dashed ? [shaftWidth * 1.6, shaftWidth * 1.1] : []
-            ))
-            Path { path in
-                path.move(to: tip)
-                path.addLine(to: CGPoint(x: base.x - uy * headWidth / 2, y: base.y + ux * headWidth / 2))
-                path.addLine(to: CGPoint(x: base.x + uy * headWidth / 2, y: base.y - ux * headWidth / 2))
-                path.closeSubpath()
-            }
-            .fill(color)
-        }
-        .opacity(glows ? 1 : 0.88)
-        .shadow(color: glows ? color.opacity(0.85) : .black.opacity(0.18), radius: glows ? squareSize * 0.1 : 1.5)
+        CrispArrow(from: from, to: to, squareSize: squareSize, dashed: dashed, color: color,
+                   proportions: .coach(dashed: dashed), glow: glows ? color : nil)
     }
 }
 

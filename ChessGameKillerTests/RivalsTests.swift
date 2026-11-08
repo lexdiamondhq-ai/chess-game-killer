@@ -253,9 +253,39 @@ final class RivalsTests: XCTestCase {
         }
     }
 
+    /// The five rivals climb from the Cub to the Ashen King, each on its own coin; games saved
+    /// under their former names ("The 1600s") still find them and show the new name.
+    func testRivalsHaveFacesAndKeepTheirFormerNames() {
+        XCTAssertEqual(Rival.all.map(\.name), ["The Cub", "The Hunter", "The Berserker", "The Lionheart", "The Ashen King"])
+        for rival in Rival.all {
+            XCTAssertNotNil(rival.coinName.flatMap { UIImage(named: $0) }, "\(rival.slug)'s coin is missing")
+            XCTAssertEqual(Rival.named(rival.formerName ?? "")?.level, rival.level)
+        }
+        XCTAssertNil(Rival.grudge(.club).coinName)
+
+        let old = SavedGame(id: UUID(), date: .now, opponent: "The 1600s", level: MatchController.Level.club.rawValue,
+                            playerIsWhite: true, result: .win, accuracy: nil, positions: [], moves: [], moments: [])
+        XCTAssertEqual(old.opponentShown, "The Berserker")
+        let friend = SavedGame(id: UUID(), date: .now, opponent: "Dana", level: nil,
+                               playerIsWhite: true, result: .win, accuracy: nil, positions: [], moves: [], moments: [])
+        XCTAssertEqual(friend.opponentShown, "Dana")
+
+        // One rival is one player: "The Berserker wins", where the old crowds were many.
+        XCTAssertEqual("The Berserker".agreeing("wins", "win"), "wins")
+        XCTAssertEqual("The Ashen King".midSentence.possessive, "the Ashen King's")
+        // The Ashen King was the Dragonlord: games and wins saved under that name still find him.
+        let dragonlord = SavedGame(id: UUID(), date: .now, opponent: "The Dragonlord",
+                                   level: MatchController.Level.grandmaster.rawValue, playerIsWhite: true, result: .win,
+                                   accuracy: nil, positions: [], moves: [], moments: [])
+        XCTAssertEqual(dragonlord.opponentShown, "The Ashen King")
+        XCTAssertEqual(Rival.named("The Dragonlord")?.level, .grandmaster)
+        XCTAssertEqual("The 1600s".agreeing("wins", "win"), "win")
+    }
+
     // MARK: Pictures
 
-    /// The summons, caught a few seconds in, and the New Game sheet opening on a Grudge.
+    /// The summons, caught a few seconds in, your Grudge's card on Home, and the New Game sheet
+    /// (rivals only: the Grudge lives on Home now).
     func testPictures() throws {
         let defaults = UserDefaults.standard
         let keys = ["setup.grudge", "grudge.lastSeen", GrudgeStore.key, GrudgeStore.unseenKey]
@@ -275,13 +305,16 @@ final class RivalsTests: XCTestCase {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.black), wait: 6)
 
-        defaults.set(try JSONEncoder().encode(record), forKey: GrudgeStore.key)
-        defaults.set(true, forKey: "setup.grudge")
-        defaults.set("6-11", forKey: "grudge.lastSeen")
-        let grudges = GrudgeStore(defaults: defaults)
-        try snapshot("grudge-new-game", view: Color.black.ignoresSafeArea().sheet(isPresented: .constant(true)) {
-            NewGameSheet(theme: .named(.gilded), start: { _ in }).environment(grudges)
-        }, wait: 6)
+        // Its card on Home, resting and opened into the summons.
+        try snapshot("grudge-home-card", view: VStack(spacing: 16) {
+            HomeAuroraGrudge(record: record, isOpen: false, palette: HomeAuroraPalette(dark: false),
+                             select: {}, settle: {})
+            HomeAuroraGrudge(record: record, isOpen: true, palette: HomeAuroraPalette(dark: false),
+                             lastSeen: (6, 11), select: {}, settle: {})
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(hex: 0xF6F1E7)), wait: 6)
 
         try snapshot("crowd-new-game", view: Color.black.ignoresSafeArea().sheet(isPresented: .constant(true)) {
             NewGameSheet(theme: .named(.gilded), start: { _ in }).environment(GrudgeStore(defaults: UserDefaults(suiteName: "RivalsTestsEmpty")!))

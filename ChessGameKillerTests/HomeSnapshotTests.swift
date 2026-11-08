@@ -24,13 +24,13 @@ final class HomeSnapshotTests: XCTestCase {
         try await super.tearDown()
     }
 
-    /// The board home (1A): the sheet halfway on Today, all the way up on Learn, on Army and
-    /// You, and folded down to the strip with the board filling the screen.
+    /// The board home (1A): the sheet halfway on Today, all the way up on Learn and on Today (the
+    /// masterpiece and the army), on You, and folded down to the strip with the board filling the screen.
     func testTheBoardHome() throws {
         UserDefaults.standard.set(true, forKey: HomeLayout.key)
         let shots: [(HomeSheetDetent, HomeSheetTab, String)] = [
             (.half, .today, "zz-home-sheet-1-today"), (.full, .learn, "zz-home-sheet-2-learn"),
-            (.half, .army, "zz-home-sheet-3-army"), (.half, .you, "zz-home-sheet-4-you"),
+            (.full, .today, "zz-home-sheet-3-today-up"), (.half, .you, "zz-home-sheet-4-you"),
             (.board, .today, "zz-home-sheet-5-folded"),
         ]
         for (detent, tab, name) in shots {
@@ -129,11 +129,21 @@ final class HomeSnapshotTests: XCTestCase {
         open.isHidden = true
     }
 
-    /// Holding the gold knight in the dock: the five rivals and the other ways to a game rise
+    /// Holding the gold knight in the dock: the five rivals and the shortcuts under them rise
     /// out of it over the veiled page, and the jewel wears a cross to close them.
     func testTheJewelsShortcuts() throws {
         let window = try show(HomeSample.home(showsShortcuts: true))
         try save(window, "zz-home-9-shortcuts")
+        window.isHidden = true
+    }
+
+    /// The knight held on the board home, with players to reach online: the five rivals, then
+    /// Online, A friend, Today's Move and Puzzles over Analyze, Train and Your games.
+    func testTheKnightsShortcutsOnTheBoardHome() throws {
+        UserDefaults.standard.set(true, forKey: HomeLayout.key)
+        let center = ChallengeCenter(api: FakeChallengeAPI(), store: ChallengeStore(), sounds: nil)
+        let window = try show(HomeSample.home(showsShortcuts: true).environment(center))
+        try save(window, "zz-home-sheet-6-shortcuts")
         window.isHidden = true
     }
 
@@ -233,7 +243,7 @@ final class HomeSnapshotTests: XCTestCase {
                                   moveNumber: 1, plies: 0)
         let alone = HomeCurrentGame.list(yourTurn, fen: start, friends: [])
         XCTAssertEqual(alone.map(\.id), ["computer"], "The only game going still gets its chip")
-        XCTAssertEqual(alone.first?.title, "vs The 1600s")
+        XCTAssertEqual(alone.first?.title, "vs The Berserker")
         XCTAssertEqual(alone.first?.kind, .computer)
         XCTAssertEqual(alone.first?.status, .yourMove)
         XCTAssertEqual(alone.first?.detail, "Computer · No clock · Move 1")

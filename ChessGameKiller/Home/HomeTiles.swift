@@ -219,6 +219,27 @@ struct HomePlayTileFace: View {
     }
 }
 
+/// Analyze, out where it's seen on Today (Alex, 2026-11-06: "the analysis needs to be easier
+/// to find on the home screen", then "should just be one button for it"): one button, like a
+/// face of the Play tile above it, into the analyzer, where a photo, a screenshot, the camera
+/// or a board set up by hand all start.
+struct HomeAnalyzeTile: View {
+    let tone: HomeTone
+    let analyze: () -> Void
+
+    /// What it takes, said the same wherever Analyze is offered.
+    static let line = "A photo, a screenshot or any position"
+
+    var body: some View {
+        HomePlayTileFace(glyph: Glyphs.analyze, title: "Analyze", line: Self.line,
+                         live: false, tone: tone, label: "Analyze",
+                         hint: "Find the best moves. Take a photo, pick a screenshot or set up a board.",
+                         inputLabels: ["Analyze", "Analysis", "Best move"], action: analyze)
+            .padding(6)
+            .homePane(RoundedRectangle(cornerRadius: HomeMetrics.tileRadius, style: .continuous), tone: tone)
+    }
+}
+
 // MARK: - Today
 
 /// Where the daily habit stands: the streak, what's done, and Today's Move.
@@ -785,6 +806,15 @@ struct HomeRivalPortrait: View {
     let size: CGFloat
 
     var body: some View {
+        if rival.coinName != nil {
+            // The coins are already struck in the home's own bronze, silver and gold.
+            RivalCoin(rival: rival, size: size)
+        } else {
+            printed
+        }
+    }
+
+    private var printed: some View {
         Image(rival.portraitName)
             .resizable()
             .scaledToFill()

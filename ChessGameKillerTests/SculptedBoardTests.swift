@@ -173,31 +173,51 @@ final class SculptedBoardTests: XCTestCase {
         }
     }
 
-    /// The flat set has all six pieces in both colors, each a tile with its picture on top.
+    /// The flat set has all six pieces in both colors, each a shape over its shadow.
     func testTheFlatSetHasAllSixPieces() {
         for color in [Piece.Color.white, .black] {
             for kind in [Piece.Kind.king, .queen, .rook, .bishop, .knight, .pawn] {
                 let node = SculptedFlatSet.makePiece(kind, color: color, look: .gilded)
                 XCTAssertEqual(node.childNodes.count, 2, "\(color) \(kind)")
                 XCTAssertTrue(node.childNodes.allSatisfy { $0.geometry != nil }, "\(color) \(kind)")
+                // The shadow lies under the board's marks, the shape over them.
+                XCTAssertLessThan(node.childNodes[0].renderingOrder, node.childNodes[1].renderingOrder)
             }
         }
     }
 
-    /// Every tile has its picture, as wide as the tile and as tall as the flat view sees it, and
-    /// reaches no further than its own square.
-    func testEveryGlassTileHasItsPicture() throws {
-        let elevation = CGFloat(SculptedCamera.Framing.seated.elevation)
+    /// Every cut-out has its picture and its shadow, and the shape in the picture reaches no
+    /// further from the middle than its stated reach, which keeps it inside its own square.
+    func testEveryCutOutHasItsPictureAndShadow() throws {
         for color in [Piece.Color.white, .black] {
             for kind in [Piece.Kind.king, .queen, .rook, .bishop, .knight, .pawn] {
                 let name = SculptedFlatSet.pictureName(kind, color: color)
-                let picture = try XCTUnwrap(UIImage(named: name), "\(name) is missing")
-                let (width, height) = SculptedFlatSet.size(of: kind)
-                let seen = width * sin(elevation) + height * cos(elevation)
-                XCTAssertEqual(picture.size.height / picture.size.width, seen / width, accuracy: 0.005, name)
-                XCTAssertLessThan(width / 2 + SculptedFlatSet.reach(of: kind), 0.5, "\(name) reaches out of its square")
+                let picture = try XCTUnwrap(UIImage(named: name)?.cgImage, "\(name) is missing")
+                XCTAssertNotNil(UIImage(named: SculptedFlatSet.shadowName(kind)), "\(kind)'s shadow is missing")
+                XCTAssertEqual(picture.width, picture.height, name)
+                let reach = Self.opaqueReach(picture) * Double(SculptedFlatSet.span)
+                XCTAssertLessThanOrEqual(reach, Double(SculptedFlatSet.half(of: kind)) + 0.005, name)
+                XCTAssertGreaterThan(reach, Double(SculptedFlatSet.half(of: kind)) - 0.03, "\(name) is smaller than stated")
+                XCTAssertLessThan(Double(SculptedFlatSet.half(of: kind)), 0.42, "\(name) crowds its square")
             }
         }
+    }
+
+    /// How far a picture's visible pixels reach from its middle, as a share of its width.
+    private static func opaqueReach(_ image: CGImage) -> Double {
+        let side = image.width
+        var alpha = [UInt8](repeating: 0, count: side * side)
+        let context = CGContext(data: &alpha, width: side, height: side, bitsPerComponent: 8, bytesPerRow: side,
+                                space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.alphaOnly.rawValue)
+        context?.draw(image, in: CGRect(x: 0, y: 0, width: side, height: side))
+        var reach = 0.0
+        let middle = Double(side) / 2
+        for y in 0..<side {
+            for x in 0..<side where alpha[y * side + x] > 20 {
+                reach = max(reach, abs(Double(x) + 0.5 - middle), abs(Double(y) + 0.5 - middle))
+            }
+        }
+        return reach / Double(side)
     }
 
     /// The flat view looks straight down, so the polished board mirrors the top of its studio:
@@ -237,6 +257,80 @@ final class SculptedBoardTests: XCTestCase {
             XCTAssertTrue(points.allSatisfy { abs($0.x) <= 1 && abs($0.y) <= 1 })
             XCTAssertGreaterThan(points.map { abs($0.x) }.max() ?? 0, 0.95, "edge to edge")
             XCTAssertGreaterThan(points.map { abs($0.y) }.max() ?? 0, 0.9, "top to bottom, nothing wasted")
+        }
+    }
+
+    /// The files and ranks sit on the frame outside the squares, as on a printed board (Alex,
+    /// 2026-11-06: "shouldnt they be outside the board?"): each letter under its own file, each
+    /// number beside its own rank, all in the picture, upright and the right way round from
+    /// either side, tilted or flat.
+    func testTheFilesAndRanksSitOnTheFrameBesideTheirSquares() {
+        let files = Array("abcdefgh")
+        for flipped in [false, true] {
+            let labels = SculptedBoardScene.labelPlacements(flipped: flipped)
+            let letters = labels.filter { $0.text.first?.isLetter == true }
+            let numbers = labels.filter { $0.text.first?.isNumber == true }
+            XCTAssertEqual(letters.map(\.text).sorted(), files.map { String($0) })
+            XCTAssertEqual(numbers.map(\.text).sorted(), (1...8).map { String($0) })
+            for label in labels {
+                // Past the squares and the metal line round them, short of the frame's outer edge.
+                let out = max(abs(label.position.x), abs(label.position.z))
+                XCTAssertGreaterThan(out, SculptedCamera.fitHalfWidth, label.text)
+                XCTAssertLessThan(out, SculptedCamera.boardHalfWidth - 0.15, label.text)
+                XCTAssertGreaterThan(label.position.y, 0.005, "on top of the glass")
+            }
+            for letter in letters {
+                let file = files.firstIndex(of: letter.text.first!)!
+                XCTAssertEqual(letter.position.x, SculptedCamera.position(of: Square(file: file, rank: 0)).x, accuracy: 0.001, letter.text)
+            }
+            for number in numbers {
+                let rank = Int(number.text)! - 1
+                XCTAssertEqual(number.position.z, SculptedCamera.position(of: Square(file: 0, rank: rank)).z, accuracy: 0.001, number.text)
+            }
+
+            let near: Float = flipped ? -1 : 1
+            // A glyph's own up and right, lying on the frame.
+            let turn = SculptedBoardScene.labelOrientation(flipped: flipped)
+            let glyphUp = turn.act(SIMD3<Float>(0, 0.1, 0))
+            let glyphRight = turn.act(SIMD3<Float>(0.1, 0, 0))
+            let views: [(SculptedCamera.Framing, Float)] = [
+                (.standing, SculptedCamera.standingAspects.lowerBound),
+                (.standing, SculptedCamera.standingAspects.upperBound),
+                (.seated, Float(SculptedCamera.Framing.seated.aspect)),
+            ]
+            for (framing, aspect) in views {
+                let size = CGSize(width: 390, height: CGFloat(390 / aspect))
+                let camera = SculptedCamera.fitted(aspect: aspect, flipped: flipped, framing: framing)
+                let view = "\(framing) \(aspect) flipped \(flipped)"
+                func screen(_ point: SIMD3<Float>) -> CGPoint { camera.screenPoint(point, in: size) }
+                for label in labels {
+                    // The whole glyph is in the picture, not cut off at the view's edge.
+                    for dx: Float in [-0.12, 0.12] {
+                        for dz: Float in [-0.12, 0.12] {
+                            let n = camera.normalized(label.position + SIMD3(dx, 0, dz))
+                            XCTAssertTrue(abs(n.x) <= 1 && abs(n.y) <= 1, "\(label.text) \(view)")
+                        }
+                    }
+                    // Its top points up the screen and its right to the right: upright, not mirrored.
+                    let here = screen(label.position)
+                    XCTAssertLessThan(screen(label.position + glyphUp).y, here.y, "\(label.text) \(view)")
+                    XCTAssertGreaterThan(screen(label.position + glyphRight).x, here.x, "\(label.text) \(view)")
+                }
+                // Read along the bottom, a to h for White and h to a for Black; up the left side,
+                // 1 to 8 for White and 8 to 1 for Black.
+                let across = letters.sorted { screen($0.position).x < screen($1.position).x }.map(\.text).joined()
+                XCTAssertEqual(across, flipped ? "hgfedcba" : "abcdefgh", view)
+                let up = numbers.sorted { screen($0.position).y > screen($1.position).y }.map(\.text).joined()
+                XCTAssertEqual(up, flipped ? "87654321" : "12345678", view)
+                // Outside the squares: the letters below the near rank's edge, the numbers left of
+                // the left file's edge.
+                for letter in letters {
+                    XCTAssertGreaterThan(screen(letter.position).y, screen(SIMD3(letter.position.x, 0, 4 * near)).y, "\(letter.text) \(view)")
+                }
+                for number in numbers {
+                    XCTAssertLessThan(screen(number.position).x, screen(SIMD3(-4 * near, 0, number.position.z)).x, "\(number.text) \(view)")
+                }
+            }
         }
     }
 

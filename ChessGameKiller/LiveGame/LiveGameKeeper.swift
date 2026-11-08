@@ -7,7 +7,7 @@ import UIKit
 /// Keeps the game under way on the Lock Screen, in the Dynamic Island and in StandBy: a Live
 /// Activity that starts on a game's first move, follows every move and ends with the game (or
 /// as soon as another one is set up). Only games against a rival. iOS's own switch turns it off
-/// (Settings, Chess Game Killer, Live Activities).
+/// (Settings, Beauty of Chess, Live Activities).
 ///
 /// The clock waits while the app is away, so the Lock Screen shows the time you come back to,
 /// standing still rather than counting down.

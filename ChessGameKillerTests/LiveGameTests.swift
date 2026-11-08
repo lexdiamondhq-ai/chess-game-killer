@@ -129,7 +129,7 @@ final class LiveGameTests: XCTestCase {
         match.suspend()
 
         let game = LiveGameKeeper.attributes(of: match)
-        XCTAssertEqual(game.rival, "The 1600s")
+        XCTAssertEqual(game.rival, "The Berserker")
         XCTAssertEqual(game.glow, "rival-1600s-glow")
         XCTAssertEqual(game.lightHex, MatchController.Level.club.rival.lightHex)
         XCTAssertFalse(game.youAreWhite)

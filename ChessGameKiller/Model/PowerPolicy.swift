@@ -49,6 +49,10 @@ final class PowerPolicy {
 
     nonisolated static func framesPerSecond(constrained: Bool) -> Int { constrained ? 30 : 60 }
 
+    /// How fast a 3D board draws while a piece is moving, when the phone isn't holding back: the
+    /// screen's full rate on a ProMotion phone (others simply draw at their own top rate).
+    nonisolated static let motionFramesPerSecond = 120
+
     private func watch() {
         // Both notifications arrive on any thread.
         for name in [ProcessInfo.thermalStateDidChangeNotification, Notification.Name.NSProcessInfoPowerStateDidChange] {

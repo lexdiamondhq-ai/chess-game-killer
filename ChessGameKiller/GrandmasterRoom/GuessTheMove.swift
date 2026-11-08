@@ -203,11 +203,9 @@ struct GuessTheMoveView: View {
                     }
                     .font(.app(.subheadline, weight: .semibold).monospacedDigit())
                     .padding(.horizontal, 20)
-                    TrainingBoardView(game: runner.board, theme: theme, flipped: runner.hero == .black,
-                                      arrows: runner.arrows,
-                                      onTap: runner.phase == .guessing ? { (square: Square) in runner.tap(square) } : nil)
-                        .frame(width: side, height: side)
-                        .boardHeadroom(theme: theme, side: side)
+                    TrainerBoard(game: runner.board, theme: theme, side: side, flipped: runner.hero == .black,
+                                 arrows: runner.arrows,
+                                 onTap: runner.phase == .guessing ? { (square: Square) in runner.tap(square) } : nil)
                     RoomMessage(text: runner.message, tone: runner.tone, theme: theme)
                         .padding(.horizontal, 16)
                     if runner.phase == .finished {

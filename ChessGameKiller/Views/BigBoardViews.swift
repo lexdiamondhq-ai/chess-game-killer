@@ -10,7 +10,8 @@ struct BigBoardTray<Dock: View>: View {
     @Binding var isOpen: Bool
     /// While the coach is unfolded in the tray, the second row steps aside for it.
     var coachIsWide = false
-    let onNewGame: () -> Void
+    /// Nil when Home is on: new games start only from Home (Alex, 2026-11-07).
+    let onNewGame: (() -> Void)?
     let onSettings: () -> Void
     let onExit: () -> Void
     var onArmy: (() -> Void)?
@@ -85,7 +86,9 @@ struct BigBoardTray<Dock: View>: View {
             if let onHome {
                 DockButton(title: "Home", symbol: Glyphs.home, theme: theme, action: onHome)
             }
-            DockButton(title: "New game", symbol: "plus", theme: theme, action: onNewGame)
+            if let onNewGame {
+                DockButton(title: "New game", symbol: "plus", theme: theme, action: onNewGame)
+            }
             Menu {
                 if let onGames {
                     Button(action: onGames) { Label("Your games", image: Glyphs.games) }

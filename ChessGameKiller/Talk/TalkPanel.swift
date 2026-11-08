@@ -44,8 +44,7 @@ struct TalkPanel: View {
             let side: CGFloat = boardSide(in: proxy.size)
             let bottomInset: CGFloat = proxy.safeAreaInsets.bottom
             VStack(spacing: 12) {
-                TalkPanelBoard(fen: session.fen, flipped: session.player == .black, light: light, theme: theme)
-                    .frame(width: side, height: side)
+                TalkPanelBoard(fen: session.fen, flipped: session.player == .black, light: light, theme: theme, side: side)
                 conversation(bottomInset: bottomInset)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)

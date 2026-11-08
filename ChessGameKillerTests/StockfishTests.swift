@@ -22,6 +22,28 @@ final class StockfishTests: XCTestCase {
         XCTAssertEqual(Set(lines.compactMap(\.firstMove)).count, lines.count, "a move shows up twice")
     }
 
+    /// Analysis tells its lines as it deepens, so they can show before the search ends.
+    func testAnalysisReportsAsItDeepens() async throws {
+        try XCTSkipUnless(StockfishEngine.hasNetworks)
+        let start = Position.standard.fen
+        let reports = Reports()
+        let lines = await StockfishEngine.shared.analyze(fen: start, depth: 12, lines: 2, maxTimeMs: 5000) { found, depth in
+            reports.add(depth: depth, count: found.count)
+        }
+        XCTAssertFalse(lines.isEmpty)
+        let seen = reports.all
+        XCTAssertGreaterThan(seen.count, 3, "it should report several depths before the end")
+        XCTAssertEqual(seen.map(\.depth), seen.map(\.depth).sorted(), "depths only go up")
+        XCTAssertTrue(seen.allSatisfy { (1...2).contains($0.count) })
+    }
+
+    private final class Reports: @unchecked Sendable {
+        private let lock = NSLock()
+        private var reports: [(depth: Int, count: Int)] = []
+        func add(depth: Int, count: Int) { lock.withLock { reports.append((depth, count)) } }
+        var all: [(depth: Int, count: Int)] { lock.withLock { reports } }
+    }
+
     func testFindsMateInOne() async throws {
         try XCTSkipUnless(StockfishEngine.hasNetworks)
         let backRank = "6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1"
@@ -130,6 +152,57 @@ final class StockfishTests: XCTestCase {
             XCTAssertFalse(match.engineFailed, "\(level) said the engine was unavailable")
         }
         await match.settleEngine()
+    }
+
+    // MARK: Grading known blunders with the real engine
+
+    /// Grades `move` the way a game does: the position before searched for two lines,
+    /// the one after for the opponent's answer, at the coach's full depth.
+    private func gradeWithStockfish(_ move: String, in fen: String) async throws -> MoveReview.Grade {
+        let budget = EngineBudget.full
+        let engine = StockfishEngine.shared
+        let before = await engine.analyze(fen: fen, depth: budget.gradeDepth, lines: 2, maxTimeMs: 10_000)
+        let best = try XCTUnwrap(before.first)
+        if best.firstMove == move { return .best }
+        var board = Board(position: try XCTUnwrap(Position(fen: fen)))
+        let squares = try XCTUnwrap(Notation.squares(of: move))
+        XCTAssertNotNil(board.move(pieceAt: squares.from, to: squares.to), "\(move) should be legal")
+        let answers = await engine.analyze(fen: board.position.fen, depth: budget.gradeDepth, lines: 1, maxTimeMs: 10_000)
+        let answer = try XCTUnwrap(answers.first)
+        let loss = MoveReview.materialLoss(fen: fen, best: best.moves, played: [move] + answer.moves)
+        return MoveReview.grade(before: best.evaluation, after: answer.evaluation.flipped, playedBest: false, materialLoss: loss)
+    }
+
+    /// Alex's game against the 1200s, move 22: twelve pawns down, Rd1 walks into mate.
+    /// The coach called moves like it "Good".
+    func testWalkingIntoMateInALostGameIsABlunder() async throws {
+        try XCTSkipUnless(StockfishEngine.hasNetworks)
+        let fen = "3r2k1/p5pp/2n1p1bn/1pP5/1P3qP1/1KN5/P3B2P/7R w - - 0 22"
+        let grade = try await gradeWithStockfish("h1d1", in: fen)
+        XCTAssertEqual(grade, .blunder)
+    }
+
+    /// Ten pawns down with the bishop on c5 attacked: a3 leaves it to be taken.
+    func testHangingAPieceInALostGameIsABlunder() async throws {
+        try XCTSkipUnless(StockfishEngine.hasNetworks)
+        let fen = "r1bqkbnr/ppp2ppp/2n5/2B5/8/8/PPP2PPP/R3K2R w KQkq - 1 10"
+        let grade = try await gradeWithStockfish("a2a3", in: fen)
+        XCTAssertEqual(grade, .blunder)
+    }
+
+    /// The level game the old scale already got right still grades the same.
+    func testHangingAKnightInALevelGameIsStillABlunder() async throws {
+        try XCTSkipUnless(StockfishEngine.hasNetworks)
+        let fen = "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/3P1N2/PPP2PPP/RNBQK2R w KQkq - 1 5"
+        let grade = try await gradeWithStockfish("f3d4", in: fen)
+        XCTAssertEqual(grade, .blunder)
+    }
+
+    func testAQuietDevelopingMoveIsNotPunished() async throws {
+        try XCTSkipUnless(StockfishEngine.hasNetworks)
+        let fen = "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/3P1N2/PPP2PPP/RNBQK2R w KQkq - 1 5"
+        let grade = try await gradeWithStockfish("b1c3", in: fen)
+        XCTAssertTrue([.best, .excellent, .good].contains(grade), "\(grade)")
     }
 }
 

@@ -322,7 +322,7 @@ struct SculptedStillBoard: View {
 
 /// Fits a view inside what it is offered at a shape within `range` (width over height): as
 /// `aspectRatio(_:contentMode: .fit)` does for one shape, for a range of them.
-private struct AspectRange: ViewModifier {
+struct AspectRange: ViewModifier {
     let range: ClosedRange<Float>
 
     func body(content: Content) -> some View {
@@ -330,7 +330,7 @@ private struct AspectRange: ViewModifier {
     }
 }
 
-private struct AspectRangeLayout: Layout {
+struct AspectRangeLayout: Layout {
     let low: CGFloat
     let high: CGFloat
 
