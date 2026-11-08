@@ -3,16 +3,24 @@ import SwiftUI
 /// The colors Rewind uses on every board: one accent for the good, one warm tone
 /// for moves to fix, and red for the ones that hurt.
 enum RewindPalette {
-    static let gold = Color(hex: 0xE6C17A)
-    static let amber = Color(hex: 0xF0AE5A)
-    static let coral = Color(hex: 0xEF7B6E)
+    static let goldHex: UInt32 = 0xE6C17A
+    static let amberHex: UInt32 = 0xF0AE5A
+    static let coralHex: UInt32 = 0xEF7B6E
+    static let gold = Color(hex: goldHex)
+    static let amber = Color(hex: amberHex)
+    static let coral = Color(hex: coralHex)
 
     static func color(for moment: SavedMoment, rewritten: Bool) -> Color {
-        if rewritten { return gold }
+        Color(hex: hex(for: moment, rewritten: rewritten))
+    }
+
+    /// The same color as 0xRRGGBB, for the 3D board's marks.
+    static func hex(for moment: SavedMoment, rewritten: Bool) -> UInt32 {
+        if rewritten { return goldHex }
         switch moment.moveGrade {
-        case .blunder: return coral
-        case .mistake, .inaccuracy: return amber
-        default: return gold
+        case .blunder: return coralHex
+        case .mistake, .inaccuracy: return amberHex
+        default: return goldHex
         }
     }
 }

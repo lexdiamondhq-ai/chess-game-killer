@@ -20,7 +20,7 @@ import { describePosition } from "./board.js";
 import { claudeTimeoutMs, cleanText, failureCode, parseClaims } from "./claims.js";
 import { Chess } from "./vendor/chess.js";
 import { verifyTalk } from "./verify.js";
-import { speak, toBase64, voiceKey } from "./voice.js";
+import { recordingKey, speak, toBase64, voiceKey } from "./voice.js";
 
 const MAX_BODY_BYTES = 32 * 1024;
 const MAX_SAID = 800;
@@ -223,6 +223,10 @@ async function runTalk(talk, env, deps, writer) {
 /** The voice line: the coach's MP3, or why there's none so the app uses the device's voice. */
 async function voiceLine(text, env, deps, coach = "leo") {
   if (!voiceKey(env)) return { type: "voice", unavailable: "not_configured" };
+  // Said before in this voice: play that recording again, free.
+  const key = await recordingKey(env, text, coach);
+  const kept = await recordings(env, "GET", key);
+  if (kept) return { type: "voice", format: "mp3", audio: toBase64(kept) };
   let allowed;
   try {
     allowed = await takeFromBudget(env, "voice", text.length, dailyLimit(env.DAILY_VOICE_CHARS, DEFAULT_DAILY_VOICE_CHARS));
@@ -238,7 +242,26 @@ async function voiceLine(text, env, deps, coach = "leo") {
     audio = null;
   }
   if (!(audio instanceof Uint8Array) || audio.length === 0) return { type: "voice", unavailable: "upstream" };
+  await recordings(env, "PUT", key, audio);
   return { type: "voice", format: "mp3", audio: toBase64(audio) };
+}
+
+/**
+ * Leo's recordings, kept by recordingKey: GET gives the bytes or null, PUT keeps them. Never
+ * throws: a recording that can't be kept or found is only made again.
+ */
+async function recordings(env, method, key, audio) {
+  if (!env.RECORDINGS) return null;
+  try {
+    const store = env.RECORDINGS.get(env.RECORDINGS.idFromName("global"));
+    const answer = await store.fetch(`https://recordings/${key}`, { method, body: audio });
+    if (method !== "GET" || answer.status !== 200) return null;
+    const bytes = new Uint8Array(await answer.arrayBuffer());
+    return bytes.length > 0 ? bytes : null;
+  } catch (error) {
+    console.error(JSON.stringify({ voice: "recordings_failed", error: (error && error.name) || "error" }));
+    return null;
+  }
 }
 
 /** The stream's error codes: timeout, upstream (Claude failed or refused) or internal (a bug of ours). */
@@ -444,6 +467,41 @@ export class TalkBudget {
     if (used + amount > limit) return false;
     await this.ctx.storage.put("today", { ...today, [field]: used + amount });
     return true;
+  }
+}
+
+/** How many spoken answers TalkRecordings keeps (about 100 KB each). */
+const MAX_RECORDINGS = 3000;
+
+/**
+ * Keeps Leo's spoken answers, so a line he has said before in the same voice plays again
+ * without paying ElevenLabs. Up to MAX_RECORDINGS; once full, new lines are simply not kept.
+ */
+export class TalkRecordings {
+  static max = MAX_RECORDINGS;
+
+  constructor(ctx) {
+    this.ctx = ctx;
+  }
+
+  /** GET /<key>: 200 with the MP3, or 404. PUT /<key> with the MP3 as the body: 204. */
+  async fetch(request) {
+    const key = new URL(request.url).pathname.slice(1);
+    if (!/^[0-9a-f]{64}$/.test(key)) return new Response("not found", { status: 404 });
+    if (request.method === "GET") {
+      const audio = await this.ctx.storage.get(`r:${key}`);
+      return audio ? new Response(audio, { headers: { "content-type": "audio/mpeg" } }) : new Response("none", { status: 404 });
+    }
+    if (request.method === "PUT") {
+      const audio = new Uint8Array(await request.arrayBuffer());
+      if (audio.length === 0 || audio.length > 2 * 1024 * 1024) return new Response("bad", { status: 400 });
+      const count = Number(await this.ctx.storage.get("count")) || 0;
+      if (count >= MAX_RECORDINGS || (await this.ctx.storage.get(`r:${key}`))) return new Response(null, { status: 204 });
+      await this.ctx.storage.put(`r:${key}`, audio);
+      await this.ctx.storage.put("count", count + 1);
+      return new Response(null, { status: 204 });
+    }
+    return new Response("method not allowed", { status: 405 });
   }
 }
 

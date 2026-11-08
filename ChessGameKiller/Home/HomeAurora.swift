@@ -14,6 +14,8 @@ struct HomeAuroraInfo {
     /// The 3D board turning at the top: its look and the game's pieces.
     var look: SculptedLook
     var pieces: [Piece]
+    /// Your finest move of the week, framed, when you played one.
+    var finest: HomeFinestMove? = nil
 }
 
 struct HomeAuroraActions {
@@ -26,6 +28,8 @@ struct HomeAuroraActions {
     var playGrudge: () -> Void = {}
     /// Opens Puzzles.
     var puzzles: () -> Void = {}
+    /// Opens one of your finished games in Rewind.
+    var replay: (UUID) -> Void = { _ in }
 }
 
 /// Aurora's colors, night and day.
@@ -248,7 +252,7 @@ struct HomeAuroraView: View {
     // MARK: The page
 
     /// The page that slides up over the board: your games first, then a slim line of numbers,
-    /// then today's things as long rows.
+    /// then today's things as long rows, led by your finest move of the week.
     private var page: some View {
         let shape = UnevenRoundedRectangle(cornerRadii: .init(topLeading: 34, bottomLeading: 0,
                                                               bottomTrailing: 0, topTrailing: 34),
@@ -265,6 +269,9 @@ struct HomeAuroraView: View {
                 .padding(.horizontal, 12)
             HomeAuroraSection(title: "For today", palette: palette, note: nil)
             VStack(spacing: 10) {
+                if let finest = info.finest {
+                    HomeAuroraFinestMove(finest: finest, palette: palette) { actions.replay(finest.gameID) }
+                }
                 todayRows
             }
             .padding(.horizontal, 16)
