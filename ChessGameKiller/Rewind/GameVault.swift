@@ -43,6 +43,11 @@ final class GameVault {
         games.first { $0.id == id }
     }
 
+    /// Whether a game from a chess site is already here.
+    func hasImported(_ sourceID: String) -> Bool {
+        games.contains { $0.sourceID == sourceID }
+    }
+
     /// Adds a game, or brings a saved one up to date (its last grades can land after the game ends).
     /// What the player already rewrote is kept.
     func record(_ game: SavedGame) {
@@ -56,7 +61,10 @@ final class GameVault {
             guard updated != games[index] else { return }
             games[index] = updated
         } else {
-            games.insert(game, at: 0)
+            // Newest first. A game played here is always the newest; one brought in from a
+            // chess site slots in by when it was played.
+            let index = game.isImported ? (games.firstIndex { $0.date <= game.date } ?? games.count) : 0
+            games.insert(game, at: index)
             if games.count > Self.limit { games.removeLast(games.count - Self.limit) }
         }
         save()
