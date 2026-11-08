@@ -1,4 +1,4 @@
-// The coach's voice: Leo's answer read aloud by Trevor on ElevenLabs, Vera's by
+// The coach's voice: Leo's answer read aloud by Frederick on ElevenLabs, Vera's by
 // Sarah, with the same model and settings as their recorded lessons
 // (scripts/training/make_narration.py), so the coach in a game sounds like the
 // coach in the lessons. When there's no
@@ -6,8 +6,8 @@
 // device's voice instead.
 
 const API = "https://api.elevenlabs.io/v1/text-to-speech";
-/** Trevor ("TrevorT" in ElevenLabs' voice library): a natural, conversational American man. */
-const DEFAULT_VOICE_ID = "69SAlwj2jajrSXUGnYAA";
+/** Frederick ("Frederick Surrey" in ElevenLabs' voice library): a calm, velvety, well-spoken Englishman. */
+const DEFAULT_VOICE_ID = "j9jfwdrw7BRfcR43Qohk";
 /** Sarah: a confident, warm young American woman. Vera's voice. */
 const DEFAULT_VERA_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
 /** Leo's model, ElevenLabs' newest and most natural (LEO_MODEL in make_narration.py). */
