@@ -14,6 +14,8 @@ struct PlateRemark<Status: View>: View {
     /// In the game's dock, where the line is short: the coach's verdict stacks its grade over
     /// its advice, so neither is cut (Alex, 2026-11-07).
     var stacked = false
+    /// The rival's line is drawn larger than the person's (Alex, 2026-11-08).
+    var scale: CGFloat = 1
     @ViewBuilder let status: () -> Status
 
     @AppStorage("rivalBanter") private var banterOn = true
@@ -22,7 +24,7 @@ struct PlateRemark<Status: View>: View {
         ZStack(alignment: .leading) {
             if isRival, banterOn, let line = match.rivalLine {
                 Text("\u{201C}\(line.text)\u{201D}")
-                    .font(.app(.footnote, weight: .medium))
+                    .font(.app(.footnote, weight: .medium, scale: scale))
                     .italic()
                     .foregroundStyle(Color.primary.opacity(0.72))
                     .lineLimit(1)
@@ -31,7 +33,7 @@ struct PlateRemark<Status: View>: View {
                     .transition(.opacity.combined(with: .offset(y: 3)))
                     .accessibilityLabel("\(match.setup.rival.name) says: \(line.text)")
             } else if isRival, let vote = shownVote {
-                CrowdVoteLine(vote: vote, crowd: "players rated \(match.setup.rival.spokenElo)", theme: theme)
+                CrowdVoteLine(vote: vote, crowd: "players rated \(match.setup.rival.spokenElo)", theme: theme, scale: scale)
                     .id("vote-\(match.game.plyCount)")
                     .transition(.opacity.combined(with: .offset(y: 3)))
             } else if !isRival, let verdict = match.verdictLine {

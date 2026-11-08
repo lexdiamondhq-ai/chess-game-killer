@@ -367,7 +367,6 @@ struct RivalWelcome: View {
                 .frame(width: 120, height: 1)
                 .padding(.vertical, 6)
             Button {
-                RivalTheme.shared.arm(film.level)
                 player?.pause()
                 begin()
             } label: {

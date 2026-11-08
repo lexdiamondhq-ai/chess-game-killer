@@ -127,9 +127,11 @@ struct RivalLadder {
     }
 }
 
-/// The rival's theme under the game: it starts when a game against a rival begins from its
-/// film, loops quietly, and fades when the game ends or you go home. Ambient, so it mixes with
-/// other audio and stays quiet on silent. Settings > Sound & feel turns it off.
+/// The rival's theme under the game: it starts whenever a game against a rival begins (its
+/// film first or not, a rematch too) and when you come back to one under way, loops quietly,
+/// and fades when the game ends or you go home (Alex, 2026-11-08: the music must play when you
+/// return to the rivals). Your Grudge stays quiet. Ambient, so it mixes with other audio and
+/// stays quiet on silent. Settings > Sound & feel turns it off.
 @MainActor
 @Observable
 final class RivalTheme {
@@ -139,8 +141,8 @@ final class RivalTheme {
 
     private(set) var on: Bool
     @ObservationIgnored private var player: AVAudioPlayer?
-    /// The rival whose film just played: its game is about to start.
-    @ObservationIgnored private var armed: MatchController.Level?
+    /// The rival whose theme the player holds.
+    @ObservationIgnored private var loaded: MatchController.Level?
     @ObservationIgnored private var playing: MatchController.Level?
 
     private init() {
@@ -153,36 +155,40 @@ final class RivalTheme {
         if !on { stop() }
     }
 
-    /// The film ended on Begin: the next game against this rival gets its theme.
-    func arm(_ level: MatchController.Level) {
-        armed = level
+    /// Whether a game has a rival's theme: every game against the computer but Your Grudge.
+    static func hasTheme(_ setup: MatchController.Setup) -> Bool {
+        setup.opponent == .computer && !setup.grudge
     }
 
-    /// A new game started. Only a game against the rival whose film just played gets its theme;
-    /// any other game stops it.
-    func gameStarted(level: MatchController.Level, grudge: Bool) {
-        defer { armed = nil }
-        guard let armed, armed == level, !grudge else {
-            stop()
-            return
-        }
-        play(armed)
+    /// A new game started: a rival game plays its rival's theme, any other game is quiet.
+    func gameStarted(_ setup: MatchController.Setup) {
+        if Self.hasTheme(setup) { play(setup.level) } else { stop() }
+    }
+
+    /// The game screen came back over a game under way (from Home): its theme picks up again.
+    func resume(_ setup: MatchController.Setup) {
+        guard Self.hasTheme(setup) else { return }
+        play(setup.level)
     }
 
     private func play(_ level: MatchController.Level) {
         guard on, !Welcome.isUnderTest, let url = RivalFilm.of(level).themeURL else { return }
-        if playing != level || player == nil {
+        if loaded != level || player == nil {
             player?.stop()
             player = try? AVAudioPlayer(contentsOf: url)
             player?.numberOfLoops = -1
             player?.prepareToPlay()
+            loaded = level
         }
         guard let player else { return }
         playing = level
         try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
         try? AVAudioSession.sharedInstance().setActive(true)
-        player.volume = 0
-        player.play()
+        // Already playing (or fading out): it only rises again, with no restart.
+        if !player.isPlaying {
+            player.volume = 0
+            player.play()
+        }
         player.setVolume(Self.volume, fadeDuration: 3)
     }
 
@@ -195,6 +201,8 @@ final class RivalTheme {
             try? await Task.sleep(for: .seconds(fade + 0.05))
             guard let self, self.playing == nil else { return }
             self.player?.stop()
+            // The next game hears it from the top.
+            self.player?.currentTime = 0
         }
     }
 }

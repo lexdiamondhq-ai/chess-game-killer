@@ -144,7 +144,7 @@ struct SettingsSheet: View {
                                 ), theme: theme)
                                 rule
                             }
-                            ToggleRow(title: "Rival themes", subtitle: "Each rival's score, quietly, under a game begun from its film.",
+                            ToggleRow(title: "Rival themes", subtitle: "Each rival's score, quietly, under every game against it.",
                                       symbol: "music.quarternote.3", isOn: Binding(
                                 get: { rivalTheme.on },
                                 set: { on in if on != rivalTheme.on { rivalTheme.toggle() } }
