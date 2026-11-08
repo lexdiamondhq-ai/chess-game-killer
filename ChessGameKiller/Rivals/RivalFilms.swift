@@ -61,6 +61,22 @@ struct RivalFilm {
 /// opens once you beat the Berserker, and the Ashen King once you beat the Lionheart (Alex,
 /// 2026-11-07). A win is read from the rivals you have beaten (`RivalBoardsEarned`), which keeps
 /// wins saved under a rival's former name ("The 1600s").
+/// The rivals whose welcome film you've seen. Until you have, Home's Play shows the film first.
+enum RivalIntros {
+    static let key = "rivals.introsSeen"
+
+    static func seen(_ level: MatchController.Level, defaults: UserDefaults = .standard) -> Bool {
+        (defaults.stringArray(forKey: key) ?? []).contains(level.rival.slug)
+    }
+
+    static func mark(_ level: MatchController.Level, defaults: UserDefaults = .standard) {
+        var all = defaults.stringArray(forKey: key) ?? []
+        guard !all.contains(level.rival.slug) else { return }
+        all.append(level.rival.slug)
+        defaults.set(all, forKey: key)
+    }
+}
+
 struct RivalLadder {
     /// Lowercased names of every opponent beaten.
     let beatenNames: Set<String>
@@ -73,8 +89,10 @@ struct RivalLadder {
         self.init(beatenNames: RivalBoardsEarned.names(defaults))
     }
 
-    /// The first rival that must be beaten before the next one opens.
-    static let gate: MatchController.Level = .club
+    /// The first rival that must be beaten before the next one opens: the Cub, so every rival
+    /// waits until the one before it is beaten (Alex, 2026-11-08: "must beat the previous rival
+    /// before moving on to the next").
+    static let gate: MatchController.Level = .beginner
 
     func beaten(_ rival: Rival) -> Bool {
         beatenNames.contains(rival.name.lowercased())

@@ -317,9 +317,7 @@ struct HomeAuroraView: View {
         return ScrollView(.horizontal) {
             LazyHStack(spacing: 12) {
                 ForEach(all) { card in
-                    HomeAuroraGameTile(card: card, palette: palette,
-                                       change: card.kind == .next ? actions.stage.change : nil,
-                                       meet: meet(card)) { open(card) }
+                    tile(card)
                         .containerRelativeFrame(.horizontal) { width, _ in
                             all.count > 1 ? width - 72 : width - 32
                         }
@@ -333,10 +331,17 @@ struct HomeAuroraView: View {
         .contentMargins(.horizontal, 16, for: .scrollContent)
     }
 
-    /// Opens the hall on the next game's rival (on the one up next, for your Grudge).
-    private func meet(_ card: HomeAuroraGameCard) -> (() -> Void)? {
-        guard let rival = card.rival else { return nil }
-        return { actions.rivals(rival.isGrudge ? nil : rival.level) }
+    /// The next game gets the rival's own card, like your finest move (Alex, 2026-11-08);
+    /// your games keep their boards.
+    @ViewBuilder
+    private func tile(_ card: HomeAuroraGameCard) -> some View {
+        if let upNext = card.upNext {
+            HomeAuroraNextRival(card: card, rival: upNext.rival, palette: palette,
+                                play: { open(card) }, change: actions.stage.change,
+                                meet: { actions.rivals(upNext.isGrudge ? nil : upNext.level) })
+        } else {
+            HomeAuroraGameTile(card: card, palette: palette) { open(card) }
+        }
     }
 
     /// Rating, level and streak, small in the header: serif figures over fine caps, parted by
@@ -465,26 +470,15 @@ struct HomeAuroraGameTile: View {
     /// The next game's card offers Change beside Play: it opens the New Game sheet, for your
     /// side, clock and rival (Alex, 2026-11-08). Nil on every other card.
     var change: (() -> Void)? = nil
-    /// The next game shows its rival's coin, big, where a game shows its board (Alex,
-    /// 2026-11-08); a tap on the coin opens that rival in the hall.
-    var meet: (() -> Void)? = nil
     let action: () -> Void
-
-    private var height: CGFloat { card.rival == nil ? 128 : 144 }
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
         Button(action: action) {
             HStack(spacing: 14) {
-                if card.rival != nil {
-                    // Room for the coin, drawn over the card so its own button can take taps.
-                    Color.clear.frame(width: 120, height: 120)
-                        .accessibilityHidden(true)
-                } else {
-                    HomeAuroraBoard(fen: card.fen, flipped: card.flipped, lit: card.yourMove)
-                        .frame(width: 104, height: 104)
-                        .shadow(color: .black.opacity(0.35), radius: 10, y: 6)
-                }
+                HomeAuroraBoard(fen: card.fen, flipped: card.flipped, lit: card.yourMove)
+                    .frame(width: 104, height: 104)
+                    .shadow(color: .black.opacity(0.35), radius: 10, y: 6)
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 6) {
                         Circle()
@@ -525,25 +519,12 @@ struct HomeAuroraGameTile: View {
                 Spacer(minLength: 0)
             }
             .padding(12)
-            .frame(height: height)
+            .frame(height: 128)
             .background(shape.fill(palette.card))
             .overlay(shape.strokeBorder(card.yourMove ? palette.gold.opacity(0.4) : palette.line, lineWidth: 1))
         }
         .buttonStyle(HomeStagePress())
         .accessibilityElement(children: .combine)
-        .overlay(alignment: .leading) {
-            if let rival = card.rival {
-                Button { meet?() } label: {
-                    RivalPortrait(rival: rival, size: 120)
-                        .shadow(color: palette.gold.opacity(palette.dark ? 0.35 : 0.2), radius: 14, y: 4)
-                        .contentShape(Circle())
-                }
-                .buttonStyle(HomeStagePress())
-                .padding(.leading, 12)
-                .accessibilityLabel(rival.name)
-                .accessibilityHint("Opens \(rival.name) in the rivals' hall")
-            }
-        }
         .overlay(alignment: .bottomTrailing) {
             // On the same line as Play, at the card's right edge.
             if let change {
@@ -562,6 +543,149 @@ struct HomeAuroraGameTile: View {
                 .accessibilityHint("Pick your side, clock and rival")
             }
         }
+    }
+}
+
+/// The next game, dressed like your finest move (Alex, 2026-11-08: "Change the Rival to look
+/// like this, use the main pic for the rival, get rid of the coin"): the rival's own picture,
+/// the still from its welcome film, in a gold frame on the left; small gold caps, the rival's
+/// name in serif, the match in grey, and Play and Change as gold pills. The picture opens the
+/// rival in the hall, where its film plays.
+struct HomeAuroraNextRival: View {
+    let card: HomeAuroraGameCard
+    let rival: Rival
+    let palette: HomeAuroraPalette
+    let play: () -> Void
+    let change: () -> Void
+    let meet: () -> Void
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
+        HStack(spacing: 14) {
+            Button(action: meet) {
+                HomeRivalFrame(rival: rival, side: 112)
+            }
+            .buttonStyle(HomeStagePress())
+            .accessibilityLabel(rival.name)
+            .accessibilityHint("Opens \(rival.name) in the rivals' hall")
+            VStack(alignment: .leading, spacing: 4) {
+                Text(card.status.uppercased())
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1.2)
+                    .foregroundStyle(palette.gold)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                Text(rival.name)
+                    .font(.system(size: 26, weight: .regular, design: .serif))
+                    .foregroundStyle(palette.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                Text(detail)
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(palette.ink2)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 8) {
+                    Button(action: play) { pill("Play", symbol: "play.fill") }
+                        .buttonStyle(HomeStagePress())
+                        .accessibilityLabel("Play \(rival.name)")
+                    Button(action: change) { pill("Change", symbol: "slider.horizontal.3") }
+                        .buttonStyle(HomeStagePress())
+                        .accessibilityLabel("Change the next game")
+                        .accessibilityHint("Pick your side, clock and rival")
+                }
+                .padding(.top, 6)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity)
+        .background(shape.fill(palette.card))
+        .background(alignment: .topLeading) {
+            // A warm gold light from the frame's corner, as on your finest move.
+            RadialGradient(colors: [palette.gold.opacity(palette.dark ? 0.18 : 0.14), palette.gold.opacity(0)],
+                           center: .topLeading, startRadius: 0, endRadius: 220)
+                .clipShape(shape)
+                .allowsHitTesting(false)
+        }
+        .overlay(shape.strokeBorder(palette.gold.opacity(0.32), lineWidth: 1))
+    }
+
+    /// "1000 · No clock · You're White".
+    private var detail: String {
+        ([rival.elo.replacingOccurrences(of: "~", with: "")] + card.tags).joined(separator: " · ")
+    }
+
+    private func pill(_ title: String, symbol: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: symbol)
+                .font(.system(size: 9.5, weight: .bold))
+            Text(title)
+                .font(.system(size: 12, weight: .bold))
+        }
+        .foregroundStyle(palette.gold)
+        .padding(.horizontal, 11)
+        .frame(height: 28)
+        .overlay(Capsule().strokeBorder(palette.gold.opacity(0.45), lineWidth: 1))
+        .contentShape(Capsule())
+    }
+}
+
+/// A rival's own picture, the still from its welcome film, cut square on its face and set in
+/// the same gold frame as your finest move. Your Grudge, who has no film, shows its portrait.
+struct HomeRivalFrame: View {
+    let rival: Rival
+    let side: CGFloat
+
+    /// The stills, read once each.
+    @MainActor private static var stills: [String: UIImage] = [:]
+
+    @MainActor
+    private var still: UIImage? {
+        guard !rival.isGrudge else { return nil }
+        if let cached = Self.stills[rival.slug] { return cached }
+        let image = RivalFilm.of(rival.level).cardImage
+        Self.stills[rival.slug] = image
+        return image
+    }
+
+    /// Where the square starts down the 9:16 still, so it sits on the rider's face: the Ashen
+    /// King sits low on his throne under the dragon.
+    private var top: CGFloat { rival.level == .grandmaster ? 0.2 : 0.07 }
+
+    var body: some View {
+        let pad: CGFloat = side * 0.055
+        let inner: CGFloat = side - 2 * pad
+        Group {
+            if let still {
+                Image(uiImage: still)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: inner, height: inner * 16 / 9)
+                    .offset(y: -top * inner * 16 / 9)
+                    .frame(width: inner, height: inner, alignment: .top)
+                    .clipped()
+            } else {
+                Image(rival.portraitName)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFill()
+                    .frame(width: inner, height: inner)
+                    .clipped()
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+        .padding(pad)
+        .background(
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .fill(LinearGradient(stops: [.init(color: Color(hex: 0xF3D99A), location: 0),
+                                             .init(color: Color(hex: 0x9C6B2C), location: 0.45),
+                                             .init(color: Color(hex: 0xE9C47C), location: 0.7),
+                                             .init(color: Color(hex: 0x7E5520), location: 1)],
+                                     startPoint: .topLeading, endPoint: .bottomTrailing))
+        )
+        .shadow(color: .black.opacity(0.45), radius: 12, y: 8)
+        .accessibilityHidden(true)
     }
 }
 

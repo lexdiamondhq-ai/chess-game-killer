@@ -97,6 +97,8 @@ struct NewGameSheet: View {
     @State private var openRow: MatchRow?
     @State private var confirmingForfeit = false
     @Environment(\.dismiss) private var dismiss
+    /// Which rivals are open: each waits until the one before it is beaten (Alex, 2026-11-08).
+    private let ladder: RivalLadder
 
     /// `stakesOpen` and `stake` are for pictures: On the line unfolded, with a piece already picked.
     init(theme: BoardTheme, forfeits: String? = nil, defaults: UserDefaults = .standard,
@@ -108,7 +110,10 @@ struct NewGameSheet: View {
         self.forfeits = forfeits
         self.start = start
         self.challenge = challenge
-        let level = (defaults.object(forKey: "setup.level") as? Int).flatMap { MatchController.Level(rawValue: $0) } ?? .club
+        let ladder = RivalLadder(defaults: defaults)
+        self.ladder = ladder
+        let saved = (defaults.object(forKey: "setup.level") as? Int).flatMap { MatchController.Level(rawValue: $0) }
+        let level = saved.map { ladder.isOpen($0) ? $0 : ladder.current } ?? ladder.current
         _draftSide = State(initialValue: defaults.string(forKey: "setup.side").flatMap { SideChoice(rawValue: $0) } ?? .white)
         _draftLevel = State(initialValue: level)
         _draftClock = State(initialValue: defaults.string(forKey: "setup.clock").flatMap { TimeControl(rawValue: $0) } ?? .unlimited)
@@ -122,7 +127,9 @@ struct NewGameSheet: View {
     /// The choices from last time, for when the sheet is closed without starting.
     static func savedSetup(_ defaults: UserDefaults = .standard) -> MatchController.Setup {
         let side = defaults.string(forKey: "setup.side").flatMap { SideChoice(rawValue: $0) } ?? .white
-        let level = (defaults.object(forKey: "setup.level") as? Int).flatMap { MatchController.Level(rawValue: $0) } ?? .club
+        let ladder = RivalLadder(defaults: defaults)
+        let saved = (defaults.object(forKey: "setup.level") as? Int).flatMap { MatchController.Level(rawValue: $0) }
+        let level = saved.map { ladder.isOpen($0) ? $0 : ladder.current } ?? ladder.current
         let clock = defaults.string(forKey: "setup.clock").flatMap { TimeControl(rawValue: $0) } ?? TimeControl.unlimited
         return MatchController.Setup(playerColor: side.color, level: level, timeControl: clock)
     }
@@ -179,9 +186,10 @@ struct NewGameSheet: View {
                 Button {
                     if forfeits == nil { play() } else { confirmingForfeit = true }
                 } label: {
-                    Label(playTitle, systemImage: "play.fill")
+                    Label(playTitle, systemImage: lockedBy == nil ? "play.fill" : "lock.fill")
                         .padding(.vertical, 2)
                 }
+                .disabled(lockedBy != nil)
                 .buttonStyle(TrainingButtonStyle(theme: theme))
                 .padding(.horizontal, 20)
                 .padding(.bottom, 8)
@@ -360,7 +368,13 @@ struct NewGameSheet: View {
     /// The colour the army's pieces are drawn in here: the side picked, White for Random.
     private var armyColor: Piece.Color { draftSide == .black ? .black : .white }
 
+    /// Who to beat first, when the rival in front is still locked.
+    private var lockedBy: Rival? {
+        ladder.isOpen(draftLevel) ? nil : MatchController.Level(rawValue: draftLevel.rawValue - 1)?.rival
+    }
+
     private var playTitle: String {
+        if let lockedBy { return "Beat \(lockedBy.name.lowercasedFirstWord) first" }
         if let army, let stake { return "Play for \(army.displayName(of: stake))" }
         if let army, let prisoner { return "Rescue \(army.displayName(of: prisoner))" }
         return "Play \(draftRival.name)"
@@ -471,7 +485,9 @@ struct NewGameSheet: View {
             LazyHStack(spacing: 12) {
                 ForEach(Rival.all) { rival in
                     RivalCard(rival: rival, isSelected: draftLevel == rival.level, theme: theme,
-                          holding: army?.prisoner(of: rival.level).map { army?.displayName(of: $0) ?? "" })
+                          holding: army?.prisoner(of: rival.level).map { army?.displayName(of: $0) ?? "" },
+                          lockedBy: ladder.isOpen(rival.level) ? nil
+                              : MatchController.Level(rawValue: rival.level.rawValue - 1)?.rival)
                         .containerRelativeFrame(.horizontal) { length, _ in length - 50 }
                         .scrollTransition(.interactive, axis: .horizontal) { content, phase in
                             content
@@ -597,14 +613,30 @@ private struct RivalCard: View {
     let theme: BoardTheme
     /// The name of the player's piece this rival is holding (On the line), if any.
     var holding: String? = nil
+    /// The rival to beat first, while this one is locked.
+    var lockedBy: Rival? = nil
 
     private var holdingNote: String {
         holding.map { " Holding your \($0)." } ?? ""
     }
 
+    private var lockNote: String {
+        lockedBy.map { " Locked. Beat \($0.name.lowercasedFirstWord) first." } ?? ""
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             RivalCoin(rival: rival, size: 92)
+                .saturation(lockedBy == nil ? 1 : 0)
+                .opacity(lockedBy == nil ? 1 : 0.55)
+                .overlay {
+                    if lockedBy != nil {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .shadow(color: .black.opacity(0.5), radius: 4)
+                    }
+                }
                 .scaleEffect(isSelected ? 1 : 0.92)
                 .frame(width: 100, height: 100)
                 .animation(.spring(response: 0.45, dampingFraction: 0.75), value: isSelected)
@@ -621,6 +653,16 @@ private struct RivalCard: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 2)
+                if let lockedBy {
+                    Label("Beat \(lockedBy.name.lowercasedFirstWord) first", systemImage: "lock.fill")
+                        .font(.app(.caption2, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color.primary.opacity(0.08), in: Capsule())
+                        .padding(.top, 2)
+                }
                 if let holding {
                     Label("Holding \(holding)", systemImage: "lock.fill")
                         .font(.app(.caption2, weight: .bold))
@@ -661,7 +703,7 @@ private struct RivalCard: View {
         .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .animation(.snappy, value: isSelected)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(rival.name), \(rival.level.name), \(rival.spokenElo). \(rival.blurb)\(holdingNote)")
+        .accessibilityLabel("\(rival.name), \(rival.level.name), \(rival.spokenElo). \(rival.blurb)\(holdingNote)\(lockNote)")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
