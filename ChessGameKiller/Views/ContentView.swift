@@ -760,7 +760,6 @@ struct ContentView: View {
     /// Everything that leaves the board for a moment, one tap away.
     private var moreMenu: some View {
         Menu {
-            Button {
             // Flip is in the dock, so it isn't repeated here (Alex, 2026-11-08).
             Section {
                 Button {
