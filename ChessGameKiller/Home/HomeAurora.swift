@@ -267,14 +267,14 @@ struct HomeAuroraView: View {
                 .padding(.top, 10)
             HomeAuroraSection(title: gamesTitle, palette: palette, note: gamesNote)
             gameRow
-            HomeAuroraSection(title: "Face a rival", palette: palette, note: "Up next: \(stage.upNext.level.rival.shortName)")
+            // A quiet way into the hall in the heading's corner; the coins open it too (Alex,
+            // 2026-11-08, layout tidy).
+            HomeAuroraSection(title: "Face a rival", palette: palette, note: "All rivals",
+                              action: { actions.rivals(nil) })
             // A coin opens its rival's card in the hall, where its film plays and the locks hold
             // (Alex, 2026-11-07).
             HomeAuroraRivals(next: stage.upNext.level, palette: palette, play: { actions.rivals($0) })
                 .padding(.horizontal, 12)
-            HomeAuroraRivalsButton(palette: palette) { actions.rivals(nil) }
-                .padding(.horizontal, 16)
-                .padding(.top, 14)
             HomeAuroraSection(title: "For today", palette: palette, note: nil)
             VStack(spacing: 10) {
                 todayRows
@@ -924,6 +924,8 @@ struct HomeAuroraSection: View {
     let title: String
     let palette: HomeAuroraPalette
     var note: String? = nil
+    /// Makes the note a quiet link in the heading's corner ("All rivals ›").
+    var action: (() -> Void)? = nil
 
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
@@ -937,7 +939,20 @@ struct HomeAuroraSection: View {
                     .frame(width: 44, height: 1)
             }
             Spacer()
-            if let note {
+            if let note, let action {
+                Button(action: action) {
+                    HStack(spacing: 3) {
+                        Text(note)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .bold))
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(palette.gold)
+                    // A bigger target than it looks, without making the heading taller.
+                    .contentShape(Rectangle().inset(by: -12))
+                }
+                .buttonStyle(.plain)
+            } else if let note {
                 Text(note)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(palette.ink2)
@@ -1002,52 +1017,6 @@ struct HomeAuroraRivals: View {
         .accessibilityLabel("Play \(rival.name)")
         .accessibilityValue(rival.spokenElo)
         .accessibilityHint(isNext ? "Up next" : "")
-    }
-}
-
-/// Rivals, under the coins: opens the rivals' hall, where each rival's card is swiped through
-/// and its welcome film plays before the game (Alex, 2026-11-07).
-struct HomeAuroraRivalsButton: View {
-    let palette: HomeAuroraPalette
-    let action: () -> Void
-
-    var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
-        Button(action: action) {
-            HStack(spacing: 12) {
-                Image(systemName: "shield.lefthalf.filled")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Color(hex: 0xE8C27A))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("RIVALS")
-                        .font(.custom("Cinzel-Bold", size: 16, relativeTo: .headline))
-                        .tracking(3)
-                        .foregroundStyle(Color(hex: 0xF2EEE6))
-                    Text("Five warriors. Beat each one to climb.")
-                        .font(.system(size: 13, weight: .regular, design: .serif))
-                        .italic()
-                        .foregroundStyle(Color(hex: 0xF2EEE6).opacity(0.6))
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Color(hex: 0xE8C27A).opacity(0.8))
-            }
-            .padding(.horizontal, 18)
-            .frame(maxWidth: .infinity, minHeight: 64)
-            .background {
-                shape.fill(LinearGradient(colors: [Color(hex: 0x17151A), Color(hex: 0x0B0A0D)],
-                                          startPoint: .topLeading, endPoint: .bottomTrailing))
-            }
-            .overlay {
-                shape.strokeBorder(LinearGradient(colors: [Color(hex: 0xE8C27A).opacity(0.6), Color(hex: 0xE8C27A).opacity(0.1)],
-                                                  startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1)
-            }
-            .shadow(color: palette.shadow, radius: 12, y: 6)
-        }
-        .buttonStyle(HomeStagePress())
-        .accessibilityLabel("Rivals")
-        .accessibilityHint("Swipe through the five rivals and face one")
     }
 }
 
