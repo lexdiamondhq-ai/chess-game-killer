@@ -117,7 +117,7 @@ struct SculptedBoardState: Equatable {
     var finale: SculptedFinale?
     /// Ghost Vision's line, nearest step first, while the player holds the board.
     var ghosts: [SculptedGhostStep] = []
-    /// Seen from the player's chair, or from above with each piece inside its square (Big Board).
+    /// Seen from the player's chair, or from above with each piece inside its square (Flat).
     var framing: SculptedCamera.Framing = .standing
     /// The pieces come without lasting ids (an earlier position of the game, a preview):
     /// the scene matches them to the pieces on the board so each one moves rather than fades.
@@ -608,7 +608,7 @@ final class SculptedBoardScene {
         var heirloomParts: [SCNNode] = []
         /// Turned about its own axis so it reads best (the knight nearly side-on).
         let yaw: Float
-        /// The piece at rest in its own frame: turned by `yaw`, and on Big Board laid down
+        /// The piece at rest in its own frame: turned by `yaw`, and in Flat laid down
         /// on its side. Every pose of the model ends with it.
         var rest: simd_float4x4
         /// Seen flat from above: no tipping over at the end of the game.
@@ -1224,7 +1224,7 @@ final class SculptedBoardScene {
         node.root.simdWorldOrientation.inverse.act(vector)
     }
 
-    /// `yaw` is the piece's rest (`PieceNode.rest`): its turn, and on Big Board its lying down.
+    /// `yaw` is the piece's rest (`PieceNode.rest`): its turn, and in Flat its lying down.
     private static func pose(y: Float, axis: SIMD3<Float>, angle: Float, scale s: Float, yaw: simd_float4x4) -> simd_float4x4 {
         translation(SIMD3(0, y, 0))
             * simd_float4x4(simd_quatf(angle: angle, axis: simd_normalize(axis)))
@@ -1987,7 +1987,7 @@ final class SculptedBoardScene {
         let metal = shared.copy() as? SCNMaterial ?? shared
         inlay = metal
         inlayGlow = metal.emission.contents
-        let gap: Float = 0.09
+        let gap: Float = 0.03
         let line: Float = 0.012
         let span = 8 + 2 * gap + line
         let inlay: [(x: Float, z: Float, width: Float, length: Float)] = [
@@ -2005,50 +2005,118 @@ final class SculptedBoardScene {
         scene.rootNode.addChildNode(board)
     }
 
-    /// The files and ranks on the frame, outside the squares as on a printed board, upright for
-    /// the player: the letters along the frame's near side, each under its file, and the numbers
-    /// down its left side, each beside its rank. From Black's side the near side and the left
-    /// are the other ones, and the letters run h to a.
+    /// The files and ranks in the corners of the edge squares, as most boards show them, upright
+    /// for the player: each letter in the bottom-right corner of its file's square on the near
+    /// rank, each number in the top-left corner of its rank's square on the left file. From
+    /// Black's side the near rank and the left file are the other ones, and the letters run h to a.
     private func buildLabels(flipped: Bool) {
         labelsNode.childNodes.forEach { $0.removeFromParentNode() }
         let turn = Self.labelOrientation(flipped: flipped)
         for label in Self.labelPlacements(flipped: flipped) {
-            addLabel(label.text, at: label.position, orientation: turn)
+            addLabel(label.text, at: label.position, onLightSquare: (label.square.fileIndex + label.square.rankIndex) % 2 == 1, orientation: turn)
         }
     }
 
-    /// Lying on the frame, the tops of the letters toward the far side of the board.
+    /// Lying on the squares, the tops of the letters toward the far side of the board.
     static func labelOrientation(flipped: Bool) -> simd_quatf {
         simd_quatf(angle: flipped ? .pi : 0, axis: SculptedCamera.up) * flat
     }
 
-    /// Where each file letter and rank number sits on the frame, just above the glass's top.
-    static func labelPlacements(flipped: Bool) -> [(text: String, position: SIMD3<Float>)] {
+    /// Where each file letter and rank number sits, a hair above the squares, and on which square.
+    static func labelPlacements(flipped: Bool) -> [(text: String, position: SIMD3<Float>, square: Square)] {
         // Toward the player: White's side of the board, or Black's.
         let near: Float = flipped ? -1 : 1
-        let band = SculptedCamera.labelBand
-        let height: Float = 0.011
+        let inset = SculptedCamera.labelInset
+        let height: Float = 0.004
         let files = Array("abcdefgh")
-        var placements: [(text: String, position: SIMD3<Float>)] = []
+        var placements: [(text: String, position: SIMD3<Float>, square: Square)] = []
         for index in 0..<8 {
-            // The file's and the rank's own line on the board, whichever side the player is on.
+            // The near rank's square under each file, and the left file's square beside each rank.
+            let bottom = Square(file: index, rank: flipped ? 7 : 0)
+            let left = Square(file: flipped ? 7 : 0, rank: index)
             let file = Float(index) - 3.5
             let rank = 3.5 - Float(index)
-            placements.append((String(files[index]), SIMD3(file, height, band * near)))
-            // The player's left is the a-file's side for White and the h-file's for Black.
-            placements.append(("\(index + 1)", SIMD3(-band * near, height, rank)))
+            // The player's right is +x for White and -x for Black; the far side -z for White, +z for Black.
+            placements.append((String(files[index]),
+                               SIMD3(file + (0.5 - inset) * near, height, (4 - inset) * near), bottom))
+            placements.append(("\(index + 1)",
+                               SIMD3(-(4 - inset) * near, height, rank - (0.5 - inset) * near), left))
         }
         return placements
     }
 
-    /// A letter or number on the smoked glass frame, pale like the metal line beside it.
-    private func addLabel(_ text: String, at position: SIMD3<Float>, orientation: simd_quatf) {
-        let node = SCNNode(geometry: Self.mark(size: 0.3, color: look.platinumMark, alpha: 0.85, mask: MarkImages.label(text)))
+    /// A letter or number on a square, in the other squares' color so it never matches the
+    /// square under it (Alex, 2026-11-07): the dark squares' stone on a light square, the light
+    /// squares' on a dark one. Settings, Coordinates, takes them all away.
+    private func addLabel(_ text: String, at position: SIMD3<Float>, onLightSquare: Bool, orientation: simd_quatf) {
+        let inks = Self.labelInks(squares: look.squares)
+        let node = SCNNode(geometry: Self.mark(size: 0.26, color: onLightSquare ? inks.onLight : inks.onDark, alpha: 0.95,
+                                               mask: MarkImages.label(text)))
         node.simdPosition = position
         node.simdOrientation = orientation
         node.castsShadow = false
         node.renderingOrder = 8
         labelsNode.addChildNode(node)
+    }
+}
+
+extension SculptedBoardScene {
+    /// The colors for the files and ranks on a look's squares: the average of the dark squares
+    /// for the light ones, and of the light squares for the dark ones. Where the two stones are
+    /// too close to tell apart, near-black and near-white instead.
+    static func labelInks(squares name: String) -> (onLight: UIColor, onDark: UIColor) {
+        if let cached = labelInkCache[name] { return cached }
+        let fallback = (onLight: UIColor(white: 0.1, alpha: 1), onDark: UIColor(white: 0.95, alpha: 1))
+        var inks = fallback
+        if let image = UIImage(named: name)?.cgImage, let averages = squareAverages(image) {
+            let (light, dark) = averages
+            if luminance(light) - luminance(dark) > 0.25 {
+                inks = (onLight: color(dark), onDark: color(light))
+            }
+        }
+        labelInkCache[name] = inks
+        return inks
+    }
+
+    private static var labelInkCache: [String: (onLight: UIColor, onDark: UIColor)] = [:]
+
+    /// The average color of the light squares and of the dark ones, the board's picture drawn
+    /// down to 4 pixels a square; whichever group is brighter is the light one.
+    static func squareAverages(_ image: CGImage) -> (light: SIMD3<Float>, dark: SIMD3<Float>)? {
+        let side = 32
+        var pixels = [UInt8](repeating: 0, count: side * side * 4)
+        let drawn = pixels.withUnsafeMutableBytes { buffer -> Bool in
+            guard let context = CGContext(data: buffer.baseAddress, width: side, height: side, bitsPerComponent: 8,
+                                          bytesPerRow: side * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            context.interpolationQuality = .medium
+            context.draw(image, in: CGRect(x: 0, y: 0, width: side, height: side))
+            return true
+        }
+        guard drawn else { return nil }
+        var sums = [SIMD3<Float>(repeating: 0), SIMD3<Float>(repeating: 0)]
+        var counts = [0, 0]
+        let cell = side / 8
+        for y in 0..<side {
+            for x in 0..<side {
+                // Only each square's middle, clear of the blur at its edges.
+                let inX = x % cell, inY = y % cell
+                guard (1...2).contains(inX), (1...2).contains(inY) else { continue }
+                let group = (x / cell + y / cell) % 2
+                let i = (y * side + x) * 4
+                sums[group] += SIMD3(Float(pixels[i]), Float(pixels[i + 1]), Float(pixels[i + 2])) / 255
+                counts[group] += 1
+            }
+        }
+        guard counts[0] > 0, counts[1] > 0 else { return nil }
+        let a = sums[0] / Float(counts[0]), b = sums[1] / Float(counts[1])
+        return luminance(a) >= luminance(b) ? (a, b) : (b, a)
+    }
+
+    static func luminance(_ c: SIMD3<Float>) -> Float { 0.2126 * c.x + 0.7152 * c.y + 0.0722 * c.z }
+
+    private static func color(_ c: SIMD3<Float>) -> UIColor {
+        UIColor(red: CGFloat(c.x), green: CGFloat(c.y), blue: CGFloat(c.z), alpha: 1)
     }
 }
 

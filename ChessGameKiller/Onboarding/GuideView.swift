@@ -16,8 +16,6 @@ struct GuideView: View {
          "Ghost Vision. Your turn in a game: hold a finger on the board and the best line appears a few moves ahead. Slide left to step back through it. Counts as help."),
         ("circle.circle", "Tap the orb for the coach",
          "The round button in the middle of the dock opens the coach: grades, the best moves, undo and new game."),
-        ("hand.draw", "Swipe the board to replay",
-         "In Big Board, swipe sideways on the board to step back through the game, and swipe up from the bottom for the tools."),
         ("arrow.down", "Pull the home board down",
          "On the home screen, pull the board down to open You: your pieces, your games and Settings. The You button in the dock does the same."),
     ]
