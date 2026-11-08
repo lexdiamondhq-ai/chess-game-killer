@@ -938,7 +938,8 @@ struct ContentView: View {
                         ExecutivePlate(match: match, theme: theme, color: bottomColor, inDock: true)
                     }
                 }
-                .frame(height: 44)
+                // Room for the grade, its advice and your captures under them, inside the dock.
+                .frame(height: 60)
                 .padding(.leading, 10)
                 .padding(.trailing, 2)
                 .frame(maxWidth: .infinity, alignment: .leading)

@@ -37,7 +37,7 @@ struct ExecutivePlate: View {
 
     private var dockLine: some View {
         HStack(spacing: 8) {
-            statusRow
+            dockStatus
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel(spokenLabel)
             Spacer(minLength: 4)
@@ -127,13 +127,39 @@ struct ExecutivePlate: View {
                 CheckTag(color: theme.check)
                     .transition(.scale.combined(with: .opacity))
             }
-            PlateRemark(match: match, theme: theme, isRival: isComputer, stacked: inDock) {
+            PlateRemark(match: match, theme: theme, isRival: isComputer) {
                 statusWords
             }
             .layoutPriority(1)
             CapturedPieces(match: match, by: color)
         }
         .animation(.easeInOut(duration: 0.2), value: selectedArmyPiece?.name)
+    }
+
+    /// The dock's status: the grade (or "Your move") on top, the pieces you have taken and your
+    /// lead on their own line under it, as on the rival's card above (Alex, 2026-11-08).
+    private var dockStatus: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 6) {
+                if inCheck {
+                    CheckTag(color: theme.check)
+                        .transition(.scale.combined(with: .opacity))
+                }
+                PlateRemark(match: match, theme: theme, isRival: isComputer, stacked: true) {
+                    statusWords
+                }
+            }
+            if hasCaptures {
+                CapturedPieces(match: match, by: color)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: selectedArmyPiece?.name)
+        .animation(.snappy(duration: 0.3), value: hasCaptures)
+    }
+
+    private var hasCaptures: Bool {
+        !match.game.captured(by: color).isEmpty || match.game.materialLead(for: color) > 0
     }
 
     /// The turn dot and the status, or the selected army piece's name and rank.
