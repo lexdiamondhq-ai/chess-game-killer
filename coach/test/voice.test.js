@@ -51,6 +51,19 @@ test("the voice settings, voice and model are the ones the recorded lessons use"
   assert.match(toml, /^VOICE_MODEL = "eleven_v4"$/m);
 });
 
+test("TALK_VOICE_MODEL reads live answers with the cheaper model, for Leo and Vera, in their own voices", async () => {
+  const { fetchImpl, calls } = fakeFetch();
+  const talk = { ...env, TALK_VOICE_MODEL: "eleven_flash_v2_5" };
+  await speak(talk, "Hello.", fetchImpl);
+  await speak(talk, "Hello.", fetchImpl, "vera");
+  assert.match(calls[0].url, /\/69SAlwj2jajrSXUGnYAA\?/);
+  assert.equal(calls[0].body.model_id, "eleven_flash_v2_5");
+  assert.match(calls[1].url, /\/EXAVITQu4vr4xnSDxMaL\?/);
+  assert.equal(calls[1].body.model_id, "eleven_flash_v2_5");
+  const toml = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8");
+  assert.match(toml, /^TALK_VOICE_MODEL = "eleven_flash_v2_5"$/m);
+});
+
 test("no key, no text or an odd voice ID: nothing is sent", async () => {
   const { fetchImpl, calls } = fakeFetch();
   assert.equal(await speak({}, "Hello.", fetchImpl), null);

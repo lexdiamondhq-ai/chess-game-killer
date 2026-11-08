@@ -1,4 +1,4 @@
-// Chess Game Killer in the browser: the home page, the invite page and the game itself.
+// Beauty of Chess in the browser: the home page, the invite page and the game itself.
 // No framework and no build step. The server's protocol is in play/PROTOCOL.md.
 
 import { Chess } from '/vendor/chess.js';
@@ -769,7 +769,7 @@ function render() {
 
 function renderTitle() {
   const g = S.game;
-  let t = 'Chess Game Killer';
+  let t = 'Beauty of Chess';
   if (S.view === 'invite') t = `${nameOf(g.creator)} challenged you to chess · ${t}`;
   else if (S.view === 'wait') t = `Waiting for your friend · ${t}`;
   else if (S.view === 'game' && g) {
@@ -912,7 +912,7 @@ function buildWait() {
     actions.append(h('button', {
       class: 'btn btn-primary btn-block',
       type: 'button',
-      onclick: () => navigator.share({ title: 'Chess Game Killer', text: shareText, url }).catch(() => {}),
+      onclick: () => navigator.share({ title: 'Beauty of Chess', text: shareText, url }).catch(() => {}),
     }, icon('share'), 'Share link'));
   } else {
     const subject = `${myName && myName !== 'Player' ? myName : 'A friend'} challenged you to chess`;

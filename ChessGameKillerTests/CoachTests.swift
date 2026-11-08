@@ -64,6 +64,69 @@ final class CoachTests: XCTestCase {
         XCTAssertEqual(MoveReview.grade(before: .mate(2), after: .centipawns(150), playedBest: false), .blunder)
     }
 
+    // MARK: Grading a game that is already lopsided
+    // Winning chances flatten out far from equal, so these used to read "Excellent" or "Good".
+
+    /// From a game against the 1200s: White twelve pawns down, every rook or knight move
+    /// but one walked into mate, and each was called "Good".
+    func testWalkingIntoMateIsABlunderEvenWhenAlreadyLost() {
+        XCTAssertEqual(MoveReview.grade(before: .centipawns(-1220), after: .mate(-1), playedBest: false), .blunder)
+        XCTAssertEqual(MoveReview.grade(before: .centipawns(-1220), after: .mate(-10), playedBest: false), .blunder)
+        XCTAssertEqual(MoveReview.grade(before: .centipawns(-300), after: .mate(-4), playedBest: false), .blunder)
+    }
+
+    func testAMateThatWasComingAnywayIsNoBlunder() {
+        XCTAssertEqual(MoveReview.grade(before: .mate(-3), after: .mate(-2), playedBest: false), .excellent)
+    }
+
+    /// White is ten pawns down and the bishop on c5 is attacked. 10. a3?? leaves it to be taken.
+    /// The lines are Stockfish 17's at depth 12.
+    private let hangingBishop = "r1bqkbnr/ppp2ppp/2n5/2B5/8/8/PPP2PPP/R3K2R w KQkq - 1 10"
+    private let tradeTheBishop = ["c5f8", "e8f8", "e1g1", "f8e8"]
+
+    func testHangingAPieceWhenAlreadyLostIsABlunder() {
+        let played = ["a2a3", "f8c5", "e1g1", "g8f6", "f1e1", "c8e6", "b2b4"]
+        let loss = MoveReview.materialLoss(fen: hangingBishop, best: tradeTheBishop, played: played)
+        XCTAssertEqual(loss, 3)
+        XCTAssertEqual(MoveReview.grade(before: .centipawns(-1009), after: .centipawns(-1204), playedBest: false,
+                                        materialLoss: loss), .blunder)
+        // The curve alone can't see it.
+        XCTAssertEqual(MoveReview.grade(before: .centipawns(-1009), after: .centipawns(-1204), playedBest: false), .excellent)
+    }
+
+    /// 10. g3 lets Black move first, but the bishops still come off a move later: no loss.
+    func testATradeAMoveLaterIsNotALoss() {
+        let played = ["g2g3", "c8e6", "c5f8", "e8f8", "e1g1", "g8f6", "f1e1"]
+        XCTAssertEqual(MoveReview.materialLoss(fen: hangingBishop, best: tradeTheBishop, played: played), 0)
+    }
+
+    func testMissingAFreePieceCounts() {
+        // White is twelve pawns up and Black's bishop on c4 is free. 10. a3 lets it trade itself off
+        // instead: passing over a free piece costs the same as giving one away.
+        let fen = "r3k2r/ppp2ppp/8/8/2b5/8/PPP2PPP/RNBQKBNR w KQkq - 0 10"
+        let loss = MoveReview.materialLoss(fen: fen, best: ["f1c4", "e8g8", "b1c3", "a8e8"],
+                                           played: ["a2a3", "c4f1", "e1f1", "e8g8", "b1c3"])
+        XCTAssertEqual(loss, 3)
+    }
+
+    func testASoundSacrificeIsNotPunished() {
+        // The engine scores it about as well as its own move, so the material isn't held against it.
+        XCTAssertEqual(MoveReview.grade(before: .centipawns(50), after: .centipawns(40), playedBest: false,
+                                        materialLoss: 3), .excellent)
+    }
+
+    func testGivingBackMaterialWhileStillWinningIsAtWorstAMistake() {
+        XCTAssertEqual(MoveReview.grade(before: .centipawns(1200), after: .centipawns(950), playedBest: false,
+                                        materialLoss: 3), .mistake)
+        XCTAssertEqual(MoveReview.grade(before: .centipawns(1200), after: .centipawns(950), playedBest: false,
+                                        materialLoss: 1), .inaccuracy)
+    }
+
+    func testMaterialNeedsAWholeMoveOfEachLine() {
+        XCTAssertNil(MoveReview.materialLoss(fen: hangingBishop, best: ["c5f8"], played: ["a2a3", "f8c5"]))
+        XCTAssertNil(MoveReview.materialLoss(fen: hangingBishop, best: tradeTheBishop, played: []))
+    }
+
     func testReviewTextNamesTheBetterMove() {
         let review = MoveReview(id: 0, grade: .mistake, played: "a3", best: "e4", evaluation: .centipawns(-120))
         XCTAssertEqual(review.title, "Mistake")

@@ -1,4 +1,4 @@
-// The chess board for Chess Game Killer in the browser.
+// The chess board for Beauty of Chess in the browser.
 // Squares are buttons (for keyboard and screen readers); pieces sit in their own layer and slide
 // between squares. Tap a piece then a square, or drag it. Legal moves show as dots on empty
 // squares and rings on captures.

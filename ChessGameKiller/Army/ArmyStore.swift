@@ -469,7 +469,7 @@ final class ArmyStore {
             .max { $0.1 < $1.1 }
         guard let best else { return nil }
         let (slot, times) = best
-        // The name sits mid-sentence: "The 1600s have taken your queen three times."
+        // The name sits mid-sentence: "The Berserker has taken your queen three times."
         return ArmyNews(slot: slot, rank: record(for: slot).rank, name: displayName(of: slot, capitalized: false),
                         kind: .grudge(rival: rival, times: times))
     }
