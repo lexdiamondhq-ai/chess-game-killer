@@ -19,8 +19,10 @@ struct ExecutivePlate: View {
     @ScaledMetric(relativeTo: .footnote) private var scaledStatusHeight: CGFloat = 16
     /// The status row's height. It stops growing where the line's type does.
     private var statusHeight: CGFloat { min(scaledStatusHeight, 21) * lineScale }
-    /// A rival (not Your Grudge) speaks in blood red dripping letters (Alex, 2026-11-08).
+    /// A rival (not Your Grudge) speaks in its own letters: blood red for the Ashen King, ash
+    /// grey gothic for the rest (Alex, 2026-11-08; `RivalLetters`).
     private var speaksInBlood: Bool { isComputer && !inDock && !match.setup.grudge }
+    private var voice: RivalLetters.Voice { .init(match.setup.level) }
     /// The line under the rival's name (its taunt, remarks and captures) is half again as large
     /// as the rest (Alex, 2026-11-08).
     private var lineScale: CGFloat { isComputer && !inDock ? 1.5 : 1 }
@@ -135,7 +137,7 @@ struct ExecutivePlate: View {
                 CheckTag(color: theme.check)
                     .transition(.scale.combined(with: .opacity))
             }
-            PlateRemark(match: match, theme: theme, isRival: isComputer, scale: lineScale, blood: speaksInBlood) {
+            PlateRemark(match: match, theme: theme, isRival: isComputer, scale: lineScale, voice: speaksInBlood ? voice : nil) {
                 statusWords
             }
             .layoutPriority(1)
@@ -202,7 +204,7 @@ struct ExecutivePlate: View {
                     .transition(.opacity)
             } else if !status.isEmpty, isTaunt {
                 Text(status)
-                    .bloodLetters(theme)
+                    .rivalLetters(voice, theme: theme)
                     .transition(.opacity)
             } else if !status.isEmpty {
                 Text(status)
@@ -310,7 +312,7 @@ struct ExecutivePlate: View {
             if rival.isGrudge {
                 return "\(rival.level.name) · \(rival.elo.replacingOccurrences(of: "~", with: ""))"
             }
-            return RivalTaunt.line(for: rival.level, game: match.gameID)
+            return RivalTaunt.line(for: rival.level, game: match.gameID, ply: match.game.plyCount)
         }
         return isActive ? "Your move" : ""
     }

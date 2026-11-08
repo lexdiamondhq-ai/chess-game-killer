@@ -13,10 +13,21 @@ final class RivalTauntTests: XCTestCase {
         }
     }
 
-    func testOneLinePerGame() {
+    func testTheLineHoldsForTwoMovesThenRotates() {
         let game = UUID()
-        let first = RivalTaunt.line(for: .grandmaster, game: game)
-        XCTAssertEqual(RivalTaunt.line(for: .grandmaster, game: game), first)
+        let step = RivalTaunt.pliesPerLine
+        let first = RivalTaunt.line(for: .grandmaster, game: game, ply: 0)
+        XCTAssertEqual(RivalTaunt.line(for: .grandmaster, game: game, ply: step - 1), first)
+        XCTAssertNotEqual(RivalTaunt.line(for: .grandmaster, game: game, ply: step), first)
         XCTAssertTrue(RivalTaunt.lines(for: .grandmaster).contains(first))
+    }
+
+    func testEveryLineComesRoundInAGame() {
+        let game = UUID()
+        for level in MatchController.Level.allCases {
+            let lines = RivalTaunt.lines(for: level)
+            let seen = Set((0..<lines.count).map { RivalTaunt.line(for: level, game: game, ply: $0 * RivalTaunt.pliesPerLine) })
+            XCTAssertEqual(seen.count, lines.count, "\(level)")
+        }
     }
 }

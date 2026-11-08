@@ -16,8 +16,8 @@ struct PlateRemark<Status: View>: View {
     var stacked = false
     /// The rival's line is drawn larger than the person's (Alex, 2026-11-08).
     var scale: CGFloat = 1
-    /// A rival speaks in blood red dripping letters, on up to two lines (Alex, 2026-11-08).
-    var blood = false
+    /// A rival speaks in its own letters, on up to two lines (Alex, 2026-11-08; `RivalLetters`).
+    var voice: RivalLetters.Voice? = nil
     @ViewBuilder let status: () -> Status
 
     @AppStorage("rivalBanter") private var banterOn = true
@@ -55,8 +55,8 @@ struct PlateRemark<Status: View>: View {
 extension PlateRemark {
     @ViewBuilder
     private func remark(_ text: String) -> some View {
-        if blood {
-            Text(text).bloodLetters(theme)
+        if let voice {
+            Text(text).rivalLetters(voice, theme: theme)
         } else {
             Text("\u{201C}\(text)\u{201D}")
                 .font(.app(.footnote, weight: .medium, scale: scale))
