@@ -713,7 +713,7 @@ extension HomeView {
             } else {
                 actions.resume()
             }
-        }, playRival: { level in playRival(level) }, rivals: { level in
+        }, playRival: { level in playRival(level) }, options: { level in actions.playRival(level) }, rivals: { level in
             hallStart = level
             hallIntro = false
             showingHall = true
