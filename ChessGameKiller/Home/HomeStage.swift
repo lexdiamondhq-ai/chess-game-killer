@@ -5,7 +5,7 @@ import SwiftUI
 /// music, streak and You up top; the real 3D board turning slowly on a faceted stone stage in a
 /// dark room; the rating with three pills under it; a deck of cards (swipe down for the next,
 /// All for every one); and a floating glass tab bar with the gold knight. It follows
-/// Settings > Home colors, with a sun and moon to switch. Going to a board swoops the camera in.
+/// Settings > Appearance. Going to a board swoops the camera in.
 /// On by default; Settings > Stage home turns it off. The game's own board is untouched.
 enum HomeStageLayout {
     static let key = "homeStage"
@@ -98,8 +98,6 @@ struct HomeStageView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("haptics") private var hapticsOn = true
-    /// Settings > Home colors, also switched by the sun and moon in the top bar.
-    @AppStorage(HomeToneMode.key) private var toneMode = HomeToneMode.defaultMode
     /// The deck's order: the first is in front.
     @State private var order: [HomeStageCard] = HomeStageCard.allCases
     @State private var fanned = false
@@ -244,11 +242,6 @@ struct HomeStageView: View {
                     HomeMusicBars(on: music.on, gold: palette.goldHi, off: palette.ink3)
                 }
             }
-            roundButton(label: palette.dark ? "Light mode" : "Dark mode", action: flipLight) {
-                Image(systemName: palette.dark ? "sun.max.fill" : "moon.fill")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(palette.goldHi)
-            }
             Button { toBoard(actions.dailyMove) } label: {
                 HStack(spacing: 5) {
                     Image(systemName: "flame.fill")
@@ -285,12 +278,6 @@ struct HomeStageView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
-    }
-
-    private func flipLight() {
-        withAnimation(.easeInOut(duration: 0.45)) {
-            toneMode = palette.dark ? .light : .dark
-        }
     }
 
     // MARK: Rating and pills
@@ -503,6 +490,9 @@ struct HomeStageBoard: View, Animatable {
     let plinth: UIColor?
     let still: Bool
     var dive: CGFloat
+    /// How much farther back the camera sits than usual, so the whole board, its corners swinging
+    /// as it turns, stays inside the view (the Aurora home, where nothing may cut it off).
+    var pullBack: Float = 0
 
     var animatableData: CGFloat {
         get { dive }
@@ -514,7 +504,8 @@ struct HomeStageBoard: View, Animatable {
             TimelineView(.animation(minimumInterval: 1 / 30, paused: still)) { context in
                 let time: Double = still ? 0 : context.date.timeIntervalSinceReferenceDate
                 HomeHeroBoard(stage: stage, look: look, pieces: pieces,
-                              camera: Self.camera(size: geo.size, time: time, dive: dive, black: black),
+                              camera: Self.camera(size: geo.size, time: time, dive: dive, black: black,
+                                                  pullBack: pullBack),
                               presence: light.map { HomeWindowBoard.presence($0, arrival: 0, leaning: leaning) },
                               plinth: plinth)
             }
@@ -522,7 +513,8 @@ struct HomeStageBoard: View, Animatable {
     }
 
     /// About two minutes a turn, high enough to see the whole board, the stage cut by the edges.
-    static func camera(size: CGSize, time: Double, dive: CGFloat, black: Bool) -> SculptedCamera {
+    static func camera(size: CGSize, time: Double, dive: CGFloat, black: Bool,
+                       pullBack: Float = 0) -> SculptedCamera {
         let d = Float(min(max(dive, 0), 1))
         let ease: Float = d * d * (3 - 2 * d)
         let orbit = Float((time * 0.05).truncatingRemainder(dividingBy: 2 * Double.pi))
@@ -531,7 +523,7 @@ struct HomeStageBoard: View, Animatable {
         camera.aspect = Float(size.width / max(size.height, 1))
         camera.azimuth = -0.35 + orbit + 1.8 * ease + (black ? Float.pi : 0)
         camera.elevation = (40 + 42 * ease) * .pi / 180
-        camera.distance = 25 - 13 * ease
+        camera.distance = 25 + pullBack - 13 * ease
         camera.focus = SIMD3<Float>(0, -1.2 * (1 - ease), 0)
         return camera
     }

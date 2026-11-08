@@ -49,6 +49,27 @@ struct SettingsSheet: View {
 
                     PremiumSettingsCard(theme: theme) { showingPremium = true }
 
+                    if boardSheet || stageHome {
+                        // Light or dark lives here, not on the Today screen (Alex, 2026-11-07).
+                        section("Appearance") {
+                            SettingsGroup(theme: theme) {
+                                PickerRow(title: "Light or dark", subtitle: homeTone.blurb, symbol: "circle.lefthalf.filled", theme: theme) {
+                                    Picker("Light or dark", selection: $homeTone) {
+                                        ForEach(HomeToneMode.allCases) { mode in
+                                            Text(mode.title).tag(mode)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    section("App icon") {
+                        SettingsGroup(theme: theme) {
+                            AppIconPicker(accent: accent)
+                        }
+                    }
+
                     section("Board") {
                         themeGrid(Self.looks)
                         Text("Rival boards".uppercased())
@@ -90,16 +111,6 @@ struct SettingsSheet: View {
                             rule
                             ToggleRow(title: "Board and sheet", subtitle: "The 3D board stays on top and one glass sheet holds the rest, at home and in a game. Off brings back the tiles and the floating dock.",
                                       symbol: "rectangle.bottomhalf.inset.filled", isOn: $boardSheet, theme: theme)
-                            if boardSheet || stageHome {
-                                rule
-                                PickerRow(title: "Home colors", subtitle: homeTone.blurb, symbol: "circle.lefthalf.filled", theme: theme) {
-                                    Picker("Home colors", selection: $homeTone) {
-                                        ForEach(HomeToneMode.allCases) { mode in
-                                            Text(mode.title).tag(mode)
-                                        }
-                                    }
-                                }
-                            }
                         }
                     }
 
@@ -737,7 +748,7 @@ struct LicensesView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Chess Game Killer is built on open source, and is open source itself under the GPL because it ships with Stockfish.")
+                Text("Beauty of Chess is built on open source, and is open source itself under the GPL because it ships with Stockfish.")
                     .font(.app(.footnote))
                     .foregroundStyle(.secondary)
                     .padding(.bottom, 4)
@@ -770,7 +781,7 @@ struct LicensesView: View {
                     .accessibilityElement(children: .combine)
                 }
                 Link(destination: URL(string: "https://github.com/lexdiamondhq-ai/chess-game-killer")!) {
-                    Label("Chess Game Killer source code", systemImage: "chevron.left.forwardslash.chevron.right")
+                    Label("Beauty of Chess source code", systemImage: "chevron.left.forwardslash.chevron.right")
                         .font(.app(.subheadline, weight: .semibold))
                 }
                 .padding(.top, 8)

@@ -11,8 +11,9 @@ struct ContentView: View {
     @State private var showingNewGame = true
     @State private var showingSettings = false
     @State private var showingAnalyze = false
-    /// Analyze opens on this position (the home's masterpiece) instead of its first screen.
-    @State private var analyzeFEN: String?
+    /// The analyzer, kept while the app runs: closing Analyze and opening it again finds the same board.
+    @State private var analyzer = ScanSession(reader: CloudBoardReader.live, engine: StockfishEngine.shared,
+                                              sounds: SoundPlayer.shared)
     @State private var coachExpanded = false
     @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .gilded
     @AppStorage("showBestMoves") private var showBestMoves = false
@@ -327,17 +328,16 @@ struct ContentView: View {
                 SettingsSheet()
                     .boardSheetGrabber(boardSheet)
             }
-            .sheet(isPresented: $showingAnalyze, onDismiss: { analyzeFEN = nil }) {
+            .sheet(isPresented: $showingAnalyze) {
                 AnalyzeSheet(
                     theme: theme,
                     currentFEN: match.hasStarted ? match.game.fen : nil,
                     engine: StockfishEngine.shared,
-                    reader: CloudBoardReader.live,
+                    session: analyzer,
                     rival: fromHereSetup.rival.name,
                     clock: fromHereSetup.timeControl,
                     forfeits: forfeits,
-                    onAnalyzeGame: analyzeGame,
-                    startsAt: analyzeFEN
+                    onAnalyzeGame: analyzeGame
                 ) { draft in
                     play(from: draft)
                 }
@@ -450,7 +450,8 @@ struct ContentView: View {
             resume: { leaveHome() },
             analyze: { showingAnalyze = true },
             analyzePosition: { fen in
-                analyzeFEN = fen
+                // Opened on a position (the home's masterpiece): straight to its analysis.
+                analyzer.analyze(fen: fen)
                 showingAnalyze = true
             },
             train: { showingTraining = true },
@@ -640,7 +641,7 @@ struct ContentView: View {
                         }
                         .animation(.easeInOut(duration: 1.2), value: stormy)
                 }
-                .navigationTitle("Chess Game Killer")
+                .navigationTitle("Beauty of Chess")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar { toolbarContent }
                 .toolbar(bigBoard ? .hidden : .visible, for: .navigationBar)
@@ -957,9 +958,10 @@ struct ContentView: View {
                         ExecutivePlate(match: match, theme: theme, color: bottomColor, inDock: true)
                     }
                 }
-                .frame(height: 36)
-                .padding(.leading, 14)
-                .padding(.trailing, 4)
+                // Room for the grade, its advice and your captures under them, inside the dock.
+                .frame(height: 60)
+                .padding(.leading, 10)
+                .padding(.trailing, 2)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 // The orb's place. Only a width: a bare Color.clear takes every bit of
                 // height it is offered, which pushed the dock up and squeezed the board to nothing.

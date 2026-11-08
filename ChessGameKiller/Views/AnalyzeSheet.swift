@@ -18,11 +18,12 @@ struct AnalyzeSheet: View {
     let onAnalyzeGame: (() -> Void)?
     let onPlay: (PositionDraft) -> Void
 
-    @State private var session: ScanSession
+    /// The app's one session, so the board is still there when Analyze opens again.
+    @Bindable var session: ScanSession
     @State private var photoItem: PhotosPickerItem?
     @State private var isLoadingPhoto = false
     @State private var showingCamera = false
-    /// Photo scans run out (3 a week free, 3 a day with Premium): then the offer shows.
+    /// Photo scans run out (3 a week free; Premium only meets a high fair-use guard): then the offer shows.
     @State private var offer: PremiumFeature?
     @Environment(\.dismiss) private var dismiss
 
@@ -30,12 +31,11 @@ struct AnalyzeSheet: View {
         theme: BoardTheme,
         currentFEN: String?,
         engine: ChessEngine?,
-        reader: BoardReader,
+        session: ScanSession,
         rival: String,
         clock: TimeControl,
         forfeits: String? = nil,
         onAnalyzeGame: (() -> Void)? = nil,
-        startsAt: String? = nil,
         onPlay: @escaping (PositionDraft) -> Void
     ) {
         self.theme = theme
@@ -46,10 +46,7 @@ struct AnalyzeSheet: View {
         self.forfeits = forfeits
         self.onAnalyzeGame = onAnalyzeGame
         self.onPlay = onPlay
-        let session = ScanSession(reader: reader)
-        // Opened on a position (the home's masterpiece): straight to its analysis.
-        if let startsAt { session.analyze(fen: startsAt) }
-        _session = State(initialValue: session)
+        self.session = session
     }
 
     private var accent: Color { theme.trainingAccent }
@@ -65,6 +62,8 @@ struct AnalyzeSheet: View {
 
     /// The card's line, with the scans left when there's a limit.
     private func scanDetail(_ line: String) -> String {
+        // Premium feels unlimited: no countdown, the fair-use guard only speaks if it's reached.
+        if Premium.shared.isPremium, Premium.shared.canUse(.scan) { return line }
         guard let left = Premium.shared.remaining(.scan),
               let allowance = Premium.shared.allowance(.scan) else { return line }
         let when: String = allowance.period == .day ? "today" : "this week"
@@ -184,15 +183,73 @@ extension AnalyzeSheet {
             BoardEditorView(session: session, theme: theme)
         case .analysis:
             // A photo's analysis can open the editor to fix a piece; coming back starts it over.
-            AnalysisView(draft: session.analyzed, theme: theme, engine: engine,
+            AnalysisView(draft: session.analyzed, theme: theme, engine: engine, model: session.analysis,
                          rival: rival, clock: clock, forfeits: forfeits,
                          photo: session.photo, photoDoubts: session.photoDoubts,
-                         onEditPieces: { session.editPieces($0) }) { draft in
+                         onEditPieces: { session.editPieces($0) },
+                         onSwitchTurn: { session.switchTurn(of: $0) },
+                         photoButtons: photoButtons) { draft in
                 onPlay(draft)
                 dismiss()
             }
             .id(session.analysisRun)
         }
+    }
+
+    /// Take a photo and Upload a photo, lower right on the analysis, so a new board can come in
+    /// from there without going back (Alex, 2026-11-08). Same scans and limit as the first screen.
+    fileprivate var photoButtons: AnalysisPhotoButtons {
+        AnalysisPhotoButtons(hasCamera: hasCamera, canScan: canScan, item: $photoItem,
+                             isLoading: isLoadingPhoto) {
+            if canScan { showingCamera = true } else { offer = .scan }
+        } onNoScans: {
+            offer = .scan
+        }
+    }
+}
+
+/// The analysis's two photo buttons: the camera, and a picture or screenshot from Photos.
+/// Either one reads the new board and opens its analysis, as from the analyzer's first screen.
+struct AnalysisPhotoButtons: View {
+    let hasCamera: Bool
+    let canScan: Bool
+    @Binding var item: PhotosPickerItem?
+    let isLoading: Bool
+    let onCamera: () -> Void
+    let onNoScans: () -> Void
+
+    var body: some View {
+        if hasCamera {
+            Button(action: onCamera) {
+                Label("Take a photo", systemImage: "camera")
+            }
+            .accessibilityHint("Snap a real board to analyze it")
+        }
+        if canScan {
+            PhotosPicker(selection: $item, matching: .images) {
+                Label("Upload a photo", systemImage: "photo.on.rectangle")
+            }
+            .disabled(isLoading)
+            .accessibilityHint("A picture or a screenshot of a board, to analyze it")
+        } else {
+            Button(action: onNoScans) {
+                Label("Upload a photo", systemImage: "photo.on.rectangle")
+            }
+        }
+    }
+}
+
+/// One half of the analysis's photo pill, lower right.
+private struct PhotoPillStyle: ButtonStyle {
+    let accent: Color
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.app(.title3, weight: .semibold))
+            .foregroundStyle(accent)
+            .frame(width: 58, height: 46)
+            .contentShape(Rectangle())
+            .opacity(configuration.isPressed ? 0.55 : 1)
     }
 }
 
@@ -492,19 +549,26 @@ struct AnalysisView: View {
     var photoDoubts: String?
     /// Opens the editor on the board's pieces, to fix one the reader got wrong. Offered with the photo.
     var onEditPieces: ((PositionDraft) -> Void)?
+    /// Gives the board's position to the other side to move, for a fresh analysis.
+    var onSwitchTurn: ((PositionDraft) -> Void)?
+    /// Take a photo and Upload a photo, for a new board, when the analyzer offers them.
+    var photoButtons: AnalysisPhotoButtons?
     let onPlay: (PositionDraft) -> Void
 
     @State private var model: AnalysisModel
     @State private var flipped: Bool
-    @State private var confirmingForfeit = false
     @State private var showingPhoto = false
     @AppStorage("haptics") private var hapticsOn = true
     @AppStorage("sculpted3D") private var sculpted3D = true
     @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.auto
 
-    init(draft: PositionDraft, theme: BoardTheme, engine: ChessEngine?, rival: String = "the computer",
+    /// `model` is the board to pick up where it was left, when there is one.
+    init(draft: PositionDraft, theme: BoardTheme, engine: ChessEngine?, model: AnalysisModel? = nil,
+         rival: String = "the computer",
          clock: TimeControl = .unlimited, forfeits: String? = nil,
          photo: UIImage? = nil, photoDoubts: String? = nil, onEditPieces: ((PositionDraft) -> Void)? = nil,
+         onSwitchTurn: ((PositionDraft) -> Void)? = nil,
+         photoButtons: AnalysisPhotoButtons? = nil,
          onPlay: @escaping (PositionDraft) -> Void) {
         self.theme = theme
         self.rival = rival
@@ -513,19 +577,23 @@ struct AnalysisView: View {
         self.photo = photo
         self.photoDoubts = photoDoubts
         self.onEditPieces = onEditPieces
+        self.onSwitchTurn = onSwitchTurn
+        self.photoButtons = photoButtons
         self.onPlay = onPlay
         let sounds: SoundPlaying? = engine == nil ? nil : SoundPlayer.shared
-        _model = State(initialValue: AnalysisModel(draft: draft, engine: engine, sounds: sounds))
+        _model = State(initialValue: model ?? AnalysisModel(draft: draft, engine: engine, sounds: sounds))
         _flipped = State(initialValue: draft.sideToMove == .black)
     }
 
     /// A board already part way through, for pictures in the tests.
     init(model: AnalysisModel, theme: BoardTheme, photo: UIImage? = nil, photoDoubts: String? = nil,
-         onEditPieces: ((PositionDraft) -> Void)? = nil, onPlay: @escaping (PositionDraft) -> Void = { _ in }) {
+         onEditPieces: ((PositionDraft) -> Void)? = nil, onSwitchTurn: ((PositionDraft) -> Void)? = nil,
+         onPlay: @escaping (PositionDraft) -> Void = { _ in }) {
         self.theme = theme
         self.photo = photo
         self.photoDoubts = photoDoubts
         self.onEditPieces = onEditPieces
+        self.onSwitchTurn = onSwitchTurn
         self.onPlay = onPlay
         _model = State(initialValue: model)
         _flipped = State(initialValue: model.start.sideToMove == .black)
@@ -533,6 +601,7 @@ struct AnalysisView: View {
 
     /// The side the person takes from here: the one to move.
     private var sideName: String { model.draft.sideToMove == .white ? "White" : "Black" }
+    private var otherSideName: String { model.draft.sideToMove == .white ? "Black" : "White" }
 
     private var accent: Color { theme.trainingAccent }
 
@@ -565,20 +634,61 @@ struct AnalysisView: View {
                     // Edge to edge, as the game's board runs, its frame going off the sides.
                     .padding(.horizontal, -8)
                 HStack {
-                    Text("\(sideName) to move")
-                        .font(.app(.caption, weight: .semibold))
-                        .foregroundStyle(.secondary)
+                    turn
                     Spacer(minLength: 0)
                     BoardViewSwitch(theme: theme)
                 }
             }
         } else {
-            PositionBoard(draft: model.draft, theme: theme, flipped: flipped,
-                          hints: hints,
-                          onTap: { square in model.tap(square) }, tints: tints,
-                          selected: model.selected, targets: model.targets)
-                .animation(.snappy(duration: 0.4), value: flipped)
-                .animation(.snappy(duration: 0.22), value: model.draft.fen)
+            VStack(spacing: 6) {
+                PositionBoard(draft: model.draft, theme: theme, flipped: flipped,
+                              hints: hints,
+                              onTap: { square in model.tap(square) }, tints: tints,
+                              selected: model.selected, targets: model.targets)
+                    .animation(.snappy(duration: 0.4), value: flipped)
+                    .animation(.snappy(duration: 0.22), value: model.draft.fen)
+                if onSwitchTurn != nil {
+                    HStack {
+                        turn
+                        Spacer(minLength: 0)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Whose move it is. Before any move is made on the board it's a button that gives the move
+    /// to the other side and starts the analysis over (Alex, 2026-11-07: "I can't switch from
+    /// white to black", on a photo read as White's move).
+    @ViewBuilder
+    private var turn: some View {
+        if let onSwitchTurn, !model.canGoBack {
+            Button {
+                model.stopLine()
+                onSwitchTurn(model.draft)
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.left.arrow.right")
+                        .imageScale(.small)
+                    Text("\(sideName) to move")
+                }
+                .font(.app(.footnote, weight: .semibold))
+                .foregroundStyle(Color.primary)
+                .lineLimit(1)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 32)
+                .glassPane(Capsule())
+                .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .fixedSize()
+            .dynamicTypeSize(...DynamicTypeSize.xLarge)
+            .accessibilityLabel("\(sideName) to move")
+            .accessibilityHint("Gives the move to \(otherSideName) and analyzes again")
+        } else {
+            Text("\(sideName) to move")
+                .font(.app(.caption, weight: .semibold))
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -592,36 +702,29 @@ struct AnalysisView: View {
                 stepper
                 madeMoves
                 lines
-                VStack(spacing: 6) {
-                    Button {
-                        model.stopLine()
-                        if forfeits == nil { onPlay(model.draft) } else { confirmingForfeit = true }
-                    } label: {
-                        Label("Play \(rival) from here", systemImage: "play.fill")
-                            .font(.app(.headline))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 4)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .foregroundStyle(theme.screenIsDark ? Color.black : Color.white)
-                    .disabled(model.ending != nil || model.draft.position == nil)
-                    Text("You play \(sideName) · \(clock.isTimed ? clock.name : "no clock")")
-                        .font(.app(.footnote))
-                        .foregroundStyle(.secondary)
-                }
-                .confirmationDialog("Leave your game against \(forfeits ?? rival)?",
-                                    isPresented: $confirmingForfeit, titleVisibility: .visible) {
-                    Button("Resign and play \(rival)", role: .destructive) { onPlay(model.draft) }
-                    Button("Keep playing", role: .cancel) {}
-                } message: {
-                    Text("It counts as a loss for your army.")
-                }
             }
             .padding(16)
             .animation(.snappy, value: model.lines)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            // Lower right (Alex, 2026-11-08), docked in its own strip so the page scrolls
+            // above it and it never covers a score.
+            if let photoButtons {
+                HStack {
+                    Spacer()
+                    HStack(spacing: 0) {
+                        photoButtons
+                    }
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(PhotoPillStyle(accent: accent))
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .overlay(Capsule().strokeBorder(accent.opacity(0.3), lineWidth: 1))
+                    .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(.ultraThinMaterial.opacity(0.9), ignoresSafeAreaEdges: .bottom)
+            }
         }
         .navigationTitle("Analysis")
         .navigationBarTitleDisplayMode(.inline)

@@ -73,16 +73,32 @@ struct TalkPanelLight: Equatable {
 }
 
 /// The still board with a verdict lit on it. It only shows; it never takes a tap.
+/// It is the same board as everywhere else in the app: the real 3D board, tilted or flat from
+/// above with the Tilted / Flat switch under it, when the look has one and 3D pieces are on;
+/// otherwise the flat board.
 struct TalkPanelBoard: View {
     let fen: String
     let flipped: Bool
     let light: TalkPanelLight
     let theme: BoardTheme
+    /// How wide the flat board is, which is as tall. The 3D board takes `TrainingBoardView.sideRoom`
+    /// more, edge to edge as in a game.
+    let side: CGFloat
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(BoardTheme.coordinatesKey) private var showsCoordinates = true
+    @AppStorage("sculpted3D") private var sculpted3D = true
+    @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.auto
 
     var body: some View {
+        if BoardView.playsIn3D(theme, setting: sculpted3D) {
+            sculptedBoard
+        } else {
+            flatBoard
+        }
+    }
+
+    private var flatBoard: some View {
         PositionBoard(draft: draft, theme: theme, flipped: flipped, tints: tints)
             .overlay { arrowLayer }
             .animation(motion, value: light)
@@ -90,6 +106,63 @@ struct TalkPanelBoard: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("The position")
             .accessibilityAddTraits(.isImage)
+            .frame(width: side, height: side)
+            .boardHeadroom(theme: theme, side: side)
+    }
+
+    /// The verdict's squares and arrows lie on the stone, as the coach's do in lessons and drills.
+    private var sculptedBoard: some View {
+        let width: CGFloat = DrillBoard.width3D(side: side)
+        let framing: SculptedCamera.Framing = tilt.framing(bigBoard: false)
+        return VStack(spacing: 6) {
+            SculptedPositionBoard(
+                pieces: draft.pieces,
+                theme: theme,
+                flipped: flipped,
+                lastMove: stoneLastMove,
+                marks: stoneMarks,
+                arrows: stoneArrows,
+                framing: framing
+            )
+            .frame(width: width, height: DrillBoard.height3D(side: width, framing: framing))
+            .allowsHitTesting(false)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("The position")
+            .accessibilityAddTraits(.isImage)
+            HStack {
+                Spacer(minLength: 0)
+                BoardViewSwitch(theme: theme)
+            }
+            .frame(width: side)
+        }
+    }
+
+    /// The move that led here, lit as the game lights it, while no verdict is.
+    private var stoneLastMove: LastMove? {
+        guard light.lastMove.count == 2 else { return nil }
+        return LastMove(from: light.lastMove[0], to: light.lastMove[1])
+    }
+
+    /// The verdict's squares on the stone, in a steady order.
+    private var stoneMarks: [SculptedCoachMark] {
+        light.squares
+            .map { SculptedCoachMark(square: $0.key, color: Self.hex($0.value, theme: theme)) }
+            .sorted { $0.square.notation < $1.square.notation }
+    }
+
+    /// The verdict's arrows on the stone: solid, in the verdict's tone.
+    private var stoneArrows: [SculptedCoachArrow] {
+        light.arrows.map { SculptedCoachArrow(from: $0.from, to: $0.to, color: Self.hex($0.tone, theme: theme)) }
+    }
+
+    /// A tone as 0xRRGGBB in the colors the 3D board gives the coach in lessons and drills:
+    /// green for good, red for danger, gold for what is only being shown.
+    static func hex(_ tone: TalkArrow.Tone, theme: BoardTheme) -> UInt32 {
+        switch tone {
+        case .good: return TrainingColor.green.hex(on: theme)
+        case .bad: return TrainingColor.red.hex(on: theme)
+        case .info: return TrainingColor.yellow.hex(on: theme)
+        }
     }
 
     private var draft: PositionDraft {

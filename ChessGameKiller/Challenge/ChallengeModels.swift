@@ -561,14 +561,14 @@ enum ChallengeInviteText {
         return phrase.prefix(1).uppercased() + phrase.dropFirst()
     }
 
-    /// "Alex challenged you to chess on Chess Game Killer. 10 minutes each, you play Black. Tap to play: …"
+    /// "Alex challenged you to chess on Beauty of Chess. 10 minutes each, you play Black. Tap to play: …"
     static func message(from name: String, clock: FriendClock?, friendPlays side: FriendSeat, url: URL) -> String {
         "\(lead(from: name, clock: clock, friendPlays: side)) Tap to play: \(url.absoluteString)"
     }
 
     /// The message without its link, for the share sheet, which sends the link itself.
     static func lead(from name: String, clock: FriendClock?, friendPlays side: FriendSeat) -> String {
-        "\(sender(name)) challenged you to chess on Chess Game Killer. \(clockWords(clock)), you play \(side.name)."
+        "\(sender(name)) challenged you to chess on Beauty of Chess. \(clockWords(clock)), you play \(side.name)."
     }
 
     static func subject(from name: String) -> String {
@@ -577,7 +577,7 @@ enum ChallengeInviteText {
 
     static func emailBody(from name: String, clock: FriendClock?, friendPlays side: FriendSeat, url: URL, code: String) -> String {
         message(from: name, clock: clock, friendPlays: side, url: url)
-            + "\n\nOr open Chess Game Killer and enter the code \(ChallengeLink.spaced(code))."
+            + "\n\nOr open Beauty of Chess and enter the code \(ChallengeLink.spaced(code))."
     }
 
     private static func sender(_ name: String) -> String {

@@ -184,6 +184,29 @@ final class MatchControllerTests: XCTestCase {
         XCTAssertEqual(match.review?.evaluation, .centipawns(-250))
     }
 
+    /// Ten pawns down, a3 hangs the bishop. The coach used to call it Excellent.
+    func testHangingAPieceInALostGameIsABlunder() async throws {
+        let position = try XCTUnwrap(Position(fen: "r1bqkbnr/ppp2ppp/2n5/2B5/8/8/PPP2PPP/R3K2R w KQkq - 1 10"))
+        let start = GameModel(position: position)
+        let before = start.fen
+        XCTAssertTrue(start.playEngineMove("a2a3"))
+        let engine = FakeEngine(scripted: [
+            before: [
+                EngineLine(moves: ["c5f8", "e8f8", "e1g1", "f8e8"], evaluation: .centipawns(-1009)),
+                EngineLine(moves: ["a1d1", "f8c5", "d1d8", "e8d8"], evaluation: .centipawns(-1146)),
+            ],
+            start.fen: [EngineLine(moves: ["f8c5", "e1g1", "g8f6", "f1e1", "c8e6", "b2b4"], evaluation: .centipawns(1204))],
+        ])
+        let match = MatchController(engine: engine, sounds: nil)
+        match.startTapping(from: position)
+        await waitUntil("hints appear") { match.hints.count == 2 }
+
+        tapMove(match, "a2a3")
+        await waitUntil("the move is reviewed") { match.review != nil }
+        XCTAssertEqual(match.review?.grade, .blunder)
+        XCTAssertEqual(match.review?.best, "Bxf8")
+    }
+
     func testComputerRepliesAndPlayerCanMoveAgain() async {
         let sounds = SilentSounds()
         let match = MatchController(engine: FakeEngine(), sounds: sounds)
