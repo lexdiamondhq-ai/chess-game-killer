@@ -48,6 +48,6 @@ enum RivalBoardsEarned {
         if earned.contains(look.name.lowercased()) { return true }
         guard let level = MatchController.Level(rawValue: index) else { return false }
         let rival = level.rival
-        return earned.contains(rival.name.lowercased()) || earned.contains(rival.formerName?.lowercased() ?? "")
+        return earned.contains(rival.name.lowercased()) || rival.pastNames.contains { earned.contains($0.lowercased()) }
     }
 }

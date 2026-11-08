@@ -13,6 +13,7 @@ struct SettingsSheet: View {
     @AppStorage("haptics") private var hapticsOn = true
     /// Home's music. Its switch moved here from Home's header (Alex, 2026-11-07).
     @State private var homeMusic = HomeMusic.shared
+    @State private var rivalTheme = RivalTheme.shared
     @AppStorage("rivalBanter") private var banterOn = true
     @AppStorage("bigBoard") private var bigBoard = false
     @AppStorage("sculpted3D") private var sculpted3D = true
@@ -151,6 +152,12 @@ struct SettingsSheet: View {
                                 ), theme: theme)
                                 rule
                             }
+                            ToggleRow(title: "Rival themes", subtitle: "Each rival's score, quietly, under a game begun from its film.",
+                                      symbol: "music.quarternote.3", isOn: Binding(
+                                get: { rivalTheme.on },
+                                set: { on in if on != rivalTheme.on { rivalTheme.toggle() } }
+                            ), theme: theme)
+                            rule
                             ToggleRow(title: "Daily reminder", subtitle: "At most one a day, around when you usually play, and only if the day isn't done yet.",
                                       symbol: "flame.fill", isOn: $remindersOn, theme: theme)
                                 .onChange(of: remindersOn) { _, on in
@@ -727,7 +734,7 @@ struct LicensesView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Chess Game Killer is built on open source, and is open source itself under the GPL because it ships with Stockfish.")
+                Text("Beauty of Chess is built on open source, and is open source itself under the GPL because it ships with Stockfish.")
                     .font(.app(.footnote))
                     .foregroundStyle(.secondary)
                     .padding(.bottom, 4)
@@ -760,7 +767,7 @@ struct LicensesView: View {
                     .accessibilityElement(children: .combine)
                 }
                 Link(destination: URL(string: "https://github.com/lexdiamondhq-ai/chess-game-killer")!) {
-                    Label("Chess Game Killer source code", systemImage: "chevron.left.forwardslash.chevron.right")
+                    Label("Beauty of Chess source code", systemImage: "chevron.left.forwardslash.chevron.right")
                         .font(.app(.subheadline, weight: .semibold))
                 }
                 .padding(.top, 8)

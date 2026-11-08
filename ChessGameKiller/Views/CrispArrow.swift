@@ -256,8 +256,8 @@ enum ArrowColors {
 }
 
 /// An arrow drawn crisp: an even color that brightens toward its tail, a fine edge, and a soft
-/// shadow under it. An analysis arrow flies: it bows to the side, its shadow lies straight on the
-/// board beneath it, and the best move's lands on a ring.
+/// shadow under it. An analysis arrow flies: it bows to the side, a solid one's faint shadow lies
+/// straight on the board beneath it, and the best move's lands on a ring.
 struct CrispArrow: View {
     let from: CGPoint
     let to: CGPoint
@@ -294,13 +294,15 @@ struct CrispArrow: View {
         let line = max(0.75, squareSize * 0.022)
         Canvas { context, _ in
             let clear = opacity < 1
-            if p.bow > 0 && glow == nil {
-                // The shadow on the board below the flight.
-                var ground = context
-                ground.addFilter(.blur(radius: squareSize * 0.07))
-                ground.stroke(Path { $0.move(to: tail); $0.addLine(to: tip) },
-                              with: .color(.black.opacity(clear ? 0.14 * opacity : 0.22)),
-                              style: StrokeStyle(lineWidth: p.shaft * squareSize * 0.8, lineCap: .round))
+            if p.bow > 0 && glow == nil && !clear {
+                // A faint shadow on the board below the flight, softened by hand: a few wide, nearly
+                // clear strokes rather than a blur filter, which the phone drew as a hard black bar.
+                // A see-through arrow casts none, as glass wouldn't.
+                let ground = Path { $0.move(to: tail); $0.addLine(to: tip) }
+                for spread in [1.6, 1.15, 0.7] {
+                    context.stroke(ground, with: .color(.black.opacity(0.035)),
+                                   style: StrokeStyle(lineWidth: p.shaft * squareSize * spread, lineCap: .round))
+                }
             }
             if landing {
                 let ring = CGRect(x: to.x - squareSize * 0.33, y: to.y - squareSize * 0.14,

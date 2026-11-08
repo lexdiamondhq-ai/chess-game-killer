@@ -483,7 +483,7 @@ struct HomeShortcutsPanel: View {
     }
 
     /// Each rival's coin a little bigger than the one before, so the row climbs toward the
-    /// Dragonlord.
+    /// Ashen King.
     private func coinSize(_ rival: Rival) -> CGFloat {
         min(orb, 56) * (0.8 + 0.07 * CGFloat(rival.level.rawValue))
     }
@@ -643,7 +643,7 @@ struct HomeYouPanel: View {
                 HomeLinkRow(title: "Settings", detail: "Board look, sound, hints", tone: tone) { go(actions.settings) }
                 if let premium = actions.premium {
                     HomeHairline(tone: tone)
-                    HomeLinkRow(title: "Chess Game Killer Pro", detail: "Everything, with no limits", tone: tone) { go(premium) }
+                    HomeLinkRow(title: "Beauty of Chess Pro", detail: "Everything, with no limits", tone: tone) { go(premium) }
                 }
             }
         }
