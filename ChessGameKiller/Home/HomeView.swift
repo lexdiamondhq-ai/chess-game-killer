@@ -73,6 +73,8 @@ struct HomeView: View {
     @State private var pullReady = true
     /// Today's session, worked out once rather than on every redraw.
     @State private var plan: SessionPlan?
+    /// Your finest move of the week for Today, read from your games once rather than on every redraw.
+    @State private var finestMove: HomeFinestMove?
     /// The board window has scrolled out of sight; the dock carries its button instead.
     @State private var windowGone = false
     /// The jewel's shortcuts are open above it.
@@ -227,11 +229,25 @@ struct HomeView: View {
             // course left, then real puzzles at the player's level aimed at what their games show.
             plan = await training.planToday(puzzles: puzzles, games: vault.games)
         }
+        .task(id: notesKey) { await readToday() }
     }
 
     /// Changes whenever today's plan would: a session done, a new day, a game saved.
     private var planKey: String {
         "\(training.progress.sessionsDone) \(training.progress.xp) \(training.trainedToday) \(Trainer.dayString(.now)) \(vault.games.count)"
+    }
+
+    /// Changes whenever the finest move could: a game saved or graded, a new day.
+    private var notesKey: String {
+        // The newest game's grades land after it ends: count them too.
+        let graded: Int = vault.games.first?.moments.count ?? 0
+        return "\(vault.games.count) \(graded) \(Trainer.dayString(.now))"
+    }
+
+    /// Reads the games off the main thread for the week's finest move.
+    private func readToday() async {
+        let games: [SavedGame] = vault.games
+        finestMove = await Task.detached(priority: .utility) { HomeFinestMove.pick(games: games) }.value
     }
 
     // MARK: The page
@@ -667,14 +683,16 @@ extension HomeView {
             you: { openYou(.bottom) },
             rooms: openShortcuts)
         let auroraInfo = HomeAuroraInfo(stage: info, games: currentGameList(upNext), look: look,
-                                        pieces: match.game.pieces.map(\.piece))
+                                        pieces: match.game.pieces.map(\.piece), finest: finestMove)
         let auroraActions = HomeAuroraActions(stage: stageActions, open: { game in
             if let friend = game.friendGame {
                 challenges?.play(friend)
             } else {
                 actions.resume()
             }
-        }, playRival: { level in playRival(level) })
+        }, playRival: { level in playRival(level) }, replay: { id in
+            if let game = vault.game(id) { actions.openGame(game) }
+        })
         return HomeAuroraView(tone: tone, info: auroraInfo, actions: auroraActions)
     }
 }
