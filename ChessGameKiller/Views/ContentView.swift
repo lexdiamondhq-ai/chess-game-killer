@@ -637,15 +637,20 @@ struct ContentView: View {
         }
     }
 
-    /// The opponent's line above the board and yours below it, hugging it, with the moves under
-    /// yours; the whole block sits in the middle of the space. The board runs edge to edge on a
+    /// The opponent's line above the board and the moves under it (your own line is in the dock;
+    /// Big Board keeps it under the board); the whole block sits in the middle of the space. The board runs edge to edge on a
     /// phone. While the coach is open the two players fold into one line. Big Board uses the same
     /// layout without the top bar, and the board there can be swiped to look back through the game.
+    /// The side whose line is under the board: yours, unless the board is flipped.
+    private var bottomColor: Piece.Color { match.isBoardFlipped ? .black : .white }
+
     private func boardLayout(in size: CGSize) -> some View {
         let compact = coachExpanded
         let aspect = boardAspect
-        let lines = compact ? stripHeight : plateHeight * 2
-        let gaps = Self.gap * (compact ? 2 : 3)
+        // Your own line sits in the dock, except in Big Board.
+        let ownPlate = !compact && bigBoard
+        let lines = compact ? stripHeight : plateHeight * (ownPlate ? 2 : 1)
+        let gaps = Self.gap * (ownPlate ? 3 : 2)
         let fixed = lines + gaps + ribbonHeight + Self.edgeRoom * 2
         // The headroom over a flat board grows with the board, so it is solved for with it.
         let room = max(0, size.height - fixed)
@@ -660,9 +665,9 @@ struct ContentView: View {
         // between the gaps and the edges, like the Home's cards, instead of pooling above and below.
         let used = fixed + side * headroom + boardHeight
         let spare = max(0, size.height - used)
-        let slots: CGFloat = compact ? 2 : 3
+        let slots: CGFloat = ownPlate ? 3 : 2
         let gap = Self.gap + min(spare / (slots + 2), Self.maxExtraGap)
-        let topColor: Piece.Color = match.isBoardFlipped ? .white : .black
+        let topColor = bottomColor.opposite
         return VStack(spacing: 0) {
             Spacer(minLength: Self.edgeRoom)
             Group {
@@ -678,8 +683,8 @@ struct ContentView: View {
             board
                 .frame(width: side, height: boardHeight)
             Color.clear.frame(height: gap)
-            if !compact {
-                ExecutivePlate(match: match, theme: theme, color: topColor.opposite)
+            if ownPlate {
+                ExecutivePlate(match: match, theme: theme, color: bottomColor)
                     .frame(width: lineWidth, height: plateHeight)
                 Color.clear.frame(height: gap)
             }
@@ -920,23 +925,23 @@ struct ContentView: View {
         .padding(.top, 8)
     }
 
-    /// Every control named, three either side of the orb. They step aside while the orb is wide.
+    /// Your line on the left of the orb, three controls on its right. They step aside while the orb is wide.
     /// No glass of its own: it sits on the dock's, or on Big Board's tray.
     private func dockRow(coachHeight: CGFloat) -> some View {
         ZStack {
             HStack(spacing: 0) {
-                HStack(spacing: 0) {
-                    DockButton(title: "Analyze", symbol: Glyphs.analyze, theme: theme) {
-                        showingAnalyze = true
-                    }
-                    DockButton(title: "Train", symbol: Glyphs.train, theme: theme) {
-                        showingTraining = true
-                    }
-                    DockButton(title: "Puzzles", symbol: Glyphs.puzzles, theme: theme) {
-                        showingPuzzles = true
+                // Your line ("Your move", captures, clock) in bold green, in place of the card
+                // that sat under the board (Alex, 2026-11-07). Analyze lives in the orb; Train and
+                // Puzzles wait off the game screen. Big Board keeps the card, as its tray can close.
+                Group {
+                    if !bigBoard {
+                        ExecutivePlate(match: match, theme: theme, color: bottomColor, inDock: true)
                     }
                 }
-                .frame(maxWidth: .infinity)
+                .frame(height: 44)
+                .padding(.leading, 10)
+                .padding(.trailing, 2)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 // The orb's place. Only a width: a bare Color.clear takes every bit of
                 // height it is offered, which pushed the dock up and squeezed the board to nothing.
                 Color.clear.frame(width: CoachOrb.orbSize + 12, height: 1)
@@ -963,7 +968,7 @@ struct ContentView: View {
             .allowsHitTesting(!coachIsWide)
             CoachOrb(match: match, theme: theme, isExpanded: $coachExpanded, expandedMaxHeight: coachHeight,
                      newGame: { showingNewGame = true }, showGames: { showingGames = true },
-                     talk: { openTalk() })
+                     talk: { openTalk() }, analyze: { showingAnalyze = true })
                 .padding(.horizontal, coachExpanded ? 0 : 6)
         }
         .frame(minHeight: Self.dockHeight)
