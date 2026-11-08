@@ -624,6 +624,34 @@ private struct RivalCard: View {
         lockedBy.map { " Locked. Beat \($0.name.lowercasedFirstWord) first." } ?? ""
     }
 
+    @ViewBuilder
+    private var bottomLine: some View {
+        if let lockedBy {
+            Label("Beat \(lockedBy.name.lowercasedFirstWord) first", systemImage: "lock.fill")
+                .font(.app(.caption, weight: .bold))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        } else if let holding {
+            Label("Holding \(holding)", systemImage: "lock.fill")
+                .font(.app(.caption, weight: .bold))
+                .foregroundStyle(rival.hue)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        } else {
+            HStack(spacing: 4) {
+                ForEach(0..<5, id: \.self) { index in
+                    let lit = index < rival.strength
+                    Capsule()
+                        .fill(lit ? rival.hue : Color.primary.opacity(0.14))
+                        .frame(width: 22, height: 5)
+                        .shadow(color: lit && theme.glows ? rival.hue.opacity(0.8) : .clear, radius: 4)
+                }
+            }
+            .accessibilityHidden(true)
+        }
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             RivalCoin(rival: rival, size: 92)
@@ -640,56 +668,35 @@ private struct RivalCard: View {
                 .scaleEffect(isSelected ? 1 : 0.92)
                 .frame(width: 100, height: 100)
                 .animation(.spring(response: 0.45, dampingFraction: 0.75), value: isSelected)
+            // Every card has the same lines in the same places (Alex, 2026-11-08): the name, the
+            // level and Elo, four lines kept for how they play, then one bottom line that shows
+            // the strength bars, or who to beat first, or the piece the rival is holding.
             VStack(alignment: .leading, spacing: 4) {
                 Text(rival.name)
                     .font(.app(.title2, weight: .heavy))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
+                    .fixedSize(horizontal: false, vertical: true)
                 (Text(rival.level.name).foregroundStyle(rival.hue) + Text(" · Elo \(rival.elo)"))
                     .font(.app(.caption, weight: .semibold))
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(rival.blurb)
                     .font(.app(.caption))
                     .foregroundStyle(.secondary)
+                    .lineLimit(4, reservesSpace: true)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 2)
-                if let lockedBy {
-                    Label("Beat \(lockedBy.name.lowercasedFirstWord) first", systemImage: "lock.fill")
-                        .font(.app(.caption2, weight: .bold))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Color.primary.opacity(0.08), in: Capsule())
-                        .padding(.top, 2)
-                }
-                if let holding {
-                    Label("Holding \(holding)", systemImage: "lock.fill")
-                        .font(.app(.caption2, weight: .bold))
-                        .foregroundStyle(rival.hue)
-                        .lineLimit(1)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(rival.hue.opacity(0.14), in: Capsule())
-                        .padding(.top, 2)
-                }
-                HStack(spacing: 4) {
-                    ForEach(0..<5, id: \.self) { index in
-                        let lit = index < rival.strength
-                        Capsule()
-                            .fill(lit ? rival.hue : Color.primary.opacity(0.14))
-                            .frame(width: 22, height: 5)
-                            .shadow(color: lit && theme.glows ? rival.hue.opacity(0.8) : .clear, radius: 4)
-                    }
-                }
-                .padding(.top, 6)
-                .accessibilityHidden(true)
+                bottomLine
+                    .frame(height: 18, alignment: .leading)
+                    .padding(.top, 4)
             }
             Spacer(minLength: 0)
         }
         .padding(.leading, 8)
         .padding(.trailing, 14)
-        .frame(minHeight: 150)
+        .padding(.vertical, 16)
         .background {
             let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
             shape
