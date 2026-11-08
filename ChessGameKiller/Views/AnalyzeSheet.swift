@@ -239,20 +239,17 @@ struct AnalysisPhotoButtons: View {
     }
 }
 
-/// A round glass button for the analysis's photo buttons, lower right.
-private struct PhotoOrbStyle: ButtonStyle {
+/// One half of the analysis's photo pill, lower right.
+private struct PhotoPillStyle: ButtonStyle {
     let accent: Color
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.app(.title3, weight: .semibold))
             .foregroundStyle(accent)
-            .frame(width: 54, height: 54)
-            .background(.ultraThinMaterial, in: Circle())
-            .overlay(Circle().strokeBorder(accent.opacity(0.35), lineWidth: 1))
-            .shadow(color: .black.opacity(0.18), radius: 8, y: 3)
-            .scaleEffect(configuration.isPressed ? 0.92 : 1)
-            .animation(.snappy(duration: 0.15), value: configuration.isPressed)
+            .frame(width: 58, height: 46)
+            .contentShape(Rectangle())
+            .opacity(configuration.isPressed ? 0.55 : 1)
     }
 }
 
@@ -657,20 +654,26 @@ struct AnalysisView: View {
                 lines
             }
             .padding(16)
-            // Room under the last line for the photo buttons.
-            .padding(.bottom, photoButtons == nil ? 0 : 120)
             .animation(.snappy, value: model.lines)
         }
-        .overlay(alignment: .bottomTrailing) {
-            // Lower right, within thumb's reach (Alex, 2026-11-08: "I want it on the lower right").
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            // Lower right (Alex, 2026-11-08), docked in its own strip so the page scrolls
+            // above it and it never covers a score.
             if let photoButtons {
-                VStack(spacing: 12) {
-                    photoButtons
+                HStack {
+                    Spacer()
+                    HStack(spacing: 0) {
+                        photoButtons
+                    }
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(PhotoPillStyle(accent: accent))
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .overlay(Capsule().strokeBorder(accent.opacity(0.3), lineWidth: 1))
+                    .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
                 }
-                .labelStyle(.iconOnly)
-                .buttonStyle(PhotoOrbStyle(accent: accent))
-                .padding(.trailing, 18)
-                .padding(.bottom, 12)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(.ultraThinMaterial.opacity(0.9), ignoresSafeAreaEdges: .bottom)
             }
         }
         .navigationTitle("Analysis")
