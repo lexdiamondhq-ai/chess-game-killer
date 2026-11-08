@@ -580,6 +580,8 @@ final class ThinkTests: XCTestCase {
         guard let squares = Notation.squares(of: uci) else { return }
         runner.tap(squares.from)
         runner.tap(squares.to)
+        // A promotion waits for the player to choose its piece.
+        if let kind = TrainingChess.promotionKind(of: uci) { runner.promote(to: kind) }
     }
 
     private func waitUntil(_ what: String, timeout: Duration = .seconds(5), _ condition: () -> Bool) async {
