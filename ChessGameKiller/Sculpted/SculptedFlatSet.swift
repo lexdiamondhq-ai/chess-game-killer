@@ -3,68 +3,77 @@ import SceneKit
 import UIKit
 import simd
 
-/// The pieces for the flat board, seen from straight above: glass tiles with the piece etched
-/// into them, as in the concept render Alex picked (design/flat-pieces/crystal.jpg). White is
-/// milky glass with the piece inked dark on top; Black is smoked glass with the piece glowing gold
-/// inside; a gold foot under both.
+/// The pieces for the flat board, seen from straight above: Floating Cut-outs, Alex's pick of
+/// the bold looks (2026-11-07). Each piece is a bold paper-cut shape that hovers a little above
+/// its square and casts a long soft shadow off to the side, so it reads as standing up even from
+/// straight above, and the square's color shows all round it. White is warm paper with dark
+/// lines; Black is near-black with gold detail and a thin gold edge, so it reads on a dark square.
 ///
-/// SceneKit can't draw glass like that: tried as see-through glass it came out plain white. So
-/// each tile shows the render's own glass: a picture of it drawn in Cycles from the flat view's
-/// angle (scripts/sculpted/flat/glass.py), laid on a plain tile that casts the shadow, and lit to
-/// follow the board's light (`light`).
+/// Each piece is two pictures (scripts/sculpted/flat/cutouts.js) on planes: the shape, lit to
+/// follow the board's light (`light`), and under it its shadow, set off toward the player's right.
+/// The shape's clear pixels are cut away, so the board's marks show through them and an arrow on
+/// the stone still passes under the piece.
 ///
-/// Sizes are in squares, the tile's foot at the origin, y up, the top of the piece toward -z
+/// Sizes are in squares, the piece's square at the origin, y up, the top of the piece toward -z
 /// (away from White), like the carved sets.
 enum SculptedFlatSet {
-    /// Width and height of a tile: the pawn's is smaller.
-    static func size(of kind: Piece.Kind) -> (width: CGFloat, height: CGFloat) {
-        kind == .pawn ? (0.62, 0.2) : (0.78, 0.26)
+    /// How far across a square the pictures reach: the 45-unit box the pieces are drawn in.
+    static let span: CGFloat = 0.92
+
+    /// How high the shape hovers over the stone.
+    static let hover: Float = 0.05
+
+    /// Where the shadow falls from under the shape: toward the player's right and toward them.
+    static let shadowOffset = SIMD2<Float>(0.075, 0.1)
+
+    /// How far each shape reaches from its square's center, gold edge and all, read off its
+    /// picture at `span`.
+    static func half(of kind: Piece.Kind) -> Float {
+        switch kind {
+        case .king: return 0.376
+        case .queen: return 0.403
+        case .rook: return 0.363
+        case .bishop: return 0.372
+        case .knight: return 0.363
+        case .pawn: return 0.372
+        }
     }
 
-    /// The tile's rounded corners, seen from above, as in the pictures.
-    static let corner: CGFloat = 0.08
-
-    /// How far the picture reaches past the tile's top toward the player: the sliver of its near
-    /// side the flat view sees, from 80 degrees up, as the pictures are drawn.
-    static func reach(of kind: Piece.Kind) -> CGFloat {
-        let elevation = CGFloat(SculptedCamera.Framing.seated.elevation)
-        return size(of: kind).height / tan(elevation)
-    }
-
-    /// How far the tile reaches from its square's center across the board, and how tall it is,
-    /// in squares.
+    /// How far the piece reaches from its square's center across the board, and how high it
+    /// hovers, in squares.
     static func extent(of kind: Piece.Kind) -> (reach: Float, height: Float) {
-        let tile = size(of: kind)
-        return (Float(tile.width) / 2, Float(tile.height))
+        (half(of: kind), hover)
     }
 
-    /// The picture's name in the asset catalog.
+    /// The shape's picture's name in the asset catalog.
     static func pictureName(_ kind: Piece.Kind, color: Piece.Color) -> String {
-        "glass-\(color == .white ? "w" : "b")\(kind.glassLetter)"
+        "cutout-\(color == .white ? "w" : "b")\(kind.letter)"
+    }
+
+    /// The shadow's picture's name: one for both colors.
+    static func shadowName(_ kind: Piece.Kind) -> String {
+        "cutout-shadow-\(kind.letter)"
     }
 
     static func makePiece(_ kind: Piece.Kind, color: Piece.Color, look: SculptedLook) -> SCNNode {
-        let (width, height) = size(of: kind)
-        let reach = Self.reach(of: kind)
         let node = SCNNode()
 
-        // The plain tile: it casts the shadow and hides under the picture, but for a sliver of its
-        // near side on the far ranks, which the camera sees from a little lower.
-        let body = SCNNode(geometry: SCNBox(width: width, height: height, length: width, chamferRadius: corner))
-        body.geometry?.materials = [side(color)]
-        body.position = SCNVector3(0, Float(height / 2), 0)
+        let shadow = SCNNode(geometry: SCNPlane(width: span, height: span))
+        shadow.geometry?.materials = [shadowMaterial(kind)]
+        shadow.eulerAngles.x = -.pi / 2
+        shadow.position = SCNVector3(shadowOffset.x, 0.0018, shadowOffset.y)
+        // With the contact shadows: under the board's marks and every piece.
+        shadow.renderingOrder = 5
 
-        // The picture, on the tile's top: from its far edge to the near side's foot, as the flat
-        // view sees the tile.
-        let plane = SCNPlane(width: width, height: width + reach)
-        plane.cornerRadius = corner
-        plane.materials = [picture(kind, color: color, look: look)]
-        let top = SCNNode(geometry: plane)
-        top.eulerAngles.x = -.pi / 2
-        top.position = SCNVector3(0, Float(height) + 0.0015, Float(reach / 2))
-        top.castsShadow = false
+        let shape = SCNNode(geometry: SCNPlane(width: span, height: span))
+        shape.geometry?.materials = [picture(kind, color: color, look: look)]
+        shape.eulerAngles.x = -.pi / 2
+        shape.position = SCNVector3(0, hover, 0)
+        // Over the board's marks, which show through its clear pixels, and under the arrows.
+        shape.renderingOrder = 14
 
-        for part in [body, top] {
+        for part in [shadow, shape] {
+            part.castsShadow = false
             part.categoryBitMask = SculptedBoardScene.pieceCategory
             node.addChildNode(part)
         }
@@ -75,7 +84,7 @@ enum SculptedFlatSet {
     /// themselves, so they follow by hand, about as much as the board does.
     static func dim(_ dimmed: Bool) {
         for material in pictures.values {
-            material.emission.intensity = dimmed ? 0.53 : 1
+            material.multiply.contents = UIColor(white: dimmed ? 0.53 : 1, alpha: 1)
         }
     }
 
@@ -89,38 +98,46 @@ enum SculptedFlatSet {
     }
 
     private static var pictures: [String: SCNMaterial] = [:]
-    private static var sides: [Piece.Color: SCNMaterial] = [:]
+    private static var shadows: [Piece.Kind: SCNMaterial] = [:]
 
     private static func picture(_ kind: Piece.Kind, color: Piece.Color, look: SculptedLook) -> SCNMaterial {
         let name = pictureName(kind, color: color)
         let key = "\(look.name)-\(name)"
         if let made = pictures[key] { return made }
         let material = SCNMaterial()
-        // The picture carries its own light, so it glows as it is drawn, over a black that takes
-        // no light (lambert has no shine), then is brightened or dimmed with the board's light
-        // where the tile stands.
-        material.lightingModel = .lambert
-        material.diffuse.contents = UIColor.black
-        material.emission.contents = UIImage(named: name)
-        material.emission.mipFilter = .linear
-        if let spot = look.spot {
-            material.shaderModifiers = [.fragment: light(spot)]
-        }
+        // The picture is drawn as it is, then brightened or dimmed with the board's light where
+        // the piece stands. Its clear pixels are cut away, so they hide nothing beneath.
+        material.lightingModel = .constant
+        material.diffuse.contents = UIImage(named: name)
+        material.diffuse.mipFilter = .linear
+        material.blendMode = .alpha
+        var fragment = cut
+        if let spot = look.spot { fragment += light(spot) }
+        material.shaderModifiers = [.fragment: fragment]
         pictures[key] = material
         return material
     }
 
-    /// The tile's sides, where they show below the picture: the glass's color there.
-    private static func side(_ color: Piece.Color) -> SCNMaterial {
-        if let made = sides[color] { return made }
-        let made = color == .white
-            ? SculptedAssets.pbr(UIColor(red: 0.6, green: 0.58, blue: 0.56, alpha: 1), roughness: 0.3, coat: 1, coatRoughness: 0.03)
-            : SculptedAssets.pbr(UIColor(red: 0.2, green: 0.12, blue: 0.06, alpha: 1), roughness: 0.3, coat: 1, coatRoughness: 0.03)
-        sides[color] = made
-        return made
+    /// Drops the shape's clear pixels, so they write no depth and the marks under them show.
+    private static let cut = """
+    if (_output.color.a < 0.04) { discard_fragment(); }
+
+    """
+
+    private static func shadowMaterial(_ kind: Piece.Kind) -> SCNMaterial {
+        if let made = shadows[kind] { return made }
+        let material = SCNMaterial()
+        material.lightingModel = .constant
+        material.diffuse.contents = UIImage(named: shadowName(kind))
+        material.diffuse.mipFilter = .linear
+        material.blendMode = .alpha
+        material.transparency = 0.42
+        material.writesToDepthBuffer = false
+        shadows[kind] = material
+        return material
     }
 
-    /// The board's light where the tile stands, relative to the middle of the board, where the
+    /// The board's light where the piece stands, relative to the middle of the board, where the
     /// pictures look as drawn. The looks with a spot key light the board in a pool, brightest
     /// toward the player's left: the light the squares take there is the key's (falling off with
     /// distance and toward the rim of its cone) plus an even share from the studio and the rim
@@ -136,18 +153,18 @@ enum SculptedFlatSet {
         // At the middle of the board, the key shines straight down its cone.
         let middle = even + strength * Double(key.y) / Double(simd_length_squared(key)) / Double(simd_length(key))
         return """
-        float4x4 glassCamera = scn_frame.inverseViewTransform;
-        float3 glassPoint = (glassCamera * float4(_surface.position, 1.0)).xyz;
-        float2 glassSide = glassCamera[2].xz;
-        glassSide = length(glassSide) > 0.0001 ? normalize(glassSide) : float2(0.0, 1.0);
-        float3 glassKey = float3(\(key.x) * glassSide.y + \(key.z) * glassSide.x, \(key.y),
-                                 \(-key.x) * glassSide.x + \(key.z) * glassSide.y);
-        float3 glassToKey = glassKey - glassPoint;
-        float glassDistance2 = dot(glassToKey, glassToKey);
-        float3 glassL = glassToKey * rsqrt(glassDistance2);
-        float glassCone = saturate((dot(-glassL, normalize(-glassKey)) - \(outer)) / \(inner - outer));
-        float glassLight = \(even) + \(strength) * max(glassL.y, 0.0) * glassCone / glassDistance2;
-        _output.color.rgb *= glassLight / \(middle);
+        float4x4 flatCamera = scn_frame.inverseViewTransform;
+        float3 flatPoint = (flatCamera * float4(_surface.position, 1.0)).xyz;
+        float2 flatSide = flatCamera[2].xz;
+        flatSide = length(flatSide) > 0.0001 ? normalize(flatSide) : float2(0.0, 1.0);
+        float3 flatKey = float3(\(key.x) * flatSide.y + \(key.z) * flatSide.x, \(key.y),
+                                 \(-key.x) * flatSide.x + \(key.z) * flatSide.y);
+        float3 flatToKey = flatKey - flatPoint;
+        float flatDistance2 = dot(flatToKey, flatToKey);
+        float3 flatL = flatToKey * rsqrt(flatDistance2);
+        float flatCone = saturate((dot(-flatL, normalize(-flatKey)) - \(outer)) / \(inner - outer));
+        float flatLight = \(even) + \(strength) * max(flatL.y, 0.0) * flatCone / flatDistance2;
+        _output.color.rgb *= flatLight / \(middle);
         """
     }
 
@@ -160,7 +177,7 @@ enum SculptedFlatSet {
 
 private extension Piece.Kind {
     /// The letter the pictures are named by.
-    var glassLetter: String {
+    var letter: String {
         switch self {
         case .king: return "K"
         case .queen: return "Q"

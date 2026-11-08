@@ -3,14 +3,16 @@ import SwiftUI
 
 /// A puzzle's board in real 3D: the game's own board, tilted with the pieces standing or flat
 /// from above (the Board view setting), with the coach's glowing squares and arrows lying on
-/// the stone. Tap a piece and then its square, as on the flat training board. Drills put no
-/// labels on the board, so it has none.
+/// the stone, and its little labels (a lesson's letters, a candidate's number) pinned to the
+/// corner of their square. Tap a piece and then its square, as on the flat training board.
 struct SculptedTrainingBoard: View {
     let game: GameModel
     let theme: BoardTheme
     var flipped = false
     var arrows: [BoardArrow] = []
     var marks: [SquareMark] = []
+    /// Little tags on squares, drawn over the picture where the flat board draws them.
+    var labels: [SquareLabel] = []
     /// Taps on squares. Nil makes the board look-only.
     var onTap: ((Square) -> Void)?
     /// Seen from the player's chair, or from above with the flat pieces.
@@ -42,6 +44,7 @@ struct SculptedTrainingBoard: View {
                     .contentShape(Rectangle())
                     .gesture(SpatialTapGesture().onEnded { value in tap(at: value.location) })
                     .accessibilityHidden(true)
+                labelLayer(camera: camera, size: size)
                 squareElements(camera: camera, size: size)
             }
         }
@@ -110,6 +113,43 @@ struct SculptedTrainingBoard: View {
         withAnimation(.snappy(duration: 0.22)) { onTap(square) }
     }
 
+    // MARK: Labels
+
+    /// Each label in its capsule at the far right corner of its square as the camera sees it,
+    /// sized to that square, as the flat board places them.
+    private func labelLayer(camera: SculptedCamera, size: CGSize) -> some View {
+        ZStack(alignment: .topLeading) {
+            ForEach(labels, id: \.self) { label in
+                if let square = Self.square(named: label.square) {
+                    let frame = camera.frame(of: square, in: size)
+                    let cell = frame.width
+                    let color = (label.color ?? .blue).color(on: theme)
+                    Text(label.text)
+                        .font(.app(size: cell * 0.24, weight: .heavy))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .foregroundStyle(theme.isDark ? Color.black : Color.white)
+                        .padding(.horizontal, cell * 0.07)
+                        .frame(minWidth: cell * 0.38, minHeight: cell * 0.34)
+                        .background(color, in: Capsule())
+                        .shadow(color: theme.glows ? color.opacity(0.9) : .black.opacity(0.25),
+                                radius: theme.glows ? cell * 0.1 : 2, y: theme.glows ? 0 : 1)
+                        .position(Self.labelCenter(in: frame))
+                        .transition(.scale(scale: 0.5).combined(with: .opacity))
+                }
+            }
+        }
+        .frame(width: size.width, height: size.height, alignment: .topLeading)
+        .animation(.spring(duration: 0.3, bounce: 0.35), value: labels)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    /// Where a label sits on its square as the camera sees it: the far right corner, as on the flat board.
+    static func labelCenter(in frame: CGRect) -> CGPoint {
+        CGPoint(x: frame.minX + frame.width * 0.76, y: frame.minY + frame.height * 0.24)
+    }
+
     // MARK: VoiceOver
 
     /// One element over each square's outline, read and tapped like the flat board's squares.
@@ -137,6 +177,7 @@ struct SculptedTrainingBoard: View {
         if let occupant { parts.append(occupant.spokenName) }
         if game.targets.contains(square) { parts.append(occupant == nil ? "move here" : "capture") }
         if marks.contains(where: { $0.square == square.notation }) { parts.append("highlighted") }
+        if let label = labels.first(where: { $0.square == square.notation }) { parts.append(label.text) }
         return parts.joined(separator: ", ")
     }
 }

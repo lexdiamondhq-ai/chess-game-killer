@@ -281,7 +281,7 @@ final class AnalysisModel {
         let fen = draft.fen
         if let known = cache[fen] {
             show(known.lines, depth: known.depth, fen: fen)
-            if known.depth >= 18 {
+            if known.depth >= Self.fullDepth {
                 isThinking = false
                 return
             }
@@ -291,16 +291,35 @@ final class AnalysisModel {
             depth = 0
         }
         isThinking = true
-        for depth in [10, 18] {
-            // Capped so the deep pass can't run away on a slow phone.
-            let found = await engine.analyze(fen: fen, depth: depth, lines: 2, maxTimeMs: depth == 10 ? 1500 : 8000)
-            if Task.isCancelled || id != generation { return }
-            guard !found.isEmpty else { continue }
-            cache[fen] = (found, depth)
-            show(found, depth: depth, fen: fen)
+        // One search that reports as it deepens: the arrows show as soon as the first depths are
+        // in, a fraction of a second, and firm up as it looks further. Capped so it can't run
+        // away on a slow phone.
+        let found = await engine.analyze(fen: fen, depth: Self.fullDepth, lines: 2, maxTimeMs: 6000) { [weak self] found, depth in
+            Task { @MainActor in self?.progress(found, depth: depth, fen: fen, id: id) }
+        }
+        if Task.isCancelled || id != generation { return }
+        if !found.isEmpty {
+            cache[fen] = (found, Self.fullDepth)
+            show(found, depth: Self.fullDepth, fen: fen)
         }
         isThinking = false
         failed = lines.isEmpty
+    }
+
+    /// How deep the analysis looks before it counts as done.
+    static let fullDepth = 18
+
+    /// The first depth worth showing: shallower, the best move still jumps about.
+    static let firstDepth = 8
+
+    /// The lines so far, while the search is still deepening. Too shallow, shallower than shown
+    /// already, or for a position since left, they are dropped.
+    private func progress(_ found: [EngineLine], depth: Int, fen: String, id: Int) {
+        guard id == generation, isThinking, depth >= Self.firstDepth, depth > self.depth, depth < Self.fullDepth,
+              !found.isEmpty,
+              cache[fen].map({ $0.depth < depth }) ?? true else { return }
+        cache[fen] = (found, depth)
+        show(found, depth: depth, fen: fen)
     }
 
     private func show(_ found: [EngineLine], depth: Int, fen: String) {
@@ -323,7 +342,7 @@ final class AnalysisModel {
         let fen = draft.fen
         if let known = cache[fen] {
             show(known.lines, depth: known.depth, fen: fen)
-            if known.depth >= 18 {
+            if known.depth >= Self.fullDepth {
                 isThinking = false
                 return
             }

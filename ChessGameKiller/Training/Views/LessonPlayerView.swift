@@ -87,17 +87,16 @@ struct LessonPlayerView: View {
             VStack(spacing: 12) {
                 header(player)
                 progress(player)
-                TrainingBoardView(
+                TrainerBoard(
                     game: player.game,
                     theme: theme,
+                    side: boardSide,
                     flipped: player.isFlipped,
                     arrows: player.arrows,
                     marks: player.marks,
                     labels: player.labels,
                     onTap: player.phase == .task ? { (square: Square) in player.tap(square) } : nil
                 )
-                .frame(width: boardSide, height: boardSide)
-                .boardHeadroom(theme: theme, side: boardSide)
                 .padding(.top, 4)
                 ScrollView {
                     caption(player)

@@ -31,11 +31,9 @@ struct EndgameView: View {
                 RoomHeader(title: study.title, subtitle: subtitle) { dismiss() }
                 if let runner {
                     goalRow(runner)
-                    TrainingBoardView(game: runner.board, theme: theme, flipped: runner.player == .black,
-                                      marks: runner.marks,
-                                      onTap: runner.phase == .playing ? { (square: Square) in runner.tap(square) } : nil)
-                        .frame(width: side, height: side)
-                        .boardHeadroom(theme: theme, side: side)
+                    TrainerBoard(game: runner.board, theme: theme, side: side, flipped: runner.player == .black,
+                                 marks: runner.marks,
+                                 onTap: runner.phase == .playing ? { (square: Square) in runner.tap(square) } : nil)
                         .id(runner.study.id)
                         .transition(.opacity)
                     RoomMessage(text: runner.message, tone: runner.tone, theme: theme)

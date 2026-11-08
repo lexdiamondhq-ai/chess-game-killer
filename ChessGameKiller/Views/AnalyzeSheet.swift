@@ -501,6 +501,8 @@ struct AnalysisView: View {
     @State private var confirmingForfeit = false
     @State private var showingPhoto = false
     @AppStorage("haptics") private var hapticsOn = true
+    @AppStorage("sculpted3D") private var sculpted3D = true
+    @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.auto
 
     init(draft: PositionDraft, theme: BoardTheme, engine: ChessEngine?, rival: String = "the computer",
          clock: TimeControl = .unlimited, forfeits: String? = nil,
@@ -549,17 +551,45 @@ struct AnalysisView: View {
         return tints
     }
 
+    /// The board, as in a game: the real 3D board, tilted or flat from above, with the Tilted /
+    /// Flat switch under it, when the look has one and 3D pieces are on; otherwise the flat board.
+    /// Seen from the side to move at first (the toolbar's button turns it round).
+    @ViewBuilder
+    private var board: some View {
+        let hints = model.selected == nil ? model.hints : []
+        if BoardView.playsIn3D(theme, setting: sculpted3D) {
+            VStack(spacing: 6) {
+                SculptedPositionBoard(pieces: model.draft.pieces, theme: theme, flipped: flipped, hints: hints,
+                                      selected: model.selected, targets: model.targets,
+                                      lastMove: model.lastMove.map { LastMove(from: $0.from, to: $0.to) },
+                                      onTap: { square in model.tap(square) },
+                                      framing: tilt.framing(bigBoard: false))
+                    // Edge to edge, as the game's board runs, its frame going off the sides.
+                    .padding(.horizontal, -8)
+                HStack {
+                    Text("\(sideName) to move")
+                        .font(.app(.caption, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 0)
+                    BoardViewSwitch(theme: theme)
+                }
+            }
+        } else {
+            PositionBoard(draft: model.draft, theme: theme, flipped: flipped,
+                          hints: hints,
+                          onTap: { square in model.tap(square) }, tints: tints,
+                          selected: model.selected, targets: model.targets)
+                .animation(.snappy(duration: 0.4), value: flipped)
+                .animation(.snappy(duration: 0.22), value: model.draft.fen)
+        }
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 14) {
                 photoRow
                 header
-                PositionBoard(draft: model.draft, theme: theme, flipped: flipped,
-                              hints: model.selected == nil ? model.hints : [],
-                              onTap: { square in model.tap(square) }, tints: tints,
-                              selected: model.selected, targets: model.targets)
-                    .animation(.snappy(duration: 0.4), value: flipped)
-                    .animation(.snappy(duration: 0.22), value: model.draft.fen)
+                board
                     .sensoryFeedback(.selection, trigger: model.selected) { _, new in hapticsOn && new != nil }
                 stepper
                 madeMoves

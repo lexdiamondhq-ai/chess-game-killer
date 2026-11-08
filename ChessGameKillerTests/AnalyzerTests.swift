@@ -183,6 +183,18 @@ final class BoardReaderTests: XCTestCase {
         XCTAssertEqual(reading.draft[.d1], .init(.king, .black))
     }
 
+    func testScanCountStartsAgainEachMonth() {
+        let defaults = UserDefaults(suiteName: "ScanCountTests")!
+        defaults.removePersistentDomain(forName: "ScanCountTests")
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let november = Date(timeIntervalSince1970: 1_793_836_800) // 2026-11-05
+        let december = Date(timeIntervalSince1970: 1_796_428_800) // 2026-12-05
+        XCTAssertEqual(ScanCount.next(defaults: defaults, now: november, calendar: calendar), 1)
+        XCTAssertEqual(ScanCount.next(defaults: defaults, now: november, calendar: calendar), 2)
+        XCTAssertEqual(ScanCount.next(defaults: defaults, now: december, calendar: calendar), 1)
+    }
+
     func testOnlyNetworkTroubleBlamesTheConnection() {
         XCTAssertEqual(CloudBoardReader.readerError(for: URLError(.notConnectedToInternet)), .offline)
         XCTAssertEqual(CloudBoardReader.readerError(for: URLError(.timedOut)), .offline)
@@ -441,6 +453,23 @@ final class AnalysisModelTests: XCTestCase {
         XCTAssertFalse(model.failed)
     }
 
+    /// The arrows show from the search's first useful depth, while it is still looking deeper.
+    func testTheBestMovesShowBeforeTheSearchEnds() async {
+        let engine = DeepeningEngine()
+        let model = AnalysisModel(draft: .standard, engine: engine)
+        let running = Task { await model.run() }
+        for _ in 0..<100 where model.hints.isEmpty {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertTrue(model.isThinking, "still looking deeper")
+        XCTAssertEqual(model.hints.first?.uci, "d2d4")
+        XCTAssertEqual(model.depth, 9)
+        await running.value
+        XCTAssertFalse(model.isThinking)
+        XCTAssertEqual(model.hints.first?.uci, "e2e4")
+        XCTAssertEqual(model.depth, AnalysisModel.fullDepth)
+    }
+
     func testScoresAreShownFromWhitesSide() async {
         let draft = PositionDraft(fen: "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1")!
         let engine = FakeEngine(scripted: [
@@ -612,4 +641,22 @@ final class PlayFromPositionTests: XCTestCase {
         match.tap(.a8)
         XCTAssertEqual(match.game.winner, .white)
     }
+}
+
+/// Reports a shallow depth that is too noisy to show, then one worth showing, then answers
+/// deeper a little later with another move.
+private final class DeepeningEngine: ChessEngine, @unchecked Sendable {
+    func analyze(fen: String, depth: Int, lines: Int, maxTimeMs: Int?) async -> [EngineLine] {
+        [EngineLine(moves: ["e2e4"], evaluation: .centipawns(30))]
+    }
+
+    func analyze(fen: String, depth: Int, lines: Int, maxTimeMs: Int?,
+                 progress: @escaping @Sendable ([EngineLine], Int) -> Void) async -> [EngineLine] {
+        progress([EngineLine(moves: ["a2a3"], evaluation: .centipawns(0))], 3)
+        progress([EngineLine(moves: ["d2d4"], evaluation: .centipawns(25))], 9)
+        try? await Task.sleep(for: .milliseconds(400))
+        return await analyze(fen: fen, depth: depth, lines: lines, maxTimeMs: maxTimeMs)
+    }
+
+    func chooseMove(fen: String, skill: Int, depth: Int?, thinkTimeMs: Int) async -> String? { nil }
 }
