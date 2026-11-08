@@ -194,37 +194,6 @@ REEL_LINES = [
 ]
 
 
-# Leo's note on Today. Keep in step with HomeLeoNote in
-# ChessGameKiller/Home/HomeTodayNotes.swift (allLines). Leo's alone: the app always plays
-# them in his voice, so no other coach records them (half the cost).
-NOTE_LINES = [
-    "Before you let go of a piece, ask one question: can they take it for free?",
-    "Count the guards. If a piece has more attackers than defenders, it needs help.",
-    "After every move they make, ask what it attacks. Then make yours.",
-    "Their last move is a message. Read it before you answer.",
-    "Before you move, check every square their knights and queen can reach.",
-    "Two of your pieces a knight's jump apart is an invitation. Don't send it.",
-    "Checks, captures, attacks. Look for all three before anything else.",
-    "When something on their side feels loose, look harder. That's where the tactic is.",
-    "When their king is short of squares, look at every check. One of them may end it.",
-    "Count their king's escape squares. When there are none left, a check is mate.",
-    "Center, develop, castle. Do those three before anything clever.",
-    "Move each piece once in the opening, and get your king safe early.",
-    "In the endgame, the king is a fighter. Bring him forward.",
-    "Rooks belong behind passed pawns, yours or theirs.",
-    "Name two or three candidate moves before you choose one.",
-    "Before you play, picture the board after your move. Then find their best reply.",
-    "If you see a good move, look for a better one.",
-    "Ask what your opponent wants before you ask what you want.",
-    "Every piece should have a job. Find the one that doesn't, and give it one.",
-    "When you're ahead, trade pieces. When you're behind, keep them on.",
-    "A knight on the rim is dim. Bring it toward the center.",
-    "Rooks love open files. Find one, and put a rook on it.",
-    "When you're winning, don't hurry. Make it safe, then make it count.",
-    "Sit on your hands for a moment. The first move you see is rarely the best.",
-]
-
-
 def lesson_lines() -> list[str]:
     """Every lesson and reel line, in Leo's words."""
     course = json.loads((CONTENT / "course.json").read_text())
@@ -255,8 +224,7 @@ def reaction_lines(coach: str) -> list[str]:
 def all_lines(coach: str = "leo") -> list[str]:
     """Everything the coach says: reactions first (they're short and heard most), then the lessons."""
     lines: list[str] = []
-    own = NOTE_LINES if coach == "leo" else []
-    for line in reaction_lines(coach) + [personalize(line, coach) for line in lesson_lines()] + own:
+    for line in reaction_lines(coach) + [personalize(line, coach) for line in lesson_lines()]:
         if line not in lines:
             lines.append(line)
     return lines

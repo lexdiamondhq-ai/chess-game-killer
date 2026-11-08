@@ -73,8 +73,7 @@ struct HomeView: View {
     @State private var pullReady = true
     /// Today's session, worked out once rather than on every redraw.
     @State private var plan: SessionPlan?
-    /// Leo's note and your finest move for Today, read from your games once rather than on every redraw.
-    @State private var leoNote: HomeLeoNote?
+    /// Your finest move of the week for Today, read from your games once rather than on every redraw.
     @State private var finestMove: HomeFinestMove?
     /// The board window has scrolled out of sight; the dock carries its button instead.
     @State private var windowGone = false
@@ -238,25 +237,17 @@ struct HomeView: View {
         "\(training.progress.sessionsDone) \(training.progress.xp) \(training.trainedToday) \(Trainer.dayString(.now)) \(vault.games.count)"
     }
 
-    /// Changes whenever Leo's note or the finest move could: a game saved or graded, a new day, a
-    /// new name, morning turning to afternoon.
+    /// Changes whenever the finest move could: a game saved or graded, a new day.
     private var notesKey: String {
-        let hour: Int = Calendar.current.component(.hour, from: .now)
         // The newest game's grades land after it ends: count them too.
         let graded: Int = vault.games.first?.moments.count ?? 0
-        return "\(vault.games.count) \(graded) \(Trainer.dayString(.now)) \(hour < 12 ? 0 : (hour < 17 ? 1 : 2)) \(playerName)"
+        return "\(vault.games.count) \(graded) \(Trainer.dayString(.now))"
     }
 
-    /// Reads the games off the main thread for Leo's note and the week's finest move.
+    /// Reads the games off the main thread for the week's finest move.
     private func readToday() async {
         let games: [SavedGame] = vault.games
-        let name: String = playerName
-        let read = await Task.detached(priority: .utility) { () -> (HomeLeoNote, HomeFinestMove?) in
-            let report: CoachReport = CoachReport.make(games: games)
-            return (HomeLeoNote.make(report: report, name: name), HomeFinestMove.pick(games: games))
-        }.value
-        leoNote = read.0
-        finestMove = read.1
+        finestMove = await Task.detached(priority: .utility) { HomeFinestMove.pick(games: games) }.value
     }
 
     // MARK: The page
@@ -692,7 +683,7 @@ extension HomeView {
             you: { openYou(.bottom) },
             rooms: openShortcuts)
         let auroraInfo = HomeAuroraInfo(stage: info, games: currentGameList(upNext), look: look,
-                                        pieces: match.game.pieces.map(\.piece), note: leoNote, finest: finestMove)
+                                        pieces: match.game.pieces.map(\.piece), finest: finestMove)
         let auroraActions = HomeAuroraActions(stage: stageActions, open: { game in
             if let friend = game.friendGame {
                 challenges?.play(friend)
