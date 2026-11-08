@@ -397,7 +397,7 @@ final class ChallengeTests: XCTestCase {
         mate.result = FriendGameState.Result(winner: .white, reason: .checkmate)
         mate.setMoves(mate.moves)
         game.apply(mate)
-        XCTAssertEqual(sounds.played.last, .gameOver, "mate against the player")
+        XCTAssertEqual(sounds.played.last, .defeat, "mate against the player")
         XCTAssertEqual(game.phase, .over)
         XCTAssertEqual(game.resultHeadline, "Checkmate. Alex wins")
         XCTAssertEqual(game.didWin, false)
