@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
-import worker, { SCHEMA, buildRequest, normalize, toBase64 } from "../src/index.js";
+import worker, { SCHEMA, buildRequest, normalize, orient, toBase64, whiteView } from "../src/index.js";
 
 const realFetch = globalThis.fetch;
 afterEach(() => {
@@ -210,4 +210,31 @@ test("the allowance follows DAILY_LIMIT, or the default without it", async () =>
   assert.deepEqual(limits, ["25", "300"]);
   // Without the binding (local tests, an older deploy) scans are not blocked.
   assert.equal(await withinDailyBudget({}), true);
+});
+
+// Alex's scan (2026-11-08): read with White at the bottom, the black pawns
+// marched up the board and the white king sat on a8. Turned round, it's a
+// normal game: White's king on h1, Black's on e7.
+const BACKWARDS = ["K.......", "....P...", "..B..B.N", "........", ".p.p...P", "p..r....", "...k.p..", "........"];
+
+test("a board read the wrong way round is turned", () => {
+  assert.equal(orient(BACKWARDS, "bottom"), "top");
+  assert.equal(normalize({ found: true, rows: BACKWARDS, white_side: "bottom" }).white_side, "top");
+  assert.deepEqual(whiteView(BACKWARDS, "top"), [
+    "........", "..p.k...", "....r..p", "P...p.p.", "........", "N.B..B..", "...P....", ".......K",
+  ]);
+});
+
+test("a board read the right way round is left alone", () => {
+  assert.equal(orient(ROWS, "bottom"), "bottom");
+  assert.equal(orient([...ROWS].reverse().map((row) => [...row].reverse().join("")), "top"), "top");
+  // Passed pawns racing to promote look backwards, but too close to call.
+  const race = ["........", "P.......", "........", "...k....", "....K...", "........", ".......p", "........"];
+  assert.equal(orient(race, "bottom"), "bottom");
+});
+
+test("pawns on the first or last rank give the side away", () => {
+  const sideways = ["........", "...k....", "........", "P......p", "P......p", "........", "....K...", "........"];
+  // Seen with White on the left, these pawns stand on ranks 1 and 8: impossible.
+  assert.notEqual(orient(sideways, "left"), "left");
 });

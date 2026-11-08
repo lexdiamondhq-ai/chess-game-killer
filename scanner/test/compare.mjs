@@ -5,7 +5,7 @@
 // Usage: ANTHROPIC_API_KEY=... node scanner/test/compare.mjs claude-sonnet-5-5:high claude-opus-5-5:high
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { apiKey, buildRequest, normalize } from "../src/index.js";
+import { apiKey, buildRequest, normalize, whiteView } from "../src/index.js";
 
 const folder = new URL("./boards/", import.meta.url).pathname;
 const expected = JSON.parse(await readFile(join(folder, "expected.json"), "utf8"));
@@ -21,24 +21,12 @@ function grid(placement) {
   return placement.split("/").map((row) => row.replace(/\d/g, (n) => ".".repeat(Number(n))));
 }
 
-/** Rows as seen in the picture to rank 8..1, files a..h (same as the app). */
-function toWhiteView(rows, side) {
-  const board = Array.from({ length: 8 }, () => Array(8).fill("."));
-  rows.forEach((text, r) => {
-    [...text].forEach((ch, c) => {
-      const [file, rank] =
-        side === "bottom" ? [c, 7 - r] : side === "top" ? [7 - c, r] : side === "left" ? [r, c] : [7 - r, 7 - c];
-      board[7 - rank][file] = ch;
-    });
-  });
-  return board.map((row) => row.join(""));
-}
 
-async function read(bytes, model, effort) {
+async function read(bytes, type, model, effort) {
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-    body: JSON.stringify(buildRequest(bytes, "image/png", model, effort)),
+    body: JSON.stringify(buildRequest(bytes, type, model, effort)),
   });
   const message = await response.json();
   if (!response.ok) throw new Error(`${response.status} ${message.error?.message}`);
@@ -55,13 +43,14 @@ for (const config of configs) {
     const bytes = new Uint8Array(await readFile(join(folder, name)));
     const started = Date.now();
     try {
-      const { answer, usage } = await read(bytes, model, effort);
+      const type = name.endsWith(".jpg") ? "image/jpeg" : "image/png";
+      const { answer, usage } = await read(bytes, type, model, effort);
       const seconds = ((Date.now() - started) / 1000).toFixed(0);
       if (!answer.found) {
         lines.push(`  ${name}: no board found, ${seconds} s`);
         continue;
       }
-      const got = toWhiteView(answer.rows, answer.white_side);
+      const got = whiteView(answer.rows, answer.white_side);
       const truth = grid(want.placement);
       let right = 0;
       for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) if (got[r][c] === truth[r][c]) right++;

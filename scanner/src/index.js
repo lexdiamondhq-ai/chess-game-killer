@@ -98,6 +98,7 @@ export default {
 
 /** Asks Claude to read the board and returns the cleaned-up answer. */
 export async function readBoard(bytes, type, env) {
+  const started = Date.now();
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -119,6 +120,8 @@ export async function readBoard(bytes, type, env) {
   }
   const text = (message.content || []).find((block) => block.type === "text");
   if (!text) throw new Error("Claude did not report a board");
+  // Shows in the Worker's logs, to see where a slow read's time went.
+  console.log(`read in ${Date.now() - started} ms, ${message.usage?.output_tokens ?? "?"} output tokens`);
   return normalize(JSON.parse(text.text));
 }
 
@@ -166,10 +169,56 @@ export function normalize(input) {
   return {
     found: true,
     rows: clean,
-    white_side: SIDES.has(answer.white_side) ? answer.white_side : "bottom",
+    white_side: orient(clean, SIDES.has(answer.white_side) ? answer.white_side : "bottom"),
     side_to_move: answer.side_to_move === "white" || answer.side_to_move === "black" ? answer.side_to_move : null,
     confidence: CONFIDENCE.has(answer.confidence) ? answer.confidence : "medium",
   };
+}
+
+/** The board from White's side (rank 8 first, files a to h), for rows read
+ * top to bottom from a picture with White's side on `side`. Same as the app. */
+export function whiteView(rows, side) {
+  const board = Array.from({ length: 8 }, () => Array(8).fill("."));
+  rows.forEach((text, r) => {
+    [...text].forEach((cell, c) => {
+      const [file, rank] =
+        side === "bottom" ? [c, 7 - r] : side === "top" ? [7 - c, r] : side === "left" ? [r, c] : [7 - r, 7 - c];
+      board[7 - rank][file] = cell;
+    });
+  });
+  return board.map((row) => row.join(""));
+}
+
+/** How unlikely a position looks: pawns never stand on the first or last
+ * rank, and pawns and kings mostly stay near their own side. 0 is the start. */
+export function oddness(board) {
+  let score = 0;
+  board.forEach((row, i) => {
+    const rank = 8 - i;
+    for (const cell of row) {
+      if ((cell === "P" || cell === "p") && (rank === 1 || rank === 8)) score += 20;
+      else if (cell === "P") score += rank - 2;
+      else if (cell === "p") score += 7 - rank;
+      else if (cell === "K") score += rank - 1;
+      else if (cell === "k") score += 8 - rank;
+    }
+  });
+  return score;
+}
+
+/** White's side, turned round when Claude read the board the wrong way: when
+ * another side makes the position far likelier (black pawns marching up,
+ * the white king in Black's corner), that side wins. A close call keeps
+ * Claude's answer, so a real race of passed pawns isn't turned. */
+export function orient(rows, side) {
+  const read = oddness(whiteView(rows, side));
+  let best = side;
+  let bestScore = read;
+  for (const other of SIDES) {
+    const score = oddness(whiteView(rows, other));
+    if (score < bestScore) [best, bestScore] = [other, score];
+  }
+  return read - bestScore >= 10 && bestScore * 2 <= read ? best : side;
 }
 
 /** Base64 without Node's Buffer, in chunks so big photos don't overflow the call stack. */

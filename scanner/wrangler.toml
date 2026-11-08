@@ -7,8 +7,9 @@ workers_dev = true
 
 [vars]
 # The Claude model that reads the board, and how hard it thinks (low to max).
+# Sonnet on low reads the test boards as well as on high, without long thinking on photos.
 MODEL = "claude-sonnet-5-5"
-EFFORT = "high"
+EFFORT = "low"
 # The most scans a day across everyone. The address is public, so this caps the bill.
 DAILY_LIMIT = "300"
 
