@@ -204,20 +204,15 @@ struct HomeAuroraView: View {
                                // the board (Alex, 2026-11-07). The clay board keeps its own even light.
                                light: nil,
                                leaning: upNext.inProgress && upNext.yourMove, plinth: nil,
-                               still: reduceMotion, dive: 0)
+                               still: reduceMotion, dive: 0,
+                               // Far enough back that the turning board's corners never reach
+                               // the view's edge: nothing cuts it off (Alex, 2026-11-08).
+                               pullBack: 5)
                     .id(SculptedLook.clay.name)
             }
         }
         .frame(height: height)
         .frame(maxWidth: .infinity)
-        // The board's lower edge melts into the marble instead of stopping on a hard line
-        // where the 3D view ends (Alex, 2026-11-07). It is gone a little before the view's
-        // edge, so the corners of the frame that reach the bottom fade with it.
-        .mask(LinearGradient(stops: [.init(color: .black, location: 0),
-                                     .init(color: .black, location: 0.74),
-                                     .init(color: .black.opacity(0.4), location: 0.86),
-                                     .init(color: .clear, location: 0.94)],
-                             startPoint: .top, endPoint: .bottom))
         .scaleEffect(1 - 0.12 * lift, anchor: .top)
         .opacity(1 - 0.55 * Double(lift))
         .allowsHitTesting(false)
