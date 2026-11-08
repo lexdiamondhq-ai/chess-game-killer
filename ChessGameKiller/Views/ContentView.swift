@@ -45,6 +45,8 @@ struct ContentView: View {
     @AppStorage(HomeLayout.key) private var boardSheet = HomeLayout.defaultOn
     /// The board home's room: Light, Middle or Dark.
     @AppStorage(HomeToneMode.key) private var homeTone = HomeToneMode.defaultMode
+    /// The stage home is always dark.
+    @AppStorage(HomeStageLayout.key) private var stageHome = HomeStageLayout.defaultOn
     /// Back from a game, the home's sheet rises out of the game's.
     @State private var homeRises = false
     /// The board home's tab, kept here so a redraw of the home (a new look) stays on it.
@@ -242,6 +244,13 @@ struct ContentView: View {
             }
     }
 
+    /// A screen is open over Home: training, today's move, puzzles, games, the army, a lesson,
+    /// a session, Leo, or Analyze.
+    private var coversHome: Bool {
+        showingTraining || showingDaily || showingPuzzles || showingGames || showingArmy
+            || coach.presentedLesson != nil || coach.presentedSession != nil || talk != nil || showingAnalyze
+    }
+
     /// The game screen with its sheets and full-screen covers.
     private var presented: some View {
         observed
@@ -296,6 +305,10 @@ struct ContentView: View {
                 }, close: { talk = nil })
             }
             .animation(.easeInOut(duration: 0.35), value: theme.id)
+            .onChange(of: coversHome, initial: true) { _, covers in
+                // Home's music rests under any screen opened over it, so Leo is heard alone.
+                HomeMusic.shared.setCovered(covers)
+            }
             .sheet(isPresented: $showingNewGame, onDismiss: startIfNeeded) {
                 NewGameSheet(theme: theme, forfeits: forfeits) { setup in
                     withAnimation(.snappy) { match.start(setup) }
@@ -560,7 +573,7 @@ struct ContentView: View {
     /// The window's light: the board home's room while it shows (Light and Middle are light),
     /// the board's look everywhere else.
     private var windowScheme: ColorScheme? {
-        if showingHome, homeLit, boardSheet, !showingWelcome { return homeTone.scheme }
+        if showingHome, homeLit, boardSheet || stageHome, !showingWelcome { return homeTone.scheme }
         return theme.isDark ? .dark : nil
     }
 

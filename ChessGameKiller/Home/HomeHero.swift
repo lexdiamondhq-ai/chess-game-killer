@@ -84,6 +84,8 @@ struct HomeHeroBoard: UIViewRepresentable {
     let camera: SculptedCamera
     /// Someone at the table: the next rival's light from across the board.
     var presence: SculptedPresence? = nil
+    /// The stone stage under the board, on the stage home.
+    var plinth: UIColor? = nil
 
     @AppStorage(BoardTheme.coordinatesKey) private var showsCoordinates = true
 
@@ -101,6 +103,7 @@ struct HomeHeroBoard: UIViewRepresentable {
         context.coordinator.showsCoordinates = showsCoordinates
         scene.heldCamera = camera
         scene.presence = presence
+        scene.plinth = plinth
         return scene.view
     }
 
@@ -114,6 +117,7 @@ struct HomeHeroBoard: UIViewRepresentable {
         }
         if scene.heldCamera != camera { scene.heldCamera = camera }
         if scene.presence != presence { scene.presence = presence }
+        if scene.plinth != plinth { scene.plinth = plinth }
     }
 
     private var state: SculptedBoardState {
