@@ -1,4 +1,4 @@
-// Chess Game Killer scanner: POST a photo or screenshot of a chess board to
+// Beauty of Chess scanner: POST a photo or screenshot of a chess board to
 // /read and get the position back. Claude does the reading; the Anthropic key
 // never leaves this server.
 
@@ -88,7 +88,7 @@ export default {
     if (!(await withinDailyBudget(env))) return json({ error: "daily_limit" }, 429);
 
     try {
-      return json(await readBoard(bytes, type, env));
+      return json(await readBoard(bytes, type, env, settingsFor(request, env)));
     } catch (error) {
       console.error("reading failed:", error && error.message);
       return json({ error: "upstream", status: (error && error.status) || null }, 502);
@@ -97,7 +97,8 @@ export default {
 };
 
 /** Asks Claude to read the board and returns the cleaned-up answer. */
-export async function readBoard(bytes, type, env) {
+export async function readBoard(bytes, type, env, settings = { model: env.MODEL, effort: env.EFFORT }) {
+  const started = Date.now();
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -105,7 +106,7 @@ export async function readBoard(bytes, type, env) {
       "anthropic-version": "2023-06-01",
       "content-type": "application/json",
     },
-    body: JSON.stringify(buildRequest(bytes, type, env.MODEL, env.EFFORT)),
+    body: JSON.stringify(buildRequest(bytes, type, settings.model, settings.effort)),
   });
   if (!response.ok) {
     const detail = (await response.text()).slice(0, 300);
@@ -119,7 +120,21 @@ export async function readBoard(bytes, type, env) {
   }
   const text = (message.content || []).find((block) => block.type === "text");
   if (!text) throw new Error("Claude did not report a board");
+  // Shows in the Worker's logs, to see where a slow read's time went.
+  console.log(`read in ${Date.now() - started} ms, ${message.usage?.output_tokens ?? "?"} output tokens`);
   return normalize(JSON.parse(text.text));
+}
+
+/** A player's first FAST_SCANS scans each month (the app counts them in X-Scan-Count)
+ * read with FAST_MODEL, which answers in about 2 seconds; later ones, and
+ * older apps that send no count, use MODEL. */
+export function settingsFor(request, env) {
+  const count = Number(request.headers.get("x-scan-count"));
+  const fastScans = Number(env.FAST_SCANS) || 0;
+  if (env.FAST_MODEL && Number.isInteger(count) && count >= 1 && count <= fastScans) {
+    return { model: env.FAST_MODEL, effort: env.FAST_EFFORT };
+  }
+  return { model: env.MODEL, effort: env.EFFORT };
 }
 
 /** The key without stray spaces or line breaks from pasting it into a secret. */
@@ -166,10 +181,56 @@ export function normalize(input) {
   return {
     found: true,
     rows: clean,
-    white_side: SIDES.has(answer.white_side) ? answer.white_side : "bottom",
+    white_side: orient(clean, SIDES.has(answer.white_side) ? answer.white_side : "bottom"),
     side_to_move: answer.side_to_move === "white" || answer.side_to_move === "black" ? answer.side_to_move : null,
     confidence: CONFIDENCE.has(answer.confidence) ? answer.confidence : "medium",
   };
+}
+
+/** The board from White's side (rank 8 first, files a to h), for rows read
+ * top to bottom from a picture with White's side on `side`. Same as the app. */
+export function whiteView(rows, side) {
+  const board = Array.from({ length: 8 }, () => Array(8).fill("."));
+  rows.forEach((text, r) => {
+    [...text].forEach((cell, c) => {
+      const [file, rank] =
+        side === "bottom" ? [c, 7 - r] : side === "top" ? [7 - c, r] : side === "left" ? [r, c] : [7 - r, 7 - c];
+      board[7 - rank][file] = cell;
+    });
+  });
+  return board.map((row) => row.join(""));
+}
+
+/** How unlikely a position looks: pawns never stand on the first or last
+ * rank, and pawns and kings mostly stay near their own side. 0 is the start. */
+export function oddness(board) {
+  let score = 0;
+  board.forEach((row, i) => {
+    const rank = 8 - i;
+    for (const cell of row) {
+      if ((cell === "P" || cell === "p") && (rank === 1 || rank === 8)) score += 20;
+      else if (cell === "P") score += rank - 2;
+      else if (cell === "p") score += 7 - rank;
+      else if (cell === "K") score += rank - 1;
+      else if (cell === "k") score += 8 - rank;
+    }
+  });
+  return score;
+}
+
+/** White's side, turned round when Claude read the board the wrong way: when
+ * another side makes the position far likelier (black pawns marching up,
+ * the white king in Black's corner), that side wins. A close call keeps
+ * Claude's answer, so a real race of passed pawns isn't turned. */
+export function orient(rows, side) {
+  const read = oddness(whiteView(rows, side));
+  let best = side;
+  let bestScore = read;
+  for (const other of SIDES) {
+    const score = oddness(whiteView(rows, other));
+    if (score < bestScore) [best, bestScore] = [other, score];
+  }
+  return read - bestScore >= 10 && bestScore * 2 <= read ? best : side;
 }
 
 /** Base64 without Node's Buffer, in chunks so big photos don't overflow the call stack. */

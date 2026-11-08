@@ -6,6 +6,8 @@
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Beauty of Chess</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -39,6 +41,8 @@
 		<string>Geist-Medium.ttf</string>
 		<string>Geist-SemiBold.ttf</string>
 		<string>Geist-Bold.ttf</string>
+		<string>CinzelDecorative-Bold.ttf</string>
+		<string>Cinzel-Bold.ttf</string>
 	</array>
 </dict>
 </plist>

@@ -4,7 +4,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { templateAnswer, wordAnswer } from "../src/answer.js";
 import { ClaudeFailure, parseClaims } from "../src/claims.js";
 import * as entry from "../src/index.js";
-import worker, { TalkBudget, checkTalk, cleanFacts, createHandler } from "../src/index.js";
+import worker, { TalkBudget, TalkRecordings, checkTalk, cleanFacts, createHandler } from "../src/index.js";
 
 const FEN = "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/3P1N2/PPP2PPP/RNBQK2R w KQkq - 1 5";
 const FACTS = {
@@ -299,6 +299,58 @@ test("without Leo's voice the app is told why, so it uses the device's voice", a
     ).voice,
     { type: "voice", unavailable: "upstream" },
   );
+});
+
+/** The RECORDINGS binding, served by a real TalkRecordings with memory storage. */
+function fakeRecordings({ fail = false } = {}) {
+  const store = new TalkRecordings({ storage: memoryStorage() });
+  const namespace = {
+    idFromName: (name) => ({ name }),
+    get: () => ({
+      fetch: async (url, init) => {
+        if (fail) throw new Error("recordings unreachable");
+        return store.fetch(new Request(url, init));
+      },
+    }),
+  };
+  return { namespace, store };
+}
+
+test("a line Leo has said before plays his recording again: no ElevenLabs call, no characters counted", async (t) => {
+  capture(t);
+  const budget = fakeBudget();
+  const { handler, env, calls } = setup({}, { RECORDINGS: fakeRecordings().namespace }, { budget });
+  const first = (await send(handler, env)).lines[2];
+  const second = (await send(handler, env)).lines[2];
+  assert.equal(calls.speak.length, 1);
+  assert.deepEqual(second, first);
+  assert.deepEqual(second, { type: "voice", format: "mp3", audio: Buffer.from(MP3).toString("base64") });
+  assert.equal(budget.asked.filter((url) => url.includes("/voice")).length, 1);
+  // A new voice or model is a new recording.
+  await send(handler, { ...env, TALK_VOICE_MODEL: "eleven_flash_v2_5" });
+  assert.equal(calls.speak.length, 2);
+});
+
+test("recordings that can't be reached only mean paying for the voice again", async (t) => {
+  capture(t);
+  const { handler, env, calls } = setup({}, { RECORDINGS: fakeRecordings({ fail: true }).namespace });
+  const lines = [(await send(handler, env)).lines[2], (await send(handler, env)).lines[2]];
+  assert.deepEqual(lines.map((line) => line.format), ["mp3", "mp3"]);
+  assert.equal(calls.speak.length, 2);
+});
+
+test("the recordings stop growing once full, and refuse odd keys", async () => {
+  const { store } = fakeRecordings();
+  const key = (n) => n.toString(16).padStart(64, "0");
+  const put = (k) => store.fetch(new Request(`https://recordings/${k}`, { method: "PUT", body: new Uint8Array([1, 2]) }));
+  const get = (k) => store.fetch(new Request(`https://recordings/${k}`));
+  assert.equal((await put(key(1))).status, 204);
+  assert.equal((await get(key(1))).status, 200);
+  assert.equal((await get(key(2))).status, 404);
+  assert.equal((await get("../budget")).status, 404);
+  await store.ctx.storage.put("count", TalkRecordings.max);
+  await put(key(3));
+  assert.equal((await get(key(3))).status, 404);
 });
 
 test("the day's voice characters run out across talks", async (t) => {
