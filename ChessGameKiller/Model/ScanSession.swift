@@ -9,6 +9,9 @@ import UIKit
 /// A photo goes straight from being read to its analysis, with no stop in the editor
 /// (Alex, 2026-11-06: "Skip the board read and adding pieces and go straight to analyze").
 /// The analysis can open the editor to fix a piece, and the editor's Analyze comes back.
+///
+/// The app keeps one session, so closing Analyze and opening it again finds the same board,
+/// with the moves played on it (Alex, 2026-11-08: "my previous game should be on there still").
 @MainActor
 @Observable
 final class ScanSession {
@@ -25,6 +28,8 @@ final class ScanSession {
     /// The position the analysis looks at. A new analysis starts each time `analysisRun` changes.
     private(set) var analyzed = PositionDraft.standard
     private(set) var analysisRun = 0
+    /// The analysis board for `analyzed`, kept here so it outlives the sheet.
+    private(set) var analysis: AnalysisModel?
     private(set) var photo: UIImage?
     private(set) var isReading = false
     /// Shown above the editor: what the reader made of the photo, or why it couldn't.
@@ -34,12 +39,16 @@ final class ScanSession {
     private(set) var photoDoubts: String?
 
     private let reader: BoardReader
+    private let engine: ChessEngine?
+    private let sounds: SoundPlaying?
     private var readTask: Task<Void, Never>?
     /// Which read is current, so one that was replaced can't report into the next.
     private var readID = 0
 
-    init(reader: BoardReader) {
+    init(reader: BoardReader, engine: ChessEngine? = nil, sounds: SoundPlaying? = nil) {
         self.reader = reader
+        self.engine = engine
+        self.sounds = sounds
     }
 
     // MARK: Starting points
@@ -112,6 +121,7 @@ final class ScanSession {
     private func startAnalysis(of position: PositionDraft) {
         analyzed = position
         analysisRun += 1
+        analysis = AnalysisModel(draft: position, engine: engine, sounds: sounds)
     }
 
     // MARK: Reading
@@ -135,6 +145,8 @@ final class ScanSession {
         readTask = nil
         readID += 1
         isReading = false
+        // Analyze closed mid-read: it opens on its first screen next time, not a stalled read.
+        if path.last == .reading { path.removeLast() }
     }
 
     private func finishReading(_ reading: BoardReading, id: Int) {
@@ -259,8 +271,9 @@ final class AnalysisModel {
     // MARK: Thinking
 
     /// Looks quickly, then deeper, updating as each pass finishes.
+    /// Opened again (Analyze closed and reopened), it carries on from what it had found.
     func run() async {
-        guard ending == nil, lines.isEmpty, !isThinking else { return }
+        guard ending == nil, lines.isEmpty || depth < Self.fullDepth else { return }
         await analyzeCurrent()
     }
 
@@ -297,7 +310,12 @@ final class AnalysisModel {
         let found = await engine.analyze(fen: fen, depth: Self.fullDepth, lines: 2, maxTimeMs: 6000) { [weak self] found, depth in
             Task { @MainActor in self?.progress(found, depth: depth, fen: fen, id: id) }
         }
-        if Task.isCancelled || id != generation { return }
+        guard id == generation else { return }
+        // The sheet closed mid-search: stop, so opening it again can look afresh.
+        if Task.isCancelled {
+            isThinking = false
+            return
+        }
         if !found.isEmpty {
             cache[fen] = (found, Self.fullDepth)
             show(found, depth: Self.fullDepth, fen: fen)

@@ -18,7 +18,8 @@ struct AnalyzeSheet: View {
     let onAnalyzeGame: (() -> Void)?
     let onPlay: (PositionDraft) -> Void
 
-    @State private var session: ScanSession
+    /// The app's one session, so the board is still there when Analyze opens again.
+    @Bindable var session: ScanSession
     @State private var photoItem: PhotosPickerItem?
     @State private var isLoadingPhoto = false
     @State private var showingCamera = false
@@ -30,12 +31,11 @@ struct AnalyzeSheet: View {
         theme: BoardTheme,
         currentFEN: String?,
         engine: ChessEngine?,
-        reader: BoardReader,
+        session: ScanSession,
         rival: String,
         clock: TimeControl,
         forfeits: String? = nil,
         onAnalyzeGame: (() -> Void)? = nil,
-        startsAt: String? = nil,
         onPlay: @escaping (PositionDraft) -> Void
     ) {
         self.theme = theme
@@ -46,10 +46,7 @@ struct AnalyzeSheet: View {
         self.forfeits = forfeits
         self.onAnalyzeGame = onAnalyzeGame
         self.onPlay = onPlay
-        let session = ScanSession(reader: reader)
-        // Opened on a position (the home's masterpiece): straight to its analysis.
-        if let startsAt { session.analyze(fen: startsAt) }
-        _session = State(initialValue: session)
+        self.session = session
     }
 
     private var accent: Color { theme.trainingAccent }
@@ -184,7 +181,7 @@ extension AnalyzeSheet {
             BoardEditorView(session: session, theme: theme)
         case .analysis:
             // A photo's analysis can open the editor to fix a piece; coming back starts it over.
-            AnalysisView(draft: session.analyzed, theme: theme, engine: engine,
+            AnalysisView(draft: session.analyzed, theme: theme, engine: engine, model: session.analysis,
                          rival: rival, clock: clock, forfeits: forfeits,
                          photo: session.photo, photoDoubts: session.photoDoubts,
                          onEditPieces: { session.editPieces($0) }) { draft in
@@ -502,7 +499,9 @@ struct AnalysisView: View {
     @AppStorage("sculpted3D") private var sculpted3D = true
     @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.auto
 
-    init(draft: PositionDraft, theme: BoardTheme, engine: ChessEngine?, rival: String = "the computer",
+    /// `model` is the board to pick up where it was left, when there is one.
+    init(draft: PositionDraft, theme: BoardTheme, engine: ChessEngine?, model: AnalysisModel? = nil,
+         rival: String = "the computer",
          clock: TimeControl = .unlimited, forfeits: String? = nil,
          photo: UIImage? = nil, photoDoubts: String? = nil, onEditPieces: ((PositionDraft) -> Void)? = nil,
          onPlay: @escaping (PositionDraft) -> Void) {
@@ -515,7 +514,7 @@ struct AnalysisView: View {
         self.onEditPieces = onEditPieces
         self.onPlay = onPlay
         let sounds: SoundPlaying? = engine == nil ? nil : SoundPlayer.shared
-        _model = State(initialValue: AnalysisModel(draft: draft, engine: engine, sounds: sounds))
+        _model = State(initialValue: model ?? AnalysisModel(draft: draft, engine: engine, sounds: sounds))
         _flipped = State(initialValue: draft.sideToMove == .black)
     }
 
