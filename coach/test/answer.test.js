@@ -30,7 +30,7 @@ function message(text, extra = {}) {
     id: "msg_test",
     type: "message",
     role: "assistant",
-    model: "claude-opus-5-5",
+    model: "claude-sonnet-5-5",
     stop_reason: "end_turn",
     content: [
       { type: "thinking", thinking: "", signature: "sig" },
@@ -178,7 +178,7 @@ test("the template never runs past 320 characters", () => {
 
 test("the answer request: Leo's persona, the checked facts, the fallback and no sampling settings", () => {
   const request = buildAnswerRequest(checked, { ...spoken, said: "is <b>this</b> safe?" }, {});
-  assert.equal(request.model, "claude-opus-5-5");
+  assert.equal(request.model, "claude-sonnet-5-5");
   assert.equal(request.max_tokens, 3000);
   assert.deepEqual(request.betas, ["server-side-fallback-2026-07-01"]);
   assert.equal(request.fallbacks, "default");
