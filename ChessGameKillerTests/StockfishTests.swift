@@ -22,6 +22,28 @@ final class StockfishTests: XCTestCase {
         XCTAssertEqual(Set(lines.compactMap(\.firstMove)).count, lines.count, "a move shows up twice")
     }
 
+    /// Analysis tells its lines as it deepens, so they can show before the search ends.
+    func testAnalysisReportsAsItDeepens() async throws {
+        try XCTSkipUnless(StockfishEngine.hasNetworks)
+        let start = Position.standard.fen
+        let reports = Reports()
+        let lines = await StockfishEngine.shared.analyze(fen: start, depth: 12, lines: 2, maxTimeMs: 5000) { found, depth in
+            reports.add(depth: depth, count: found.count)
+        }
+        XCTAssertFalse(lines.isEmpty)
+        let seen = reports.all
+        XCTAssertGreaterThan(seen.count, 3, "it should report several depths before the end")
+        XCTAssertEqual(seen.map(\.depth), seen.map(\.depth).sorted(), "depths only go up")
+        XCTAssertTrue(seen.allSatisfy { (1...2).contains($0.count) })
+    }
+
+    private final class Reports: @unchecked Sendable {
+        private let lock = NSLock()
+        private var reports: [(depth: Int, count: Int)] = []
+        func add(depth: Int, count: Int) { lock.withLock { reports.append((depth, count)) } }
+        var all: [(depth: Int, count: Int)] { lock.withLock { reports } }
+    }
+
     func testFindsMateInOne() async throws {
         try XCTSkipUnless(StockfishEngine.hasNetworks)
         let backRank = "6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1"

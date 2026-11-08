@@ -173,31 +173,51 @@ final class SculptedBoardTests: XCTestCase {
         }
     }
 
-    /// The flat set has all six pieces in both colors, each a tile with its picture on top.
+    /// The flat set has all six pieces in both colors, each a shape over its shadow.
     func testTheFlatSetHasAllSixPieces() {
         for color in [Piece.Color.white, .black] {
             for kind in [Piece.Kind.king, .queen, .rook, .bishop, .knight, .pawn] {
                 let node = SculptedFlatSet.makePiece(kind, color: color, look: .gilded)
                 XCTAssertEqual(node.childNodes.count, 2, "\(color) \(kind)")
                 XCTAssertTrue(node.childNodes.allSatisfy { $0.geometry != nil }, "\(color) \(kind)")
+                // The shadow lies under the board's marks, the shape over them.
+                XCTAssertLessThan(node.childNodes[0].renderingOrder, node.childNodes[1].renderingOrder)
             }
         }
     }
 
-    /// Every tile has its picture, as wide as the tile and as tall as the flat view sees it, and
-    /// reaches no further than its own square.
-    func testEveryGlassTileHasItsPicture() throws {
-        let elevation = CGFloat(SculptedCamera.Framing.seated.elevation)
+    /// Every cut-out has its picture and its shadow, and the shape in the picture reaches no
+    /// further from the middle than its stated reach, which keeps it inside its own square.
+    func testEveryCutOutHasItsPictureAndShadow() throws {
         for color in [Piece.Color.white, .black] {
             for kind in [Piece.Kind.king, .queen, .rook, .bishop, .knight, .pawn] {
                 let name = SculptedFlatSet.pictureName(kind, color: color)
-                let picture = try XCTUnwrap(UIImage(named: name), "\(name) is missing")
-                let (width, height) = SculptedFlatSet.size(of: kind)
-                let seen = width * sin(elevation) + height * cos(elevation)
-                XCTAssertEqual(picture.size.height / picture.size.width, seen / width, accuracy: 0.005, name)
-                XCTAssertLessThan(width / 2 + SculptedFlatSet.reach(of: kind), 0.5, "\(name) reaches out of its square")
+                let picture = try XCTUnwrap(UIImage(named: name)?.cgImage, "\(name) is missing")
+                XCTAssertNotNil(UIImage(named: SculptedFlatSet.shadowName(kind)), "\(kind)'s shadow is missing")
+                XCTAssertEqual(picture.width, picture.height, name)
+                let reach = Self.opaqueReach(picture) * Double(SculptedFlatSet.span)
+                XCTAssertLessThanOrEqual(reach, Double(SculptedFlatSet.half(of: kind)) + 0.005, name)
+                XCTAssertGreaterThan(reach, Double(SculptedFlatSet.half(of: kind)) - 0.03, "\(name) is smaller than stated")
+                XCTAssertLessThan(Double(SculptedFlatSet.half(of: kind)), 0.42, "\(name) crowds its square")
             }
         }
+    }
+
+    /// How far a picture's visible pixels reach from its middle, as a share of its width.
+    private static func opaqueReach(_ image: CGImage) -> Double {
+        let side = image.width
+        var alpha = [UInt8](repeating: 0, count: side * side)
+        let context = CGContext(data: &alpha, width: side, height: side, bitsPerComponent: 8, bytesPerRow: side,
+                                space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.alphaOnly.rawValue)
+        context?.draw(image, in: CGRect(x: 0, y: 0, width: side, height: side))
+        var reach = 0.0
+        let middle = Double(side) / 2
+        for y in 0..<side {
+            for x in 0..<side where alpha[y * side + x] > 20 {
+                reach = max(reach, abs(Double(x) + 0.5 - middle), abs(Double(y) + 0.5 - middle))
+            }
+        }
+        return reach / Double(side)
     }
 
     /// The flat view looks straight down, so the polished board mirrors the top of its studio:

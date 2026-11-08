@@ -15,54 +15,24 @@ struct DrillBoard: View {
     var showsTurn = true
 
     @AppStorage("sculpted3D") private var sculpted3D = true
-    @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.auto
 
     private var threeD: Bool { BoardView.playsIn3D(theme, setting: sculpted3D) }
-    private var framing: SculptedCamera.Framing { tilt.framing(bigBoard: false) }
 
     var body: some View {
-        VStack(spacing: 6) {
-            board
-            HStack(spacing: 8) {
-                TurnBadge(theme: theme, side: runner.learner, showing: showsTurn)
-                Spacer(minLength: 0)
-                BoardViewSwitch(theme: theme)
+        TrainerBoard(game: runner.game, theme: theme, side: side, flipped: runner.learner == .black,
+                     arrows: runner.arrows, marks: runner.marks, labels: runner.labels,
+                     onTap: runner.acceptsTaps ? { (square: Square) in runner.tap(square) } : nil,
+                     turn: runner.learner, showsTurn: showsTurn)
+            // A screen that keeps its board for the next puzzle hands it another drill.
+            .onChange(of: SoundTiming(drill: ObjectIdentifier(runner), threeD: threeD), initial: true) { _, timing in
+                Self.timeSounds(of: runner, threeD: timing.threeD)
             }
-            .frame(width: side)
-        }
-        // A screen that keeps its board for the next puzzle hands it another drill.
-        .onChange(of: SoundTiming(drill: ObjectIdentifier(runner), threeD: threeD), initial: true) { _, timing in
-            Self.timeSounds(of: runner, threeD: timing.threeD)
-        }
     }
 
     /// What the timing of the move sounds hangs on: the drill, and whether its board is the 3D one.
     private struct SoundTiming: Equatable {
         let drill: ObjectIdentifier
         let threeD: Bool
-    }
-
-    @ViewBuilder
-    private var board: some View {
-        let onTap: ((Square) -> Void)? = runner.acceptsTaps ? { (square: Square) in runner.tap(square) } : nil
-        if threeD {
-            // Another puzzle, or a playout started over, brings a fresh game whose piece ids
-            // start over: a fresh board fades in over the old one, rather than the pieces
-            // walking to new places.
-            ZStack {
-                SculptedTrainingBoard(game: runner.game, theme: theme, flipped: runner.learner == .black,
-                                      arrows: runner.arrows, marks: runner.marks, onTap: onTap, framing: framing)
-                    .transition(.opacity)
-                    .id(ObjectIdentifier(runner.game))
-            }
-            .animation(.easeInOut(duration: 0.25), value: ObjectIdentifier(runner.game))
-            .frame(width: Self.width3D(side: side), height: Self.height3D(side: Self.width3D(side: side), framing: framing))
-        } else {
-            TrainingBoardView(game: runner.game, theme: theme, flipped: runner.learner == .black,
-                              arrows: runner.arrows, marks: runner.marks, labels: runner.labels, onTap: onTap)
-                .frame(width: side, height: side)
-                .boardHeadroom(theme: theme, side: side)
-        }
     }
 
     /// The 3D board's width: the flat board's and the room beside it, as the game's board runs
