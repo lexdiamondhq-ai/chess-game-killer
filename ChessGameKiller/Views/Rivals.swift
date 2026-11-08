@@ -4,8 +4,8 @@ import UIKit
 /// Who the person plays against the computer: The Crowd at one rating, or their Grudge.
 ///
 /// The Crowd is real people. Its moves come from games real players at that rating played in
-/// the same position (Lichess's database, see `CrowdBook`), and Maia, a network trained on
-/// players of that rating (see `Maia`), takes over once the position is one nobody has reached. The Grudge is one rival that
+/// the same position (Lichess's database, see `CrowdBook`), and Stockfish takes over at the
+/// same strength once the position is one nobody has reached. The Grudge is one rival that
 /// remembers every game against you (`GrudgeStore`).
 struct Rival: Identifiable {
     enum Kind: Equatable {

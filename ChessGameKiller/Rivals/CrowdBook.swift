@@ -65,7 +65,7 @@ protocol CrowdBookSource: AnyObject, Sendable {
 
 enum CrowdBook {
     /// Fewer games than this and the position is too rare to call it the crowd's choice:
-    /// Maia, players of the same rating, takes over (Stockfish for the Masters).
+    /// Stockfish takes over at the same strength.
     static func minimumGames(for source: CrowdSource) -> Int {
         switch source {
         case .lichess: return 40
