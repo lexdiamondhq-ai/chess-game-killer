@@ -48,6 +48,7 @@ actor StockfishEngine: ChessEngine {
     private var startGaveUp = false
     private var readyCount = 0
     private var listener: Task<Void, Never>?
+    private var setupListener: Task<Void, Never>?
     private var pending: PendingSearch?
     private var nextSearchID = 0
     /// Counts requests for the engine, so a waiting one can tell a newer one came.
@@ -197,8 +198,8 @@ actor StockfishEngine: ChessEngine {
                 await engine.send(command: .stop)
                 continue
             }
-            // Stockfish's "bestmove" after a stop sometimes never arrives. Don't wait
-            // for it: past a short grace the old search ends with what it found.
+            // Should a stop's "bestmove" still never arrive, don't wait for it: past a
+            // short grace the old search ends with what it found.
             if let current = pending, let stoppedAt = current.stoppedAt,
                ContinuousClock.now - stoppedAt > Self.stopGrace {
                 Self.trace?("no answer to stop: ending search \(current.id)")
@@ -289,8 +290,9 @@ actor StockfishEngine: ChessEngine {
         }
         if await task.value { return true }
         // That start gave up waiting for Stockfish to report in, but it can still come up:
-        // its replies are read on the main thread, which a busy app (or a test run) can hold
-        // up for a while. Look again, so a slow start never leaves it out for the session.
+        // until it runs, its replies are read on the main thread (by ChessKitEngine), which a
+        // busy app (or a test run) can hold up for a while. Look again, so a slow start never
+        // leaves it out for the session.
         return await attachWhenRunning(within: Self.lateStartWait)
     }
 
@@ -322,23 +324,39 @@ actor StockfishEngine: ChessEngine {
         }
         // Another search may have attached it while this one waited.
         if let attachTask { return await attachTask.value }
-        guard let responses = await engine.responseStream else { return false }
+        guard let libraryResponses = await engine.responseStream else { return false }
         if let attachTask { return await attachTask.value }
         if startGaveUp { NSLog("Stockfish: running after a slow start") }
-        let task = Task { await self.attach(to: responses) }
+        // Read the replies ourselves from here on (see EngineOutput): ChessKitEngine's reading
+        // drops a reply now and then, most often the "bestmove" that answers a stop. Nothing
+        // awaits between the check above and this, so it happens once.
+        let ownResponses = EngineOutput.takeOver()
+        if ownResponses == nil { NSLog("Stockfish: couldn't take over its output; reading it through ChessKitEngine") }
+        let responses = ownResponses ?? libraryResponses
+        let task = Task { await self.attach(to: responses, setup: ownResponses == nil ? nil : libraryResponses) }
         attachTask = task
         return await task.value
     }
 
-    private func attach(to responses: AsyncStream<EngineResponse>) async -> Bool {
+    /// Reads `responses` from now on. `setup` is ChessKitEngine's own stream when they are
+    /// read by our reader instead: it still brings the "readyok" that ends its setup.
+    private func attach(to responses: AsyncStream<EngineResponse>, setup: AsyncStream<EngineResponse>?) async -> Bool {
         listener = Task { [weak self] in
             for await response in responses {
                 await self?.handle(response)
             }
         }
+        if let setup {
+            setupListener = Task { [weak self] in
+                for await response in setup {
+                    if case .readyok = response { await self?.countReady() }
+                }
+            }
+        }
 
         // The engine passes on its own "readyok" once its setup (which points
-        // Stockfish at the network files) is done.
+        // Stockfish at the network files and sets its threads) is done, so ours
+        // are set after it.
         var attempts = 0
         while readyCount == 0, attempts < 50 {
             attempts += 1
@@ -363,6 +381,10 @@ actor StockfishEngine: ChessEngine {
             NSLog("Stockfish: no readyok after loading networks; carrying on")
         }
         return await engine.isRunning
+    }
+
+    private func countReady() {
+        readyCount += 1
     }
 
     private func handle(_ response: EngineResponse) {
