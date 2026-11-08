@@ -278,7 +278,8 @@ final class RivalsTests: XCTestCase {
 
     // MARK: Pictures
 
-    /// The summons, caught a few seconds in, and the New Game sheet opening on a Grudge.
+    /// The summons, caught a few seconds in, your Grudge's card on Home, and the New Game sheet
+    /// (rivals only: the Grudge lives on Home now).
     func testPictures() throws {
         let defaults = UserDefaults.standard
         let keys = ["setup.grudge", "grudge.lastSeen", GrudgeStore.key, GrudgeStore.unseenKey]
@@ -298,13 +299,16 @@ final class RivalsTests: XCTestCase {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.black), wait: 6)
 
-        defaults.set(try JSONEncoder().encode(record), forKey: GrudgeStore.key)
-        defaults.set(true, forKey: "setup.grudge")
-        defaults.set("6-11", forKey: "grudge.lastSeen")
-        let grudges = GrudgeStore(defaults: defaults)
-        try snapshot("grudge-new-game", view: Color.black.ignoresSafeArea().sheet(isPresented: .constant(true)) {
-            NewGameSheet(theme: .named(.gilded), start: { _ in }).environment(grudges)
-        }, wait: 6)
+        // Its card on Home, resting and opened into the summons.
+        try snapshot("grudge-home-card", view: VStack(spacing: 16) {
+            HomeAuroraGrudge(record: record, isOpen: false, palette: HomeAuroraPalette(dark: false),
+                             select: {}, settle: {})
+            HomeAuroraGrudge(record: record, isOpen: true, palette: HomeAuroraPalette(dark: false),
+                             lastSeen: (6, 11), select: {}, settle: {})
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(hex: 0xF6F1E7)), wait: 6)
 
         try snapshot("crowd-new-game", view: Color.black.ignoresSafeArea().sheet(isPresented: .constant(true)) {
             NewGameSheet(theme: .named(.gilded), start: { _ in }).environment(GrudgeStore(defaults: UserDefaults(suiteName: "RivalsTestsEmpty")!))

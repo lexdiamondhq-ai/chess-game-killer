@@ -24,6 +24,10 @@ struct HomeAuroraActions {
     var open: (HomeCurrentGame) -> Void
     /// Starts a game against one of the five rivals.
     var playRival: (MatchController.Level) -> Void = { _ in }
+    /// Starts a game against your Grudge.
+    var playGrudge: () -> Void = {}
+    /// Opens Puzzles.
+    var puzzles: () -> Void = {}
     /// Opens one of your finished games in Rewind.
     var replay: (UUID) -> Void = { _ in }
 }
@@ -75,6 +79,16 @@ struct HomeAuroraView: View {
     @State private var pulled: CGFloat = 0
     /// Which position of the game of the day the turning board shows: it plays itself slowly.
     @State private var boardFrame = 0
+    /// Your Grudge. Absent in previews: no Grudge on the page.
+    @Environment(GrudgeStore.self) private var grudges: GrudgeStore?
+    /// The score when you last saw your Grudge ("7-11"), so what changed since plays out.
+    @AppStorage("grudge.lastSeen") private var grudgeLastSeen = ""
+    /// The Grudge's card opened into its summons.
+    @State private var grudgeOpen = false
+    /// The score the summons counts up from, read once as it opens.
+    @State private var grudgeSince: (you: Int, it: Int)?
+    /// The first time you meet it, its birth plays instead.
+    @State private var grudgeBorn = false
 
     private var palette: HomeAuroraPalette { HomeAuroraPalette(dark: tone.scheme == .dark) }
     private var stage: HomeStageInfo { info.stage }
@@ -99,8 +113,11 @@ struct HomeAuroraView: View {
             ZStack(alignment: .top) {
                 HomeAuroraBackdrop(palette: palette)
                 // The marble starts just under the header's gold line, never above it.
-                HomeAuroraMarble(palette: palette)
-                    .frame(height: boardHeight + 100)
+                // "Beauty of Chess" is cut into the slab under the board; it shows as the page
+                // is pulled down.
+                HomeAuroraMarble(palette: palette, carvingTop: boardHeight + 10,
+                                 carving: Double(min(max(-pulled / 70, 0), 1)))
+                    .frame(height: boardHeight + 130)
                     .padding(.top, 54)
                     .opacity(1 - 0.6 * Double(lift))
                 spinningBoard(height: boardHeight, lift: lift)
@@ -187,9 +204,14 @@ struct HomeAuroraView: View {
             if SculptedAssets.shared.isLoaded {
                 HomeStageBoard(stage: boardStage, look: SculptedLook.clay, pieces: boardPieces,
                                black: stage.masterpiece?.flipped ?? (upNext.playerColor == .black),
-                               light: upNext.rival.lightUI,
+                               // No rival light over it: its warm pool washed out the middle of
+                               // the board (Alex, 2026-11-07). The clay board keeps its own even light.
+                               light: nil,
                                leaning: upNext.inProgress && upNext.yourMove, plinth: nil,
-                               still: reduceMotion, dive: 0)
+                               still: reduceMotion, dive: 0,
+                               // Far enough back that the turning board's corners never reach
+                               // the view's edge: nothing cuts it off (Alex, 2026-11-08).
+                               pullBack: 5)
                     .id(SculptedLook.clay.name)
             }
         }
@@ -210,17 +232,10 @@ struct HomeAuroraView: View {
                 .foregroundStyle(palette.ink)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
-            Spacer(minLength: 0)
-            if music.available {
-                circle(label: music.on ? "Music off" : "Music on", action: music.toggle) {
-                    HomeMusicBars(on: music.on, gold: palette.gold, off: palette.ink3)
-                }
-            }
-            circle(label: "You", action: actions.stage.you) {
-                Image(systemName: "crown")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(palette.gold)
-            }
+            Spacer(minLength: 8)
+            // Your numbers sit at the top right, in place of the music and crown buttons
+            // (Alex, 2026-11-07); Home music is in Settings > Sound & feel.
+            numbers
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
@@ -232,18 +247,6 @@ struct HomeAuroraView: View {
                 .frame(height: 0.75)
                 .padding(.horizontal, 20)
         }
-    }
-
-    private func circle<Label: View>(label: String, action: @escaping () -> Void,
-                                     @ViewBuilder content: () -> Label) -> some View {
-        Button(action: action) {
-            content()
-                .frame(width: 36, height: 36)
-                .background(Circle().fill(.ultraThinMaterial))
-                .overlay(Circle().strokeBorder(palette.line, lineWidth: 1))
-        }
-        .buttonStyle(HomeStagePress())
-        .accessibilityLabel(label)
     }
 
     // MARK: The page
@@ -261,9 +264,6 @@ struct HomeAuroraView: View {
                 .padding(.top, 10)
             HomeAuroraSection(title: gamesTitle, palette: palette, note: gamesNote)
             gameRow
-            numbers
-                .padding(.horizontal, 20)
-                .padding(.top, 22)
             HomeAuroraSection(title: "Face a rival", palette: palette, note: "Up next: \(stage.upNext.level.rival.shortName)")
             HomeAuroraRivals(next: stage.upNext.level, palette: palette, play: actions.playRival)
                 .padding(.horizontal, 12)
@@ -275,6 +275,14 @@ struct HomeAuroraView: View {
                 todayRows
             }
             .padding(.horizontal, 16)
+            // Under For today (Alex, 2026-11-07).
+            if let grudges {
+                HomeAuroraSection(title: "Your Grudge", palette: palette,
+                                  note: grudges.unseen ? "It's waiting" : nil)
+                HomeAuroraGrudge(record: grudges.record, isOpen: grudgeOpen, palette: palette,
+                                 born: grudgeBorn, lastSeen: grudgeSince, select: toggleGrudge, settle: settleGrudge)
+                    .padding(.horizontal, 16)
+            }
         }
         .padding(.bottom, 130)
         .frame(maxWidth: .infinity)
@@ -321,46 +329,56 @@ struct HomeAuroraView: View {
         .contentMargins(.horizontal, 16, for: .scrollContent)
     }
 
-    /// Rating, level and streak in one slim engraved line.
+    /// Rating, level and streak, small in the header: serif figures over fine caps, parted by
+    /// gold hairlines. Each opens what it counts.
     private var numbers: some View {
         HStack(spacing: 0) {
             number(stage.rating.map { $0.formatted(.number) } ?? "New", label: "Rating", action: actions.stage.you)
             hairline
             number("\(stage.rankNumber)", label: "Level", action: actions.stage.learn)
             hairline
-            number("\(stage.day.streak)", label: "Day streak",
-                   action: actions.stage.dailyMove)
+            number("\(stage.day.streak)", label: "Streak", action: actions.stage.dailyMove)
         }
-        .padding(.vertical, 14)
-        .overlay(alignment: .top) { palette.line.frame(height: 1) }
-        .overlay(alignment: .bottom) { palette.line.frame(height: 1) }
+        .fixedSize()
     }
 
     private var hairline: some View {
-        LinearGradient(colors: [palette.gold.opacity(0), palette.gold.opacity(0.5), palette.gold.opacity(0)],
+        LinearGradient(colors: [palette.gold.opacity(0), palette.gold.opacity(0.55), palette.gold.opacity(0)],
                        startPoint: .top, endPoint: .bottom)
-            .frame(width: 1, height: 40)
+            .frame(width: 1, height: 26)
     }
 
     private func number(_ value: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 3) {
+            VStack(spacing: 1) {
                 Text(value)
-                    .font(.system(size: 26, weight: .regular, design: .serif))
+                    .font(.system(size: 17, weight: .regular, design: .serif))
                     .foregroundStyle(palette.ink)
                     .monospacedDigit()
+                    .lineLimit(1)
                 Text(label.uppercased())
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(1.4)
-                    .foregroundStyle(palette.ink2)
+                    .font(.system(size: 7.5, weight: .bold))
+                    .tracking(1.2)
+                    .foregroundStyle(palette.gold)
             }
-            .frame(maxWidth: .infinity)
+            .frame(minWidth: 40)
+            .padding(.horizontal, 7)
+            .contentShape(Rectangle())
         }
         .buttonStyle(HomeStagePress())
+        .accessibilityLabel("\(label) \(value)")
     }
 
     @ViewBuilder
     private var todayRows: some View {
+        HomeAuroraRow(eyebrow: "Today's Move", title: todayTitle, detail: todayDetail,
+                      accent: palette.rose, palette: palette, action: actions.stage.dailyMove) {
+            HomeAuroraEmblem(glyph: Glyphs.today, fill: HomeAuroraPalette.roseTile)
+        }
+        HomeAuroraRow(eyebrow: "Puzzles", title: "Sharpen your eye", detail: "Tactics at your level, one after another",
+                      accent: palette.violet, palette: palette, action: actions.puzzles) {
+            HomeAuroraEmblem(glyph: Glyphs.puzzles, fill: HomeAuroraPalette.violetTile)
+        }
         HomeAuroraRow(eyebrow: "Coach Leo", title: stage.plan?.title ?? "Today's lesson", detail: coachLine,
                       accent: palette.teal, palette: palette, action: actions.stage.coach) {
             HomeAuroraEmblem(glyph: Glyphs.coach, fill: HomeAuroraPalette.tealTile)
@@ -386,6 +404,25 @@ struct HomeAuroraView: View {
         if stage.trainedToday { return "Done today. Another round?" }
         guard let plan = stage.plan else { return "Pick up where you stopped" }
         return "\(plan.minutes) min with Leo"
+    }
+
+    /// Opens the Grudge's card into its summons, counting from when you last met; or closes it.
+    private func toggleGrudge() {
+        guard let grudges, let record = grudges.record else { return }
+        if !grudgeOpen {
+            let parts = grudgeLastSeen.split(separator: "-").compactMap { Int($0) }
+            grudgeSince = parts.count == 2 ? (you: parts[0], it: parts[1]) : nil
+            grudgeBorn = grudges.unseen
+            // Seen now: next time the summons counts from here.
+            grudgeLastSeen = "\(record.yourWins)-\(record.itsWins)"
+            grudges.markSeen()
+        }
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) { grudgeOpen.toggle() }
+    }
+
+    private func settleGrudge() {
+        actions.playGrudge()
+        grudgeOpen = false
     }
 
     private func open(_ card: HomeAuroraGameCard) {
@@ -511,6 +548,158 @@ struct HomeAuroraRow<Picture: View>: View {
         }
         .buttonStyle(HomeStagePress())
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// Your Grudge on Home, dressed like the rows for today (Alex, 2026-11-07: "match the other
+/// areas"): a white card with a thin red edge, small caps, a serif line, and the onyx king at the
+/// right. A tap opens it into the summons, with Settle it to start the game; another tap on the
+/// summons closes it. Before the Grudge exists, the card says what wakes it.
+struct HomeAuroraGrudge: View {
+    let record: GrudgeRecord?
+    let isOpen: Bool
+    let palette: HomeAuroraPalette
+    var born = false
+    var lastSeen: (you: Int, it: Int)? = nil
+    let select: () -> Void
+    let settle: () -> Void
+
+    private var red: Color { palette.dark ? Color(hex: 0xF0606C) : Color(hex: 0xC8283A) }
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+        Group {
+            if let record, isOpen {
+                VStack(spacing: 16) {
+                    GrudgeStage(record: record, born: born, lastSeen: lastSeen)
+                    Button(action: settle) {
+                        Label("Settle it", systemImage: "play.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(red)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 48)
+                            .background(Capsule().fill(red.opacity(0.08)))
+                            .overlay(Capsule().strokeBorder(red.opacity(0.55), lineWidth: 1))
+                    }
+                    .buttonStyle(HomeStagePress())
+                }
+                .padding(16)
+                .contentShape(shape)
+                .onTapGesture(perform: select)
+                .transition(.opacity)
+            } else {
+                Button(action: select) { row }
+                    .buttonStyle(HomeStagePress())
+                    .disabled(record == nil)
+                    .accessibilityElement(children: .combine)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .background(shape.fill(palette.card))
+        .overlay(shape.strokeBorder(isOpen ? red.opacity(0.35) : palette.line, lineWidth: 1))
+        .animation(.spring(response: 0.5, dampingFraction: 0.86), value: isOpen)
+    }
+
+    private var row: some View {
+        HStack(spacing: 14) {
+            Capsule()
+                .fill(LinearGradient(colors: [red, red.opacity(0.2)], startPoint: .top, endPoint: .bottom))
+                .frame(width: 3)
+                .padding(.vertical, 4)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(record.map { "\($0.mood.title) · \($0.score)" }?.uppercased() ?? "Not yet")
+                    .font(.system(size: 10.5, weight: .bold).monospacedDigit())
+                    .tracking(1.3)
+                    .foregroundStyle(record == nil ? palette.ink3 : red)
+                Text(record == nil ? "Someone is watching" : "Settle the score")
+                    .font(.system(size: 19, weight: .regular, design: .serif))
+                    .foregroundStyle(palette.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Text(record.map { "Remembers every game. About \($0.rating.formatted()) now." }
+                     ?? "Lose to a rival once and it takes it personally.")
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(palette.ink2)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            GrudgeKing(scars: record?.scars ?? 0, size: 64, light: record == nil ? 0.1 : 0.55)
+                .opacity(record == nil ? 0.45 : 1)
+                .frame(width: 64, height: 64)
+        }
+        .padding(.vertical, 12)
+        .padding(.leading, 14)
+        .padding(.trailing, 12)
+        .contentShape(Rectangle())
+    }
+}
+
+/// "Beauty of Chess" carved into the marble under the board in Cinzel Decorative Bold (Alex,
+/// 2026-11-07, option 3). The letters are cut into the stone itself: each groove darkens the
+/// marble under it (multiply) instead of covering it, so the slab's veins run on through the
+/// letters as they would in a real inscription (Alex: "the lines would be inside the letters").
+/// An inner shadow under each top edge, a faint shadowed wall above and a lit lower lip give
+/// the cut its depth; "of" is gold leaf laid in the same cut.
+/// Cinzel Decorative's lowercase h carries a swash crossbar that read as broken, so the H is
+/// plain Cinzel's.
+struct HomeAuroraCarving: View {
+    let palette: HomeAuroraPalette
+    /// How much shows, 0 to 1. Applied to each layer, not the whole: an opacity on the group
+    /// would flatten it and the grooves would stop multiplying with the marble.
+    var reveal: Double = 1
+
+    /// Cinzel Decorative Bold and Cinzel Bold (both SIL OFL), bundled in Home/Fonts.
+    static let fontName = "CinzelDecorative-Bold"
+    static let plainFontName = "Cinzel-Bold"
+
+    private static let size: CGFloat = 33
+    private var font: Font { .custom(Self.fontName, size: Self.size, relativeTo: .largeTitle) }
+    private var plain: Font { .custom(Self.plainFontName, size: Self.size, relativeTo: .largeTitle) }
+
+    /// How much each groove darkens the marble: a warm grey, and gold for "of".
+    private var stone: Color { palette.dark ? Color(hex: 0x8C8781) : Color(hex: 0xDCD2C2) }
+    private var gold: Color { palette.dark ? Color(hex: 0xE0B064) : Color(hex: 0xD9A24A) }
+
+    private func words(_ body: AnyShapeStyle, of: AnyShapeStyle) -> Text {
+        Text("Beauty ").font(font).foregroundStyle(body)
+            + Text("of").font(font).foregroundStyle(of)
+            + Text(" C").font(font).foregroundStyle(body)
+            + Text("H").font(plain).foregroundStyle(body)
+            + Text("ess").font(font).foregroundStyle(body)
+    }
+
+    private func words(_ style: some ShapeStyle) -> Text {
+        words(AnyShapeStyle(style), of: AnyShapeStyle(style))
+    }
+
+    private func cut(_ color: Color) -> AnyShapeStyle {
+        AnyShapeStyle(color
+            .shadow(.inner(color: .black.opacity(palette.dark ? 0.55 : 0.3), radius: 1.4, x: 0, y: 1.6)))
+    }
+
+    var body: some View {
+        ZStack {
+            // The lit lower lip of each cut.
+            words(Color.white.opacity(palette.dark ? 0.1 : 0.9))
+                .offset(y: 1.2)
+                .opacity(reveal)
+            // The shadowed upper wall, just above.
+            words(Color(hex: 0x3C2D19).opacity(palette.dark ? 0.35 : 0.18))
+                .offset(y: -0.7)
+                .opacity(reveal)
+                .blendMode(.multiply)
+            // The floor of the cut: it darkens the marble, veins and all.
+            words(cut(stone), of: cut(gold))
+                .opacity(reveal)
+                .blendMode(.multiply)
+        }
+        .tracking(1.5)
+        .lineLimit(1)
+        .minimumScaleFactor(0.6)
+        .padding(.horizontal, 20)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 
@@ -895,6 +1084,9 @@ struct HomeAuroraBackdrop: View {
 /// the turning board, melting softly into the room below it.
 struct HomeAuroraMarble: View {
     let palette: HomeAuroraPalette
+    /// Where "Beauty of Chess" is cut, from the top of the slab, and how much of it shows (0 to 1).
+    var carvingTop: CGFloat = 0
+    var carving: Double = 0
 
     var body: some View {
         // The slab is exactly its frame: the image fills it from the top and nothing spills
@@ -905,9 +1097,16 @@ struct HomeAuroraMarble: View {
                     .resizable()
                     .scaledToFill()
             }
+            .overlay(alignment: .top) {
+                // Part of the slab: cut, clipped and faded with it.
+                if carving > 0 {
+                    HomeAuroraCarving(palette: palette, reveal: carving)
+                        .padding(.top, carvingTop)
+                }
+            }
             .clipped()
             .mask(LinearGradient(stops: [.init(color: .black, location: 0),
-                                         .init(color: .black, location: 0.72),
+                                         .init(color: .black, location: 0.84),
                                          .init(color: .clear, location: 1)],
                                  startPoint: .top, endPoint: .bottom))
             .allowsHitTesting(false)
@@ -955,10 +1154,10 @@ struct HomeAuroraTabBar: View {
     var body: some View {
         HStack(spacing: 12) {
             HStack(spacing: 0) {
-                tab("Today", glyph: Glyphs.today, on: true) {}
-                tab("Learn", glyph: Glyphs.coach, on: false, action: learn)
-                tab("You", glyph: Glyphs.king, on: false, action: you)
-                tab("Rooms", glyph: Glyphs.home, on: false, action: rooms)
+                tab("Today", icon: .today, on: true) {}
+                tab("Learn", icon: .learn, on: false, action: learn)
+                tab("You", icon: .you, on: false, action: you)
+                tab("Rooms", icon: .rooms, on: false, action: rooms)
             }
             .padding(.horizontal, 6)
             .frame(height: 64)
@@ -969,7 +1168,12 @@ struct HomeAuroraTabBar: View {
                     .overlay(Capsule().strokeBorder(palette.gold.opacity(0.35), lineWidth: 0.75))
                     .shadow(color: .black.opacity(palette.dark ? 0.5 : 0.14), radius: 20, y: 10)
             }
-            Button(action: play) {
+            // A tap opens Analyze; a press and hold brings up the Rooms panel (Alex, 2026-11-07).
+            knight
+        }
+    }
+
+    private var knight: some View {
                 Glyph(name: Glyphs.train, size: 32, weight: .bold)
                     .foregroundStyle(Color(hex: 0x2A1C08))
                     .frame(width: 64, height: 64)
@@ -981,16 +1185,21 @@ struct HomeAuroraTabBar: View {
                     }
                     .overlay(Circle().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
                     .shadow(color: .black.opacity(palette.dark ? 0.5 : 0.18), radius: 14, y: 8)
-            }
-            .buttonStyle(HomeStagePress())
-            .accessibilityLabel("Analyze")
-        }
+                    .contentShape(Circle())
+                    .onTapGesture(perform: play)
+                    .onLongPressGesture(minimumDuration: 0.35, perform: rooms)
+                    .accessibilityElement()
+                    .accessibilityLabel("Analyze")
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction(named: "Rooms", rooms)
     }
 
-    private func tab(_ title: String, glyph: String, on: Bool, action: @escaping () -> Void) -> some View {
+    private func tab(_ title: String, icon: HomeTabIcon.Kind, on: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 3) {
-                Glyph(name: glyph, size: 22, weight: .semibold)
+                HomeTabIcon(kind: icon,
+                            color: on ? (palette.dark ? Color(hex: 0xE8C27A) : Color(hex: 0xB7832E)) : palette.ink3)
+                    .frame(width: 24, height: 24)
                 Text(title)
                     .font(.system(size: 10.5, weight: .semibold))
             }
@@ -1003,5 +1212,88 @@ struct HomeAuroraTabBar: View {
         .buttonStyle(HomeStagePress())
         .accessibilityLabel(title)
         .accessibilityAddTraits(on ? .isSelected : [])
+    }
+}
+
+/// The bottom bar's tab icons (Alex, 2026-11-07: "Do B but make the You and Rooms from A").
+/// Today and Learn are solid chess pieces in gold leaf: a pawn at sunrise and a bishop.
+/// You and Rooms are fine engraved lines: a crowned shield and a castle gate.
+/// Drawn on a 26-point grid; the selected tab shows in gold.
+struct HomeTabIcon: View {
+    enum Kind { case today, learn, you, rooms }
+
+    let kind: Kind
+    let color: Color
+
+    var body: some View {
+        Canvas { context, size in
+            let k = min(size.width, size.height) / 26
+            context.translateBy(x: (size.width - 26 * k) / 2, y: (size.height - 26 * k) / 2)
+            context.scaleBy(x: k, y: k)
+            let shading = GraphicsContext.Shading.color(color)
+            let line = StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round)
+            switch kind {
+            case .today:
+                // A pawn at sunrise.
+                context.fill(Path(ellipseIn: CGRect(x: 9.5, y: 3.5, width: 7, height: 7)), with: shading)
+                context.fill(Path { p in
+                    p.move(to: CGPoint(x: 10, y: 12)); p.addLine(to: CGPoint(x: 16, y: 12))
+                    p.addLine(to: CGPoint(x: 17.5, y: 20)); p.addLine(to: CGPoint(x: 8.5, y: 20)); p.closeSubpath()
+                    p.addRect(CGRect(x: 7, y: 21, width: 12, height: 2.5))
+                }, with: shading)
+                context.stroke(Path { p in
+                    p.move(to: CGPoint(x: 3, y: 7)); p.addLine(to: CGPoint(x: 6, y: 7))
+                    p.move(to: CGPoint(x: 20, y: 7)); p.addLine(to: CGPoint(x: 23, y: 7))
+                    p.move(to: CGPoint(x: 13, y: 1)); p.addLine(to: CGPoint(x: 13, y: 2.5))
+                }, with: shading, style: StrokeStyle(lineWidth: 1.3, lineCap: .round))
+            case .learn:
+                // A bishop, its mitre cut with the slit.
+                context.drawLayer { layer in
+                    layer.fill(Path { p in
+                        p.move(to: CGPoint(x: 13, y: 2))
+                        p.addCurve(to: CGPoint(x: 18, y: 11), control1: CGPoint(x: 16, y: 5), control2: CGPoint(x: 18, y: 8))
+                        p.addCurve(to: CGPoint(x: 15.5, y: 15), control1: CGPoint(x: 18, y: 13), control2: CGPoint(x: 16.5, y: 14.5))
+                        p.addLine(to: CGPoint(x: 17, y: 20)); p.addLine(to: CGPoint(x: 9, y: 20))
+                        p.addLine(to: CGPoint(x: 10.5, y: 15))
+                        p.addCurve(to: CGPoint(x: 8, y: 11), control1: CGPoint(x: 9.5, y: 14.5), control2: CGPoint(x: 8, y: 13))
+                        p.addCurve(to: CGPoint(x: 13, y: 2), control1: CGPoint(x: 8, y: 8), control2: CGPoint(x: 10, y: 5))
+                        p.closeSubpath()
+                        p.addRect(CGRect(x: 7, y: 21, width: 12, height: 2.5))
+                    }, with: shading)
+                    layer.blendMode = .destinationOut
+                    layer.stroke(Path { p in
+                        p.move(to: CGPoint(x: 14.5, y: 6)); p.addLine(to: CGPoint(x: 11.5, y: 10))
+                    }, with: .color(.black), style: StrokeStyle(lineWidth: 1.4, lineCap: .round))
+                }
+            case .you:
+                // A crowned shield, engraved.
+                context.stroke(Path { p in
+                    p.move(to: CGPoint(x: 5, y: 7)); p.addLine(to: CGPoint(x: 21, y: 7)); p.addLine(to: CGPoint(x: 21, y: 13))
+                    p.addCurve(to: CGPoint(x: 13, y: 23), control1: CGPoint(x: 21, y: 18), control2: CGPoint(x: 17, y: 21))
+                    p.addCurve(to: CGPoint(x: 5, y: 13), control1: CGPoint(x: 9, y: 21), control2: CGPoint(x: 5, y: 18))
+                    p.closeSubpath()
+                    p.move(to: CGPoint(x: 9, y: 11)); p.addLine(to: CGPoint(x: 11, y: 9)); p.addLine(to: CGPoint(x: 13, y: 11))
+                    p.addLine(to: CGPoint(x: 15, y: 9)); p.addLine(to: CGPoint(x: 17, y: 11)); p.addLine(to: CGPoint(x: 17, y: 13))
+                    p.addLine(to: CGPoint(x: 9, y: 13)); p.closeSubpath()
+                }, with: shading, style: line)
+            case .rooms:
+                // A castle gate, engraved.
+                context.stroke(Path { p in
+                    p.move(to: CGPoint(x: 4, y: 23))
+                    for (x, y) in [(4, 9), (7, 9), (7, 6), (10, 6), (10, 9), (16, 9), (16, 6), (19, 6), (19, 9), (22, 9), (22, 23)] {
+                        p.addLine(to: CGPoint(x: x, y: y))
+                    }
+                    p.closeSubpath()
+                    p.move(to: CGPoint(x: 10, y: 23)); p.addLine(to: CGPoint(x: 10, y: 17))
+                    p.addArc(center: CGPoint(x: 13, y: 17), radius: 3, startAngle: .degrees(180), endAngle: .degrees(0), clockwise: false)
+                    p.addLine(to: CGPoint(x: 16, y: 23))
+                }, with: shading, style: line)
+                context.stroke(Path { p in
+                    p.move(to: CGPoint(x: 12, y: 17)); p.addLine(to: CGPoint(x: 12, y: 23))
+                    p.move(to: CGPoint(x: 14, y: 17)); p.addLine(to: CGPoint(x: 14, y: 23))
+                }, with: .color(color.opacity(0.7)), style: line)
+            }
+        }
+        .accessibilityHidden(true)
     }
 }

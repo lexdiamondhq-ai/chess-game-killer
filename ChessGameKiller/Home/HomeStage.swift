@@ -483,11 +483,16 @@ struct HomeStageBoard: View, Animatable {
     let look: SculptedLook
     let pieces: [Piece]
     let black: Bool
-    let light: UIColor
+    /// The rival's colored light hovering over the board. Nil for none: the board in its own
+    /// even light, as on the Aurora home.
+    let light: UIColor?
     let leaning: Bool
     let plinth: UIColor?
     let still: Bool
     var dive: CGFloat
+    /// How much farther back the camera sits than usual, so the whole board, its corners swinging
+    /// as it turns, stays inside the view (the Aurora home, where nothing may cut it off).
+    var pullBack: Float = 0
 
     var animatableData: CGFloat {
         get { dive }
@@ -499,15 +504,17 @@ struct HomeStageBoard: View, Animatable {
             TimelineView(.animation(minimumInterval: 1 / 30, paused: still)) { context in
                 let time: Double = still ? 0 : context.date.timeIntervalSinceReferenceDate
                 HomeHeroBoard(stage: stage, look: look, pieces: pieces,
-                              camera: Self.camera(size: geo.size, time: time, dive: dive, black: black),
-                              presence: HomeWindowBoard.presence(light, arrival: 0, leaning: leaning),
+                              camera: Self.camera(size: geo.size, time: time, dive: dive, black: black,
+                                                  pullBack: pullBack),
+                              presence: light.map { HomeWindowBoard.presence($0, arrival: 0, leaning: leaning) },
                               plinth: plinth)
             }
         }
     }
 
     /// About two minutes a turn, high enough to see the whole board, the stage cut by the edges.
-    static func camera(size: CGSize, time: Double, dive: CGFloat, black: Bool) -> SculptedCamera {
+    static func camera(size: CGSize, time: Double, dive: CGFloat, black: Bool,
+                       pullBack: Float = 0) -> SculptedCamera {
         let d = Float(min(max(dive, 0), 1))
         let ease: Float = d * d * (3 - 2 * d)
         let orbit = Float((time * 0.05).truncatingRemainder(dividingBy: 2 * Double.pi))
@@ -516,7 +523,7 @@ struct HomeStageBoard: View, Animatable {
         camera.aspect = Float(size.width / max(size.height, 1))
         camera.azimuth = -0.35 + orbit + 1.8 * ease + (black ? Float.pi : 0)
         camera.elevation = (40 + 42 * ease) * .pi / 180
-        camera.distance = 25 - 13 * ease
+        camera.distance = 25 + pullBack - 13 * ease
         camera.focus = SIMD3<Float>(0, -1.2 * (1 - ease), 0)
         return camera
     }

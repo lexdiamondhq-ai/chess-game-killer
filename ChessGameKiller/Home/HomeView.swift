@@ -58,6 +58,8 @@ struct HomeView: View {
     @AppStorage("setup.level") private var storedLevel: Int?
     @AppStorage("setup.grudge") private var grudgeOn = false
     @Environment(GrudgeStore.self) private var grudges: GrudgeStore?
+    /// Your Grudge picked from Home while a game is under way: asks before that game is lost.
+    @State private var confirmingGrudge = false
     @AppStorage("setup.clock") private var timeControl: TimeControl = .unlimited
     @AppStorage("haptics") private var hapticsOn = true
     /// The name friends see, from the last challenge: the home says hello with it.
@@ -563,17 +565,24 @@ struct HomeView: View {
             .transition(.opacity)
             .accessibilityHidden(true)
         HomeShortcutsPanel(tone: tone, next: upNext.level, underWay: upNext.inProgress, shortcuts: shortcutList,
-                           playRival: { level in playRival(level) }, close: closeShortcuts)
+                           playRival: { level in playRival(level) }, close: closeShortcuts, asRooms: stageOn)
             .padding(.horizontal, 16)
             .frame(maxWidth: 520)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-            .padding(.bottom, lift)
-            .transition(reduceMotion ? .opacity : .scale(scale: 0.2, anchor: anchor).combined(with: .opacity))
+            // Rooms on the Aurora home rise from the bottom bar; elsewhere out of the jewel.
+            .padding(.bottom, stageOn ? 96 : lift)
+            .transition(reduceMotion ? .opacity
+                        : stageOn ? .move(edge: .bottom).combined(with: .opacity)
+                        : .scale(scale: 0.2, anchor: anchor).combined(with: .opacity))
             .zIndex(2)
-        HomeJewel(tone: tone, upNext: upNext, face: .open, tap: closeShortcuts)
-            .position(jewel)
-            .transition(.opacity)
-            .zIndex(3)
+        if !stageOn {
+            // The jewel wears a cross to close the panel. Rooms on the Aurora home close by a
+            // tap outside or a drag down instead (Alex, 2026-11-07: no X).
+            HomeJewel(tone: tone, upNext: upNext, face: .open, tap: closeShortcuts)
+                .position(jewel)
+                .transition(.opacity)
+                .zIndex(3)
+        }
     }
 
     /// The jewel's note, just above it.
@@ -690,10 +699,36 @@ extension HomeView {
             } else {
                 actions.resume()
             }
-        }, playRival: { level in playRival(level) }, replay: { id in
+        }, playRival: { level in playRival(level) }, playGrudge: playGrudge, puzzles: actions.puzzles, replay: { id in
             if let game = vault.game(id) { actions.openGame(game) }
         })
         return HomeAuroraView(tone: tone, info: auroraInfo, actions: auroraActions)
+            .confirmationDialog("Leave your game against \(match.opponentName)?",
+                                isPresented: $confirmingGrudge, titleVisibility: .visible) {
+                Button("Resign and play Your Grudge", role: .destructive) { startGrudge() }
+                Button("Keep playing", role: .cancel) {}
+            } message: {
+                Text("It counts as a loss for your army.")
+            }
+    }
+
+    /// Your Grudge, from Home: the game starts at once on the side and clock picked last time.
+    /// A game under way that would count as a loss is asked about first.
+    private func playGrudge() {
+        if match.newGameForfeits {
+            confirmingGrudge = true
+        } else {
+            startGrudge()
+        }
+    }
+
+    private func startGrudge() {
+        guard let record = grudges?.record else { return }
+        grudgeOn = true
+        var setup = MatchController.Setup(playerColor: side.color, level: record.level, timeControl: timeControl)
+        setup.grudge = true
+        setup.grudgeSkill = record.skill
+        actions.start(setup)
     }
 }
 
