@@ -6,6 +6,7 @@ struct CrowdVoteLine: View {
     let vote: CrowdVote
     let crowd: String
     let theme: BoardTheme
+    var scale: CGFloat = 1
 
     @State private var filled = false
 
@@ -15,14 +16,14 @@ struct CrowdVoteLine: View {
         HStack(spacing: 7) {
             Capsule()
                 .fill(Color.primary.opacity(0.12))
-                .frame(width: 34, height: 5)
+                .frame(width: 34 * scale, height: 5 * scale)
                 .overlay(alignment: .leading) {
                     Capsule()
                         .fill(gold)
-                        .frame(width: 34 * (filled ? vote.share : 0), height: 5)
+                        .frame(width: 34 * scale * (filled ? vote.share : 0), height: 5 * scale)
                 }
             Text("\(vote.percent) played \(vote.san)")
-                .font(.app(.footnote, weight: .medium).monospacedDigit())
+                .font(.app(.footnote, weight: .medium, scale: scale).monospacedDigit())
                 .foregroundStyle(Color.primary.opacity(0.72))
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)

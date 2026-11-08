@@ -36,9 +36,10 @@ enum AppFont {
 
 extension Font {
     /// A text style in Geist. Headline is semibold like the system's; the rest are regular.
-    static func app(_ style: Font.TextStyle, weight: Font.Weight? = nil) -> Font {
+    /// `scale` grows it past the style's size while keeping the style's Dynamic Type scaling.
+    static func app(_ style: Font.TextStyle, weight: Font.Weight? = nil, scale: CGFloat = 1) -> Font {
         let weight = weight ?? (style == .headline ? .semibold : .regular)
-        return .custom(AppFont.name(for: weight), size: AppFont.size(for: style), relativeTo: style)
+        return .custom(AppFont.name(for: weight), size: AppFont.size(for: style) * scale, relativeTo: style)
     }
 
     /// A fixed size in Geist, for numbers and labels drawn to fit a shape.

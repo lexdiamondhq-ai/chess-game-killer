@@ -18,7 +18,10 @@ struct ExecutivePlate: View {
 
     @ScaledMetric(relativeTo: .footnote) private var scaledStatusHeight: CGFloat = 16
     /// The status row's height. It stops growing where the line's type does.
-    private var statusHeight: CGFloat { min(scaledStatusHeight, 21) }
+    private var statusHeight: CGFloat { min(scaledStatusHeight, 21) * lineScale }
+    /// The line under the rival's name (its taunt, remarks and captures) is half again as large
+    /// as the rest (Alex, 2026-11-08).
+    private var lineScale: CGFloat { isComputer && !inDock ? 1.5 : 1 }
     /// The player's army, so a selected named piece shows its name here.
     @Environment(ArmyStore.self) private var army: ArmyStore?
 
@@ -127,11 +130,11 @@ struct ExecutivePlate: View {
                 CheckTag(color: theme.check)
                     .transition(.scale.combined(with: .opacity))
             }
-            PlateRemark(match: match, theme: theme, isRival: isComputer) {
+            PlateRemark(match: match, theme: theme, isRival: isComputer, scale: lineScale) {
                 statusWords
             }
             .layoutPriority(1)
-            CapturedPieces(match: match, by: color)
+            CapturedPieces(match: match, by: color, scale: lineScale)
         }
         .animation(.easeInOut(duration: 0.2), value: selectedArmyPiece?.name)
     }
@@ -194,7 +197,8 @@ struct ExecutivePlate: View {
                     .transition(.opacity)
             } else if !status.isEmpty {
                 Text(status)
-                    .font(inDock ? .app(.subheadline, weight: .bold) : .app(.footnote, weight: isActive ? .medium : .regular))
+                    .font(inDock ? .app(.subheadline, weight: .bold)
+                          : .app(.footnote, weight: isActive ? .medium : .regular, scale: lineScale))
                     .foregroundStyle(inDock ? (isActive ? green : green.opacity(0.6))
                                      : (isActive ? Color.primary.opacity(0.86) : Color.secondary))
                     .lineLimit(1)
@@ -307,8 +311,11 @@ private struct CapturedPieces: View {
     let match: MatchController
     /// The side that did the capturing.
     let by: Piece.Color
+    /// Larger on the rival's line.
+    var scale: CGFloat = 1
 
-    @ScaledMetric(relativeTo: .footnote) private var size: CGFloat = 14
+    @ScaledMetric(relativeTo: .footnote) private var baseSize: CGFloat = 14
+    private var size: CGFloat { baseSize * scale }
 
     var body: some View {
         let taken = match.game.captured(by: by)
@@ -337,7 +344,7 @@ private struct CapturedPieces: View {
                         silhouette(of: entry.kind)
                         if entry.count > 1 {
                             Text("\(entry.count)")
-                                .font(.app(.caption2, weight: .semibold).monospacedDigit())
+                                .font(.app(.caption2, weight: .semibold, scale: scale).monospacedDigit())
                         }
                     }
                 }
@@ -350,7 +357,7 @@ private struct CapturedPieces: View {
     private func leadLabel(_ lead: Int) -> some View {
         if lead > 0 {
             Text("+\(lead)")
-                .font(.app(.footnote, weight: .semibold).monospacedDigit())
+                .font(.app(.footnote, weight: .semibold, scale: scale).monospacedDigit())
         }
     }
 

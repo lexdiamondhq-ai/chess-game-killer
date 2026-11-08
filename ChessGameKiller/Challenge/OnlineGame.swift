@@ -496,7 +496,7 @@ final class OnlineGame {
         deadlineTask = nil
         // A game decided on the board already had its sound; one decided off it gets it now.
         if seenLive, let result = state.result, result.reason.wasPlayed, !match.game.isGameOver {
-            sounds?.play(result.winner == seat ? .victory : .gameOver)
+            sounds?.play(result.winner == nil ? .gameOver : result.winner == seat ? .victory : .defeat)
         }
         onFinish?(record, state)
     }
@@ -700,7 +700,7 @@ final class OnlineGame {
         guard let sounds else { return }
         let game = match.game
         if game.isGameOver {
-            sounds.play(game.winner == seat.color ? .victory : .gameOver)
+            sounds.play(game.winner == nil ? .gameOver : game.winner == seat.color ? .victory : .defeat)
         } else if played.isCapture {
             sounds.play(.capture)
         } else if played.givesCheck {

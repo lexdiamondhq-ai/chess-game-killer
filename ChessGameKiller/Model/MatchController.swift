@@ -573,13 +573,15 @@ final class MatchController {
         gradeWhatsLeft()
     }
 
-    /// The victory theme when a person wins, a quiet chime otherwise.
+    /// The victory theme when a person wins, a dark toll when they lose, a quiet chime for a draw.
     private func playEndSound(winner: Piece.Color?, after delay: TimeInterval = 0) {
-        if let winner, game.humanColors.contains(winner) {
-            sounds?.play(.victory, after: delay)
+        let sound: GameSound
+        if let winner {
+            sound = game.humanColors.contains(winner) ? .victory : .defeat
         } else {
-            sounds?.play(.gameOver, after: delay)
+            sound = .gameOver
         }
+        sounds?.play(sound, after: delay)
     }
 
     /// How far ahead the person must be (in centipawns) for the rival to resign.

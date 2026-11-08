@@ -12,7 +12,10 @@ enum GameSound: String, CaseIterable {
     case check
     case castle
     case win
+    /// A game that ends with nobody winning: a draw.
     case gameOver = "game-over"
+    /// A low, ominous toll when the person loses: mated, resigned or out of time.
+    case defeat
     /// A short video-game "level clear" theme, when a person wins.
     case victory
     /// The chime as the app opens.
@@ -32,6 +35,7 @@ enum GameSound: String, CaseIterable {
         case .castle: return 0.75
         case .win: return 0.7
         case .gameOver: return 0.6
+        case .defeat: return 0.6
         case .victory: return 0.7
         case .welcome: return 0.4
         }
@@ -40,7 +44,7 @@ enum GameSound: String, CaseIterable {
     /// The longer cues: the endings and the welcome. They fade out when something new begins.
     var isLong: Bool {
         switch self {
-        case .win, .gameOver, .victory, .welcome: return true
+        case .win, .gameOver, .defeat, .victory, .welcome: return true
         case .move, .select, .capture, .check, .castle: return false
         }
     }
