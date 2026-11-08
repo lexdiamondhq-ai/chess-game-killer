@@ -45,6 +45,8 @@ struct GamesDoorView: View {
                     waitingCard(gamesRead: report.gamesRead)
                 }
             }
+            TrainSectionTitle(text: "Games you play online")
+            ImportGamesRow(theme: theme)
             if !store.openMistakes.isEmpty {
                 TrainSectionTitle(text: "From your games")
                 fixRow
@@ -277,7 +279,7 @@ struct RecentGameRow: View {
         if let rival {
             RivalCoin(rival: rival, size: 34)
         } else {
-            Image(systemName: "person.2.fill")
+            Image(systemName: game.isImported ? "globe" : "person.2.fill")
                 .font(.app(.footnote))
                 .foregroundStyle(.secondary)
                 .frame(width: 34, height: 34)
