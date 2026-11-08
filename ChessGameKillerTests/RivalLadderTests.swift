@@ -1,17 +1,35 @@
 import XCTest
 @testable import ChessGameKiller
 
-/// The rivals' hall: the first three rivals are always open, the Lionheart and the Ashen King
-/// open only once the rival before them is beaten, and every rival has its film's media.
+/// The rivals' hall: the Cub is always open, every other rival opens only once the rival before
+/// it is beaten, and every rival has its film's media.
 final class RivalLadderTests: XCTestCase {
-    func testNewPlayerFacesTheFirstThree() {
+    func testNewPlayerFacesOnlyTheCub() {
         let ladder = RivalLadder(beatenNames: [])
         XCTAssertTrue(ladder.isOpen(.beginner))
-        XCTAssertTrue(ladder.isOpen(.casual))
-        XCTAssertTrue(ladder.isOpen(.club))
+        XCTAssertFalse(ladder.isOpen(.casual))
+        XCTAssertFalse(ladder.isOpen(.club))
         XCTAssertFalse(ladder.isOpen(.expert))
         XCTAssertFalse(ladder.isOpen(.grandmaster))
         XCTAssertEqual(ladder.current, .beginner)
+    }
+
+    func testPremiumOpensEveryRival() throws {
+        let ladder = RivalLadder(beatenNames: [], allOpen: true)
+        for level in MatchController.Level.allCases { XCTAssertTrue(ladder.isOpen(level)) }
+        XCTAssertEqual(ladder.current, .beginner)
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "RivalLadderPremium"))
+        defaults.removePersistentDomain(forName: "RivalLadderPremium")
+        XCTAssertFalse(RivalLadder(defaults: defaults).isOpen(.grandmaster))
+        defaults.set(true, forKey: Premium.activeKey)
+        XCTAssertTrue(RivalLadder(defaults: defaults).isOpen(.grandmaster))
+    }
+
+    func testBeatingTheCubOpensTheHunterOnly() {
+        let ladder = RivalLadder(beatenNames: ["the cub"])
+        XCTAssertTrue(ladder.isOpen(.casual))
+        XCTAssertFalse(ladder.isOpen(.club))
+        XCTAssertEqual(ladder.current, .casual)
     }
 
     func testBeatingTheBerserkerOpensTheLionheart() {
@@ -34,6 +52,17 @@ final class RivalLadderTests: XCTestCase {
     func testTheHallOpensOnTheFirstRivalNotYetBeaten() {
         let ladder = RivalLadder(beatenNames: ["the cub", "the hunter"])
         XCTAssertEqual(ladder.current, .club)
+    }
+
+    func testEachRivalsIntroIsRememberedOnceSeen() throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "RivalIntrosTests"))
+        defaults.removePersistentDomain(forName: "RivalIntrosTests")
+        XCTAssertFalse(RivalIntros.seen(.casual, defaults: defaults))
+        RivalIntros.mark(.casual, defaults: defaults)
+        RivalIntros.mark(.casual, defaults: defaults)
+        XCTAssertTrue(RivalIntros.seen(.casual, defaults: defaults))
+        XCTAssertFalse(RivalIntros.seen(.club, defaults: defaults))
+        XCTAssertEqual(defaults.stringArray(forKey: RivalIntros.key), ["1200s"])
     }
 
     func testEveryRivalHasItsFilmCardAndTheme() {

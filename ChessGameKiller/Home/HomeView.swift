@@ -63,6 +63,8 @@ struct HomeView: View {
     /// The rivals' hall is open, on this rival (nil: the one up next).
     @State private var showingHall = false
     @State private var hallStart: MatchController.Level?
+    /// The hall opens straight into the rival's welcome film.
+    @State private var hallIntro = false
     @AppStorage("setup.clock") private var timeControl: TimeControl = .unlimited
     @AppStorage("haptics") private var hapticsOn = true
     /// The name friends see, from the last challenge: the home says hello with it.
@@ -151,10 +153,20 @@ struct HomeView: View {
     private var pieceTheme: BoardTheme { theme.sculptedLook == nil ? .named(.gilded) : theme }
 
     private var upNext: HomeUpNext {
-        HomeUpNext.make(match: match, side: side,
-                        level: storedLevel.flatMap(MatchController.Level.init(rawValue:)),
+        HomeUpNext.make(match: match, side: side, level: nextLevel,
                         timeControl: timeControl, hasPlayed: !vault.games.isEmpty,
                         grudge: grudgeOn ? grudges?.record : nil)
+    }
+
+    /// The rival up next: the one you played last, while it's open to you; otherwise the first
+    /// rival on the ladder you haven't beaten (Alex, 2026-11-08: each rival waits until the one
+    /// before is beaten).
+    private var nextLevel: MatchController.Level? {
+        let ladder = RivalLadder()
+        if let stored = storedLevel.flatMap(MatchController.Level.init(rawValue:)) {
+            return ladder.isOpen(stored) ? stored : ladder.current
+        }
+        return vault.games.isEmpty ? nil : ladder.current
     }
 
     private var piecesLine: String {
@@ -682,7 +694,7 @@ extension HomeView {
                                  gameFEN: match.game.fen, todayFEN: puzzle?.fen, todaySolver: puzzle?.solver,
                                  pieceTheme: pieceTheme)
         let stageActions = HomeStageActions(
-            play: { primary(upNext) },
+            play: { playNext(upNext) },
             change: { secondary(upNext) },
             dailyMove: actions.dailyMove,
             coach: {
@@ -703,13 +715,14 @@ extension HomeView {
             }
         }, playRival: { level in playRival(level) }, rivals: { level in
             hallStart = level
+            hallIntro = false
             showingHall = true
         }, playGrudge: playGrudge, puzzles: actions.puzzles, replay: { id in
             if let game = vault.game(id) { actions.openGame(game) }
         })
         return HomeAuroraView(tone: tone, info: auroraInfo, actions: auroraActions)
             .fullScreenCover(isPresented: $showingHall) {
-                RivalsHall(start: hallStart, begin: { level in
+                RivalsHall(start: hallStart, intro: hallIntro, begin: { level in
                     // The film's last frame gives way to the game: the hall closes at once.
                     var quiet = Transaction()
                     quiet.disablesAnimations = true
@@ -724,6 +737,18 @@ extension HomeView {
             } message: {
                 Text("It counts as a loss for your army.")
             }
+    }
+
+    /// Play on the next game. The first time you face a rival, its welcome film plays first and
+    /// its Begin starts the game (Alex, 2026-11-08: "you should see each intro video").
+    private func playNext(_ upNext: HomeUpNext) {
+        guard !upNext.inProgress, !upNext.isGrudge, !RivalIntros.seen(upNext.level) else {
+            primary(upNext)
+            return
+        }
+        hallStart = upNext.level
+        hallIntro = true
+        showingHall = true
     }
 
     /// Your Grudge, from Home: the game starts at once on the side and clock picked last time.

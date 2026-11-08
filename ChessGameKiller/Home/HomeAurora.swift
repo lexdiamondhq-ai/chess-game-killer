@@ -260,16 +260,15 @@ struct HomeAuroraView: View {
                 .fill(palette.ink3)
                 .frame(width: 38, height: 4)
                 .padding(.top, 10)
-            HomeAuroraSection(title: gamesTitle, palette: palette, note: gamesNote)
+            // The Face a rival coins are gone: the rival you're on stands big in the Next game
+            // card instead (Alex, 2026-11-08). All rivals moves to this heading's corner.
+            if info.games.isEmpty {
+                HomeAuroraSection(title: gamesTitle, palette: palette, note: "All rivals",
+                                  action: { actions.rivals(nil) })
+            } else {
+                HomeAuroraSection(title: gamesTitle, palette: palette, note: gamesNote)
+            }
             gameRow
-            // A quiet way into the hall in the heading's corner; the coins open it too (Alex,
-            // 2026-11-08, layout tidy).
-            HomeAuroraSection(title: "Face a rival", palette: palette, note: "All rivals",
-                              action: { actions.rivals(nil) })
-            // A coin opens its rival's card in the hall, where its film plays and the locks hold
-            // (Alex, 2026-11-07).
-            HomeAuroraRivals(next: stage.upNext.level, palette: palette, play: { actions.rivals($0) })
-                .padding(.horizontal, 12)
             HomeAuroraSection(title: "For today", palette: palette, note: nil)
             VStack(spacing: 10) {
                 if let finest = info.finest {
@@ -313,13 +312,24 @@ struct HomeAuroraView: View {
     }
 
     /// Your games as wide cards, the next one peeking in at the right.
+    @ViewBuilder
     private var gameRow: some View {
         let all: [HomeAuroraGameCard] = cards
-        return ScrollView(.horizontal) {
+        if all.count == 1, let only = all.first {
+            // One card sits on the page like your finest move below it, edge to edge with the
+            // same margins (Alex, 2026-11-08: "the same size in length as the one below").
+            tile(only)
+                .padding(.horizontal, 16)
+        } else {
+            swipeRow(all)
+        }
+    }
+
+    private func swipeRow(_ all: [HomeAuroraGameCard]) -> some View {
+        ScrollView(.horizontal) {
             LazyHStack(spacing: 12) {
                 ForEach(all) { card in
-                    HomeAuroraGameTile(card: card, palette: palette,
-                                       change: card.kind == .next ? actions.stage.change : nil) { open(card) }
+                    tile(card)
                         .containerRelativeFrame(.horizontal) { width, _ in
                             all.count > 1 ? width - 72 : width - 32
                         }
@@ -331,6 +341,19 @@ struct HomeAuroraView: View {
         .scrollIndicators(.hidden)
         .scrollClipDisabled()
         .contentMargins(.horizontal, 16, for: .scrollContent)
+    }
+
+    /// The next game gets the rival's own card, like your finest move (Alex, 2026-11-08);
+    /// your games keep their boards.
+    @ViewBuilder
+    private func tile(_ card: HomeAuroraGameCard) -> some View {
+        if let upNext = card.upNext {
+            HomeAuroraNextRival(card: card, rival: upNext.rival, palette: palette,
+                                play: { open(card) }, change: actions.stage.change,
+                                meet: { actions.rivals(upNext.isGrudge ? nil : upNext.level) })
+        } else {
+            HomeAuroraGameTile(card: card, palette: palette) { open(card) }
+        }
     }
 
     /// Rating, level and streak, small in the header: serif figures over fine caps, parted by
@@ -532,6 +555,149 @@ struct HomeAuroraGameTile: View {
                 .accessibilityHint("Pick your side, clock and rival")
             }
         }
+    }
+}
+
+/// The next game, dressed like your finest move (Alex, 2026-11-08: "Change the Rival to look
+/// like this, use the main pic for the rival, get rid of the coin"): the rival's own picture,
+/// the still from its welcome film, in a gold frame on the left; small gold caps, the rival's
+/// name in serif, the match in grey, and Play and Options as gold pills. The picture opens the
+/// rival in the hall, where its film plays.
+struct HomeAuroraNextRival: View {
+    let card: HomeAuroraGameCard
+    let rival: Rival
+    let palette: HomeAuroraPalette
+    let play: () -> Void
+    let change: () -> Void
+    let meet: () -> Void
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
+        HStack(spacing: 14) {
+            Button(action: meet) {
+                HomeRivalFrame(rival: rival, side: 112)
+            }
+            .buttonStyle(HomeStagePress())
+            .accessibilityLabel(rival.name)
+            .accessibilityHint("Opens \(rival.name) in the rivals' hall")
+            VStack(alignment: .leading, spacing: 4) {
+                Text(card.status.uppercased())
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1.2)
+                    .foregroundStyle(palette.gold)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                Text(rival.name)
+                    .font(.system(size: 26, weight: .regular, design: .serif))
+                    .foregroundStyle(palette.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                Text(detail)
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(palette.ink2)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 8) {
+                    Button(action: play) { pill("Play", symbol: "play.fill") }
+                        .buttonStyle(HomeStagePress())
+                        .accessibilityLabel("Play \(rival.name)")
+                    Button(action: change) { pill("Options", symbol: "slider.horizontal.3") }
+                        .buttonStyle(HomeStagePress())
+                        .accessibilityLabel("Change the next game")
+                        .accessibilityHint("Pick your side, clock and rival")
+                }
+                .padding(.top, 6)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity)
+        .background(shape.fill(palette.card))
+        .background(alignment: .topLeading) {
+            // A warm gold light from the frame's corner, as on your finest move.
+            RadialGradient(colors: [palette.gold.opacity(palette.dark ? 0.18 : 0.14), palette.gold.opacity(0)],
+                           center: .topLeading, startRadius: 0, endRadius: 220)
+                .clipShape(shape)
+                .allowsHitTesting(false)
+        }
+        .overlay(shape.strokeBorder(palette.gold.opacity(0.32), lineWidth: 1))
+    }
+
+    /// "1000 · No clock · You're White".
+    private var detail: String {
+        ([rival.elo.replacingOccurrences(of: "~", with: "")] + card.tags).joined(separator: " · ")
+    }
+
+    private func pill(_ title: String, symbol: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: symbol)
+                .font(.system(size: 9.5, weight: .bold))
+            Text(title)
+                .font(.system(size: 12, weight: .bold))
+        }
+        .foregroundStyle(palette.gold)
+        .padding(.horizontal, 11)
+        .frame(height: 28)
+        .overlay(Capsule().strokeBorder(palette.gold.opacity(0.45), lineWidth: 1))
+        .contentShape(Capsule())
+    }
+}
+
+/// A rival's own picture, the still from its welcome film, cut square on its face and set in
+/// the same gold frame as your finest move. Your Grudge, who has no film, shows its portrait.
+struct HomeRivalFrame: View {
+    let rival: Rival
+    let side: CGFloat
+
+    /// The stills, read once each.
+    @MainActor private static var stills: [String: UIImage] = [:]
+
+    @MainActor
+    private var still: UIImage? {
+        guard !rival.isGrudge else { return nil }
+        if let cached = Self.stills[rival.slug] { return cached }
+        let image = RivalFilm.of(rival.level).cardImage
+        Self.stills[rival.slug] = image
+        return image
+    }
+
+    /// Where the square starts down the 9:16 still, so it sits on the rider's face: the Ashen
+    /// King sits low on his throne under the dragon.
+    private var top: CGFloat { rival.level == .grandmaster ? 0.2 : 0.07 }
+
+    var body: some View {
+        let pad: CGFloat = side * 0.055
+        let inner: CGFloat = side - 2 * pad
+        Group {
+            if let still {
+                Image(uiImage: still)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: inner, height: inner * 16 / 9)
+                    .offset(y: -top * inner * 16 / 9)
+                    .frame(width: inner, height: inner, alignment: .top)
+                    .clipped()
+            } else {
+                Image(rival.portraitName)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFill()
+                    .frame(width: inner, height: inner)
+                    .clipped()
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+        .padding(pad)
+        .background(
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .fill(LinearGradient(stops: [.init(color: Color(hex: 0xF3D99A), location: 0),
+                                             .init(color: Color(hex: 0x9C6B2C), location: 0.45),
+                                             .init(color: Color(hex: 0xE9C47C), location: 0.7),
+                                             .init(color: Color(hex: 0x7E5520), location: 1)],
+                                     startPoint: .topLeading, endPoint: .bottomTrailing))
+        )
+        .shadow(color: .black.opacity(0.45), radius: 12, y: 8)
+        .accessibilityHidden(true)
     }
 }
 
@@ -773,6 +939,9 @@ struct HomeAuroraGameCard: Identifiable, Equatable {
     let headlineEnd: String
     let button: String
     let tags: [String]
+    /// The next game, whose rival shows big in place of the board.
+    var upNext: HomeUpNext? = nil
+    var rival: Rival? { upNext?.rival }
 
     init(_ game: HomeCurrentGame) {
         let name: String = game.title.hasPrefix("vs ") ? String(game.title.dropFirst(3)) : game.title
@@ -820,6 +989,7 @@ struct HomeAuroraGameCard: Identifiable, Equatable {
         button = "Play"
         tags = [upNext.timeControl.isTimed ? upNext.timeControl.name : "No clock",
                 upNext.playerColor == .black ? "You're Black" : "You're White"]
+        self.upNext = upNext
     }
 
     static func next(_ upNext: HomeUpNext, fen: String) -> HomeAuroraGameCard {
@@ -1000,61 +1170,6 @@ struct HomeAuroraSection: View {
         .padding(.top, 22)
         .padding(.bottom, 12)
         .accessibilityAddTraits(.isHeader)
-    }
-}
-
-/// The five rivals on Today, each on its coin, the coins growing from the Cub to the
-/// Ashen King so the row climbs (Alex, 2026-11-07: "Let's have these visible on the Today
-/// screen"). The rival up next wears a gold ring; a tap starts a game against that rival.
-struct HomeAuroraRivals: View {
-    let next: MatchController.Level
-    let palette: HomeAuroraPalette
-    let play: (MatchController.Level) -> Void
-
-    @ScaledMetric(relativeTo: .caption) private var largest: CGFloat = 64
-
-    private func size(_ rival: Rival) -> CGFloat {
-        min(largest, 72) * (0.72 + 0.07 * CGFloat(rival.level.rawValue))
-    }
-
-    var body: some View {
-        HStack(alignment: .bottom, spacing: 0) {
-            ForEach(Rival.all) { rival in
-                coin(rival)
-            }
-        }
-    }
-
-    private func coin(_ rival: Rival) -> some View {
-        let isNext = rival.level == next
-        return Button { play(rival.level) } label: {
-            VStack(spacing: 4) {
-                RivalCoin(rival: rival, size: size(rival))
-                    .padding(2)
-                    .overlay {
-                        if isNext {
-                            Circle()
-                                .strokeBorder(palette.gold, lineWidth: 1.5)
-                                .shadow(color: palette.gold.opacity(0.6), radius: 7)
-                        }
-                    }
-                Text(rival.shortName)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(palette.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                Text(rival.elo.replacingOccurrences(of: "~", with: ""))
-                    .font(.system(size: 10, weight: .bold).monospacedDigit())
-                    .tracking(0.6)
-                    .foregroundStyle(palette.ink2)
-            }
-            .frame(maxWidth: .infinity)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(HomeStagePress())
-        .accessibilityLabel("Play \(rival.name)")
-        .accessibilityValue(rival.spokenElo)
-        .accessibilityHint(isNext ? "Up next" : "")
     }
 }
 
