@@ -79,6 +79,8 @@ struct HomeAuroraView: View {
     @State private var boardStage = SculptedStage()
     /// How far the page has been pulled up over the board, in points.
     @State private var pulled: CGFloat = 0
+    /// The header's height, so it knows when the page's top edge reaches it.
+    @State private var headerHeight: CGFloat = 52
     /// Which position of the game of the day the turning board shows: it plays itself slowly.
     @State private var boardFrame = 0
     /// Your Grudge. Absent in previews: no Grudge on the page.
@@ -108,6 +110,11 @@ struct HomeAuroraView: View {
             // Small enough that the name and the header sit clear above it.
             let boardHeight: CGFloat = max(230, geo.size.height * 0.34)
             let lift: CGFloat = min(max(pulled / boardHeight, 0), 1)
+            // The page's top edge, measured from the top of the screen under the status bar.
+            let pageTop: CGFloat = boardHeight + 18 - pulled
+            // The header gives way as the page's edge touches it, and comes back as the page
+            // goes down again, following your finger both ways (Alex, 2026-11-08).
+            let tuck: CGFloat = min(max((headerHeight + 6 - pageTop) / (headerHeight * 0.75), 0), 1)
             ZStack(alignment: .top) {
                 HomeAuroraBackdrop(palette: palette)
                 // The marble starts just under the header's gold line, never above it.
@@ -136,7 +143,15 @@ struct HomeAuroraView: View {
                     }
                 }
                 .scrollIndicators(.hidden)
+                // Once the header has tucked away, a slim veil keeps the cards from running
+                // sharp under the clock and battery.
+                LinearGradient(colors: [palette.bg, palette.bg.opacity(0)], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 14)
+                    .ignoresSafeArea(edges: .top)
+                    .opacity(Double(tuck))
+                    .allowsHitTesting(false)
                 header
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0 }
                     .background(alignment: .top) {
                         // The header gets a soft backing once the page covers the board.
                         LinearGradient(colors: [palette.bg, palette.bg.opacity(0)], startPoint: .top, endPoint: .bottom)
@@ -145,6 +160,11 @@ struct HomeAuroraView: View {
                             .ignoresSafeArea(edges: .top)
                             .allowsHitTesting(false)
                     }
+                    .opacity(1 - Double(tuck))
+                    .offset(y: reduceMotion ? 0 : -14 * tuck)
+                    .blur(radius: reduceMotion ? 0 : 4 * tuck)
+                    .allowsHitTesting(tuck < 0.5)
+                    .accessibilityHidden(tuck >= 1)
                 VStack(spacing: 0) {
                     Spacer()
                     HomeAuroraTabBar(palette: palette, play: actions.stage.analyze, learn: actions.stage.learn,
