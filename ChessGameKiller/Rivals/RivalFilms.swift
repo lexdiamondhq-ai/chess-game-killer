@@ -49,7 +49,7 @@ struct RivalFilm {
             return RivalFilm(rival: rival, beat: 4.0, title: "Down from the throne",
                              lore: "Wears the lion. Rules by the hammer, and never yields a square.")
         case .grandmaster:
-            return RivalFilm(rival: rival, beat: 3.4, title: "The storm throne",
+            return RivalFilm(rival: rival, beat: 4.6, title: "The storm throne",
                              lore: "Crowned in bone and ash. Plays the masters' moves, then the machine's.")
         }
     }
