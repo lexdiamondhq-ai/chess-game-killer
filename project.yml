@@ -43,6 +43,8 @@ targets:
         UIAppFonts: [Geist-Regular.ttf, Geist-Medium.ttf, Geist-SemiBold.ttf, Geist-Bold.ttf]
         # The game under way on the Lock Screen and in the Dynamic Island (Shared/LiveGame).
         NSSupportsLiveActivities: true
+        # Lets the app animate at 120 frames a second on ProMotion iPhones (iOS caps it at 60 without).
+        CADisableMinimumFrameDurationOnPhone: true
     dependencies:
       - package: ChessKit
       - package: ChessKitEngine

@@ -2,8 +2,8 @@ import ChessKit
 import PhotosUI
 import SwiftUI
 
-/// The analyzer: start from a photo, a screenshot, an empty board or the
-/// current game, fix the position, then see Stockfish's two best moves.
+/// The analyzer, where every Analyze button opens: start from a photo, a screenshot, an empty
+/// board or the current game, then see Stockfish's two best moves and play them out.
 struct AnalyzeSheet: View {
     let theme: BoardTheme
     /// The game on the board, if one has started.
@@ -17,8 +17,6 @@ struct AnalyzeSheet: View {
     /// Called when the person analyzes a game still being played: that counts as help, like Undo.
     let onAnalyzeGame: (() -> Void)?
     let onPlay: (PositionDraft) -> Void
-    /// Opened from the home's Scan a board shortcut: the camera comes up straight away.
-    let startsWithCamera: Bool
 
     @State private var session: ScanSession
     @State private var photoItem: PhotosPickerItem?
@@ -37,7 +35,7 @@ struct AnalyzeSheet: View {
         clock: TimeControl,
         forfeits: String? = nil,
         onAnalyzeGame: (() -> Void)? = nil,
-        startsWithCamera: Bool = false,
+        startsAt: String? = nil,
         onPlay: @escaping (PositionDraft) -> Void
     ) {
         self.theme = theme
@@ -47,9 +45,11 @@ struct AnalyzeSheet: View {
         self.clock = clock
         self.forfeits = forfeits
         self.onAnalyzeGame = onAnalyzeGame
-        self.startsWithCamera = startsWithCamera
         self.onPlay = onPlay
-        _session = State(initialValue: ScanSession(reader: reader))
+        let session = ScanSession(reader: reader)
+        // Opened on a position (the home's masterpiece): straight to its analysis.
+        if let startsAt { session.analyze(fen: startsAt) }
+        _session = State(initialValue: session)
     }
 
     private var accent: Color { theme.trainingAccent }
@@ -84,7 +84,7 @@ struct AnalyzeSheet: View {
         NavigationStack(path: $session.path) {
             ScrollView {
                 VStack(spacing: 12) {
-                    Text("Snap a real board, pick a screenshot or set one up. I'll find the two best moves.")
+                    Text("Snap a real board, pick a screenshot or set one up. I'll find the best moves, and you can play them out.")
                         .font(.app(.subheadline))
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -144,16 +144,7 @@ struct AnalyzeSheet: View {
                 }
             }
             .navigationDestination(for: ScanSession.Step.self) { step in
-                switch step {
-                case .editor:
-                    BoardEditorView(session: session, theme: theme)
-                case .analysis:
-                    AnalysisView(draft: session.draft, theme: theme, engine: engine,
-                                 rival: rival, clock: clock, forfeits: forfeits) { draft in
-                        onPlay(draft)
-                        dismiss()
-                    }
-                }
+                destination(step)
             }
         }
         .onChange(of: photoItem) { _, item in
@@ -174,18 +165,34 @@ struct AnalyzeSheet: View {
             CameraPicker { image in scan(image) }
                 .ignoresSafeArea()
         }
-        .task {
-            // Scan a board: the camera once the sheet is up (or the offer, with no scans left).
-            guard startsWithCamera, hasCamera else { return }
-            try? await Task.sleep(for: .milliseconds(450))
-            if canScan { showingCamera = true } else { offer = .scan }
-        }
         .premiumOffer($offer)
         .tint(accent)
         .presentationBackground {
             TrainingBackdrop(theme: theme)
         }
         .screenScheme(theme)
+    }
+}
+
+extension AnalyzeSheet {
+    @ViewBuilder
+    fileprivate func destination(_ step: ScanSession.Step) -> some View {
+        switch step {
+        case .reading:
+            PhotoReadingView(session: session, theme: theme)
+        case .editor:
+            BoardEditorView(session: session, theme: theme)
+        case .analysis:
+            // A photo's analysis can open the editor to fix a piece; coming back starts it over.
+            AnalysisView(draft: session.analyzed, theme: theme, engine: engine,
+                         rival: rival, clock: clock, forfeits: forfeits,
+                         photo: session.photo, photoDoubts: session.photoDoubts,
+                         onEditPieces: { session.editPieces($0) }) { draft in
+                onPlay(draft)
+                dismiss()
+            }
+            .id(session.analysisRun)
+        }
     }
 }
 
@@ -239,6 +246,51 @@ struct Panel: View {
     }
 }
 
+// MARK: - Reading
+
+/// The photo, big, while the reader checks every square; its analysis follows by itself.
+struct PhotoReadingView: View {
+    let session: ScanSession
+    let theme: BoardTheme
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 18) {
+                if let photo = session.photo {
+                    Image(uiImage: photo)
+                        .resizable()
+                        .scaledToFit()
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .frame(maxHeight: 420)
+                        .accessibilityLabel("Your photo")
+                }
+                VStack(spacing: 6) {
+                    HStack(spacing: 10) {
+                        ProgressView()
+                        Text("Reading the board")
+                            .font(.app(.headline))
+                    }
+                    Text("I'm checking every square, then I'll find the best moves. This can take up to a minute.")
+                        .font(.app(.subheadline))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Button("Stop") { withAnimation(.snappy) { session.stopReading() } }
+                    .buttonStyle(.bordered)
+                    .accessibilityLabel("Stop reading the photo")
+                    .accessibilityHint("Then set up the pieces by hand")
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity)
+        }
+        .navigationTitle("Reading your photo")
+        .navigationBarTitleDisplayMode(.inline)
+        // Backing out while it's read drops the read, so its analysis can't open later.
+        .onDisappear { session.leaveReading() }
+    }
+}
+
 // MARK: - Editor
 
 /// Fix up the position: tap a piece below, then tap squares to place it.
@@ -262,31 +314,21 @@ struct BoardEditorView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                if session.photo != nil || session.isReading || session.readingFailed {
+                if session.photo != nil || session.readingFailed {
                     readingBanner
                 }
 
                 PositionBoard(draft: session.draft, theme: theme) { square in
                     place(on: square)
                 }
-                .overlay {
-                    if session.isReading {
-                        ProgressView("Reading the board")
-                            .padding(16)
-                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    }
-                }
-                .disabled(session.isReading)
 
                 palette
 
-                // What the reader finds replaces the whole draft, so hold edits until it's done.
                 Picker("Turn", selection: $session.draft.sideToMove) {
                     Text("White to move").tag(Piece.Color.white)
                     Text("Black to move").tag(Piece.Color.black)
                 }
                 .pickerStyle(.segmented)
-                .disabled(session.isReading)
 
                 HStack(spacing: 10) {
                     // Turns the pieces around, for a photo taken from the other side of the board.
@@ -301,9 +343,8 @@ struct BoardEditorView: View {
                     }
                     .accessibilityLabel("Reset to the starting position")
                 }
-                .disabled(session.isReading)
 
-                if let problem, !session.isReading {
+                if let problem {
                     Label(problem, systemImage: "exclamationmark.triangle.fill")
                         .font(.app(.subheadline, weight: .medium))
                         .foregroundStyle(Color(hex: 0xFF9A3C))
@@ -318,9 +359,9 @@ struct BoardEditorView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button("Analyze") { session.path.append(.analysis) }
+                Button("Analyze") { session.analyzeDraft() }
                     .fontWeight(.semibold)
-                    .disabled(!session.draft.isValid || session.isReading)
+                    .disabled(!session.draft.isValid)
             }
         }
         .sheet(isPresented: $showingPhoto) {
@@ -348,20 +389,16 @@ struct BoardEditorView: View {
                 .accessibilityLabel("Show your photo")
             }
             VStack(alignment: .leading, spacing: 4) {
-                Text(session.isReading ? "Reading your photo" : session.readingFailed ? "Couldn't read it" : "Board read")
+                Text(session.readingFailed ? "Couldn't read it" : "Your photo")
                     .font(.app(.headline))
-                Text(session.isReading ? "I'm checking every square. This can take up to a minute." : session.readingNote ?? "")
-                    .font(.app(.subheadline))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                if let note = session.readingNote {
+                    Text(note)
+                        .font(.app(.subheadline))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             Spacer(minLength: 0)
-            if session.isReading {
-                Button("Stop") { withAnimation(.snappy) { session.stopReading() } }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .accessibilityLabel("Stop reading the photo")
-            }
         }
         .padding(12)
         .background(Panel(theme: theme, highlight: session.readingFailed ? Color(hex: 0xFF9A3C) : nil))
@@ -441,7 +478,8 @@ struct BoardEditorView: View {
 
 // MARK: - Analysis
 
-/// Stockfish's two best moves for the position, drawn as arrows, with what follows.
+/// Stockfish's two best moves for the position, drawn as arrows, on a board to explore: move
+/// any piece and see the best answer, step through the moves, or play out the best line.
 struct AnalysisView: View {
     let theme: BoardTheme
     /// Who "Play from here" plays, and on what clock.
@@ -449,21 +487,46 @@ struct AnalysisView: View {
     var clock: TimeControl = .unlimited
     /// The rival of a game in progress that starting this one would cost.
     var forfeits: String?
+    /// The photo the position was read from, and what the reader wasn't sure of.
+    var photo: UIImage?
+    var photoDoubts: String?
+    /// Opens the editor on the board's pieces, to fix one the reader got wrong. Offered with the photo.
+    var onEditPieces: ((PositionDraft) -> Void)?
     let onPlay: (PositionDraft) -> Void
 
     @State private var model: AnalysisModel
     @State private var flipped: Bool
     @State private var confirmingForfeit = false
+    @State private var showingPhoto = false
+    @AppStorage("haptics") private var hapticsOn = true
 
     init(draft: PositionDraft, theme: BoardTheme, engine: ChessEngine?, rival: String = "the computer",
-         clock: TimeControl = .unlimited, forfeits: String? = nil, onPlay: @escaping (PositionDraft) -> Void) {
+         clock: TimeControl = .unlimited, forfeits: String? = nil,
+         photo: UIImage? = nil, photoDoubts: String? = nil, onEditPieces: ((PositionDraft) -> Void)? = nil,
+         onPlay: @escaping (PositionDraft) -> Void) {
         self.theme = theme
         self.rival = rival
         self.clock = clock
         self.forfeits = forfeits
+        self.photo = photo
+        self.photoDoubts = photoDoubts
+        self.onEditPieces = onEditPieces
         self.onPlay = onPlay
-        _model = State(initialValue: AnalysisModel(draft: draft, engine: engine))
+        let sounds: SoundPlaying? = engine == nil ? nil : SoundPlayer.shared
+        _model = State(initialValue: AnalysisModel(draft: draft, engine: engine, sounds: sounds))
         _flipped = State(initialValue: draft.sideToMove == .black)
+    }
+
+    /// A board already part way through, for pictures in the tests.
+    init(model: AnalysisModel, theme: BoardTheme, photo: UIImage? = nil, photoDoubts: String? = nil,
+         onEditPieces: ((PositionDraft) -> Void)? = nil, onPlay: @escaping (PositionDraft) -> Void = { _ in }) {
+        self.theme = theme
+        self.photo = photo
+        self.photoDoubts = photoDoubts
+        self.onEditPieces = onEditPieces
+        self.onPlay = onPlay
+        _model = State(initialValue: model)
+        _flipped = State(initialValue: model.start.sideToMove == .black)
     }
 
     /// The side the person takes from here: the one to move.
@@ -471,15 +534,37 @@ struct AnalysisView: View {
 
     private var accent: Color { theme.trainingAccent }
 
+    /// The last move's squares and the piece picked up, tinted.
+    private var tints: [Square: Color] {
+        var tints: [Square: Color] = [:]
+        if let last = model.lastMove {
+            tints[last.from] = accent.opacity(0.22)
+            tints[last.to] = accent.opacity(0.34)
+        }
+        if let selected = model.selected {
+            tints[selected] = accent.opacity(0.45)
+        }
+        return tints
+    }
+
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
+            VStack(spacing: 14) {
+                photoRow
                 header
-                PositionBoard(draft: model.draft, theme: theme, flipped: flipped, hints: model.hints)
+                PositionBoard(draft: model.draft, theme: theme, flipped: flipped,
+                              hints: model.selected == nil ? model.hints : [],
+                              onTap: { square in model.tap(square) }, tints: tints,
+                              selected: model.selected, targets: model.targets)
                     .animation(.snappy(duration: 0.4), value: flipped)
+                    .animation(.snappy(duration: 0.22), value: model.draft.fen)
+                    .sensoryFeedback(.selection, trigger: model.selected) { _, new in hapticsOn && new != nil }
+                stepper
+                madeMoves
                 lines
                 VStack(spacing: 6) {
                     Button {
+                        model.stopLine()
                         if forfeits == nil { onPlay(model.draft) } else { confirmingForfeit = true }
                     } label: {
                         Label("Play \(rival) from here", systemImage: "play.fill")
@@ -508,7 +593,7 @@ struct AnalysisView: View {
             .padding(16)
             .animation(.snappy, value: model.lines)
         }
-        .navigationTitle("Best moves")
+        .navigationTitle("Analysis")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -522,6 +607,31 @@ struct AnalysisView: View {
             }
         }
         .task { await model.run() }
+        .onDisappear { model.stopLine() }
+        .sheet(isPresented: $showingPhoto) {
+            if let photo {
+                Image(uiImage: photo)
+                    .resizable()
+                    .scaledToFit()
+                    .padding()
+                    .presentationDetents([.medium, .large])
+            }
+        }
+    }
+
+    // MARK: The photo
+
+    /// The photo the position was read from, with the way to fix its pieces.
+    @ViewBuilder
+    private var photoRow: some View {
+        if let photo, let onEditPieces {
+            PhotoSourceRow(photo: photo, doubts: photoDoubts, theme: theme) {
+                showingPhoto = true
+            } onEdit: {
+                model.stopLine()
+                onEditPieces(model.draft)
+            }
+        }
     }
 
     // MARK: Who's better
@@ -542,6 +652,7 @@ struct AnalysisView: View {
                     if let evaluation = model.evaluationForWhite {
                         Text(evaluation.label)
                             .font(.app(.headline).monospacedDigit())
+                            .contentTransition(.numericText())
                     }
                 }
                 EvaluationBar(winningChances: model.evaluationForWhite?.winningChances ?? 0, theme: theme)
@@ -560,6 +671,89 @@ struct AnalysisView: View {
         return "Thinking"
     }
 
+    // MARK: Stepping through
+
+    /// Back to the start, a move back, play the best line, a move ahead.
+    private var stepper: some View {
+        HStack(spacing: 10) {
+            stepButton("backward.end.fill", label: "Back to the start", enabled: model.canGoBack) { model.rewind() }
+            stepButton("chevron.backward", label: "Move back", enabled: model.canGoBack) { model.back() }
+            Button {
+                if model.isPlayingLine { model.stopLine() } else { model.playLine() }
+            } label: {
+                Label(model.isPlayingLine ? "Pause" : "Play the line",
+                      systemImage: model.isPlayingLine ? "pause.fill" : "play.fill")
+                    .font(.app(.subheadline, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .contentTransition(.symbolEffect(.replace))
+            }
+            .buttonStyle(.bordered)
+            .disabled(!model.isPlayingLine && !model.canPlayLine)
+            .accessibilityHint("Plays the engine's best line out on the board, a move at a time")
+            stepButton("chevron.forward", label: "Move ahead", enabled: model.canGoForward) { model.forward() }
+        }
+    }
+
+    private func stepButton(_ symbol: String, label: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.app(.body, weight: .semibold))
+                .frame(width: 48, height: 44)
+        }
+        .buttonStyle(.bordered)
+        .disabled(!enabled)
+        .accessibilityLabel(label)
+    }
+
+    /// The moves made on the board, to jump back to; or how to make one.
+    @ViewBuilder
+    private var madeMoves: some View {
+        let made = model.movesMade
+        if made.isEmpty {
+            Text(model.ending == nil
+                 ? "Tap a piece to move it and see the best answer, or tap Play the line to watch the best moves play out."
+                 : "Go back to try another move.")
+                .font(.app(.footnote))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            ScrollViewReader { reader in
+                ScrollView(.horizontal) {
+                    HStack(spacing: 6) {
+                        moveChip("Start", on: model.cursor == 0, ahead: false, id: -1) { model.rewind() }
+                        ForEach(made, id: \.index) { move in
+                            moveChip(move.label, on: model.cursor == move.index + 1, ahead: move.index >= model.cursor,
+                                     id: move.index) { model.jump(to: move.index) }
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+                .scrollIndicators(.hidden)
+                .onChange(of: model.cursor) { _, cursor in
+                    withAnimation(.snappy) { reader.scrollTo(cursor - 1, anchor: .center) }
+                }
+            }
+        }
+    }
+
+    private func moveChip(_ text: String, on: Bool, ahead: Bool, id: Int, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(text)
+                .font(.app(.subheadline, weight: on ? .semibold : .regular).monospacedDigit())
+                .foregroundStyle(on ? accent : (ahead ? Color.secondary.opacity(0.7) : Color.primary))
+                .padding(.horizontal, 10)
+                .frame(minHeight: 34)
+                .background {
+                    Capsule().fill(on ? accent.opacity(0.18) : Color.secondary.opacity(0.1))
+                }
+        }
+        .buttonStyle(.plain)
+        .id(id)
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+
     // MARK: The two lines
 
     @ViewBuilder
@@ -567,27 +761,35 @@ struct AnalysisView: View {
         if model.ending == nil {
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(Array(model.lines.prefix(2).enumerated()), id: \.offset) { index, line in
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 8) {
-                            ArrowSample(color: index == 0 ? theme.bestArrow : theme.secondArrow, dashed: index != 0)
-                            Text(index == 0 ? "Best" : "Next best")
-                                .font(.app(.subheadline))
-                                .foregroundStyle(.secondary)
-                            if index < model.hints.count {
-                                Text(model.hints[index].san)
-                                    .font(.app(.headline))
+                    Button {
+                        if let uci = line.firstMove { model.play(uci, fromLine: true) }
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 8) {
+                                ArrowSample(color: index == 0 ? theme.bestArrow : theme.secondArrow, dashed: index != 0)
+                                Text(index == 0 ? "Best" : "Next best")
+                                    .font(.app(.subheadline))
+                                    .foregroundStyle(.secondary)
+                                if index < model.hints.count {
+                                    Text(model.hints[index].san)
+                                        .font(.app(.headline))
+                                }
+                                Spacer()
+                                Text(scoreLabel(line))
+                                    .font(.app(.subheadline, weight: .semibold).monospacedDigit())
+                                    .foregroundStyle(.secondary)
                             }
-                            Spacer()
-                            Text(scoreLabel(line))
-                                .font(.app(.subheadline, weight: .semibold).monospacedDigit())
+                            Text(model.readable(line))
+                                .font(.app(.footnote))
                                 .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
-                        Text(model.readable(line))
-                            .font(.app(.footnote))
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
+                        .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
                     .accessibilityElement(children: .combine)
+                    .accessibilityHint("Plays this move on the board")
                 }
                 HStack(spacing: 8) {
                     if model.isThinking {
@@ -598,7 +800,7 @@ struct AnalysisView: View {
                         Text("The engine didn't answer. Go back and try again.")
                     } else if model.depth > 0 {
                         Image(systemName: "checkmark.seal.fill").foregroundStyle(accent)
-                        Text("Checked by Stockfish 17")
+                        Text("Checked by Stockfish 17. Tap a line to play its move.")
                     }
                 }
                 .font(.app(.footnote))
@@ -612,6 +814,52 @@ struct AnalysisView: View {
 
     private func scoreLabel(_ line: EngineLine) -> String {
         (model.draft.sideToMove == .white ? line.evaluation : line.evaluation.flipped).label
+    }
+}
+
+/// Over the analysis of a photo: the photo to compare with, what the reader wasn't sure of,
+/// and the way to fix a piece it got wrong (Alex, 2026-11-06: "maybe have an option somewhere
+/// to add pieces after analyze").
+private struct PhotoSourceRow: View {
+    let photo: UIImage
+    let doubts: String?
+    let theme: BoardTheme
+    let onShowPhoto: () -> Void
+    let onEdit: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button(action: onShowPhoto) {
+                Image(uiImage: photo)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 40, height: 40)
+                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Show your photo")
+            VStack(alignment: .leading, spacing: 2) {
+                Text("From your photo")
+                    .font(.app(.subheadline, weight: .semibold))
+                if let doubts {
+                    Text(doubts)
+                        .font(.app(.footnote))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 0)
+            Button(action: onEdit) {
+                Label("Edit pieces", systemImage: "square.and.pencil")
+                    .font(.app(.subheadline, weight: .semibold))
+                    .lineLimit(1)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .accessibilityHint("Move, add or take off pieces, or change whose turn it is, then analyze again")
+        }
+        .padding(10)
+        .background(Panel(theme: theme, highlight: doubts == nil ? nil : Color(hex: 0xFF9A3C)))
     }
 }
 

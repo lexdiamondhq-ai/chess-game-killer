@@ -18,10 +18,11 @@ enum GameSound: String, CaseIterable {
     /// The chime as the app opens.
     case welcome
 
-    /// Evens out the generated files, which come out at different loudness. The wooden
-    /// knocks sit a little under full volume; a capture lands slightly harder than a move,
-    /// and check (its file raised 3 dB) a touch above a move. The endings sit only a little
-    /// above the knocks, so the end of a game is never a jolt.
+    /// Sets how the sounds sit against each other. The wooden knocks sit a little under full
+    /// volume; a capture lands slightly harder than a move, and check (its file raised 3 dB)
+    /// a touch above a move. The longer cues' files are all made the same loudness
+    /// (-16 LUFS, scripts/make_sounds.py), so these alone place them: the endings only a
+    /// little above the knocks, so the end of a game is never a jolt, and the welcome softest.
     var volume: Float {
         switch self {
         case .move: return 0.75
@@ -29,9 +30,9 @@ enum GameSound: String, CaseIterable {
         case .capture: return 0.9
         case .check: return 1.0
         case .castle: return 0.75
-        case .win: return 0.3
-        case .gameOver: return 0.25
-        case .victory: return 0.4
+        case .win: return 0.7
+        case .gameOver: return 0.6
+        case .victory: return 0.7
         case .welcome: return 0.4
         }
     }

@@ -297,6 +297,50 @@ final class SculptedSnapshotTests: XCTestCase {
         return (scene, window)
     }
 
+    /// A puzzle's marks on the 3D board, tilted and flat from above: the coach's green arrow up
+    /// the empty a-file reads green in its middle, with a dashed blue one, a yellow square and a
+    /// red one beside it.
+    func testCoachArrowsAndSquares() throws {
+        let position = try XCTUnwrap(Position(fen: "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1"))
+        for framing in [SculptedCamera.Framing.standing, .seated] {
+            var state = SculptedBoardState(pieces: position.pieces.map { PlacedPiece(id: $0.square.rawValue, piece: $0) })
+            state.framing = framing
+            state.coachArrows = [SculptedCoachArrow(from: .a1, to: .a8, color: 0x2E9E48),
+                                 SculptedCoachArrow(from: .g1, to: .e3, color: 0x2F74E0, dashed: true)]
+            state.coachMarks = [SculptedCoachMark(square: .a8, color: 0xE9A800), SculptedCoachMark(square: .f7, color: 0xD93636)]
+            let (scene, window) = try stage(state)
+            let image = scene.snapshot()
+            try save(image, "coach-3d-\(framing == .standing ? "tilted" : "flat")")
+            // Halfway up the a-file, between a4 and a5, where nothing stands.
+            let point = scene.camera.screenPoint(SIMD3(-3.5, 0, 0), in: scene.view.bounds.size)
+            let pixel = try XCTUnwrap(Self.color(of: image, at: point, in: scene.view.bounds.size))
+            XCTAssertGreaterThan(pixel.green, pixel.red + 0.15, "\(framing): \(pixel)")
+            XCTAssertGreaterThan(pixel.green, pixel.blue + 0.1, "\(framing): \(pixel)")
+            window.isHidden = true
+        }
+    }
+
+    /// The color of the picture at a point of a view of `size`, each part from 0 to 1.
+    private static func color(of image: UIImage, at point: CGPoint, in size: CGSize) -> (red: CGFloat, green: CGFloat, blue: CGFloat)? {
+        guard let cg = image.cgImage, size.width > 0, size.height > 0 else { return nil }
+        let x = Int(point.x / size.width * CGFloat(cg.width))
+        let y = Int(point.y / size.height * CGFloat(cg.height))
+        guard x >= 0, y >= 0, x < cg.width, y < cg.height, let one = cg.cropping(to: CGRect(x: x, y: y, width: 1, height: 1)) else {
+            return nil
+        }
+        var bytes = [UInt8](repeating: 0, count: 4)
+        let drawn = bytes.withUnsafeMutableBytes { buffer -> Bool in
+            guard let context = CGContext(data: buffer.baseAddress, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                                          space: CGColorSpaceCreateDeviceRGB(),
+                                          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            context.draw(one, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+            return true
+        }
+        guard drawn else { return nil }
+        let alpha = max(CGFloat(bytes[3]) / 255, 0.001)
+        return (CGFloat(bytes[0]) / 255 / alpha, CGFloat(bytes[1]) / 255 / alpha, CGFloat(bytes[2]) / 255 / alpha)
+    }
+
     /// A square piece of the picture, by fractions of its size, at full resolution.
     private func crop(_ image: UIImage, x: CGFloat, y: CGFloat, side: CGFloat) -> UIImage {
         guard let cg = image.cgImage else { return image }
