@@ -80,13 +80,28 @@ enum RivalIntros {
 struct RivalLadder {
     /// Lowercased names of every opponent beaten.
     let beatenNames: Set<String>
+    /// Every rival open, no climb: Premium players, and the app's own test builds (Alex,
+    /// 2026-11-08: "should we open it all to premium users?").
+    var allOpen = false
 
-    init(beatenNames: Set<String>) {
+    init(beatenNames: Set<String>, allOpen: Bool = false) {
         self.beatenNames = beatenNames
+        self.allOpen = allOpen
     }
 
     init(defaults: UserDefaults = .standard) {
-        self.init(beatenNames: RivalBoardsEarned.names(defaults))
+        self.init(beatenNames: RivalBoardsEarned.names(defaults), allOpen: Self.opensEverything(defaults))
+    }
+
+    /// Premium (remembered at launch, as Premium itself reads it) opens every rival. Debug
+    /// builds put on the phone from the Mac do too, so every rival can be tried; tests don't.
+    static func opensEverything(_ defaults: UserDefaults) -> Bool {
+        if defaults.bool(forKey: Premium.activeKey) { return true }
+        #if DEBUG
+        return ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil
+        #else
+        return false
+        #endif
     }
 
     /// The first rival that must be beaten before the next one opens: the Cub, so every rival
@@ -100,7 +115,7 @@ struct RivalLadder {
     }
 
     func isOpen(_ level: MatchController.Level) -> Bool {
-        guard level.rawValue > Self.gate.rawValue,
+        guard !allOpen, level.rawValue > Self.gate.rawValue,
               let previous = MatchController.Level(rawValue: level.rawValue - 1) else { return true }
         return beaten(previous.rival)
     }

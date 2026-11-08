@@ -14,6 +14,17 @@ final class RivalLadderTests: XCTestCase {
         XCTAssertEqual(ladder.current, .beginner)
     }
 
+    func testPremiumOpensEveryRival() throws {
+        let ladder = RivalLadder(beatenNames: [], allOpen: true)
+        for level in MatchController.Level.allCases { XCTAssertTrue(ladder.isOpen(level)) }
+        XCTAssertEqual(ladder.current, .beginner)
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "RivalLadderPremium"))
+        defaults.removePersistentDomain(forName: "RivalLadderPremium")
+        XCTAssertFalse(RivalLadder(defaults: defaults).isOpen(.grandmaster))
+        defaults.set(true, forKey: Premium.activeKey)
+        XCTAssertTrue(RivalLadder(defaults: defaults).isOpen(.grandmaster))
+    }
+
     func testBeatingTheCubOpensTheHunterOnly() {
         let ladder = RivalLadder(beatenNames: ["the cub"])
         XCTAssertTrue(ladder.isOpen(.casual))
