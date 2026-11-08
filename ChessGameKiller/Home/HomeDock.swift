@@ -338,17 +338,16 @@ struct HomeJewelGold: View {
     }
 }
 
-/// The jewel's shortcuts under the rivals, in the order they show, four to a row: the ways to
-/// a game first (a person online, a friend, Today's Move, puzzles), then the ways to look
-/// closer (Analyze, the coach, your games). Alex asked for more in it, Analyze among them, and
-/// then for one Analyze, not several (2026-11-06): a photo, a screenshot or the camera all
-/// start inside it.
+/// Rooms, from the bar or a hold on the gold knight: only the ways to a game that the Today
+/// page doesn't already hold (Alex, 2026-11-08: "Lets go with all"). A person online, a friend,
+/// a new game on your own side and clock, and your games. Today's Move, Puzzles, Analyze and
+/// the coach live on Today, so they are not repeated here.
 enum HomeShortcutKind: String, CaseIterable, Identifiable {
-    case online, friend, dailyMove, puzzles, analyze, train, games
+    case online, friend, newGame, games
 
     var id: String { rawValue }
 
-    /// What the jewel offers: Online and A friend only when the app can reach other players.
+    /// What Rooms offers: Online and A friend only when the app can reach other players.
     static func list(online: Bool) -> [HomeShortcutKind] {
         online ? allCases : allCases.filter { !$0.needsOnline }
     }
@@ -359,10 +358,7 @@ enum HomeShortcutKind: String, CaseIterable, Identifiable {
         switch self {
         case .online: return "Online"
         case .friend: return "A friend"
-        case .dailyMove: return "Today's Move"
-        case .puzzles: return "Puzzles"
-        case .analyze: return "Analyze"
-        case .train: return "Train"
+        case .newGame: return "New game"
         case .games: return "Your games"
         }
     }
@@ -371,10 +367,7 @@ enum HomeShortcutKind: String, CaseIterable, Identifiable {
         switch self {
         case .online: return Glyphs.online
         case .friend: return Glyphs.challenge
-        case .dailyMove: return Glyphs.today
-        case .puzzles: return Glyphs.puzzles
-        case .analyze: return Glyphs.analyze
-        case .train: return Glyphs.coach
+        case .newGame: return Glyphs.play
         case .games: return Glyphs.games
         }
     }
@@ -383,10 +376,7 @@ enum HomeShortcutKind: String, CaseIterable, Identifiable {
         switch self {
         case .online: return "Play someone at your level now"
         case .friend: return "Send a friend a game by link"
-        case .dailyMove: return "The puzzle of the day"
-        case .puzzles: return "Rated puzzles at your level"
-        case .analyze: return "The best moves for a photo, a screenshot or any position"
-        case .train: return "Lessons, drills and today's session"
+        case .newGame: return "Pick your side, clock and rival"
         case .games: return "Look back at the games you've played"
         }
     }

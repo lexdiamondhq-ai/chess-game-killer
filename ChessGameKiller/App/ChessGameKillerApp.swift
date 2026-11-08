@@ -11,6 +11,7 @@ struct ChessGameKillerApp: App {
     init() {
         LookIntroduction.applyOnce()
         HintsIntroduction.applyOnce()
+        HomeLayouts.settle()
         showcase = Showcase.fromLaunchArguments()
         // A tapped daily reminder opens Today's Move.
         UNUserNotificationCenter.current().delegate = DailyNotificationDelegate.shared

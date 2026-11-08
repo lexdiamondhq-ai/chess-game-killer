@@ -20,10 +20,7 @@ struct SettingsSheet: View {
     @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.auto
     @AppStorage(Heirloom.settingKey) private var heirloomOn = true
     @AppStorage(BoardTheme.coordinatesKey) private var coordinatesOn = true
-    @AppStorage(HomeScreen.key) private var homeScreen = HomeScreen.defaultOn
-    @AppStorage(HomeLayout.key) private var boardSheet = HomeLayout.defaultOn
     @AppStorage(HomeToneMode.key) private var homeTone = HomeToneMode.defaultMode
-    @AppStorage(HomeStageLayout.key) private var stageHome = HomeStageLayout.defaultOn
     /// Shared with the lessons' speaker button and the highlight reel.
     @AppStorage("coachVoiceMuted") private var voiceMuted = false
     /// Out loud with the ring switch on silent. Read by CoachVoice when a lesson, reel or Leo's reply starts.
@@ -49,23 +46,18 @@ struct SettingsSheet: View {
 
                     PremiumSettingsCard(theme: theme) { showingPremium = true }
 
-                    if boardSheet || stageHome {
-                        // Light or dark lives here, not on the Today screen (Alex, 2026-11-07).
-                        section("Appearance") {
-                            SettingsGroup(theme: theme) {
-                                PickerRow(title: "Light or dark", subtitle: homeTone.blurb, symbol: "circle.lefthalf.filled", theme: theme) {
-                                    Picker("Light or dark", selection: $homeTone) {
-                                        ForEach(HomeToneMode.allCases) { mode in
-                                            Text(mode.title).tag(mode)
-                                        }
+                    // Light or dark lives here, not on the Today screen (Alex, 2026-11-07), and the
+                    // app icon sits with it (Alex, 2026-11-08).
+                    section("Appearance") {
+                        SettingsGroup(theme: theme) {
+                            PickerRow(title: "Light or dark", subtitle: homeTone.blurb, symbol: "circle.lefthalf.filled", theme: theme) {
+                                Picker("Light or dark", selection: $homeTone) {
+                                    ForEach(HomeToneMode.allCases) { mode in
+                                        Text(mode.title).tag(mode)
                                     }
                                 }
                             }
-                        }
-                    }
-
-                    section("App icon") {
-                        SettingsGroup(theme: theme) {
+                            rule
                             AppIconPicker(accent: accent)
                         }
                     }
@@ -102,15 +94,8 @@ struct SettingsSheet: View {
                             rule
                             ToggleRow(title: "Big Board", subtitle: "The board fills the screen. Swipe up from the bottom for the tools, sideways on the board to replay moves.",
                                       symbol: "arrow.up.left.and.arrow.down.right", isOn: $bigBoard, theme: theme)
-                            rule
-                            ToggleRow(title: "Home screen", subtitle: "Open on a home page: the board up top, your week, and every mode one tap away.",
-                                      symbol: "house", isOn: $homeScreen, theme: theme)
-                            rule
-                            ToggleRow(title: "Stage home", subtitle: "Your board lit on a stage, a deck of cards for what's next, and a floating tab bar, in light or dark. Your game's board doesn't change.",
-                                      symbol: "sparkles", isOn: $stageHome, theme: theme)
-                            rule
-                            ToggleRow(title: "Board and sheet", subtitle: "The 3D board stays on top and one glass sheet holds the rest, at home and in a game. Off brings back the tiles and the floating dock.",
-                                      symbol: "rectangle.bottomhalf.inset.filled", isOn: $boardSheet, theme: theme)
+                            // The switches for the earlier homes are gone (Alex, 2026-11-08): the
+                            // app has one home. HomeLayouts.settle() puts anyone who turned them off back.
                         }
                     }
 
@@ -139,6 +124,18 @@ struct SettingsSheet: View {
                                     }
                                 }
                             }
+                            // The coach's voice, with the coach (Alex, 2026-11-08), not under Sound & feel.
+                            rule
+                            ToggleRow(title: "Coach's voice", subtitle: "\(Coach.current.name) reads lessons and highlight reels aloud. Captions always show.",
+                                      symbol: "waveform", isOn: Binding(get: { !voiceMuted }, set: { voiceMuted = !$0 }), theme: theme)
+                            rule
+                            ToggleRow(title: "Speak on silent", subtitle: "Lessons, reels and Talk It Through play out loud even with the ring switch on silent. Off, the coach goes quiet with it, like the game's sounds.",
+                                      symbol: "bell.slash.fill", isOn: $speaksOnSilent, theme: theme)
+                                .disabled(voiceMuted)
+                            rule
+                            ToggleRow(title: "Voice reactions", subtitle: reactionsSubtitle,
+                                      symbol: "bubble.left.and.text.bubble.right.fill", isOn: $reactionsOn, theme: theme)
+                                .disabled(voiceMuted)
                         }
                     }
 
@@ -170,17 +167,6 @@ struct SettingsSheet: View {
                             rule
                             ToggleRow(title: "Rival banter", subtitle: "Rivals talk to you during the game.",
                                       symbol: "bubble.left.fill", isOn: $banterOn, theme: theme)
-                            rule
-                            ToggleRow(title: "Coach's voice", subtitle: "\(Coach.current.name) reads lessons and highlight reels aloud. Captions always show.",
-                                      symbol: "waveform", isOn: Binding(get: { !voiceMuted }, set: { voiceMuted = !$0 }), theme: theme)
-                            rule
-                            ToggleRow(title: "Speak on silent", subtitle: "Lessons, reels and Talk It Through play out loud even with the ring switch on silent. Off, the coach goes quiet with it, like the game's sounds.",
-                                      symbol: "bell.slash.fill", isOn: $speaksOnSilent, theme: theme)
-                                .disabled(voiceMuted)
-                            rule
-                            ToggleRow(title: "Voice reactions", subtitle: reactionsSubtitle,
-                                      symbol: "bubble.left.and.text.bubble.right.fill", isOn: $reactionsOn, theme: theme)
-                                .disabled(voiceMuted)
                         }
                     }
 
