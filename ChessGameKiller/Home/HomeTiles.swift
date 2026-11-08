@@ -806,6 +806,15 @@ struct HomeRivalPortrait: View {
     let size: CGFloat
 
     var body: some View {
+        if rival.coinName != nil {
+            // The coins are already struck in the home's own bronze, silver and gold.
+            RivalCoin(rival: rival, size: size)
+        } else {
+            printed
+        }
+    }
+
+    private var printed: some View {
         Image(rival.portraitName)
             .resizable()
             .scaledToFill()

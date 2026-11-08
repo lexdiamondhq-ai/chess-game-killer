@@ -27,6 +27,8 @@ struct RewindView: View {
     /// The ply the line plays from; moving anywhere else on the game's line ends it.
     @State private var ghostAnchor: Int?
     @AppStorage(ReviewLevel.storageKey) private var levelID = ReviewLevel.club.rawValue
+    @AppStorage("sculpted3D") private var sculpted3D = true
+    @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.auto
     private let engine: ChessEngine?
     private let opensLine: Bool
     @State private var chance: SecondChance?
@@ -67,8 +69,7 @@ struct RewindView: View {
                 let side = min(geo.size.width - TrainingBoardView.sideRoom, geo.size.height * 0.46, 620)
                 VStack(spacing: 0) {
                     header
-                    board
-                        .frame(width: side, height: side)
+                    board(side: side)
                         .padding(.top, 8)
                     Lifeline(game: game, ply: $ply, ghost: ghostBranch, dotFill: theme.screenIsDark ? Color(hex: 0x101114) : .white) { moment in
                         jump(to: moment)
@@ -152,7 +153,7 @@ struct RewindView: View {
                 levelMenu(explorer)
             } else {
                 VStack(spacing: 2) {
-                    Text("Rewind · vs \(game.opponent)")
+                    Text("Rewind · vs \(game.opponentShown)")
                         .font(.app(.caption2, weight: .semibold))
                         .tracking(2.5)
                         .textCase(.uppercase)
@@ -176,10 +177,10 @@ struct RewindView: View {
                     .minimumScaleFactor(0.8)
                     .frame(minHeight: 44)
                     .tint(.primary)
-                    .accessibilityLabel("Rematch \(game.opponent)")
-                    .confirmationDialog("Leave your game against \(forfeits ?? game.opponent)?",
+                    .accessibilityLabel("Rematch \(game.opponentShown)")
+                    .confirmationDialog("Leave your game against \(forfeits ?? game.opponentShown)?",
                                         isPresented: $confirmingRematch, titleVisibility: .visible) {
-                        Button("Resign and play \(game.opponent)", role: .destructive) { onPlayAgain(game) }
+                        Button("Resign and play \(game.opponentShown)", role: .destructive) { onPlayAgain(game) }
                         Button("Keep playing", role: .cancel) {}
                     } message: {
                         Text("It counts as a loss for your army.")
@@ -227,74 +228,129 @@ struct RewindView: View {
 
     // MARK: Board
 
-    private var board: some View {
-        let fen: String
+    /// The board as everywhere else in the app: the real 3D board, tilted with the pieces standing
+    /// or flat from above, edge to edge with the Tilted / Flat switch under it, when the look has one
+    /// and 3D pieces are on; otherwise the flat board, with room above it for the tall pieces.
+    @ViewBuilder
+    private func board(side: CGFloat) -> some View {
+        let shown = shownPosition
+        if BoardView.playsIn3D(theme, setting: sculpted3D) {
+            let width = DrillBoard.width3D(side: side)
+            let framing = tilt.framing(bigBoard: false)
+            VStack(spacing: 6) {
+                SculptedPositionBoard(
+                    pieces: (PositionDraft(fen: shown.fen) ?? .standard).pieces,
+                    theme: theme,
+                    flipped: !game.playerIsWhite,
+                    hints: shown.hints,
+                    selected: explorer?.selected,
+                    marks: stoneMarks(shown),
+                    onTap: shown.onTap,
+                    framing: framing
+                )
+                .overlay { promotionPicker }
+                .frame(width: width, height: DrillBoard.height3D(side: width, framing: framing))
+                HStack {
+                    Spacer(minLength: 0)
+                    BoardViewSwitch(theme: theme)
+                }
+                .frame(width: side)
+            }
+        } else {
+            PositionBoard(
+                draft: PositionDraft(fen: shown.fen) ?? .standard,
+                theme: theme,
+                flipped: !game.playerIsWhite,
+                hints: shown.hints,
+                onTap: shown.onTap,
+                tints: shown.lit.mapValues { Color(hex: $0.color).opacity($0.opacity) },
+                ghosts: shown.ghosts,
+                ghostColor: RewindPalette.gold
+            )
+            .overlay { promotionPicker }
+            .animation(.easeInOut(duration: 0.35), value: shown.fen)
+            .frame(width: side, height: side)
+            .boardHeadroom(theme: theme, side: side)
+        }
+    }
+
+    /// A pawn of the player's own reaching the last rank: they choose what it becomes.
+    /// A tap beside the pieces leaves the pawn where it was.
+    @ViewBuilder
+    private var promotionPicker: some View {
+        if let explorer, let promotion = explorer.promoting {
+            GeometryReader { geo in
+                PromotionPicker(
+                    color: promotion.color, theme: theme,
+                    squareSize: min(geo.size.width / 8, geo.size.height / 6),
+                    cancel: { withAnimation(.snappy(duration: 0.2)) { explorer.cancelPromotion() } },
+                    choose: { kind in
+                        stopAutoplay()
+                        withAnimation(.snappy(duration: 0.2)) { explorer.promote(to: kind) }
+                    }
+                )
+            }
+            .transition(.opacity)
+        }
+    }
+
+    /// The lit squares as marks on the 3D board's stone, in a steady order; the piece picked up
+    /// is the board's own selection.
+    private func stoneMarks(_ shown: ShownPosition) -> [SculptedCoachMark] {
+        let marks: [SculptedCoachMark] = shown.lit.compactMap { square, light in
+            square == explorer?.selected ? nil : SculptedCoachMark(square: square, color: light.color)
+        }
+        return marks.sorted { $0.square.notation < $1.square.notation }
+    }
+
+    /// What the board shows: the game at the ply, its moment's squares lit in the moment's color,
+    /// or the better line being walked, with its next move and the other side's best try.
+    private struct ShownPosition {
+        var fen: String
         var hints: [MoveHint] = []
-        var tints: [Square: Color] = [:]
+        /// Squares lit, in 0xRRGGBB, and how strongly on the flat board.
+        var lit: [Square: (color: UInt32, opacity: Double)] = [:]
+        /// The line's pieces, drawn see-through on the flat board.
         var ghosts: Set<Square> = []
         var onTap: ((Square) -> Void)?
+    }
+
+    private var shownPosition: ShownPosition {
         if let explorer {
-            fen = explorer.fen
-            ghosts = explorer.ghostSquares
+            var shown = ShownPosition(fen: explorer.fen, ghosts: explorer.ghostSquares)
             if let current = explorer.current, let squares = Notation.squares(of: current.uci) {
-                tints[squares.from] = RewindPalette.gold.opacity(0.24)
+                shown.lit[squares.from] = (RewindPalette.goldHex, 0.24)
             }
             // The line's next move, and the other side's best tries beside it.
             if let next = explorer.next, let squares = Notation.squares(of: next.uci) {
-                hints.append(MoveHint(rank: 0, from: squares.from, to: squares.to, san: next.san,
-                                      uci: next.uci, evaluation: .centipawns(0)))
+                shown.hints.append(MoveHint(rank: 0, from: squares.from, to: squares.to, san: next.san,
+                                            uci: next.uci, evaluation: .centipawns(0)))
             }
             if let branch = explorer.branches.first, let first = branch.moves.first, let squares = Notation.squares(of: first) {
-                hints.append(MoveHint(rank: 1, from: squares.from, to: squares.to, san: branch.san,
-                                      uci: first, evaluation: branch.evaluation))
+                shown.hints.append(MoveHint(rank: 1, from: squares.from, to: squares.to, san: branch.san,
+                                            uci: first, evaluation: branch.evaluation))
             }
             if let selected = explorer.selected {
-                tints[selected] = RewindPalette.gold.opacity(0.5)
+                shown.lit[selected] = (RewindPalette.goldHex, 0.5)
             }
-            onTap = { square in
+            shown.onTap = { square in
                 stopAutoplay()
                 explorer.tap(square)
             }
-        } else {
-            fen = game.positions[min(ply, game.positions.count - 1)]
-            if let focused, let squares = Notation.squares(of: focused.uci) {
-                let color = RewindPalette.color(for: focused, rewritten: game.rewritten.contains(focused.ply))
-                if focused.ply == ply + 1 {
-                    // Before the move: where it went from, ringed.
-                    tints[squares.from] = color.opacity(0.32)
-                } else {
-                    tints[squares.from] = color.opacity(0.22)
-                    tints[squares.to] = color.opacity(0.38)
-                }
+            return shown
+        }
+        var shown = ShownPosition(fen: game.positions[min(ply, game.positions.count - 1)])
+        if let focused, let squares = Notation.squares(of: focused.uci) {
+            let color = RewindPalette.hex(for: focused, rewritten: game.rewritten.contains(focused.ply))
+            if focused.ply == ply + 1 {
+                // Before the move: where it went from, ringed.
+                shown.lit[squares.from] = (color, 0.32)
+            } else {
+                shown.lit[squares.from] = (color, 0.22)
+                shown.lit[squares.to] = (color, 0.38)
             }
         }
-        return PositionBoard(
-            draft: PositionDraft(fen: fen) ?? .standard,
-            theme: theme,
-            flipped: !game.playerIsWhite,
-            hints: hints,
-            onTap: onTap,
-            tints: tints,
-            ghosts: ghosts,
-            ghostColor: RewindPalette.gold
-        )
-        .overlay {
-            // A pawn of the player's own reaching the last rank: they choose what it becomes.
-            if let explorer, let promotion = explorer.promoting {
-                GeometryReader { geo in
-                    PromotionPicker(
-                        color: promotion.color, theme: theme, squareSize: geo.size.width / 8,
-                        cancel: { withAnimation(.snappy(duration: 0.2)) { explorer.cancelPromotion() } },
-                        choose: { kind in
-                            stopAutoplay()
-                            withAnimation(.snappy(duration: 0.2)) { explorer.promote(to: kind) }
-                        }
-                    )
-                }
-                .transition(.opacity)
-            }
-        }
-        .animation(.easeInOut(duration: 0.35), value: fen)
+        return shown
     }
 
     private var ghostBranch: (ply: Int, value: Double)? {

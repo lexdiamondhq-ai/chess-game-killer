@@ -233,8 +233,8 @@ final class ArmyTests: XCTestCase {
         let name = store.record(for: .kingsKnight).name
         XCTAssertNotNil(name)
         XCTAssertEqual(hero.name, name)
-        XCTAssertEqual(hero.line, "\(name ?? "") took the 1600s' queen.")
-        // The honor's 5 XP as this game counted it: half as much again against The 1600s.
+        XCTAssertEqual(hero.line, "\(name ?? "") took the Berserker's queen.")
+        // The honor's 5 XP as this game counted it: half as much again against the Berserker.
         XCTAssertEqual(hero.xp, 8)
         XCTAssertEqual(store.record(for: .kingsKnight).honors, 1)
         XCTAssertEqual(store.record(for: .ePawn).honors, 0)
@@ -281,10 +281,10 @@ final class ArmyTests: XCTestCase {
         XCTAssertEqual(store.record(for: .dPawn).nemesis?.level, .expert)
         let grudge = store.grudge(against: .expert)
         XCTAssertEqual(grudge?.slot, .dPawn)
-        XCTAssertEqual(grudge?.kind, .grudge(rival: "The 2000s", times: 3))
+        XCTAssertEqual(grudge?.kind, .grudge(rival: "The Lionheart", times: 3))
         // Mid-sentence, a piece without a name is "your d-pawn".
         let name = store.record(for: .dPawn).name ?? "your \(ArmySlot.dPawn.title.lowercased())"
-        XCTAssertEqual(grudge?.headline, "The 2000s have taken \(name) three times.")
+        XCTAssertEqual(grudge?.headline, "The Lionheart has taken \(name) three times.")
         XCTAssertNil(store.grudge(against: .beginner))
     }
 
@@ -309,11 +309,11 @@ final class ArmyTests: XCTestCase {
         let news = store.record(game.ledger!, playerColor: .white, won: true, stakes: vector)
         let pawn = store.record(for: .dPawn)
         XCTAssertTrue(pawn.revenge.contains(MatchController.Level.expert.rawValue))
-        XCTAssertTrue(news.contains { $0.slot == .dPawn && $0.kind == .revenge(rival: "The 2000s") })
+        XCTAssertTrue(news.contains { $0.slot == .dPawn && $0.kind == .revenge(rival: "The Lionheart") })
         XCTAssertEqual(news.first { $0.slot == .dPawn }?.label, "REVENGE")
-        // 1 game + 3 win + 2 survived + 2 for the pawn + 5 hero + 15 revenge, doubled against The 2000s.
+        // 1 game + 3 win + 2 survived + 2 for the pawn + 5 hero + 15 revenge, doubled against the Lionheart.
         XCTAssertEqual(pawn.xp - xpBefore, (1 + 3 + 2 + 2 + 5 + 15) * 2)
-        // Once avenged, The 2000s no longer opens with a grudge about it.
+        // Once avenged, the Lionheart no longer opens with a grudge about it.
         XCTAssertNil(store.grudge(against: .expert))
     }
 

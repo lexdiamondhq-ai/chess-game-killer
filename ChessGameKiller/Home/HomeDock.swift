@@ -338,17 +338,16 @@ struct HomeJewelGold: View {
     }
 }
 
-/// The jewel's shortcuts under the rivals, in the order they show, four to a row: the ways to
-/// a game first (a person online, a friend, Today's Move, puzzles), then the ways to look
-/// closer (Analyze, the coach, your games). Alex asked for more in it, Analyze among them, and
-/// then for one Analyze, not several (2026-11-06): a photo, a screenshot or the camera all
-/// start inside it.
+/// Rooms, from the bar or a hold on the gold knight: only the ways to a game that the Today
+/// page doesn't already hold (Alex, 2026-11-08: "Lets go with all"). A person online, a friend,
+/// a new game on your own side and clock, and your games. Today's Move, Puzzles, Analyze and
+/// the coach live on Today, so they are not repeated here.
 enum HomeShortcutKind: String, CaseIterable, Identifiable {
-    case online, friend, dailyMove, puzzles, analyze, train, games
+    case online, friend, newGame, games
 
     var id: String { rawValue }
 
-    /// What the jewel offers: Online and A friend only when the app can reach other players.
+    /// What Rooms offers: Online and A friend only when the app can reach other players.
     static func list(online: Bool) -> [HomeShortcutKind] {
         online ? allCases : allCases.filter { !$0.needsOnline }
     }
@@ -359,10 +358,7 @@ enum HomeShortcutKind: String, CaseIterable, Identifiable {
         switch self {
         case .online: return "Online"
         case .friend: return "A friend"
-        case .dailyMove: return "Today's Move"
-        case .puzzles: return "Puzzles"
-        case .analyze: return "Analyze"
-        case .train: return "Train"
+        case .newGame: return "New game"
         case .games: return "Your games"
         }
     }
@@ -371,10 +367,7 @@ enum HomeShortcutKind: String, CaseIterable, Identifiable {
         switch self {
         case .online: return Glyphs.online
         case .friend: return Glyphs.challenge
-        case .dailyMove: return Glyphs.today
-        case .puzzles: return Glyphs.puzzles
-        case .analyze: return Glyphs.analyze
-        case .train: return Glyphs.coach
+        case .newGame: return Glyphs.play
         case .games: return Glyphs.games
         }
     }
@@ -383,10 +376,7 @@ enum HomeShortcutKind: String, CaseIterable, Identifiable {
         switch self {
         case .online: return "Play someone at your level now"
         case .friend: return "Send a friend a game by link"
-        case .dailyMove: return "The puzzle of the day"
-        case .puzzles: return "Rated puzzles at your level"
-        case .analyze: return "The best moves for a photo, a screenshot or any position"
-        case .train: return "Lessons, drills and today's session"
+        case .newGame: return "Pick your side, clock and rival"
         case .games: return "Look back at the games you've played"
         }
     }
@@ -424,26 +414,46 @@ struct HomeShortcutsPanel: View {
     let shortcuts: [HomeShortcut]
     let playRival: (MatchController.Level) -> Void
     let close: () -> Void
+    /// Rooms on the Aurora home: no rivals here (they have their own row on the page, Alex
+    /// 2026-11-07), and a grabber in place of the jewel's cross; a drag down closes it.
+    var asRooms = false
 
     @AccessibilityFocusState private var titleFocused: Bool
+    @State private var drag: CGFloat = 0
     @ScaledMetric(relativeTo: .caption2) private var orb: CGFloat = 46
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Play a crowd")
-                .font(.app(.footnote, weight: .semibold))
-                .foregroundStyle(tone.ink2)
-                .padding(.leading, 4)
-                .accessibilityAddTraits(.isHeader)
-                .accessibilityFocused($titleFocused)
-            HStack(alignment: .top, spacing: 0) {
-                ForEach(Rival.all) { rival in
-                    rivalButton(rival)
+            if asRooms {
+                Capsule()
+                    .fill(tone.ink.opacity(0.25))
+                    .frame(width: 38, height: 4)
+                    .frame(maxWidth: .infinity)
+                    .padding(.bottom, 2)
+                    .accessibilityHidden(true)
+                Text("Rooms")
+                    .font(.system(size: 20, weight: .medium, design: .serif))
+                    .foregroundStyle(tone.ink)
+                    .padding(.leading, 6)
+                    .padding(.bottom, 4)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityFocused($titleFocused)
+            } else {
+                Text("Face a rival")
+                    .font(.app(.footnote, weight: .semibold))
+                    .foregroundStyle(tone.ink2)
+                    .padding(.leading, 4)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityFocused($titleFocused)
+                HStack(alignment: .top, spacing: 0) {
+                    ForEach(Rival.all) { rival in
+                        rivalButton(rival)
+                    }
                 }
+                HomeHairline(tone: tone)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 2)
             }
-            HomeHairline(tone: tone)
-                .padding(.horizontal, 4)
-                .padding(.vertical, 2)
             LazyVGrid(columns: Self.columns, spacing: 12) {
                 ForEach(shortcuts) { shortcut in
                     shortcutButton(shortcut)
@@ -454,6 +464,17 @@ struct HomeShortcutsPanel: View {
         .padding(.top, 14)
         .padding(.bottom, 12)
         .homePane(RoundedRectangle(cornerRadius: HomeMetrics.cardRadius, style: .continuous), tone: tone)
+        .offset(y: drag)
+        .gesture(DragGesture(minimumDistance: 8)
+            .onChanged { value in if asRooms { drag = max(0, value.translation.height) } }
+            .onEnded { value in
+                guard asRooms else { return }
+                if value.translation.height > 70 || value.predictedEndTranslation.height > 160 {
+                    close()
+                } else {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { drag = 0 }
+                }
+            })
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(.isModal)
@@ -461,27 +482,37 @@ struct HomeShortcutsPanel: View {
         .onAppear { titleFocused = true }
     }
 
+    /// Each rival's coin a little bigger than the one before, so the row climbs toward the
+    /// Ashen King.
+    private func coinSize(_ rival: Rival) -> CGFloat {
+        min(orb, 56) * (0.8 + 0.07 * CGFloat(rival.level.rawValue))
+    }
+
     private func rivalButton(_ rival: Rival) -> some View {
         let isNext = rival.level == next
-        let size: CGFloat = min(orb, 56)
+        let size = coinSize(rival)
         return Button { pick { playRival(rival.level) } } label: {
-            VStack(spacing: 5) {
-                Image(rival.glowName)
-                    .resizable()
-                    .interpolation(.high)
-                    .scaledToFit()
-                    .frame(width: size, height: size)
-                    .background {
+            VStack(spacing: 3) {
+                RivalCoin(rival: rival, size: size)
+                    .padding(2)
+                    .overlay {
+                        // The rival up next wears a gold ring.
                         if isNext {
                             Circle()
-                                .fill(RadialGradient(colors: [rival.light.opacity(0.34), rival.light.opacity(0)],
-                                                     center: .center, startRadius: 0, endRadius: size * 0.75))
-                                .frame(width: size * 1.5, height: size * 1.5)
+                                .strokeBorder(tone.metal, lineWidth: 1.5)
+                                .shadow(color: tone.metal.opacity(0.5), radius: 6)
                         }
                     }
+                    // The coins sit on one line however big they grow.
+                    .frame(height: coinSize(Rival.all[Rival.all.count - 1]) + 4, alignment: .bottom)
                 Text(rival.shortName)
                     .font(.app(.caption2, weight: .semibold))
-                    .foregroundStyle(isNext ? tone.ink : tone.ink2)
+                    .foregroundStyle(tone.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                Text(rival.elo.replacingOccurrences(of: "~", with: ""))
+                    .font(.app(.caption2).monospacedDigit())
+                    .foregroundStyle(tone.ink2)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }
@@ -612,7 +643,7 @@ struct HomeYouPanel: View {
                 HomeLinkRow(title: "Settings", detail: "Board look, sound, hints", tone: tone) { go(actions.settings) }
                 if let premium = actions.premium {
                     HomeHairline(tone: tone)
-                    HomeLinkRow(title: "Chess Game Killer Pro", detail: "Everything, with no limits", tone: tone) { go(premium) }
+                    HomeLinkRow(title: "Beauty of Chess Pro", detail: "Everything, with no limits", tone: tone) { go(premium) }
                 }
             }
         }
