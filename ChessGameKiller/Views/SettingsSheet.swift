@@ -61,6 +61,12 @@ struct SettingsSheet: View {
                         }
                     }
 
+                    section("App icon") {
+                        SettingsGroup(theme: theme) {
+                            AppIconPicker(accent: accent)
+                        }
+                    }
+
                     section("Board") {
                         themeGrid(Self.looks)
                         Text("Rival boards".uppercased())
