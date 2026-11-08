@@ -4,9 +4,9 @@ import SwiftUI
 /// The Aurora home (Alex's pick, 2026-11-07: "Spotlight" with "Bento" tiles). Your game is the
 /// hero: a clean flat board (the Gilded board with the app's cut-out pieces) under one serif
 /// line and a gold button; swipe sideways to your other games, the next one peeking at the
-/// right. Under it, tiles for your rating, streak, Today's Move, Coach Leo, Analyze and the
-/// masterpiece. The room is deep ink with a soft violet, rose and gold glow and fine gold
-/// engraved rings, or ivory by day. A glass tab bar with the gold knight beside it.
+/// right. Under it, rows for Today's Move, Puzzles, Coach Leo and the game of the day; Analyze
+/// is the gold knight in the bar (one button for it, Alex 2026-11-08). The room is deep ink
+/// with a soft violet, rose and gold glow and fine gold engraved rings, or ivory by day. A glass tab bar with the gold knight beside it.
 struct HomeAuroraInfo {
     var stage: HomeStageInfo
     /// Every game still going, your move first. Empty when none is.
@@ -93,16 +93,12 @@ struct HomeAuroraView: View {
     private var palette: HomeAuroraPalette { HomeAuroraPalette(dark: tone.scheme == .dark) }
     private var stage: HomeStageInfo { info.stage }
 
-    /// Your games (or the next game when none is going), then the move and the game of the day.
+    /// Your games, or the next game when none is going. Only games: Today's Move and the game
+    /// of the day are rows under For today (Alex, 2026-11-08).
     private var cards: [HomeAuroraGameCard] {
-        var all: [HomeAuroraGameCard] = info.games.isEmpty
+        info.games.isEmpty
             ? [HomeAuroraGameCard.next(stage.upNext, fen: stage.gameFEN)]
             : info.games.map(HomeAuroraGameCard.init)
-        all.append(HomeAuroraGameCard.today(stage.day, fen: stage.todayFEN, solver: stage.todaySolver))
-        if let masterpiece = stage.masterpiece {
-            all.append(HomeAuroraGameCard.masterpiece(masterpiece))
-        }
-        return all
     }
 
     var body: some View {
@@ -320,7 +316,8 @@ struct HomeAuroraView: View {
         return ScrollView(.horizontal) {
             LazyHStack(spacing: 12) {
                 ForEach(all) { card in
-                    HomeAuroraGameTile(card: card, palette: palette) { open(card) }
+                    HomeAuroraGameTile(card: card, palette: palette,
+                                       change: card.kind == .next ? actions.stage.change : nil) { open(card) }
                         .containerRelativeFrame(.horizontal) { width, _ in
                             all.count > 1 ? width - 72 : width - 32
                         }
@@ -388,10 +385,19 @@ struct HomeAuroraView: View {
                       accent: palette.teal, palette: palette, action: actions.stage.coach) {
             HomeAuroraEmblem(glyph: Glyphs.coach, fill: HomeAuroraPalette.tealTile)
         }
-        HomeAuroraRow(eyebrow: "Analyze", title: "Any position", detail: "A photo, a screenshot or a board you set up",
-                      accent: palette.gold, palette: palette, action: actions.stage.analyze) {
-            HomeAuroraEmblem(glyph: Glyphs.analyze, fill: HomeAuroraPalette.goldTile)
+        // Analyze is the gold knight, its one button on Home (Alex, 2026-11-08), so it has no
+        // row here. The game of the day, which the board up top plays, opens from its own row.
+        if let masterpiece = stage.masterpiece {
+            HomeAuroraRow(eyebrow: "Game of the day", title: masterpiece.title, detail: masterpiece.players,
+                          accent: palette.gold, palette: palette, action: openMasterpiece) {
+                HomeAuroraBoard(fen: masterpiece.frames.first, flipped: masterpiece.flipped, lit: false)
+            }
         }
+    }
+
+    /// The game of the day, in Analyze from its first position, ready to play through.
+    private func openMasterpiece() {
+        if let fen = stage.masterpiece?.frames.first { actions.stage.analyzePosition(fen) }
     }
 
     private var todayTitle: String {
@@ -439,7 +445,7 @@ struct HomeAuroraView: View {
         case .today:
             actions.stage.dailyMove()
         case .masterpiece:
-            if let fen = stage.masterpiece?.frames.first { actions.stage.analyzePosition(fen) }
+            openMasterpiece()
         }
     }
 }
@@ -448,6 +454,9 @@ struct HomeAuroraView: View {
 struct HomeAuroraGameTile: View {
     let card: HomeAuroraGameCard
     let palette: HomeAuroraPalette
+    /// The next game's card offers Change beside Play: it opens the New Game sheet, for your
+    /// side, clock and rival (Alex, 2026-11-08). Nil on every other card.
+    var change: (() -> Void)? = nil
     let action: () -> Void
 
     var body: some View {
@@ -503,6 +512,24 @@ struct HomeAuroraGameTile: View {
         }
         .buttonStyle(HomeStagePress())
         .accessibilityElement(children: .combine)
+        .overlay(alignment: .bottomTrailing) {
+            // On the same line as Play, at the card's right edge.
+            if let change {
+                Button(action: change) {
+                    Text("Change")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(palette.gold)
+                        .padding(.horizontal, 12)
+                        .frame(height: 30)
+                        .background(Capsule().strokeBorder(palette.gold.opacity(0.45), lineWidth: 1))
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(HomeStagePress())
+                .padding(12)
+                .accessibilityLabel("Change the next game")
+                .accessibilityHint("Pick your side, clock and rival")
+            }
+        }
     }
 }
 
@@ -787,8 +814,10 @@ struct HomeAuroraGameCard: Identifiable, Equatable {
         status = "Up next"
         headline = "\(upNext.rival.name) is ready\nwhen "
         headlineEnd = "you are"
-        button = "Play \(upNext.rival.name)"
-        tags = [upNext.timeControl.isTimed ? upNext.timeControl.name : "No clock"]
+        // The title names the rival; the button just plays, with Change beside it.
+        button = "Play"
+        tags = [upNext.timeControl.isTimed ? upNext.timeControl.name : "No clock",
+                upNext.playerColor == .black ? "You're Black" : "You're White"]
     }
 
     static func next(_ upNext: HomeUpNext, fen: String) -> HomeAuroraGameCard {

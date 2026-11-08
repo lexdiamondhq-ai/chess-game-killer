@@ -875,11 +875,7 @@ struct ContentView: View {
             } label: {
                 Label("Big Board", image: Glyphs.bigBoard)
             }
-            Button {
-                withAnimation(.snappy) { match.flipBoard() }
-            } label: {
-                Label("Flip board", image: Glyphs.flip)
-            }
+            // Flip is in the dock, so it isn't repeated here (Alex, 2026-11-08).
             Section {
                 Button {
                     showingGames = true

@@ -18,7 +18,7 @@ struct GamesDoorView: View {
     private static let recentCount = 3
 
     var body: some View {
-        TrainScreen(theme: theme, title: "Your games",
+        TrainScreen(theme: theme, title: "Chess DNA",
                     intro: "\(Coach.current.title) reads every move of your recent games and finds where the points go.") {
             // The full Chess DNA is Premium's; the top weakness below stays free.
             if let dna, dna.gamesRead > 0, Premium.shared.opens(.coachProfile) {

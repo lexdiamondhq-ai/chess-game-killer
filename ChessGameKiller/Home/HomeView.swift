@@ -519,8 +519,7 @@ struct HomeView: View {
         actions.start(MatchController.Setup(playerColor: side.color, level: level, timeControl: timeControl))
     }
 
-    /// The jewel's shortcuts under the rivals: Online and A friend (when the app has them),
-    /// Today's Move, Puzzles, Analyze, the coach and your games.
+    /// Rooms: Online and A friend (when the app has them), a new game and your games.
     private var shortcutList: [HomeShortcut] {
         let waiting: Int = challenges?.onlineWaiting ?? 0
         return HomeShortcutKind.list(online: challenges != nil).map { kind in
@@ -533,10 +532,7 @@ struct HomeView: View {
         switch kind {
         case .online: challenges?.playOnline()
         case .friend: challenges?.compose()
-        case .dailyMove: actions.dailyMove()
-        case .puzzles: actions.puzzles()
-        case .analyze: actions.analyze()
-        case .train: actions.train()
+        case .newGame: secondary(upNext)
         case .games: actions.rewind()
         }
     }

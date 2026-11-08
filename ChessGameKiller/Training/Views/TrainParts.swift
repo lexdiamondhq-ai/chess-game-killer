@@ -17,7 +17,7 @@ enum TrainDoor: String, CaseIterable, Identifiable, Hashable {
         case .openings: return "Openings"
         case .endgames: return "Endgames"
         case .calculation: return "Calculation"
-        case .games: return "Your games"
+        case .games: return "Chess DNA"
         }
     }
 
