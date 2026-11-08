@@ -68,8 +68,9 @@ def main():
     for name, want in expected.items():
         with open(os.path.join(folder, name), "rb") as f:
             image = f.read()
+        kind = "image/jpeg" if name.endswith(".jpg") else "image/png"
         request = urllib.request.Request(f"{url}/read", data=image, method="POST",
-                                         headers={**HEADERS, "Content-Type": "image/png"})
+                                         headers={**HEADERS, "Content-Type": kind})
         started = time.time()
         try:
             with urllib.request.urlopen(request, timeout=150) as response:
