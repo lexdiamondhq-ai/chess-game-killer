@@ -274,6 +274,10 @@ test("Vera answers as Vera, by the same rules as Leo", () => {
   assert.match(leo, /^You are Leo,/);
   assert.match(vera, /^You are Vera,/);
   assert.doesNotMatch(vera, /\bLeo\b/);
+  // Leo is the gentleman: courteous and unhurried. Vera keeps her own quick manner.
+  assert.match(leo, /cultured grandmaster/);
+  assert.match(leo, /shall we/);
+  assert.doesNotMatch(vera, /shall we/);
   // Everything after the persona is the same rules, word for word.
   const rules = (prompt) => prompt.slice(prompt.indexOf("Before moving"));
   assert.equal(rules(vera), rules(leo));

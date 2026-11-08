@@ -21,8 +21,8 @@ CLAUDE_TIMEOUT_MS = "12000"
 # The address is public, so these cap the bill.
 DAILY_TALKS = "400"
 DAILY_VOICE_CHARS = "40000"
-# Leo's voice on ElevenLabs: Trevor (a natural, conversational American, from the voice library), with the lessons' model, so he sounds the same.
-VOICE_ID = "69SAlwj2jajrSXUGnYAA"
+# Leo's voice on ElevenLabs: Frederick (a calm, velvety, well-spoken Englishman, from the voice library), with the lessons' model, so he sounds the same.
+VOICE_ID = "j9jfwdrw7BRfcR43Qohk"
 VOICE_MODEL = "eleven_v4"
 # Live Talk answers are read with ElevenLabs' Flash model, about half the cost per
 # character of the lessons' model, in the same voice. Remove to match the lessons exactly.
