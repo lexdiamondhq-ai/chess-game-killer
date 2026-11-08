@@ -80,7 +80,7 @@ struct CheckCalloutLayer: View {
     }
 
     /// Calls the check out over the king for a moment, once the checking piece is down. A board
-    /// drawn again with the same position (back from Home, the Big Board, another look) only
+    /// drawn again with the same position (back from Home, another look) only
     /// shows what is left of a callout already made, so the same check is never called twice.
     private func announce(after count: Int, fresh: Bool) {
         guard game.checkedKing != nil else {

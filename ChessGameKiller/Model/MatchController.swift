@@ -642,15 +642,7 @@ final class MatchController {
 
     /// A rough quality score for the person's moves this game, 0 to 100.
     var accuracy: Int? {
-        let weights: [MoveReview.Grade: Int] = [
-            .checkmate: 100, .best: 100, .excellent: 95, .good: 85, .inaccuracy: 60, .mistake: 35, .blunder: 10,
-        ]
-        let graded = gradeCounts.reduce(into: (sum: 0, count: 0)) { acc, entry in
-            acc.sum += (weights[entry.key] ?? 0) * entry.value
-            acc.count += entry.value
-        }
-        guard graded.count > 0 else { return nil }
-        return graded.sum / graded.count
+        SavedGame.accuracy(of: gradeCounts)
     }
 
     // MARK: The clock

@@ -8,8 +8,6 @@ enum AppTip: String, CaseIterable, Identifiable {
     case ghostVision
     /// Right after the first Undo in a game against a rival.
     case undoHelp
-    /// The first time Big Board is on during a game.
-    case bigBoard
     /// On the home, once a game has been played: the gold knight in the dock has shortcuts.
     case jewelShortcuts
 
@@ -20,7 +18,6 @@ enum AppTip: String, CaseIterable, Identifiable {
         case .coachOrb: return "circle.circle"
         case .ghostVision: return "eye"
         case .undoHelp: return "hand.raised"
-        case .bigBoard: return "hand.draw"
         case .jewelShortcuts: return "hand.tap"
         }
     }
@@ -33,8 +30,6 @@ enum AppTip: String, CaseIterable, Identifiable {
             return "Hold the board to see the best line ahead. Counts as help."
         case .undoHelp:
             return "Undo counts as help: this game now earns your pieces half the XP."
-        case .bigBoard:
-            return "Swipe the board sideways to replay moves. Swipe up for the tools."
         case .jewelShortcuts:
             return "Hold the gold knight for shortcuts: your rivals, Online, Analyze and more."
         }
@@ -78,12 +73,10 @@ enum TipBook {
     ///   - playerMoves: moves the player has made this game.
     ///   - lineReady: Ghost Vision has a line to show (it's on and the engine found one).
     ///   - justUndid: the player just took a move back in a game that earns XP.
-    ///   - bigBoard: Big Board is on.
-    static func next(playerMoves: Int, lineReady: Bool, justUndid: Bool, bigBoard: Bool,
+    static func next(playerMoves: Int, lineReady: Bool, justUndid: Bool,
                      _ defaults: UserDefaults = .standard) -> AppTip? {
         let wanted: [AppTip] = [
             justUndid ? .undoHelp : nil,
-            bigBoard ? .bigBoard : nil,
             playerMoves >= 1 ? .coachOrb : nil,
             playerMoves >= 3 && lineReady ? .ghostVision : nil,
         ].compactMap { $0 }

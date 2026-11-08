@@ -39,7 +39,7 @@ const SAN_PATTERN = /^(?:O-O(?:-O)?|[KQRBN][a-h]?[1-8]?x?[a-h][1-8]|[a-h](?:x[a-
 
 /** The server-side fallback: a declined request is re-run on the model Anthropic recommends for it. */
 export const FALLBACK_BETA = "server-side-fallback-2026-07-01";
-const DEFAULT_MODEL = "claude-opus-5-5";
+const DEFAULT_MODEL = "claude-sonnet-5-5";
 const EFFORTS = new Set(["low", "medium", "high", "xhigh", "max"]);
 const DEFAULT_TIMEOUT_MS = 12000;
 
@@ -392,7 +392,7 @@ export class ClaudeFailure extends Error {
   }
 }
 
-/** The model from MODEL, or Claude Opus 5.5. */
+/** The model from MODEL, or Claude Sonnet 5.5. */
 export function modelOf(env = {}) {
   return String(env.MODEL || "").trim() || DEFAULT_MODEL;
 }
