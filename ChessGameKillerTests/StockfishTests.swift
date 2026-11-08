@@ -65,6 +65,39 @@ final class StockfishTests: XCTestCase {
         }
     }
 
+    /// Every stop gets its "bestmove", even while the main thread is too busy to look. The
+    /// replies were read on the main thread in chunks, and a chunk that ended partway through
+    /// the "bestmove" lost it: the search then waited out its grace and the next one the
+    /// lost-answer wait, about 2.3 s for a move that takes milliseconds.
+    func testEveryStopIsAnsweredWhileTheMainThreadIsBusy() async throws {
+        try XCTSkipUnless(StockfishEngine.hasNetworks)
+        await StockfishEngine.shared.warmUp()
+        let traces = Traces()
+        StockfishEngine.trace = { traces.add($0) }
+        defer { StockfishEngine.trace = nil }
+        let start = Position.standard.fen
+        for _ in 0..<8 {
+            // A deep search with three lines says a lot, and nobody reads it for a while.
+            let analysis = Task { await StockfishEngine.shared.analyze(fen: start, depth: 40, lines: 3, maxTimeMs: 5000) }
+            await MainActor.run { Thread.sleep(forTimeInterval: 0.3) }
+            let started = ContinuousClock.now
+            let move = await StockfishEngine.shared.chooseMove(fen: start, skill: 20, depth: 2, thinkTimeMs: 1000)
+            let elapsed = ContinuousClock.now - started
+            XCTAssertNotNil(move)
+            XCTAssertLessThan(elapsed, .milliseconds(1500), "the stop went unanswered")
+            _ = await analysis.value
+        }
+        let lost = traces.all.filter { $0.hasPrefix("no answer to stop") || $0.hasPrefix("an ended search never answered") }
+        XCTAssertEqual(lost, [], "every stop should be answered")
+    }
+
+    private final class Traces: @unchecked Sendable {
+        private let lock = NSLock()
+        private var lines: [String] = []
+        func add(_ line: String) { lock.withLock { lines.append(line) } }
+        var all: [String] { lock.withLock { lines } }
+    }
+
     /// A depth cap ends a search long before its time: the weaker rivals answer almost at once.
     func testACappedSearchEndsEarly() async throws {
         try XCTSkipUnless(StockfishEngine.hasNetworks)

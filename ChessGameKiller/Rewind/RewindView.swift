@@ -248,6 +248,7 @@ struct RewindView: View {
                     onTap: shown.onTap,
                     framing: framing
                 )
+                .overlay { promotionPicker }
                 .frame(width: width, height: DrillBoard.height3D(side: width, framing: framing))
                 HStack {
                     Spacer(minLength: 0)
@@ -266,9 +267,30 @@ struct RewindView: View {
                 ghosts: shown.ghosts,
                 ghostColor: RewindPalette.gold
             )
+            .overlay { promotionPicker }
             .animation(.easeInOut(duration: 0.35), value: shown.fen)
             .frame(width: side, height: side)
             .boardHeadroom(theme: theme, side: side)
+        }
+    }
+
+    /// A pawn of the player's own reaching the last rank: they choose what it becomes.
+    /// A tap beside the pieces leaves the pawn where it was.
+    @ViewBuilder
+    private var promotionPicker: some View {
+        if let explorer, let promotion = explorer.promoting {
+            GeometryReader { geo in
+                PromotionPicker(
+                    color: promotion.color, theme: theme,
+                    squareSize: min(geo.size.width / 8, geo.size.height / 6),
+                    cancel: { withAnimation(.snappy(duration: 0.2)) { explorer.cancelPromotion() } },
+                    choose: { kind in
+                        stopAutoplay()
+                        withAnimation(.snappy(duration: 0.2)) { explorer.promote(to: kind) }
+                    }
+                )
+            }
+            .transition(.opacity)
         }
     }
 

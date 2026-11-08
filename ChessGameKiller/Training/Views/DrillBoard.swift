@@ -22,6 +22,7 @@ struct DrillBoard: View {
         TrainerBoard(game: runner.game, theme: theme, side: side, flipped: runner.learner == .black,
                      arrows: runner.arrows, marks: runner.marks, labels: runner.labels,
                      onTap: runner.acceptsTaps ? { (square: Square) in runner.tap(square) } : nil,
+                     onPromote: { kind in runner.promote(to: kind) },
                      turn: runner.learner, showsTurn: showsTurn)
             // A screen that keeps its board for the next puzzle hands it another drill.
             .onChange(of: SoundTiming(drill: ObjectIdentifier(runner), threeD: threeD), initial: true) { _, timing in

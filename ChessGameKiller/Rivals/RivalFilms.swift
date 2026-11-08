@@ -49,7 +49,7 @@ struct RivalFilm {
             return RivalFilm(rival: rival, beat: 4.0, title: "Down from the throne",
                              lore: "Wears the lion. Rules by the hammer, and never yields a square.")
         case .grandmaster:
-            return RivalFilm(rival: rival, beat: 3.4, title: "The storm throne",
+            return RivalFilm(rival: rival, beat: 4.6, title: "The storm throne",
                              lore: "Crowned in bone and ash. Plays the masters' moves, then the machine's.")
         }
     }
@@ -61,20 +61,53 @@ struct RivalFilm {
 /// opens once you beat the Berserker, and the Ashen King once you beat the Lionheart (Alex,
 /// 2026-11-07). A win is read from the rivals you have beaten (`RivalBoardsEarned`), which keeps
 /// wins saved under a rival's former name ("The 1600s").
+/// The rivals whose welcome film you've seen. Until you have, Home's Play shows the film first.
+enum RivalIntros {
+    static let key = "rivals.introsSeen"
+
+    static func seen(_ level: MatchController.Level, defaults: UserDefaults = .standard) -> Bool {
+        (defaults.stringArray(forKey: key) ?? []).contains(level.rival.slug)
+    }
+
+    static func mark(_ level: MatchController.Level, defaults: UserDefaults = .standard) {
+        var all = defaults.stringArray(forKey: key) ?? []
+        guard !all.contains(level.rival.slug) else { return }
+        all.append(level.rival.slug)
+        defaults.set(all, forKey: key)
+    }
+}
+
 struct RivalLadder {
     /// Lowercased names of every opponent beaten.
     let beatenNames: Set<String>
+    /// Every rival open, no climb: Premium players, and the app's own test builds (Alex,
+    /// 2026-11-08: "should we open it all to premium users?").
+    var allOpen = false
 
-    init(beatenNames: Set<String>) {
+    init(beatenNames: Set<String>, allOpen: Bool = false) {
         self.beatenNames = beatenNames
+        self.allOpen = allOpen
     }
 
     init(defaults: UserDefaults = .standard) {
-        self.init(beatenNames: RivalBoardsEarned.names(defaults))
+        self.init(beatenNames: RivalBoardsEarned.names(defaults), allOpen: Self.opensEverything(defaults))
     }
 
-    /// The first rival that must be beaten before the next one opens.
-    static let gate: MatchController.Level = .club
+    /// Premium (remembered at launch, as Premium itself reads it) opens every rival. Debug
+    /// builds put on the phone from the Mac do too, so every rival can be tried; tests don't.
+    static func opensEverything(_ defaults: UserDefaults) -> Bool {
+        if defaults.bool(forKey: Premium.activeKey) { return true }
+        #if DEBUG
+        return ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil
+        #else
+        return false
+        #endif
+    }
+
+    /// The first rival that must be beaten before the next one opens: the Cub, so every rival
+    /// waits until the one before it is beaten (Alex, 2026-11-08: "must beat the previous rival
+    /// before moving on to the next").
+    static let gate: MatchController.Level = .beginner
 
     func beaten(_ rival: Rival) -> Bool {
         beatenNames.contains(rival.name.lowercased())
@@ -82,7 +115,7 @@ struct RivalLadder {
     }
 
     func isOpen(_ level: MatchController.Level) -> Bool {
-        guard level.rawValue > Self.gate.rawValue,
+        guard !allOpen, level.rawValue > Self.gate.rawValue,
               let previous = MatchController.Level(rawValue: level.rawValue - 1) else { return true }
         return beaten(previous.rival)
     }

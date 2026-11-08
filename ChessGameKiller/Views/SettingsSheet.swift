@@ -62,13 +62,9 @@ struct SettingsSheet: View {
                     }
 
                     section("Board") {
+                        // The rival boards (Spark to Singularity) are no longer offered here
+                        // (Alex, 2026-11-08: "Remove the rival options").
                         themeGrid(Self.looks)
-                        Text("Rival boards".uppercased())
-                            .font(.app(.caption, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                            .tracking(1)
-                            .padding(.top, 12)
-                        themeGrid(BoardTheme.rivals)
                         SettingsGroup(theme: theme) {
                             if theme.sculptedLook != nil {
                                 ToggleRow(title: "3D pieces", subtitle: "Carved pieces that lift, glide and fall. Off draws the same set flat.",

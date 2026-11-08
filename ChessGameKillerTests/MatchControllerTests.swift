@@ -288,6 +288,9 @@ final class MatchControllerTests: XCTestCase {
         defaults.set("black", forKey: "setup.side")
         defaults.set(MatchController.Level.expert.rawValue, forKey: "setup.level")
         defaults.set("5+0", forKey: "setup.clock")
+        // A rival still locked falls back to the first one open and not yet beaten.
+        XCTAssertEqual(NewGameSheet.savedSetup(defaults).level, .beginner)
+        defaults.set(["the berserker"], forKey: RivalBoardsEarned.key)
         let setup = NewGameSheet.savedSetup(defaults)
         XCTAssertEqual(setup.opponent, .computer)
         XCTAssertEqual(setup.playerColor, .black)

@@ -4,8 +4,8 @@ import UIKit
 
 /// The rivals' hall, opened from Rivals on Home (Alex, 2026-11-07): one card for each rival,
 /// swiped through, its film's last frame above a short line on how it plays. Face plays the
-/// rival's welcome film, then Begin starts the game. The Lionheart and the Ashen King stay
-/// locked until the rival before them is beaten; their cards still show, saying who to beat.
+/// rival's welcome film, then Begin starts the game. Every rival after the Cub stays locked
+/// until the rival before it is beaten; their cards still show, saying who to beat.
 struct RivalsHall: View {
     /// The rival the hall opens on; nil opens on the first one not yet beaten.
     var start: MatchController.Level? = nil
@@ -21,14 +21,17 @@ struct RivalsHall: View {
 
     private static let gold = Color(hex: 0xE8C27A)
 
-    init(start: MatchController.Level? = nil, begin: @escaping (MatchController.Level) -> Void,
-         close: @escaping () -> Void) {
+    /// `intro` opens straight into the start rival's welcome film: the first time you face a
+    /// rival from Home's Play, its film plays before the game (Alex, 2026-11-08).
+    init(start: MatchController.Level? = nil, intro: Bool = false,
+         begin: @escaping (MatchController.Level) -> Void, close: @escaping () -> Void) {
         self.start = start
         self.begin = begin
         self.close = close
         let ladder = RivalLadder()
         _ladder = State(initialValue: ladder)
         _selected = State(initialValue: start ?? ladder.current)
+        _showing = State(initialValue: intro ? start.map(RivalFilm.of) : nil)
     }
 
     var body: some View {
@@ -277,7 +280,7 @@ struct RivalHallCard: View {
     }
 }
 
-private extension String {
+extension String {
     /// "The Lionheart" as it reads mid-sentence: "the Lionheart".
     var lowercasedFirstWord: String {
         hasPrefix("The ") ? "the " + dropFirst(4) : self
@@ -339,7 +342,10 @@ struct RivalWelcome: View {
             .padding(.top, 8)
             .accessibilityLabel("Back to the rivals")
         }
-        .task { await play() }
+        .task {
+            RivalIntros.mark(film.level)
+            await play()
+        }
         .onDisappear { player?.pause() }
     }
 

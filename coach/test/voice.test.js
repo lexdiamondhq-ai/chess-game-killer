@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { test } from "node:test";
 import { VERA_VOICE_SETTINGS, VOICE_SETTINGS, speak, toBase64, voiceKey } from "../src/voice.js";
 
-const env = { ELEVENLABS_API_KEY: " xi-test\n", VOICE_ID: "69SAlwj2jajrSXUGnYAA", VOICE_MODEL: "eleven_v4" };
+const env = { ELEVENLABS_API_KEY: " xi-test\n", VOICE_ID: "j9jfwdrw7BRfcR43Qohk", VOICE_MODEL: "eleven_v4" };
 const MP3 = new Uint8Array([0xff, 0xfb, 0x90, 0x64, 1, 2, 3]);
 
 /** A stand-in for fetch that records the call and answers with `reply`. */
@@ -22,7 +22,7 @@ test("Leo's answer comes back as MP3 bytes, read by Trevor with the lessons' mod
   assert.deepEqual(audio, MP3);
   assert.equal(calls.length, 1);
   const [{ url, options, body }] = calls;
-  assert.equal(url, "https://api.elevenlabs.io/v1/text-to-speech/69SAlwj2jajrSXUGnYAA?output_format=mp3_44100_128");
+  assert.equal(url, "https://api.elevenlabs.io/v1/text-to-speech/j9jfwdrw7BRfcR43Qohk?output_format=mp3_44100_128");
   assert.equal(options.method, "POST");
   assert.equal(options.headers["xi-api-key"], "xi-test");
   assert.equal(options.headers["content-type"], "application/json");
@@ -34,7 +34,7 @@ test("Leo's answer comes back as MP3 bytes, read by Trevor with the lessons' mod
 test("without VOICE_ID or VOICE_MODEL it's still Trevor on the lessons' model", async () => {
   const { fetchImpl, calls } = fakeFetch();
   await speak({ ELEVENLABS_API_KEY: "k" }, "Hello.", fetchImpl);
-  assert.match(calls[0].url, /\/text-to-speech\/69SAlwj2jajrSXUGnYAA\?/);
+  assert.match(calls[0].url, /\/text-to-speech\/j9jfwdrw7BRfcR43Qohk\?/);
   assert.equal(calls[0].body.model_id, "eleven_v4");
   assert.equal("voice_settings" in calls[0].body, false);
 });
@@ -45,9 +45,9 @@ test("the voice settings, voice and model are the ones the recorded lessons use"
   assert.match(script, /^VOICE_SETTINGS = None$/m);
   assert.match(script, /^LEO_MODEL = "eleven_v4"$/m);
   assert.match(script, /"leo":.*\n.*"model": LEO_MODEL, "settings": VOICE_SETTINGS, "format": "mp3_44100_128"/);
-  assert.match(script, /"69SAlwj2jajrSXUGnYAA"/);
+  assert.match(script, /"j9jfwdrw7BRfcR43Qohk"/);
   const toml = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8");
-  assert.match(toml, /^VOICE_ID = "69SAlwj2jajrSXUGnYAA"$/m);
+  assert.match(toml, /^VOICE_ID = "j9jfwdrw7BRfcR43Qohk"$/m);
   assert.match(toml, /^VOICE_MODEL = "eleven_v4"$/m);
 });
 
@@ -56,7 +56,7 @@ test("TALK_VOICE_MODEL reads live answers with the cheaper model, for Leo and Ve
   const talk = { ...env, TALK_VOICE_MODEL: "eleven_flash_v2_5" };
   await speak(talk, "Hello.", fetchImpl);
   await speak(talk, "Hello.", fetchImpl, "vera");
-  assert.match(calls[0].url, /\/69SAlwj2jajrSXUGnYAA\?/);
+  assert.match(calls[0].url, /\/j9jfwdrw7BRfcR43Qohk\?/);
   assert.equal(calls[0].body.model_id, "eleven_flash_v2_5");
   assert.match(calls[1].url, /\/EXAVITQu4vr4xnSDxMaL\?/);
   assert.equal(calls[1].body.model_id, "eleven_flash_v2_5");

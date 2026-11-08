@@ -2,7 +2,7 @@
 """Records each coach's voice for every line in the lessons, and their short
 reactions in puzzles and drills, with ElevenLabs.
 
-Two coaches teach the same course: Leo (Trevor's voice) and Vera (Sarah's). The
+Two coaches teach the same course: Leo (Frederick's voice) and Vera (Sarah's). The
 course is written in Leo's words; for Vera his name becomes hers, exactly as
 Coach.personalize does in the app. Reactions ("Nice move.", "Try again.") come
 from Training/Content/reactions.json.
@@ -59,11 +59,11 @@ LEO_MODEL = "eleven_v4"
 # (2026-11-06). Changing them doesn't re-record anything.
 VOICE_SETTINGS = None
 COACHES = {
-    # Trevor ("TrevorT"): a natural, conversational American man, a professional voice from
-    # ElevenLabs' voice library, picked by Alex from samples (2026-11-06). Should its owner ever
+    # Frederick ("Frederick Surrey"): a calm, velvety, well-spoken Englishman, a professional voice from
+    # ElevenLabs' voice library, picked by Alex from samples (2026-11-07, after Trevor sounded too high). Should its owner ever
     # withdraw it, the recordings stay; give Leo another voice and push to record them again.
     # Override with ELEVENLABS_VOICE_ID. Recorded at 128 kbps, then levelled (MASTER).
-    "leo": {"name": "Leo", "prefix": "nar-", "voice": os.environ.get("ELEVENLABS_VOICE_ID", "69SAlwj2jajrSXUGnYAA"),
+    "leo": {"name": "Leo", "prefix": "nar-", "voice": os.environ.get("ELEVENLABS_VOICE_ID", "j9jfwdrw7BRfcR43Qohk"),
             "model": LEO_MODEL, "settings": VOICE_SETTINGS, "format": "mp3_44100_128", "master": True},
     # Sarah: a confident, warm young American woman. Override with ELEVENLABS_VERA_VOICE_ID.
     # Steady and clean: high stability, no style exaggeration, recorded at 128 kbps.
@@ -186,10 +186,10 @@ REEL_LINES = [
     "Here's how it went.",
     "What a move. This is the one I'd frame.",
     "And right here, the whole game turned.",
-    "Ouch. This is the one to learn from.",
+    "Ah. This is the one to learn from.",
     "And that's how you finish a game.",
     "A win. Well played.",
-    "Not this time. We'll get them next game.",
+    "Not this time. We shall have them next game.",
     "Honours even. A fair result.",
 ]
 
