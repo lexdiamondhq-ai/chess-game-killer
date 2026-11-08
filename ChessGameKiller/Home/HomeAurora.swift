@@ -951,7 +951,7 @@ struct HomeAuroraSection: View {
 }
 
 /// The five rivals on Today, each on its coin, the coins growing from the Cub to the
-/// Dragonlord so the row climbs (Alex, 2026-11-07: "Let's have these visible on the Today
+/// Ashen King so the row climbs (Alex, 2026-11-07: "Let's have these visible on the Today
 /// screen"). The rival up next wears a gold ring; a tap starts a game against that rival.
 struct HomeAuroraRivals: View {
     let next: MatchController.Level

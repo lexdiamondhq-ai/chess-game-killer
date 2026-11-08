@@ -253,10 +253,10 @@ final class RivalsTests: XCTestCase {
         }
     }
 
-    /// The five rivals climb from the Cub to the Dragonlord, each on its own coin; games saved
+    /// The five rivals climb from the Cub to the Ashen King, each on its own coin; games saved
     /// under their former names ("The 1600s") still find them and show the new name.
     func testRivalsHaveFacesAndKeepTheirFormerNames() {
-        XCTAssertEqual(Rival.all.map(\.name), ["The Cub", "The Hunter", "The Berserker", "The Lionheart", "The Dragonlord"])
+        XCTAssertEqual(Rival.all.map(\.name), ["The Cub", "The Hunter", "The Berserker", "The Lionheart", "The Ashen King"])
         for rival in Rival.all {
             XCTAssertNotNil(rival.coinName.flatMap { UIImage(named: $0) }, "\(rival.slug)'s coin is missing")
             XCTAssertEqual(Rival.named(rival.formerName ?? "")?.level, rival.level)
@@ -272,7 +272,13 @@ final class RivalsTests: XCTestCase {
 
         // One rival is one player: "The Berserker wins", where the old crowds were many.
         XCTAssertEqual("The Berserker".agreeing("wins", "win"), "wins")
-        XCTAssertEqual("The Dragonlord".midSentence.possessive, "the Dragonlord's")
+        XCTAssertEqual("The Ashen King".midSentence.possessive, "the Ashen King's")
+        // The Ashen King was the Dragonlord: games and wins saved under that name still find him.
+        let dragonlord = SavedGame(id: UUID(), date: .now, opponent: "The Dragonlord",
+                                   level: MatchController.Level.grandmaster.rawValue, playerIsWhite: true, result: .win,
+                                   accuracy: nil, positions: [], moves: [], moments: [])
+        XCTAssertEqual(dragonlord.opponentShown, "The Ashen King")
+        XCTAssertEqual(Rival.named("The Dragonlord")?.level, .grandmaster)
         XCTAssertEqual("The 1600s".agreeing("wins", "win"), "win")
     }
 

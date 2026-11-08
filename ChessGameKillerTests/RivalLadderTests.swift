@@ -1,7 +1,7 @@
 import XCTest
 @testable import ChessGameKiller
 
-/// The rivals' hall: the first three rivals are always open, the Lionheart and the Dragonlord
+/// The rivals' hall: the first three rivals are always open, the Lionheart and the Ashen King
 /// open only once the rival before them is beaten, and every rival has its film's media.
 final class RivalLadderTests: XCTestCase {
     func testNewPlayerFacesTheFirstThree() {
@@ -24,6 +24,11 @@ final class RivalLadderTests: XCTestCase {
         let ladder = RivalLadder(beatenNames: ["the 1600s", "the 2000s"])
         XCTAssertTrue(ladder.isOpen(.expert))
         XCTAssertTrue(ladder.isOpen(.grandmaster))
+    }
+
+    func testAWinOverTheLionheartUnderAnyNameOpensTheAshenKing() {
+        XCTAssertTrue(RivalLadder(beatenNames: ["the lionheart"]).isOpen(.grandmaster))
+        XCTAssertTrue(RivalLadder(beatenNames: ["the dragonlord"]).beaten(MatchController.Level.grandmaster.rival))
     }
 
     func testTheHallOpensOnTheFirstRivalNotYetBeaten() {

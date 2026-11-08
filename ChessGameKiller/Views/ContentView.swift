@@ -635,7 +635,7 @@ struct ContentView: View {
                 .background {
                     SheetBackdrop(theme: theme)
                         .overlay {
-                            // The Dragonlord plays in his storm (Alex, 2026-11-08).
+                            // The Ashen King plays in his storm (Alex, 2026-11-08).
                             if stormy { DragonStorm().transition(.opacity) }
                         }
                         .animation(.easeInOut(duration: 1.2), value: stormy)
@@ -653,7 +653,7 @@ struct ContentView: View {
     /// phone. While the coach is open the two players fold into one line. Big Board uses the same
     /// layout without the top bar, and the board there can be swiped to look back through the game.
     /// The side whose line is under the board: yours, unless the board is flipped.
-    /// Against the Dragonlord, rain and lightning fill the backdrop behind the board.
+    /// Against the Ashen King, rain and lightning fill the backdrop behind the board.
     private var stormy: Bool {
         !match.setup.grudge && match.setup.level == .grandmaster
     }

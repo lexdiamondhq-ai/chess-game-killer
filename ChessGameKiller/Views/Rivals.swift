@@ -3,7 +3,7 @@ import UIKit
 
 /// Who the person plays against the computer: a rival at one rating, or their Grudge.
 ///
-/// The five rivals climb from the Cub to the Dragonlord, each a warrior wearing the beast it
+/// The five rivals climb from the Cub to the Ashen King, each a warrior wearing the beast it
 /// hunted, struck on a coin that darkens from bronze to onyx and gold (Alex, 2026-11-07). Behind
 /// each one is a crowd of real people: its moves come from games real players at that rating
 /// played in the same position (Lichess's database, see `CrowdBook`), and Stockfish takes over at the
@@ -17,13 +17,19 @@ struct Rival: Identifiable {
 
     let level: MatchController.Level
     let kind: Kind
-    /// "The Berserker", "The Dragonlord", "Your Grudge".
+    /// "The Berserker", "The Ashen King", "Your Grudge".
     let name: String
-    /// A short name for tight places, like the home's ladder: "Berserker", "Dragonlord".
+    /// A short name for tight places, like the home's ladder: "Berserker", "Ashen King".
     let shortName: String
     /// What the rival was called before it had a face, "The 1600s": saved games from then
     /// still carry it.
     var formerName: String?
+    /// Names it had since, for saved games and wins from then: the Ashen King was the
+    /// Dragonlord until 2026-11-08.
+    var laterFormerNames: [String] = []
+
+    /// Every name this rival had before today's.
+    var pastNames: [String] { (formerName.map { [$0] } ?? []) + laterFormerNames }
     /// Names the rival's pictures: "1600s", "masters", "grudge".
     let slug: String
     /// Rough Elo, like "~1600" or "2500+".
@@ -79,7 +85,7 @@ struct Rival: Identifiable {
     /// The name to show for a saved game's opponent: a rival's name today, even for a game
     /// saved under its former name, and anyone else's as it was saved.
     static func shownName(of game: SavedGame) -> String {
-        guard let rival = of(saved: game), game.opponent == rival.formerName else { return game.opponent }
+        guard let rival = of(saved: game), rival.pastNames.contains(game.opponent) else { return game.opponent }
         return rival.name
     }
 
@@ -100,7 +106,7 @@ struct Rival: Identifiable {
         if key == "grudge" || key == "your grudge" { return grudge(.club) }
         return all.first {
             $0.slug == key || $0.name.lowercased() == key || $0.shortName.lowercased() == key
-                || $0.formerName?.lowercased() == key
+                || $0.pastNames.contains { $0.lowercased() == key }
         }
     }
 }
@@ -135,8 +141,10 @@ extension MatchController.Level {
                          blurb: "Strong players. Sharp, patient, and they rarely hand you a piece.",
                          hue: Color(hex: 0xD6A24A), hue2: Color(hex: 0xA6722C), lightHex: 0xEDA94E)
         case .grandmaster:
-            return Rival(level: self, kind: .crowd, name: "The Dragonlord", shortName: "Dragonlord",
-                         formerName: "The Masters", slug: "masters", elo: "2500+",
+            // Renamed from the Dragonlord, his dragon-skull helm gone for a crown of bone grown
+            // from his own skull (Alex, 2026-11-08).
+            return Rival(level: self, kind: .crowd, name: "The Ashen King", shortName: "Ashen King",
+                         formerName: "The Masters", laterFormerNames: ["The Dragonlord"], slug: "masters", elo: "2500+",
                          blurb: "Grandmasters' games, then full Stockfish when the book runs out.",
                          hue: Color(hex: 0xF2DCA8), hue2: Color(hex: 0xD6B26A), lightHex: 0xF6DDA6)
         }

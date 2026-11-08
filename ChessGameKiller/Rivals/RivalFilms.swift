@@ -50,7 +50,7 @@ struct RivalFilm {
                              lore: "Wears the lion. Rules by the hammer, and never yields a square.")
         case .grandmaster:
             return RivalFilm(rival: rival, beat: 3.4, title: "The storm throne",
-                             lore: "Wears the dragon's skull. Plays the masters' moves, then the machine's.")
+                             lore: "Crowned in bone and ash. Plays the masters' moves, then the machine's.")
         }
     }
 
@@ -58,7 +58,7 @@ struct RivalFilm {
 }
 
 /// Who you may face. The Cub, the Hunter and the Berserker are always open; the Lionheart
-/// opens once you beat the Berserker, and the Dragonlord once you beat the Lionheart (Alex,
+/// opens once you beat the Berserker, and the Ashen King once you beat the Lionheart (Alex,
 /// 2026-11-07). A win is read from the rivals you have beaten (`RivalBoardsEarned`), which keeps
 /// wins saved under a rival's former name ("The 1600s").
 struct RivalLadder {
@@ -78,7 +78,7 @@ struct RivalLadder {
 
     func beaten(_ rival: Rival) -> Bool {
         beatenNames.contains(rival.name.lowercased())
-            || rival.formerName.map { beatenNames.contains($0.lowercased()) } == true
+            || rival.pastNames.contains { beatenNames.contains($0.lowercased()) }
     }
 
     func isOpen(_ level: MatchController.Level) -> Bool {

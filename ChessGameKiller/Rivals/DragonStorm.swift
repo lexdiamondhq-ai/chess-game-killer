@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The Dragonlord's storm behind the board (Alex, 2026-11-08: "when playing the Dragon Lord,
+/// The Ashen King's storm behind the board (Alex, 2026-11-08, then the Dragonlord: "when playing the Dragon Lord,
 /// see the rain and lightning in the background"). It lies over the look's backdrop and under
 /// the board: a darker sky at the top, rain falling in three depths, and now and then lightning
 /// far off in the clouds, a forked bolt with a cold flash that fades. The board stays clear:

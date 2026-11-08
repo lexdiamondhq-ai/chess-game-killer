@@ -4,7 +4,7 @@ import UIKit
 
 /// The rivals' hall, opened from Rivals on Home (Alex, 2026-11-07): one card for each rival,
 /// swiped through, its film's last frame above a short line on how it plays. Face plays the
-/// rival's welcome film, then Begin starts the game. The Lionheart and the Dragonlord stay
+/// rival's welcome film, then Begin starts the game. The Lionheart and the Ashen King stay
 /// locked until the rival before them is beaten; their cards still show, saying who to beat.
 struct RivalsHall: View {
     /// The rival the hall opens on; nil opens on the first one not yet beaten.
