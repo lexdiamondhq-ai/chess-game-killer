@@ -1,4 +1,4 @@
-// Chess Game Killer scanner: POST a photo or screenshot of a chess board to
+// Beauty of Chess scanner: POST a photo or screenshot of a chess board to
 // /read and get the position back. Claude does the reading; the Anthropic key
 // never leaves this server.
 

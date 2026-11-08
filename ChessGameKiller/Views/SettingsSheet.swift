@@ -717,7 +717,7 @@ struct LicensesView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Chess Game Killer is built on open source, and is open source itself under the GPL because it ships with Stockfish.")
+                Text("Beauty of Chess is built on open source, and is open source itself under the GPL because it ships with Stockfish.")
                     .font(.app(.footnote))
                     .foregroundStyle(.secondary)
                     .padding(.bottom, 4)
@@ -750,7 +750,7 @@ struct LicensesView: View {
                     .accessibilityElement(children: .combine)
                 }
                 Link(destination: URL(string: "https://github.com/lexdiamondhq-ai/chess-game-killer")!) {
-                    Label("Chess Game Killer source code", systemImage: "chevron.left.forwardslash.chevron.right")
+                    Label("Beauty of Chess source code", systemImage: "chevron.left.forwardslash.chevron.right")
                         .font(.app(.subheadline, weight: .semibold))
                 }
                 .padding(.top, 8)
