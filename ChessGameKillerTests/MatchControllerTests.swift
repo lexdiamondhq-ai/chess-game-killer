@@ -625,7 +625,7 @@ final class MatchControllerTests: XCTestCase {
         XCTAssertEqual(match.outcome, .resigned(loser: .white))
         XCTAssertEqual(match.winner, .black)
         XCTAssertTrue(match.isOver)
-        XCTAssertEqual(sounds.played.last, .gameOver)
+        XCTAssertEqual(sounds.played.last, .defeat)
         XCTAssertFalse(match.canResign)
     }
 

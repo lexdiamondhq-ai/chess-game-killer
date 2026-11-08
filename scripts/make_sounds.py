@@ -43,6 +43,11 @@ SOUNDS = {
     "game-over": ("The end of a chess game: two soft, warm, descending notes on a felt piano with "
                   "a low cello underneath, calm and dignified, not sad, quickly fading. No synths, "
                   "no drums", 2.2),
+    # defeat.mp3 (a loss) is not made here: it is two takes blended by hand, two distant
+    # funeral bell tolls ("Two slow tolls of a huge low iron funeral bell, far away across a
+    # misty valley...") over a short low requiem choir at 75% ("A brief dark choral requiem:
+    # a low wordless choir sings one slow descending minor phrase over deep strings..."),
+    # then tidied to CUE_LUFS. game-over.mp3 is kept for draws.
     "victory": ("A joyful video game level-complete victory fanfare: a bright rising "
                 "melody on shimmering synths and bells, punchy drums, ending on a big "
                 "triumphant major chord with sparkles, polished modern mobile game music", 6.0),
