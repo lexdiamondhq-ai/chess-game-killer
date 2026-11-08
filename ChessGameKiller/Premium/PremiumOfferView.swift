@@ -138,6 +138,7 @@ struct PremiumOfferView: View {
             }
             .disabled(premium.isRestoring)
             Link("Terms of use", destination: PremiumStyle.terms)
+            Link("Privacy", destination: PremiumStyle.privacy)
         }
         .font(.app(.footnote, weight: .semibold))
         .foregroundStyle(.secondary)
@@ -148,6 +149,8 @@ enum PremiumStyle {
     static let gold = Color(hex: 0xD9A65E)
     /// Apple's standard licence agreement, which the App Store applies to subscriptions.
     static let terms = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
+    /// What leaves the phone and why (play/public/privacy), required beside a subscription offer.
+    static let privacy = URL(string: "https://play.chess-game-killer.workers.dev/privacy/")!
 }
 
 private struct PremiumOfferHeader: View {
