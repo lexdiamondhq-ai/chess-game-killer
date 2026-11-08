@@ -196,7 +196,7 @@ extension AnalyzeSheet {
         }
     }
 
-    /// Take a photo and Upload a photo, in the analysis's top bar, so a new board can come in
+    /// Take a photo and Upload a photo, lower right on the analysis, so a new board can come in
     /// from there without going back (Alex, 2026-11-08). Same scans and limit as the first screen.
     fileprivate var photoButtons: AnalysisPhotoButtons {
         AnalysisPhotoButtons(hasCamera: hasCamera, canScan: canScan, item: $photoItem,
@@ -236,6 +236,23 @@ struct AnalysisPhotoButtons: View {
                 Label("Upload a photo", systemImage: "photo.on.rectangle")
             }
         }
+    }
+}
+
+/// A round glass button for the analysis's photo buttons, lower right.
+private struct PhotoOrbStyle: ButtonStyle {
+    let accent: Color
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.app(.title3, weight: .semibold))
+            .foregroundStyle(accent)
+            .frame(width: 54, height: 54)
+            .background(.ultraThinMaterial, in: Circle())
+            .overlay(Circle().strokeBorder(accent.opacity(0.35), lineWidth: 1))
+            .shadow(color: .black.opacity(0.18), radius: 8, y: 3)
+            .scaleEffect(configuration.isPressed ? 0.92 : 1)
+            .animation(.snappy(duration: 0.15), value: configuration.isPressed)
     }
 }
 
@@ -541,7 +558,6 @@ struct AnalysisView: View {
 
     @State private var model: AnalysisModel
     @State private var flipped: Bool
-    @State private var confirmingForfeit = false
     @State private var showingPhoto = false
     @AppStorage("haptics") private var hapticsOn = true
     @AppStorage("sculpted3D") private var sculpted3D = true
@@ -639,45 +655,27 @@ struct AnalysisView: View {
                 stepper
                 madeMoves
                 lines
-                VStack(spacing: 6) {
-                    Button {
-                        model.stopLine()
-                        if forfeits == nil { onPlay(model.draft) } else { confirmingForfeit = true }
-                    } label: {
-                        Label("Play \(rival) from here", systemImage: "play.fill")
-                            .font(.app(.headline))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 4)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .foregroundStyle(theme.screenIsDark ? Color.black : Color.white)
-                    .disabled(model.ending != nil || model.draft.position == nil)
-                    Text("You play \(sideName) · \(clock.isTimed ? clock.name : "no clock")")
-                        .font(.app(.footnote))
-                        .foregroundStyle(.secondary)
-                }
-                .confirmationDialog("Leave your game against \(forfeits ?? rival)?",
-                                    isPresented: $confirmingForfeit, titleVisibility: .visible) {
-                    Button("Resign and play \(rival)", role: .destructive) { onPlay(model.draft) }
-                    Button("Keep playing", role: .cancel) {}
-                } message: {
-                    Text("It counts as a loss for your army.")
-                }
             }
             .padding(16)
+            // Room under the last line for the photo buttons.
+            .padding(.bottom, photoButtons == nil ? 0 : 120)
             .animation(.snappy, value: model.lines)
+        }
+        .overlay(alignment: .bottomTrailing) {
+            // Lower right, within thumb's reach (Alex, 2026-11-08: "I want it on the lower right").
+            if let photoButtons {
+                VStack(spacing: 12) {
+                    photoButtons
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(PhotoOrbStyle(accent: accent))
+                .padding(.trailing, 18)
+                .padding(.bottom, 12)
+            }
         }
         .navigationTitle("Analysis")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if let photoButtons {
-                ToolbarItemGroup(placement: .primaryAction) {
-                    photoButtons
-                }
-            }
             ToolbarItem(placement: .primaryAction) {
                 Button { flipped.toggle() } label: {
                     Label {
