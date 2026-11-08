@@ -341,9 +341,10 @@ struct HomeJewelGold: View {
 /// Rooms, from the bar or a hold on the gold knight: only the ways to a game that the Today
 /// page doesn't already hold (Alex, 2026-11-08: "Lets go with all"). A person online, a friend,
 /// a new game on your own side and clock, and your games. Today's Move, Puzzles, Analyze and
-/// the coach live on Today, so they are not repeated here.
+/// the coach live on Today, so they are not repeated here. The rivals' hall joins them, the
+/// fifth room, as the review proposed once the hall landed.
 enum HomeShortcutKind: String, CaseIterable, Identifiable {
-    case online, friend, newGame, games
+    case online, friend, newGame, rivals, games
 
     var id: String { rawValue }
 
@@ -359,6 +360,7 @@ enum HomeShortcutKind: String, CaseIterable, Identifiable {
         case .online: return "Online"
         case .friend: return "A friend"
         case .newGame: return "New game"
+        case .rivals: return "Rivals"
         case .games: return "Your games"
         }
     }
@@ -368,6 +370,8 @@ enum HomeShortcutKind: String, CaseIterable, Identifiable {
         case .online: return Glyphs.online
         case .friend: return Glyphs.challenge
         case .newGame: return Glyphs.play
+        // The shield the hall's own door wore on Home.
+        case .rivals: return "shield.lefthalf.filled"
         case .games: return Glyphs.games
         }
     }
@@ -377,6 +381,7 @@ enum HomeShortcutKind: String, CaseIterable, Identifiable {
         case .online: return "Play someone at your level now"
         case .friend: return "Send a friend a game by link"
         case .newGame: return "Pick your side, clock and rival"
+        case .rivals: return "The five rivals, and the one to beat next"
         case .games: return "Look back at the games you've played"
         }
     }
@@ -402,8 +407,10 @@ struct HomeShortcutsPanel: View {
     /// Four to a row under the five rivals.
     static let perRow = 4
 
-    private static var columns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: 0, alignment: .top), count: perRow)
+    /// Rooms sit in one row, however many there are (four or five); elsewhere, four to a row.
+    private var columns: [GridItem] {
+        let count: Int = asRooms ? min(max(shortcuts.count, 1), 5) : Self.perRow
+        return Array(repeating: GridItem(.flexible(), spacing: 0, alignment: .top), count: count)
     }
 
     let tone: HomeTone
@@ -454,7 +461,7 @@ struct HomeShortcutsPanel: View {
                     .padding(.horizontal, 4)
                     .padding(.vertical, 2)
             }
-            LazyVGrid(columns: Self.columns, spacing: 12) {
+            LazyVGrid(columns: columns, spacing: 12) {
                 ForEach(shortcuts) { shortcut in
                     shortcutButton(shortcut)
                 }
