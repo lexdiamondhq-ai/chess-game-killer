@@ -288,7 +288,8 @@ extension String {
 }
 
 /// A rival's welcome: its film, full screen and with sound, opening from a point of torchlight;
-/// then its name, and Begin. A tap skips to the name. The film's last frame holds behind it.
+/// then its name, and Begin. A tap skips to the name; a swipe down goes back. Nothing sits over
+/// the art. The film's last frame holds behind it.
 struct RivalWelcome: View {
     let film: RivalFilm
     let begin: () -> Void
@@ -330,18 +331,12 @@ struct RivalWelcome: View {
         .ignoresSafeArea()
         .contentShape(Rectangle())
         .onTapGesture { skip() }
-        .overlay(alignment: .topTrailing) {
-            Button(action: leave) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.8))
-                    .frame(width: 40, height: 40)
-                    .background(.ultraThinMaterial, in: Circle())
-            }
-            .padding(.trailing, 16)
-            .padding(.top, 8)
-            .accessibilityLabel("Back to the rivals")
-        }
+        // No button over the art: a swipe down goes back to the rivals, as does "Not now".
+        .gesture(DragGesture(minimumDistance: 24).onEnded { drag in
+            let t = drag.translation
+            if t.height > 90, t.height > abs(t.width) * 1.5 { leave() }
+        })
+        .accessibilityAction(.escape) { leave() }
         .task {
             RivalIntros.mark(film.level)
             await play()
