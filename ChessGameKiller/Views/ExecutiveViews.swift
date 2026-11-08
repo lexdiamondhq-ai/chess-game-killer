@@ -19,8 +19,8 @@ struct ExecutivePlate: View {
     @ScaledMetric(relativeTo: .footnote) private var scaledStatusHeight: CGFloat = 16
     /// The status row's height. It stops growing where the line's type does.
     private var statusHeight: CGFloat { min(scaledStatusHeight, 21) * lineScale }
-    /// A rival (not Your Grudge) speaks in its own letters: blood red for the Ashen King, ash
-    /// grey gothic for the rest (Alex, 2026-11-08; `RivalLetters`).
+    /// A rival (not Your Grudge) speaks in its own letters: blood red for the Ashen King,
+    /// tarnished silver for the rest (Alex, 2026-11-08; `RivalLetters`).
     private var speaksInBlood: Bool { isComputer && !inDock && !match.setup.grudge }
     private var voice: RivalLetters.Voice { .init(match.setup.level) }
     /// The line under the rival's name (its taunt, remarks and captures) is half again as large
