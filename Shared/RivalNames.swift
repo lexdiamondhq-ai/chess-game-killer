@@ -12,7 +12,7 @@ extension String {
         namesACrowd ? plural : singular
     }
 
-    /// A rival's name inside a sentence: "the Berserker", "the Dragonlord", "your Grudge".
+    /// A rival's name inside a sentence: "the Berserker", "the Ashen King", "your Grudge".
     var midSentence: String {
         guard hasPrefix("The ") || hasPrefix("Your ") else { return self }
         return prefix(1).lowercased() + dropFirst()

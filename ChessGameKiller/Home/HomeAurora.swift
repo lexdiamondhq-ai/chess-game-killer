@@ -24,6 +24,8 @@ struct HomeAuroraActions {
     var open: (HomeCurrentGame) -> Void
     /// Starts a game against one of the five rivals.
     var playRival: (MatchController.Level) -> Void = { _ in }
+    /// Opens the rivals' hall, on this rival or on the one up next.
+    var rivals: (MatchController.Level?) -> Void = { _ in }
     /// Starts a game against your Grudge.
     var playGrudge: () -> Void = {}
     /// Opens Puzzles.
@@ -264,8 +266,13 @@ struct HomeAuroraView: View {
                 .padding(.top, 10)
             HomeAuroraSection(title: gamesTitle, palette: palette, note: gamesNote)
             gameRow
-            HomeAuroraSection(title: "Face a rival", palette: palette, note: "Up next: \(stage.upNext.level.rival.shortName)")
-            HomeAuroraRivals(next: stage.upNext.level, palette: palette, play: actions.playRival)
+            // A quiet way into the hall in the heading's corner; the coins open it too (Alex,
+            // 2026-11-08, layout tidy).
+            HomeAuroraSection(title: "Face a rival", palette: palette, note: "All rivals",
+                              action: { actions.rivals(nil) })
+            // A coin opens its rival's card in the hall, where its film plays and the locks hold
+            // (Alex, 2026-11-07).
+            HomeAuroraRivals(next: stage.upNext.level, palette: palette, play: { actions.rivals($0) })
                 .padding(.horizontal, 12)
             HomeAuroraSection(title: "For today", palette: palette, note: nil)
             VStack(spacing: 10) {
@@ -926,6 +933,8 @@ struct HomeAuroraSection: View {
     let title: String
     let palette: HomeAuroraPalette
     var note: String? = nil
+    /// Makes the note a quiet link in the heading's corner ("All rivals ›").
+    var action: (() -> Void)? = nil
 
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
@@ -939,7 +948,20 @@ struct HomeAuroraSection: View {
                     .frame(width: 44, height: 1)
             }
             Spacer()
-            if let note {
+            if let note, let action {
+                Button(action: action) {
+                    HStack(spacing: 3) {
+                        Text(note)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .bold))
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(palette.gold)
+                    // A bigger target than it looks, without making the heading taller.
+                    .contentShape(Rectangle().inset(by: -12))
+                }
+                .buttonStyle(.plain)
+            } else if let note {
                 Text(note)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(palette.ink2)
@@ -953,7 +975,7 @@ struct HomeAuroraSection: View {
 }
 
 /// The five rivals on Today, each on its coin, the coins growing from the Cub to the
-/// Dragonlord so the row climbs (Alex, 2026-11-07: "Let's have these visible on the Today
+/// Ashen King so the row climbs (Alex, 2026-11-07: "Let's have these visible on the Today
 /// screen"). The rival up next wears a gold ring; a tap starts a game against that rival.
 struct HomeAuroraRivals: View {
     let next: MatchController.Level

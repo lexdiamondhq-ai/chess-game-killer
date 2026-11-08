@@ -3,7 +3,7 @@ import Foundation
 /// The line a rival says under its name on the game screen while it waits, in place of its rank
 /// and rating (Alex, 2026-11-07: "more condescending the better, and cocky as you climb the
 /// ranks"). The Cub is cheeky, the Hunter patient, the Berserker brutal, the Lionheart royal
-/// and the Dragonlord barely aware you exist. One line per game, short enough for one row.
+/// and the Ashen King barely aware you exist. One line per game, short enough for one row.
 enum RivalTaunt {
     static func lines(for level: MatchController.Level) -> [String] {
         switch level {

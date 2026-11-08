@@ -493,7 +493,7 @@ struct HomeShortcutsPanel: View {
     }
 
     /// Each rival's coin a little bigger than the one before, so the row climbs toward the
-    /// Dragonlord.
+    /// Ashen King.
     private func coinSize(_ rival: Rival) -> CGFloat {
         min(orb, 56) * (0.8 + 0.07 * CGFloat(rival.level.rawValue))
     }
