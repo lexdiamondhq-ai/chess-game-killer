@@ -66,13 +66,18 @@ final class GuessRunner {
         guard phase == .guessing else { return }
         let before = board.moveCount
         board.tap(square)
-        if board.pendingPromotion != nil {
-            let expected = game.moves[index]
-            board.promote(to: expected.count == 5 ? (TrainingChess.promotionKind(of: expected) ?? .queen) : .queen)
-        }
+        // A pawn on the last rank waits for the player to choose its piece on the board.
+        if board.pendingPromotion != nil { return }
         if board.moveCount != before, let played = board.lastPlayed {
             judge(played)
         }
+    }
+
+    /// Finishes a promotion with the piece the player chose, and judges the guess.
+    func promote(to kind: Piece.Kind) {
+        guard phase == .guessing, board.pendingPromotion != nil else { return }
+        board.promote(to: kind)
+        if let played = board.lastPlayed { judge(played) }
     }
 
     /// The opponent's moves play by themselves; then it's the player's turn.
@@ -205,7 +210,8 @@ struct GuessTheMoveView: View {
                     .padding(.horizontal, 20)
                     TrainerBoard(game: runner.board, theme: theme, side: side, flipped: runner.hero == .black,
                                  arrows: runner.arrows,
-                                 onTap: runner.phase == .guessing ? { (square: Square) in runner.tap(square) } : nil)
+                                 onTap: runner.phase == .guessing ? { (square: Square) in runner.tap(square) } : nil,
+                                 onPromote: { kind in runner.promote(to: kind) })
                     RoomMessage(text: runner.message, tone: runner.tone, theme: theme)
                         .padding(.horizontal, 16)
                     if runner.phase == .finished {

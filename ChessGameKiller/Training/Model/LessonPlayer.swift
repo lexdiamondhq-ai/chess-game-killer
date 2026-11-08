@@ -293,14 +293,23 @@ final class LessonPlayer {
 
     // MARK: Tasks
 
+    /// Finishes a promotion with the piece the learner chose, and judges the move.
+    func promote(to kind: Piece.Kind) {
+        guard phase == .task, !solved, let task = step.task, task.type == .move,
+              game.pendingPromotion != nil else { return }
+        game.promote(to: kind)
+        if let played = game.lastPlayed {
+            sound(for: played)
+            judge(played.uci, task: task)
+        }
+    }
+
     private func tapToMove(_ square: Square, task: LessonTask) {
         let movesBefore = game.moveCount
         let selectedBefore = game.selected
         game.tap(square)
-        if game.pendingPromotion != nil {
-            let expected = (task.solution ?? []).indices.contains(solutionIndex) ? task.solution?[solutionIndex] : nil
-            game.promote(to: expected.flatMap(TrainingChess.promotionKind(of:)) ?? .queen)
-        }
+        // A pawn on the last rank waits for the learner to choose its piece on the board.
+        if game.pendingPromotion != nil { return }
         if game.moveCount != movesBefore, let played = game.lastPlayed {
             sound(for: played)
             judge(played.uci, task: task)

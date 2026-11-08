@@ -95,7 +95,8 @@ struct LessonPlayerView: View {
                     arrows: player.arrows,
                     marks: player.marks,
                     labels: player.labels,
-                    onTap: player.phase == .task ? { (square: Square) in player.tap(square) } : nil
+                    onTap: player.phase == .task ? { (square: Square) in player.tap(square) } : nil,
+                    onPromote: { kind in player.promote(to: kind) }
                 )
                 .padding(.top, 4)
                 ScrollView {

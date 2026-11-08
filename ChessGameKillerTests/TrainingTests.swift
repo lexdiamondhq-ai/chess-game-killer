@@ -533,6 +533,28 @@ final class DrillRunnerTests: XCTestCase {
         }
     }
 
+    private let promotion = """
+    {"id": "t-promo", "skill": "promotion", "type": "move", "rating": 500, "fen": "8/P7/8/8/8/8/k7/4K3 w - - 0 1", "solution": ["a7a8q"]}
+    """
+
+    /// A pawn reaching the last rank waits for the learner to choose; the piece chosen is the move judged.
+    func testAPromotionWaitsForTheLearnersPiece() async throws {
+        let right = try runner(promotion)
+        try await started(right)
+        move(right, "a7a8")
+        XCTAssertNotNil(right.game.pendingPromotion, "the picker is up")
+        XCTAssertNil(right.outcome)
+        XCTAssertEqual(right.mistakes, 0)
+        right.promote(to: .queen)
+        XCTAssertEqual(right.outcome, .firstTry)
+
+        let wrong = try runner(promotion)
+        try await started(wrong)
+        move(wrong, "a7a8")
+        wrong.promote(to: .knight)
+        XCTAssertEqual(wrong.mistakes, 1)
+    }
+
     func testAWrongMoveIsTakenBackForAnotherTry() async throws {
         let runner = try runner(backRank)
         try await started(runner)

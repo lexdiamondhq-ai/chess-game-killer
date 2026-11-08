@@ -666,6 +666,29 @@ final class AnalysisModelTests: XCTestCase {
         XCTAssertEqual(model.movesMade.map { $0.label }, ["1. d4"])
     }
 
+    /// A pawn the person moves to the last rank asks what it becomes, and becomes that.
+    func testAPromotionAsksWhichPiece() {
+        let draft = PositionDraft(fen: "8/8/8/8/8/8/4p3/K6k b - - 0 1")!
+        let model = AnalysisModel(draft: draft, engine: nil)
+        model.tap(.e2)
+        model.tap(.e1)
+        XCTAssertEqual(model.promoting?.to, .e1)
+        XCTAssertEqual(model.promoting?.color, .black)
+        XCTAssertTrue(model.playedSteps.isEmpty, "nothing is played until a piece is chosen")
+        XCTAssertEqual(model.draft[.e2], .init(.pawn, .black))
+
+        model.cancelPromotion()
+        XCTAssertNil(model.promoting)
+        XCTAssertEqual(model.draft[.e2], .init(.pawn, .black), "a change of mind leaves the pawn")
+
+        model.tap(.e2)
+        model.tap(.e1)
+        model.promote(to: .knight)
+        XCTAssertNil(model.promoting)
+        XCTAssertEqual(model.playedSteps.map(\.uci), ["e2e1n"])
+        XCTAssertEqual(model.draft[.e1], .init(.knight, .black))
+    }
+
     func testLinesAreNumberedFromThePositionOnTheBoard() async {
         let draft = PositionDraft(fen: "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3")!
         let engine = FakeEngine(scripted: [

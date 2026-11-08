@@ -67,6 +67,17 @@ final class LevelCheckRunner {
     func tap(_ square: Square) {
         guard phase == .solving, let drill, drill.acceptsTaps else { return }
         drill.tap(square)
+        checkAnswer(drill)
+    }
+
+    /// Finishes a promotion with the piece the player chose.
+    func promote(to kind: Piece.Kind) {
+        guard phase == .solving, let drill else { return }
+        drill.promote(to: kind)
+        checkAnswer(drill)
+    }
+
+    private func checkAnswer(_ drill: DrillRunner) {
         if drill.mistakes > 0 {
             answer(solved: false)
         } else if let outcome = drill.outcome {

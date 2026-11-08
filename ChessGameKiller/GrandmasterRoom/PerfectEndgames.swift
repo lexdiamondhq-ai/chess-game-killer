@@ -33,7 +33,8 @@ struct EndgameView: View {
                     goalRow(runner)
                     TrainerBoard(game: runner.board, theme: theme, side: side, flipped: runner.player == .black,
                                  marks: runner.marks,
-                                 onTap: runner.phase == .playing ? { (square: Square) in runner.tap(square) } : nil)
+                                 onTap: runner.phase == .playing ? { (square: Square) in runner.tap(square) } : nil,
+                                 onPromote: { kind in runner.promote(to: kind) })
                         .id(runner.study.id)
                         .transition(.opacity)
                     RoomMessage(text: runner.message, tone: runner.tone, theme: theme)

@@ -618,6 +618,23 @@ struct AnalysisView: View {
         return tints
     }
 
+    /// What a pawn the person moved to the last rank becomes: Queen, Rook, Bishop or Knight,
+    /// as in a game. A tap beside the pieces leaves the pawn where it was.
+    @ViewBuilder
+    private var promotionPicker: some View {
+        if let promotion = model.promoting {
+            GeometryReader { geo in
+                PromotionPicker(
+                    color: promotion.color, theme: theme,
+                    squareSize: min(geo.size.width / 8, geo.size.height / 6),
+                    cancel: { withAnimation(.snappy(duration: 0.2)) { model.cancelPromotion() } },
+                    choose: { kind in withAnimation(.snappy(duration: 0.2)) { model.promote(to: kind) } }
+                )
+            }
+            .transition(.opacity)
+        }
+    }
+
     /// The standing board's tilt here, in degrees: up from the lowest (50), which a scroll
     /// view would otherwise give it, toward the highest (62).
     private static let analysisTilt: Float = 58
@@ -639,6 +656,7 @@ struct AnalysisView: View {
                     // tips higher, so the board and its pieces come out larger (Alex, 2026-11-08).
                     .aspectRatio(tilt == .tilted ? CGFloat(SculptedCamera.snugAspect(tilt: Self.analysisTilt)) : tilt.framing.aspect,
                                  contentMode: .fit)
+                    .overlay { promotionPicker }
                     // Edge to edge, as the game's board runs: out past the screen's own padding.
                     .padding(.horizontal, -16)
                 HStack {
@@ -653,6 +671,7 @@ struct AnalysisView: View {
                               hints: hints,
                               onTap: { square in model.tap(square) }, tints: tints,
                               selected: model.selected, targets: model.targets)
+                    .overlay { promotionPicker }
                     .animation(.snappy(duration: 0.4), value: flipped)
                     .animation(.snappy(duration: 0.22), value: model.draft.fen)
                 if onSwitchTurn != nil {
