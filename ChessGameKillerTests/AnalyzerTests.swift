@@ -329,6 +329,30 @@ final class ScanSessionTests: XCTestCase {
         XCTAssertEqual(session.analyzed[.a1], .init(.rook, .white))
     }
 
+    /// Whose move it is can be switched on the analysis itself (Alex, 2026-11-07: "I can't switch
+    /// from white to black"): the same pieces, the other side to move, a fresh analysis, and the
+    /// reader's guess at the turn no longer flagged. A doubt about the pieces stays.
+    func testTheTurnSwitchesOnTheAnalysis() async {
+        let draft = PositionDraft(fen: "6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1")!
+        let session = ScanSession(reader: FakeBoardReader(result: .success(
+            BoardReading(draft: draft, whiteSide: .bottom, sureOfTurn: false, confidence: .low)
+        )))
+        session.read(UIImage())
+        await waitUntil { !session.isReading }
+        let firstRun = session.analysisRun
+
+        session.switchTurn(of: session.analyzed)
+        XCTAssertEqual(session.path, [.analysis], "still the one analysis")
+        XCTAssertEqual(session.analyzed.sideToMove, .black)
+        XCTAssertEqual(session.analyzed.fen.split(separator: " ").first, draft.fen.split(separator: " ").first)
+        XCTAssertGreaterThan(session.analysisRun, firstRun, "the analysis starts over")
+        XCTAssertEqual(session.photoDoubts, "The picture was hard to read, so check the pieces.")
+        XCTAssertEqual(session.draft.sideToMove, .black, "Edit pieces opens on the switched turn")
+
+        session.switchTurn(of: session.analyzed)
+        XCTAssertEqual(session.analyzed.sideToMove, .white, "and back")
+    }
+
     /// Pieces read that can't be analyzed (here, no black king) open the editor instead,
     /// where what's wrong shows under the board.
     func testPiecesThatCantBeAnalyzedOpenTheEditor() async {
