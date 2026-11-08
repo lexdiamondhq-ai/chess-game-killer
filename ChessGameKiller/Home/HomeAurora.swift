@@ -561,7 +561,7 @@ struct HomeAuroraGameTile: View {
 /// The next game, dressed like your finest move (Alex, 2026-11-08: "Change the Rival to look
 /// like this, use the main pic for the rival, get rid of the coin"): the rival's own picture,
 /// the still from its welcome film, in a gold frame on the left; small gold caps, the rival's
-/// name in serif, the match in grey, and Play and Change as gold pills. The picture opens the
+/// name in serif, the match in grey, and Play and Options as gold pills. The picture opens the
 /// rival in the hall, where its film plays.
 struct HomeAuroraNextRival: View {
     let card: HomeAuroraGameCard
@@ -601,7 +601,7 @@ struct HomeAuroraNextRival: View {
                     Button(action: play) { pill("Play", symbol: "play.fill") }
                         .buttonStyle(HomeStagePress())
                         .accessibilityLabel("Play \(rival.name)")
-                    Button(action: change) { pill("Change", symbol: "slider.horizontal.3") }
+                    Button(action: change) { pill("Options", symbol: "slider.horizontal.3") }
                         .buttonStyle(HomeStagePress())
                         .accessibilityLabel("Change the next game")
                         .accessibilityHint("Pick your side, clock and rival")
