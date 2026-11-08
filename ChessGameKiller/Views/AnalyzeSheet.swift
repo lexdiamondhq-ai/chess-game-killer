@@ -618,6 +618,10 @@ struct AnalysisView: View {
         return tints
     }
 
+    /// The standing board's tilt here, in degrees: up from the lowest (50), which a scroll
+    /// view would otherwise give it, toward the highest (62).
+    private static let analysisTilt: Float = 58
+
     /// The board, as in a game: the real 3D board, tilted or flat from above, with the Tilted /
     /// Flat switch under it, when the look has one and 3D pieces are on; otherwise the flat board.
     /// Seen from the side to move at first (the toolbar's button turns it round).
@@ -631,6 +635,10 @@ struct AnalysisView: View {
                                       lastMove: model.lastMove.map { LastMove(from: $0.from, to: $0.to) },
                                       onTap: { square in model.tap(square) },
                                       framing: tilt.framing)
+                    // Standing, a little taller than the scroll view would leave it: the camera
+                    // tips higher, so the board and its pieces come out larger (Alex, 2026-11-08).
+                    .aspectRatio(tilt == .tilted ? CGFloat(SculptedCamera.snugAspect(tilt: Self.analysisTilt)) : tilt.framing.aspect,
+                                 contentMode: .fit)
                     // Edge to edge, as the game's board runs: out past the screen's own padding.
                     .padding(.horizontal, -16)
                 HStack {
