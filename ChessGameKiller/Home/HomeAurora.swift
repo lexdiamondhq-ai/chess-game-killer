@@ -312,9 +312,21 @@ struct HomeAuroraView: View {
     }
 
     /// Your games as wide cards, the next one peeking in at the right.
+    @ViewBuilder
     private var gameRow: some View {
         let all: [HomeAuroraGameCard] = cards
-        return ScrollView(.horizontal) {
+        if all.count == 1, let only = all.first {
+            // One card sits on the page like your finest move below it, edge to edge with the
+            // same margins (Alex, 2026-11-08: "the same size in length as the one below").
+            tile(only)
+                .padding(.horizontal, 16)
+        } else {
+            swipeRow(all)
+        }
+    }
+
+    private func swipeRow(_ all: [HomeAuroraGameCard]) -> some View {
+        ScrollView(.horizontal) {
             LazyHStack(spacing: 12) {
                 ForEach(all) { card in
                     tile(card)
