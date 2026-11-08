@@ -32,6 +32,8 @@ targets:
     info:
       path: Support/ChessGameKiller-Info.plist
       properties:
+        # The name under the home screen icon.
+        CFBundleDisplayName: Beauty of Chess
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         CFBundleURLTypes:
@@ -65,7 +67,7 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         # Every look is dark, so the launch screen and system sheets are too (no white flash at launch).
         INFOPLIST_KEY_UIUserInterfaceStyle: Dark
-        INFOPLIST_KEY_CFBundleDisplayName: Chess Game Killer
+        INFOPLIST_KEY_CFBundleDisplayName: Beauty of Chess
         INFOPLIST_KEY_NSCameraUsageDescription: Take a photo of a chess board to find the best move.
         INFOPLIST_KEY_NSMicrophoneUsageDescription: Leo listens while you hold the button to talk through your move.
         INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: Your words become text so Leo can check your plan.
@@ -87,7 +89,7 @@ targets:
     info:
       path: Support/ChessGameKillerWidget-Info.plist
       properties:
-        CFBundleDisplayName: Chess Game Killer
+        CFBundleDisplayName: Beauty of Chess
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         NSExtension:

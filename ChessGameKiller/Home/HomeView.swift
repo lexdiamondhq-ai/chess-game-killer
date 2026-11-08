@@ -1046,7 +1046,7 @@ extension HomeView {
                     .homeRise(1)
                 if let premium = actions.premium {
                     HomeHairline(tone: tone)
-                    HomeLinkRow(glyph: Glyphs.king, title: "Chess Game Killer Pro", detail: "Everything, with no limits", tone: tone, action: premium)
+                    HomeLinkRow(glyph: Glyphs.king, title: "Beauty of Chess Pro", detail: "Everything, with no limits", tone: tone, action: premium)
                         .homeRise(2)
                 }
             }

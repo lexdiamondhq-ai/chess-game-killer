@@ -1,4 +1,4 @@
-# Chess Game Killer
+# Beauty of Chess
 
 One beautiful iOS chess game, with every feature easy to reach and easy to understand.
 
@@ -35,7 +35,7 @@ Then press Run in Xcode. The first build downloads Stockfish's neural network fi
 
 ## Tests
 `xcodebuild test -scheme ChessGameKiller -destination 'platform=iOS Simulator,name=iPhone 16'`
-GitHub Actions runs the same build and tests on every pull request, including a real Stockfish search.
+GitHub Actions runs the same build and tests on every pull request that changes the app, including a real Stockfish search. Mac minutes are costly, so the simulator screenshots run only when the pull request has the `screenshots` label (or when the workflow is run by hand), and main runs only the newest-Xcode build.
 
 ## Sounds
 The sounds in `ChessGameKiller/Sounds` are made with the ElevenLabs Sound Effects API by `scripts/make_sounds.py`. To change one, edit its prompt in that script and push to the `generate-sounds` branch (or run the "Generate sounds with ElevenLabs" workflow). The workflow uses the `ELEVENLABS_API_KEY` repository secret and commits the new files back to that branch.

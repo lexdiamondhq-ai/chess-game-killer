@@ -72,6 +72,7 @@ struct CloudBoardReader: BoardReader {
         var request = URLRequest(url: endpoint.appendingPathComponent("read"))
         request.httpMethod = "POST"
         request.setValue("image/jpeg", forHTTPHeaderField: "Content-Type")
+        request.setValue(String(ScanCount.next()), forHTTPHeaderField: "X-Scan-Count")
         request.timeoutInterval = 120
 
         let result: (Data, URLResponse)
@@ -121,6 +122,19 @@ struct CloudBoardReader: BoardReader {
             sureOfTurn: turn != nil,
             confidence: answer.confidence ?? .medium
         )
+    }
+}
+
+/// This month's photos so far, counting the one being sent. The server reads
+/// a player's first 100 scans each month with its fastest model.
+enum ScanCount {
+    static func next(defaults: UserDefaults = .standard, now: Date = .now, calendar: Calendar = .current) -> Int {
+        let parts = calendar.dateComponents([.year, .month], from: now)
+        let month = (parts.year ?? 0) * 100 + (parts.month ?? 0)
+        let count = defaults.integer(forKey: "scanCountMonth") == month ? defaults.integer(forKey: "scanCount") + 1 : 1
+        defaults.set(month, forKey: "scanCountMonth")
+        defaults.set(count, forKey: "scanCount")
+        return count
     }
 }
 

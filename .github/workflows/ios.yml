@@ -1,14 +1,50 @@
 name: iOS build and tests
 
+# Mac runners cost about ten times what Linux ones do, so this workflow keeps them short:
+# - Pull requests run the tests (build-and-test), only when the app's own files change,
+#   and a new push cancels the run it replaces.
+# - Main runs only the newest-Xcode build (xcode-26-build); the pull request already ran the tests.
+# - The simulator screenshots (about 15 minutes) run only when asked for: add the
+#   "screenshots" label to the pull request, or run the workflow by hand.
 on:
   push:
     branches: [main]
+    paths:
+      - "ChessGameKiller/**"
+      - "ChessGameKillerTests/**"
+      - "ChessGameKillerWidget/**"
+      - "Shared/**"
+      - "Support/**"
+      - "project.yml"
+      - ".github/workflows/ios.yml"
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
+    paths:
+      - "ChessGameKiller/**"
+      - "ChessGameKillerTests/**"
+      - "ChessGameKillerWidget/**"
+      - "Shared/**"
+      - "Support/**"
+      - "project.yml"
+      - ".github/workflows/ios.yml"
+  workflow_dispatch:
+    inputs:
+      screenshots:
+        description: Take the simulator screenshots
+        type: boolean
+        default: true
+
+concurrency:
+  group: ios-${{ github.ref }}
+  # A newer push to a pull request replaces the run still going; runs on main always finish.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   xcode-26-build:
     # Alex builds on the newest Xcode, whose type checker gives up sooner on long
     # SwiftUI expressions. This build flags any expression slower than 150 ms.
+    # It runs on main and by hand, not on every pull request push.
+    if: github.event_name != 'pull_request'
     runs-on: macos-26
     timeout-minutes: 45
     steps:
@@ -50,7 +86,14 @@ jobs:
           fi
 
   build-and-test:
+    # Pull requests and by hand. Adding a label other than "screenshots" starts no run.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' &&
+       (github.event.action != 'labeled' || github.event.label.name == 'screenshots'))
     runs-on: macos-15
+    env:
+      SCREENSHOTS: ${{ (github.event_name == 'workflow_dispatch' && inputs.screenshots) || contains(github.event.pull_request.labels.*.name, 'screenshots') }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -100,7 +143,8 @@ jobs:
       - name: Screenshots on the simulator
         # The tests draw their pictures in-process, which leaves out the system's glass.
         # These are the screen itself, as a phone shows it. A picture that fails never fails the run.
-        if: always()
+        # Only when asked for (see the top of this file): they take about 15 Mac minutes.
+        if: always() && env.SCREENSHOTS == 'true'
         continue-on-error: true
         run: |
           UDID="${{ steps.sim.outputs.udid }}"
@@ -203,7 +247,7 @@ jobs:
           cat snapshots/device.txt || true
           # The newest effects print last, so the end of the log shows them; the simulator's own screenshots after all.
           LAST="sculpted-finale sculpted-big-capture check hints capture-fall game-end device"
-          ORDERED=$(ls snapshots/*.png | grep -v -E "$(echo $LAST | tr ' ' '|')"; for p in $LAST; do ls snapshots/$p-*.png 2>/dev/null; done)
+          ORDERED=$(ls snapshots/*.png | grep -v -E "$(echo $LAST | tr ' ' '|')"; for p in $LAST; do ls snapshots/$p-*.png 2>/dev/null || true; done)
           for f in $ORDERED; do
             [ -e "$f" ] || continue
             # Look studies and the simulator's screenshots are printed near full size, so they can be judged as on the phone.

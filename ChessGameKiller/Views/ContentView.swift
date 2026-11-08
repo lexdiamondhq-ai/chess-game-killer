@@ -629,7 +629,7 @@ struct ContentView: View {
                     }
                 }
                 .background { SheetBackdrop(theme: theme) }
-                .navigationTitle("Chess Game Killer")
+                .navigationTitle("Beauty of Chess")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar { toolbarContent }
                 .toolbar(bigBoard ? .hidden : .visible, for: .navigationBar)
