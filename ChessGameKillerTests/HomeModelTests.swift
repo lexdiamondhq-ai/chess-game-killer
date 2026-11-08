@@ -13,7 +13,7 @@ final class HomeModelTests: XCTestCase {
         let next = HomeUpNext.make(match: match, side: .white, level: nil, timeControl: .unlimited, hasPlayed: false)
         XCTAssertEqual(next.kind, .firstGame)
         XCTAssertEqual(next.level, .beginner)
-        XCTAssertEqual(next.rival.name, "The 1000s")
+        XCTAssertEqual(next.rival.name, "The Cub")
         XCTAssertFalse(next.inProgress)
         XCTAssertTrue(next.yourMove, "White moves first")
         XCTAssertEqual(next.moveNumber, 1)

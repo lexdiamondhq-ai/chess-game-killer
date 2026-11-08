@@ -430,7 +430,7 @@ struct HomeShortcutsPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Play a crowd")
+            Text("Face a rival")
                 .font(.app(.footnote, weight: .semibold))
                 .foregroundStyle(tone.ink2)
                 .padding(.leading, 4)
@@ -461,27 +461,37 @@ struct HomeShortcutsPanel: View {
         .onAppear { titleFocused = true }
     }
 
+    /// Each rival's coin a little bigger than the one before, so the row climbs toward the
+    /// Dragonlord.
+    private func coinSize(_ rival: Rival) -> CGFloat {
+        min(orb, 56) * (0.8 + 0.07 * CGFloat(rival.level.rawValue))
+    }
+
     private func rivalButton(_ rival: Rival) -> some View {
         let isNext = rival.level == next
-        let size: CGFloat = min(orb, 56)
+        let size = coinSize(rival)
         return Button { pick { playRival(rival.level) } } label: {
-            VStack(spacing: 5) {
-                Image(rival.glowName)
-                    .resizable()
-                    .interpolation(.high)
-                    .scaledToFit()
-                    .frame(width: size, height: size)
-                    .background {
+            VStack(spacing: 3) {
+                RivalCoin(rival: rival, size: size)
+                    .padding(2)
+                    .overlay {
+                        // The rival up next wears a gold ring.
                         if isNext {
                             Circle()
-                                .fill(RadialGradient(colors: [rival.light.opacity(0.34), rival.light.opacity(0)],
-                                                     center: .center, startRadius: 0, endRadius: size * 0.75))
-                                .frame(width: size * 1.5, height: size * 1.5)
+                                .strokeBorder(tone.metal, lineWidth: 1.5)
+                                .shadow(color: tone.metal.opacity(0.5), radius: 6)
                         }
                     }
+                    // The coins sit on one line however big they grow.
+                    .frame(height: coinSize(Rival.all[Rival.all.count - 1]) + 4, alignment: .bottom)
                 Text(rival.shortName)
                     .font(.app(.caption2, weight: .semibold))
-                    .foregroundStyle(isNext ? tone.ink : tone.ink2)
+                    .foregroundStyle(tone.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                Text(rival.elo.replacingOccurrences(of: "~", with: ""))
+                    .font(.app(.caption2).monospacedDigit())
+                    .foregroundStyle(tone.ink2)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }

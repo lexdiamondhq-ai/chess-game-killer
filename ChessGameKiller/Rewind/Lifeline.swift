@@ -56,7 +56,7 @@ struct Lifeline: View {
                 VStack(alignment: .leading, spacing: 0) {
                     Text("YOU")
                     Spacer(minLength: 0)
-                    Text(game.opponent.uppercased())
+                    Text(game.opponentShown.uppercased())
                         .lineLimit(1)
                 }
                 .padding(.leading, inset)
