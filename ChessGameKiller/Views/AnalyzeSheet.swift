@@ -187,11 +187,54 @@ extension AnalyzeSheet {
             AnalysisView(draft: session.analyzed, theme: theme, engine: engine,
                          rival: rival, clock: clock, forfeits: forfeits,
                          photo: session.photo, photoDoubts: session.photoDoubts,
-                         onEditPieces: { session.editPieces($0) }) { draft in
+                         onEditPieces: { session.editPieces($0) },
+                         photoButtons: photoButtons) { draft in
                 onPlay(draft)
                 dismiss()
             }
             .id(session.analysisRun)
+        }
+    }
+
+    /// Take a photo and Upload a photo, in the analysis's top bar, so a new board can come in
+    /// from there without going back (Alex, 2026-11-08). Same scans and limit as the first screen.
+    fileprivate var photoButtons: AnalysisPhotoButtons {
+        AnalysisPhotoButtons(hasCamera: hasCamera, canScan: canScan, item: $photoItem,
+                             isLoading: isLoadingPhoto) {
+            if canScan { showingCamera = true } else { offer = .scan }
+        } onNoScans: {
+            offer = .scan
+        }
+    }
+}
+
+/// The analysis's two photo buttons: the camera, and a picture or screenshot from Photos.
+/// Either one reads the new board and opens its analysis, as from the analyzer's first screen.
+struct AnalysisPhotoButtons: View {
+    let hasCamera: Bool
+    let canScan: Bool
+    @Binding var item: PhotosPickerItem?
+    let isLoading: Bool
+    let onCamera: () -> Void
+    let onNoScans: () -> Void
+
+    var body: some View {
+        if hasCamera {
+            Button(action: onCamera) {
+                Label("Take a photo", systemImage: "camera")
+            }
+            .accessibilityHint("Snap a real board to analyze it")
+        }
+        if canScan {
+            PhotosPicker(selection: $item, matching: .images) {
+                Label("Upload a photo", systemImage: "photo.on.rectangle")
+            }
+            .disabled(isLoading)
+            .accessibilityHint("A picture or a screenshot of a board, to analyze it")
+        } else {
+            Button(action: onNoScans) {
+                Label("Upload a photo", systemImage: "photo.on.rectangle")
+            }
         }
     }
 }
@@ -492,6 +535,8 @@ struct AnalysisView: View {
     var photoDoubts: String?
     /// Opens the editor on the board's pieces, to fix one the reader got wrong. Offered with the photo.
     var onEditPieces: ((PositionDraft) -> Void)?
+    /// Take a photo and Upload a photo, for a new board, when the analyzer offers them.
+    var photoButtons: AnalysisPhotoButtons?
     let onPlay: (PositionDraft) -> Void
 
     @State private var model: AnalysisModel
@@ -505,6 +550,7 @@ struct AnalysisView: View {
     init(draft: PositionDraft, theme: BoardTheme, engine: ChessEngine?, rival: String = "the computer",
          clock: TimeControl = .unlimited, forfeits: String? = nil,
          photo: UIImage? = nil, photoDoubts: String? = nil, onEditPieces: ((PositionDraft) -> Void)? = nil,
+         photoButtons: AnalysisPhotoButtons? = nil,
          onPlay: @escaping (PositionDraft) -> Void) {
         self.theme = theme
         self.rival = rival
@@ -513,6 +559,7 @@ struct AnalysisView: View {
         self.photo = photo
         self.photoDoubts = photoDoubts
         self.onEditPieces = onEditPieces
+        self.photoButtons = photoButtons
         self.onPlay = onPlay
         let sounds: SoundPlaying? = engine == nil ? nil : SoundPlayer.shared
         _model = State(initialValue: AnalysisModel(draft: draft, engine: engine, sounds: sounds))
@@ -626,6 +673,11 @@ struct AnalysisView: View {
         .navigationTitle("Analysis")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            if let photoButtons {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    photoButtons
+                }
+            }
             ToolbarItem(placement: .primaryAction) {
                 Button { flipped.toggle() } label: {
                     Label {
