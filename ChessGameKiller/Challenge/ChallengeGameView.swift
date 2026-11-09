@@ -12,7 +12,7 @@ struct ChallengeGameView: View {
 
     @Environment(ChallengeCenter.self) private var center
     @AppStorage("sculpted3D") private var sculpted3D = true
-    @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.auto
+    @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.tilted
     @AppStorage("haptics") private var hapticsOn = true
     @State private var confirming: Confirmation?
     @State private var copied = false
@@ -85,14 +85,14 @@ struct ChallengeGameView: View {
     private var topSeat: FriendSeat { game.match.isBoardFlipped ? .white : .black }
 
     private func layout(in size: CGSize) -> some View {
-        let aspect = BoardView.aspect(theme, setting: sculpted3D, framing: tilt.framing(bigBoard: false))
+        let aspect = BoardView.aspect(theme, setting: sculpted3D, framing: tilt.framing)
         let spare = size.height - Self.plateHeight * 2 - Self.ribbonHeight - Self.spacing * 5
         let width = max(0, min(size.width, spare * aspect, Self.maxBoardSide))
         return VStack(spacing: Self.spacing) {
             Spacer(minLength: 0)
             FriendPlate(game: game, seat: topSeat, theme: theme)
                 .frame(height: Self.plateHeight)
-            BoardView(match: game.match, theme: theme, framing: tilt.framing(bigBoard: false))
+            BoardView(match: game.match, theme: theme, framing: tilt.framing)
                 .frame(width: width, height: width / aspect)
             FriendPlate(game: game, seat: topSeat.opposite, theme: theme)
                 .frame(height: Self.plateHeight)
@@ -863,13 +863,13 @@ struct FriendClockBox: View {
             let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
             Text(FriendClockMath.label(left))
                 .font(.system(size: 21, weight: .medium).monospacedDigit())
-                .foregroundStyle(running ? Color.black.opacity(0.88) : Color.secondary)
+                .foregroundStyle(running ? (urgent ? Color.black.opacity(0.88) : runningInk) : Color.secondary)
                 .lineLimit(1)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 5)
                 .background {
                     if running {
-                        shape.fill(urgent ? ChallengeColors.urgent : Color.white.opacity(0.92))
+                        shape.fill(urgent ? ChallengeColors.urgent : runningFace)
                     } else {
                         shape.fill(Color.primary.opacity(0.04))
                             .overlay(shape.strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
@@ -879,6 +879,11 @@ struct FriendClockBox: View {
         }
         .animation(.snappy(duration: 0.25), value: running)
     }
+
+    /// A running clock's face: the home's one solid fill (ivory in the dark, the set's ink in
+    /// Light), or bright white on the older home.
+    private var runningFace: Color { theme.screenTone?.ivory ?? Color.white.opacity(0.92) }
+    private var runningInk: Color { theme.screenTone?.onIvory ?? Color.black.opacity(0.88) }
 }
 
 /// A soft dot that breathes while the lobby waits.

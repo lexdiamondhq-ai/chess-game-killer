@@ -69,7 +69,7 @@ struct GlyphTile<Content: View>: View {
         content()
             .foregroundStyle(Color.primary.opacity(0.86))
             .frame(width: 34, height: 34)
-            .background(theme.isDark ? Color.black.opacity(0.3) : Color.primary.opacity(0.06), in: tile)
-            .overlay { tile.strokeBorder(Color.primary.opacity(theme.isDark ? 0.09 : 0.08), lineWidth: 1) }
+            .background(theme.screenIsDark ? Color.black.opacity(0.3) : Color.primary.opacity(0.06), in: tile)
+            .overlay { tile.strokeBorder(Color.primary.opacity(theme.screenIsDark ? 0.09 : 0.08), lineWidth: 1) }
     }
 }

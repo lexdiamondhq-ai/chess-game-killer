@@ -13,6 +13,8 @@ struct ChallengeJoinView: View {
     /// Asked for only when the player has never given one.
     @State private var asksForName = false
 
+    private var boardSide: CGFloat { asksForName ? 168 : 228 }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
@@ -80,15 +82,11 @@ struct ChallengeJoinView: View {
             .padding(.top, 18)
 
             // A smaller board when the name is asked for, so the name field shows above the buttons.
-            if let draft = PositionDraft(fen: Position.standard.fen) {
-                let side: CGFloat = asksForName ? 168 : 228
-                PositionBoard(draft: draft, theme: theme, flipped: mySeat == .black)
-                    .frame(width: side, height: side)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .shadow(color: .black.opacity(0.45), radius: 18, y: 10)
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
-            }
+            CutoutStillBoard(fen: Position.standard.fen, theme: theme, flipped: mySeat == .black)
+                .frame(width: boardSide, height: boardSide)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .shadow(color: .black.opacity(theme.screenIsDark ? 0.45 : 0.18), radius: 18, y: 10)
+                .allowsHitTesting(false)
 
             if asksForName {
                 VStack(alignment: .leading, spacing: 10) {
@@ -146,7 +144,7 @@ struct ChallengeJoinView: View {
                             .opacity(invite.isJoining ? 0 : 1)
                         if invite.isJoining {
                             ProgressView()
-                                .tint(Color.black.opacity(0.8))
+                                .tint(theme.screenTone?.onIvory ?? Color.black.opacity(0.8))
                         }
                     }
                 }

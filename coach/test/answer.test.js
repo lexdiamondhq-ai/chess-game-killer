@@ -30,7 +30,7 @@ function message(text, extra = {}) {
     id: "msg_test",
     type: "message",
     role: "assistant",
-    model: "claude-opus-5-5",
+    model: "claude-sonnet-5-5",
     stop_reason: "end_turn",
     content: [
       { type: "thinking", thinking: "", signature: "sig" },
@@ -178,7 +178,7 @@ test("the template never runs past 320 characters", () => {
 
 test("the answer request: Leo's persona, the checked facts, the fallback and no sampling settings", () => {
   const request = buildAnswerRequest(checked, { ...spoken, said: "is <b>this</b> safe?" }, {});
-  assert.equal(request.model, "claude-opus-5-5");
+  assert.equal(request.model, "claude-sonnet-5-5");
   assert.equal(request.max_tokens, 3000);
   assert.deepEqual(request.betas, ["server-side-fallback-2026-07-01"]);
   assert.equal(request.fallbacks, "default");
@@ -274,6 +274,10 @@ test("Vera answers as Vera, by the same rules as Leo", () => {
   assert.match(leo, /^You are Leo,/);
   assert.match(vera, /^You are Vera,/);
   assert.doesNotMatch(vera, /\bLeo\b/);
+  // Leo is the gentleman: courteous and unhurried. Vera keeps her own quick manner.
+  assert.match(leo, /cultured grandmaster/);
+  assert.match(leo, /shall we/);
+  assert.doesNotMatch(vera, /shall we/);
   // Everything after the persona is the same rules, word for word.
   const rules = (prompt) => prompt.slice(prompt.indexOf("Before moving"));
   assert.equal(rules(vera), rules(leo));

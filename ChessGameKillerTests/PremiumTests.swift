@@ -38,9 +38,9 @@ final class PremiumTests: XCTestCase {
         XCTAssertEqual(PremiumFeature.ghostVision.free, .perDay(3))
         XCTAssertNil(PremiumFeature.ghostVision.premium)
         XCTAssertEqual(PremiumFeature.talk.free, .perWeek(3))
-        XCTAssertEqual(PremiumFeature.talk.premium, .perDay(10))
+        XCTAssertEqual(PremiumFeature.talk.premium, .perDay(50))
         XCTAssertEqual(PremiumFeature.scan.free, .perWeek(3))
-        XCTAssertEqual(PremiumFeature.scan.premium, .perDay(3))
+        XCTAssertEqual(PremiumFeature.scan.premium, .perDay(30))
         XCTAssertEqual(PremiumFeature.ratedPuzzle.free, .perDay(15))
         XCTAssertEqual(PremiumFeature.puzzleRush.free, .perDay(1))
         XCTAssertEqual(PremiumFeature.fullRewind.free, .perDay(1))
@@ -127,11 +127,23 @@ final class PremiumTests: XCTestCase {
 
     func testPremiumStillCapsTheFeaturesThatCostMoney() {
         let premium = Premium(defaults: defaults, isPremium: true)
-        XCTAssertEqual(premium.remaining(.talk), 10)
-        for _ in 0..<10 { XCTAssertTrue(premium.use(.talk)) }
+        XCTAssertEqual(premium.remaining(.talk), 50)
+        for _ in 0..<50 { XCTAssertTrue(premium.use(.talk)) }
         XCTAssertFalse(premium.use(.talk))
-        for _ in 0..<3 { XCTAssertTrue(premium.use(.scan)) }
+        for _ in 0..<30 { XCTAssertTrue(premium.use(.scan)) }
         XCTAssertFalse(premium.use(.scan))
+    }
+
+    func testPremiumPlayersHearTheirCapNotAnOffer() throws {
+        let free = Premium(defaults: defaults, isPremium: false)
+        let paid = Premium(defaults: defaults, isPremium: true)
+        XCTAssertEqual(free.limitLine(.scan), PremiumFeature.scan.limitLine)
+        XCTAssertEqual(paid.limitLine(.scan), PremiumFeature.scan.premiumLimitLine)
+        XCTAssertEqual(paid.limitLine(.talk), PremiumFeature.talk.premiumLimitLine)
+        for feature in PremiumFeature.allCases where feature.premium != nil {
+            let line = try XCTUnwrap(feature.premiumLimitLine, "\(feature) has a Premium cap, so it needs its own line")
+            XCTAssertFalse(line.contains("Premium"), "\(feature): don't sell Premium to a Premium player")
+        }
     }
 
     func testLockedFeaturesStayShutForFreePlayers() {
@@ -207,6 +219,9 @@ final class PremiumTests: XCTestCase {
         XCTAssertFalse(RivalBoardsEarned.opens(.singularity, premium: premium, defaults: defaults))
         RivalBoardsEarned.note([Self.game(against: "The Masters", result: .win)], defaults: defaults)
         XCTAssertTrue(RivalBoardsEarned.opens(.singularity, premium: premium, defaults: defaults))
+        // Since the rivals have faces, a win is saved under the new name and opens the same board.
+        RivalBoardsEarned.note([Self.game(against: "The Hunter", result: .win)], defaults: defaults)
+        XCTAssertTrue(RivalBoardsEarned.opens(.drift, premium: premium, defaults: defaults))
     }
 
     private static func game(against rival: String, result: SavedGame.Result) -> SavedGame {

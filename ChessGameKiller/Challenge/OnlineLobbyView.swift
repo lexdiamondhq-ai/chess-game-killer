@@ -108,7 +108,7 @@ struct OnlineLobbyView: View {
                             Task { await lobby.challenge(player, name: name) }
                         }
                         if player.id != players.last?.id {
-                            Divider().overlay(Color.white.opacity(0.06)).padding(.leading, 64)
+                            Divider().overlay(Color.primary.opacity(0.06)).padding(.leading, 64)
                         }
                     }
                 }
@@ -381,13 +381,13 @@ struct OnlineSeats: View {
                         .overlay {
                             Image(systemName: "checkmark")
                                 .font(.system(size: 20, weight: .bold))
-                                .foregroundStyle(Color.black.opacity(0.85))
+                                .foregroundStyle(theme.onChallengeAccent)
                         }
                         .transition(.scale(scale: 0.3).combined(with: .opacity))
                 } else {
                     Circle()
-                        .fill(Color.white.opacity(0.06))
-                        .overlay { Circle().strokeBorder(Color.white.opacity(0.14), lineWidth: 1) }
+                        .fill(Color.primary.opacity(0.06))
+                        .overlay { Circle().strokeBorder(Color.primary.opacity(0.14), lineWidth: 1) }
                     Text("?")
                         .font(theme.challengeFont(20, .semibold))
                         .foregroundStyle(.secondary)

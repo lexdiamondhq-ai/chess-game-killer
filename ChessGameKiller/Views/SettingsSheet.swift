@@ -11,14 +11,14 @@ struct SettingsSheet: View {
     @AppStorage(GhostVision.storageKey) private var ghostVisionOn = true
     @AppStorage("soundEffects") private var soundOn = true
     @AppStorage("haptics") private var hapticsOn = true
+    /// Home's music. Its switch moved here from Home's header (Alex, 2026-11-07).
+    @State private var homeMusic = HomeMusic.shared
+    @State private var rivalTheme = RivalTheme.shared
     @AppStorage("rivalBanter") private var banterOn = true
-    @AppStorage("bigBoard") private var bigBoard = false
     @AppStorage("sculpted3D") private var sculpted3D = true
-    @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.auto
+    @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.tilted
     @AppStorage(Heirloom.settingKey) private var heirloomOn = true
     @AppStorage(BoardTheme.coordinatesKey) private var coordinatesOn = true
-    @AppStorage(HomeScreen.key) private var homeScreen = HomeScreen.defaultOn
-    @AppStorage(HomeLayout.key) private var boardSheet = HomeLayout.defaultOn
     @AppStorage(HomeToneMode.key) private var homeTone = HomeToneMode.defaultMode
     /// Shared with the lessons' speaker button and the highlight reel.
     @AppStorage("coachVoiceMuted") private var voiceMuted = false
@@ -35,7 +35,7 @@ struct SettingsSheet: View {
     @State private var showingPremium = false
 
     private var theme: BoardTheme { .named(themeID) }
-    private var accent: Color { theme.accent ?? .accentColor }
+    private var accent: Color { theme.trainingAccent }
 
     var body: some View {
         NavigationStack {
@@ -45,14 +45,26 @@ struct SettingsSheet: View {
 
                     PremiumSettingsCard(theme: theme) { showingPremium = true }
 
+                    // Light or dark lives here, not on the Today screen (Alex, 2026-11-07), and the
+                    // app icon sits with it (Alex, 2026-11-08).
+                    section("Appearance") {
+                        SettingsGroup(theme: theme) {
+                            PickerRow(title: "Light or dark", subtitle: homeTone.blurb, symbol: "circle.lefthalf.filled", theme: theme) {
+                                Picker("Light or dark", selection: $homeTone) {
+                                    ForEach(HomeToneMode.allCases) { mode in
+                                        Text(mode.title).tag(mode)
+                                    }
+                                }
+                            }
+                            rule
+                            AppIconPicker(accent: accent)
+                        }
+                    }
+
                     section("Board") {
+                        // The rival boards (Spark to Singularity) are no longer offered here
+                        // (Alex, 2026-11-08: "Remove the rival options").
                         themeGrid(Self.looks)
-                        Text("Rival boards".uppercased())
-                            .font(.app(.caption, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                            .tracking(1)
-                            .padding(.top, 12)
-                        themeGrid(BoardTheme.rivals)
                         SettingsGroup(theme: theme) {
                             if theme.sculptedLook != nil {
                                 ToggleRow(title: "3D pieces", subtitle: "Carved pieces that lift, glide and fall. Off draws the same set flat.",
@@ -69,30 +81,13 @@ struct SettingsSheet: View {
                                     rule
                                 }
                             }
-                            ToggleRow(title: "Coordinates", subtitle: "Letters and numbers around the board. Off gives the squares more room.",
+                            ToggleRow(title: "Coordinates", subtitle: "The letters and numbers along the board's edge. Off hides them.",
                                       symbol: "textformat.abc", isOn: $coordinatesOn, theme: theme)
                             rule
                             ToggleRow(title: "Piece history", subtitle: "Your pieces wear what they've been through: gold seams, a promoted pawn's collar, notches, patina.",
                                       symbol: "seal", isOn: $heirloomOn, theme: theme)
-                            rule
-                            ToggleRow(title: "Big Board", subtitle: "The board fills the screen. Swipe up from the bottom for the tools, sideways on the board to replay moves.",
-                                      symbol: "arrow.up.left.and.arrow.down.right", isOn: $bigBoard, theme: theme)
-                            rule
-                            ToggleRow(title: "Home screen", subtitle: "Open on a home page: the board up top, your week, and every mode one tap away.",
-                                      symbol: "house", isOn: $homeScreen, theme: theme)
-                            rule
-                            ToggleRow(title: "Board and sheet", subtitle: "The 3D board stays on top and one glass sheet holds the rest, at home and in a game. Off brings back the tiles and the floating dock.",
-                                      symbol: "rectangle.bottomhalf.inset.filled", isOn: $boardSheet, theme: theme)
-                            if boardSheet {
-                                rule
-                                PickerRow(title: "Home colors", subtitle: homeTone.blurb, symbol: "circle.lefthalf.filled", theme: theme) {
-                                    Picker("Home colors", selection: $homeTone) {
-                                        ForEach(HomeToneMode.allCases) { mode in
-                                            Text(mode.title).tag(mode)
-                                        }
-                                    }
-                                }
-                            }
+                            // The switches for the earlier homes are gone (Alex, 2026-11-08): the
+                            // app has one home. HomeLayouts.settle() puts anyone who turned them off back.
                         }
                     }
 
@@ -121,24 +116,7 @@ struct SettingsSheet: View {
                                     }
                                 }
                             }
-                        }
-                    }
-
-                    section("Sound & feel") {
-                        SettingsGroup(theme: theme) {
-                            ToggleRow(title: "Sound effects", symbol: "speaker.wave.2.fill", isOn: $soundOn, theme: theme)
-                            rule
-                            ToggleRow(title: "Haptics", symbol: "iphone.radiowaves.left.and.right", isOn: $hapticsOn, theme: theme)
-                            rule
-                            ToggleRow(title: "Daily reminder", subtitle: "At most one a day, around when you usually play, and only if the day isn't done yet.",
-                                      symbol: "flame.fill", isOn: $remindersOn, theme: theme)
-                                .onChange(of: remindersOn) { _, on in
-                                    // Turned on: ask iOS once, then the app plans them when Settings closes.
-                                    if on { Task { _ = await DailyReminders.requestPermission() } }
-                                }
-                            rule
-                            ToggleRow(title: "Rival banter", subtitle: "Rivals talk to you during the game.",
-                                      symbol: "bubble.left.fill", isOn: $banterOn, theme: theme)
+                            // The coach's voice, with the coach (Alex, 2026-11-08), not under Sound & feel.
                             rule
                             ToggleRow(title: "Coach's voice", subtitle: "\(Coach.current.name) reads lessons and highlight reels aloud. Captions always show.",
                                       symbol: "waveform", isOn: Binding(get: { !voiceMuted }, set: { voiceMuted = !$0 }), theme: theme)
@@ -150,6 +128,37 @@ struct SettingsSheet: View {
                             ToggleRow(title: "Voice reactions", subtitle: reactionsSubtitle,
                                       symbol: "bubble.left.and.text.bubble.right.fill", isOn: $reactionsOn, theme: theme)
                                 .disabled(voiceMuted)
+                        }
+                    }
+
+                    section("Sound & feel") {
+                        SettingsGroup(theme: theme) {
+                            ToggleRow(title: "Sound effects", symbol: "speaker.wave.2.fill", isOn: $soundOn, theme: theme)
+                            rule
+                            ToggleRow(title: "Haptics", symbol: "iphone.radiowaves.left.and.right", isOn: $hapticsOn, theme: theme)
+                            rule
+                            if homeMusic.available {
+                                ToggleRow(title: "Home music", symbol: "music.note", isOn: Binding(
+                                    get: { homeMusic.on },
+                                    set: { on in if on != homeMusic.on { homeMusic.toggle() } }
+                                ), theme: theme)
+                                rule
+                            }
+                            ToggleRow(title: "Rival themes", subtitle: "Each rival's score, quietly, under every game against it.",
+                                      symbol: "music.quarternote.3", isOn: Binding(
+                                get: { rivalTheme.on },
+                                set: { on in if on != rivalTheme.on { rivalTheme.toggle() } }
+                            ), theme: theme)
+                            rule
+                            ToggleRow(title: "Daily reminder", subtitle: "At most one a day, around when you usually play, and only if the day isn't done yet.",
+                                      symbol: "flame.fill", isOn: $remindersOn, theme: theme)
+                                .onChange(of: remindersOn) { _, on in
+                                    // Turned on: ask iOS once, then the app plans them when Settings closes.
+                                    if on { Task { _ = await DailyReminders.requestPermission() } }
+                                }
+                            rule
+                            ToggleRow(title: "Rival banter", subtitle: "Rivals talk to you during the game.",
+                                      symbol: "bubble.left.fill", isOn: $banterOn, theme: theme)
                         }
                     }
 
@@ -170,6 +179,11 @@ struct SettingsSheet: View {
                                 LicensesView(theme: theme)
                             } label: {
                                 LinkRowLabel(title: "Open-source licenses", symbol: "doc.text", theme: theme)
+                            }
+                            .buttonStyle(.plain)
+                            rule
+                            Link(destination: PremiumStyle.privacy) {
+                                LinkRowLabel(title: "Privacy policy", symbol: "hand.raised", theme: theme)
                             }
                             .buttonStyle(.plain)
                             rule
@@ -211,14 +225,14 @@ struct SettingsSheet: View {
         }
         .presentationDetents([.large])
         .presentationBackground {
-            SheetBackdrop(theme: theme)
+            TrainingBackdrop(theme: theme)
         }
         .premiumOffer($offer)
         .sheet(isPresented: $showingPremium) {
             PremiumOfferView(feature: nil)
         }
         .tint(accent)
-        .preferredColorScheme(theme.isDark ? .dark : nil)
+        .screenScheme(theme)
     }
 
     // MARK: Pieces of the screen
@@ -450,7 +464,7 @@ private struct ThemeCard: View {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 17, weight: .semibold))
                                 .symbolRenderingMode(.palette)
-                                .foregroundStyle(Color.black, theme.accent ?? .accentColor)
+                                .foregroundStyle(Color.black, theme.trainingAccent)
                                 .background(Circle().fill(Color.black).padding(-1.5))
                                 .offset(x: 7, y: -7)
                                 .transition(.scale.combined(with: .opacity))
@@ -479,14 +493,14 @@ private struct ThemeCard: View {
                 } else if locked {
                     Image(systemName: "crown.fill")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(theme.accent ?? .accentColor)
+                        .foregroundStyle(theme.trainingAccent)
                         .accessibilityHidden(true)
                 }
             }
             .padding(.horizontal, 14)
             .frame(maxWidth: .infinity)
             .frame(height: 72)
-            .background(SettingsCard(theme: theme, selected: isSelected, color: theme.accent ?? .accentColor))
+            .background(SettingsCard(theme: theme, selected: isSelected, color: theme.trainingAccent))
             .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -558,7 +572,7 @@ private struct ToggleRow: View {
             }
             .opacity(isEnabled ? 1 : 0.4)
         }
-        .tint(theme.accent ?? .accentColor)
+        .tint(theme.trainingAccent)
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
     }
@@ -589,7 +603,7 @@ private struct PickerRow<Choice: View>: View {
             choice
                 .pickerStyle(.menu)
                 .labelsHidden()
-                .tint(theme.accent ?? .accentColor)
+                .tint(theme.trainingAccent)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -625,12 +639,12 @@ private struct IconTile: View {
     let theme: BoardTheme
 
     var body: some View {
-        let accent = theme.accent ?? .accentColor
+        let accent = theme.trainingAccent
         Image(systemName: symbol)
             .font(.system(size: 15, weight: .semibold))
             .foregroundStyle(accent)
             .frame(width: 34, height: 34)
-            .background(accent.opacity(theme.isDark ? 0.14 : 0.12), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .background(accent.opacity(theme.screenIsDark ? 0.14 : 0.12), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
             .accessibilityHidden(true)
     }
 }
@@ -644,7 +658,7 @@ private struct SettingsGroup<Content: View>: View {
         VStack(spacing: 0) {
             content
         }
-        .background(SettingsCard(theme: theme, selected: false, color: theme.accent ?? .accentColor))
+        .background(SettingsCard(theme: theme, selected: false, color: theme.trainingAccent))
     }
 }
 
@@ -666,7 +680,7 @@ private struct SettingsCard: View {
     }
 }
 
-/// The backdrop for a sheet, in the theme's colors.
+/// The backdrop for a sheet, in the theme's colors. The game screen stands on it too.
 struct SheetBackdrop: View {
     let theme: BoardTheme
 
@@ -717,7 +731,7 @@ struct LicensesView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Chess Game Killer is built on open source, and is open source itself under the GPL because it ships with Stockfish.")
+                Text("Beauty of Chess is built on open source, and is open source itself under the GPL because it ships with Stockfish.")
                     .font(.app(.footnote))
                     .foregroundStyle(.secondary)
                     .padding(.bottom, 4)
@@ -729,10 +743,10 @@ struct LicensesView: View {
                             Spacer(minLength: 8)
                             Text(credit.license)
                                 .font(.app(.caption, weight: .semibold))
-                                .foregroundStyle(theme.accent ?? .accentColor)
+                                .foregroundStyle(theme.trainingAccent)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
-                                .background((theme.accent ?? .accentColor).opacity(0.14), in: Capsule())
+                                .background(theme.trainingAccent.opacity(0.14), in: Capsule())
                         }
                         Text(credit.detail)
                             .font(.app(.subheadline))
@@ -746,11 +760,11 @@ struct LicensesView: View {
                     }
                     .padding(14)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(SettingsCard(theme: theme, selected: false, color: theme.accent ?? .accentColor))
+                    .background(SettingsCard(theme: theme, selected: false, color: theme.trainingAccent))
                     .accessibilityElement(children: .combine)
                 }
                 Link(destination: URL(string: "https://github.com/lexdiamondhq-ai/chess-game-killer")!) {
-                    Label("Chess Game Killer source code", systemImage: "chevron.left.forwardslash.chevron.right")
+                    Label("Beauty of Chess source code", systemImage: "chevron.left.forwardslash.chevron.right")
                         .font(.app(.subheadline, weight: .semibold))
                 }
                 .padding(.top, 8)
@@ -758,7 +772,7 @@ struct LicensesView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
         }
-        .background(SheetBackdrop(theme: theme))
+        .background(TrainingBackdrop(theme: theme))
         .navigationTitle("Licenses")
         .navigationBarTitleDisplayMode(.inline)
     }

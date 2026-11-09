@@ -16,7 +16,7 @@ struct DailyTally: Decodable, Equatable, Sendable {
 
     /// "62% of 1,284 players found it." — or, with only a few in, "You're one of the first 8."
     var line: String {
-        guard let percent = percentFound else { return "You're the first to try it today." }
+        guard let percent = percentFound, players > 1 else { return "You're the first to try it today." }
         if players < 20 { return "You're one of the first \(players) players to try it today." }
         let count = players.formatted(.number)
         return "\(percent)% of \(count) players found it."

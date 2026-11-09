@@ -30,7 +30,7 @@ struct LevelCheckView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let side = max(200, min(geo.size.width - 24, geo.size.height * 0.52))
+            let side = max(200, min(geo.size.width - TrainingBoardView.sideRoom, geo.size.height * 0.52))
             VStack(spacing: 10) {
                 RoomHeader(title: "Find my level", subtitle: subtitle) { close() }
                 switch runner?.phase ?? .intro {
@@ -45,7 +45,7 @@ struct LevelCheckView: View {
             .frame(width: geo.size.width)
         }
         .background { TrainingBackdrop(theme: theme) }
-        .preferredColorScheme(theme.isDark ? .dark : nil)
+        .screenScheme(theme)
         .tint(theme.trainingAccent)
         .animation(.snappy, value: runner?.phase)
         .task {
@@ -154,20 +154,19 @@ struct LevelCheckView: View {
                     LevelProgressBar(answered: runner.estimator.answers.count, theme: theme)
                         .padding(.horizontal, 16)
                     if let drill = runner.drill {
-                        TrainingBoardView(
+                        TrainerBoard(
                             game: drill.game,
                             theme: theme,
+                            side: boardSide,
                             flipped: drill.learner == .black,
                             onTap: runner.phase == .solving && drill.acceptsTaps
-                                ? { (square: Square) in runner.tap(square) } : nil
+                                ? { (square: Square) in runner.tap(square) } : nil,
+                            onPromote: { kind in runner.promote(to: kind) },
+                            turn: drill.learner,
+                            showsTurn: runner.phase == .solving && drill.phase == .solving
                         )
-                        .frame(width: boardSide, height: boardSide)
-                        .boardHeadroom(theme: theme, side: boardSide)
                         .id(ObjectIdentifier(drill))
                         .transition(.opacity)
-                        TurnBadge(theme: theme, side: drill.learner,
-                                  showing: runner.phase == .solving && drill.phase == .solving)
-                            .padding(.top, -10)
                     }
                     RoomMessage(text: message(runner), tone: tone(runner), theme: theme)
                         .padding(.horizontal, 16)

@@ -28,7 +28,7 @@ struct CandidateMovesView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let side = max(200, min(geo.size.width - 24, geo.size.height * 0.5))
+            let side = max(200, min(geo.size.width - TrainingBoardView.sideRoom, geo.size.height * 0.5))
             VStack(spacing: 8) {
                 header
                 content(boardSide: side)
@@ -36,7 +36,7 @@ struct CandidateMovesView: View {
             .frame(width: geo.size.width)
         }
         .background { TrainingBackdrop(theme: theme) }
-        .preferredColorScheme(theme.isDark ? .dark : nil)
+        .screenScheme(theme)
         .tint(theme.trainingAccent)
         .task {
             await puzzles.load()
@@ -136,10 +136,7 @@ private struct CandidatePositionView: View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(spacing: 18) {
-                    VStack(spacing: 6) {
-                        board
-                        turnBadge
-                    }
+                    board
                     RoomMessage(text: runner.message, tone: runner.tone, theme: theme)
                         .padding(.horizontal, 16)
                     if let report = runner.report {
@@ -165,22 +162,19 @@ private struct CandidatePositionView: View {
         .sensoryFeedback(.selection, trigger: runner.candidates.count) { _, _ in hapticsOn }
     }
 
+    /// The board, with "White to move" in the player's color under it while the list is made.
     private var board: some View {
-        TrainingBoardView(
+        TrainerBoard(
             game: runner.game,
             theme: theme,
+            side: boardSide,
             flipped: runner.learner == .black,
             arrows: runner.arrows,
             labels: runner.labels,
-            onTap: runner.phase == .listing ? { (square: Square) in runner.tap(square) } : nil
+            onTap: runner.phase == .listing ? { (square: Square) in runner.tap(square) } : nil,
+            turn: runner.learner,
+            showsTurn: runner.phase == .listing
         )
-        .frame(width: boardSide, height: boardSide)
-        .boardHeadroom(theme: theme, side: boardSide)
-    }
-
-    /// "White to move" in the player's color, under the board while the list is made.
-    private var turnBadge: some View {
-        TurnBadge(theme: theme, side: runner.learner, showing: runner.phase == .listing)
     }
 
     @ViewBuilder
@@ -285,7 +279,7 @@ private struct CandidateSlots: View {
             }
             .padding(.horizontal, 10)
             .frame(maxWidth: .infinity, minHeight: 44)
-            .background(color.opacity(theme.isDark ? 0.14 : 0.1), in: Capsule())
+            .background(color.opacity(theme.screenIsDark ? 0.14 : 0.1), in: Capsule())
             .overlay(Capsule().strokeBorder(color.opacity(0.5), lineWidth: 1))
             .contentShape(Capsule())
         }
@@ -322,7 +316,7 @@ private struct CandidateNumber: View {
     var body: some View {
         Text("\(number)")
             .font(.app(.caption, weight: .heavy).monospacedDigit())
-            .foregroundStyle(theme.isDark ? Color.black : Color.white)
+            .foregroundStyle(theme.screenIsDark ? Color.black : Color.white)
             .frame(width: size, height: size)
             .background(color, in: Circle())
             .accessibilityHidden(true)

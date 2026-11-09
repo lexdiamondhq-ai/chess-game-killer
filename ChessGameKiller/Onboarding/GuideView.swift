@@ -8,7 +8,7 @@ struct GuideView: View {
     let replayWelcome: () -> Void
     @State private var tipsReset = false
 
-    private var accent: Color { theme.accent ?? .accentColor }
+    private var accent: Color { theme.trainingAccent }
 
     /// The hidden gestures, by what they do. (Gesture, then what it's called in the app.)
     static let gestures: [(symbol: String, title: String, text: String)] = [
@@ -16,8 +16,6 @@ struct GuideView: View {
          "Ghost Vision. Your turn in a game: hold a finger on the board and the best line appears a few moves ahead. Slide left to step back through it. Counts as help."),
         ("circle.circle", "Tap the orb for the coach",
          "The round button in the middle of the dock opens the coach: grades, the best moves, undo and new game."),
-        ("hand.draw", "Swipe the board to replay",
-         "In Big Board, swipe sideways on the board to step back through the game, and swipe up from the bottom for the tools."),
         ("arrow.down", "Pull the home board down",
          "On the home screen, pull the board down to open You: your pieces, your games and Settings. The You button in the dock does the same."),
     ]
@@ -55,7 +53,7 @@ struct GuideView: View {
             .padding(.vertical, 16)
         }
         .tint(accent)
-        .background { SheetBackdrop(theme: theme).ignoresSafeArea() }
+        .background { TrainingBackdrop(theme: theme).ignoresSafeArea() }
         .navigationTitle("How it works")
         .navigationBarTitleDisplayMode(.inline)
     }

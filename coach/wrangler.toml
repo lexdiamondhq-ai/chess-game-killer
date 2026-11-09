@@ -11,7 +11,7 @@ workers_dev = true
 [vars]
 # The Claude model that hears the player's claims and words Leo's answer, and
 # how hard it thinks for each (low to max). It always thinks a little.
-MODEL = "claude-opus-5-5"
+MODEL = "claude-sonnet-5-5"
 PARSE_EFFORT = "low"
 ANSWER_EFFORT = "low"
 # How long each Claude call may take, in milliseconds. A slow answer falls back
@@ -21,9 +21,12 @@ CLAUDE_TIMEOUT_MS = "12000"
 # The address is public, so these cap the bill.
 DAILY_TALKS = "400"
 DAILY_VOICE_CHARS = "40000"
-# Leo's voice on ElevenLabs: Liam (a young, articulate American), with the lessons' model, so he sounds the same.
-VOICE_ID = "TX3LPaxmHKxFdv7VOQHJ"
-VOICE_MODEL = "eleven_multilingual_v2"
+# Leo's voice on ElevenLabs: Frederick (a calm, velvety, well-spoken Englishman, from the voice library), with the lessons' model, so he sounds the same.
+VOICE_ID = "j9jfwdrw7BRfcR43Qohk"
+VOICE_MODEL = "eleven_v4"
+# Live Talk answers are read with ElevenLabs' Flash model, about half the cost per
+# character of the lessons' model, in the same voice. Remove to match the lessons exactly.
+TALK_VOICE_MODEL = "eleven_flash_v2_5"
 
 # At most 12 talks a minute from one address, so a leaked URL can't run up the bill.
 [[ratelimits]]
@@ -36,6 +39,15 @@ simple = { limit = 12, period = 60 }
 name = "BUDGET"
 class_name = "TalkBudget"
 
+# Keeps Leo's spoken answers, so a line he has said before plays again for free.
+[[durable_objects.bindings]]
+name = "RECORDINGS"
+class_name = "TalkRecordings"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["TalkBudget"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["TalkRecordings"]

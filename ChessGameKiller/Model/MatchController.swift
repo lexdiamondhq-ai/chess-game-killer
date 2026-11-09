@@ -573,13 +573,15 @@ final class MatchController {
         gradeWhatsLeft()
     }
 
-    /// The victory theme when a person wins, a quiet chime otherwise.
+    /// The victory theme when a person wins, a dark toll when they lose, a quiet chime for a draw.
     private func playEndSound(winner: Piece.Color?, after delay: TimeInterval = 0) {
-        if let winner, game.humanColors.contains(winner) {
-            sounds?.play(.victory, after: delay)
+        let sound: GameSound
+        if let winner {
+            sound = game.humanColors.contains(winner) ? .victory : .defeat
         } else {
-            sounds?.play(.gameOver, after: delay)
+            sound = .gameOver
         }
+        sounds?.play(sound, after: delay)
     }
 
     /// How far ahead the person must be (in centipawns) for the rival to resign.
@@ -642,15 +644,7 @@ final class MatchController {
 
     /// A rough quality score for the person's moves this game, 0 to 100.
     var accuracy: Int? {
-        let weights: [MoveReview.Grade: Int] = [
-            .checkmate: 100, .best: 100, .excellent: 95, .good: 85, .inaccuracy: 60, .mistake: 35, .blunder: 10,
-        ]
-        let graded = gradeCounts.reduce(into: (sum: 0, count: 0)) { acc, entry in
-            acc.sum += (weights[entry.key] ?? 0) * entry.value
-            acc.count += entry.value
-        }
-        guard graded.count > 0 else { return nil }
-        return graded.sum / graded.count
+        SavedGame.accuracy(of: gradeCounts)
     }
 
     // MARK: The clock
@@ -884,12 +878,15 @@ final class MatchController {
         let after: Evaluation
         // The opponent's best answer, so the coach can say what the move allows.
         var reply: String?
+        // The move played and the engine's line after it, to see what material it gives away.
+        var playedLine: [String] = []
         if playedBest {
             after = bestLine.evaluation
             reply = bestLine.moves.dropFirst().first
         } else if before.count > 1, before[1].firstMove == move.uci {
             after = before[1].evaluation
             reply = before[1].moves.dropFirst().first
+            playedLine = before[1].moves
         } else if played.endedGame {
             after = .centipawns(0)
         } else {
@@ -898,9 +895,11 @@ final class MatchController {
             guard let line = answer.first else { return true }
             after = line.evaluation.flipped
             reply = line.firstMove
+            playedLine = [move.uci] + line.moves
         }
 
-        let grade = MoveReview.grade(before: bestLine.evaluation, after: after, playedBest: playedBest)
+        let materialLoss = MoveReview.materialLoss(fen: move.fenBefore, best: bestLine.moves, played: playedLine)
+        let grade = MoveReview.grade(before: bestLine.evaluation, after: after, playedBest: playedBest, materialLoss: materialLoss)
         let bestSAN = playedBest ? nil : Notation.san(of: bestMove, fen: move.fenBefore)
         publishReview(grade, move: move, ply: played.ply, fenAfter: played.fenAfter, best: bestSAN, evaluation: after,
                       bestUCI: bestMove, before: bestLine.evaluation, reply: reply, origin: played.origin,

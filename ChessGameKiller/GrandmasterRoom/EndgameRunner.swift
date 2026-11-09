@@ -161,10 +161,18 @@ final class EndgameRunner {
         guard phase == .playing else { return }
         let before = board.moveCount
         board.tap(square)
-        if board.pendingPromotion != nil { board.promote(to: .queen) }
+        // A pawn on the last rank waits for the player to choose its piece on the board.
+        if board.pendingPromotion != nil { return }
         if board.moveCount != before, let played = board.lastPlayed {
             respond(to: played)
         }
+    }
+
+    /// Finishes a promotion with the piece the player chose.
+    func promote(to kind: Piece.Kind) {
+        guard phase == .playing, board.pendingPromotion != nil else { return }
+        board.promote(to: kind)
+        if let played = board.lastPlayed { respond(to: played) }
     }
 
     /// Leo's hint, in two steps: first the piece to move, then the move itself.

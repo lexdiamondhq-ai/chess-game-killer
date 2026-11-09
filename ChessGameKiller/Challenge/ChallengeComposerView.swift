@@ -236,7 +236,7 @@ struct ChallengeComposerView: View {
                 .truncationMode(.middle)
                 .textSelection(.enabled)
             Rectangle()
-                .fill(Color.white.opacity(0.1))
+                .fill(Color.primary.opacity(0.1))
                 .frame(height: 0.5)
                 .padding(.vertical, 2)
             HStack(spacing: 18) {
@@ -283,7 +283,7 @@ struct ChallengeComposerView: View {
                             .opacity(composer.isCreating ? 0 : 1)
                         if composer.isCreating {
                             ProgressView()
-                                .tint(Color.black.opacity(0.8))
+                                .tint(theme.screenTone?.onIvory ?? Color.black.opacity(0.8))
                         }
                     }
                 }
@@ -346,7 +346,7 @@ struct ChallengeBarBackground: View {
             .fill(.ultraThinMaterial)
             .overlay(alignment: .top) {
                 Rectangle()
-                    .fill(Color.white.opacity(0.1))
+                    .fill(Color.primary.opacity(0.1))
                     .frame(height: 0.5)
             }
             .ignoresSafeArea(edges: .bottom)

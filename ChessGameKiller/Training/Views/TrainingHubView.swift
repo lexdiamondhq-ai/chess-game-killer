@@ -13,8 +13,6 @@ struct TrainingHubView: View {
     /// The app-wide daily streak, when the app provides it.
     @Environment(DailyStore.self) private var daily: DailyStore?
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("coachVoiceMuted") private var voiceMuted = false
-    @AppStorage(CoachReactions.storageKey) private var reactionsOn = true
     @State private var coachChoice = CoachChoice.shared
     @State private var repertoire = RepertoireStore.live()
     /// The endgame record the whole app shares, so a study finished anywhere shows here.
@@ -56,7 +54,8 @@ struct TrainingHubView: View {
             }
             .scrollBounceBehavior(.basedOnSize)
             .background { TrainingBackdrop(theme: theme) }
-            .navigationTitle("Train")
+            // The tab that opens it says Learn, so the page does too (Alex, 2026-11-08).
+            .navigationTitle("Learn")
             .navigationBarTitleDisplayMode(.large)
             .toolbar { toolbar }
             .navigationDestination(for: TrainDoor.self) { door in
@@ -64,7 +63,7 @@ struct TrainingHubView: View {
             }
         }
         .tint(theme.trainingAccent)
-        .preferredColorScheme(theme.isDark ? .dark : nil)
+        .screenScheme(theme)
         .environment(repertoire)
         .environment(endgames)
         .environment(think)
@@ -192,7 +191,7 @@ struct TrainingHubView: View {
         case .games:
             let open = store.openMistakes.count
             if open > 0 { return open == 1 ? "1 position to fix" : "\(open) positions to fix" }
-            return vault.games.isEmpty ? "Play a game first" : "Your Chess DNA and what to fix"
+            return vault.games.isEmpty ? "Play a game first" : "Your style and what to fix"
         }
     }
 
@@ -224,14 +223,8 @@ struct TrainingHubView: View {
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
+            // The coach's voice switches live in Settings > Coach, once (Alex, 2026-11-08).
             Menu {
-                Toggle(isOn: Binding(get: { !voiceMuted }, set: { voiceMuted = !$0 })) {
-                    Label("Coach's voice", systemImage: "speaker.wave.2.fill")
-                }
-                Toggle(isOn: $reactionsOn) {
-                    Label("Voice reactions", systemImage: "bubble.left.and.text.bubble.right.fill")
-                }
-                .disabled(voiceMuted)
                 Button {
                     showingLevelCheck = true
                 } label: {
@@ -401,22 +394,12 @@ struct TodayCard: View {
 
 /// A small, still picture of a position on the player's board, from the side to move.
 struct BoardThumbnail: View {
+    let fen: String
     let theme: BoardTheme
-    @State private var game: GameModel
-    private let flipped: Bool
-
-    init(fen: String, theme: BoardTheme) {
-        self.theme = theme
-        let position = Position(fen: fen) ?? .standard
-        let model = GameModel(position: position)
-        model.humanColors = []
-        _game = State(initialValue: model)
-        flipped = position.sideToMove == .black
-    }
 
     var body: some View {
-        TrainingBoardView(game: game, theme: theme, flipped: flipped)
+        // The same stone and cut-out pieces as the game's board seen flat, turned for Black to move.
+        CutoutStillBoard(fen: fen, theme: theme, flipped: Position(fen: fen)?.sideToMove == .black)
             .allowsHitTesting(false)
-            .accessibilityHidden(true)
     }
 }

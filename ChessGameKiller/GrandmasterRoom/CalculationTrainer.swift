@@ -154,7 +154,7 @@ struct CalculationView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let side = max(200, min(geo.size.width - 24, geo.size.height * 0.52))
+            let side = max(200, min(geo.size.width - TrainingBoardView.sideRoom, geo.size.height * 0.52))
             VStack(spacing: 12) {
                 RoomHeader(title: "Calculation", subtitle: "See the moves in your head") { dismiss() }
                 // Scrolls only when it must, so the buttons are never cut off on a small phone.

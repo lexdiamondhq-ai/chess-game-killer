@@ -54,7 +54,7 @@ struct RewindGamesView: View {
                 .frame(maxWidth: 680)
                 .frame(maxWidth: .infinity)
             }
-            .background { ThemeBackdrop(theme: theme).ignoresSafeArea() }
+            .background { TrainingBackdrop(theme: theme).ignoresSafeArea() }
             .navigationTitle("Your games")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -75,7 +75,7 @@ struct RewindGamesView: View {
                 }
             }
         }
-        .preferredColorScheme(theme.isDark ? .dark : nil)
+        .screenScheme(theme)
         .tint(theme.accent ?? RewindPalette.gold)
     }
 
@@ -156,8 +156,7 @@ private struct GameCard: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
-            PositionBoard(draft: PositionDraft(fen: game.finalFEN) ?? .standard, theme: theme,
-                          flipped: !game.playerIsWhite)
+            CutoutStillBoard(fen: game.finalFEN, theme: theme, flipped: !game.playerIsWhite)
                 .frame(width: 104, height: 104)
                 .allowsHitTesting(false)
             VStack(alignment: .leading, spacing: 8) {
@@ -166,7 +165,7 @@ private struct GameCard: View {
                     // The result sits beside the name, so the moves and the date get the whole line.
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            Text(game.opponent)
+                            Text(game.opponentShown)
                                 .font(.app(.headline))
                                 .lineLimit(1)
                             Spacer(minLength: 4)
@@ -213,13 +212,9 @@ private struct GameCard: View {
     @ViewBuilder
     private var portrait: some View {
         if let rival {
-            Image(rival.portraitName)
-                .resizable()
-                .scaledToFill()
-                .frame(width: 32, height: 32)
-                .clipShape(Circle())
+            RivalCoin(rival: rival, size: 32)
         } else {
-            Image(systemName: "person.2.fill")
+            Image(systemName: game.isImported ? "globe" : "person.2.fill")
                 .font(.app(.footnote))
                 .frame(width: 32, height: 32)
                 .background(Circle().fill(Color.primary.opacity(0.08)))

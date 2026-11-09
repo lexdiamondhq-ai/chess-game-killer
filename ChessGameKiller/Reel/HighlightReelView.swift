@@ -11,13 +11,13 @@ struct ReelFrame: View {
     /// Where the wordmark sits from the top. On the phone it clears the island and the buttons.
     var wordmarkTop: CGFloat = 34
 
-    private var accent: Color { theme.accent ?? .accentColor }
+    private var accent: Color { theme.trainingAccent }
     /// Rounded type on Neon, plain SF Pro on every other look, as in the game.
     private var design: Font.Design { theme.glows ? .rounded : .default }
 
     var body: some View {
         ZStack {
-            ThemeBackdrop(theme: theme)
+            TrainingBackdrop(theme: theme)
             VStack(spacing: 0) {
                 Text("CHESS GAME KILLER")
                     .font(.app(size: 13, weight: .heavy))
@@ -30,7 +30,7 @@ struct ReelFrame: View {
             }
             .padding(.horizontal, 20)
         }
-        .environment(\.colorScheme, theme.isDark ? .dark : .light)
+        .environment(\.colorScheme, theme.screenIsDark ? .dark : .light)
     }
 
     @ViewBuilder
@@ -140,7 +140,7 @@ struct ReelFrame: View {
                         .multilineTextAlignment(.center)
                 }
             }
-            Text("Coached by \(Coach.current.name) · Chess Game Killer")
+            Text("Coached by \(Coach.current.name) · Beauty of Chess")
                 .font(.app(size: 14, weight: .medium))
                 .foregroundStyle(.secondary)
         }
@@ -202,7 +202,7 @@ private struct ReelEvalBar: View {
             ZStack(alignment: .leading) {
                 Capsule().fill(Color.primary.opacity(0.15))
                 Capsule()
-                    .fill(theme.accent ?? .accentColor)
+                    .fill(theme.trainingAccent)
                     .frame(width: max(4, geo.size.width * (chances + 1) / 2))
             }
         }
@@ -258,6 +258,8 @@ struct HighlightReelView: View {
             started = Date()
         }
         .onDisappear { stopVoice() }
+        // The page's light or dark, kept to the reel so the game behind it stays as it is.
+        .environment(\.colorScheme, theme.screenIsDark ? .dark : .light)
         .alert("Couldn't make the video", isPresented: $exportFailed) {
             Button("Try again") { Task { await export() } }
             Button("Cancel", role: .cancel) {}
@@ -284,8 +286,8 @@ struct HighlightReelView: View {
                     .font(.system(size: 15, weight: .bold))
                     .padding(.horizontal, 14)
                     .frame(height: 36)
-                    .background(theme.accent ?? .accentColor, in: Capsule())
-                    .foregroundStyle(theme.isDark ? Color.black : Color.white)
+                    .background(theme.trainingAccent, in: Capsule())
+                    .foregroundStyle(theme.screenIsDark ? Color.black : Color.white)
                     .frame(height: 44)
                     .contentShape(Rectangle())
             }

@@ -59,7 +59,7 @@ struct SculptedBoardView: View {
     var endBrowsing: (() -> Void)?
     /// Ghost Vision, when the player can hold the board to see ahead.
     var vision: GhostVision?
-    /// Seen from the player's chair, or from above with the flat pieces (Big Board).
+    /// Seen from the player's chair, or from above with the flat pieces (Flat).
     var framing: SculptedCamera.Framing = .standing
 
     /// Width over height: the board seen at an angle is wider than it is tall.
@@ -322,7 +322,7 @@ struct SculptedStillBoard: View {
 
 /// Fits a view inside what it is offered at a shape within `range` (width over height): as
 /// `aspectRatio(_:contentMode: .fit)` does for one shape, for a range of them.
-private struct AspectRange: ViewModifier {
+struct AspectRange: ViewModifier {
     let range: ClosedRange<Float>
 
     func body(content: Content) -> some View {
@@ -330,7 +330,7 @@ private struct AspectRange: ViewModifier {
     }
 }
 
-private struct AspectRangeLayout: Layout {
+struct AspectRangeLayout: Layout {
     let low: CGFloat
     let high: CGFloat
 

@@ -29,9 +29,9 @@ struct ChallengeEntryRow: View {
             .frame(minHeight: 60)
             .background {
                 shape
-                    .fill(theme.isDark ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)))
-                    .overlay { shape.strokeBorder(Color.primary.opacity(theme.isDark ? 0.12 : 0.08), lineWidth: 1) }
-                    .shadow(color: .black.opacity(theme.isDark ? 0.3 : 0.08), radius: 16, y: 6)
+                    .fill(theme.screenIsDark ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)))
+                    .overlay { shape.strokeBorder(Color.primary.opacity(theme.screenIsDark ? 0.12 : 0.08), lineWidth: 1) }
+                    .shadow(color: .black.opacity(theme.screenIsDark ? 0.3 : 0.08), radius: 16, y: 6)
             }
             .contentShape(shape)
         }

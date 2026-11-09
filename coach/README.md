@@ -2,7 +2,7 @@
 
 Before a move, the player tells Coach Leo what they see and what they'll play, out loud or typed. This server
 checks every claim against the rules and Stockfish's numbers (worked out on the iPhone and sent along), then has
-Claude word Leo's answer, and ElevenLabs reads it in Liam's voice, the voice of the recorded lessons.
+Claude word Leo's answer, and ElevenLabs reads it in Trevor's voice, the voice of the recorded lessons.
 Claude never decides what's true: it turns the words into claims, and words the verdict the rules reached.
 
 The workflow deploys it to **https://coach.chess-game-killer.workers.dev**. [PROTOCOL.md](PROTOCOL.md) is the contract with the app:
@@ -18,7 +18,7 @@ the request, the stream, the claim kinds, the grades and the limits.
   are right, grade the move, and find what was missed. No AI in here.
 - `src/answer.js`: Claude call 2. The checked facts go in; Leo's spoken answer comes out. A guard turns down
   wording with move notation or a square the facts don't name, and the server's own template answers instead.
-- `src/voice.js`: Liam on ElevenLabs, with the lessons' model and settings (`scripts/training/make_narration.py`).
+- `src/voice.js`: Trevor on ElevenLabs, with the lessons' model and settings (`scripts/training/make_narration.py`).
 - `src/vendor/chess.js`: [chess.js](https://github.com/jhlywa/chess.js) 1.4.0 (BSD-2-Clause), the same copy as `play/`.
 
 A talk streams `checked`, `answer`, `voice` and `done`, one JSON line each, so the app can light up the board
@@ -59,7 +59,7 @@ The live check runs the real pipeline in Node against the real APIs for every ca
 `test/fixtures/talks.json`, and prints a table of what Claude heard, the verdicts, Leo's words, timings and tokens:
 
 ```sh
-ANTHROPIC_API_KEY=… node test/live.mjs                      # ELEVENLABS_API_KEY=… adds one reading by Liam
+ANTHROPIC_API_KEY=… node test/live.mjs                      # ELEVENLABS_API_KEY=… adds one reading by Trevor
 ANTHROPIC_API_KEY=… node test/live.mjs --only castle --audio leo.mp3
 ```
 
@@ -74,15 +74,15 @@ live check when the `ANTHROPIC_API_KEY` secret is set. On pushes to `main` it al
 talk with the live server (`test/smoke.mjs`). It needs `ANTHROPIC_API_KEY` and `CLOUDFLARE_API_TOKEN`;
 `ELEVENLABS_API_KEY` is optional (no voice without it); the account ID is looked up from the token.
 
-Settings (`[vars]` in `wrangler.toml`): `MODEL` (`claude-opus-5-5`), `PARSE_EFFORT` and `ANSWER_EFFORT` (`low`),
+Settings (`[vars]` in `wrangler.toml`): `MODEL` (`claude-sonnet-5-5`), `PARSE_EFFORT` and `ANSWER_EFFORT` (`low`),
 `CLAUDE_TIMEOUT_MS` (12000, for each Claude call), `DAILY_TALKS` (400) and `DAILY_VOICE_CHARS` (40000) across
-everyone per UTC day, `VOICE_ID` (Liam, Leo's voice), `VERA_VOICE_ID` (Sarah, Vera's voice; requests with `coach: "vera"`) and `VOICE_MODEL` (`eleven_multilingual_v2`). Each address can start 12
+everyone per UTC day, `VOICE_ID` (Trevor, Leo's voice), `VERA_VOICE_ID` (Sarah, Vera's voice; requests with `coach: "vera"`) and `VOICE_MODEL` (`eleven_v4`, Leo's; Vera stays on `eleven_multilingual_v2`). Each address can start 12
 talks a minute.
 
 ## What a talk costs
 
-Two Claude Opus 5.5 calls at low effort, with the server-side fallback on, so a request Opus's safety classifiers
+Two Claude Sonnet 5.5 calls at low effort, with the server-side fallback on, so a request Sonnet's safety classifiers
 turn down is answered by another model rather than refused. The first call's instructions (about 1,700 tokens) are cached; the rest is the position, the words and the verdict,
-around 1,500 tokens in all, plus a few hundred tokens out each, thinking included. That comes to about one or two
-cents a talk at list prices, so `DAILY_TALKS` caps Claude at roughly $8 a day. The live check prints the measured
+around 1,500 tokens in all, plus a few hundred tokens out each, thinking included. That comes to about half a cent to a
+cent a talk at list prices, so `DAILY_TALKS` caps Claude at roughly $4 a day. The live check prints the measured
 figure. The voice is 100 to 320 characters of ElevenLabs a talk; `DAILY_VOICE_CHARS` caps it at 40,000 a day.

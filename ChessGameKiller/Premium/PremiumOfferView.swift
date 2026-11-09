@@ -13,25 +13,34 @@ struct PremiumOfferView: View {
     private var premium: Premium { .shared }
 
     private var theme: BoardTheme { .named(themeID) }
-    private var accent: Color { theme.accent ?? PremiumStyle.gold }
+    /// The home's metal on its pages, or the board's own gold.
+    private var accent: Color { theme.screenTone?.metal ?? theme.accent ?? PremiumStyle.gold }
+    private var onAccent: Color { theme.screenIsDark ? .black : .white }
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            ThemeBackdrop(theme: theme).ignoresSafeArea()
+            TrainingBackdrop(theme: theme).ignoresSafeArea()
             ScrollView {
                 VStack(spacing: 22) {
                     PremiumOfferHeader(accent: accent)
-                    if let feature {
-                        PremiumReasonCard(text: feature.limitLine, accent: accent)
+                    if premium.isPremium {
+                        // Already subscribed: only Premium's own daily caps lead here. Say so,
+                        // and never ask them to buy it again.
+                        PremiumOwnedCard(text: feature.map(premium.limitLine), accent: accent)
+                        doneButton
+                    } else {
+                        if let feature {
+                            PremiumReasonCard(text: feature.limitLine, accent: accent)
+                        }
+                        PremiumBenefitList(accent: accent)
+                        plans
+                        buyButton
+                        PremiumFinePrint(plan: plan, price: premium.price(plan), trial: plan == .yearly && trial)
+                        footerLinks
                     }
-                    PremiumBenefitList(accent: accent)
-                    plans
-                    buyButton
-                    PremiumFinePrint(plan: plan, price: premium.price(plan), trial: plan == .yearly && trial)
-                    footerLinks
                 }
                 .padding(.horizontal, 20)
-                .padding(.top, 56)
+                .padding(.top, 64)
                 .padding(.bottom, 28)
                 .frame(maxWidth: 560)
                 .frame(maxWidth: .infinity)
@@ -39,7 +48,7 @@ struct PremiumOfferView: View {
             .scrollBounceBehavior(.basedOnSize)
             closeButton
         }
-        .preferredColorScheme(theme.isDark ? .dark : nil)
+        .screenScheme(theme)
         .tint(accent)
         .task {
             premium.start()
@@ -51,21 +60,38 @@ struct PremiumOfferView: View {
         }
     }
 
+    /// A 44-point target with the visible circle inside it, set in from the sheet's rounded
+    /// corner so a thumb reaching for the corner still lands on it.
     private var closeButton: some View {
         Button {
             dismiss()
         } label: {
             Image(systemName: "xmark")
-                .font(.system(size: 15, weight: .bold))
+                .font(.system(size: 16, weight: .bold))
                 .foregroundStyle(.secondary)
-                .frame(width: 34, height: 34)
+                .frame(width: 38, height: 38)
                 .glassPane(Circle())
+                .frame(width: 52, height: 52)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .frame(width: 44, height: 44)
-        .padding(.trailing, 14)
-        .padding(.top, 8)
+        .padding(.trailing, 12)
+        .padding(.top, 10)
         .accessibilityLabel("Close")
+    }
+
+    private var doneButton: some View {
+        Button {
+            dismiss()
+        } label: {
+            Text("Done")
+                .font(.app(.headline))
+                .foregroundStyle(onAccent)
+                .frame(maxWidth: .infinity)
+                .frame(height: 54)
+                .background(accent, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 
     private var plans: some View {
@@ -86,10 +112,10 @@ struct PremiumOfferView: View {
             } label: {
                 ZStack {
                     Text(title).opacity(busy ? 0 : 1)
-                    if busy { ProgressView().tint(.black) }
+                    if busy { ProgressView().tint(onAccent) }
                 }
                 .font(.app(.headline))
-                .foregroundStyle(Color.black)
+                .foregroundStyle(onAccent)
                 .frame(maxWidth: .infinity)
                 .frame(height: 54)
                 .background(accent, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -112,6 +138,7 @@ struct PremiumOfferView: View {
             }
             .disabled(premium.isRestoring)
             Link("Terms of use", destination: PremiumStyle.terms)
+            Link("Privacy", destination: PremiumStyle.privacy)
         }
         .font(.app(.footnote, weight: .semibold))
         .foregroundStyle(.secondary)
@@ -122,6 +149,8 @@ enum PremiumStyle {
     static let gold = Color(hex: 0xD9A65E)
     /// Apple's standard licence agreement, which the App Store applies to subscriptions.
     static let terms = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
+    /// What leaves the phone and why (play/public/privacy), required beside a subscription offer.
+    static let privacy = URL(string: "https://play.chess-game-killer.workers.dev/privacy/")!
 }
 
 private struct PremiumOfferHeader: View {
@@ -187,7 +216,7 @@ private struct PremiumBenefitList: View {
         Benefit(symbol: "graduationcap", title: "Every lesson and drill",
                 detail: "All 15 lessons, 3,865 openings, 22 endgames, master games and Blindfold."),
         Benefit(symbol: "eye", title: "Ghost Vision any time",
-                detail: "Plus Talk It Through 10 times a day and 3 photo scans a day."),
+                detail: "Plus Talk It Through and photo scans, as often as you like."),
         Benefit(symbol: "square.grid.3x3", title: "Every board look",
                 detail: "Every set and every rival's board."),
     ]
@@ -288,6 +317,28 @@ private struct PremiumFinePrint: View {
     }
 }
 
+/// For a player who already has Premium: thanks, and where today's cap stops if one did.
+private struct PremiumOwnedCard: View {
+    let text: String?
+    let accent: Color
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Label("You have Premium", systemImage: "checkmark.seal.fill")
+                .font(.app(.headline))
+                .foregroundStyle(accent)
+            Text(text ?? "Thank you. Everything is open.")
+                .font(.app(.subheadline))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity)
+        .glassPane(RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+}
+
 // MARK: - Showing the offer
 
 extension View {
@@ -310,21 +361,24 @@ struct PremiumLimitCard: View {
             Image(systemName: "crown.fill")
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(accent)
-            Text(feature.limitLine)
+            Text(Premium.shared.limitLine(feature))
                 .font(.app(.subheadline, weight: .medium))
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-            Button {
-                offer = feature
-            } label: {
-                Text("See Premium")
-                    .font(.app(.headline))
-                    .foregroundStyle(Color.black)
-                    .frame(maxWidth: 260)
-                    .frame(height: 48)
-                    .background(accent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            // Premium players already have it: their cap comes back tomorrow, nothing to buy.
+            if !Premium.shared.isPremium {
+                Button {
+                    offer = feature
+                } label: {
+                    Text("See Premium")
+                        .font(.app(.headline))
+                        .foregroundStyle(Color.black)
+                        .frame(maxWidth: 260)
+                        .frame(height: 48)
+                        .background(accent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
         .padding(20)
         .frame(maxWidth: .infinity)

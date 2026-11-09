@@ -59,7 +59,7 @@ struct LessonPlayerView: View {
                 unavailable
             }
         }
-        .preferredColorScheme(theme.isDark ? .dark : nil)
+        .screenScheme(theme)
         .tint(theme.trainingAccent)
         .onAppear {
             guard player == nil else { return }
@@ -83,21 +83,21 @@ struct LessonPlayerView: View {
 
     private func content(_ player: LessonPlayer) -> some View {
         GeometryReader { geo in
-            let boardSide = max(200, min(geo.size.width - 32, geo.size.height * 0.56))
+            let boardSide = max(200, min(geo.size.width - TrainingBoardView.sideRoom, geo.size.height * 0.56))
             VStack(spacing: 12) {
                 header(player)
                 progress(player)
-                TrainingBoardView(
+                TrainerBoard(
                     game: player.game,
                     theme: theme,
+                    side: boardSide,
                     flipped: player.isFlipped,
                     arrows: player.arrows,
                     marks: player.marks,
                     labels: player.labels,
-                    onTap: player.phase == .task ? { (square: Square) in player.tap(square) } : nil
+                    onTap: player.phase == .task ? { (square: Square) in player.tap(square) } : nil,
+                    onPromote: { kind in player.promote(to: kind) }
                 )
-                .frame(width: boardSide, height: boardSide)
-                .boardHeadroom(theme: theme, side: boardSide)
                 .padding(.top, 4)
                 ScrollView {
                     caption(player)
@@ -253,7 +253,7 @@ struct LessonPlayerView: View {
             .padding(.vertical, 11)
             .background {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(color.opacity(tried ? 0.16 : (theme.isDark ? 0.12 : 0.08)))
+                    .fill(color.opacity(tried ? 0.16 : (theme.screenIsDark ? 0.12 : 0.08)))
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -311,11 +311,11 @@ struct LessonPlayerView: View {
         return Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: size * 0.36, weight: .bold))
-                .foregroundStyle(prominent ? (theme.isDark ? Color.black : Color.white) : accent)
+                .foregroundStyle(prominent ? (theme.screenIsDark ? Color.black : Color.white) : accent)
                 .frame(width: size, height: size)
                 .background {
                     Circle()
-                        .fill(prominent ? AnyShapeStyle(accent) : AnyShapeStyle(accent.opacity(theme.isDark ? 0.16 : 0.12)))
+                        .fill(prominent ? AnyShapeStyle(accent) : AnyShapeStyle(accent.opacity(theme.screenIsDark ? 0.16 : 0.12)))
                         .shadow(color: prominent && theme.glows ? accent.opacity(0.6) : .clear, radius: 12)
                 }
                 .contentTransition(.symbolEffect(.replace))

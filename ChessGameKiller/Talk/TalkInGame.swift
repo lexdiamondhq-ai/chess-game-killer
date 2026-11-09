@@ -82,7 +82,7 @@ struct TalkMic: View {
     @ScaledMetric(relativeTo: .subheadline) private var scaled: CGFloat = 34
 
     var body: some View {
-        let accent: Color = theme.challengeAccent
+        let accent: Color = theme.accent ?? .accentColor
         let side: CGFloat = min(max(scaled, 30), 42)
         ZStack {
             Circle()

@@ -12,8 +12,8 @@ struct HomeActions {
     var playRival: (MatchController.Level) -> Void = { _ in }
     var resume: () -> Void = {}
     var analyze: () -> Void = {}
-    /// Opens Analyze on the camera, to read a real board.
-    var scan: () -> Void = {}
+    /// Opens Analyze on this position, ready to play through.
+    var analyzePosition: (String) -> Void = { _ in }
     var train: () -> Void = {}
     /// Starts today's session with Coach Leo.
     var trainToday: (SessionPlan) -> Void = { _ in }
@@ -35,9 +35,9 @@ struct HomeActions {
 /// (Online, or A friend by link); Today's Move and today's session with the coach side by
 /// side; the games still going with people, as a strip of small boards; the ladder of rivals;
 /// and your games. The glass dock holds the four doors and, in their middle, the gold knight:
-/// a tap plays, a hold opens its shortcuts (the five rivals, Online, a friend, Today's Move,
-/// a real board through the camera). Your pieces, your games and Settings are in the You
-/// panel, from the dock or by pulling the page down.
+/// a tap plays, a hold opens its shortcuts (the five rivals, then Online, a friend, Today's
+/// Move, Puzzles, Analyze, the coach and your games). Your pieces, your games and Settings are
+/// in the You panel, from the dock or by pulling the page down.
 struct HomeView: View {
     let match: MatchController
     let theme: BoardTheme
@@ -58,6 +58,13 @@ struct HomeView: View {
     @AppStorage("setup.level") private var storedLevel: Int?
     @AppStorage("setup.grudge") private var grudgeOn = false
     @Environment(GrudgeStore.self) private var grudges: GrudgeStore?
+    /// Your Grudge picked from Home while a game is under way: asks before that game is lost.
+    @State private var confirmingGrudge = false
+    /// The rivals' hall is open, on this rival (nil: the one up next).
+    @State private var showingHall = false
+    @State private var hallStart: MatchController.Level?
+    /// The hall opens straight into the rival's welcome film.
+    @State private var hallIntro = false
     @AppStorage("setup.clock") private var timeControl: TimeControl = .unlimited
     @AppStorage("haptics") private var hapticsOn = true
     /// The name friends see, from the last challenge: the home says hello with it.
@@ -73,6 +80,8 @@ struct HomeView: View {
     @State private var pullReady = true
     /// Today's session, worked out once rather than on every redraw.
     @State private var plan: SessionPlan?
+    /// Your finest move of the week for Today, read from your games once rather than on every redraw.
+    @State private var finestMove: HomeFinestMove?
     /// The board window has scrolled out of sight; the dock carries its button instead.
     @State private var windowGone = false
     /// The jewel's shortcuts are open above it.
@@ -85,6 +94,8 @@ struct HomeView: View {
     @AppStorage(HomeLayout.key) private var boardSheet = HomeLayout.defaultOn
     /// The board home's room: Light, Middle or Dark (the tiles home stays dark).
     @AppStorage(HomeToneMode.key) private var toneMode = HomeToneMode.defaultMode
+    /// The stage home: dark, the board on a lit stage, a deck of cards (Settings can turn it off).
+    @AppStorage(HomeStageLayout.key) private var stageOn = HomeStageLayout.defaultOn
     /// Where the sheet rests, and how far a finger has it from there. The drag springs back by
     /// itself when a pull is cut short (an alert, a call), so the sheet never parks between rests.
     @State private var sheetDetent: HomeSheetDetent = .half
@@ -137,15 +148,25 @@ struct HomeView: View {
     // MARK: Reading
 
     private var look: SculptedLook { theme.sculptedLook ?? .gilded }
-    private var tone: HomeTone { .of(look, mode: boardSheet ? toneMode : .dark) }
+    private var tone: HomeTone { .of(look, mode: (boardSheet || stageOn) ? toneMode : .dark) }
     /// The pieces on the small boards match the board in the window.
     private var pieceTheme: BoardTheme { theme.sculptedLook == nil ? .named(.gilded) : theme }
 
     private var upNext: HomeUpNext {
-        HomeUpNext.make(match: match, side: side,
-                        level: storedLevel.flatMap(MatchController.Level.init(rawValue:)),
+        HomeUpNext.make(match: match, side: side, level: nextLevel,
                         timeControl: timeControl, hasPlayed: !vault.games.isEmpty,
                         grudge: grudgeOn ? grudges?.record : nil)
+    }
+
+    /// The rival up next: the one you played last, while it's open to you; otherwise the first
+    /// rival on the ladder you haven't beaten (Alex, 2026-11-08: each rival waits until the one
+    /// before is beaten).
+    private var nextLevel: MatchController.Level? {
+        let ladder = RivalLadder()
+        if let stored = storedLevel.flatMap(MatchController.Level.init(rawValue:)) {
+            return ladder.isOpen(stored) ? stored : ladder.current
+        }
+        return vault.games.isEmpty ? nil : ladder.current
     }
 
     private var piecesLine: String {
@@ -171,7 +192,12 @@ struct HomeView: View {
             ZStack(alignment: .top) {
                 HomeBackdrop(tone: tone)
 
-                if boardSheet {
+                if stageOn {
+                    stageHome()
+                        .blur(radius: veiled ? 12 : 0)
+                        .accessibilityHidden(veiled)
+                        .allowsHitTesting(!veiled)
+                } else if boardSheet {
                     sheetHome(geo)
                 } else {
                     page(safeTop: safeTop)
@@ -183,7 +209,7 @@ struct HomeView: View {
                         .padding(.top, 6)
                 }
 
-                if jewelTip, !shortcutsOpen, you == nil {
+                if jewelTip, !stageOn, !shortcutsOpen, you == nil {
                     jewelNote(in: geo.size)
                 }
 
@@ -220,11 +246,25 @@ struct HomeView: View {
             // course left, then real puzzles at the player's level aimed at what their games show.
             plan = await training.planToday(puzzles: puzzles, games: vault.games)
         }
+        .task(id: notesKey) { await readToday() }
     }
 
     /// Changes whenever today's plan would: a session done, a new day, a game saved.
     private var planKey: String {
         "\(training.progress.sessionsDone) \(training.progress.xp) \(training.trainedToday) \(Trainer.dayString(.now)) \(vault.games.count)"
+    }
+
+    /// Changes whenever the finest move could: a game saved or graded, a new day.
+    private var notesKey: String {
+        // The newest game's grades land after it ends: count them too.
+        let graded: Int = vault.games.first?.moments.count ?? 0
+        return "\(vault.games.count) \(graded) \(Trainer.dayString(.now))"
+    }
+
+    /// Reads the games off the main thread for the week's finest move.
+    private func readToday() async {
+        let games: [SavedGame] = vault.games
+        finestMove = await Task.detached(priority: .utility) { HomeFinestMove.pick(games: games) }.value
     }
 
     // MARK: The page
@@ -494,29 +534,31 @@ struct HomeView: View {
         actions.start(MatchController.Setup(playerColor: side.color, level: level, timeControl: timeControl))
     }
 
-    /// The jewel's other ways to a game: a person online or a friend (when the app has them),
-    /// Today's Move, and a real board through the camera.
+    /// Rooms: Online and A friend (when the app has them), a new game, the rivals and your games.
     private var shortcutList: [HomeShortcut] {
-        var list: [HomeShortcut] = []
-        if let challenges {
-            let waiting: Int = challenges.onlineWaiting ?? 0
-            list.append(HomeShortcut(title: "Online", glyph: Glyphs.online, hint: "Play someone at your level now",
-                                     live: waiting > 0) { challenges.playOnline() })
-            list.append(HomeShortcut(title: "A friend", glyph: Glyphs.challenge, hint: "Send a friend a game by link") {
-                challenges.compose()
-            })
+        let waiting: Int = challenges?.onlineWaiting ?? 0
+        return HomeShortcutKind.list(online: challenges != nil).map { kind in
+            HomeShortcut(kind: kind, live: kind == .online && waiting > 0) { open(kind) }
         }
-        list.append(HomeShortcut(title: "Today's Move", glyph: Glyphs.today, hint: "The puzzle of the day",
-                                 action: actions.dailyMove))
-        list.append(HomeShortcut(title: "Scan a board", glyph: Glyphs.scan, hint: "Read a real board with the camera",
-                                 action: actions.scan))
-        return list
+    }
+
+    /// Where a shortcut goes.
+    private func open(_ kind: HomeShortcutKind) {
+        switch kind {
+        case .online: challenges?.playOnline()
+        case .friend: challenges?.compose()
+        case .newGame: secondary(upNext)
+        case .rivals:
+            hallStart = nil
+            showingHall = true
+        case .games: actions.rewind()
+        }
     }
 
     /// Where the jewel stands, in the home's space: the middle of the dock's bar, a little
     /// above it at rest. Before the dock has been measured, where it would be.
     private func jewelCenter(in size: CGSize) -> CGPoint {
-        let lift: CGFloat = (windowGone || boardSheet) ? 0 : HomeDock.raise
+        let lift: CGFloat = (windowGone || boardSheet || stageOn) ? 0 : HomeDock.raise
         guard dockBar != .zero else {
             return CGPoint(x: size.width / 2, y: size.height - 38 - lift)
         }
@@ -537,17 +579,24 @@ struct HomeView: View {
             .transition(.opacity)
             .accessibilityHidden(true)
         HomeShortcutsPanel(tone: tone, next: upNext.level, underWay: upNext.inProgress, shortcuts: shortcutList,
-                           playRival: { level in playRival(level) }, close: closeShortcuts)
+                           playRival: { level in playRival(level) }, close: closeShortcuts, asRooms: stageOn)
             .padding(.horizontal, 16)
             .frame(maxWidth: 520)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-            .padding(.bottom, lift)
-            .transition(reduceMotion ? .opacity : .scale(scale: 0.2, anchor: anchor).combined(with: .opacity))
+            // Rooms on the Aurora home rise from the bottom bar; elsewhere out of the jewel.
+            .padding(.bottom, stageOn ? 96 : lift)
+            .transition(reduceMotion ? .opacity
+                        : stageOn ? .move(edge: .bottom).combined(with: .opacity)
+                        : .scale(scale: 0.2, anchor: anchor).combined(with: .opacity))
             .zIndex(2)
-        HomeJewel(tone: tone, upNext: upNext, face: .open, tap: closeShortcuts)
-            .position(jewel)
-            .transition(.opacity)
-            .zIndex(3)
+        if !stageOn {
+            // The jewel wears a cross to close the panel. Rooms on the Aurora home close by a
+            // tap outside or a drag down instead (Alex, 2026-11-07: no X).
+            HomeJewel(tone: tone, upNext: upNext, face: .open, tap: closeShortcuts)
+                .position(jewel)
+                .transition(.opacity)
+                .zIndex(3)
+        }
     }
 
     /// The jewel's note, just above it.
@@ -629,6 +678,111 @@ struct HomeView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: fromTop ? .top : .bottom)
             .transition(reduceMotion ? .opacity : .move(edge: fromTop ? .top : .bottom).combined(with: .opacity))
             .zIndex(2)
+    }
+}
+
+// MARK: - The stage home
+
+extension HomeView {
+    /// The stage home: the same game, cards and doors as the other homes, laid out on a dark stage.
+    func stageHome() -> some View {
+        let upNext = self.upNext
+        let puzzle: HomePuzzle? = dailyPuzzle
+        let info = HomeStageInfo(upNext: upNext, day: dailyState, rating: HomeLadder(games: vault.games).yourRating,
+                                 rankNumber: training.rankNumber, plan: plan, trainedToday: training.trainedToday,
+                                 masterpiece: HomeMasterpiece.of(), name: playerName,
+                                 gameFEN: match.game.fen, todayFEN: puzzle?.fen, todaySolver: puzzle?.solver,
+                                 pieceTheme: pieceTheme)
+        let stageActions = HomeStageActions(
+            play: { playNext(upNext) },
+            change: { secondary(upNext) },
+            dailyMove: actions.dailyMove,
+            coach: {
+                if let plan { actions.trainToday(plan) } else { actions.train() }
+            },
+            learn: actions.train,
+            analyze: actions.analyze,
+            analyzePosition: actions.analyzePosition,
+            you: { openYou(.bottom) },
+            rooms: openShortcuts)
+        let auroraInfo = HomeAuroraInfo(stage: info, games: currentGameList(upNext), look: look,
+                                        pieces: match.game.pieces.map(\.piece), finest: finestMove)
+        let auroraActions = HomeAuroraActions(stage: stageActions, open: { game in
+            if let friend = game.friendGame {
+                challenges?.play(friend)
+            } else {
+                actions.resume()
+            }
+        }, playRival: { level in playOtherRival(level) }, options: { level in actions.playRival(level) }, rivals: { level in
+            hallStart = level
+            hallIntro = false
+            showingHall = true
+        }, playGrudge: playGrudge, puzzles: actions.puzzles, replay: { id in
+            if let game = vault.game(id) { actions.openGame(game) }
+        })
+        return HomeAuroraView(tone: tone, info: auroraInfo, actions: auroraActions)
+            .fullScreenCover(isPresented: $showingHall) {
+                RivalsHall(start: hallStart, intro: hallIntro, begin: { level in
+                    // The film's last frame gives way to the game: the hall closes at once.
+                    var quiet = Transaction()
+                    quiet.disablesAnimations = true
+                    withTransaction(quiet) { showingHall = false }
+                    playRival(level)
+                }, close: { showingHall = false })
+            }
+            .confirmationDialog("Leave your game against \(match.opponentName)?",
+                                isPresented: $confirmingGrudge, titleVisibility: .visible) {
+                Button("Resign and play Your Grudge", role: .destructive) { startGrudge() }
+                Button("Keep playing", role: .cancel) {}
+            } message: {
+                Text("It counts as a loss for your army.")
+            }
+    }
+
+    /// Play on the next game. Every time you face a rival, its welcome film plays first and its
+    /// Begin starts the game (Alex, 2026-11-09: "when I hit play on this rival, I should see the
+    /// intro video"). A swipe down on the film goes back.
+    private func playNext(_ upNext: HomeUpNext) {
+        guard !upNext.inProgress, !upNext.isGrudge else {
+            primary(upNext)
+            return
+        }
+        showFilm(upNext.level)
+    }
+
+    /// Play on another rival's page of the Up next card: its film first too. During a game the
+    /// New Game sheet opens on that rival instead, as before.
+    private func playOtherRival(_ level: MatchController.Level) {
+        guard !upNext.inProgress else {
+            playRival(level)
+            return
+        }
+        showFilm(level)
+    }
+
+    private func showFilm(_ level: MatchController.Level) {
+        hallStart = level
+        hallIntro = true
+        showingHall = true
+    }
+
+    /// Your Grudge, from Home: the game starts at once on the side and clock picked last time.
+    /// A game under way that would count as a loss is asked about first.
+    private func playGrudge() {
+        if match.newGameForfeits {
+            confirmingGrudge = true
+        } else {
+            startGrudge()
+        }
+    }
+
+    private func startGrudge() {
+        guard let record = grudges?.record else { return }
+        grudgeOn = true
+        var setup = MatchController.Setup(playerColor: side.color, level: record.level, timeControl: timeControl)
+        setup.grudge = true
+        setup.grudgeSkill = record.skill
+        actions.start(setup)
     }
 }
 
@@ -903,12 +1057,12 @@ extension HomeView {
         switch sheetTab {
         case .today: sheetToday(upNext)
         case .learn: sheetLearn
-        case .army: sheetArmy
         case .you: sheetYou
         }
     }
 
-    /// Today: your games going, a person to play, Today's Move and the coach, the rivals.
+    /// Today: your games going, a person to play, Analyze, Today's Move and the coach, the
+    /// day's masterpiece, your army and the rivals.
     private func sheetToday(_ upNext: HomeUpNext) -> some View {
         let day = dailyState
         let ladder = HomeLadder(games: vault.games)
@@ -917,6 +1071,8 @@ extension HomeView {
                 .homeRise(0)
             playPerson()
                 .homeRise(1)
+            HomeAnalyzeTile(tone: tone, analyze: actions.analyze)
+                .homeRise(2)
             HStack(alignment: .top, spacing: Self.gap) {
                 HomeDailyTile(puzzle: dailyPuzzle, daily: day, tone: tone, pieceTheme: pieceTheme,
                               solve: actions.dailyMove)
@@ -924,21 +1080,29 @@ extension HomeView {
                               tone: tone, start: actions.trainToday, train: actions.train)
             }
             .fixedSize(horizontal: false, vertical: true)
-            .homeRise(2)
+            .homeRise(3)
             if HomeNoticeCard.shows(day) {
                 HomeNoticeCard(daily: day, tone: tone, remind: answerReminder)
                     .transition(.opacity)
-                    .homeRise(3)
+                    .homeRise(4)
             }
+            if let masterpiece = HomeMasterpiece.of() {
+                HomeMasterpieceTile(masterpiece: masterpiece, tone: tone, pieceTheme: pieceTheme,
+                                    open: actions.analyzePosition)
+                    .homeRise(5)
+            }
+            HomeArmyTile(army: army, color: upNext.playerColor, pieceTheme: pieceTheme, tone: tone, open: actions.army)
+                .homeRise(6)
             HomeLadderTile(ladder: ladder, tone: tone, play: { level in actions.playRival(level) })
                 .padding(.top, 4)
-                .homeRise(4)
+                .homeRise(7)
         }
     }
 
-    /// Learn: every way to get better, in one card.
+    /// Learn: every way to get better, in one card, and your games to look back on.
     private var sheetLearn: some View {
-        VStack(alignment: .leading, spacing: Self.gap) {
+        let played = vault.games
+        return VStack(alignment: .leading, spacing: Self.gap) {
             sheetCard {
                 HomeLinkRow(glyph: Glyphs.coach, title: "Train with Coach Leo", detail: "Lessons, drills and today's session", tone: tone, action: actions.train)
                     .homeZoomSource(.coach)
@@ -956,29 +1120,13 @@ extension HomeView {
                     .homeZoomSource(.games)
                     .homeRise(3)
                 HomeHairline(tone: tone)
-                HomeLinkRow(glyph: Glyphs.analyze, title: "Analyze", detail: "Study any position with the engine", tone: tone, action: actions.analyze)
+                HomeLinkRow(glyph: Glyphs.analyze, title: "Analyze", detail: HomeAnalyzeTile.line, tone: tone, action: actions.analyze)
                     .homeRise(4)
-                HomeHairline(tone: tone)
-                HomeLinkRow(glyph: Glyphs.scan, title: "Scan a board", detail: "Read a real board with the camera", tone: tone, action: actions.scan)
-                    .homeRise(5)
-            }
-        }
-    }
-
-    /// Army: your pieces with memory, and the games they played.
-    private var sheetArmy: some View {
-        let played = vault.games
-        return VStack(alignment: .leading, spacing: Self.gap) {
-            sheetCard {
-                HomeLinkRow(glyph: Glyphs.army, title: "Your pieces", detail: piecesLine, tone: tone, action: actions.army)
-                    .homeZoomSource(.army)
-                    .homeRise(0)
             }
             if !played.isEmpty {
                 HomeGamesTile(rows: HomeGameRow.rows(played), total: played.count,
                               week: HomeGameRow.thisWeek(played), tone: tone, openAll: actions.rewind)
-                    .homeZoomSource(.games)
-                    .homeRise(1)
+                    .homeRise(5)
             }
         }
     }
@@ -1005,7 +1153,7 @@ extension HomeView {
                     .homeRise(1)
                 if let premium = actions.premium {
                     HomeHairline(tone: tone)
-                    HomeLinkRow(glyph: Glyphs.king, title: "Chess Game Killer Pro", detail: "Everything, with no limits", tone: tone, action: premium)
+                    HomeLinkRow(glyph: Glyphs.king, title: "Beauty of Chess Pro", detail: "Everything, with no limits", tone: tone, action: premium)
                         .homeRise(2)
                 }
             }

@@ -102,16 +102,18 @@ struct SculptedCamera: Equatable {
 
     /// Half the board's width including its frame.
     static let boardHalfWidth: Float = 4.55
-    /// Half the width the camera keeps in the picture: the squares and a sliver of the frame's
-    /// inner edge. The rest of the frame runs off the sides, so the squares get the screen
-    /// (Alex, 2026-11-04: "much larger, taking up more of the screen"). The files and ranks sit
-    /// on the edge squares instead of the frame, so none of them are lost.
-    static let fitHalfWidth: Float = 4.1
+    /// Half the width of the squares with the metal line round them and a thin rim of frame.
+    /// The board runs edge to edge (Alex, 2026-11-07: other apps' boards look larger), so
+    /// the rest of the frame stays off the sides of the picture.
+    static let fitHalfWidth: Float = 4.06
+    /// How far each file letter and rank number sits in from its corner square's two edges.
+    static let labelInset: Float = 0.15
     /// The tallest piece, the king, with its cross.
     static let tallest: Float = 1.47
 
     /// What must stay in the picture: the squares' corners with a sliver of frame (its top, and
-    /// its near face below them) and the tops of the tallest pieces on the far rank.
+    /// its near face below them), and the tops of the tallest pieces on the far rank. The files
+    /// and ranks are inside the squares.
     static var keyPoints: [SIMD3<Float>] { keyPoints(tallest: tallest) }
 
     static func keyPoints(tallest: Float) -> [SIMD3<Float>] {
@@ -132,7 +134,7 @@ struct SculptedCamera: Equatable {
     // MARK: Framing
 
     /// How the board is seen: from the player's chair, pieces standing tall, or from high
-    /// above (Big Board), each piece a flat piece inside its own square.
+    /// above (Flat), each piece a flat piece inside its own square.
     enum Framing: Equatable {
         case standing
         case seated
@@ -205,7 +207,7 @@ struct SculptedCamera: Equatable {
         return camera
     }
 
-    private static let margin = SIMD2<Float>(0.012, 0.035)
+    private static let margin = SIMD2<Float>(0.004, 0.035)
 
     /// The chair's height above the board, standing, in degrees: from the classic view across
     /// the table to a higher one that opens up the far ranks on a tall phone.
@@ -275,17 +277,32 @@ struct SculptedCamera: Equatable {
 }
 
 /// The "Board view" setting for the 3D board: tilted with the pieces standing, or flat from
-/// above with each piece cut flat in its square. Auto tilts the usual board and lays Big Board flat.
-enum BoardTilt: String, CaseIterable, Identifiable {
-    case auto, tilted, flat
+/// above with each piece cut flat in its square.
+enum BoardTilt: RawRepresentable, CaseIterable, Identifiable {
+    case tilted, flat
 
     static let storageKey = "boardTilt"
+
+    /// "auto", saved before Big Board went (it tilted every board but Big Board's), reads as Tilted.
+    init?(rawValue: String) {
+        switch rawValue {
+        case "tilted", "auto": self = .tilted
+        case "flat": self = .flat
+        default: return nil
+        }
+    }
+
+    var rawValue: String {
+        switch self {
+        case .tilted: return "tilted"
+        case .flat: return "flat"
+        }
+    }
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .auto: return "Auto"
         case .tilted: return "Tilted"
         case .flat: return "Flat"
         }
@@ -293,15 +310,13 @@ enum BoardTilt: String, CaseIterable, Identifiable {
 
     var blurb: String {
         switch self {
-        case .auto: return "Tilted, with the pieces standing. Flat from above on Big Board."
-        case .tilted: return "Always tilted, with the pieces standing, Big Board too."
-        case .flat: return "Always flat from above, with flat pieces."
+        case .tilted: return "Tilted, with the pieces standing."
+        case .flat: return "Flat from above, with flat pieces."
         }
     }
 
-    func framing(bigBoard: Bool) -> SculptedCamera.Framing {
+    var framing: SculptedCamera.Framing {
         switch self {
-        case .auto: return bigBoard ? .seated : .standing
         case .tilted: return .standing
         case .flat: return .seated
         }

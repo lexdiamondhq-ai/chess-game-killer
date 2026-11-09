@@ -39,7 +39,7 @@ struct PuzzleCyclesView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .preferredColorScheme(theme.isDark ? .dark : nil)
+        .screenScheme(theme)
         .tint(theme.trainingAccent)
         .animation(.snappy, value: runner == nil)
         .animation(.snappy, value: choosingSet)
@@ -107,7 +107,7 @@ struct PuzzleCyclesView: View {
 
     private func playing(_ runner: DrillRunner, _ puzzle: LichessPuzzle) -> some View {
         GeometryReader { geo in
-            let side = max(200, min(geo.size.width - 32, geo.size.height - 270, 560))
+            let side = max(200, min(geo.size.width - TrainingBoardView.sideRoom, geo.size.height - 270, 560))
             ScrollView {
                 VStack(spacing: 14) {
                     if let set = store.cycleSet, let run = set.currentRun {
@@ -116,13 +116,7 @@ struct PuzzleCyclesView: View {
                             .frame(maxWidth: 560)
                             .padding(.horizontal, 16)
                     }
-                    TrainingBoardView(game: runner.game, theme: theme, flipped: runner.learner == .black,
-                                      arrows: runner.arrows, marks: runner.marks, labels: runner.labels,
-                                      onTap: runner.acceptsTaps ? { (square: Square) in runner.tap(square) } : nil)
-                        .frame(width: side, height: side)
-                        .boardHeadroom(theme: theme, side: side)
-                    TurnBadge(theme: theme, side: runner.learner, showing: runner.phase == .solving)
-                        .padding(.top, -8)
+                    DrillBoard(runner: runner, theme: theme, side: side, showsTurn: runner.phase == .solving)
                     RoomMessage(text: runner.message, tone: runner.tone, theme: theme)
                         .frame(maxWidth: 560)
                         .padding(.horizontal, 16)

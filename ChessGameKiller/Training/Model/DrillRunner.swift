@@ -28,6 +28,8 @@ final class DrillRunner {
     let learner: Piece.Color
     private(set) var game: GameModel
     private(set) var phase: Phase = .intro
+    /// The drill has ended, solved or not.
+    var isOver: Bool { if case .done = phase { return true } else { return false } }
     private(set) var message: String
     private(set) var tone: Tone = .coach
     private(set) var arrows: [BoardArrow] = []
@@ -52,6 +54,11 @@ final class DrillRunner {
     /// Hears right and wrong answers, for the coach's spoken reactions ("Nice move", "Try again").
     /// Nil when the drill plays no sound, and in the level check, which is a test.
     @ObservationIgnored var reactions: Reacting?
+    /// Seconds from a move until its piece touches down, so its sound is heard then: on the 3D
+    /// board the piece glides first (the board sets this), on the flat one it is there at once.
+    @ObservationIgnored var landingDelay: @MainActor (PlayedMove) -> TimeInterval = { _ in 0 }
+    /// The move sounds. Nil when the drill plays none.
+    @ObservationIgnored var sounds: SoundPlaying?
 
     private let startFEN: String
     private let setup: String?
@@ -64,7 +71,6 @@ final class DrillRunner {
     private let explain: String?
     private let lines: CoachLines?
     private let engine: ChessEngine?
-    private let sounds: SoundPlaying?
     @ObservationIgnored private var index = 0
     @ObservationIgnored private var found: Set<String> = []
     @ObservationIgnored private var pending: Task<Void, Never>?
@@ -348,20 +354,30 @@ final class DrillRunner {
         let movesBefore = game.moveCount
         let selectedBefore = game.selected
         game.tap(square)
-        if game.pendingPromotion != nil {
-            let expected = solution.indices.contains(index) ? solution[index] : nil
-            game.promote(to: expected.flatMap(TrainingChess.promotionKind(of:)) ?? .queen)
-        }
-        if game.moveCount != movesBefore, let played = game.lastPlayed {
-            sound(for: played)
-            marks = []
-            if kind == .playout {
-                playoutMoved()
-            } else {
-                judge(played)
-            }
+        // A pawn on the last rank waits for the learner to choose its piece on the board.
+        if game.pendingPromotion != nil { return }
+        if game.moveCount != movesBefore {
+            moved()
         } else if game.selected != nil, game.selected != selectedBefore {
             sounds?.play(.select)
+        }
+    }
+
+    /// Finishes a promotion with the piece the learner chose, and judges the move.
+    func promote(to kind: Piece.Kind) {
+        guard phase == .solving, game.pendingPromotion != nil else { return }
+        game.promote(to: kind)
+        moved()
+    }
+
+    private func moved() {
+        guard let played = game.lastPlayed else { return }
+        sound(for: played)
+        marks = []
+        if kind == .playout {
+            playoutMoved()
+        } else {
+            judge(played)
         }
     }
 
@@ -669,16 +685,18 @@ final class DrillRunner {
         sound(for: played)
     }
 
+    /// The move's sound, as its piece touches down.
     private func sound(for move: PlayedMove) {
         guard let sounds else { return }
+        let landing = landingDelay(move)
         if move.isCapture {
-            sounds.play(.capture)
+            sounds.play(.capture, after: landing)
         } else if move.givesCheck {
-            sounds.play(.check)
+            sounds.play(.check, after: landing)
         } else if move.isCastle {
-            sounds.play(.castle)
+            sounds.play(.castle, after: landing)
         } else {
-            sounds.play(.move)
+            sounds.play(.move, after: landing)
         }
     }
 

@@ -14,6 +14,8 @@ struct WelcomeFlow: View {
     @State private var page: Int
     @State private var choice = WelcomeChoice()
     @AppStorage("sculpted3D") private var sculpted3D = true
+    @AppStorage(HomeLayout.key) private var sheet = HomeLayout.defaultOn
+    @AppStorage(HomeToneMode.key) private var toneMode = HomeToneMode.defaultMode
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static let pages = 4
@@ -26,12 +28,14 @@ struct WelcomeFlow: View {
     }
 
     private var theme: BoardTheme { .named(choice.look) }
-    private var accent: Color { theme.accent ?? .accentColor }
+    private var accent: Color { tone?.metal ?? theme.accent ?? .accentColor }
+    /// The home's colors around the chosen board, as on every screen around a board.
+    private var tone: HomeTone? { HomeTone.screen(for: theme, sheet: sheet, mode: toneMode) }
     private var rival: Rival { choice.experience.level.rival }
 
     var body: some View {
         ZStack {
-            ThemeBackdrop(theme: theme)
+            TrainingBackdrop(theme: theme)
                 .ignoresSafeArea()
                 .animation(.easeInOut(duration: 0.4), value: choice.look)
             VStack(spacing: 0) {
@@ -49,7 +53,7 @@ struct WelcomeFlow: View {
             .padding(.bottom, 12)
             .frame(maxWidth: 520)
         }
-        .environment(\.colorScheme, .dark)
+        .environment(\.colorScheme, tone?.scheme ?? .dark)
         .tint(accent)
         .animation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.45, dampingFraction: 0.88), value: page)
     }
@@ -87,7 +91,7 @@ struct WelcomeFlow: View {
         HStack(spacing: 7) {
             ForEach(0..<Self.pages, id: \.self) { index in
                 Capsule()
-                    .fill(index == page ? accent : Color.white.opacity(0.22))
+                    .fill(index == page ? accent : Color.primary.opacity(0.22))
                     .frame(width: index == page ? 18 : 6, height: 6)
             }
         }
@@ -107,11 +111,7 @@ struct WelcomeFlow: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
             }
-            .buttonStyle(.borderedProminent)
-            .buttonBorderShape(.capsule)
-            .controlSize(.large)
-            .tint(accent)
-            .foregroundStyle(Color.black)
+            .modifier(WelcomePrimaryButton(tone: tone, accent: accent))
             if last, canStartGame {
                 Button("Look around first") { done(play: false) }
                     .font(.app(.subheadline, weight: .semibold))
@@ -220,6 +220,43 @@ struct WelcomeFlow: View {
     }
 }
 
+/// The page's one solid button: the home's ivory button, or the look's accent on the older home.
+private struct WelcomePrimaryButton: ViewModifier {
+    let tone: HomeTone?
+    let accent: Color
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if let tone {
+            content
+                .buttonStyle(WelcomeIvoryStyle(tone: tone))
+        } else {
+            content
+                .buttonStyle(.borderedProminent)
+                .buttonBorderShape(.capsule)
+                .controlSize(.large)
+                .tint(accent)
+                .foregroundStyle(Color.black)
+        }
+    }
+}
+
+private struct WelcomeIvoryStyle: ButtonStyle {
+    let tone: HomeTone
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(tone.onIvory)
+            .padding(.vertical, 6)
+            .frame(minHeight: 50)
+            .background { HomeIvoryFill(tone: tone) }
+            .contentShape(Capsule())
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .opacity(configuration.isPressed ? 0.9 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.8), value: configuration.isPressed)
+    }
+}
+
 /// An icon, a bold word and one line.
 private struct WelcomeRow: View {
     let glyph: String
@@ -269,7 +306,7 @@ private struct ExperienceCard: View {
                 Spacer(minLength: 0)
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(isSelected ? accent : Color.white.opacity(0.3))
+                    .foregroundStyle(isSelected ? accent : Color.primary.opacity(0.3))
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)

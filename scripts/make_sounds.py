@@ -6,6 +6,8 @@ then push to the `generate-sounds` branch to regenerate.
 
 Usage: python3 scripts/make_sounds.py <output-dir> [name ...]
 With names, only those sounds are made; the rest are left as they are.
+       python3 scripts/make_sounds.py --tidy <output-dir> [name ...]
+tidies the files already there (see tidy) without calling ElevenLabs.
 Sounds listed in MUSIC are composed with the ElevenLabs Music API, falling
 back to the Sound Effects API if music isn't available on the account.
 """
@@ -34,17 +36,44 @@ SOUNDS = {
     "castle": ("Two weighted wooden chess pieces with felt bases set down on a hardwood board one "
                "right after the other: two soft knocks a fraction of a second apart. Close-up, "
                "dry room, no music", 0.7),
-    "win": ("A triumphant short synthwave victory chime with sparkles", 2.5),
-    "game-over": ("A calm descending synth chime signalling the end of a game", 2.2),
+    # The endings: warm and acoustic like the pieces, never arcade synths.
+    "win": ("A short, elegant success chime: three warm rising notes on a soft celesta and a "
+            "felt piano, a gentle shimmer at the end. Clean, luxurious, understated, no synths, "
+            "no drums", 2.2),
+    "game-over": ("The end of a chess game: two soft, warm, descending notes on a felt piano with "
+                  "a low cello underneath, calm and dignified, not sad, quickly fading. No synths, "
+                  "no drums", 2.2),
+    # defeat.mp3 (a loss) is not made here: it is two takes blended by hand, two distant
+    # funeral bell tolls ("Two slow tolls of a huge low iron funeral bell, far away across a
+    # misty valley...") over a short low requiem choir at 75% ("A brief dark choral requiem:
+    # a low wordless choir sings one slow descending minor phrase over deep strings..."),
+    # then tidied to CUE_LUFS. game-over.mp3 is kept for draws.
     "victory": ("A joyful video game level-complete victory fanfare: a bright rising "
                 "melody on shimmering synths and bells, punchy drums, ending on a big "
                 "triumphant major chord with sparkles, polished modern mobile game music", 6.0),
     "welcome": ("A short elegant welcoming chime for opening a premium game app: warm "
                 "bell and soft synth pad, three gentle rising notes, clean and luxurious", 2.2),
+    # Background music, in the family of Home's "The Long Winter" (cello, strings, choir):
+    # quiet, even loops that sit under the screen without a climax.
+    "music-puzzles": ("Calm, focused medieval fantasy orchestral underscore, seamless as a background "
+                      "loop: soft pizzicato strings and a gentle harp ostinato, a low sustained cello "
+                      "drone, sparse solo violin phrases in a minor key, no drums. Slow steady tempo "
+                      "around 66 BPM, thoughtful and concentrated, very quiet and even with no climax",
+                      90.0),
+    "music-training": ("Warm, hopeful medieval fantasy orchestral underscore, seamless as a background "
+                       "loop to sit under a spoken voice: soft string pads, a gentle solo cello melody "
+                       "in a major-leaning mode, light celesta and harp touches, nothing in the "
+                       "midrange that competes with speech, no drums. Slow tempo around 68 BPM, "
+                       "encouraging and patient, very soft and even", 90.0),
+    "music-analyze": ("Mysterious, contemplative medieval fantasy orchestral underscore, seamless as a "
+                      "background loop: slow low strings, a distant french horn, a hushed wordless "
+                      "choir pad, soft timpani rolls far in the background, a solo viola line in a "
+                      "minor key. Very slow tempo around 60 BPM, deep and pondering, like studying an "
+                      "old map by candlelight, quiet throughout", 90.0),
 }
 
 # Composed as music rather than as a sound effect: text and length come from SOUNDS.
-MUSIC = {"victory"}
+MUSIC = {"victory", "music-puzzles", "music-training", "music-analyze"}
 
 # Raised after generating, in dB. The check's bell comes out quieter than a plain move,
 # and check is the more important news.
@@ -91,6 +120,90 @@ def louder(audio: bytes, decibels: float, out: str) -> bytes:
     return audio
 
 
+# The longer cues are all brought to this loudness, so GameSound.volume alone sets how they
+# sit against each other and a regenerated file never comes out much louder or quieter.
+CUE_LUFS = -16.0
+# ...without their peaks going past this.
+CUE_PEAK_DB = -1.0
+
+
+def loudness(path: str) -> tuple[float, float] | None:
+    """Integrated loudness (LUFS) and true peak (dBFS) of a file, by ffmpeg's EBU R128 meter."""
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        return None
+    meter = subprocess.run([
+        ffmpeg, "-hide_banner", "-nostats", "-i", path, "-af", "ebur128=peak=true", "-f", "null", "-",
+    ], capture_output=True, text=True)
+    summary = meter.stderr.rsplit("Summary:", 1)[-1]
+    level = peak = None
+    for line in summary.splitlines():
+        words = line.split()
+        if len(words) >= 2 and words[0] == "I:":
+            level = float(words[1])
+        if len(words) >= 2 and words[0] == "Peak:":
+            peak = float(words[1])
+    if level is None or peak is None:
+        return None
+    return level, peak
+
+
+def tidy(audio: bytes, out: str, knock: bool) -> bytes:
+    """Starts the sound on its first real sample, so a piece is heard the instant it lands
+    (the generated files open with a few hundredths of a second of near silence, and the
+    victory theme with a third of a second), with a 4 ms fade in and a short fade out so
+    nothing clicks. A longer cue is also brought to CUE_LUFS. Unchanged without ffmpeg."""
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        return audio
+    source = os.path.join(out, "tidy-in.mp3")
+    target = os.path.join(out, "tidy-out.mp3")
+    with open(source, "wb") as f:
+        f.write(audio)
+    tail = 0.03 if knock else 0.25
+    gain = ""
+    measured = None if knock else loudness(source)
+    if measured:
+        level, peak = measured
+        change = min(CUE_LUFS - level, CUE_PEAK_DB - peak)
+        if abs(change) >= 0.5:
+            gain = f"volume={change:.1f}dB,"
+    chain = (
+        "silenceremove=start_periods=1:start_threshold=-52dB:start_silence=0.002,"
+        f"{gain}"
+        "afade=t=in:d=0.004,"
+        # A fade out on the last stretch: reversed, it is a fade in.
+        f"areverse,silenceremove=start_periods=1:start_threshold=-70dB,afade=t=in:d={tail},areverse"
+    )
+    subprocess.run([
+        ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", source,
+        "-af", chain, "-ar", "44100", "-b:a", "128k", target,
+    ], check=True)
+    with open(target, "rb") as f:
+        audio = f.read()
+    os.remove(source)
+    os.remove(target)
+    return audio
+
+
+# The short knocks of the pieces; everything else is a longer cue.
+KNOCKS = {"move", "select", "capture", "check", "castle"}
+
+
+def tidy_files(out: str, only: set[str]) -> None:
+    for name in SOUNDS:
+        if only and name not in only:
+            continue
+        path = os.path.join(out, f"{name}.mp3")
+        if not os.path.exists(path):
+            continue
+        with open(path, "rb") as f:
+            audio = tidy(f.read(), out, name in KNOCKS)
+        with open(path, "wb") as f:
+            f.write(audio)
+        print(f"{name}.mp3 tidied: {len(audio)} bytes")
+
+
 def generate(text: str, seconds: float, key: str) -> bytes:
     body = json.dumps({
         "text": text,
@@ -133,11 +246,18 @@ def compose(text: str, seconds: float, key: str) -> bytes | None:
 
 
 def main() -> None:
-    out = sys.argv[1]
-    only = set(sys.argv[2:])
+    args = sys.argv[1:]
+    tidy_only = bool(args) and args[0] == "--tidy"
+    if tidy_only:
+        args = args[1:]
+    out = args[0]
+    only = set(args[1:])
     unknown = only - set(SOUNDS)
     if unknown:
         sys.exit(f"Unknown sounds: {', '.join(sorted(unknown))}")
+    if tidy_only:
+        tidy_files(out, only)
+        return
     key = os.environ.get("ELEVENLABS_API_KEY")
     if not key:
         sys.exit("ELEVENLABS_API_KEY is not set. Add it as a repository secret.")
@@ -146,12 +266,17 @@ def main() -> None:
         if only and name not in only:
             continue
         audio = compose(text, seconds, key) if name in MUSIC else None
+        if audio is None and name.startswith("music-"):
+            # Skipped rather than stopping, so the pieces already composed still get committed.
+            print(f"{name}: skipped, the Music API is needed for background music")
+            continue
         if name == "castle":
             audio = castle_from_move(out)
         if audio is None:
             audio = generate(text, seconds, key)
         if name in GAIN_DB:
             audio = louder(audio, GAIN_DB[name], out)
+        audio = tidy(audio, out, name in KNOCKS)
         with open(os.path.join(out, f"{name}.mp3"), "wb") as f:
             f.write(audio)
         print(f"{name}.mp3: {len(audio)} bytes")

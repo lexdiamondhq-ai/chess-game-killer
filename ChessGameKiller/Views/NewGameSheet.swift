@@ -76,9 +76,8 @@ struct NewGameSheet: View {
 
     @AppStorage("setup.side") private var side: SideChoice = .white
     @AppStorage("setup.level") private var level: MatchController.Level = .club
+    /// Your Grudge is played from Home now; a game picked here is against a rival.
     @AppStorage("setup.grudge") private var grudgeOn = false
-    /// The score when you last saw your Grudge ("7-11"), so what changed since plays out.
-    @AppStorage("grudge.lastSeen") private var grudgeLastSeen = ""
     @AppStorage("setup.clock") private var timeControl: TimeControl = .unlimited
     @AppStorage("showBestMoves") private var showBestMoves = false
     @AppStorage("coachVerdicts") private var showVerdicts = true
@@ -88,24 +87,18 @@ struct NewGameSheet: View {
     /// The choices on the sheet, kept only when the game starts.
     @State private var draftSide: SideChoice
     @State private var draftLevel: MatchController.Level
-    /// Your Grudge rather than The Crowd.
-    @State private var draftGrudge: Bool
-    /// The score your Grudge's summons counts up from, read once as it is picked.
-    @State private var grudgeSince: (you: Int, it: Int)?
-    /// The first time you meet it, its birth plays instead.
-    @State private var grudgeBorn = false
     @State private var draftClock: TimeControl
     @State private var draftCoach: CoachMode
     /// The piece the player means to put on the line. Never remembered: every stake is chosen afresh.
     @State private var draftStake: ArmySlot?
     /// The army, for On the line. Absent in tests that draw the sheet without one.
     @Environment(ArmyStore.self) private var army: ArmyStore?
-    /// Your Grudge. Absent in tests and previews: The Crowd only.
-    @Environment(GrudgeStore.self) private var grudges: GrudgeStore?
     @State private var scrolledLevel: MatchController.Level?
     @State private var openRow: MatchRow?
     @State private var confirmingForfeit = false
     @Environment(\.dismiss) private var dismiss
+    /// Which rivals are open: each waits until the one before it is beaten (Alex, 2026-11-08).
+    private let ladder: RivalLadder
 
     /// `stakesOpen` and `stake` are for pictures: On the line unfolded, with a piece already picked.
     init(theme: BoardTheme, forfeits: String? = nil, defaults: UserDefaults = .standard,
@@ -117,10 +110,12 @@ struct NewGameSheet: View {
         self.forfeits = forfeits
         self.start = start
         self.challenge = challenge
-        let level = (defaults.object(forKey: "setup.level") as? Int).flatMap { MatchController.Level(rawValue: $0) } ?? .club
+        let ladder = RivalLadder(defaults: defaults)
+        self.ladder = ladder
+        let saved = (defaults.object(forKey: "setup.level") as? Int).flatMap { MatchController.Level(rawValue: $0) }
+        let level = saved.map { ladder.isOpen($0) ? $0 : ladder.current } ?? ladder.current
         _draftSide = State(initialValue: defaults.string(forKey: "setup.side").flatMap { SideChoice(rawValue: $0) } ?? .white)
         _draftLevel = State(initialValue: level)
-        _draftGrudge = State(initialValue: defaults.bool(forKey: "setup.grudge"))
         _draftClock = State(initialValue: defaults.string(forKey: "setup.clock").flatMap { TimeControl(rawValue: $0) } ?? .unlimited)
         _draftCoach = State(initialValue: CoachMode(
             hints: defaults.object(forKey: "showBestMoves") as? Bool ?? false,
@@ -132,23 +127,17 @@ struct NewGameSheet: View {
     /// The choices from last time, for when the sheet is closed without starting.
     static func savedSetup(_ defaults: UserDefaults = .standard) -> MatchController.Setup {
         let side = defaults.string(forKey: "setup.side").flatMap { SideChoice(rawValue: $0) } ?? .white
-        let level = (defaults.object(forKey: "setup.level") as? Int).flatMap { MatchController.Level(rawValue: $0) } ?? .club
+        let ladder = RivalLadder(defaults: defaults)
+        let saved = (defaults.object(forKey: "setup.level") as? Int).flatMap { MatchController.Level(rawValue: $0) }
+        let level = saved.map { ladder.isOpen($0) ? $0 : ladder.current } ?? ladder.current
         let clock = defaults.string(forKey: "setup.clock").flatMap { TimeControl(rawValue: $0) } ?? TimeControl.unlimited
         return MatchController.Setup(playerColor: side.color, level: level, timeControl: clock)
     }
 
-    private var accent: Color { theme.accent ?? .accentColor }
-
-    /// The Grudge, when it is picked and exists.
-    private var grudgeRecord: GrudgeRecord? {
-        draftGrudge ? grudges?.record : nil
-    }
+    private var accent: Color { theme.trainingAccent }
 
     /// Who the game would be against.
-    private var draftRival: Rival {
-        if let grudgeRecord { return .grudge(grudgeRecord.level) }
-        return draftLevel.rival
-    }
+    private var draftRival: Rival { draftLevel.rival }
 
     /// Keeps the choices for next time, then starts the game.
     private func play() {
@@ -157,35 +146,13 @@ struct NewGameSheet: View {
         timeControl = draftClock
         showBestMoves = draftCoach.showsHints
         showVerdicts = draftCoach.showsVerdicts
-        grudgeOn = grudgeRecord != nil
-        var setup = MatchController.Setup(playerColor: draftSide.color, level: draftLevel, timeControl: draftClock,
-                                          stake: stake)
-        if let grudgeRecord {
-            setup.level = grudgeRecord.level
-            setup.grudge = true
-            setup.grudgeSkill = grudgeRecord.skill
-            setup.stake = nil
-            grudgeLastSeen = "\(grudgeRecord.yourWins)-\(grudgeRecord.itsWins)"
-            grudges?.markSeen()
-        }
-        start(setup)
-    }
-
-    /// Picks the Grudge, and works out what its summons should show since you last met.
-    private func pickGrudge() {
-        guard let record = grudges?.record else { return }
-        let parts = grudgeLastSeen.split(separator: "-").compactMap { Int($0) }
-        grudgeSince = parts.count == 2 ? (you: parts[0], it: parts[1]) : nil
-        grudgeBorn = grudges?.unseen == true
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) { draftGrudge = true }
-        // Seen now: next time the summons counts from here.
-        grudgeLastSeen = "\(record.yourWins)-\(record.itsWins)"
-        grudges?.markSeen()
+        grudgeOn = false
+        start(MatchController.Setup(playerColor: draftSide.color, level: draftLevel, timeControl: draftClock,
+                                    stake: stake))
     }
 
     private func pickCrowd(_ level: MatchController.Level) {
         withAnimation(.snappy) {
-            draftGrudge = false
             scrolledLevel = level
             draftLevel = level
         }
@@ -199,16 +166,8 @@ struct NewGameSheet: View {
                         ChallengeEntryRow(theme: theme, action: challenge)
                     }
 
-                    if grudges != nil {
-                        section("Your Grudge") {
-                            GrudgeCard(record: grudges?.record, isSelected: grudgeRecord != nil, theme: theme,
-                                       born: grudgeBorn, lastSeen: grudgeSince, select: pickGrudge)
-                        }
-                    }
-
-                    section("The Crowd") {
+                    section("Rivals") {
                         rivalCarousel
-                            .opacity(grudgeRecord != nil ? 0.55 : 1)
                         dots
                     }
 
@@ -223,29 +182,15 @@ struct NewGameSheet: View {
             }
             .sensoryFeedback(.selection, trigger: openRow) { _, _ in hapticsOn }
             .sensoryFeedback(.selection, trigger: draftLevel) { _, _ in hapticsOn }
-            .onAppear {
-                // Picked last time, or just born: the sheet opens on your Grudge.
-                if grudges?.unseen == true || (draftGrudge && grudges?.record != nil) {
-                    draftGrudge = false
-                    pickGrudge()
-                } else if grudges?.record == nil {
-                    draftGrudge = false
-                }
-            }
             .safeAreaInset(edge: .bottom) {
                 Button {
                     if forfeits == nil { play() } else { confirmingForfeit = true }
                 } label: {
-                    Label(playTitle, systemImage: "play.fill")
-                        .font(.app(.headline))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
+                    Label(playTitle, systemImage: lockedBy == nil ? "play.fill" : "lock.fill")
+                        .padding(.vertical, 2)
                 }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.capsule)
-                .controlSize(.large)
-                .tint(accent)
-                .foregroundStyle(theme.isDark ? Color.black : Color.white)
+                .disabled(lockedBy != nil)
+                .buttonStyle(TrainingButtonStyle(theme: theme))
                 .padding(.horizontal, 20)
                 .padding(.bottom, 8)
                 .shadow(color: theme.glows ? accent.opacity(0.6) : .clear, radius: 14)
@@ -269,10 +214,10 @@ struct NewGameSheet: View {
         }
         .presentationDetents([.large])
         .presentationBackground {
-            ThemeBackdrop(theme: theme)
+            TrainingBackdrop(theme: theme)
         }
         .tint(accent)
-        .preferredColorScheme(theme.isDark ? .dark : nil)
+        .screenScheme(theme)
     }
 
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
@@ -351,9 +296,9 @@ struct NewGameSheet: View {
         .background {
             let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
             shape
-                .fill(theme.isDark ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)))
-                .overlay { shape.strokeBorder(Color.primary.opacity(theme.isDark ? 0.12 : 0.08), lineWidth: 1) }
-                .shadow(color: .black.opacity(theme.isDark ? 0.3 : 0.08), radius: 16, y: 6)
+                .fill(theme.screenIsDark ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)))
+                .overlay { shape.strokeBorder(Color.primary.opacity(theme.screenIsDark ? 0.12 : 0.08), lineWidth: 1) }
+                .shadow(color: .black.opacity(theme.screenIsDark ? 0.3 : 0.08), radius: 16, y: 6)
         }
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
@@ -378,7 +323,7 @@ struct NewGameSheet: View {
 
     private var rowDivider: some View {
         Rectangle()
-            .fill(Color.primary.opacity(theme.isDark ? 0.08 : 0.06))
+            .fill(Color.primary.opacity(theme.screenIsDark ? 0.08 : 0.06))
             .frame(height: 1)
             .padding(.leading, 58)
     }
@@ -412,7 +357,7 @@ struct NewGameSheet: View {
 
     /// The stake that will count: the one picked, if it is still allowed with these choices.
     private var stake: ArmySlot? {
-        guard grudgeRecord == nil, let army, let draftStake, !draftCoach.showsHints,
+        guard let army, let draftStake, !draftCoach.showsHints,
               army.canStake(draftStake, against: draftLevel) else { return nil }
         return draftStake
     }
@@ -423,15 +368,19 @@ struct NewGameSheet: View {
     /// The colour the army's pieces are drawn in here: the side picked, White for Random.
     private var armyColor: Piece.Color { draftSide == .black ? .black : .white }
 
+    /// Who to beat first, when the rival in front is still locked.
+    private var lockedBy: Rival? {
+        ladder.isOpen(draftLevel) ? nil : MatchController.Level(rawValue: draftLevel.rawValue - 1)?.rival
+    }
+
     private var playTitle: String {
-        if grudgeRecord != nil { return "Settle it" }
+        if let lockedBy { return "Beat \(lockedBy.name.lowercasedFirstWord) first" }
         if let army, let stake { return "Play for \(army.displayName(of: stake))" }
         if let army, let prisoner { return "Rescue \(army.displayName(of: prisoner))" }
         return "Play \(draftRival.name)"
     }
 
     private var stakeValue: String {
-        if grudgeRecord != nil { return "Nothing" }
         if let army, let stake { return army.displayName(of: stake) }
         if let army, let prisoner { return "Rescue \(army.displayName(of: prisoner))" }
         return "Nothing"
@@ -449,9 +398,6 @@ struct NewGameSheet: View {
     /// Why nothing can go on the line right now, if that's the case.
     private var stakeBlocked: String? {
         guard let army else { return nil }
-        if grudgeRecord != nil {
-            return "Nothing goes on the line against your Grudge. It plays for the score."
-        }
         let rival = draftLevel.rival.name
         if let prisoner {
             return "\(rival) \(rival.agreeing("is", "are")) holding \(army.displayName(of: prisoner, capitalized: false)). Win this game to get it back. Nothing else can go on the line against \(rival.midSentence) until then."
@@ -538,8 +484,10 @@ struct NewGameSheet: View {
         ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(spacing: 12) {
                 ForEach(Rival.all) { rival in
-                    RivalCard(rival: rival, isSelected: grudgeRecord == nil && draftLevel == rival.level, theme: theme,
-                          holding: army?.prisoner(of: rival.level).map { army?.displayName(of: $0) ?? "" })
+                    RivalCard(rival: rival, isSelected: draftLevel == rival.level, theme: theme,
+                          holding: army?.prisoner(of: rival.level).map { army?.displayName(of: $0) ?? "" },
+                          lockedBy: ladder.isOpen(rival.level) ? nil
+                              : MatchController.Level(rawValue: rival.level.rawValue - 1)?.rival)
                         .containerRelativeFrame(.horizontal) { length, _ in length - 50 }
                         .scrollTransition(.interactive, axis: .horizontal) { content, phase in
                             content
@@ -563,7 +511,6 @@ struct NewGameSheet: View {
         .onChange(of: scrolledLevel) { _, scrolled in
             if let scrolled, scrolled != draftLevel {
                 withAnimation(.snappy) {
-                    draftGrudge = false
                     draftLevel = scrolled
                 }
             }
@@ -573,7 +520,7 @@ struct NewGameSheet: View {
     private var dots: some View {
         HStack(spacing: 6) {
             ForEach(Rival.all) { rival in
-                let isOn = grudgeRecord == nil && rival.level == draftLevel
+                let isOn = rival.level == draftLevel
                 Capsule()
                     .fill(isOn ? rival.hue : Color.secondary.opacity(0.3))
                     .frame(width: isOn ? 18 : 6, height: 6)
@@ -650,9 +597,9 @@ struct NewGameSheet: View {
     private func card(selected: Bool, color: Color, glow: Color?) -> some View {
         let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
         return shape
-            .fill(selected ? color.opacity(0.1) : Color.primary.opacity(theme.isDark ? 0.05 : 0.03))
+            .fill(selected ? color.opacity(0.1) : Color.primary.opacity(theme.screenIsDark ? 0.05 : 0.03))
             .overlay {
-                shape.strokeBorder(selected ? color : Color.primary.opacity(theme.isDark ? 0.12 : 0.08),
+                shape.strokeBorder(selected ? color : Color.primary.opacity(theme.screenIsDark ? 0.12 : 0.08),
                                    lineWidth: selected ? 1.5 : 1)
             }
             .shadow(color: selected ? (glow ?? color).opacity(theme.glows ? 0.45 : 0.25) : .clear, radius: 12)
@@ -666,60 +613,96 @@ private struct RivalCard: View {
     let theme: BoardTheme
     /// The name of the player's piece this rival is holding (On the line), if any.
     var holding: String? = nil
+    /// The rival to beat first, while this one is locked.
+    var lockedBy: Rival? = nil
 
     private var holdingNote: String {
         holding.map { " Holding your \($0)." } ?? ""
     }
 
+    private var lockNote: String {
+        lockedBy.map { " Locked. Beat \($0.name.lowercasedFirstWord) first." } ?? ""
+    }
+
+    @ViewBuilder
+    private var bottomLine: some View {
+        if let lockedBy {
+            Label("Beat \(lockedBy.name.lowercasedFirstWord) first", systemImage: "lock.fill")
+                .font(.app(.caption, weight: .bold))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        } else if let holding {
+            Label("Holding \(holding)", systemImage: "lock.fill")
+                .font(.app(.caption, weight: .bold))
+                .foregroundStyle(rival.hue)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        } else {
+            HStack(spacing: 4) {
+                ForEach(0..<5, id: \.self) { index in
+                    let lit = index < rival.strength
+                    Capsule()
+                        .fill(lit ? rival.hue : Color.primary.opacity(0.14))
+                        .frame(width: 22, height: 5)
+                        .shadow(color: lit && theme.glows ? rival.hue.opacity(0.8) : .clear, radius: 4)
+                }
+            }
+            .accessibilityHidden(true)
+        }
+    }
+
     var body: some View {
         HStack(spacing: 12) {
-            CrowdSwarm(rival: rival, size: 100, picked: isSelected)
+            RivalCoin(rival: rival, size: 92)
+                .saturation(lockedBy == nil ? 1 : 0)
+                .opacity(lockedBy == nil ? 1 : 0.55)
+                .overlay {
+                    if lockedBy != nil {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .shadow(color: .black.opacity(0.5), radius: 4)
+                    }
+                }
+                .scaleEffect(isSelected ? 1 : 0.92)
+                .frame(width: 100, height: 100)
+                .animation(.spring(response: 0.45, dampingFraction: 0.75), value: isSelected)
+            // Every card has the same lines in the same places (Alex, 2026-11-08): the name, the
+            // level and Elo, four lines kept for how they play, then one bottom line that shows
+            // the strength bars, or who to beat first, or the piece the rival is holding.
             VStack(alignment: .leading, spacing: 4) {
                 Text(rival.name)
                     .font(.app(.title2, weight: .heavy))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
+                    .fixedSize(horizontal: false, vertical: true)
                 (Text(rival.level.name).foregroundStyle(rival.hue) + Text(" · Elo \(rival.elo)"))
                     .font(.app(.caption, weight: .semibold))
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(rival.blurb)
                     .font(.app(.caption))
                     .foregroundStyle(.secondary)
+                    .lineLimit(4, reservesSpace: true)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 2)
-                if let holding {
-                    Label("Holding \(holding)", systemImage: "lock.fill")
-                        .font(.app(.caption2, weight: .bold))
-                        .foregroundStyle(rival.hue)
-                        .lineLimit(1)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(rival.hue.opacity(0.14), in: Capsule())
-                        .padding(.top, 2)
-                }
-                HStack(spacing: 4) {
-                    ForEach(0..<5, id: \.self) { index in
-                        let lit = index < rival.strength
-                        Capsule()
-                            .fill(lit ? rival.hue : Color.primary.opacity(0.14))
-                            .frame(width: 22, height: 5)
-                            .shadow(color: lit && theme.glows ? rival.hue.opacity(0.8) : .clear, radius: 4)
-                    }
-                }
-                .padding(.top, 6)
-                .accessibilityHidden(true)
+                bottomLine
+                    .frame(height: 18, alignment: .leading)
+                    .padding(.top, 4)
             }
             Spacer(minLength: 0)
         }
         .padding(.leading, 8)
         .padding(.trailing, 14)
-        .frame(minHeight: 150)
+        .padding(.vertical, 16)
         .background {
             let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
             shape
-                .fill(theme.isDark ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)))
+                .fill(theme.screenIsDark ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)))
                 .overlay {
-                    shape.strokeBorder(isSelected ? rival.hue : Color.primary.opacity(theme.isDark ? 0.12 : 0.08),
+                    shape.strokeBorder(isSelected ? rival.hue : Color.primary.opacity(theme.screenIsDark ? 0.12 : 0.08),
                                        lineWidth: isSelected ? 1.5 : 1)
                 }
                 .shadow(color: isSelected ? rival.hue.opacity(theme.glows ? 0.4 : 0.25) : .clear, radius: 16)
@@ -727,7 +710,7 @@ private struct RivalCard: View {
         .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .animation(.snappy, value: isSelected)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(rival.name), \(rival.level.name), \(rival.spokenElo). \(rival.blurb)\(holdingNote)")
+        .accessibilityLabel("\(rival.name), \(rival.level.name), \(rival.spokenElo). \(rival.blurb)\(holdingNote)\(lockNote)")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
@@ -742,7 +725,7 @@ private struct MatchRowButton<Icon: View>: View {
     @ViewBuilder let icon: () -> Icon
     let action: () -> Void
 
-    private var accent: Color { theme.accent ?? .accentColor }
+    private var accent: Color { theme.trainingAccent }
 
     var body: some View {
         Button(action: action) {
@@ -776,7 +759,7 @@ private struct MatchRowButton<Icon: View>: View {
             .padding(.leading, 12)
             .padding(.trailing, 14)
             .frame(minHeight: 60)
-            .background(isOpen ? Color.primary.opacity(theme.isDark ? 0.04 : 0.03) : .clear)
+            .background(isOpen ? Color.primary.opacity(theme.screenIsDark ? 0.04 : 0.03) : .clear)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -794,7 +777,7 @@ private struct OptionRow: View {
     let theme: BoardTheme
     let action: () -> Void
 
-    private var accent: Color { theme.accent ?? .accentColor }
+    private var accent: Color { theme.trainingAccent }
 
     var body: some View {
         Button(action: action) {
@@ -820,7 +803,7 @@ private struct OptionRow: View {
                         .overlay {
                             Image(systemName: "checkmark")
                                 .font(.system(size: 11, weight: .heavy))
-                                .foregroundStyle(theme.isDark ? Color.black : Color.white)
+                                .foregroundStyle(theme.screenIsDark ? Color.black : Color.white)
                         }
                         .scaleEffect(isOn ? 1 : 0.4)
                         .opacity(isOn ? 1 : 0)

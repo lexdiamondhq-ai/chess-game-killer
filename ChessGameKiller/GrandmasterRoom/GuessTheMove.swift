@@ -66,13 +66,18 @@ final class GuessRunner {
         guard phase == .guessing else { return }
         let before = board.moveCount
         board.tap(square)
-        if board.pendingPromotion != nil {
-            let expected = game.moves[index]
-            board.promote(to: expected.count == 5 ? (TrainingChess.promotionKind(of: expected) ?? .queen) : .queen)
-        }
+        // A pawn on the last rank waits for the player to choose its piece on the board.
+        if board.pendingPromotion != nil { return }
         if board.moveCount != before, let played = board.lastPlayed {
             judge(played)
         }
+    }
+
+    /// Finishes a promotion with the piece the player chose, and judges the guess.
+    func promote(to kind: Piece.Kind) {
+        guard phase == .guessing, board.pendingPromotion != nil else { return }
+        board.promote(to: kind)
+        if let played = board.lastPlayed { judge(played) }
     }
 
     /// The opponent's moves play by themselves; then it's the player's turn.
@@ -189,7 +194,7 @@ struct GuessTheMoveView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let side = max(200, min(geo.size.width - 24, geo.size.height * 0.58))
+            let side = max(200, min(geo.size.width - TrainingBoardView.sideRoom, geo.size.height * 0.58))
             VStack(spacing: 12) {
                 RoomHeader(title: game.title, subtitle: game.playedAt) { dismiss() }
                 if let runner {
@@ -203,11 +208,10 @@ struct GuessTheMoveView: View {
                     }
                     .font(.app(.subheadline, weight: .semibold).monospacedDigit())
                     .padding(.horizontal, 20)
-                    TrainingBoardView(game: runner.board, theme: theme, flipped: runner.hero == .black,
-                                      arrows: runner.arrows,
-                                      onTap: runner.phase == .guessing ? { (square: Square) in runner.tap(square) } : nil)
-                        .frame(width: side, height: side)
-                        .boardHeadroom(theme: theme, side: side)
+                    TrainerBoard(game: runner.board, theme: theme, side: side, flipped: runner.hero == .black,
+                                 arrows: runner.arrows,
+                                 onTap: runner.phase == .guessing ? { (square: Square) in runner.tap(square) } : nil,
+                                 onPromote: { kind in runner.promote(to: kind) })
                     RoomMessage(text: runner.message, tone: runner.tone, theme: theme)
                         .padding(.horizontal, 16)
                     if runner.phase == .finished {

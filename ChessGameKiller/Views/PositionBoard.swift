@@ -14,7 +14,13 @@ struct PositionBoard: View {
     /// Pieces drawn as ghosts: moves that could have been, not moves that were.
     var ghosts: Set<Square> = []
     var ghostColor: Color = .yellow
+    /// The piece picked up, and the squares it can go to (drawn as dots, rings on a capture).
+    var selected: Square? = nil
+    var targets: Set<Square> = []
     @AppStorage(BoardTheme.coordinatesKey) private var showsCoordinates = true
+    @Environment(\.colorScheme) private var colorScheme
+    /// Who each piece is, so a move slides it rather than redrawing it on its new square.
+    @State private var identities = PieceIdentities()
 
     var body: some View {
         GeometryReader { geo in
@@ -52,6 +58,12 @@ struct PositionBoard: View {
                         guard let onTap, let tapped = tappedSquare(at: value.location, size: sq) else { return }
                         onTap(tapped)
                     })
+                    GlidingPieces(
+                        arrangement: identities.arrange(draft.pieces, key: draft.placementFEN),
+                        theme: theme, squareSize: sq, flipped: flipped,
+                        ghosts: ghosts, ghostColor: ghostColor, selected: selected
+                    )
+                    marks(size: sq)
                     ZStack {
                         ForEach(Array(hints.reversed())) { hint in
                             MoveArrow(
@@ -73,7 +85,7 @@ struct PositionBoard: View {
                 .frame(width: sq * 8, height: sq * 8)
                 .padding(inset)
                 if theme.boardArt != nil, showsCoordinates {
-                    FrameCoordinates(flipped: flipped, inset: inset, squareSize: sq, color: theme.labelOnDark)
+                    FrameCoordinates(flipped: flipped, inset: inset, squareSize: sq, color: theme.frameLabel(on: colorScheme))
                 }
             }
             .frame(width: side, height: side)
@@ -101,7 +113,8 @@ struct PositionBoard: View {
         BoardTapResolver.center(of: square, squareSize: size, flipped: flipped)
     }
 
-    /// The square a tap on the squares means: see `BoardTapResolver`. Nothing is picked up here.
+    /// The square a tap on the squares means: see `BoardTapResolver`. With a piece picked up,
+    /// a tap near one of its dots means that square.
     private func tappedSquare(at point: CGPoint, size: CGFloat) -> Square? {
         var isSolid: ((Piece, CGPoint) -> Bool)?
         if theme.spritePieces {
@@ -110,7 +123,8 @@ struct PositionBoard: View {
         }
         let draft = draft
         return BoardTapResolver.square(
-            at: point, squareSize: size, flipped: flipped, selected: nil, targets: [],
+            at: point, squareSize: size, flipped: flipped,
+            selected: selected, targets: targets,
             piece: { square in draft[square]?.piece(at: square) }, isSolid: isSolid
         )
     }
@@ -138,19 +152,44 @@ struct PositionBoard: View {
                     label(square.file.rawValue, size: size, color: labelColor, alignment: .bottomTrailing)
                 }
             }
-            if let token {
-                let isGhost = ghosts.contains(square)
-                PieceImage(piece: token.piece(at: square), theme: theme, size: size, onBoard: true)
-                    .opacity(isGhost ? 0.62 : 1)
-                    .shadow(color: isGhost ? ghostColor.opacity(0.9) : .clear, radius: size * 0.12)
-                    .transition(.scale(scale: 0.6).combined(with: .opacity))
-            }
         }
         .frame(width: size, height: size)
         .accessibilityElement()
         .accessibilityLabel(token.map { "\(square.notation), \($0.piece(at: square).spokenName)" } ?? square.notation)
         .accessibilityAddTraits(onTap == nil ? [] : .isButton)
         .accessibilityAction { onTap?(square) }
+    }
+
+    /// The squares the piece picked up can go to, drawn over the pieces so a ring shows round the
+    /// piece it would take.
+    private func marks(size: CGFloat) -> some View {
+        ZStack(alignment: .topLeading) {
+            ForEach(Array(targets).sorted { $0.rawValue < $1.rawValue }, id: \.self) { target in
+                targetMark(capture: draft[target] != nil, size: size)
+                    .frame(width: size, height: size)
+                    .position(center(of: target, size: size))
+            }
+        }
+        .frame(width: size * 8, height: size * 8, alignment: .topLeading)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    /// Where the piece picked up can go: a soft dot, or a ring around a piece it can take.
+    @ViewBuilder
+    private func targetMark(capture: Bool, size: CGFloat) -> some View {
+        let ink: Color = Color.black.opacity(0.28)
+        if capture {
+            Circle()
+                .strokeBorder(ink, lineWidth: size * 0.08)
+                .padding(size * 0.04)
+                .allowsHitTesting(false)
+        } else {
+            Circle()
+                .fill(ink)
+                .frame(width: size * 0.3, height: size * 0.3)
+                .allowsHitTesting(false)
+        }
     }
 
     private func label(_ text: String, size: CGFloat, color: Color, alignment: Alignment) -> some View {

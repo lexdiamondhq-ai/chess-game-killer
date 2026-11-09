@@ -4,27 +4,13 @@ import SwiftUI
 // The look of Challenge a friend: glass bars and cards with hairline edges, plain SF Pro
 // (rounded only on Neon), and the theme's one accent.
 
-/// Frosted glass: the real Liquid Glass on iOS 26, a dark material with a hairline edge before it.
+/// The app's one glass (see GlassPane): Liquid Glass on iOS 26, a frosted pane before it,
+/// light or dark with the page.
 struct ChallengeGlass<S: InsettableShape>: ViewModifier {
     let shape: S
 
     func body(content: Content) -> some View {
-        #if compiler(>=6.2)
-        if #available(iOS 26.0, *) {
-            content.glassEffect(.regular, in: shape)
-        } else {
-            fallback(content)
-        }
-        #else
-        fallback(content)
-        #endif
-    }
-
-    private func fallback(_ content: Content) -> some View {
-        content
-            .background(.ultraThinMaterial, in: shape)
-            .background(Color.black.opacity(0.22), in: shape)
-            .overlay { shape.strokeBorder(Color.white.opacity(0.13), lineWidth: 0.75) }
+        content.glassPane(shape)
     }
 }
 
@@ -35,8 +21,10 @@ extension View {
 }
 
 extension BoardTheme {
-    /// The accent, or the system's when a look has none.
-    var challengeAccent: Color { accent ?? .accentColor }
+    /// The accent: the home's metal, or the look's own (the system's when a look has none).
+    var challengeAccent: Color { trainingAccent }
+    /// Text on a fill of the accent: dark on a dark page's bright metal, white on a light page's deeper one.
+    var onChallengeAccent: Color { screenIsDark ? Color.black.opacity(0.88) : Color.white }
     /// Rounded type on Neon, plain SF Pro on every other look.
     var challengeDesign: Font.Design { glows ? .rounded : .default }
 
@@ -93,7 +81,9 @@ private struct ChallengeButtonBody: View {
             .padding(.horizontal, 18)
             .frame(maxWidth: .infinity, minHeight: height)
             .background {
-                if kind == .primary {
+                if kind == .primary, let tone = theme.screenTone {
+                    HomeIvoryFill(tone: tone)
+                } else if kind == .primary {
                     shape.fill(theme.challengeAccent)
                         .overlay { shape.strokeBorder(Color.white.opacity(0.25), lineWidth: 0.75) }
                 } else {
@@ -108,7 +98,7 @@ private struct ChallengeButtonBody: View {
 
     private var foreground: Color {
         switch kind {
-        case .primary: return Color.black.opacity(0.88)
+        case .primary: return theme.screenTone?.onIvory ?? Color.black.opacity(0.88)
         case .glass: return Color.primary
         case .destructive: return ChallengeColors.urgent
         }
@@ -139,8 +129,8 @@ struct ChallengeBarIcon: View {
             .font(.system(size: 15, weight: .semibold))
             .foregroundStyle(.primary)
             .frame(width: 36, height: 36)
-            .background(Color.white.opacity(0.08), in: Circle())
-            .overlay { Circle().strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5) }
+            .background(Color.primary.opacity(0.08), in: Circle())
+            .overlay { Circle().strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5) }
             .contentShape(Circle())
     }
 }
@@ -204,7 +194,7 @@ struct ChallengeAvatar: View {
                 Circle().fill(LinearGradient(colors: [accent.opacity(0.34), accent.opacity(0.1)],
                                              startPoint: .topLeading, endPoint: .bottomTrailing))
             }
-            .overlay { Circle().strokeBorder(Color.white.opacity(0.16), lineWidth: 0.75) }
+            .overlay { Circle().strokeBorder(Color.primary.opacity(0.16), lineWidth: 0.75) }
             .overlay(alignment: .bottomTrailing) {
                 if let online {
                     Circle()
@@ -280,7 +270,7 @@ struct ChallengeChip: View {
                 .font(theme.challengeFont(15, .semibold).monospacedDigit())
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
-                .foregroundStyle(isOn ? Color.black.opacity(0.88) : Color.primary)
+                .foregroundStyle(isOn ? theme.onChallengeAccent : Color.primary)
                 .padding(.horizontal, 6)
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .background {

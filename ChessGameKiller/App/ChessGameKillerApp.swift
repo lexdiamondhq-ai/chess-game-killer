@@ -11,6 +11,7 @@ struct ChessGameKillerApp: App {
     init() {
         LookIntroduction.applyOnce()
         HintsIntroduction.applyOnce()
+        HomeLayouts.settle()
         showcase = Showcase.fromLaunchArguments()
         // A tapped daily reminder opens Today's Move.
         UNUserNotificationCenter.current().delegate = DailyNotificationDelegate.shared
@@ -89,7 +90,7 @@ enum HintsIntroduction {
 /// Other arguments: `-showcaseLook midnight` (any look's id), `-showcase3D NO`,
 /// `-showcaseRival 1000s` (a crowd, or `grudge`), `-showcaseClock 15+10` (or `none`), `-showcaseCoach open`,
 /// `-showcaseGhost all` (Ghost Vision held, the whole line) or `-showcaseGhost 1` (held, slid back to its second move),
-/// `-showcaseBigBoard YES` (Big Board on), `-showcaseHome YES` (the home, with that game under way).
+/// `-showcaseHome YES` (the home, with that game under way).
 /// `-showcaseGames YES`, with or without `-showcase game`, lists a few friend and online games
 /// on the home's Current games.
 /// The look and the 3D switch are saved as settings, so the screen draws exactly as it would for a player.
@@ -112,7 +113,6 @@ struct Showcase {
         defaults.set(look.rawValue, forKey: "boardTheme")
         defaults.set(flag("showcase3D", in: defaults) ?? true, forKey: "sculpted3D")
         defaults.set(false, forKey: "matchRival")
-        defaults.set(flag("showcaseBigBoard", in: defaults) ?? false, forKey: "bigBoard")
 
         var setup = MatchController.Setup()
         let rival = defaults.string(forKey: "showcaseRival")?.lowercased()

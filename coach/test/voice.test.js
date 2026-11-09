@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { test } from "node:test";
 import { VERA_VOICE_SETTINGS, VOICE_SETTINGS, speak, toBase64, voiceKey } from "../src/voice.js";
 
-const env = { ELEVENLABS_API_KEY: " xi-test\n", VOICE_ID: "TX3LPaxmHKxFdv7VOQHJ", VOICE_MODEL: "eleven_multilingual_v2" };
+const env = { ELEVENLABS_API_KEY: " xi-test\n", VOICE_ID: "j9jfwdrw7BRfcR43Qohk", VOICE_MODEL: "eleven_v4" };
 const MP3 = new Uint8Array([0xff, 0xfb, 0x90, 0x64, 1, 2, 3]);
 
 /** A stand-in for fetch that records the call and answers with `reply`. */
@@ -16,37 +16,52 @@ function fakeFetch(reply = () => new Response(MP3, { headers: { "content-type": 
   return { fetchImpl, calls };
 }
 
-test("Leo's answer comes back as MP3 bytes, read by Liam with the lessons' settings", async () => {
+test("Leo's answer comes back as MP3 bytes, read by Trevor with the lessons' model and the voice's own settings", async () => {
   const { fetchImpl, calls } = fakeFetch();
   const audio = await speak(env, "  Right about the bishop.  ", fetchImpl);
   assert.deepEqual(audio, MP3);
   assert.equal(calls.length, 1);
   const [{ url, options, body }] = calls;
-  assert.equal(url, "https://api.elevenlabs.io/v1/text-to-speech/TX3LPaxmHKxFdv7VOQHJ?output_format=mp3_44100_128");
+  assert.equal(url, "https://api.elevenlabs.io/v1/text-to-speech/j9jfwdrw7BRfcR43Qohk?output_format=mp3_44100_128");
   assert.equal(options.method, "POST");
   assert.equal(options.headers["xi-api-key"], "xi-test");
   assert.equal(options.headers["content-type"], "application/json");
   assert.ok(options.signal instanceof AbortSignal);
-  assert.deepEqual(body, { text: "Right about the bishop.", model_id: "eleven_multilingual_v2", voice_settings: VOICE_SETTINGS });
+  // No settings: the voice's own, as in the samples it was chosen from.
+  assert.deepEqual(body, { text: "Right about the bishop.", model_id: "eleven_v4" });
 });
 
-test("without VOICE_ID or VOICE_MODEL it's still Liam on the lessons' model", async () => {
+test("without VOICE_ID or VOICE_MODEL it's still Trevor on the lessons' model", async () => {
   const { fetchImpl, calls } = fakeFetch();
   await speak({ ELEVENLABS_API_KEY: "k" }, "Hello.", fetchImpl);
-  assert.match(calls[0].url, /\/text-to-speech\/TX3LPaxmHKxFdv7VOQHJ\?/);
-  assert.equal(calls[0].body.model_id, "eleven_multilingual_v2");
+  assert.match(calls[0].url, /\/text-to-speech\/j9jfwdrw7BRfcR43Qohk\?/);
+  assert.equal(calls[0].body.model_id, "eleven_v4");
+  assert.equal("voice_settings" in calls[0].body, false);
 });
 
 test("the voice settings, voice and model are the ones the recorded lessons use", () => {
   const script = readFileSync(new URL("../../scripts/training/make_narration.py", import.meta.url), "utf8");
-  const settings = /^VOICE_SETTINGS = (\{.*\})$/m.exec(script)[1].replace(/True/g, "true").replace(/False/g, "false");
-  assert.deepEqual(JSON.parse(settings), { ...VOICE_SETTINGS });
-  assert.match(script, /^MODEL = "eleven_multilingual_v2"$/m);
-  assert.match(script, /"leo":.*\n.*"format": "mp3_44100_128"/);
-  assert.match(script, /"TX3LPaxmHKxFdv7VOQHJ"/);
+  assert.equal(VOICE_SETTINGS, null);
+  assert.match(script, /^VOICE_SETTINGS = None$/m);
+  assert.match(script, /^LEO_MODEL = "eleven_v4"$/m);
+  assert.match(script, /"leo":.*\n.*"model": LEO_MODEL, "settings": VOICE_SETTINGS, "format": "mp3_44100_128"/);
+  assert.match(script, /"j9jfwdrw7BRfcR43Qohk"/);
   const toml = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8");
-  assert.match(toml, /^VOICE_ID = "TX3LPaxmHKxFdv7VOQHJ"$/m);
-  assert.match(toml, /^VOICE_MODEL = "eleven_multilingual_v2"$/m);
+  assert.match(toml, /^VOICE_ID = "j9jfwdrw7BRfcR43Qohk"$/m);
+  assert.match(toml, /^VOICE_MODEL = "eleven_v4"$/m);
+});
+
+test("TALK_VOICE_MODEL reads live answers with the cheaper model, for Leo and Vera, in their own voices", async () => {
+  const { fetchImpl, calls } = fakeFetch();
+  const talk = { ...env, TALK_VOICE_MODEL: "eleven_flash_v2_5" };
+  await speak(talk, "Hello.", fetchImpl);
+  await speak(talk, "Hello.", fetchImpl, "vera");
+  assert.match(calls[0].url, /\/j9jfwdrw7BRfcR43Qohk\?/);
+  assert.equal(calls[0].body.model_id, "eleven_flash_v2_5");
+  assert.match(calls[1].url, /\/EXAVITQu4vr4xnSDxMaL\?/);
+  assert.equal(calls[1].body.model_id, "eleven_flash_v2_5");
+  const toml = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8");
+  assert.match(toml, /^TALK_VOICE_MODEL = "eleven_flash_v2_5"$/m);
 });
 
 test("no key, no text or an odd voice ID: nothing is sent", async () => {
@@ -104,16 +119,39 @@ test("Vera's answer is read by Sarah, with her lessons' settings", async () => {
   assert.deepEqual([...audio], [1, 2, 3]);
   assert.match(sent[0].url, /\/EXAVITQu4vr4xnSDxMaL\?output_format=mp3_44100_128$/);
   assert.deepEqual(sent[0].body.voice_settings, VERA_VOICE_SETTINGS);
-  // VERA_VOICE_ID swaps her voice; VOICE_ID stays Leo's.
-  await speak({ ELEVENLABS_API_KEY: "key", VOICE_ID: "leoVoice", VERA_VOICE_ID: "veraVoice" }, "Hi.", fetchImpl, "vera");
+  assert.equal(sent[0].body.model_id, "eleven_multilingual_v2");
+  // VERA_VOICE_ID swaps her voice; VOICE_ID and VOICE_MODEL stay Leo's.
+  const both = { ELEVENLABS_API_KEY: "key", VOICE_ID: "leoVoice", VOICE_MODEL: "eleven_v4", VERA_VOICE_ID: "veraVoice" };
+  await speak(both, "Hi.", fetchImpl, "vera");
   assert.match(sent[1].url, /\/veraVoice\?/);
-  await speak({ ELEVENLABS_API_KEY: "key", VOICE_ID: "leoVoice", VERA_VOICE_ID: "veraVoice" }, "Hi.", fetchImpl);
+  assert.equal(sent[1].body.model_id, "eleven_multilingual_v2");
+  await speak(both, "Hi.", fetchImpl);
   assert.match(sent[2].url, /\/leoVoice\?/);
+  assert.equal(sent[2].body.model_id, "eleven_v4");
 });
 
 test("the voices match the lesson recordings in make_narration.py", () => {
   const script = readFileSync(new URL("../../scripts/training/make_narration.py", import.meta.url), "utf8");
   assert.match(script, /ELEVENLABS_VERA_VOICE_ID", "EXAVITQu4vr4xnSDxMaL"/);
+  assert.match(script, /^MODEL = "eleven_multilingual_v2"$/m);
+  assert.match(script, /"model": MODEL, "settings": \{"stability": 0\.7/);
   assert.match(script, /"stability": 0\.7, "similarity_boost": 0\.85, "style": 0\.0, "use_speaker_boost": True, "speed": 0\.98/);
   assert.match(script, /"format": "mp3_44100_128"/);
+});
+
+test("every lesson recording is in the voice its coach speaks with now", () => {
+  // scripts/training/narration-voices.json keeps the voice and model of each recording. A coach
+  // given a new voice is recorded again by .github/workflows/narration.yml; until that run has
+  // committed the new files, this fails, so a half-switched voice can't go unnoticed.
+  const voices = JSON.parse(readFileSync(new URL("../../scripts/training/narration-voices.json", import.meta.url), "utf8"));
+  const toml = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8");
+  const leo = `${/^VOICE_ID = "(\w+)"$/m.exec(toml)[1]} ${/^VOICE_MODEL = "(\w+)"$/m.exec(toml)[1]}`;
+  const vera = "EXAVITQu4vr4xnSDxMaL eleven_multilingual_v2";
+  const files = readdirSync(new URL("../../ChessGameKiller/Training/Narration/", import.meta.url)).filter((name) => name.endsWith(".mp3"));
+  assert.ok(files.length > 400, `only ${files.length} recordings`);
+  for (const file of files) {
+    const coach = file.startsWith("nar-") ? leo : file.startsWith("vera-") ? vera : null;
+    assert.ok(coach, `${file} is neither Leo's nor Vera's`);
+    assert.equal(voices[file], coach, `${file} was recorded in another voice`);
+  }
 });

@@ -15,7 +15,7 @@ struct BoardView: View {
     /// Ghost Vision: hold the board to see the engine's line ahead. Nil where it isn't
     /// allowed, such as a game against a friend.
     var vision: GhostVision?
-    /// How the 3D board is seen: Big Board looks from above, each piece inside its square.
+    /// How the 3D board is seen: Flat looks from above, each piece inside its square.
     var framing: SculptedCamera.Framing = .standing
 
     @AppStorage("haptics") private var hapticsOn = true
@@ -50,7 +50,7 @@ struct BoardView: View {
     }
 
     /// Width over height of the board: the 3D board, seen at an angle, is wider than tall
-    /// (less so seen from above, as on Big Board).
+    /// (less so seen from above, as in Flat).
     static func aspect(_ theme: BoardTheme, setting: Bool, framing: SculptedCamera.Framing = .standing) -> CGFloat {
         playsIn3D(theme, setting: setting) ? framing.aspect : 1
     }
@@ -351,8 +351,9 @@ struct BoardView: View {
             }
         }
         .frame(width: size * 8, height: size * 8)
-        // The computer's moves arrive without a tap, so animate every change here.
-        .animation(.snappy(duration: 0.3), value: game.pieces)
+        // The computer's moves arrive without a tap, so animate every change here: the same
+        // smooth glide, with no bounce at the end, as the other boards (`PieceGlide`).
+        .animation(PieceGlide.move, value: game.pieces)
         .animation(.snappy(duration: 0.45), value: flipped)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
@@ -492,7 +493,8 @@ struct NameTagPlacement: Layout {
     }
 }
 
-/// An arrow from one square to another. Solid for the best move, dashed for the runner-up.
+/// A move's flight path from one square to another: the best move fuller, landing on a ring; the
+/// runner-up slimmer and quieter.
 struct MoveArrow: View {
     let from: CGPoint
     let to: CGPoint
@@ -502,40 +504,9 @@ struct MoveArrow: View {
     let glow: Color?
 
     var body: some View {
-        let dx = to.x - from.x
-        let dy = to.y - from.y
-        let length = max(hypot(dx, dy), 1)
-        let ux = dx / length
-        let uy = dy / length
-        let headLength = squareSize * (isBest ? 0.42 : 0.36)
-        let headWidth = squareSize * (isBest ? 0.5 : 0.42)
-        let shaftWidth = squareSize * (isBest ? 0.17 : 0.11)
-        // Start a little off the piece's center, stop at the arrowhead.
-        let start = CGPoint(x: from.x + ux * squareSize * 0.18, y: from.y + uy * squareSize * 0.18)
-        let tip = CGPoint(x: to.x - ux * squareSize * 0.08, y: to.y - uy * squareSize * 0.08)
-        let base = CGPoint(x: tip.x - ux * headLength, y: tip.y - uy * headLength)
-
-        ZStack {
-            Path { path in
-                path.move(to: start)
-                path.addLine(to: base)
-            }
-            .stroke(color, style: StrokeStyle(
-                lineWidth: shaftWidth,
-                lineCap: isBest ? .round : .butt,
-                dash: isBest ? [] : [shaftWidth * 1.6, shaftWidth * 1.1]
-            ))
-
-            Path { path in
-                path.move(to: tip)
-                path.addLine(to: CGPoint(x: base.x - uy * headWidth / 2, y: base.y + ux * headWidth / 2))
-                path.addLine(to: CGPoint(x: base.x + uy * headWidth / 2, y: base.y - ux * headWidth / 2))
-                path.closeSubpath()
-            }
-            .fill(color)
-        }
-        .shadow(color: glow?.opacity(isBest ? 0.9 : 0.6) ?? .black.opacity(0.15),
-                radius: glow == nil ? 1 : squareSize * (isBest ? 0.12 : 0.08))
+        CrispArrow(from: from, to: to, squareSize: squareSize, dashed: !isBest, color: color,
+                   proportions: .analysis(best: isBest), glow: glow, edge: .white, landing: isBest,
+                   opacity: isBest ? ArrowColors.seeThrough.best : ArrowColors.seeThrough.next, rim: ArrowColors.rim)
     }
 }
 
@@ -1004,7 +975,8 @@ struct FrameCoordinates: View {
 }
 
 /// Lets the player choose what a pawn becomes on the last rank, over a dim backdrop that
-/// fills the board. Tapping the backdrop is a change of mind: `cancel` puts the pawn back.
+/// fills the board. Each piece stands large on a soft pool of light, its name written
+/// above it in an old-fashioned hand. Tapping the backdrop is a change of mind: `cancel` puts the pawn back.
 struct PromotionPicker: View {
     let color: Piece.Color
     let theme: BoardTheme
@@ -1012,11 +984,13 @@ struct PromotionPicker: View {
     var cancel: (() -> Void)? = nil
     let choose: (Piece.Kind) -> Void
 
-    private let kinds: [Piece.Kind] = [.queen, .rook, .bishop, .knight]
+    private let kinds: [(kind: Piece.Kind, name: String)] = [
+        (.queen, "Queen"), (.rook, "Rook"), (.bishop, "Bishop"), (.knight, "Knight"),
+    ]
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.35)
+            Color.black.opacity(0.55)
                 .contentShape(Rectangle())
                 .onTapGesture { cancel?() }
                 .accessibilityElement()
@@ -1025,17 +999,12 @@ struct PromotionPicker: View {
                 .accessibilityAddTraits(.isButton)
                 .accessibilityAction { cancel?() }
                 .accessibilityHidden(cancel == nil)
-            HStack(spacing: squareSize * 0.15) {
-                ForEach(kinds, id: \.self) { kind in
-                    Button { choose(kind) } label: {
-                        PieceImage(piece: Piece(kind, color: color, square: .a1), theme: theme, size: squareSize)
-                            .padding(squareSize * 0.08)
-                            .frame(width: squareSize * 1.25, height: squareSize * 1.25)
-                            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: squareSize * 0.2, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Promote to \(String(describing: kind))")
-                    .accessibilityAction(.escape) { cancel?() }
+            HStack(spacing: squareSize * 0.1) {
+                ForEach(kinds, id: \.kind) { choice in
+                    Button { choose(choice.kind) } label: { slot(choice.kind, name: choice.name) }
+                        .buttonStyle(PromotionChoiceStyle())
+                        .accessibilityLabel("Promote to \(choice.name)")
+                        .accessibilityAction(.escape) { cancel?() }
                 }
             }
             // A tap between two pieces is a near miss, not a change of mind.
@@ -1043,6 +1012,38 @@ struct PromotionPicker: View {
             .onTapGesture {}
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func slot(_ kind: Piece.Kind, name: String) -> some View {
+        VStack(spacing: squareSize * 0.02) {
+            Text(name)
+                .font(.custom("SnellRoundhand-Bold", size: squareSize * 0.5))
+                .foregroundStyle(Color(red: 0.97, green: 0.92, blue: 0.80))
+                .shadow(color: .black.opacity(0.7), radius: 3, y: 1)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            PieceImage(piece: Piece(kind, color: color, square: .a1), theme: theme, size: squareSize * 1.5)
+                .shadow(color: .black.opacity(0.5), radius: squareSize * 0.1, y: squareSize * 0.05)
+                .background {
+                    // A faint pool of light, so black pieces stand out on the dim board too.
+                    Ellipse()
+                        .fill(RadialGradient(colors: [.white.opacity(0.22), .white.opacity(0)],
+                                             center: .center, startRadius: 0, endRadius: squareSize * 0.8))
+                        .frame(width: squareSize * 1.7, height: squareSize * 1.4)
+                        .offset(y: squareSize * 0.2)
+                }
+        }
+        .frame(width: squareSize * 1.8)
+        .contentShape(Rectangle())
+    }
+}
+
+/// A chosen piece dips a little under the finger.
+private struct PromotionChoiceStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.92 : 1)
+            .animation(.snappy(duration: 0.15), value: configuration.isPressed)
     }
 }
 

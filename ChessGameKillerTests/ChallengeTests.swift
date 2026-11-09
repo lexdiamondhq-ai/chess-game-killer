@@ -244,12 +244,12 @@ final class ChallengeTests: XCTestCase {
         let url = try XCTUnwrap(URL(string: "https://play.chess-game-killer.workers.dev/c/7KQ2XM"))
         let tenMinutes = FriendClock(initial: 600, increment: 0)
         XCTAssertEqual(ChallengeInviteText.message(from: "Alex", clock: tenMinutes, friendPlays: .black, url: url),
-                       "Alex challenged you to chess on Chess Game Killer. 10 minutes each, you play Black. Tap to play: https://play.chess-game-killer.workers.dev/c/7KQ2XM")
+                       "Alex challenged you to chess on Beauty of Chess. 10 minutes each, you play Black. Tap to play: https://play.chess-game-killer.workers.dev/c/7KQ2XM")
         XCTAssertEqual(ChallengeInviteText.subject(from: "Alex"), "Alex challenged you to a game of chess")
         XCTAssertEqual(ChallengeInviteText.lead(from: "  ", clock: FriendClock(.blitz3Plus2), friendPlays: .white),
-                       "A friend challenged you to chess on Chess Game Killer. 3 minutes each plus 2 seconds a move, you play White.")
+                       "A friend challenged you to chess on Beauty of Chess. 3 minutes each plus 2 seconds a move, you play White.")
         XCTAssertEqual(ChallengeInviteText.lead(from: "Alex", clock: nil, friendPlays: .white),
-                       "Alex challenged you to chess on Chess Game Killer. No clock, you play White.")
+                       "Alex challenged you to chess on Beauty of Chess. No clock, you play White.")
         XCTAssertTrue(ChallengeInviteText.emailBody(from: "Alex", clock: tenMinutes, friendPlays: .black, url: url, code: "7KQ2XM")
             .hasSuffix("enter the code 7KQ 2XM."))
 
@@ -397,7 +397,7 @@ final class ChallengeTests: XCTestCase {
         mate.result = FriendGameState.Result(winner: .white, reason: .checkmate)
         mate.setMoves(mate.moves)
         game.apply(mate)
-        XCTAssertEqual(sounds.played.last, .gameOver, "mate against the player")
+        XCTAssertEqual(sounds.played.last, .defeat, "mate against the player")
         XCTAssertEqual(game.phase, .over)
         XCTAssertEqual(game.resultHeadline, "Checkmate. Alex wins")
         XCTAssertEqual(game.didWin, false)

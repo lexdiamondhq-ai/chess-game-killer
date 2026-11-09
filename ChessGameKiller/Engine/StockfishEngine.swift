@@ -7,6 +7,10 @@ protocol ChessEngine: AnyObject, Sendable {
     /// The best `lines` continuations from `fen`, best first. The search stops at
     /// `depth` or after `maxTimeMs`, whichever comes first; nil means no time cap.
     func analyze(fen: String, depth: Int, lines: Int, maxTimeMs: Int?) async -> [EngineLine]
+    /// The same, telling `progress` the lines found so far each time the search reaches a new
+    /// depth, so they can show at once and firm up as it looks deeper.
+    func analyze(fen: String, depth: Int, lines: Int, maxTimeMs: Int?,
+                 progress: @escaping @Sendable ([EngineLine], Int) -> Void) async -> [EngineLine]
     /// A move to play from `fen` at the given strength: Stockfish's skill level (0 = weakest,
     /// 20 = full strength), how deep to look (nil: as deep as the time allows) and the most
     /// time to take.
@@ -14,6 +18,12 @@ protocol ChessEngine: AnyObject, Sendable {
 }
 
 extension ChessEngine {
+    /// Engines that can't report midway just answer at the end.
+    func analyze(fen: String, depth: Int, lines: Int, maxTimeMs: Int?,
+                 progress: @escaping @Sendable ([EngineLine], Int) -> Void) async -> [EngineLine] {
+        await analyze(fen: fen, depth: depth, lines: lines, maxTimeMs: maxTimeMs)
+    }
+
     /// An analysis with no time cap: it runs until `depth`.
     func analyze(fen: String, depth: Int, lines: Int) async -> [EngineLine] {
         await analyze(fen: fen, depth: depth, lines: lines, maxTimeMs: nil)
@@ -38,6 +48,7 @@ actor StockfishEngine: ChessEngine {
     private var startGaveUp = false
     private var readyCount = 0
     private var listener: Task<Void, Never>?
+    private var setupListener: Task<Void, Never>?
     private var pending: PendingSearch?
     private var nextSearchID = 0
     /// Counts requests for the engine, so a waiting one can tell a newer one came.
@@ -93,6 +104,11 @@ actor StockfishEngine: ChessEngine {
         var stopSent = false
         var stoppedAt: ContinuousClock.Instant?
         let continuation: AsyncStream<SearchResult>.Continuation
+        /// Told the lines so far as the search deepens, if anyone is listening.
+        var progress: (@Sendable ([EngineLine], Int) -> Void)?
+        /// How many lines it reports, and the depth last reported.
+        var wanted = 1
+        var reported = 0
     }
 
     private struct SearchResult: Sendable {
@@ -103,11 +119,25 @@ actor StockfishEngine: ChessEngine {
     // MARK: ChessEngine
 
     func analyze(fen: String, depth: Int, lines: Int, maxTimeMs: Int?) async -> [EngineLine] {
+        await self.lines(fen: fen, depth: depth, count: lines, maxTimeMs: maxTimeMs, progress: nil)
+    }
+
+    func analyze(fen: String, depth: Int, lines: Int, maxTimeMs: Int?,
+                 progress: @escaping @Sendable ([EngineLine], Int) -> Void) async -> [EngineLine] {
+        await self.lines(fen: fen, depth: depth, count: lines, maxTimeMs: maxTimeMs, progress: progress)
+    }
+
+    private func lines(fen: String, depth: Int, count lines: Int, maxTimeMs: Int?,
+                       progress: (@Sendable ([EngineLine], Int) -> Void)?) async -> [EngineLine] {
         let result = await search(
             fen: fen,
             options: [("Skill Level", "20"), ("MultiPV", "\(max(1, lines))")],
             go: .go(depth: depth, movetime: maxTimeMs),
-            timeout: maxTimeMs.map { .milliseconds($0 + 600) } ?? .seconds(20)
+            timeout: maxTimeMs.map { .milliseconds($0 + 600) } ?? .seconds(20),
+            progress: progress.map { report in
+                { @Sendable found, depth in report(Array(found.prefix(lines)), depth) }
+            },
+            wanted: max(1, lines)
         )
         return Array(result.lines.prefix(lines))
     }
@@ -138,7 +168,9 @@ actor StockfishEngine: ChessEngine {
         fen: String,
         options: [(String, String)],
         go: EngineCommand,
-        timeout: Duration
+        timeout: Duration,
+        progress: (@Sendable ([EngineLine], Int) -> Void)? = nil,
+        wanted: Int = 1
     ) async -> SearchResult {
         guard let position = Position(fen: fen), await startIfNeeded() else {
             return SearchResult(bestMove: nil, lines: [])
@@ -166,8 +198,8 @@ actor StockfishEngine: ChessEngine {
                 await engine.send(command: .stop)
                 continue
             }
-            // Stockfish's "bestmove" after a stop sometimes never arrives. Don't wait
-            // for it: past a short grace the old search ends with what it found.
+            // Should a stop's "bestmove" still never arrive, don't wait for it: past a
+            // short grace the old search ends with what it found.
             if let current = pending, let stoppedAt = current.stoppedAt,
                ContinuousClock.now - stoppedAt > Self.stopGrace {
                 Self.trace?("no answer to stop: ending search \(current.id)")
@@ -193,6 +225,8 @@ actor StockfishEngine: ChessEngine {
         let id = nextSearchID
         nextSearchID += 1
         pending = PendingSearch(id: id, position: position, continuation: continuation)
+        pending?.progress = progress
+        pending?.wanted = wanted
         Self.trace?("start search \(id) for request \(ticket)")
 
         for (name, value) in options {
@@ -256,8 +290,9 @@ actor StockfishEngine: ChessEngine {
         }
         if await task.value { return true }
         // That start gave up waiting for Stockfish to report in, but it can still come up:
-        // its replies are read on the main thread, which a busy app (or a test run) can hold
-        // up for a while. Look again, so a slow start never leaves it out for the session.
+        // until it runs, its replies are read on the main thread (by ChessKitEngine), which a
+        // busy app (or a test run) can hold up for a while. Look again, so a slow start never
+        // leaves it out for the session.
         return await attachWhenRunning(within: Self.lateStartWait)
     }
 
@@ -289,23 +324,39 @@ actor StockfishEngine: ChessEngine {
         }
         // Another search may have attached it while this one waited.
         if let attachTask { return await attachTask.value }
-        guard let responses = await engine.responseStream else { return false }
+        guard let libraryResponses = await engine.responseStream else { return false }
         if let attachTask { return await attachTask.value }
         if startGaveUp { NSLog("Stockfish: running after a slow start") }
-        let task = Task { await self.attach(to: responses) }
+        // Read the replies ourselves from here on (see EngineOutput): ChessKitEngine's reading
+        // drops a reply now and then, most often the "bestmove" that answers a stop. Nothing
+        // awaits between the check above and this, so it happens once.
+        let ownResponses = EngineOutput.takeOver()
+        if ownResponses == nil { NSLog("Stockfish: couldn't take over its output; reading it through ChessKitEngine") }
+        let responses = ownResponses ?? libraryResponses
+        let task = Task { await self.attach(to: responses, setup: ownResponses == nil ? nil : libraryResponses) }
         attachTask = task
         return await task.value
     }
 
-    private func attach(to responses: AsyncStream<EngineResponse>) async -> Bool {
+    /// Reads `responses` from now on. `setup` is ChessKitEngine's own stream when they are
+    /// read by our reader instead: it still brings the "readyok" that ends its setup.
+    private func attach(to responses: AsyncStream<EngineResponse>, setup: AsyncStream<EngineResponse>?) async -> Bool {
         listener = Task { [weak self] in
             for await response in responses {
                 await self?.handle(response)
             }
         }
+        if let setup {
+            setupListener = Task { [weak self] in
+                for await response in setup {
+                    if case .readyok = response { await self?.countReady() }
+                }
+            }
+        }
 
         // The engine passes on its own "readyok" once its setup (which points
-        // Stockfish at the network files) is done.
+        // Stockfish at the network files and sets its threads) is done, so ours
+        // are set after it.
         var attempts = 0
         while readyCount == 0, attempts < 50 {
             attempts += 1
@@ -330,6 +381,10 @@ actor StockfishEngine: ChessEngine {
             NSLog("Stockfish: no readyok after loading networks; carrying on")
         }
         return await engine.isRunning
+    }
+
+    private func countReady() {
+        readyCount += 1
     }
 
     private func handle(_ response: EngineResponse) {
@@ -372,6 +427,17 @@ actor StockfishEngine: ChessEngine {
             let index = info.multipv ?? 1
             if let existing = search.lines[index], existing.depth > depth { return }
             search.lines[index] = (depth, EngineLine(moves: moves, evaluation: evaluation))
+            // Every line it was asked for has reached a new depth: say what it has so far.
+            if let progress = search.progress {
+                // A position with fewer moves than lines asked for never fills them all, so
+                // the lines found so far count, as long as the best is among them.
+                let depths = (1...search.wanted).compactMap { search.lines[$0]?.depth }
+                let reached = search.lines[1] == nil ? 0 : depths.min() ?? 0
+                if reached > search.reported {
+                    search.reported = reached
+                    progress(Self.distinct(search.lines), reached)
+                }
+            }
             pending = search
 
         case .bestmove(let move, _):
@@ -400,14 +466,18 @@ actor StockfishEngine: ChessEngine {
     private func finish(searchID: Int, bestMove: String?) {
         guard let search = pending, search.id == searchID else { return }
         Self.trace?("finish search \(searchID): \(bestMove ?? "no move")")
-        // Each line is kept at its own deepest report, so a line left a depth behind can
-        // still name the move an earlier line has since taken: keep the first only.
-        var seen = Set<String>()
-        let lines = search.lines.sorted { $0.key < $1.key }.map { $0.value.line }
-            .filter { line in line.firstMove.map { seen.insert($0).inserted } ?? true }
+        let lines = Self.distinct(search.lines)
         search.continuation.yield(SearchResult(bestMove: bestMove ?? lines.first?.firstMove, lines: lines))
         search.continuation.finish()
         pending = nil
+    }
+
+    /// The lines best first. Each line is kept at its own deepest report, so a line left a depth
+    /// behind can still name the move an earlier line has since taken: keep the first only.
+    private static func distinct(_ lines: [Int: (depth: Int, line: EngineLine)]) -> [EngineLine] {
+        var seen = Set<String>()
+        return lines.sorted { $0.key < $1.key }.map { $0.value.line }
+            .filter { line in line.firstMove.map { seen.insert($0).inserted } ?? true }
     }
 
     /// Whether `move` is legal in `position` for the side to move. ChessKit's parser
