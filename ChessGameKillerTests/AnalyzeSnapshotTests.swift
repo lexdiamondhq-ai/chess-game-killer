@@ -87,6 +87,16 @@ final class AnalyzeSnapshotTests: XCTestCase {
         .screenScheme(theme))
         try save(window, "zz-analyze-3-photo")
         window.isHidden = true
+
+        // Edit pieces: the same 3D board and pieces as the analysis, with the palette under it.
+        session.draft = draft
+        let editor = try show(NavigationStack {
+            BoardEditorView(session: session, theme: theme)
+        }
+        .background { TrainingBackdrop(theme: theme) }
+        .screenScheme(theme))
+        try save(editor, "zz-analyze-4-editor")
+        editor.isHidden = true
     }
 
     /// A stand-in for a photo of a board: light and dark squares.
