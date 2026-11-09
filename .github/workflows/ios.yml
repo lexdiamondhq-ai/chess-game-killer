@@ -310,8 +310,11 @@ jobs:
     # By hand only. A job's log can be read back 5,000 lines at a time, which holds about a
     # tenth of the tests' pictures at a size worth judging, so ten small Linux jobs print a
     # tenth each, in name order: BEGIN-SCREEN name, a JPEG as base64, END-SCREEN.
-    # The tests may fail in a tone they weren't written for; the pictures are printed anyway.
-    if: always() && github.event_name == 'workflow_dispatch' && inputs.pictures
+    # The tests may fail in a tone they weren't written for; the pictures are printed anyway,
+    # but not when the tests never ran (cancelled or skipped), since then there are none.
+    if: >-
+      always() && github.event_name == 'workflow_dispatch' && inputs.pictures &&
+      (needs.build-and-test.result == 'success' || needs.build-and-test.result == 'failure')
     needs: build-and-test
     runs-on: ubuntu-latest
     timeout-minutes: 15
