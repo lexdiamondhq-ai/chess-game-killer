@@ -182,6 +182,11 @@ struct SettingsSheet: View {
                             }
                             .buttonStyle(.plain)
                             rule
+                            Link(destination: PremiumStyle.privacy) {
+                                LinkRowLabel(title: "Privacy policy", symbol: "hand.raised", theme: theme)
+                            }
+                            .buttonStyle(.plain)
+                            rule
                             // The GPL, which Stockfish comes under, gives every player the source.
                             Link(destination: URL(string: "https://github.com/lexdiamondhq-ai/chess-game-killer")!) {
                                 LinkRowLabel(title: "Source code", symbol: "chevron.left.forwardslash.chevron.right", theme: theme)
