@@ -172,7 +172,7 @@ struct HomeAuroraView: View {
                 VStack(spacing: 0) {
                     Spacer()
                     HomeAuroraTabBar(palette: palette, play: actions.stage.analyze, learn: actions.stage.learn,
-                                     rooms: actions.stage.rooms)
+                                     rooms: actions.stage.rooms, you: actions.stage.you)
                         .padding(.horizontal, 16)
                         .padding(.bottom, 8)
                         .background(alignment: .bottom) {
@@ -1413,13 +1413,15 @@ struct HomeAuroraRings: View {
     }
 }
 
-/// A glass tab bar (Today, Learn, Rooms) with the gold knight as its own round button.
-/// Rooms took You's place (Alex, 2026-11-08); You and Settings open from your Rating at the top.
+/// A glass tab bar (Today, Learn, Rooms, You) with the gold knight as its own round button.
+/// You came back beside Rooms (Alex, 2026-11-09) so Settings is one tap from the bar; the Rating
+/// at the top still opens it too.
 struct HomeAuroraTabBar: View {
     let palette: HomeAuroraPalette
     let play: () -> Void
     let learn: () -> Void
     let rooms: () -> Void
+    let you: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
@@ -1427,6 +1429,7 @@ struct HomeAuroraTabBar: View {
                 tab("Today", icon: .today, on: true) {}
                 tab("Learn", icon: .learn, on: false, action: learn)
                 tab("Rooms", icon: .rooms, on: false, action: rooms)
+                tab("You", icon: .you, on: false, action: you)
             }
             .padding(.horizontal, 6)
             .frame(height: 64)
@@ -1487,10 +1490,11 @@ struct HomeAuroraTabBar: View {
 
 /// The bottom bar's tab icons (Alex, 2026-11-07: "Do B but make the You and Rooms from A").
 /// Today and Learn are solid chess pieces in gold leaf: a pawn at sunrise and a bishop.
-/// Rooms is an engraved castle gate, its line drawn a touch heavier so it holds its own beside them.
+/// Rooms and You are engraved lines, a castle gate and a crowned shield, drawn a touch heavier so
+/// they hold their own beside them.
 /// Drawn on a 26-point grid; the selected tab shows in gold.
 struct HomeTabIcon: View {
-    enum Kind { case today, learn, rooms }
+    enum Kind { case today, learn, rooms, you }
 
     let kind: Kind
     let color: Color
@@ -1535,6 +1539,17 @@ struct HomeTabIcon: View {
                         p.move(to: CGPoint(x: 14.5, y: 6)); p.addLine(to: CGPoint(x: 11.5, y: 10))
                     }, with: .color(.black), style: StrokeStyle(lineWidth: 1.4, lineCap: .round))
                 }
+            case .you:
+                // A crowned shield, engraved.
+                context.stroke(Path { p in
+                    p.move(to: CGPoint(x: 5, y: 7)); p.addLine(to: CGPoint(x: 21, y: 7)); p.addLine(to: CGPoint(x: 21, y: 13))
+                    p.addCurve(to: CGPoint(x: 13, y: 23), control1: CGPoint(x: 21, y: 18), control2: CGPoint(x: 17, y: 21))
+                    p.addCurve(to: CGPoint(x: 5, y: 13), control1: CGPoint(x: 9, y: 21), control2: CGPoint(x: 5, y: 18))
+                    p.closeSubpath()
+                    p.move(to: CGPoint(x: 9, y: 11)); p.addLine(to: CGPoint(x: 11, y: 9)); p.addLine(to: CGPoint(x: 13, y: 11))
+                    p.addLine(to: CGPoint(x: 15, y: 9)); p.addLine(to: CGPoint(x: 17, y: 11)); p.addLine(to: CGPoint(x: 17, y: 13))
+                    p.addLine(to: CGPoint(x: 9, y: 13)); p.closeSubpath()
+                }, with: shading, style: line)
             case .rooms:
                 // A castle gate, engraved.
                 context.stroke(Path { p in
