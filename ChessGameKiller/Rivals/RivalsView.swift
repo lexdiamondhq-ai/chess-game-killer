@@ -115,27 +115,32 @@ struct RivalsHall: View {
         let height = max(320, size.height - 8)
         let width = min(size.width * 0.82, height * 0.6)
         let side = (size.width - width) / 2
-        return ScrollView(.horizontal, showsIndicators: false) {
-            LazyHStack(spacing: 14) {
-                ForEach(RivalFilm.all, id: \.level) { film in
-                    RivalHallCard(film: film, open: ladder.isOpen(film.level), beaten: ladder.beaten(film.rival)) {
-                        withAnimation(.easeIn(duration: 0.3)) { showing = film }
+        return ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 14) {
+                    ForEach(RivalFilm.all, id: \.level) { film in
+                        RivalHallCard(film: film, open: ladder.isOpen(film.level), beaten: ladder.beaten(film.rival)) {
+                            withAnimation(.easeIn(duration: 0.3)) { showing = film }
+                        }
+                        .frame(width: width, height: height)
+                        .scrollTransition(axis: .horizontal) { content, phase in
+                            content
+                                .scaleEffect(phase.isIdentity || reduceMotion ? 1 : 0.9)
+                                .opacity(phase.isIdentity ? 1 : 0.55)
+                        }
+                        .id(film.level)
                     }
-                    .frame(width: width, height: height)
-                    .scrollTransition(axis: .horizontal) { content, phase in
-                        content
-                            .scaleEffect(phase.isIdentity || reduceMotion ? 1 : 0.9)
-                            .opacity(phase.isIdentity ? 1 : 0.55)
-                    }
-                    .id(film.level)
                 }
+                .scrollTargetLayout()
             }
-            .scrollTargetLayout()
+            .contentMargins(.horizontal, side, for: .scrollContent)
+            .scrollTargetBehavior(.viewAligned)
+            .scrollPosition(id: $selected)
+            .frame(height: size.height)
+            // As on Home's Next game: the hall is put on its rival by hand as it opens, since a
+            // position handed over before the cards are laid out is not always kept.
+            .task { if let selected { proxy.scrollTo(selected, anchor: .center) } }
         }
-        .contentMargins(.horizontal, side, for: .scrollContent)
-        .scrollTargetBehavior(.viewAligned)
-        .scrollPosition(id: $selected)
-        .frame(height: size.height)
     }
 
     /// I to V under the cards: the one in front in gold, beaten ones marked, locked ones dim.
