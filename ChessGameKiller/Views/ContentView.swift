@@ -27,6 +27,8 @@ struct ContentView: View {
     @State private var showingDaily = false
     @State private var coach = GameCoach()
     @State private var showingTraining = false
+    /// The door Learn opens on, when Home asked for one (its Chess DNA card).
+    @State private var trainingDoor: TrainDoor?
     @State private var puzzles = PuzzleStore.live()
     @State private var showingPuzzles = false
     @State private var army = ArmyStore.live()
@@ -224,7 +226,7 @@ struct ContentView: View {
                 if showing { setCoach(expanded: false) }
             }
             .onChange(of: showingTraining) { _, showing in
-                if showing { setCoach(expanded: false) }
+                if showing { setCoach(expanded: false) } else { trainingDoor = nil }
             }
             .onChange(of: showingPuzzles) { _, showing in
                 if showing { setCoach(expanded: false) }
@@ -258,7 +260,7 @@ struct ContentView: View {
     private var presented: some View {
         observed
             .fullScreenCover(isPresented: $showingTraining) {
-                TrainingHubView(theme: chosenTheme).environment(training).environment(puzzles).environment(vault)
+                TrainingHubView(theme: chosenTheme, door: trainingDoor).environment(training).environment(puzzles).environment(vault)
                     .environment(daily)
                     .homeZoom(.coach, in: homeZoom, when: showingHome)
             }
@@ -448,6 +450,10 @@ struct ContentView: View {
                 showingAnalyze = true
             },
             train: { showingTraining = true },
+            chessDNA: {
+                trainingDoor = .games
+                showingTraining = true
+            },
             trainToday: { plan in coach.presentedSession = plan },
             puzzles: { showingPuzzles = true },
             dailyMove: { openDaily() },

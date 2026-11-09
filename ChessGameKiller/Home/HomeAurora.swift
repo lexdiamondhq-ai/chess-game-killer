@@ -16,6 +16,8 @@ struct HomeAuroraInfo {
     var pieces: [Piece]
     /// Your finest move of the week, framed, when you played one.
     var finest: HomeFinestMove? = nil
+    /// Your Chess DNA, once it has been read from your games.
+    var dna: ChessDNA? = nil
 }
 
 struct HomeAuroraActions {
@@ -28,8 +30,8 @@ struct HomeAuroraActions {
     var options: (MatchController.Level) -> Void = { _ in }
     /// Opens the rivals' hall, on this rival or on the one up next.
     var rivals: (MatchController.Level?) -> Void = { _ in }
-    /// Starts a game against your Grudge.
-    var playGrudge: () -> Void = {}
+    /// Opens your Chess DNA.
+    var chessDNA: () -> Void = {}
     /// Opens Puzzles.
     var puzzles: () -> Void = {}
     /// Opens one of your finished games in Rewind.
@@ -85,16 +87,6 @@ struct HomeAuroraView: View {
     @State private var headerHeight: CGFloat = 52
     /// Which position of the game of the day the turning board shows: it plays itself slowly.
     @State private var boardFrame = 0
-    /// Your Grudge. Absent in previews: no Grudge on the page.
-    @Environment(GrudgeStore.self) private var grudges: GrudgeStore?
-    /// The score when you last saw your Grudge ("7-11"), so what changed since plays out.
-    @AppStorage("grudge.lastSeen") private var grudgeLastSeen = ""
-    /// The Grudge's card opened into its summons.
-    @State private var grudgeOpen = false
-    /// The score the summons counts up from, read once as it opens.
-    @State private var grudgeSince: (you: Int, it: Int)?
-    /// The first time you meet it, its birth plays instead.
-    @State private var grudgeBorn = false
     /// The rival in front on the Up next card, as you swipe through them. Nil: the one up next.
     @State private var rivalShown: MatchController.Level?
 
@@ -301,12 +293,12 @@ struct HomeAuroraView: View {
                 todayRows
             }
             .padding(.horizontal, 16)
-            // Under For today (Alex, 2026-11-07).
-            if let grudges {
-                HomeAuroraSection(title: "Your Grudge", palette: palette,
-                                  note: grudges.unseen ? "It's waiting" : nil)
-                HomeAuroraGrudge(record: grudges.record, isOpen: grudgeOpen, palette: palette,
-                                 born: grudgeBorn, lastSeen: grudgeSince, select: toggleGrudge, settle: settleGrudge)
+            // Your Chess DNA under For today, where Your Grudge was (Alex, 2026-11-09: "Chess DNA
+            // is a nice selling point. We should highlight this instead of grudge").
+            if let dna = info.dna {
+                HomeAuroraSection(title: "Your Chess DNA", palette: palette,
+                                  note: dna.gamesRead > 0 ? ChessDNAView.basis(dna) : nil)
+                HomeAuroraDNA(dna: dna, palette: palette, action: actions.chessDNA)
                     .padding(.horizontal, 16)
             }
         }
@@ -523,25 +515,6 @@ struct HomeAuroraView: View {
         if stage.trainedToday { return "Done today. Another round?" }
         guard let plan = stage.plan else { return "Pick up where you stopped" }
         return "\(plan.minutes) min with Leo"
-    }
-
-    /// Opens the Grudge's card into its summons, counting from when you last met; or closes it.
-    private func toggleGrudge() {
-        guard let grudges, let record = grudges.record else { return }
-        if !grudgeOpen {
-            let parts = grudgeLastSeen.split(separator: "-").compactMap { Int($0) }
-            grudgeSince = parts.count == 2 ? (you: parts[0], it: parts[1]) : nil
-            grudgeBorn = grudges.unseen
-            // Seen now: next time the summons counts from here.
-            grudgeLastSeen = "\(record.yourWins)-\(record.itsWins)"
-            grudges.markSeen()
-        }
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) { grudgeOpen.toggle() }
-    }
-
-    private func settleGrudge() {
-        actions.playGrudge()
-        grudgeOpen = false
     }
 
     private func open(_ card: HomeAuroraGameCard) {
@@ -852,6 +825,159 @@ struct HomeAuroraRow<Picture: View>: View {
         }
         .buttonStyle(HomeStagePress())
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// Your Chess DNA on Home (Alex, 2026-11-09), dressed like the rows for today: a white card with
+/// a thin gold edge, your style in serif with its portrait, a gold emblem at the right, then the
+/// four habits as fine gold bars and your weapon and leak. A tap opens the Chess DNA page. Before
+/// three games are read, it says how many more Coach Leo needs.
+struct HomeAuroraDNA: View {
+    let dna: ChessDNA
+    let palette: HomeAuroraPalette
+    let action: () -> Void
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 14) {
+                header
+                if dna.hasStyle {
+                    bars
+                }
+                if dna.weapon != nil || dna.leak != nil {
+                    HStack(alignment: .top, spacing: 10) {
+                        if let weapon = dna.weapon {
+                            chip("Weapon", weapon.title, symbol: weapon.symbol, tint: palette.teal)
+                        }
+                        if let leak = dna.leak {
+                            chip("Leak", leak.headline, symbol: leak.area.symbol, tint: palette.rose)
+                        }
+                    }
+                }
+            }
+            .padding(.vertical, 14)
+            .padding(.leading, 14)
+            .padding(.trailing, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(shape.fill(palette.card))
+            .overlay(shape.strokeBorder(palette.line, lineWidth: 1))
+            .contentShape(shape)
+        }
+        .buttonStyle(HomeStagePress())
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Opens your Chess DNA")
+    }
+
+    private var header: some View {
+        HStack(spacing: 14) {
+            Capsule()
+                .fill(LinearGradient(colors: [palette.gold, palette.gold.opacity(0.2)], startPoint: .top, endPoint: .bottom))
+                .frame(width: 3)
+                .padding(.vertical, 4)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(dna.hasStyle ? "YOUR STYLE" : "STILL READING YOU")
+                    .font(.system(size: 10.5, weight: .bold))
+                    .tracking(1.3)
+                    .foregroundStyle(palette.gold)
+                Text(dna.style?.title ?? "Your style, named")
+                    .font(.system(size: 19, weight: .regular, design: .serif))
+                    .foregroundStyle(palette.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Text(detail)
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(palette.ink2)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(HomeAuroraPalette.goldTile)
+                .overlay {
+                    Image(systemName: dna.style?.symbol ?? "circle.hexagongrid.fill")
+                        .font(.system(size: 26, weight: .semibold))
+                        .foregroundStyle(Color.white)
+                }
+                .frame(width: 64, height: 64)
+                .accessibilityHidden(true)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var detail: String {
+        if let style = dna.style { return style.portrait }
+        let left = max(1, ChessDNA.gamesForStyle - dna.gamesRead)
+        let games = left == 1 ? "one more game" : "\(left) more games"
+        return "Play \(games) against any rival and \(Coach.current.name) will read how you play."
+    }
+
+    /// The four habits two by two, each a fine gold line with a dot where you sit.
+    private var bars: some View {
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 18), GridItem(.flexible(), spacing: 18)],
+                  alignment: .leading, spacing: 12) {
+            ForEach(dna.traits) { trait in
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(trait.kind.title)
+                            .font(.system(size: 12.5, weight: .medium))
+                            .foregroundStyle(palette.ink)
+                        Spacer(minLength: 4)
+                        Text(trait.word)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(trait.value == nil ? palette.ink3 : palette.gold)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                    track(trait.value)
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(trait.kind.title): \(trait.word)")
+            }
+        }
+        .padding(.leading, 17)
+    }
+
+    private func track(_ value: Double?) -> some View {
+        GeometryReader { geo in
+            let dot: CGFloat = 8
+            let x: CGFloat = (geo.size.width - dot) * CGFloat(value ?? 0.5)
+            ZStack(alignment: .leading) {
+                Capsule().fill(palette.ink.opacity(0.08)).frame(height: 2)
+                Capsule().fill(palette.gold.opacity(0.55)).frame(width: x + dot / 2, height: 2)
+                    .opacity(value == nil ? 0 : 1)
+                Circle().fill(palette.gold).frame(width: dot, height: dot)
+                    .offset(x: x)
+                    .opacity(value == nil ? 0.25 : 1)
+            }
+            .frame(height: dot)
+        }
+        .frame(height: 8)
+    }
+
+    private func chip(_ label: String, _ title: String, symbol: String, tint: Color) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: symbol)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 16)
+                .padding(.top, 1)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label.uppercased())
+                    .font(.system(size: 9.5, weight: .bold))
+                    .tracking(1.2)
+                    .foregroundStyle(tint)
+                Text(title)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(palette.ink)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(tint.opacity(palette.dark ? 0.12 : 0.07)))
     }
 }
 
