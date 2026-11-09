@@ -11,6 +11,8 @@ struct ContentView: View {
     @State private var showingNewGame = true
     @State private var showingSettings = false
     @State private var confirmingResign = false
+    /// The welcome's Play, waiting on the first rival's film: its Begin starts this game.
+    @State private var welcomeFilm: WelcomeFilm?
     @State private var showingAnalyze = false
     /// The analyzer, kept while the app runs: closing Analyze and opening it again finds the same board.
     @State private var analyzer = ScanSession(reader: CloudBoardReader.live, engine: StockfishEngine.shared,
@@ -291,6 +293,24 @@ struct ContentView: View {
                 ArmyView(theme: chosenTheme, color: match.setup.playerColor).environment(army)
                     .homeZoom(.army, in: homeZoom, when: zoomsFromSheet)
             }
+            // The welcome's Play shows the first rival's film, as Home's Play does, and its Begin
+            // starts the game (audit, 2026-11-09: the films are the app's entrance, so the first
+            // game shouldn't skip them). Backing out is "Look around first".
+            .fullScreenCover(item: $welcomeFilm) { film in
+                RivalsHall(start: film.id, intro: true, begin: { level in
+                    // The film's last frame gives way to the game: the hall closes at once.
+                    var quiet = Transaction()
+                    quiet.disablesAnimations = true
+                    withTransaction(quiet) { welcomeFilm = nil }
+                    var setup = film.choice.setup()
+                    setup.level = level
+                    withAnimation(.snappy) { match.start(setup) }
+                    leaveHome()
+                }, close: {
+                    welcomeFilm = nil
+                    lookAround()
+                })
+            }
             .fullScreenCover(item: $coach.presentedLesson) { lesson in
                 LessonScreen(lesson: lesson, theme: chosenTheme).environment(training).environment(daily)
             }
@@ -537,16 +557,22 @@ struct ContentView: View {
         armyNews != nil || coachExpanded || vision.isHolding || showingWelcome
     }
 
-    /// The welcome is done: start the first game, or leave the player on the home (or the New Game sheet).
+    /// The welcome is done: the first rival's film, then its game; or leave the player on the
+    /// home (or the New Game sheet).
     private func finishWelcome(play: Bool, choice: WelcomeChoice) {
         withAnimation(.easeInOut(duration: 0.35)) { showingWelcome = false }
         syncCoachSettings()
         if play {
-            withAnimation(.snappy) { match.start(choice.setup()) }
-            leaveHome()
-        } else if !showingHome, !match.hasStarted {
-            showingNewGame = true
+            welcomeFilm = WelcomeFilm(choice: choice)
+        } else {
+            lookAround()
         }
+    }
+
+    /// "Look around first", or backing out of the first rival's film: the home stays, or the New
+    /// Game sheet opens over a bare board.
+    private func lookAround() {
+        if !showingHome, !match.hasStarted { showingNewGame = true }
     }
 
     private func leaveHome() {
@@ -1050,3 +1076,10 @@ private struct PendingTalkMove: Equatable {
 }
 
 #Preview { ContentView() }
+
+/// What the welcome picked, held while the first rival's film plays.
+private struct WelcomeFilm: Identifiable {
+    let choice: WelcomeChoice
+    /// The rival whose film plays, and the hall's start.
+    var id: MatchController.Level { choice.experience.level }
+}
