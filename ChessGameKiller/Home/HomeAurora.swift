@@ -565,14 +565,13 @@ struct HomeAuroraGameTile: View {
                         .foregroundStyle(palette.ink)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
-                    Text(card.tags.joined(separator: " · "))
-                        .font(.system(size: 12.5))
-                        .foregroundStyle(palette.ink2)
-                        .lineLimit(1)
+                    tagLine
                     Spacer(minLength: 0)
                     HStack(spacing: 6) {
                         Text(card.button)
                             .font(.system(size: 13, weight: .bold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                         Image(systemName: "arrow.right")
                             .font(.system(size: 11, weight: .bold))
                     }
@@ -587,7 +586,9 @@ struct HomeAuroraGameTile: View {
                         }
                     }
                 }
-                Spacer(minLength: 0)
+                // The words take all the room beside the board. (A spacer after them cost its
+                // own gap, and "Make your move" was cut to "Make your m…".)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(12)
             .frame(height: 128)
@@ -614,6 +615,22 @@ struct HomeAuroraGameTile: View {
                 .accessibilityHint("Pick your side, clock and rival")
             }
         }
+    }
+}
+
+extension HomeAuroraGameTile {
+    /// Who, the clock and your side on one line. When the line runs out of room your side goes
+    /// first, since the board beside it already shows it, rather than the line ending "You'…".
+    private var tagLine: some View {
+        let all: String = card.tags.joined(separator: " · ")
+        let short: String = card.tags.count > 1 ? card.tags.dropLast().joined(separator: " · ") : all
+        return ViewThatFits(in: .horizontal) {
+            Text(all)
+            Text(short)
+        }
+        .font(.system(size: 12.5))
+        .foregroundStyle(palette.ink2)
+        .lineLimit(1)
     }
 }
 
