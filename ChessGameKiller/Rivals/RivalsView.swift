@@ -21,8 +21,8 @@ struct RivalsHall: View {
 
     private static let gold = Color(hex: 0xE8C27A)
 
-    /// `intro` opens straight into the start rival's welcome film: the first time you face a
-    /// rival from Home's Play, its film plays before the game (Alex, 2026-11-08).
+    /// `intro` opens straight into the start rival's welcome film: every time you face a rival
+    /// from Home's Play, its film plays before the game (Alex, 2026-11-09).
     init(start: MatchController.Level? = nil, intro: Bool = false,
          begin: @escaping (MatchController.Level) -> Void, close: @escaping () -> Void) {
         self.start = start

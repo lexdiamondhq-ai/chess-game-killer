@@ -61,7 +61,8 @@ struct RivalFilm {
 /// opens once you beat the Berserker, and the Ashen King once you beat the Lionheart (Alex,
 /// 2026-11-07). A win is read from the rivals you have beaten (`RivalBoardsEarned`), which keeps
 /// wins saved under a rival's former name ("The 1600s").
-/// The rivals whose welcome film you've seen. Until you have, Home's Play shows the film first.
+/// The rivals whose welcome film you've seen. Home's Play shows the film every time now
+/// (Alex, 2026-11-09); this only keeps the record.
 enum RivalIntros {
     static let key = "rivals.introsSeen"
 
