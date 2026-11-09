@@ -362,6 +362,8 @@ struct BoardEditorView: View {
 
     @State private var tool: Tool = .piece(.init(.pawn, .white))
     @State private var showingPhoto = false
+    @AppStorage("sculpted3D") private var sculpted3D = true
+    @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.tilted
 
     private var accent: Color { theme.trainingAccent }
     private var problem: String? {
@@ -375,9 +377,7 @@ struct BoardEditorView: View {
                     readingBanner
                 }
 
-                PositionBoard(draft: session.draft, theme: theme) { square in
-                    place(on: square)
-                }
+                board
 
                 palette
 
@@ -459,6 +459,31 @@ struct BoardEditorView: View {
         }
         .padding(12)
         .background(Panel(theme: theme, highlight: session.readingFailed ? Color(hex: 0xFF9A3C) : nil))
+    }
+
+    /// The same board as the analysis and the games: the real 3D board, tilted or flat from above,
+    /// with the Tilted / Flat switch under it, when the look has one and 3D pieces are on;
+    /// otherwise the flat board. A tap on a square places the chosen piece, as before.
+    @ViewBuilder
+    private var board: some View {
+        if BoardView.playsIn3D(theme, setting: sculpted3D) {
+            VStack(spacing: 6) {
+                SculptedPositionBoard(pieces: session.draft.pieces, theme: theme,
+                                      onTap: { square in place(on: square) },
+                                      framing: tilt.framing)
+                    .aspectRatio(tilt == .tilted ? CGFloat(SculptedCamera.snugAspect(tilt: AnalysisView.analysisTilt)) : tilt.framing.aspect,
+                                 contentMode: .fit)
+                    .padding(.horizontal, -16)
+                HStack {
+                    Spacer(minLength: 0)
+                    BoardViewSwitch(theme: theme)
+                }
+            }
+        } else {
+            PositionBoard(draft: session.draft, theme: theme) { square in
+                place(on: square)
+            }
+        }
     }
 
     private var palette: some View {
@@ -637,7 +662,7 @@ struct AnalysisView: View {
 
     /// The standing board's tilt here, in degrees: up from the lowest (50), which a scroll
     /// view would otherwise give it, toward the highest (62).
-    private static let analysisTilt: Float = 58
+    static let analysisTilt: Float = 58
 
     /// The board, as in a game: the real 3D board, tilted or flat from above, with the Tilted /
     /// Flat switch under it, when the look has one and 3D pieces are on; otherwise the flat board.
