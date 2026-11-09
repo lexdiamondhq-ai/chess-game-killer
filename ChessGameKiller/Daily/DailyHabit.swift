@@ -29,6 +29,9 @@ struct DailyRecord: Codable, Equatable {
     var moveDay: String?
     var moveNumber: Int?
     var moveFound = false
+    /// How each day's Move went, by day ("2026-11-09"), from the first try that day. Today's Move
+    /// opens on its result once played, and these are the days a calendar of past Moves can show.
+    var moveResults: [String: Outcome] = [:]
     /// The hour of the day the goal was met, latest last, for the reminder's time.
     var hours: [Int] = []
     /// Streak milestones already marked on a piece (7, 30, 100, 365).
@@ -43,7 +46,7 @@ struct DailyRecord: Codable, Equatable {
     init() {}
 
     private enum CodingKeys: String, CodingKey {
-        case streak, day, puzzlesSolved, moveDay, moveNumber, moveFound, hours, marks, lastMark, seeded, reminderAsked
+        case streak, day, puzzlesSolved, moveDay, moveNumber, moveFound, moveResults, hours, marks, lastMark, seeded, reminderAsked
     }
 
     init(from decoder: Decoder) throws {
@@ -54,6 +57,7 @@ struct DailyRecord: Codable, Equatable {
         moveDay = try c.decodeIfPresent(String.self, forKey: .moveDay)
         moveNumber = try c.decodeIfPresent(Int.self, forKey: .moveNumber)
         moveFound = try c.decodeIfPresent(Bool.self, forKey: .moveFound) ?? false
+        moveResults = (try? c.decodeIfPresent([String: Outcome].self, forKey: .moveResults)) ?? [:]
         hours = try c.decodeIfPresent([Int].self, forKey: .hours) ?? []
         marks = try c.decodeIfPresent([Int].self, forKey: .marks) ?? []
         lastMark = try? c.decodeIfPresent(StreakMark.self, forKey: .lastMark)

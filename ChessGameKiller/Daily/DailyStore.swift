@@ -62,6 +62,13 @@ final class DailyStore {
 
     var playedTodaysMove: Bool { playedMove() }
 
+    /// How Today's Move went on `date`, once played. A day played before results were kept
+    /// reads as found or missed.
+    func moveResult(on date: Date = .now) -> Outcome? {
+        guard playedMove(on: date) else { return nil }
+        return state.moveResults[Trainer.dayString(date, calendar: calendar)] ?? (state.moveFound ? .firstTry : .missed)
+    }
+
     /// Rated puzzles solved today, toward the three that make a day.
     var puzzlesToday: Int {
         state.day == Trainer.dayString(.now, calendar: calendar) ? state.puzzlesSolved : 0
@@ -108,6 +115,15 @@ final class DailyStore {
         save()
         onChange?()
         return result.outcome
+    }
+
+    /// Today's Move, played to the end: makes the day and keeps how it went. Only the day's
+    /// first try counts; the result stays as it was.
+    @discardableResult
+    func recordTodaysMove(_ outcome: Outcome, at date: Date = .now) -> DailyOutcome {
+        let day = Trainer.dayString(date, calendar: calendar)
+        if state.moveResults[day] == nil, !playedMove(on: date) { state.moveResults[day] = outcome }
+        return record(.todaysMove(found: outcome == .firstTry), at: date)
     }
 
     /// The reminder question was answered (either way): it isn't asked again.

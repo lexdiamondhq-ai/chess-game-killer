@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// Today's Move: the day's puzzle, the same for every player, then how the world did, the streak
-/// and what's next. Played once a day for the streak; opened again, it can be replayed for fun.
+/// and what's next. Played once a day: opened again that day, it shows how it went and plays
+/// the answer through, and the next one comes tomorrow.
 struct DailyMoveView: View {
     let theme: BoardTheme
     /// Opens Puzzles, for more.
@@ -15,7 +16,7 @@ struct DailyMoveView: View {
 
     @State private var puzzle: DailyPuzzle?
     @State private var runner: DrillRunner?
-    /// This try counts for the day (the first one today).
+    /// This try counts for the day (the first one today). Once played, the Move only shows its answer.
     @State private var counts = true
     @State private var outcome: Outcome?
     @State private var tally: DailyTally?
@@ -122,10 +123,10 @@ struct DailyMoveView: View {
         .padding(.top, 8)
     }
 
-    /// "No. 29 · Thursday · Tricky", or a note that a replay doesn't count again.
+    /// "No. 29 · Thursday · Tricky", or, once played, that the next one comes tomorrow.
     private var dateline: String {
         guard let puzzle else { return Date.now.formatted(.dateTime.weekday(.wide)) }
-        if !counts { return "No. \(puzzle.number) · Played today, this one is for fun" }
+        if !counts { return "No. \(puzzle.number) · Played today. Next one tomorrow" }
         return "No. \(puzzle.number) · \(Date.now.formatted(.dateTime.weekday(.wide))) · \(puzzle.difficulty)"
     }
 
@@ -137,7 +138,10 @@ struct DailyMoveView: View {
             Divider().opacity(0.5)
             streakBlock
             HStack(spacing: 10) {
-                if let morePuzzles {
+                if !counts {
+                    Button("Watch again") { runner?.review() }
+                        .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false))
+                } else if let morePuzzles {
                     Button("More puzzles") {
                         runner?.cancel()
                         dismiss()
@@ -221,22 +225,34 @@ struct DailyMoveView: View {
         guard let today = daily.puzzle() else { puzzle = nil; return }
         puzzle = today
         counts = !daily.playedTodaysMove
+        // Played already today: open on how it went, not on a fresh try.
+        if !counts, outcome == nil { outcome = daily.moveResult() }
         let lichess = LichessPuzzle(id: today.id, fen: today.fen, moves: today.moves, rating: today.rating, themes: today.themes)
         let item = SessionItem(content: .drill(lichess.drill), role: .focus)
         let made = DrillRunner(item: item, library: training.library, engine: nil)
         runner = made
-        // Already finished (a picture of the result): the position stays as it was set.
-        if outcome == nil { made?.begin() }
+        if counts {
+            // Already finished (a picture of the result): the position stays as it was set.
+            if outcome == nil { made?.begin() }
+        } else {
+            made?.review()
+            fetchTally(for: today, found: outcome == .firstTry)
+        }
     }
 
     private func finish(_ result: Outcome) {
         withAnimation(.snappy) { outcome = result }
         guard counts, let puzzle else { return }
         let found = result == .firstTry
-        daily.record(.todaysMove(found: found))
+        daily.recordTodaysMove(result)
         puzzles.seen(LichessPuzzle(id: puzzle.id, fen: puzzle.fen, moves: puzzle.moves, rating: puzzle.rating, themes: puzzle.themes))
         training.recordPractice(xp: found ? 6 : 2)
-        guard let stats else { return }
+        fetchTally(for: puzzle, found: found)
+    }
+
+    /// How everyone did. The server counts each player once a day, so asking again changes nothing.
+    private func fetchTally(for puzzle: DailyPuzzle, found: Bool) {
+        guard let stats, tally == nil else { return }
         let day = DailyMoves.dayKey(.now)
         Task { @MainActor in
             do {

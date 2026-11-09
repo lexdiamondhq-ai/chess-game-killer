@@ -114,6 +114,31 @@ final class DailyTests: XCTestCase {
         XCTAssertEqual(record.moveDay, "2026-10-29")
     }
 
+    func testTodaysMoveOpensOnItsResultOncePlayed() {
+        let store = DailyStore(calendar: calendar)
+        let day = date("2026-11-09", hour: 9)
+        XCTAssertNil(store.moveResult(on: day))
+        store.recordTodaysMove(.afterMistake, at: day)
+        // A second go the same day changes nothing: the first try stands.
+        store.recordTodaysMove(.firstTry, at: date("2026-11-09", hour: 21))
+        XCTAssertEqual(store.moveResult(on: day), .afterMistake)
+        XCTAssertFalse(store.state.moveFound)
+        XCTAssertEqual(store.state.moveResults, ["2026-11-09": .afterMistake])
+        // The next day there's a new one to play.
+        XCTAssertNil(store.moveResult(on: date("2026-11-10")))
+        store.recordTodaysMove(.firstTry, at: date("2026-11-10"))
+        XCTAssertEqual(store.state.moveResults.count, 2)
+    }
+
+    func testADayPlayedBeforeResultsWereKeptReadsAsFoundOrMissed() {
+        var record = DailyRecord()
+        record.moveDay = "2026-11-09"
+        record.moveFound = true
+        XCTAssertEqual(DailyStore(state: record, calendar: calendar).moveResult(on: date("2026-11-09")), .firstTry)
+        record.moveFound = false
+        XCTAssertEqual(DailyStore(state: record, calendar: calendar).moveResult(on: date("2026-11-09")), .missed)
+    }
+
     func testDaysInARowWithARestDayAWeekAndMilestones() {
         var record = DailyRecord()
         var milestones: [Int] = []
