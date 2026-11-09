@@ -54,6 +54,43 @@ final class RivalLadderTests: XCTestCase {
         XCTAssertEqual(ladder.current, .club)
     }
 
+    /// The welcome picks the first rival from how much chess the player has played; every
+    /// rival up to it is open, and the climb goes on one rival at a time from there.
+    func testTheWelcomesPickOpensEveryRivalUpToIt() {
+        let ladder = RivalLadder(beatenNames: [], start: .expert)
+        XCTAssertTrue(ladder.isOpen(.beginner))
+        XCTAssertTrue(ladder.isOpen(.casual))
+        XCTAssertTrue(ladder.isOpen(.club))
+        XCTAssertTrue(ladder.isOpen(.expert))
+        XCTAssertFalse(ladder.isOpen(.grandmaster), "the Ashen King still waits for a win over the Lionheart")
+        XCTAssertEqual(ladder.current, .expert, "the hall opens on the rival the welcome picked")
+
+        let won = RivalLadder(beatenNames: ["the lionheart"], start: .expert)
+        XCTAssertTrue(won.isOpen(.grandmaster))
+        XCTAssertEqual(won.current, .grandmaster)
+    }
+
+    @MainActor
+    func testTheWelcomeSavesItsPickForTheLadder() throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "RivalLadderStart"))
+        defaults.removePersistentDomain(forName: "RivalLadderStart")
+        XCTAssertFalse(RivalLadder(defaults: defaults).isOpen(.casual))
+
+        WelcomeChoice(experience: .regular, look: .gilded).apply(defaults)
+        var ladder = RivalLadder(defaults: defaults)
+        XCTAssertTrue(ladder.isOpen(.club))
+        XCTAssertFalse(ladder.isOpen(.expert))
+        XCTAssertEqual(ladder.current, .club)
+        XCTAssertEqual(NewGameSheet.savedSetup(defaults).level, .club, "the New Game sheet keeps the welcome's rival")
+
+        // Replaying the welcome and picking less never locks a rival again.
+        WelcomeChoice(experience: .new, look: .gilded).apply(defaults)
+        ladder = RivalLadder(defaults: defaults)
+        XCTAssertTrue(ladder.isOpen(.club))
+        XCTAssertFalse(ladder.isOpen(.expert))
+        defaults.removePersistentDomain(forName: "RivalLadderStart")
+    }
+
     func testEachRivalsIntroIsRememberedOnceSeen() throws {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: "RivalIntrosTests"))
         defaults.removePersistentDomain(forName: "RivalIntrosTests")

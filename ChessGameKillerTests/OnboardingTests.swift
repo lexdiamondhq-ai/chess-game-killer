@@ -44,6 +44,9 @@ final class OnboardingTests: XCTestCase {
         WelcomeChoice(experience: .club, look: .gilded).apply(defaults)
         XCTAssertEqual(defaults.integer(forKey: "setup.level"), MatchController.Level.expert.rawValue)
         XCTAssertFalse(defaults.bool(forKey: "showBestMoves"), "Everyone else plays a fair game")
+        // The rival the welcome promised is the one the next game is against, not the Cub.
+        XCTAssertEqual(NewGameSheet.savedSetup(defaults).level, .expert)
+        XCTAssertTrue(RivalLadder(defaults: defaults).isOpen(.expert))
     }
 
     func testEveryLevelLeadsToADifferentRival() {

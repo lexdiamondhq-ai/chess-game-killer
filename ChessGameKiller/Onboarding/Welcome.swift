@@ -79,6 +79,9 @@ struct WelcomeChoice: Equatable {
 
     func apply(_ defaults: UserDefaults = .standard) {
         defaults.set(experience.level.rawValue, forKey: "setup.level")
+        // The pick opens every rival up to it, so it stays the next game after the first one
+        // too, instead of the ladder sending the player back to the Cub.
+        RivalLadder.noteStart(experience.level, defaults)
         defaults.set(look.rawValue, forKey: "boardTheme")
         defaults.set(experience.showsHints, forKey: "showBestMoves")
     }
