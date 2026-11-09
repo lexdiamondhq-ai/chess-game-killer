@@ -877,8 +877,9 @@ struct ContentView: View {
                 // that sat under the board (Alex, 2026-11-07). Analyze lives in the orb; Train and
                 // Puzzles wait off the game screen.
                 ExecutivePlate(match: match, theme: theme, color: bottomColor, inDock: true)
-                // Room for the grade, its advice and your captures under them, inside the dock.
-                .frame(height: 60)
+                // Room for the grade, its advice and your captures under them, inside the dock;
+                // in a timed game your clock sits under the words, so the line is a little taller.
+                .frame(height: match.clock == nil ? 60 : 72)
                 .padding(.leading, 10)
                 .padding(.trailing, 2)
                 .frame(maxWidth: .infinity, alignment: .leading)

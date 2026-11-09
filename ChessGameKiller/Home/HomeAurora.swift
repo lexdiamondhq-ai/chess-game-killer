@@ -42,17 +42,19 @@ struct HomeAuroraActions {
 struct HomeAuroraPalette {
     let dark: Bool
 
-    var bg: Color { dark ? Color(hex: 0x08080C) : Color(hex: 0xF6F3EE) }
-    var bgLow: Color { dark ? Color(hex: 0x0C0B10) : Color(hex: 0xEFEAE2) }
+    // Dark is the warm espresso of the other dark screens (Alex, 2026-11-09): the page, the
+    // cards and the sheet were a cool blue-black that only Home wore. The glows above are kept.
+    var bg: Color { dark ? Color(hex: 0x100B08) : Color(hex: 0xF6F3EE) }
+    var bgLow: Color { dark ? Color(hex: 0x140F0C) : Color(hex: 0xEFEAE2) }
     var ink: Color { dark ? Color(hex: 0xF2EEE6) : Color(hex: 0x1C1813) }
     var ink2: Color { ink.opacity(dark ? 0.62 : 0.6) }
     var ink3: Color { ink.opacity(dark ? 0.36 : 0.38) }
     var line: Color { dark ? Color.white.opacity(0.08) : Color(hex: 0x1C1813).opacity(0.08) }
     var glass: Color { dark ? Color.white.opacity(0.06) : Color.white.opacity(0.72) }
     var glassHi: Color { dark ? Color.white.opacity(0.12) : Color.white }
-    var card: Color { dark ? Color(hex: 0x15171F) : Color.white }
+    var card: Color { dark ? Color(hex: 0x1D1814) : Color.white }
     /// The page that slides up over the board.
-    var sheet: Color { dark ? Color(hex: 0x0C0D12).opacity(0.97) : Color(hex: 0xF8F5F0).opacity(0.98) }
+    var sheet: Color { dark ? Color(hex: 0x110C09).opacity(0.97) : Color(hex: 0xF8F5F0).opacity(0.98) }
     var gold: Color { dark ? Color(hex: 0xE8C27A) : Color(hex: 0xB7832E) }
     var rose: Color { dark ? Color(hex: 0xF0708A) : Color(hex: 0xD9466A) }
     var violet: Color { dark ? Color(hex: 0x8B6CFF) : Color(hex: 0x6A4BE0) }
@@ -372,21 +374,28 @@ struct HomeAuroraView: View {
         let levels: [MatchController.Level] = MatchController.Level.allCases
         let shown: MatchController.Level = rivalShown ?? upNext.level
         return VStack(spacing: 12) {
-            ScrollView(.horizontal) {
-                HStack(alignment: .top, spacing: 16) {
-                    ForEach(levels) { level in
-                        rivalCard(level, card: card, upNext: upNext, ladder: ladder)
-                            .containerRelativeFrame(.horizontal)
-                            .id(level)
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal) {
+                    HStack(alignment: .top, spacing: 16) {
+                        ForEach(levels) { level in
+                            rivalCard(level, card: card, upNext: upNext, ladder: ladder)
+                                .containerRelativeFrame(.horizontal)
+                                .id(level)
+                        }
                     }
+                    .scrollTargetLayout()
                 }
-                .scrollTargetLayout()
+                .scrollTargetBehavior(.viewAligned)
+                .scrollIndicators(.hidden)
+                .scrollClipDisabled()
+                .scrollPosition(id: Binding(get: { rivalShown ?? upNext.level }, set: { rivalShown = $0 }))
+                // The tick follows the rival in front, so putting the pager in place below is silent.
+                .sensoryFeedback(.selection, trigger: shown) { _, _ in hapticsOn }
+                // A position handed over as the pager first appears is not always kept: the home
+                // opened on the first rival, beaten or not, under dashes that pointed at the next
+                // one. So the pager is put on the rival up next by hand, once it is laid out.
+                .task { proxy.scrollTo(shown, anchor: .leading) }
             }
-            .scrollTargetBehavior(.viewAligned)
-            .scrollIndicators(.hidden)
-            .scrollClipDisabled()
-            .scrollPosition(id: Binding(get: { rivalShown ?? upNext.level }, set: { rivalShown = $0 }))
-            .sensoryFeedback(.selection, trigger: rivalShown) { _, _ in hapticsOn }
             HStack(spacing: 6) {
                 ForEach(levels) { level in
                     Capsule()
@@ -565,14 +574,13 @@ struct HomeAuroraGameTile: View {
                         .foregroundStyle(palette.ink)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
-                    Text(card.tags.joined(separator: " · "))
-                        .font(.system(size: 12.5))
-                        .foregroundStyle(palette.ink2)
-                        .lineLimit(1)
+                    tagLine
                     Spacer(minLength: 0)
                     HStack(spacing: 6) {
                         Text(card.button)
                             .font(.system(size: 13, weight: .bold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                         Image(systemName: "arrow.right")
                             .font(.system(size: 11, weight: .bold))
                     }
@@ -587,7 +595,9 @@ struct HomeAuroraGameTile: View {
                         }
                     }
                 }
-                Spacer(minLength: 0)
+                // The words take all the room beside the board. (A spacer after them cost its
+                // own gap, and "Make your move" was cut to "Make your m…".)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(12)
             .frame(height: 128)
@@ -614,6 +624,22 @@ struct HomeAuroraGameTile: View {
                 .accessibilityHint("Pick your side, clock and rival")
             }
         }
+    }
+}
+
+extension HomeAuroraGameTile {
+    /// Who, the clock and your side on one line. When the line runs out of room your side goes
+    /// first, since the board beside it already shows it, rather than the line ending "You'…".
+    private var tagLine: some View {
+        let all: String = card.tags.joined(separator: " · ")
+        let short: String = card.tags.count > 1 ? card.tags.dropLast().joined(separator: " · ") : all
+        return ViewThatFits(in: .horizontal) {
+            Text(all)
+            Text(short)
+        }
+        .font(.system(size: 12.5))
+        .foregroundStyle(palette.ink2)
+        .lineLimit(1)
     }
 }
 

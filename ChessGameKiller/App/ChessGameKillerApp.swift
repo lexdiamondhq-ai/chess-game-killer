@@ -12,6 +12,8 @@ struct ChessGameKillerApp: App {
         LookIntroduction.applyOnce()
         HintsIntroduction.applyOnce()
         HomeLayouts.settle()
+        // Before the showcase, which may ask for the flat board for a screenshot.
+        SculptedSetting.settle()
         showcase = Showcase.fromLaunchArguments()
         // A tapped daily reminder opens Today's Move.
         UNUserNotificationCenter.current().delegate = DailyNotificationDelegate.shared
