@@ -18,13 +18,19 @@ struct TrainingHubView: View {
     /// The endgame record the whole app shares, so a study finished anywhere shows here.
     private var endgames: EndgameProgress { .shared }
     @State private var think = ThinkStore.live()
-    @State private var path: [TrainDoor] = []
+    @State private var path: [TrainDoor]
     /// Today's session, made once so the card shows exactly what Start plays.
     @State private var today: SessionPlan?
     @State private var session: SessionPlan?
     @State private var greeting = ""
     @State private var confirmingReset = false
     @State private var showingLevelCheck = false
+
+    /// Opens straight on one door, Learn behind it (Home's Chess DNA card opens on Chess DNA).
+    init(theme: BoardTheme, door: TrainDoor? = nil) {
+        self.theme = theme
+        _path = State(initialValue: door.map { [$0] } ?? [])
+    }
 
     var body: some View {
         NavigationStack(path: $path) {
