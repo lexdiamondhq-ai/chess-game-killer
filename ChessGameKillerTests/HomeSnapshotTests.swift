@@ -106,6 +106,36 @@ final class HomeSnapshotTests: XCTestCase {
         XCTAssertEqual(metrics.nearest(to: 0), .board)
     }
 
+    /// Your Chess DNA under For today on the Aurora home, where Your Grudge was (2026-11-09):
+    /// a few weeks in, by day and by night, and before Coach Leo has read enough games.
+    func testTheChessDNACardOnHome() throws {
+        let sample = TrainSample(settled: true)
+        let dna = ChessDNA.make(games: sample.vault.games, puzzleStats: sample.puzzles.themeStats,
+                                puzzlesPlayed: sample.puzzles.progress.played)
+        XCTAssertGreaterThan(dna.gamesRead, 0)
+        let fresh = ChessDNA.make(games: [])
+        for dark in [false, true] {
+            let palette = HomeAuroraPalette(dark: dark)
+            let page = ScrollView {
+                VStack(spacing: 0) {
+                    HomeAuroraSection(title: "Your Chess DNA", palette: palette, note: ChessDNAView.basis(dna))
+                    HomeAuroraDNA(dna: dna, palette: palette, action: {})
+                        .padding(.horizontal, 16)
+                    HomeAuroraSection(title: "Before three games", palette: palette)
+                    HomeAuroraDNA(dna: fresh, palette: palette, action: {})
+                        .padding(.horizontal, 16)
+                }
+                .padding(.top, 60)
+            }
+            .background(palette.sheet.ignoresSafeArea())
+            .background(palette.bg.ignoresSafeArea())
+            .environment(\.colorScheme, dark ? .dark : .light)
+            let window = try show(page, wait: 2)
+            try save(window, "zz-home-dna-\(dark ? "dark" : "light")")
+            window.isHidden = true
+        }
+    }
+
     func testHomeScrolling() throws {
         let window = try show(HomeSample.home())
         // The page fits on about a screen: at rest, partway (the board turning in its window), and at its foot.
