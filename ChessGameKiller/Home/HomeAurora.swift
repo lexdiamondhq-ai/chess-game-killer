@@ -42,17 +42,17 @@ struct HomeAuroraActions {
 struct HomeAuroraPalette {
     let dark: Bool
 
-    var bg: Color { dark ? Color(hex: 0x08080C) : Color(hex: 0xF6F3EE) }
-    var bgLow: Color { dark ? Color(hex: 0x0C0B10) : Color(hex: 0xEFEAE2) }
+    var bg: Color { dark ? Color(hex: 0x100B08) : Color(hex: 0xF6F3EE) }
+    var bgLow: Color { dark ? Color(hex: 0x140F0C) : Color(hex: 0xEFEAE2) }
     var ink: Color { dark ? Color(hex: 0xF2EEE6) : Color(hex: 0x1C1813) }
     var ink2: Color { ink.opacity(dark ? 0.62 : 0.6) }
     var ink3: Color { ink.opacity(dark ? 0.36 : 0.38) }
     var line: Color { dark ? Color.white.opacity(0.08) : Color(hex: 0x1C1813).opacity(0.08) }
     var glass: Color { dark ? Color.white.opacity(0.06) : Color.white.opacity(0.72) }
     var glassHi: Color { dark ? Color.white.opacity(0.12) : Color.white }
-    var card: Color { dark ? Color(hex: 0x15171F) : Color.white }
+    var card: Color { dark ? Color(hex: 0x1D1814) : Color.white }
     /// The page that slides up over the board.
-    var sheet: Color { dark ? Color(hex: 0x0C0D12).opacity(0.97) : Color(hex: 0xF8F5F0).opacity(0.98) }
+    var sheet: Color { dark ? Color(hex: 0x110C09).opacity(0.97) : Color(hex: 0xF8F5F0).opacity(0.98) }
     var gold: Color { dark ? Color(hex: 0xE8C27A) : Color(hex: 0xB7832E) }
     var rose: Color { dark ? Color(hex: 0xF0708A) : Color(hex: 0xD9466A) }
     var violet: Color { dark ? Color(hex: 0x8B6CFF) : Color(hex: 0x6A4BE0) }
