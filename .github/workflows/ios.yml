@@ -6,6 +6,8 @@ name: iOS build and tests
 # - Main runs only the newest-Xcode build (xcode-26-build); the pull request already ran the tests.
 # - The simulator screenshots (about 15 minutes) run only when asked for: add the
 #   "screenshots" label to the pull request, or run the workflow by hand.
+# - By hand, the tests' pictures can be drawn in Middle or Dark instead of Light (tone), and every
+#   picture printed across the logs of the "pictures" jobs, which run on Linux (pictures).
 on:
   push:
     branches: [main]
@@ -33,9 +35,19 @@ on:
         description: Take the simulator screenshots
         type: boolean
         default: true
+      tone:
+        description: Draw the tests' pictures in this tone (players start on Light)
+        type: choice
+        options: [light, middle, dark]
+        default: light
+      pictures:
+        description: Print every picture in the logs of the pictures jobs
+        type: boolean
+        default: false
 
 concurrency:
-  group: ios-${{ github.ref }}
+  # A run by hand in another tone waits for nothing and replaces nothing.
+  group: ios-${{ github.ref }}-${{ inputs.tone || 'light' }}
   # A newer push to a pull request replaces the run still going; runs on main always finish.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
@@ -122,8 +134,8 @@ jobs:
       - name: Build and test
         run: |
           status=0
-          # Test runner variables reach the tests without the prefix, as SNAPSHOT_DIR.
-          TEST_RUNNER_SNAPSHOT_DIR="$PWD/snapshots" xcodebuild test \
+          # Test runner variables reach the tests without the prefix, as SNAPSHOT_DIR and SNAPSHOT_TONE.
+          TEST_RUNNER_SNAPSHOT_DIR="$PWD/snapshots" TEST_RUNNER_SNAPSHOT_TONE="${{ inputs.tone }}" xcodebuild test \
             -project ChessGameKiller.xcodeproj \
             -scheme ChessGameKiller \
             -destination "id=${{ steps.sim.outputs.udid }}" \
@@ -132,6 +144,8 @@ jobs:
           grep -E "error:|Test Case .* failed|\*\* " build.log | head -80 || true
           grep -E "Executed" build.log | tail -3 || true
           grep -E "\] TIMING " build.log | head -120 || true
+          # Says so when the pictures were drawn in a tone other than Light.
+          grep -E "SNAPSHOT TONE" build.log | head -2 || true
           # The app's own encoding of each progress file, next to the hand-written ones in ProgressFileTests.
           grep -E "\] FIXTURE " build.log | head -40 || true
           # On a crash: which test was running, and the lines around the error.
@@ -291,3 +305,37 @@ jobs:
           # The engine's own account, for a failing engine test.
           grep -E "Stockfish: " build.log | head -10 || true
           grep -E "\] TIMING " build.log | tail -40 || true
+
+  pictures:
+    # By hand only. A job's log can be read back 5,000 lines at a time, which holds about a
+    # tenth of the tests' pictures at a size worth judging, so ten small Linux jobs print a
+    # tenth each, in name order: BEGIN-SCREEN name, a JPEG as base64, END-SCREEN.
+    # The tests may fail in a tone they weren't written for; the pictures are printed anyway.
+    if: always() && github.event_name == 'workflow_dispatch' && inputs.pictures
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: screens
+          path: snapshots
+      - name: Print this part's pictures
+        run: |
+          command -v convert >/dev/null || { sudo apt-get update -qq; sudo apt-get install -y -qq imagemagick; }
+          ls snapshots/*.png | sort > all.txt
+          total=$(wc -l < all.txt)
+          per=$(( (total + 9) / 10 ))
+          first=$(( ${{ matrix.part }} * per + 1 ))
+          sed -n "${first},$(( first + per - 1 ))p" all.txt > mine.txt
+          echo "Part ${{ matrix.part }}: $(wc -l < mine.txt) of $total pictures"
+          while read -r f; do
+            convert "$f" -resize x1100 -quality 72 /tmp/small.jpg
+            echo "BEGIN-SCREEN $(basename "$f")"
+            base64 -w 3000 /tmp/small.jpg
+            echo "END-SCREEN"
+          done < mine.txt
