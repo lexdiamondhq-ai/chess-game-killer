@@ -19,7 +19,7 @@ struct ReelFrame: View {
         ZStack {
             TrainingBackdrop(theme: theme)
             VStack(spacing: 0) {
-                Text("CHESS GAME KILLER")
+                Text("BEAUTY OF CHESS")
                     .font(.app(size: 13, weight: .heavy))
                     .tracking(3)
                     .foregroundStyle(accent)

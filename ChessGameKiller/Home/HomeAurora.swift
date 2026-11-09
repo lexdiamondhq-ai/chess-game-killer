@@ -372,21 +372,28 @@ struct HomeAuroraView: View {
         let levels: [MatchController.Level] = MatchController.Level.allCases
         let shown: MatchController.Level = rivalShown ?? upNext.level
         return VStack(spacing: 12) {
-            ScrollView(.horizontal) {
-                HStack(alignment: .top, spacing: 16) {
-                    ForEach(levels) { level in
-                        rivalCard(level, card: card, upNext: upNext, ladder: ladder)
-                            .containerRelativeFrame(.horizontal)
-                            .id(level)
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal) {
+                    HStack(alignment: .top, spacing: 16) {
+                        ForEach(levels) { level in
+                            rivalCard(level, card: card, upNext: upNext, ladder: ladder)
+                                .containerRelativeFrame(.horizontal)
+                                .id(level)
+                        }
                     }
+                    .scrollTargetLayout()
                 }
-                .scrollTargetLayout()
+                .scrollTargetBehavior(.viewAligned)
+                .scrollIndicators(.hidden)
+                .scrollClipDisabled()
+                .scrollPosition(id: Binding(get: { rivalShown ?? upNext.level }, set: { rivalShown = $0 }))
+                // The tick follows the rival in front, so putting the pager in place below is silent.
+                .sensoryFeedback(.selection, trigger: shown) { _, _ in hapticsOn }
+                // A position handed over as the pager first appears is not always kept: the home
+                // opened on the first rival, beaten or not, under dashes that pointed at the next
+                // one. So the pager is put on the rival up next by hand, once it is laid out.
+                .task { proxy.scrollTo(shown, anchor: .leading) }
             }
-            .scrollTargetBehavior(.viewAligned)
-            .scrollIndicators(.hidden)
-            .scrollClipDisabled()
-            .scrollPosition(id: Binding(get: { rivalShown ?? upNext.level }, set: { rivalShown = $0 }))
-            .sensoryFeedback(.selection, trigger: rivalShown) { _, _ in hapticsOn }
             HStack(spacing: 6) {
                 ForEach(levels) { level in
                     Capsule()
