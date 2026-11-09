@@ -16,6 +16,8 @@ struct PlateRemark<Status: View>: View {
     var stacked = false
     /// The rival's line is drawn larger than the person's (Alex, 2026-11-08).
     var scale: CGFloat = 1
+    /// A rival speaks in its own letters, on up to two lines (Alex, 2026-11-08; `RivalLetters`).
+    var voice: RivalLetters.Voice? = nil
     @ViewBuilder let status: () -> Status
 
     @AppStorage("rivalBanter") private var banterOn = true
@@ -23,12 +25,7 @@ struct PlateRemark<Status: View>: View {
     var body: some View {
         ZStack(alignment: .leading) {
             if isRival, banterOn, let line = match.rivalLine {
-                Text("\u{201C}\(line.text)\u{201D}")
-                    .font(.app(.footnote, weight: .medium, scale: scale))
-                    .italic()
-                    .foregroundStyle(Color.primary.opacity(0.72))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
+                remark(line.text)
                     .id("rival-\(line.id)")
                     .transition(.opacity.combined(with: .offset(y: 3)))
                     .accessibilityLabel("\(match.setup.rival.name) says: \(line.text)")
@@ -56,6 +53,20 @@ struct PlateRemark<Status: View>: View {
 }
 
 extension PlateRemark {
+    @ViewBuilder
+    private func remark(_ text: String) -> some View {
+        if let voice {
+            Text(text).rivalLetters(voice, theme: theme)
+        } else {
+            Text("\u{201C}\(text)\u{201D}")
+                .font(.app(.footnote, weight: .medium, scale: scale))
+                .italic()
+                .foregroundStyle(Color.primary.opacity(0.72))
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+    }
+
     /// The vote behind the crowd's last move, while it is your turn to answer it.
     private var shownVote: CrowdVote? {
         guard !match.isOver, !match.isComputerThinking, match.game.isHumanTurn else { return nil }
