@@ -24,6 +24,8 @@ struct HomeAuroraActions {
     var open: (HomeCurrentGame) -> Void
     /// Starts a game against one of the five rivals.
     var playRival: (MatchController.Level) -> Void = { _ in }
+    /// Opens the New Game sheet on this rival, for Options on a rival swiped to.
+    var options: (MatchController.Level) -> Void = { _ in }
     /// Opens the rivals' hall, on this rival or on the one up next.
     var rivals: (MatchController.Level?) -> Void = { _ in }
     /// Starts a game against your Grudge.
@@ -93,6 +95,8 @@ struct HomeAuroraView: View {
     @State private var grudgeSince: (you: Int, it: Int)?
     /// The first time you meet it, its birth plays instead.
     @State private var grudgeBorn = false
+    /// The rival in front on the Up next card, as you swipe through them. Nil: the one up next.
+    @State private var rivalShown: MatchController.Level?
 
     private var palette: HomeAuroraPalette { HomeAuroraPalette(dark: tone.scheme == .dark) }
     private var stage: HomeStageInfo { info.stage }
@@ -335,7 +339,11 @@ struct HomeAuroraView: View {
     @ViewBuilder
     private var gameRow: some View {
         let all: [HomeAuroraGameCard] = cards
-        if all.count == 1, let only = all.first {
+        if all.count == 1, let only = all.first, let upNext = only.upNext, !upNext.isGrudge, !upNext.inProgress {
+            // The next game: swipe sideways through every rival (Alex, 2026-11-08: "I should
+            // be able to swipe thru the cards").
+            rivalPager(only, upNext: upNext)
+        } else if all.count == 1, let only = all.first {
             // One card sits on the page like your finest move below it, edge to edge with the
             // same margins (Alex, 2026-11-08: "the same size in length as the one below").
             tile(only)
@@ -361,6 +369,61 @@ struct HomeAuroraView: View {
         .scrollIndicators(.hidden)
         .scrollClipDisabled()
         .contentMargins(.horizontal, 16, for: .scrollContent)
+    }
+
+    /// Every rival, one card each, starting on the one up next. The card stays the width of the
+    /// page; the next one waits just off the edge and glides in as you swipe. Fine gold dashes
+    /// under it say where you are. Play starts the rival in front; a locked one says who to
+    /// beat first.
+    private func rivalPager(_ card: HomeAuroraGameCard, upNext: HomeUpNext) -> some View {
+        let ladder = RivalLadder()
+        let levels: [MatchController.Level] = MatchController.Level.allCases
+        let shown: MatchController.Level = rivalShown ?? upNext.level
+        return VStack(spacing: 12) {
+            ScrollView(.horizontal) {
+                HStack(alignment: .top, spacing: 16) {
+                    ForEach(levels) { level in
+                        rivalCard(level, card: card, upNext: upNext, ladder: ladder)
+                            .containerRelativeFrame(.horizontal)
+                            .id(level)
+                    }
+                }
+                .scrollTargetLayout()
+            }
+            .scrollTargetBehavior(.viewAligned)
+            .scrollIndicators(.hidden)
+            .scrollClipDisabled()
+            .scrollPosition(id: Binding(get: { rivalShown ?? upNext.level }, set: { rivalShown = $0 }))
+            .sensoryFeedback(.selection, trigger: rivalShown) { _, _ in hapticsOn }
+            HStack(spacing: 6) {
+                ForEach(levels) { level in
+                    Capsule()
+                        .fill(level == shown ? palette.gold : palette.gold.opacity(ladder.isOpen(level) ? 0.3 : 0.14))
+                        .frame(width: level == shown ? 16 : 5, height: 5)
+                }
+            }
+            .animation(.snappy, value: shown)
+            .accessibilityHidden(true)
+        }
+        .padding(.horizontal, 16)
+        .onChange(of: upNext.level) { rivalShown = nil }
+    }
+
+    private func rivalCard(_ level: MatchController.Level, card: HomeAuroraGameCard, upNext: HomeUpNext,
+                           ladder: RivalLadder) -> some View {
+        let rival: Rival = level.rival
+        let isOpen: Bool = ladder.isOpen(level)
+        let lockedBy: Rival? = isOpen ? nil : MatchController.Level(rawValue: level.rawValue - 1)?.rival
+        let status: String = {
+            if level == upNext.level { return card.status }
+            if !isOpen { return "Locked" }
+            let place = "Rival \(level.rawValue + 1) of \(MatchController.Level.allCases.count)"
+            return ladder.beaten(rival) ? "\(place) · Beaten" : place
+        }()
+        return HomeAuroraNextRival(card: card, rival: rival, palette: palette, status: status, lockedBy: lockedBy,
+                                   play: { level == upNext.level ? open(card) : actions.playRival(level) },
+                                   change: { level == upNext.level ? actions.stage.change() : actions.options(level) },
+                                   meet: { actions.rivals(level) })
     }
 
     /// The next game gets the rival's own card, like your finest move (Alex, 2026-11-08);
@@ -587,6 +650,10 @@ struct HomeAuroraNextRival: View {
     let card: HomeAuroraGameCard
     let rival: Rival
     let palette: HomeAuroraPalette
+    /// The gold caps over the name; the card's own ("Up next") when nil.
+    var status: String? = nil
+    /// Set when this rival is still locked: the one to beat first.
+    var lockedBy: Rival? = nil
     let play: () -> Void
     let change: () -> Void
     let meet: () -> Void
@@ -596,12 +663,22 @@ struct HomeAuroraNextRival: View {
         HStack(spacing: 14) {
             Button(action: meet) {
                 HomeRivalFrame(rival: rival, side: 112)
+                    .saturation(lockedBy == nil ? 1 : 0.15)
+                    .opacity(lockedBy == nil ? 1 : 0.75)
+                    .overlay {
+                        if lockedBy != nil {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(Color(hex: 0xF3D99A))
+                                .shadow(color: .black.opacity(0.6), radius: 6)
+                        }
+                    }
             }
             .buttonStyle(HomeStagePress())
             .accessibilityLabel(rival.name)
             .accessibilityHint("Opens \(rival.name) in the rivals' hall")
             VStack(alignment: .leading, spacing: 4) {
-                Text(card.status.uppercased())
+                Text((status ?? card.status).uppercased())
                     .font(.system(size: 10, weight: .bold))
                     .tracking(1.2)
                     .foregroundStyle(palette.gold)
@@ -618,13 +695,20 @@ struct HomeAuroraNextRival: View {
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 8) {
-                    Button(action: play) { pill("Play", symbol: "play.fill") }
-                        .buttonStyle(HomeStagePress())
-                        .accessibilityLabel("Play \(rival.name)")
-                    Button(action: change) { pill("Options", symbol: "slider.horizontal.3") }
-                        .buttonStyle(HomeStagePress())
-                        .accessibilityLabel("Change the next game")
-                        .accessibilityHint("Pick your side, clock and rival")
+                    if let lockedBy {
+                        // Who opens it, in place of Play; the picture still opens the hall.
+                        pill("Beat \(lockedBy.shortName)", symbol: "lock.fill")
+                            .opacity(0.7)
+                            .accessibilityLabel("Locked. Beat \(lockedBy.name) first")
+                    } else {
+                        Button(action: play) { pill("Play", symbol: "play.fill") }
+                            .buttonStyle(HomeStagePress())
+                            .accessibilityLabel("Play \(rival.name)")
+                        Button(action: change) { pill("Options", symbol: "slider.horizontal.3") }
+                            .buttonStyle(HomeStagePress())
+                            .accessibilityLabel("Change the next game")
+                            .accessibilityHint("Pick your side, clock and rival")
+                    }
                 }
                 .padding(.top, 6)
             }
