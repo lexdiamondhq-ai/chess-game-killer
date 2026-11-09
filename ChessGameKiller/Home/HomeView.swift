@@ -535,8 +535,7 @@ struct HomeView: View {
         actions.start(MatchController.Setup(playerColor: side.color, level: level, timeControl: timeControl))
     }
 
-    /// Rooms: Online and A friend (when the app has them), a new game, the rivals, your games
-    /// and Settings.
+    /// Rooms: Online and A friend (when the app has them), a new game, the rivals and your games.
     private var shortcutList: [HomeShortcut] {
         let waiting: Int = challenges?.onlineWaiting ?? 0
         return HomeShortcutKind.list(online: challenges != nil).map { kind in
@@ -554,7 +553,6 @@ struct HomeView: View {
             hallStart = nil
             showingHall = true
         case .games: actions.rewind()
-        case .settings: actions.settings()
         }
     }
 
@@ -716,7 +714,7 @@ extension HomeView {
             } else {
                 actions.resume()
             }
-        }, playRival: { level in playRival(level) }, options: { level in actions.playRival(level) }, rivals: { level in
+        }, playRival: { level in playOtherRival(level) }, options: { level in actions.playRival(level) }, rivals: { level in
             hallStart = level
             hallIntro = false
             showingHall = true
@@ -742,14 +740,29 @@ extension HomeView {
             }
     }
 
-    /// Play on the next game. The first time you face a rival, its welcome film plays first and
-    /// its Begin starts the game (Alex, 2026-11-08: "you should see each intro video").
+    /// Play on the next game. Every time you face a rival, its welcome film plays first and its
+    /// Begin starts the game (Alex, 2026-11-09: "when I hit play on this rival, I should see the
+    /// intro video"). A swipe down on the film goes back.
     private func playNext(_ upNext: HomeUpNext) {
-        guard !upNext.inProgress, !upNext.isGrudge, !RivalIntros.seen(upNext.level) else {
+        guard !upNext.inProgress, !upNext.isGrudge else {
             primary(upNext)
             return
         }
-        hallStart = upNext.level
+        showFilm(upNext.level)
+    }
+
+    /// Play on another rival's page of the Up next card: its film first too. During a game the
+    /// New Game sheet opens on that rival instead, as before.
+    private func playOtherRival(_ level: MatchController.Level) {
+        guard !upNext.inProgress else {
+            playRival(level)
+            return
+        }
+        showFilm(level)
+    }
+
+    private func showFilm(_ level: MatchController.Level) {
+        hallStart = level
         hallIntro = true
         showingHall = true
     }

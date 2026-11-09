@@ -344,8 +344,7 @@ struct HomeJewelGold: View {
 /// the coach live on Today, so they are not repeated here. The rivals' hall joins them, the
 /// fifth room, as the review proposed once the hall landed.
 enum HomeShortcutKind: String, CaseIterable, Identifiable {
-    // Settings is the last room, so it doesn't hide behind the Rating number alone.
-    case online, friend, newGame, rivals, games, settings
+    case online, friend, newGame, rivals, games
 
     var id: String { rawValue }
 
@@ -363,7 +362,6 @@ enum HomeShortcutKind: String, CaseIterable, Identifiable {
         case .newGame: return "New game"
         case .rivals: return "Rivals"
         case .games: return "Your games"
-        case .settings: return "Settings"
         }
     }
 
@@ -375,7 +373,6 @@ enum HomeShortcutKind: String, CaseIterable, Identifiable {
         // The shield the hall's own door wore on Home.
         case .rivals: return "shield.lefthalf.filled"
         case .games: return Glyphs.games
-        case .settings: return Glyphs.settings
         }
     }
 
@@ -386,7 +383,6 @@ enum HomeShortcutKind: String, CaseIterable, Identifiable {
         case .newGame: return "Pick your side, clock and rival"
         case .rivals: return "The five rivals, and the one to beat next"
         case .games: return "Look back at the games you've played"
-        case .settings: return "Board look, sound, hints"
         }
     }
 }
@@ -411,16 +407,10 @@ struct HomeShortcutsPanel: View {
     /// Four to a row under the five rivals.
     static let perRow = 4
 
-    /// Rooms sit in one row up to five, and six (with Online and A friend) make two rows of
-    /// three; elsewhere, four to a row.
+    /// Rooms sit in one row, however many there are (four or five); elsewhere, four to a row.
     private var columns: [GridItem] {
-        let count: Int = asRooms ? Self.roomsPerRow(shortcuts.count) : Self.perRow
+        let count: Int = asRooms ? min(max(shortcuts.count, 1), 5) : Self.perRow
         return Array(repeating: GridItem(.flexible(), spacing: 0, alignment: .top), count: count)
-    }
-
-    /// How many rooms to a row: all of them up to five, then even rows.
-    static func roomsPerRow(_ count: Int) -> Int {
-        count <= 5 ? max(count, 1) : (count + 1) / 2
     }
 
     let tone: HomeTone

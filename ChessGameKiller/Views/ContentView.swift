@@ -10,6 +10,7 @@ struct ContentView: View {
     @State private var match = MatchController.live()
     @State private var showingNewGame = true
     @State private var showingSettings = false
+    @State private var confirmingResign = false
     @State private var showingAnalyze = false
     /// The analyzer, kept while the app runs: closing Analyze and opening it again finds the same board.
     @State private var analyzer = ScanSession(reader: CloudBoardReader.live, engine: StockfishEngine.shared,
@@ -788,8 +789,24 @@ struct ContentView: View {
                     Label("Settings", image: Glyphs.settings)
                 }
             }
+            // Resign is also here, not only in the dock's pull-up (Alex, 2026-11-09: "How to resign").
+            if match.canResign {
+                Section {
+                    Button(role: .destructive) {
+                        confirmingResign = true
+                    } label: {
+                        Label("Resign", systemImage: "flag.fill")
+                    }
+                }
+            }
         } label: {
             Label("More", systemImage: "ellipsis")
+        }
+        .confirmationDialog("Resign this game?", isPresented: $confirmingResign, titleVisibility: .visible) {
+            Button("Resign", role: .destructive) {
+                withAnimation(.snappy) { match.resign() }
+            }
+            Button("Keep playing", role: .cancel) {}
         }
     }
 

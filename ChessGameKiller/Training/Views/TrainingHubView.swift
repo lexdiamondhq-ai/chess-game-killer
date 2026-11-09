@@ -394,22 +394,12 @@ struct TodayCard: View {
 
 /// A small, still picture of a position on the player's board, from the side to move.
 struct BoardThumbnail: View {
+    let fen: String
     let theme: BoardTheme
-    @State private var game: GameModel
-    private let flipped: Bool
-
-    init(fen: String, theme: BoardTheme) {
-        self.theme = theme
-        let position = Position(fen: fen) ?? .standard
-        let model = GameModel(position: position)
-        model.humanColors = []
-        _game = State(initialValue: model)
-        flipped = position.sideToMove == .black
-    }
 
     var body: some View {
-        TrainingBoardView(game: game, theme: theme, flipped: flipped)
+        // The same stone and cut-out pieces as the game's board seen flat, turned for Black to move.
+        CutoutStillBoard(fen: fen, theme: theme, flipped: Position(fen: fen)?.sideToMove == .black)
             .allowsHitTesting(false)
-            .accessibilityHidden(true)
     }
 }
