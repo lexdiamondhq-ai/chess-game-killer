@@ -48,7 +48,8 @@ struct BoardView: View {
         .modifier(GhostVisionGesture(vision: vision, match: match, enabled: browsing == nil))
     }
 
-    /// Whether this look plays on the real 3D board, given the "3D pieces" setting.
+    /// Whether this look plays on the real 3D board. The setting was the "3D pieces" switch; it
+    /// has left Settings and is on for every player (see `SculptedSetting`).
     static func playsIn3D(_ theme: BoardTheme, setting: Bool) -> Bool {
         theme.sculptedLook != nil && setting && SculptedAssets.shared.isLoaded
     }
