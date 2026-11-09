@@ -453,6 +453,7 @@ struct HomeView: View {
         var state = HomeDailyState()
         state.streak = daily.streak
         state.doneToday = daily.doneToday
+        state.restDayUsed = daily.restDayUsed
         state.number = today?.number ?? 0
         state.difficulty = today?.difficulty ?? ""
         state.played = daily.playedTodaysMove

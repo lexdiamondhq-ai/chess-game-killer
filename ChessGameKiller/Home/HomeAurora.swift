@@ -431,13 +431,14 @@ struct HomeAuroraView: View {
         }
     }
 
-    /// Rating, level and streak, small in the header: serif figures over fine caps, parted by
+    /// Rating, rank and streak, small in the header: serif figures over fine caps, parted by
     /// gold hairlines. Each opens what it counts.
     private var numbers: some View {
         HStack(spacing: 0) {
             number(stage.rating.map { $0.formatted(.number) } ?? "New", label: "Rating", action: actions.stage.you)
             hairline
-            number("\(stage.rankNumber)", label: "Level", action: actions.stage.learn)
+            // Your training rank, Pawn to King. "Level" beside Rating read as the rival's level.
+            number("\(stage.rankNumber)", label: "Rank", action: actions.stage.learn)
             hairline
             number("\(stage.day.streak)", label: "Streak", action: actions.stage.dailyMove)
         }
@@ -508,6 +509,8 @@ struct HomeAuroraView: View {
     private var todayDetail: String {
         if stage.day.played { return "Back tomorrow for the next one" }
         let streak: Int = stage.day.streak
+        // The week's rest day is spent: a miss now ends the streak, so say so where it's kept.
+        if stage.day.restDayUsed { return "Rest day used. Keep your \(streak)-day streak" }
         return streak > 0 ? "Keep your \(streak)-day streak" : "One puzzle, the same for everyone"
     }
 
@@ -1571,8 +1574,13 @@ struct HomeAuroraTabBar: View {
         }
     }
 
+    /// The knight carries its name like the tabs do, so nobody has to guess what it opens.
     private var knight: some View {
-                Glyph(name: Glyphs.train, size: 32, weight: .bold)
+                VStack(spacing: 1) {
+                    Glyph(name: Glyphs.train, size: 27, weight: .bold)
+                    Text("Analyze")
+                        .font(.system(size: 9.5, weight: .semibold))
+                }
                     .foregroundStyle(Color(hex: 0x2A1C08))
                     .frame(width: 64, height: 64)
                     .background {

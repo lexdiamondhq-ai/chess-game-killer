@@ -42,6 +42,11 @@ final class DailyStore {
 
     var bestStreak: Int { max(state.streak.best, streak) }
 
+    /// The week's rest day is spent, so a miss now ends the streak.
+    func restDayUsed(on date: Date = .now) -> Bool { DailyRules.restDayUsed(state, on: date, calendar: calendar) }
+
+    var restDayUsed: Bool { restDayUsed() }
+
     /// The day's goal is met.
     func isDone(on date: Date = .now) -> Bool { DailyRules.isDone(state, on: date, calendar: calendar) }
 
