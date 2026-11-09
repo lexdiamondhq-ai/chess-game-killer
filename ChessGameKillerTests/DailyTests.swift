@@ -127,13 +127,36 @@ final class DailyTests: XCTestCase {
         XCTAssertEqual(record.streak.current, 7)
         XCTAssertEqual(milestones, [7])
         XCTAssertEqual(DailyRules.aliveThrough(record, calendar: calendar), "2026-10-09", "tomorrow, or the day after on the rest day")
+        XCTAssertFalse(DailyRules.restDayUsed(record, on: date("2026-10-08"), calendar: calendar), "still free")
         let afterRest = DailyRules.record(.game, in: record, at: date("2026-10-09"), calendar: calendar)
         XCTAssertTrue(afterRest.outcome.usedRestDay)
         XCTAssertEqual(afterRest.record.streak.current, 8)
         XCTAssertNil(afterRest.outcome.milestone, "a mark is earned once")
-        // The rest day is used up for the week: the next gap ends the streak.
+        // The rest day is used up for the week: Home says so, and the next gap ends the streak.
+        XCTAssertTrue(DailyRules.restDayUsed(afterRest.record, on: date("2026-10-09"), calendar: calendar))
         XCTAssertEqual(DailyRules.aliveThrough(afterRest.record, calendar: calendar), "2026-10-10")
         XCTAssertEqual(DailyRules.streak(afterRest.record, on: date("2026-10-11"), calendar: calendar), 0)
+        XCTAssertFalse(DailyRules.restDayUsed(afterRest.record, on: date("2026-10-11"), calendar: calendar), "no streak, nothing to spend")
+        // Kept up every day, the rest day is free again a week after it was spent.
+        var kept = afterRest.record
+        for offset in 1...5 {
+            let day = calendar.date(byAdding: .day, value: offset, to: date("2026-10-09"))!
+            kept = DailyRules.record(.game, in: kept, at: day, calendar: calendar).record
+        }
+        XCTAssertTrue(DailyRules.restDayUsed(kept, on: date("2026-10-14"), calendar: calendar))
+        XCTAssertFalse(DailyRules.restDayUsed(kept, on: date("2026-10-15"), calendar: calendar))
+        XCTAssertEqual(DailyRules.aliveThrough(kept, calendar: calendar), "2026-10-16", "the day after is covered again")
+    }
+
+    /// Home's streak line says when the week's rest day is spent, on every home.
+    func testHomeSaysWhenTheRestDayIsSpent() {
+        var state = HomeDailyState()
+        state.streak = 8
+        XCTAssertFalse(state.detail.hasPrefix("Rest day used"))
+        state.restDayUsed = true
+        XCTAssertTrue(state.detail.hasPrefix("Rest day used this week."), state.detail)
+        state.doneToday = true
+        XCTAssertFalse(state.detail.hasPrefix("Rest day used"), "once today is done, the day is safe")
     }
 
     func testTheTrainingStreakCarriesOverOnce() {

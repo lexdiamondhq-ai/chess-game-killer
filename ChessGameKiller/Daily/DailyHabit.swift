@@ -138,6 +138,16 @@ enum DailyRules {
         Trainer.isAlive(record.streak, on: date, calendar: calendar) ? record.streak.current : 0
     }
 
+    /// The week's rest day is spent: a missed day in the last seven was forgiven, so the next
+    /// miss ends the streak. False once the streak has lapsed or the week is up.
+    static func restDayUsed(_ record: DailyRecord, on date: Date, calendar: Calendar = .current) -> Bool {
+        guard streak(record, on: date, calendar: calendar) > 0,
+              let rest = record.streak.restDay, let restDate = Trainer.date(from: rest, calendar: calendar) else { return false }
+        let since = calendar.dateComponents([.day], from: calendar.startOfDay(for: restDate),
+                                            to: calendar.startOfDay(for: date)).day ?? 99
+        return since < 7
+    }
+
     /// The last day the streak still stands if nothing more is done: tomorrow, or the day after
     /// when the week's rest day is still free. Nil with no streak.
     static func aliveThrough(_ record: DailyRecord, calendar: Calendar = .current) -> String? {

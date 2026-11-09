@@ -194,11 +194,14 @@ final class HomeModelTests: XCTestCase {
 
     /// Rooms holds only what the Today page doesn't (Alex, 2026-11-08): the ways to play a
     /// person, a new game on your own side and clock, and your games. Today's Move, Puzzles,
-    /// Analyze and the coach are on Today, so they aren't repeated here. The rivals' hall is the fifth.
+    /// Analyze and the coach are on Today, so they aren't repeated here. The rivals' hall is the
+    /// fifth, and Settings the last, so it doesn't hide behind the Rating number alone.
     func testRoomsHoldOnlyWhatTodayDoesNot() {
         let rooms = HomeShortcutKind.list(online: true)
-        XCTAssertEqual(rooms, [.online, .friend, .newGame, .rivals, .games])
-        XCTAssertLessThanOrEqual(rooms.count, 5, "One row")
+        XCTAssertEqual(rooms, [.online, .friend, .newGame, .rivals, .games, .settings])
+        XCTAssertEqual(HomeShortcutsPanel.roomsPerRow(rooms.count), 3, "Six rooms make two even rows")
+        XCTAssertEqual(HomeShortcutsPanel.roomsPerRow(5), 5, "Up to five sit in one row")
+        XCTAssertEqual(HomeShortcutsPanel.roomsPerRow(4), 4)
         XCTAssertEqual(Set(rooms.map(\.title)).count, rooms.count, "Each has a name of its own")
         for kind in rooms {
             XCTAssertFalse(kind.glyph.isEmpty, "\(kind.title) has an icon")
@@ -208,7 +211,7 @@ final class HomeModelTests: XCTestCase {
 
     /// With no other players to reach, Online and A friend are left out and the rest keep their order.
     func testWithoutOtherPlayersRoomsKeepTheRest() {
-        XCTAssertEqual(HomeShortcutKind.list(online: false), [.newGame, .rivals, .games])
+        XCTAssertEqual(HomeShortcutKind.list(online: false), [.newGame, .rivals, .games, .settings])
     }
 
     /// The app has one home: a switch for an earlier home turned off before goes back to its default.

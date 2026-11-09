@@ -246,6 +246,9 @@ struct HomeAnalyzeTile: View {
 struct HomeDailyState: Equatable {
     var streak = 0
     var doneToday = false
+    /// The week's rest day is spent: a missed day in the last seven was forgiven, so the next
+    /// miss ends the streak.
+    var restDayUsed = false
     /// Today's Move: its number, how hard, whether it was played and found.
     var number = 0
     var difficulty = ""
@@ -267,6 +270,7 @@ struct HomeDailyState: Equatable {
             let left = DailyRules.puzzlesForTheDay - puzzlesToday
             return "\(left) more \(left == 1 ? "puzzle" : "puzzles"), one game or Today's Move keeps it."
         }
+        if restDayUsed { return "Rest day used this week. One game, Today's Move or 3 puzzles keeps it going." }
         return streak > 0 ? "One game, Today's Move or 3 puzzles keeps it going."
             : "One game, Today's Move or 3 puzzles starts a streak."
     }

@@ -446,6 +446,7 @@ struct HomeView: View {
         var state = HomeDailyState()
         state.streak = daily.streak
         state.doneToday = daily.doneToday
+        state.restDayUsed = daily.restDayUsed
         state.number = today?.number ?? 0
         state.difficulty = today?.difficulty ?? ""
         state.played = daily.playedTodaysMove
@@ -534,7 +535,8 @@ struct HomeView: View {
         actions.start(MatchController.Setup(playerColor: side.color, level: level, timeControl: timeControl))
     }
 
-    /// Rooms: Online and A friend (when the app has them), a new game, the rivals and your games.
+    /// Rooms: Online and A friend (when the app has them), a new game, the rivals, your games
+    /// and Settings.
     private var shortcutList: [HomeShortcut] {
         let waiting: Int = challenges?.onlineWaiting ?? 0
         return HomeShortcutKind.list(online: challenges != nil).map { kind in
@@ -552,6 +554,7 @@ struct HomeView: View {
             hallStart = nil
             showingHall = true
         case .games: actions.rewind()
+        case .settings: actions.settings()
         }
     }
 
