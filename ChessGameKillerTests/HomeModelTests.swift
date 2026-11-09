@@ -122,6 +122,24 @@ final class HomeModelTests: XCTestCase {
         XCTAssertEqual(HomeLadder.elo([(1000, 0), (1000, 0), (1000, 0)]), 1113, "Losing to a weaker rival costs most")
     }
 
+    /// The count starts where the welcome's answer put the player (audit, 2026-11-09), so a club
+    /// player's first number isn't a beginner's; an install that never answered starts at 1,200.
+    func testTheRatingStartsWhereTheWelcomeSaid() {
+        XCTAssertEqual(HomeLadder.elo([(1500, 1), (1500, 1), (1500, 0)], from: 1800), 1778)
+        XCTAssertEqual(HomeLadder.elo([(1000, 0), (1000, 0), (1000, 0)], from: 1000), 943)
+        let suite = "HomeLadderStart"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        XCTAssertEqual(HomeLadder.savedStart(defaults), 1200)
+        WelcomeChoice(experience: .club, look: .gilded).apply(defaults)
+        XCTAssertEqual(HomeLadder.savedStart(defaults), 1800)
+        let club = HomeLadder(games: HomeSample.games(), start: HomeLadder.savedStart(defaults))
+        let anyone = HomeLadder(games: HomeSample.games(), start: HomeLadder.startingRating)
+        XCTAssertGreaterThan(club.yourRating ?? 0, anyone.yourRating ?? 0, "The same games count from higher up")
+        XCTAssertEqual(club.gamesCounted, anyone.gamesCounted)
+        defaults.removePersistentDomain(forName: suite)
+    }
+
     /// Losing can never raise your rating, however strong the rival (Alex, 2026-11-09: the old
     /// performance formula made ten losses to Lionheart read 1,600).
     func testLosingToAStrongRivalNeverRaisesYourRating() {
