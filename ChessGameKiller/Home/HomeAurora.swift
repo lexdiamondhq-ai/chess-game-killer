@@ -888,7 +888,7 @@ struct HomeAuroraDNA: View {
                 Text(detail)
                     .font(.system(size: 12.5))
                     .foregroundStyle(palette.ink2)
-                    .lineLimit(2)
+                    .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
