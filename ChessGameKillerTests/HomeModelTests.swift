@@ -107,8 +107,9 @@ final class HomeModelTests: XCTestCase {
         XCTAssertEqual(ladder.rungs[MatchController.Level.expert.rawValue].standing, .behind)
         XCTAssertEqual(ladder.nextToBeat, .expert, "The gentlest rival you don't lead yet")
         XCTAssertEqual(ladder.gamesCounted, 9)
-        // Average 1600, five wins and three losses over nine games: about 1689, so 1700.
-        XCTAssertEqual(ladder.yourRating, 1700)
+        // From 1200: five wins (four over stronger or equal rivals), a draw, three losses
+        // to stronger rivals. About 1338; games on the same day may fall in either order.
+        XCTAssertEqual(Double(ladder.yourRating ?? 0), 1338, accuracy: 3)
     }
 
     func testANewPlayerHasNoRatingYet() {
@@ -116,10 +117,17 @@ final class HomeModelTests: XCTestCase {
         XCTAssertNil(empty.yourRating)
         XCTAssertEqual(empty.nextToBeat, .beginner)
         XCTAssertTrue(empty.rungs.allSatisfy { $0.standing == .notPlayed && $0.score == nil })
-        XCTAssertNil(HomeLadder.performance([(1500, 1), (1500, 1)]), "Two games say too little")
-        XCTAssertEqual(HomeLadder.performance([(1500, 1), (1500, 1), (1500, 0)]), 1650)
-        XCTAssertEqual(HomeLadder.performance([(3000, 1), (3000, 1), (3000, 1)]), 3000, "Never above Singularity")
-        XCTAssertEqual(HomeLadder.performance([(800, 0), (800, 0), (800, 0)]), 400)
+        XCTAssertNil(HomeLadder.elo([(1500, 1), (1500, 1)]), "Two games say too little")
+        XCTAssertEqual(HomeLadder.elo([(1500, 1), (1500, 1), (1500, 0)]), 1259)
+        XCTAssertEqual(HomeLadder.elo([(1000, 0), (1000, 0), (1000, 0)]), 1113, "Losing to a weaker rival costs most")
+    }
+
+    /// Losing can never raise your rating, however strong the rival (Alex, 2026-11-09: the old
+    /// performance formula made ten losses to Lionheart read 1,600).
+    func testLosingToAStrongRivalNeverRaisesYourRating() {
+        let losses = Array(repeating: (rating: 2000, score: 0.0), count: 10)
+        XCTAssertEqual(HomeLadder.elo(losses), 1196)
+        XCTAssertLessThanOrEqual(HomeLadder.elo(Array(repeating: (2500, 0.0), count: 5)) ?? .max, 1200)
     }
 
     func testUnfinishedGamesDoNotCount() {
