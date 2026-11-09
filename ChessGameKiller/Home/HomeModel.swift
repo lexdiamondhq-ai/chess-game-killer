@@ -169,7 +169,8 @@ struct HomeLadder: Equatable {
     init(games: [SavedGame]) {
         var rungs = MatchController.Level.allCases.map { Rung(level: $0) }
         var counted: [(rating: Int, score: Double)] = []
-        for game in games {
+        // Oldest first, since each game moves the rating from where the one before left it.
+        for game in games.sorted(by: { $0.date < $1.date }) {
             guard let raw = game.level, let level = MatchController.Level(rawValue: raw),
                   !Rival.isGrudge(opponent: game.opponent) else { continue }
             switch game.result {
@@ -189,20 +190,25 @@ struct HomeLadder: Equatable {
         self.rungs = rungs
         nextToBeat = rungs.first { $0.standing != .ahead }?.level
         gamesCounted = counted.count
-        yourRating = Self.performance(counted)
+        yourRating = Self.elo(counted)
     }
 
-    /// The rating your results are worth, the way tournaments estimate it: the average
-    /// rating you played, plus 400 for each win more than losses, over the games.
-    /// Rounded to 50, since a handful of games can't say more.
-    static func performance(_ results: [(rating: Int, score: Double)]) -> Int? {
+    /// Where everyone starts: about a casual weekend player.
+    static let startingRating = 1200.0
+
+    /// Your Elo, game by game from the first: a win raises it, a loss lowers it, and by more
+    /// the more surprising the result (beating a stronger rival, losing to a weaker one).
+    /// The first 20 games move it faster (K 40, then 20), as FIDE does while a rating settles.
+    /// Losing to a far stronger rival costs little but can never raise it.
+    static func elo(_ results: [(rating: Int, score: Double)]) -> Int? {
         guard results.count >= minimumGamesForRating else { return nil }
-        let n = Double(results.count)
-        let average = Double(results.map(\.rating).reduce(0, +)) / n
-        let margin = results.map { ($0.score - 0.5) * 2 }.reduce(0, +)
-        let raw = average + 400 * margin / n
-        let rounded = Int((raw / 50).rounded()) * 50
-        return min(max(rounded, 400), 3000)
+        var rating = startingRating
+        for (index, result) in results.enumerated() {
+            let expected = 1 / (1 + pow(10, (Double(result.rating) - rating) / 400))
+            let k: Double = index < 20 ? 40 : 20
+            rating += k * (result.score - expected)
+        }
+        return min(max(Int(rating.rounded()), 400), 3000)
     }
 
     /// "3", "½" or "2½".
