@@ -80,17 +80,39 @@ enum RivalIntros {
 struct RivalLadder {
     /// Lowercased names of every opponent beaten.
     let beatenNames: Set<String>
+    /// The rival the welcome picked for the first game, from how much chess the player said
+    /// they had played. Every rival up to it is open from the start, so the welcome's promise
+    /// ("First rival: The Lionheart") holds past that first game, and a club player needn't
+    /// beat three weaker rivals before meeting the one they were given. The Cub for a new
+    /// player, and the climb above the start still goes one rival at a time.
+    var start: MatchController.Level = RivalLadder.gate
     /// Every rival open, no climb: Premium players, and the app's own test builds (Alex,
     /// 2026-11-08: "should we open it all to premium users?").
     var allOpen = false
 
-    init(beatenNames: Set<String>, allOpen: Bool = false) {
+    init(beatenNames: Set<String>, start: MatchController.Level = RivalLadder.gate, allOpen: Bool = false) {
         self.beatenNames = beatenNames
+        self.start = start
         self.allOpen = allOpen
     }
 
     init(defaults: UserDefaults = .standard) {
-        self.init(beatenNames: RivalBoardsEarned.names(defaults), allOpen: Self.opensEverything(defaults))
+        self.init(beatenNames: RivalBoardsEarned.names(defaults), start: Self.savedStart(defaults),
+                  allOpen: Self.opensEverything(defaults))
+    }
+
+    /// Where the welcome's pick is kept.
+    static let startKey = "rivals.startLevel"
+
+    static func savedStart(_ defaults: UserDefaults) -> MatchController.Level {
+        (defaults.object(forKey: startKey) as? Int).flatMap { MatchController.Level(rawValue: $0) } ?? gate
+    }
+
+    /// Remembers the rival the welcome picked. A weaker pick on a replayed welcome never
+    /// locks a rival again.
+    static func noteStart(_ level: MatchController.Level, _ defaults: UserDefaults = .standard) {
+        guard level.rawValue > savedStart(defaults).rawValue else { return }
+        defaults.set(level.rawValue, forKey: startKey)
     }
 
     /// Premium (remembered at launch, as Premium itself reads it) opens every rival. Debug
@@ -115,15 +137,18 @@ struct RivalLadder {
     }
 
     func isOpen(_ level: MatchController.Level) -> Bool {
-        guard !allOpen, level.rawValue > Self.gate.rawValue,
+        guard !allOpen, level.rawValue > max(Self.gate.rawValue, start.rawValue),
               let previous = MatchController.Level(rawValue: level.rawValue - 1) else { return true }
         return beaten(previous.rival)
     }
 
-    /// The rival the hall opens on: the first open one not yet beaten, or the strongest open one.
+    /// The rival the hall opens on: the first open one not yet beaten, counting from where the
+    /// climb started (the rivals below the welcome's pick were passed over, not lost to), or
+    /// the strongest open one.
     var current: MatchController.Level {
         let open = MatchController.Level.allCases.filter(isOpen)
-        return open.first { !beaten($0.rival) } ?? open.last ?? .beginner
+        let unbeaten = open.filter { !beaten($0.rival) }
+        return unbeaten.first { $0.rawValue >= start.rawValue } ?? unbeaten.first ?? open.last ?? .beginner
     }
 }
 
