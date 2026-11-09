@@ -136,7 +136,7 @@ final class HomeSnapshotTests: XCTestCase {
         }
     }
 
-    /// For today with Today's Move first and your finest move as a row the size of Puzzles; Rooms
+    /// For today with Today's Move first and your finest move's large card under it; Rooms
     /// with Your Grudge beside the rivals, two rows of three; and Your Grudge's own room (Alex,
     /// 2026-11-09). By day and by night.
     func testForTodayRoomsAndTheGrudgesRoom() throws {
@@ -158,7 +158,7 @@ final class HomeSnapshotTests: XCTestCase {
                                   accent: palette.rose, palette: palette, action: {}) {
                         HomeAuroraEmblem(glyph: Glyphs.today, fill: HomeAuroraPalette.roseTile)
                     }
-                    HomeAuroraFinestRow(finest: finest, palette: palette, replay: {})
+                    HomeAuroraFinestMove(finest: finest, palette: palette, replay: {})
                     HomeAuroraRow(eyebrow: "Puzzles", title: "Sharpen your eye", detail: "Tactics at your level, one after another",
                                   accent: palette.violet, palette: palette, action: {}) {
                         HomeAuroraEmblem(glyph: Glyphs.puzzles, fill: HomeAuroraPalette.violetTile)

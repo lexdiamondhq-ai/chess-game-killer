@@ -507,10 +507,11 @@ struct HomeAuroraView: View {
                       accent: palette.rose, palette: palette, action: actions.stage.dailyMove) {
             HomeAuroraEmblem(glyph: Glyphs.today, fill: HomeAuroraPalette.roseTile)
         }
-        // Today's Move leads For today; your finest move follows as a row like Puzzles (Alex,
-        // 2026-11-09: "the finest move should be below in the same size area as the puzzles").
+        // Today's Move leads For today; your finest move follows in its own large gold-framed
+        // card (Alex, 2026-11-09: "For Today should be todays move, the finest move should be
+        // below"; "I want the for Today to still have the larger card view").
         if let finest = info.finest {
-            HomeAuroraFinestRow(finest: finest, palette: palette) { actions.replay(finest.gameID) }
+            HomeAuroraFinestMove(finest: finest, palette: palette) { actions.replay(finest.gameID) }
         }
         HomeAuroraRow(eyebrow: "Puzzles", title: "Sharpen your eye", detail: "Tactics at your level, one after another",
                       accent: palette.violet, palette: palette, action: actions.puzzles) {
