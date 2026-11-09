@@ -63,6 +63,17 @@ enum Experience: String, CaseIterable, Identifiable {
     /// New players see the coach's best move lit on the board; everyone else plays on their own.
     var showsHints: Bool { self == .new }
 
+    /// About where a player who answered this is rated: where the Home rating starts counting,
+    /// so a club player's first number isn't a beginner's (audit, 2026-11-09).
+    var startingRating: Int {
+        switch self {
+        case .new: return 1000
+        case .casual: return 1200
+        case .regular: return 1500
+        case .club: return 1800
+        }
+    }
+
     /// The line under the title: who they'll meet first.
     var detail: String {
         let rival = level.rival
@@ -82,6 +93,8 @@ struct WelcomeChoice: Equatable {
         // The pick opens every rival up to it, so it stays the next game after the first one
         // too, instead of the ladder sending the player back to the Cub.
         RivalLadder.noteStart(experience.level, defaults)
+        // The Home rating counts from about where the answer puts the player.
+        defaults.set(experience.startingRating, forKey: HomeLadder.startKey)
         defaults.set(look.rawValue, forKey: "boardTheme")
         defaults.set(experience.showsHints, forKey: "showBestMoves")
     }

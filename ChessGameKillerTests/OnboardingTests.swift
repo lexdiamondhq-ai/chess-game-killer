@@ -40,6 +40,7 @@ final class OnboardingTests: XCTestCase {
         XCTAssertEqual(defaults.string(forKey: "boardTheme"), "midnight")
         XCTAssertTrue(defaults.bool(forKey: "showBestMoves"), "New players see the best move")
         XCTAssertEqual(choice.setup(defaults).level, .beginner)
+        XCTAssertEqual(HomeLadder.savedStart(defaults), 1000, "The rating counts from a learner's")
 
         WelcomeChoice(experience: .club, look: .gilded).apply(defaults)
         XCTAssertEqual(defaults.integer(forKey: "setup.level"), MatchController.Level.expert.rawValue)
@@ -47,12 +48,14 @@ final class OnboardingTests: XCTestCase {
         // The rival the welcome promised is the one the next game is against, not the Cub.
         XCTAssertEqual(NewGameSheet.savedSetup(defaults).level, .expert)
         XCTAssertTrue(RivalLadder(defaults: defaults).isOpen(.expert))
+        XCTAssertEqual(HomeLadder.savedStart(defaults), 1800, "A club player's rating counts from a club player's")
     }
 
     func testEveryLevelLeadsToADifferentRival() {
         let levels = Experience.allCases.map(\.level)
         XCTAssertEqual(Set(levels).count, levels.count)
         XCTAssertEqual(levels.first, .beginner)
+        XCTAssertEqual(Experience.allCases.map(\.startingRating), [1000, 1200, 1500, 1800], "More chess, a higher start")
     }
 
     func testTheWelcomeOffersOnlyFreeLooks() {
