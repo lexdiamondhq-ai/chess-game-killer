@@ -136,7 +136,7 @@ final class HomeSnapshotTests: XCTestCase {
         }
     }
 
-    /// For today with Today's Move first and your finest move's large card under it; Rooms
+    /// For today with Today's Move in the large card and your finest move as a row under it; Rooms
     /// with Your Grudge beside the rivals, two rows of three; and Your Grudge's own room (Alex,
     /// 2026-11-09). By day and by night.
     func testForTodayRoomsAndTheGrudgesRoom() throws {
@@ -154,11 +154,9 @@ final class HomeSnapshotTests: XCTestCase {
             let page = VStack(spacing: 0) {
                 HomeAuroraSection(title: "For today", palette: palette)
                 VStack(spacing: 10) {
-                    HomeAuroraRow(eyebrow: "Today's Move", title: "White to play and win", detail: "Keep your 5-day streak",
-                                  accent: palette.rose, palette: palette, action: {}) {
-                        HomeAuroraEmblem(glyph: Glyphs.today, fill: HomeAuroraPalette.roseTile)
-                    }
-                    HomeAuroraFinestMove(finest: finest, palette: palette, replay: {})
+                    HomeAuroraTodayCard(fen: finest.fen, flipped: false, title: "White to play and win",
+                                        detail: "Keep your 5-day streak", played: false, palette: palette, open: {})
+                    HomeAuroraFinestRow(finest: finest, palette: palette, replay: {})
                     HomeAuroraRow(eyebrow: "Puzzles", title: "Sharpen your eye", detail: "Tactics at your level, one after another",
                                   accent: palette.violet, palette: palette, action: {}) {
                         HomeAuroraEmblem(glyph: Glyphs.puzzles, fill: HomeAuroraPalette.violetTile)

@@ -503,15 +503,15 @@ struct HomeAuroraView: View {
 
     @ViewBuilder
     private var todayRows: some View {
-        HomeAuroraRow(eyebrow: "Today's Move", title: todayTitle, detail: todayDetail,
-                      accent: palette.rose, palette: palette, action: actions.stage.dailyMove) {
-            HomeAuroraEmblem(glyph: Glyphs.today, fill: HomeAuroraPalette.roseTile)
-        }
-        // Today's Move leads For today; your finest move follows in its own large gold-framed
-        // card (Alex, 2026-11-09: "For Today should be todays move, the finest move should be
-        // below"; "I want the for Today to still have the larger card view").
+        // Today's Move leads For today in the large gold-framed card; your finest move follows
+        // as a row the size of Puzzles (Alex, 2026-11-09: "For Today should be todays move, the
+        // finest move should be below in the same size area as the puzzles format"; "still have
+        // the larger card view"; "just say todays move instead of your finest move").
+        HomeAuroraTodayCard(fen: stage.todayFEN, flipped: stage.todaySolver == .black, title: todayTitle,
+                            detail: todayDetail, played: stage.day.played, palette: palette,
+                            open: actions.stage.dailyMove)
         if let finest = info.finest {
-            HomeAuroraFinestMove(finest: finest, palette: palette) { actions.replay(finest.gameID) }
+            HomeAuroraFinestRow(finest: finest, palette: palette) { actions.replay(finest.gameID) }
         }
         HomeAuroraRow(eyebrow: "Puzzles", title: "Sharpen your eye", detail: "Tactics at your level, one after another",
                       accent: palette.violet, palette: palette, action: actions.puzzles) {

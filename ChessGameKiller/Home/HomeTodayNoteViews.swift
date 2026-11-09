@@ -1,62 +1,79 @@
 import SwiftUI
 import UIKit
 
-/// The player's finest move of the week, hung in a gold frame: the position before it with the
-/// move as a Dusk Blue arrow, the move in serif, against whom and when, and Replay and Share.
-struct HomeAuroraFinestMove: View {
-    let finest: HomeFinestMove
+/// Today's Move in the large card For today opens with (Alex, 2026-11-09: "For Today should be
+/// todays move"; "still have the larger card view"; "just say todays move"): the day's position
+/// in a gold frame, whose move it is in serif, the streak line, and Play. A tap anywhere opens it.
+struct HomeAuroraTodayCard: View {
+    let fen: String?
+    let flipped: Bool
+    let title: String
+    let detail: String
+    /// Played today: the card offers to see how it went instead of Play.
+    let played: Bool
     let palette: HomeAuroraPalette
-    let replay: () -> Void
-
-    @State private var picture: Image?
+    let open: () -> Void
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
-        HStack(spacing: 14) {
-            HomeFinestMoveFrame(finest: finest, side: 112)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("YOUR FINEST MOVE THIS WEEK")
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(1.2)
-                    .foregroundStyle(palette.gold)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                Text(finest.move)
-                    .font(.system(size: 26, weight: .regular, design: .serif))
-                    .foregroundStyle(palette.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                Text(finest.detail)
-                    .font(.system(size: 12.5))
-                    .foregroundStyle(palette.ink2)
-                    .lineLimit(3)
-                    .fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: 8) {
-                    Button(action: replay) { pill("Replay", symbol: "play.fill") }
-                        .buttonStyle(HomeStagePress())
-                    if let picture {
-                        ShareLink(item: picture, preview: SharePreview("My finest move: \(finest.move)", image: picture)) {
-                            pill("Share", symbol: "square.and.arrow.up")
-                        }
-                        .buttonStyle(HomeStagePress())
-                    }
+        Button(action: open) {
+            HStack(spacing: 14) {
+                frame(side: 112)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("TODAY'S MOVE")
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(1.2)
+                        .foregroundStyle(palette.gold)
+                        .lineLimit(1)
+                    Text(title)
+                        .font(.system(size: 24, weight: .regular, design: .serif))
+                        .foregroundStyle(palette.ink)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.7)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(detail)
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(palette.ink2)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                    pill(played ? "See it" : "Play", symbol: played ? "checkmark" : "play.fill")
+                        .padding(.top, 6)
                 }
-                .padding(.top, 6)
+                Spacer(minLength: 0)
             }
-            Spacer(minLength: 0)
+            .padding(14)
+            .frame(maxWidth: .infinity)
+            .background(shape.fill(palette.card))
+            .background(alignment: .topLeading) {
+                // A warm gold light from the frame's corner.
+                RadialGradient(colors: [palette.gold.opacity(palette.dark ? 0.18 : 0.14), palette.gold.opacity(0)],
+                               center: .topLeading, startRadius: 0, endRadius: 220)
+                    .clipShape(shape)
+                    .allowsHitTesting(false)
+            }
+            .overlay(shape.strokeBorder(palette.gold.opacity(0.32), lineWidth: 1))
+            .contentShape(shape)
         }
-        .padding(14)
-        .frame(maxWidth: .infinity)
-        .background(shape.fill(palette.card))
-        .background(alignment: .topLeading) {
-            // A warm gold light from the frame's corner.
-            RadialGradient(colors: [palette.gold.opacity(palette.dark ? 0.18 : 0.14), palette.gold.opacity(0)],
-                           center: .topLeading, startRadius: 0, endRadius: 220)
-                .clipShape(shape)
-                .allowsHitTesting(false)
-        }
-        .overlay(shape.strokeBorder(palette.gold.opacity(0.32), lineWidth: 1))
-        .task(id: finest.gameID.uuidString + finest.uci) { picture = render() }
+        .buttonStyle(HomeStagePress())
+        .accessibilityElement(children: .combine)
+        .accessibilityHint(played ? "Shows how today's move went" : "Opens today's move")
+    }
+
+    private func frame(side: CGFloat) -> some View {
+        let pad: CGFloat = side * 0.055
+        return HomeAuroraBoard(fen: fen, flipped: flipped, lit: false)
+            .frame(width: side - 2 * pad, height: side - 2 * pad)
+            .padding(pad)
+            .background(
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(LinearGradient(stops: [.init(color: Color(hex: 0xF3D99A), location: 0),
+                                                 .init(color: Color(hex: 0x9C6B2C), location: 0.45),
+                                                 .init(color: Color(hex: 0xE9C47C), location: 0.7),
+                                                 .init(color: Color(hex: 0x7E5520), location: 1)],
+                                         startPoint: .topLeading, endPoint: .bottomTrailing))
+            )
+            .shadow(color: .black.opacity(0.45), radius: 12, y: 8)
+            .accessibilityHidden(true)
     }
 
     private func pill(_ title: String, symbol: String) -> some View {
@@ -70,10 +87,41 @@ struct HomeAuroraFinestMove: View {
         .padding(.horizontal, 11)
         .frame(height: 28)
         .overlay(Capsule().strokeBorder(palette.gold.opacity(0.45), lineWidth: 1))
-        .contentShape(Capsule())
+    }
+}
+
+/// Your finest move of the week as one of today's rows, the size of Puzzles: the framed move at
+/// the right. A tap replays it; a press and hold shares the picture.
+struct HomeAuroraFinestRow: View {
+    let finest: HomeFinestMove
+    let palette: HomeAuroraPalette
+    let replay: () -> Void
+
+    @State private var picture: Image?
+
+    var body: some View {
+        HomeAuroraRow(eyebrow: "Your finest move", title: finest.move, detail: who,
+                      accent: palette.gold, palette: palette, action: replay) {
+            HomeFinestMoveFrame(finest: finest, side: 64)
+        }
+        .accessibilityHint("Replays the game at this move")
+        .contextMenu {
+            Button(action: replay) { Label("Replay", systemImage: "play.fill") }
+            if let picture {
+                ShareLink(item: picture, preview: SharePreview("My finest move: \(finest.move)", image: picture)) {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                }
+            }
+        }
+        .task(id: finest.gameID.uuidString + finest.uci) { picture = render() }
     }
 
-    /// The picture to share: the framed move on the dark room, with the move and the app's name.
+    /// The row has one line: who it was against and when ("Against the Hunter, yesterday.").
+    private var who: String {
+        guard let end = finest.detail.range(of: ". ") else { return finest.detail }
+        return String(finest.detail[..<end.lowerBound]) + "."
+    }
+
     @MainActor
     private func render() -> Image? {
         let renderer = ImageRenderer(content: HomeFinestMoveCard(finest: finest))
