@@ -181,6 +181,9 @@ struct OnlineLobbyView: View {
         .padding(.bottom, 8)
         .frame(maxWidth: 560)
         .frame(maxWidth: .infinity)
+        // The same frosted bar as under "Create challenge": without it the list scrolled on
+        // behind the button, and the two seats sat on top of the fair-play card's words.
+        .background { ChallengeBarBackground() }
         .animation(.snappy(duration: 0.25), value: lobby.problem)
     }
 }

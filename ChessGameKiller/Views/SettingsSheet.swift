@@ -66,20 +66,18 @@ struct SettingsSheet: View {
                         // (Alex, 2026-11-08: "Remove the rival options").
                         themeGrid(Self.looks)
                         SettingsGroup(theme: theme) {
+                            // The "3D pieces" switch is gone (Alex, 2026-11-09: retire the old flat
+                            // board). A look with a 3D board always plays on it, Tilted or Flat;
+                            // SculptedSetting.settle() puts anyone who turned it off back.
                             if theme.sculptedLook != nil {
-                                ToggleRow(title: "3D pieces", subtitle: "Carved pieces that lift, glide and fall. Off draws the same set flat.",
-                                          symbol: "cube", isOn: $sculpted3D, theme: theme)
-                                rule
-                                if sculpted3D {
-                                    PickerRow(title: "Board view", subtitle: tilt.blurb, symbol: "perspective", theme: theme) {
-                                        Picker("Board view", selection: $tilt) {
-                                            ForEach(BoardTilt.allCases) { choice in
-                                                Text(choice.title).tag(choice)
-                                            }
+                                PickerRow(title: "Board view", subtitle: tilt.blurb, symbol: "perspective", theme: theme) {
+                                    Picker("Board view", selection: $tilt) {
+                                        ForEach(BoardTilt.allCases) { choice in
+                                            Text(choice.title).tag(choice)
                                         }
                                     }
-                                    rule
                                 }
+                                rule
                             }
                             ToggleRow(title: "Coordinates", subtitle: "The letters and numbers along the board's edge. Off hides them.",
                                       symbol: "textformat.abc", isOn: $coordinatesOn, theme: theme)

@@ -17,6 +17,10 @@ struct BoardView: View {
     var vision: GhostVision?
     /// How the 3D board is seen: Flat looks from above, each piece inside its square.
     var framing: SculptedCamera.Framing = .standing
+    /// The ink for the letters and numbers in the flat board's frame, where the page behind the
+    /// board can be light (a friend game in Light). Nil keeps the look's pale ink, as in a game
+    /// against the computer, whose screen is always dark.
+    var frameLabel: Color?
 
     @AppStorage("haptics") private var hapticsOn = true
     /// The player's army, so veteran pieces show their glow and scar.
@@ -44,7 +48,8 @@ struct BoardView: View {
         .modifier(GhostVisionGesture(vision: vision, match: match, enabled: browsing == nil))
     }
 
-    /// Whether this look plays on the real 3D board, given the "3D pieces" setting.
+    /// Whether this look plays on the real 3D board. The setting was the "3D pieces" switch; it
+    /// has left Settings and is on for every player (see `SculptedSetting`).
     static func playsIn3D(_ theme: BoardTheme, setting: Bool) -> Bool {
         theme.sculptedLook != nil && setting && SculptedAssets.shared.isLoaded
     }
@@ -100,7 +105,7 @@ struct BoardView: View {
                 .frame(width: sq * 8, height: sq * 8)
                 .padding(inset)
             if theme.boardArt != nil, showsCoordinates {
-                FrameCoordinates(flipped: flipped, inset: inset, squareSize: sq, color: theme.labelOnDark)
+                FrameCoordinates(flipped: flipped, inset: inset, squareSize: sq, color: frameLabel ?? theme.labelOnDark)
             }
         }
         .frame(width: side, height: side)

@@ -249,6 +249,15 @@ final class HomeModelTests: XCTestCase {
         XCTAssertTrue(HomeLayout.usesSheet(defaults))
     }
 
+    /// The "3D pieces" switch left Settings: one turned off before goes back to its default, on.
+    func testEveryoneLandsOnTheStoneBoard() {
+        let defaults = UserDefaults(suiteName: "SculptedSettingTests")!
+        defer { defaults.removePersistentDomain(forName: "SculptedSettingTests") }
+        defaults.set(false, forKey: SculptedSetting.key)
+        SculptedSetting.settle(defaults)
+        XCTAssertNil(defaults.object(forKey: SculptedSetting.key))
+    }
+
     // MARK: Helpers
 
     private func game(_ level: MatchController.Level, _ result: SavedGame.Result) -> SavedGame {

@@ -43,21 +43,43 @@ struct ExecutivePlate: View {
     private var green: Color { theme.isDark ? Color(hex: 0x5CCB94) : Color(hex: 0x1C7A4E) }
 
     private var dockLine: some View {
-        HStack(spacing: 8) {
-            dockStatus
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel(spokenLabel)
-            Spacer(minLength: 4)
+        HStack(spacing: 0) {
             if let clock = match.clock {
-                ExecutiveClock(clock: clock, color: color, owner: clockOwner, theme: theme)
-                    .fixedSize()
-                    .layoutPriority(2)
+                timedDockStatus(clock)
+            } else {
+                dockStatus
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(spokenLabel)
             }
+            Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .dynamicTypeSize(...DynamicTypeSize.xLarge)
         .animation(.snappy(duration: 0.3), value: isActive)
         .animation(.snappy(duration: 0.3), value: inCheck)
+    }
+
+    /// In a timed game the words keep the line's whole width and your clock sits under them,
+    /// with what you have taken beside it. Side by side, the clock left the words room for a
+    /// few letters: "Your move" read "You…" and a grade "Mis…".
+    private func timedDockStatus(_ clock: ChessClock) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            dockWords
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(spokenLabel)
+            HStack(spacing: 8) {
+                // The clock is its own element, so VoiceOver reads its time as it stands.
+                ExecutiveClock(clock: clock, color: color, owner: clockOwner, theme: theme, slim: true)
+                    .fixedSize()
+                    .layoutPriority(2)
+                if hasCaptures {
+                    CapturedPieces(match: match, by: color)
+                        .transition(.opacity)
+                }
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: selectedArmyPiece?.name)
+        .animation(.snappy(duration: 0.3), value: hasCaptures)
     }
 
     private var card: some View {
@@ -150,15 +172,7 @@ struct ExecutivePlate: View {
     /// lead on their own line under it, as on the rival's card above (Alex, 2026-11-08).
     private var dockStatus: some View {
         VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 6) {
-                if inCheck {
-                    CheckTag(color: theme.check)
-                        .transition(.scale.combined(with: .opacity))
-                }
-                PlateRemark(match: match, theme: theme, isRival: isComputer, stacked: true) {
-                    statusWords
-                }
-            }
+            dockWords
             if hasCaptures {
                 CapturedPieces(match: match, by: color)
                     .transition(.opacity)
@@ -166,6 +180,19 @@ struct ExecutivePlate: View {
         }
         .animation(.easeInOut(duration: 0.2), value: selectedArmyPiece?.name)
         .animation(.snappy(duration: 0.3), value: hasCaptures)
+    }
+
+    /// CHECK and the status, or for a few seconds the coach's grade over its advice.
+    private var dockWords: some View {
+        HStack(spacing: 6) {
+            if inCheck {
+                CheckTag(color: theme.check)
+                    .transition(.scale.combined(with: .opacity))
+            }
+            PlateRemark(match: match, theme: theme, isRival: isComputer, stacked: true) {
+                statusWords
+            }
+        }
     }
 
     private var hasCaptures: Bool {
@@ -401,6 +428,8 @@ private struct ExecutiveClock: View {
     /// "Your clock" or "Pulse's clock", for VoiceOver.
     let owner: String
     let theme: BoardTheme
+    /// In the game's dock, under your words: a little less air above and below the time.
+    var slim = false
 
     private var isRunning: Bool { clock.running == color }
 
@@ -414,7 +443,7 @@ private struct ExecutiveClock: View {
                 .foregroundStyle(isRunning ? Color.black.opacity(0.88) : Color.secondary)
                 .lineLimit(1)
                 .padding(.horizontal, 11)
-                .padding(.vertical, 4)
+                .padding(.vertical, slim ? 2 : 4)
                 .background {
                     if isRunning {
                         shape.fill(urgent ? Color(hex: 0xFF4D6D) : Color.white.opacity(0.92))

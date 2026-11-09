@@ -359,7 +359,7 @@ struct ArmyView: View {
                     if let captor {
                         Image(systemName: "lock.fill")
                             .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(captor.rival.hue)
+                            .foregroundStyle(captor.rival.ink(on: theme))
                             .padding(3)
                             .background(.ultraThinMaterial, in: Circle())
                     }
@@ -609,8 +609,8 @@ struct PieceDetailView: View {
                                 .font(.app(.caption, weight: .bold))
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
-                                .background(level.rival.hue.opacity(0.2), in: Capsule())
-                                .foregroundStyle(level.rival.hue)
+                                .background(level.rival.ink(on: theme).opacity(0.2), in: Capsule())
+                                .foregroundStyle(level.rival.ink(on: theme))
                         }
                     }
                 }
@@ -681,8 +681,8 @@ struct PieceDetailView: View {
                                 .font(.app(.caption, weight: .bold))
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
-                                .background(level.rival.hue.opacity(0.2), in: Capsule())
-                                .foregroundStyle(level.rival.hue)
+                                .background(level.rival.ink(on: theme).opacity(0.2), in: Capsule())
+                                .foregroundStyle(level.rival.ink(on: theme))
                         }
                     }
                 }

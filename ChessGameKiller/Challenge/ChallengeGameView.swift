@@ -11,6 +11,7 @@ struct ChallengeGameView: View {
     let theme: BoardTheme
 
     @Environment(ChallengeCenter.self) private var center
+    @Environment(\.colorScheme) private var colorScheme
     @AppStorage("sculpted3D") private var sculpted3D = true
     @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.tilted
     @AppStorage("haptics") private var hapticsOn = true
@@ -92,7 +93,9 @@ struct ChallengeGameView: View {
             Spacer(minLength: 0)
             FriendPlate(game: game, seat: topSeat, theme: theme)
                 .frame(height: Self.plateHeight)
-            BoardView(match: game.match, theme: theme, framing: tilt.framing)
+            // This screen follows Light or dark, so the frame's letters take a dark ink on the
+            // light page, where the pale one was all but invisible.
+            BoardView(match: game.match, theme: theme, framing: tilt.framing, frameLabel: theme.frameLabel(on: colorScheme))
                 .frame(width: width, height: width / aspect)
             FriendPlate(game: game, seat: topSeat.opposite, theme: theme)
                 .frame(height: Self.plateHeight)
@@ -378,16 +381,14 @@ struct ChallengeGameView: View {
     private var claimBanner: some View {
         HStack(spacing: 12) {
             ChallengeAvatar(name: game.opponentName, theme: theme, size: 32, online: false)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("\(game.opponentName) left the game")
-                    .font(theme.challengeFont(15, .semibold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                Text("Away for over \(game.graceWords)")
-                    .font(theme.challengeFont(12.5))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
+            // Two lines, as the draw offer has. Beside the two buttons there is room for about
+            // ten letters a line: on one line this read "Sam left the…", over "Away for over…",
+            // which the friend's line above the board already says in red.
+            Text("\(game.opponentName) left the game")
+                .font(theme.challengeFont(15, .semibold))
+                .lineLimit(2)
+                .minimumScaleFactor(0.85)
+                .accessibilityLabel("\(game.opponentName) left the game, away for over \(game.graceWords)")
             Spacer(minLength: 6)
             Button("Wait") {
                 game.keepWaiting()

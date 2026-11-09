@@ -157,6 +157,8 @@ struct LiveGameButton: View {
     let title: String
     let url: URL
     var fill = LiveGamePalette.ivory
+    /// The room either side of the words.
+    var inset: CGFloat = 16
 
     var body: some View {
         Link(destination: url) {
@@ -164,7 +166,7 @@ struct LiveGameButton: View {
                 .font(.app(.subheadline, weight: .semibold))
                 .foregroundStyle(LiveGamePalette.onIvory)
                 .lineLimit(1)
-                .padding(.horizontal, 16)
+                .padding(.horizontal, inset)
                 .frame(height: 34)
                 .background(Capsule().fill(fill))
         }
@@ -196,12 +198,26 @@ struct LiveGameLockView: View {
                     .minimumScaleFactor(0.8)
                     .padding(.top, 1)
                 Spacer(minLength: 6)
-                HStack(spacing: 10) {
+                HStack(spacing: 0) {
                     if let seconds = state.yourSeconds, state.result == nil {
                         LiveGameClockPill(seconds: seconds, running: state.yourMove)
+                            .fixedSize()
+                            .layoutPriority(2)
                     }
-                    Spacer(minLength: 0)
-                    LiveGameButton(title: state.result == nil ? "Open board" : "Review", url: LiveGameLink.url)
+                    Spacer(minLength: 10)
+                    if state.result == nil {
+                        // Beside the clock on a 393-point phone the button read "Open boa…". It
+                        // now draws in a little where room is short and, where even that is too
+                        // wide (a smaller phone, larger type), says "Open", as the island does.
+                        ViewThatFits(in: .horizontal) {
+                            LiveGameButton(title: "Open board", url: LiveGameLink.url)
+                            LiveGameButton(title: "Open board", url: LiveGameLink.url, inset: 12)
+                            LiveGameButton(title: "Open", url: LiveGameLink.url)
+                        }
+                        .layoutPriority(1)
+                    } else {
+                        LiveGameButton(title: "Review", url: LiveGameLink.url)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)

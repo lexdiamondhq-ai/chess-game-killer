@@ -44,6 +44,13 @@ struct Rival: Identifiable {
 
     var isGrudge: Bool { kind == .grudge }
 
+    /// The rival's gold for words and small marks. The pale gold is made for a dark page; on a
+    /// light one "Beginner" and the strength bars all but vanished, so there the pieces' deeper
+    /// metal stands in.
+    func ink(on theme: BoardTheme) -> Color {
+        theme.screenIsDark ? hue : theme.trainingAccent
+    }
+
     /// 1 to 5, for the strength bars.
     var strength: Int { level.rawValue + 1 }
 

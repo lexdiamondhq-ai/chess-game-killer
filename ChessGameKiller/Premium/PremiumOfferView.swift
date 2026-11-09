@@ -218,7 +218,7 @@ private struct PremiumBenefitList: View {
         Benefit(symbol: "eye", title: "Ghost Vision any time",
                 detail: "Plus Talk It Through and photo scans, as often as you like."),
         Benefit(symbol: "square.grid.3x3", title: "Every board look",
-                detail: "Every set and every rival's board."),
+                detail: "Every set of pieces and its board."),
     ]
 
     var body: some View {

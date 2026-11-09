@@ -104,7 +104,7 @@ struct RewindGamesView: View {
                 .font(.app(.caption, weight: .semibold))
                 .tracking(2)
                 .textCase(.uppercase)
-                .foregroundStyle(RewindPalette.gold)
+                .foregroundStyle(RewindPalette.goldInk(on: theme))
             HStack(alignment: .firstTextBaseline, spacing: 22) {
                 stat(fixed, "rewritten")
                 stat(left, "left")
@@ -148,7 +148,7 @@ private struct GameCard: View {
 
     private var resultColor: Color {
         switch game.result {
-        case .win: return RewindPalette.gold
+        case .win: return RewindPalette.goldInk(on: theme)
         case .loss: return RewindPalette.coral
         case .draw, .unfinished: return .secondary
         }
@@ -232,6 +232,6 @@ private struct GameCard: View {
     }
 
     private var footColor: Color {
-        game.toRewrite.isEmpty || game.leftToRewrite == 0 ? RewindPalette.gold : RewindPalette.amber
+        game.toRewrite.isEmpty || game.leftToRewrite == 0 ? RewindPalette.goldInk(on: theme) : RewindPalette.amber
     }
 }
