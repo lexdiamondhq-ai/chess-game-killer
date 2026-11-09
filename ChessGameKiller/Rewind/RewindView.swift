@@ -369,6 +369,7 @@ struct RewindView: View {
         return VStack(alignment: .leading, spacing: 0) {
             if let explorer, let focused, let note {
                 ExplorerCard(
+                    theme: theme,
                     explorer: explorer,
                     canTryIt: !game.rewritten.contains(focused.ply),
                     isPlaying: autoplay != nil,
@@ -632,7 +633,7 @@ private struct SecondChanceSheet: View {
                         if solved {
                             Label("Rewritten", systemImage: "checkmark.seal.fill")
                                 .font(.app(.headline))
-                                .foregroundStyle(RewindPalette.gold)
+                                .foregroundStyle(RewindPalette.goldInk(on: theme))
                                 .transition(.scale.combined(with: .opacity))
                         }
                     }
@@ -659,6 +660,7 @@ private struct SecondChanceSheet: View {
 /// The better line from a moment: every move tappable, Leo's word on the one on
 /// the board, where it leads, and the other side's best tries to follow instead.
 private struct ExplorerCard: View {
+    let theme: BoardTheme
     let explorer: LineExplorer
     let canTryIt: Bool
     let isPlaying: Bool
@@ -737,10 +739,10 @@ private struct ExplorerCard: View {
             .lineLimit(1)
             .padding(.horizontal, 10)
             .frame(minHeight: 32)
-            .foregroundStyle(lit ? RewindPalette.gold : Color.secondary)
+            .foregroundStyle(lit ? RewindPalette.goldInk(on: theme) : Color.secondary)
             .background {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(lit ? RewindPalette.gold.opacity(0.16) : Color.primary.opacity(0.05))
+                    .fill(lit ? RewindPalette.goldInk(on: theme).opacity(0.16) : Color.primary.opacity(0.05))
             }
         }
         .buttonStyle(.plain)
@@ -833,7 +835,7 @@ private struct ExplorerCard: View {
             } else {
                 Label("Rewritten", systemImage: "checkmark.seal.fill")
                     .font(.app(.subheadline, weight: .semibold))
-                    .foregroundStyle(RewindPalette.gold)
+                    .foregroundStyle(RewindPalette.goldInk(on: theme))
             }
         }
     }
