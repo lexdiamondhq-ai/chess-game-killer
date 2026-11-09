@@ -754,6 +754,7 @@ struct AnalysisView: View {
                 stepper
                 madeMoves
                 lines
+                help
             }
             .padding(16)
             .animation(.snappy, value: model.lines)
@@ -803,6 +804,24 @@ struct AnalysisView: View {
             }
         }
     }
+
+    // MARK: Help
+
+    /// At the foot of the page, the website's short directions for Analyze (Alex, 2026-11-09:
+    /// "so people don't get confused").
+    private var help: some View {
+        Link(destination: AnalysisView.faq) {
+            Label("How Analyze works", systemImage: "questionmark.circle")
+                .font(.app(.footnote, weight: .semibold))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 4)
+        .accessibilityHint("Opens the questions page on the website")
+    }
+
+    /// play/public/faq, served beside the privacy and support pages.
+    static let faq = URL(string: "https://play.chess-game-killer.workers.dev/faq/")!
 
     // MARK: The photo
 
