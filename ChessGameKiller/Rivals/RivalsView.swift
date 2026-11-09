@@ -18,6 +18,9 @@ struct RivalsHall: View {
     @State private var selected: MatchController.Level?
     /// The rival whose film is playing.
     @State private var showing: RivalFilm?
+    /// Just watched in full: back from its welcome, its card doesn't play the film again until
+    /// you swipe away and back.
+    @State private var watched: MatchController.Level?
 
     private static let gold = Color(hex: 0xE8C27A)
 
@@ -47,6 +50,7 @@ struct RivalsHall: View {
             }
             if let film = showing {
                 RivalWelcome(film: film, begin: { begin(film.level) }, back: {
+                    watched = film.level
                     withAnimation(.easeOut(duration: 0.35)) { showing = nil }
                 })
                 .transition(.opacity)
@@ -59,6 +63,7 @@ struct RivalsHall: View {
             HomeMusic.shared.setCovered(true)
         }
         .onDisappear { HomeMusic.shared.setCovered(false) }
+        .onChange(of: selected) { watched = nil }
     }
 
     /// Deep ink, lit by the rival in front: its last frame, blurred far back.
@@ -118,7 +123,11 @@ struct RivalsHall: View {
         return ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(spacing: 14) {
                 ForEach(RivalFilm.all, id: \.level) { film in
-                    RivalHallCard(film: film, open: ladder.isOpen(film.level), beaten: ladder.beaten(film.rival)) {
+                    // The rival in front plays its welcome film on its card, each one as you
+                    // swipe to it (Alex, 2026-11-09: "when you select all rivals you should get
+                    // the video introduction of each"). It ends on the card's own picture.
+                    RivalHallCard(film: film, open: ladder.isOpen(film.level), beaten: ladder.beaten(film.rival),
+                                  playing: film.level == selected && showing == nil && watched != film.level) {
                         withAnimation(.easeIn(duration: 0.3)) { showing = film }
                     }
                     .frame(width: width, height: height)
@@ -174,7 +183,11 @@ struct RivalHallCard: View {
     let film: RivalFilm
     let open: Bool
     let beaten: Bool
+    /// In front of the hall: its film plays on the card, once, with sound.
+    var playing = false
     let face: () -> Void
+
+    @State private var player: AVPlayer?
 
     private static let gold = Color(hex: 0xE8C27A)
 
@@ -207,6 +220,29 @@ struct RivalHallCard: View {
             }
         }
         .shadow(color: .black.opacity(0.6), radius: 24, y: 14)
+        .task(id: playing) { await run() }
+        .onDisappear { stop() }
+    }
+
+    /// Plays the film from the start while the card is in front; swiped away, it stops and the
+    /// card shows its picture again.
+    private func run() async {
+        guard playing, let url = film.filmURL, !Welcome.isUnderTest else {
+            stop()
+            return
+        }
+        // A film you came to watch: it plays with the ring switch off, like the welcome.
+        try? AVAudioSession.sharedInstance().setCategory(.playback, options: [.mixWithOthers])
+        try? AVAudioSession.sharedInstance().setActive(true)
+        let player = AVPlayer(url: url)
+        player.actionAtItemEnd = .pause
+        withAnimation(.easeIn(duration: 0.3)) { self.player = player }
+        player.play()
+    }
+
+    private func stop() {
+        player?.pause()
+        withAnimation(.easeOut(duration: 0.3)) { player = nil }
     }
 
     @ViewBuilder
@@ -222,6 +258,14 @@ struct RivalHallCard: View {
                     .brightness(open ? 0 : -0.18)
             } else {
                 Color(hex: 0x15171F)
+            }
+            if let player {
+                RivalFilmLayer(player: player)
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .saturation(open ? 1 : 0.15)
+                    .brightness(open ? 0 : -0.18)
+                    .transition(.opacity)
+                    .allowsHitTesting(false)
             }
         }
     }

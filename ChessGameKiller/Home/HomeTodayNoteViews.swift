@@ -1,9 +1,9 @@
 import SwiftUI
 import UIKit
 
-/// The player's finest move of the week, hung in a gold frame: the position before it with the
-/// move as a Dusk Blue arrow, the move in serif, against whom and when, and Replay and Share.
-struct HomeAuroraFinestMove: View {
+/// Your finest move of the week as one of today's rows, the size of Puzzles: the framed move at
+/// the right. A tap replays it; a press and hold shares the picture.
+struct HomeAuroraFinestRow: View {
     let finest: HomeFinestMove
     let palette: HomeAuroraPalette
     let replay: () -> Void
@@ -11,69 +11,28 @@ struct HomeAuroraFinestMove: View {
     @State private var picture: Image?
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
-        HStack(spacing: 14) {
-            HomeFinestMoveFrame(finest: finest, side: 112)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("YOUR FINEST MOVE THIS WEEK")
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(1.2)
-                    .foregroundStyle(palette.gold)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                Text(finest.move)
-                    .font(.system(size: 26, weight: .regular, design: .serif))
-                    .foregroundStyle(palette.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                Text(finest.detail)
-                    .font(.system(size: 12.5))
-                    .foregroundStyle(palette.ink2)
-                    .lineLimit(3)
-                    .fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: 8) {
-                    Button(action: replay) { pill("Replay", symbol: "play.fill") }
-                        .buttonStyle(HomeStagePress())
-                    if let picture {
-                        ShareLink(item: picture, preview: SharePreview("My finest move: \(finest.move)", image: picture)) {
-                            pill("Share", symbol: "square.and.arrow.up")
-                        }
-                        .buttonStyle(HomeStagePress())
-                    }
+        HomeAuroraRow(eyebrow: "Your finest move", title: finest.move, detail: who,
+                      accent: palette.gold, palette: palette, action: replay) {
+            HomeFinestMoveFrame(finest: finest, side: 64)
+        }
+        .accessibilityHint("Replays the game at this move")
+        .contextMenu {
+            Button(action: replay) { Label("Replay", systemImage: "play.fill") }
+            if let picture {
+                ShareLink(item: picture, preview: SharePreview("My finest move: \(finest.move)", image: picture)) {
+                    Label("Share", systemImage: "square.and.arrow.up")
                 }
-                .padding(.top, 6)
             }
-            Spacer(minLength: 0)
         }
-        .padding(14)
-        .frame(maxWidth: .infinity)
-        .background(shape.fill(palette.card))
-        .background(alignment: .topLeading) {
-            // A warm gold light from the frame's corner.
-            RadialGradient(colors: [palette.gold.opacity(palette.dark ? 0.18 : 0.14), palette.gold.opacity(0)],
-                           center: .topLeading, startRadius: 0, endRadius: 220)
-                .clipShape(shape)
-                .allowsHitTesting(false)
-        }
-        .overlay(shape.strokeBorder(palette.gold.opacity(0.32), lineWidth: 1))
         .task(id: finest.gameID.uuidString + finest.uci) { picture = render() }
     }
 
-    private func pill(_ title: String, symbol: String) -> some View {
-        HStack(spacing: 5) {
-            Image(systemName: symbol)
-                .font(.system(size: 9.5, weight: .bold))
-            Text(title)
-                .font(.system(size: 12, weight: .bold))
-        }
-        .foregroundStyle(palette.gold)
-        .padding(.horizontal, 11)
-        .frame(height: 28)
-        .overlay(Capsule().strokeBorder(palette.gold.opacity(0.45), lineWidth: 1))
-        .contentShape(Capsule())
+    /// The row has one line: who it was against and when ("Against the Hunter, yesterday.").
+    private var who: String {
+        guard let end = finest.detail.range(of: ". ") else { return finest.detail }
+        return String(finest.detail[..<end.lowerBound]) + "."
     }
 
-    /// The picture to share: the framed move on the dark room, with the move and the app's name.
     @MainActor
     private func render() -> Image? {
         let renderer = ImageRenderer(content: HomeFinestMoveCard(finest: finest))

@@ -89,6 +89,8 @@ struct HomeAuroraView: View {
     @State private var boardFrame = 0
     /// The rival in front on the Up next card, as you swipe through them. Nil: the one up next.
     @State private var rivalShown: MatchController.Level?
+    /// How far the bottom bar has faded, 0 to 1: it goes as you scroll down, comes back up.
+    @State private var barHidden: CGFloat = 0
 
     private var palette: HomeAuroraPalette { HomeAuroraPalette(dark: tone.scheme == .dark) }
     private var stage: HomeStageInfo { info.stage }
@@ -133,6 +135,8 @@ struct HomeAuroraView: View {
                             .onGeometryChange(for: CGFloat.self) { proxy in
                                 -proxy.frame(in: .scrollView).minY
                             } action: { value in
+                                hideBar(from: pulled, to: value,
+                                        tuckStart: boardHeight + 18 - headerHeight - 6)
                                 pulled = value
                             }
                         page
@@ -178,6 +182,14 @@ struct HomeAuroraView: View {
                                 .ignoresSafeArea(edges: .bottom)
                                 .allowsHitTesting(false)
                         }
+                        // The bar fades as you read down the page, from where the header
+                        // tucks away, and is back the moment you scroll up (Alex, 2026-11-09:
+                        // "slowly disappear as you are scrolling down, about the same time as
+                        // the top area"; "it reappears as soon as you start to scroll up").
+                        .opacity(1 - Double(barHidden))
+                        .offset(y: reduceMotion ? 0 : 18 * barHidden)
+                        .allowsHitTesting(barHidden < 0.5)
+                        .accessibilityHidden(barHidden >= 1)
                 }
             }
         }
@@ -185,6 +197,17 @@ struct HomeAuroraView: View {
         .onAppear { music.homeAppeared() }
         .onDisappear { music.homeDisappeared() }
         .task(id: reduceMotion) { await playThrough() }
+    }
+
+    /// Scrolling down past where the header tucks away fades the bar over about 80 points;
+    /// any scroll up, or a return above that point, brings it straight back.
+    private func hideBar(from old: CGFloat, to new: CGFloat, tuckStart: CGFloat) {
+        let delta: CGFloat = new - old
+        if new <= tuckStart || delta < -2 {
+            if barHidden > 0 { withAnimation(.easeOut(duration: 0.25)) { barHidden = 0 } }
+        } else if delta > 0 {
+            barHidden = min(1, barHidden + delta / 80)
+        }
     }
 
     /// The pieces move slowly: the game of the day's finish, a move every few seconds, a rest on
@@ -287,9 +310,6 @@ struct HomeAuroraView: View {
             gameRow
             HomeAuroraSection(title: "For today", palette: palette, note: nil)
             VStack(spacing: 10) {
-                if let finest = info.finest {
-                    HomeAuroraFinestMove(finest: finest, palette: palette) { actions.replay(finest.gameID) }
-                }
                 todayRows
             }
             .padding(.horizontal, 16)
@@ -477,6 +497,11 @@ struct HomeAuroraView: View {
         HomeAuroraRow(eyebrow: "Today's Move", title: todayTitle, detail: todayDetail,
                       accent: palette.rose, palette: palette, action: actions.stage.dailyMove) {
             HomeAuroraEmblem(glyph: Glyphs.today, fill: HomeAuroraPalette.roseTile)
+        }
+        // Today's Move leads For today; your finest move follows as a row like Puzzles (Alex,
+        // 2026-11-09: "the finest move should be below in the same size area as the puzzles").
+        if let finest = info.finest {
+            HomeAuroraFinestRow(finest: finest, palette: palette) { actions.replay(finest.gameID) }
         }
         HomeAuroraRow(eyebrow: "Puzzles", title: "Sharpen your eye", detail: "Tactics at your level, one after another",
                       accent: palette.violet, palette: palette, action: actions.puzzles) {
@@ -1065,6 +1090,61 @@ struct HomeAuroraGrudge: View {
         .padding(.leading, 14)
         .padding(.trailing, 12)
         .contentShape(Rectangle())
+    }
+}
+
+/// Your Grudge's room, from Rooms (Alex, 2026-11-09: "place in rooms"): a sheet the height of
+/// what it holds, the summons with Settle it once the Grudge is born, and before then the card
+/// that says what wakes it. Meeting it here counts as seeing it, so the summons plays what
+/// changed since last time, or its birth the first time.
+struct HomeGrudgeRoom: View {
+    let grudges: GrudgeStore
+    let palette: HomeAuroraPalette
+    let settle: () -> Void
+
+    /// The score when you last saw your Grudge ("7-11"), so what changed since plays out.
+    @AppStorage("grudge.lastSeen") private var lastSeen = ""
+    @State private var since: (you: Int, it: Int)?
+    @State private var born = false
+    @State private var met = false
+    @State private var height: CGFloat = 420
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Your Grudge")
+                .font(.system(size: 20, weight: .medium, design: .serif))
+                .foregroundStyle(palette.ink)
+                .padding(.horizontal, 4)
+                .accessibilityAddTraits(.isHeader)
+            if met {
+                HomeAuroraGrudge(record: grudges.record, isOpen: grudges.record != nil, palette: palette,
+                                 born: born, lastSeen: since, select: {}, settle: settle)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 26)
+        .padding(.bottom, 12)
+        .frame(maxWidth: .infinity, alignment: .top)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
+        .presentationDetents([.height(height)])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(palette.sheet)
+        .presentationCornerRadius(34)
+        .environment(\.colorScheme, palette.dark ? .dark : .light)
+        .onAppear(perform: meet)
+    }
+
+    /// Reads when you last met it, then marks it seen from here.
+    private func meet() {
+        guard !met else { return }
+        if let record = grudges.record {
+            let parts = lastSeen.split(separator: "-").compactMap { Int($0) }
+            since = parts.count == 2 ? (you: parts[0], it: parts[1]) : nil
+            born = grudges.unseen
+            lastSeen = "\(record.yourWins)-\(record.itsWins)"
+            grudges.markSeen()
+        }
+        met = true
     }
 }
 
