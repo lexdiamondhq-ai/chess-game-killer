@@ -1,0 +1,39 @@
+name: Deep review compare
+
+# An experiment: writes Leo's deep review of one sample game with Fable and with
+# Opus (coach/test/review-compare.mjs) and prints both with what each cost.
+# Four calls, well under a dollar. Run by hand, or by a push that changes the script.
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/project-thread-yrs4be"]
+    paths:
+      - "coach/test/review-compare.mjs"
+      - "coach/test/fixtures/review-game.txt"
+      - ".github/workflows/review-compare.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: coach/package-lock.json
+      - name: Install
+        working-directory: coach
+        run: npm ci
+      - name: Write the review with each model
+        working-directory: coach
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        shell: bash
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then echo "::error::Missing secret: ANTHROPIC_API_KEY"; exit 1; fi
+          node test/review-compare.mjs | tee -a "$GITHUB_STEP_SUMMARY"
