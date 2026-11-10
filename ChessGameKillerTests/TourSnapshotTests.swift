@@ -14,7 +14,7 @@ import XCTest
 final class TourSnapshotTests: XCTestCase {
     private let theme = BoardTheme.named(.gilded)
     /// Leo stays quiet while the lesson is pictured.
-    private static let keys = ["coachVoiceMuted"]
+    private static let keys = ["coachVoiceMuted", PieceSet.storageKey, "boardTheme"]
     private var saved: [Any?] = []
 
     override func setUp() async throws {
@@ -39,6 +39,27 @@ final class TourSnapshotTests: XCTestCase {
             scroll(window, to: CGFloat(step) * 640)
             try save(window, "tour-settings-\(step + 1)")
         }
+        window.isHidden = true
+    }
+
+    /// Pieces sits under Light or dark and above the boards, and the preview at the top follows
+    /// a pick as it is made: first the pieces, then the board under them, then a board that plays flat.
+    func testTheSettingsPreviewFollowsThePiecesAndTheBoard() throws {
+        let defaults = UserDefaults.standard
+        defaults.set(PieceSet.stone.rawValue, forKey: PieceSet.storageKey)
+        defaults.set(BoardTheme.ID.gilded.rawValue, forKey: "boardTheme")
+        let window = try show(SettingsSheet(), wait: 3)
+        scroll(window, to: 150)
+        try save(window, "settings-pieces-1-stone")
+        defaults.set(PieceSet.porcelain.rawValue, forKey: PieceSet.storageKey)
+        RunLoop.main.run(until: Date().addingTimeInterval(2))
+        try save(window, "settings-pieces-2-porcelain")
+        defaults.set(BoardTheme.ID.midnight.rawValue, forKey: "boardTheme")
+        RunLoop.main.run(until: Date().addingTimeInterval(2))
+        try save(window, "settings-pieces-3-porcelain-on-midnight")
+        defaults.set(BoardTheme.ID.classic.rawValue, forKey: "boardTheme")
+        RunLoop.main.run(until: Date().addingTimeInterval(2))
+        try save(window, "settings-pieces-4-flat-board")
         window.isHidden = true
     }
 

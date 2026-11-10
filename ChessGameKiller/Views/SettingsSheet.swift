@@ -60,6 +60,25 @@ struct SettingsSheet: View {
                         }
                     }
 
+                    // The sets made for the tilted board, in tiles like the app icons (Alex,
+                    // 2026-11-09), under Light or dark and above the boards (Alex, 2026-11-10), so
+                    // the preview at the top is in sight as it changes into the one picked. On a
+                    // look that plays flat the tiles stay in place, dimmed, so picking a board
+                    // never moves the boards under the finger.
+                    section("Pieces") {
+                        SettingsGroup(theme: theme) {
+                            PieceSetPicker(selection: $pieceSet, accent: accent)
+                        }
+                        .opacity(theme.sculptedLook == nil ? 0.4 : 1)
+                        .disabled(theme.sculptedLook == nil)
+                        if theme.sculptedLook == nil {
+                            Text("\(theme.name) plays flat. Pick a stone board to choose its pieces.")
+                                .font(.app(.footnote))
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 4)
+                        }
+                    }
+
                     section("Board") {
                         // The rival boards (Spark to Singularity) are no longer offered here
                         // (Alex, 2026-11-08: "Remove the rival options").
@@ -85,16 +104,6 @@ struct SettingsSheet: View {
                                       symbol: "seal", isOn: $heirloomOn, theme: theme)
                             // The switches for the earlier homes are gone (Alex, 2026-11-08): the
                             // app has one home. HomeLayouts.settle() puts anyone who turned them off back.
-                        }
-                    }
-
-                    // The sets made for the tilted board, in tiles like the app icons (Alex,
-                    // 2026-11-09). The preview at the top wears the one picked.
-                    if theme.sculptedLook != nil {
-                        section("Pieces") {
-                            SettingsGroup(theme: theme) {
-                                PieceSetPicker(selection: $pieceSet, accent: accent)
-                            }
                         }
                     }
 
