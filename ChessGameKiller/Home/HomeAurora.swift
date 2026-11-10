@@ -91,6 +91,8 @@ struct HomeAuroraView: View {
     @State private var boardFrame = 0
     /// The rival in front on the Up next card, as you swipe through them. Nil: the one up next.
     @State private var rivalShown: MatchController.Level?
+    /// The card in front under For today, as you swipe through your games and Today's Move.
+    @State private var todayShown: String?
     /// How far the bottom bar has faded, 0 to 1: it goes as you scroll down, comes back up.
     @State private var barHidden: CGFloat = 0
 
@@ -99,10 +101,10 @@ struct HomeAuroraView: View {
 
     /// Your games, or the next game when none is going. Only games: Today's Move and the game
     /// of the day are rows under For today (Alex, 2026-11-08).
+    /// The games you're playing live under For today now (Alex, 2026-11-10), so the top card is
+    /// always the rival up next.
     private var cards: [HomeAuroraGameCard] {
-        info.games.isEmpty
-            ? [HomeAuroraGameCard.next(stage.upNext, fen: stage.gameFEN)]
-            : info.games.map(HomeAuroraGameCard.init)
+        [HomeAuroraGameCard.next(stage.upNext, fen: stage.gameFEN)]
     }
 
     var body: some View {
@@ -303,14 +305,10 @@ struct HomeAuroraView: View {
                 .padding(.top, 10)
             // The Face a rival coins are gone: the rival you're on stands big in the Next game
             // card instead (Alex, 2026-11-08). All rivals moves to this heading's corner.
-            if info.games.isEmpty {
-                HomeAuroraSection(title: gamesTitle, palette: palette, note: "All rivals",
-                                  action: { actions.rivals(nil) })
-            } else {
-                HomeAuroraSection(title: gamesTitle, palette: palette, note: gamesNote)
-            }
+            HomeAuroraSection(title: "Next game", palette: palette, note: "All rivals",
+                              action: { actions.rivals(nil) })
             gameRow
-            HomeAuroraSection(title: "For today", palette: palette, note: nil)
+            HomeAuroraSection(title: "For today", palette: palette, note: gamesNote)
             VStack(spacing: 10) {
                 todayRows
             }
@@ -336,11 +334,6 @@ struct HomeAuroraView: View {
                 .shadow(color: .black.opacity(palette.dark ? 0.5 : 0.1), radius: 30, y: -10)
                 .ignoresSafeArea(edges: .bottom)
         }
-    }
-
-    private var gamesTitle: String {
-        if info.games.isEmpty { return "Next game" }
-        return info.games.count == 1 ? "Your game" : "Your games"
     }
 
     private var gamesNote: String? {
@@ -507,9 +500,11 @@ struct HomeAuroraView: View {
         // as a row the size of Puzzles (Alex, 2026-11-09: "For Today should be todays move, the
         // finest move should be below in the same size area as the puzzles format"; "still have
         // the larger card view"; "just say todays move instead of your finest move").
-        HomeAuroraTodayCard(fen: stage.todayFEN, flipped: stage.todaySolver == .black, title: todayTitle,
-                            detail: todayDetail, played: stage.day.played, palette: palette,
-                            open: actions.stage.dailyMove)
+        // With games under way, the large card swipes: your games first, the ones waiting on
+        // you leading, then Today's Move (Alex, 2026-11-10: "if theres a game they're currently
+        // playing, show that and allow them to swipe through for other games they may have and
+        // today's move").
+        todayPager
         if let finest = info.finest {
             HomeAuroraFinestRow(finest: finest, palette: palette) { actions.replay(finest.gameID) }
         }
@@ -527,6 +522,58 @@ struct HomeAuroraView: View {
             HomeAuroraRow(eyebrow: "Game of the day", title: masterpiece.title, detail: masterpiece.players,
                           accent: palette.gold, palette: palette, action: openMasterpiece) {
                 HomeAuroraBoard(fen: masterpiece.frames.first, flipped: masterpiece.flipped, lit: false)
+            }
+        }
+    }
+
+    /// Your games under way, then Today's Move, one large card each; gold dashes under them when
+    /// there is more than one.
+    @ViewBuilder
+    private var todayPager: some View {
+        let today = HomeAuroraTodayCard(eyebrow: "Today's Move", fen: stage.todayFEN,
+                                        flipped: stage.todaySolver == .black, title: todayTitle,
+                                        detail: todayDetail, button: stage.day.played ? "See it" : "Play",
+                                        symbol: stage.day.played ? "checkmark" : "play.fill",
+                                        palette: palette, open: actions.stage.dailyMove)
+        let games: [HomeCurrentGame] = info.games.filter(\.isYourMove) + info.games.filter { !$0.isYourMove }
+        if games.isEmpty {
+            today
+        } else {
+            let ids: [String] = games.map(\.id) + ["today"]
+            let shown: String = todayShown ?? ids[0]
+            VStack(spacing: 12) {
+                ScrollView(.horizontal) {
+                    HStack(alignment: .top, spacing: 16) {
+                        ForEach(games) { game in
+                            let card = HomeAuroraGameCard(game)
+                            HomeAuroraTodayCard(eyebrow: card.eyebrow, fen: game.fen, flipped: game.flipped,
+                                                title: game.title, detail: card.tags.joined(separator: " · "),
+                                                button: game.isYourMove ? "Your move" : "See the game",
+                                                symbol: game.isYourMove ? "play.fill" : "eye",
+                                                lit: game.isYourMove, palette: palette) { actions.open(game) }
+                                .containerRelativeFrame(.horizontal)
+                                .id(game.id)
+                        }
+                        today
+                            .containerRelativeFrame(.horizontal)
+                            .id("today")
+                    }
+                    .scrollTargetLayout()
+                }
+                .scrollTargetBehavior(.viewAligned)
+                .scrollIndicators(.hidden)
+                .scrollClipDisabled()
+                .scrollPosition(id: $todayShown)
+                .sensoryFeedback(.selection, trigger: todayShown) { _, _ in hapticsOn }
+                HStack(spacing: 6) {
+                    ForEach(ids, id: \.self) { id in
+                        Capsule()
+                            .fill(id == shown ? palette.gold : palette.gold.opacity(0.3))
+                            .frame(width: id == shown ? 16 : 5, height: 5)
+                    }
+                }
+                .animation(.snappy, value: shown)
+                .accessibilityHidden(true)
             }
         }
     }
