@@ -17,6 +17,7 @@ struct RivalsHall: View {
     let close: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(GameVault.self) private var vault: GameVault?
     @State private var ladder: RivalLadder
     @State private var selected: MatchController.Level?
     /// The rival whose film is playing.
@@ -69,10 +70,11 @@ struct RivalsHall: View {
                 RivalHallFilm(film: film, ended: ended == level, done: { finishFilm(level) },
                               step: { stepFilm(by: $0) }, close: close) {
                     VStack(spacing: 0) {
-                        RivalHallWords(film: film, open: ladder.isOpen(level)) {
-                            withAnimation(.easeIn(duration: 0.3)) { showing = film }
-                        }
-                        .padding(.horizontal, 28)
+                        RivalFilmEnding(film: film, open: ladder.isOpen(level),
+                                        record: RivalRecord(vault?.games ?? [], against: film.rival),
+                                        face: { withAnimation(.easeIn(duration: 0.3)) { showing = film } },
+                                        notToday: close)
+                        .padding(.horizontal, 24)
                         .opacity(ended == level ? 1 : 0)
                         .offset(y: ended == level ? 0 : 18)
                         .allowsHitTesting(ended == level)
@@ -376,6 +378,148 @@ struct RivalHallWords: View {
             .overlay(Capsule().strokeBorder(.white.opacity(0.14), lineWidth: 1))
             .accessibilityLabel("Locked. Beat \(film.previous?.name ?? "the rival before") first.")
         }
+    }
+}
+
+/// Your games against one rival: wins, losses and draws.
+struct RivalRecord: Equatable {
+    var wins = 0
+    var losses = 0
+    var draws = 0
+
+    init(wins: Int = 0, losses: Int = 0, draws: Int = 0) {
+        self.wins = wins
+        self.losses = losses
+        self.draws = draws
+    }
+
+    /// Counted from the games played here against the rival (not ones brought in from a site).
+    init(_ games: [SavedGame], against rival: Rival) {
+        for game in games where game.level == rival.level.rawValue && game.sourceID == nil
+            && (game.opponent == rival.name || rival.pastNames.contains(game.opponent)) {
+            switch game.result {
+            case .win: wins += 1
+            case .loss: losses += 1
+            case .draw: draws += 1
+            case .unfinished: break
+            }
+        }
+    }
+}
+
+/// How a rival's film ends in the hall (Alex, 2026-11-10, from a picture): its rank between gold
+/// rules, its name, a line on how it plays, its rating and your record against it, and Face in a
+/// dark glass capsule with its coin; "Not today" leaves the hall. For a locked rival the capsule
+/// says who to beat first.
+struct RivalFilmEnding: View {
+    let film: RivalFilm
+    let open: Bool
+    let record: RivalRecord
+    let face: () -> Void
+    let notToday: () -> Void
+
+    private static let gold = Color(hex: 0xE8C27A)
+    private static let paleGold = Color(hex: 0xF3DDA8)
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 14) {
+                rule
+                Text("RANK \(film.numeral)")
+                    .font(.custom(HomeCarvingFont.plain, size: 15, relativeTo: .footnote))
+                    .tracking(3)
+                    .foregroundStyle(Self.gold)
+                rule
+            }
+            Text(film.rival.name.uppercased())
+                .font(.custom(HomeCarvingFont.plain, size: 34, relativeTo: .largeTitle))
+                .tracking(2.5)
+                .foregroundStyle(LinearGradient(colors: [Self.paleGold, Self.gold],
+                                                startPoint: .top, endPoint: .bottom))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .shadow(color: .black.opacity(0.7), radius: 10)
+                .padding(.top, 8)
+            Text(film.lore)
+                .font(.system(size: 18, weight: .regular, design: .serif))
+                .italic()
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.white.opacity(0.72))
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 12)
+            HStack(spacing: 0) {
+                stat(film.rival.elo, "RATING")
+                Rectangle().fill(.white.opacity(0.18)).frame(width: 1, height: 40)
+                stat("\(record.wins) · \(record.losses) · \(record.draws)", "WIN · LOSS · DRAW")
+            }
+            .padding(.top, 18)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Rating \(film.rival.elo). \(record.wins) wins, \(record.losses) losses, \(record.draws) draws.")
+            capsule
+                .padding(.top, 22)
+            Button("Not today", action: notToday)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.42))
+                .frame(minHeight: 44)
+                .padding(.top, 4)
+        }
+    }
+
+    private var rule: some View {
+        Rectangle()
+            .fill(Self.gold.opacity(0.55))
+            .frame(width: 26, height: 1)
+    }
+
+    private func stat(_ value: String, _ label: String) -> some View {
+        VStack(spacing: 6) {
+            Text(value)
+                .font(.system(size: 20, weight: .medium, design: .serif))
+                .monospacedDigit()
+                .foregroundStyle(.white.opacity(0.92))
+            Text(label)
+                .font(.system(size: 10, weight: .bold))
+                .tracking(1.8)
+                .foregroundStyle(.white.opacity(0.4))
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var capsule: some View {
+        Button(action: face) {
+            HStack(spacing: 14) {
+                RivalCoin(rival: film.rival, size: 32)
+                    .saturation(open ? 1 : 0.2)
+                if open {
+                    Text("FACE \(film.rival.name.uppercased())")
+                        .font(.custom(HomeCarvingFont.plain, size: 16, relativeTo: .body))
+                        .tracking(2)
+                        .foregroundStyle(LinearGradient(colors: [Self.paleGold, Self.gold],
+                                                        startPoint: .top, endPoint: .bottom))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                } else {
+                    Text("Beat \((film.previous?.name ?? "").lowercasedFirstWord) first")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                }
+            }
+            .padding(.horizontal, 24)
+            .frame(maxWidth: .infinity, minHeight: 60)
+            .background(Capsule().fill(Color(hex: 0x14110D).opacity(0.92)))
+            .overlay(Capsule().strokeBorder(LinearGradient(colors: [Self.gold.opacity(open ? 0.7 : 0.25),
+                                                                     Self.gold.opacity(open ? 0.3 : 0.1)],
+                                                            startPoint: .top, endPoint: .bottom),
+                                            lineWidth: 1))
+            .shadow(color: Self.gold.opacity(open ? 0.18 : 0), radius: 14, y: 4)
+        }
+        .buttonStyle(HomeStagePress())
+        .disabled(!open)
+        .accessibilityLabel(open ? "Face \(film.rival.name)"
+                                 : "Locked. Beat \(film.previous?.name ?? "the rival before") first.")
+        .accessibilityHint(open ? "Plays \(film.rival.name)'s welcome, then starts the game" : "")
     }
 }
 
