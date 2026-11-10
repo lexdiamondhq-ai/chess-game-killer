@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pieces import (arc, bead, cove, ogee, line, lathe, uvsphere, rbox, cut, group, mitre_profile, mitre_cut,
                     prism, crenel, shade, ring_lathe, merlon_caps, TAU,
                     beads, gadroons, compose, radius_at, slits, FRONT,
-                    pattee, squash_above, cross_finish, crown_gems, KING_H, LATIN_TOP,
+                    squash_above, KING_H, LATIN_TOP, king_crown_profile, king_crown,
                     queen_crown_profile, queen_crown)
 
 FOOT = 0.118          # top of every base: the piece's body starts here
@@ -133,24 +133,19 @@ def stripes(name, prof, z_top, M, widths=(0.014, 0.014, 0.014), gap=0.013):
 
 
 def king(M):
-    """The Latin king (see pieces.py) in the gilded finish: a long cross, ivory on the ivory king and
-    gold on the onyx one, amber stones round the crown."""
+    """The crowned king (see pieces.py) in the gilded finish: gold arches, orb and cross over the
+    stone's own cap, amber stones round the circlet."""
     R = 0.31; p = base_profile(R) + body_start(R)
     p += ogee(R - 0.115, 0.15, 0.125, 0.62, 32)
     body_top = len(p)
     p += line(0.125, 0.62, 0.15, 0.632, 2); p += bead(0.168, 0.632, 0.03)
     p += line(0.16, 0.662, 0.2, 0.67, 2); p += bead(0.205, 0.67, 0.036)
     p += line(0.19, 0.706, 0.11, 0.72, 2)
-    p += cove(0.11, 0.72, 0.17, 0.84); p += bead(0.17, 0.84, 0.024, 10)
-    p += line(0.158, 0.864, 0.07, 0.875, 2)
-    p += [(0.07 * math.cos(t), 0.875 + 0.03 * math.sin(t)) for t in np.linspace(0, math.pi / 2 * 0.9, 8)]
-    top = p[-1]; p += line(top[0], top[1], 0.0, top[1], 3)
-    objs = [lathe('K', p, mod=gadroons(0.73, 0.83, 18, 0.01), mat=M['body']), band('Kband', R, M), band_beads('Kbeadband', R, M)]
-    objs += crown_gems('Kgem', p, 0.79, M)
+    p += king_crown_profile()
+    objs = [lathe('K', p, mod=gadroons(0.735, 0.825, 18, 0.01), mat=M['body']), band('Kband', R, M), band_beads('Kbeadband', R, M)]
     objs += stripes('Kst', p[:body_top], 0.595, M)
     objs.append(flat_band('Kring', 0.226, 0.672, 0.704, M))
-    objs.append(beads('Kbeadcrown', 0.182, 0.852, 36, 0.011, M['metal']))
-    objs += pattee('Kcross', 0.89, LATIN_TOP, 1.30, 0.30, 0.075, 0.10, 0.075, cross_finish(M))
+    objs += king_crown('K', M)
     squash_above(objs, 0.2, (KING_H - 0.2) / (LATIN_TOP - 0.2))
     return group('king', objs)
 

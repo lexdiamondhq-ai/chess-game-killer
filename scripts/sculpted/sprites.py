@@ -18,7 +18,7 @@ only=set(rest)
 PREFIX='gilded' if SET=='gilded' else 'sculpted'
 if SET=='gilded':
     import gilded as G
-    knight_parts=G.load_knight()
+    knight_parts=G.load_knight() if not only or any(n.endswith('N') for n in only) else None
 EL=math.radians(28); W,H=560,760; SCALE=1.4; FOOT=(280,600)
 # The light, per side. Ivory: a key from the front left and little fill, so one side falls into
 # soft shade and the ivory stays brighter than the cream squares; ebony: the same key with more
@@ -89,7 +89,7 @@ def finishes(side):
             pearl=mat('pearl',(0.93,0.9,0.86),0.18,coat=1,sss=0.2)
     shade=mat('well',(0.09,0.075,0.06) if side=='w' else (0.004,0.004,0.004),0.6)
     return {'body':white if side=='w' else black,'metal':metal,'gem':gem,'pearl':pearl,'shade':shade}
-if SET=='classic': kv=np.load('scripts/sculpted/kv.npy'); kf=np.load('scripts/sculpted/kf.npy')
+if SET=='classic' and (not only or any(n.endswith('N') for n in only)): kv=np.load('scripts/sculpted/kv.npy'); kf=np.load('scripts/sculpted/kf.npy')
 def objects(o): return [o]+[c for c in o.children_recursive]
 os.makedirs(f'{outdir}/mask',exist_ok=True)
 for side in ('w','b'):
