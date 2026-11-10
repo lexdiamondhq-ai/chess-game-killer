@@ -102,12 +102,17 @@ struct ContentView: View {
     private var coachIsWide: Bool { coachExpanded }
     /// The board is out of sight: the app is in the background, or another screen covers the game.
     /// The clock and the rival wait while it is.
-    private var boardHidden: Bool {
-        scenePhase != .active || showingHome || showingTraining || showingArmy || showingPuzzles || showingGames || showingDaily
+    private var boardHidden: Bool { scenePhase != .active || boardCovered }
+    /// Another screen is over the game, or in its place.
+    private var boardCovered: Bool {
+        showingHome || showingTraining || showingArmy || showingPuzzles || showingGames || showingDaily
             || showingNewGame || showingSettings || showingAnalyze
             || coach.presentedLesson != nil || coach.presentedSession != nil
             || challenges?.isPresenting == true || talk != nil || showingWelcome
     }
+    /// The Ashen King's game is on screen with nothing over it: turned sideways, the phone
+    /// shows his hall (`BroadcastView`). Every other screen stays upright.
+    private var hallOpen: Bool { stormy && match.hasStarted && !boardCovered }
     /// Starting a game now would cost the one in progress: the rival it is against, so the
     /// screens that start games can ask first.
     private var forfeits: String? {
@@ -403,6 +408,9 @@ struct ContentView: View {
             .onChange(of: boardHidden) { _, hidden in
                 if hidden { match.suspend() } else { match.resume() }
             }
+            .onChange(of: hallOpen, initial: true) { _, open in
+                AppOrientation.allowLandscape(open)
+            }
             .onChange(of: scenePhase) { _, phase in
                 // A new day may have started while away; the reminders and the widget follow.
                 if phase == .active || phase == .background { refreshDaily() }
@@ -612,55 +620,66 @@ struct ContentView: View {
     /// The board, the players and the dock inside the navigation bar, sized to the screen.
     private var gameScreen: some View {
         GeometryReader { screen in
-            NavigationStack {
-                GeometryReader { geo in
-                    boardLayout(in: geo.size)
-                }
-                // The army's news floats just above the dock, clear of both players' lines.
-                .overlay(alignment: .bottom) {
-                    if let news = armyNews {
-                        ArmyNewsBanner(news: news, color: match.setup.playerColor, theme: theme) {
-                            armyNews = nil
-                            showingArmy = true
-                        }
-                        .padding(.horizontal, Self.inset)
-                        .padding(.bottom, 8)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+            if hallOpen, screen.size.width > screen.size.height {
+                // The phone is on its side against the Ashen King: his hall.
+                BroadcastView(match: match, theme: theme)
+                    .transition(.opacity)
+            } else {
+                uprightGame(screen)
+            }
+        }
+    }
+
+    /// The game as always: the board, the players and the dock inside the navigation bar.
+    private func uprightGame(_ screen: GeometryProxy) -> some View {
+        NavigationStack {
+            GeometryReader { geo in
+                boardLayout(in: geo.size)
+            }
+            // The army's news floats just above the dock, clear of both players' lines.
+            .overlay(alignment: .bottom) {
+                if let news = armyNews {
+                    ArmyNewsBanner(news: news, color: match.setup.playerColor, theme: theme) {
+                        armyNews = nil
+                        showingArmy = true
                     }
+                    .padding(.horizontal, Self.inset)
+                    .padding(.bottom, 8)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
-                // A one-line tip the first time a hidden gesture or a rule would help.
-                .overlay(alignment: .bottom) {
-                    GameTips(match: match, theme: theme, blocked: tipsBlocked)
+            }
+            // A one-line tip the first time a hidden gesture or a rule would help.
+            .overlay(alignment: .bottom) {
+                GameTips(match: match, theme: theme, blocked: tipsBlocked)
+                    .frame(maxWidth: Self.dockMaxWidth)
+                    .padding(.horizontal, Self.inset)
+                    .padding(.bottom, 8)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                // A finished game gives the result a little more room: the board has had its say.
+                let coachHeight = screen.size.height * (match.isOver ? Self.resultShare : Self.coachShare)
+                if boardSheet {
+                    gameSheet(coachHeight: coachHeight, bottom: screen.safeAreaInsets.bottom)
+                } else {
+                    dock(coachHeight: coachHeight)
                         .frame(maxWidth: Self.dockMaxWidth)
                         .padding(.horizontal, Self.inset)
-                        .padding(.bottom, 8)
+                        .padding(.top, 8)
+                        // Above the home indicator; on a phone without one, a little off the edge.
+                        .padding(.bottom, screen.safeAreaInsets.bottom > 0 ? 0 : 8)
                 }
-                .safeAreaInset(edge: .bottom, spacing: 0) {
-                    // A finished game gives the result a little more room: the board has had its say.
-                    let coachHeight = screen.size.height * (match.isOver ? Self.resultShare : Self.coachShare)
-                    if boardSheet {
-                        gameSheet(coachHeight: coachHeight, bottom: screen.safeAreaInsets.bottom)
-                    } else {
-                        dock(coachHeight: coachHeight)
-                            .frame(maxWidth: Self.dockMaxWidth)
-                            .padding(.horizontal, Self.inset)
-                            .padding(.top, 8)
-                            // Above the home indicator; on a phone without one, a little off the edge.
-                            .padding(.bottom, screen.safeAreaInsets.bottom > 0 ? 0 : 8)
-                    }
-                }
-                .background {
-                    SheetBackdrop(theme: theme)
-                        .overlay {
-                            // The Ashen King plays in his storm (Alex, 2026-11-08).
-                            if stormy { DragonStorm().transition(.opacity) }
-                        }
-                        .animation(.easeInOut(duration: 1.2), value: stormy)
-                }
-                .navigationTitle("Beauty of Chess")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar { toolbarContent }
             }
+            .background {
+                SheetBackdrop(theme: theme)
+                    .overlay {
+                        // The Ashen King plays in his storm (Alex, 2026-11-08).
+                        if stormy { DragonStorm().transition(.opacity) }
+                    }
+                    .animation(.easeInOut(duration: 1.2), value: stormy)
+            }
+            .navigationTitle("Beauty of Chess")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { toolbarContent }
         }
     }
 

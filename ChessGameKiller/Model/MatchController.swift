@@ -184,6 +184,11 @@ final class MatchController {
     /// Seconds from the mating move until the end is seen: the king has fallen, in 3D.
     @ObservationIgnored var finaleDelay: @MainActor (PlayedMove) -> TimeInterval = { _ in 0.4 }
 
+    /// Set while the rival's move is acted out before it lands: the King's hall, where his hand
+    /// reaches the piece first. Handed the move the rival chose (UCI), it returns when the
+    /// move should land on the board. Nil, as everywhere else, plays the move at once.
+    @ObservationIgnored var rivalStage: (@MainActor (String) async -> Void)?
+
     /// The rival's latest remark, shown for a few seconds in its line by the board.
     private(set) var rivalLine: RivalLine?
     /// The vote behind the crowd's last move ("62% played Nf3"). Nil once Stockfish has taken over.
@@ -984,6 +989,12 @@ final class MatchController {
             try? await Task.sleep(for: minimum - elapsed)
         }
         guard gen == generation, !Task.isCancelled else { return }
+        // On a stage (the King's hall) the rival's hand goes out first, and the move lands
+        // when it reaches the piece.
+        if let chosen, let rivalStage {
+            await rivalStage(chosen)
+            guard gen == generation, !Task.isCancelled else { return }
+        }
         isComputerThinking = false
 
         // The rival plays what its search found: its level is in the search itself (see

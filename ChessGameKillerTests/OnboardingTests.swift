@@ -82,6 +82,15 @@ final class OnboardingTests: XCTestCase {
         XCTAssertEqual(TipBook.next(playerMoves: 5, justUndid: true, defaults), .coachOrb)
     }
 
+    func testTheKingsHallIsToldOnlyAgainstTheKing() {
+        TipBook.markSeen(.coachOrb, defaults)
+        XCTAssertNil(TipBook.next(playerMoves: 3, justUndid: false, defaults))
+        XCTAssertNil(TipBook.next(playerMoves: 1, justUndid: false, facingKing: true, defaults), "Not on the first move")
+        XCTAssertEqual(TipBook.next(playerMoves: 2, justUndid: false, facingKing: true, defaults), .kingsHall)
+        TipBook.markSeen(.kingsHall, defaults)
+        XCTAssertNil(TipBook.next(playerMoves: 3, justUndid: false, facingKing: true, defaults))
+    }
+
     func testPicturesShowNoTipsUnlessAsked() {
         defaults.set(true, forKey: "tipsOff")
         XCTAssertNil(TipBook.next(playerMoves: 1, justUndid: true, defaults))
