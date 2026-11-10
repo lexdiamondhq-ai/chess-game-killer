@@ -2,7 +2,8 @@ import SwiftUI
 
 /// Today's Move: the day's puzzle, the same for every player, then how the world did, the streak
 /// and what's next. Played once a day: opened again that day, it shows how it went and plays
-/// the answer through, and the next one comes tomorrow.
+/// the answer through, and the next one comes tomorrow. The calendar beside the streak holds
+/// the past Moves, each one free to play again for practice.
 struct DailyMoveView: View {
     let theme: BoardTheme
     /// Opens Puzzles, for more.
@@ -21,6 +22,9 @@ struct DailyMoveView: View {
     @State private var outcome: Outcome?
     @State private var tally: DailyTally?
     @State private var tallyFailed = false
+    /// A past day's Move, picked on the calendar and played for practice. Nil for today's.
+    @State private var practiceDay: Date?
+    @State private var showingCalendar = false
 
     init(theme: BoardTheme, morePuzzles: (() -> Void)? = nil, stats: DailyStatsAPI? = LiveDailyStatsAPI.shared,
          outcome: Outcome? = nil, tally: DailyTally? = nil) {
@@ -40,6 +44,7 @@ struct DailyMoveView: View {
                         VStack(spacing: 14) {
                             if let runner {
                                 DrillView(runner: runner, theme: theme, boardSide: boardSide)
+                                    .id(ObjectIdentifier(runner))
                                     .padding(.top, 4)
                             } else if puzzle == nil {
                                 Text("Today's Move couldn't be loaded.")
@@ -76,6 +81,9 @@ struct DailyMoveView: View {
             finish(finished)
         }
         .onDisappear { runner?.cancel() }
+        .sheet(isPresented: $showingCalendar) {
+            DailyCalendarView(theme: theme, daily: daily) { day in open(day) }
+        }
     }
 
     // MARK: Pieces of the screen
@@ -114,8 +122,24 @@ struct DailyMoveView: View {
                 Text(dateline)
                     .font(.app(.caption))
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button {
+                showingCalendar = true
+            } label: {
+                Image(systemName: "calendar")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(theme.trainingAccent)
+                    .frame(width: 36, height: 36)
+                    .glassPane(Circle())
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Calendar of past Moves")
 
             StreakPill(streak: daily.streak, theme: theme)
         }
@@ -126,7 +150,10 @@ struct DailyMoveView: View {
     /// "No. 29 · Thursday · Tricky", or, once played, that the next one comes tomorrow.
     private var dateline: String {
         guard let puzzle else { return Date.now.formatted(.dateTime.weekday(.wide)) }
-        if !counts { return "No. \(puzzle.number) · Played today. Next one tomorrow" }
+        if let practiceDay {
+            return "No. \(puzzle.number) · \(practiceDay.formatted(.dateTime.month(.abbreviated).day())) · For practice"
+        }
+        if !counts { return "No. \(puzzle.number) · Done today" }
         return "No. \(puzzle.number) · \(Date.now.formatted(.dateTime.weekday(.wide))) · \(puzzle.difficulty)"
     }
 
@@ -134,11 +161,20 @@ struct DailyMoveView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(Self.verdict(outcome))
                 .font(.app(.title2, weight: .semibold))
-            tallyLine
-            Divider().opacity(0.5)
-            streakBlock
+            if practiceDay == nil {
+                tallyLine
+                Divider().opacity(0.5)
+                streakBlock
+            } else {
+                Label("A past Move, for practice. It doesn't count toward the streak.", systemImage: "calendar")
+                    .font(.app(.subheadline))
+                    .foregroundStyle(.secondary)
+            }
             HStack(spacing: 10) {
-                if !counts {
+                if practiceDay != nil {
+                    Button("Calendar") { showingCalendar = true }
+                        .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false))
+                } else if !counts {
                     Button("Watch again") { runner?.review() }
                         .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false))
                 } else if let morePuzzles {
@@ -188,7 +224,7 @@ struct DailyMoveView: View {
                 Text(daily.streak == 1 ? "1-day streak" : "\(daily.streak)-day streak")
                     .font(.app(.headline).monospacedDigit())
                 Spacer()
-                Text("Day done")
+                Text(counts ? "Day done" : "Next Move tomorrow")
                     .font(.app(.caption, weight: .semibold))
                     .foregroundStyle(theme.trainingAccent)
             }
@@ -222,22 +258,35 @@ struct DailyMoveView: View {
 
     private func start() {
         guard runner == nil else { return }
-        guard let today = daily.puzzle() else { puzzle = nil; return }
+        guard let today = daily.puzzle(on: practiceDay ?? .now) else { puzzle = nil; return }
         puzzle = today
-        counts = !daily.playedTodaysMove
+        counts = practiceDay == nil && !daily.playedTodaysMove
         // Played already today: open on how it went, not on a fresh try.
-        if !counts, outcome == nil { outcome = daily.moveResult() }
+        if practiceDay == nil, !counts, outcome == nil { outcome = daily.moveResult() }
         let lichess = LichessPuzzle(id: today.id, fen: today.fen, moves: today.moves, rating: today.rating, themes: today.themes)
         let item = SessionItem(content: .drill(lichess.drill), role: .focus)
         let made = DrillRunner(item: item, library: training.library, engine: nil)
         runner = made
-        if counts {
+        if practiceDay != nil {
+            made?.begin()
+        } else if counts {
             // Already finished (a picture of the result): the position stays as it was set.
             if outcome == nil { made?.begin() }
         } else {
             made?.review()
             fetchTally(for: today, found: outcome == .firstTry)
         }
+    }
+
+    /// A day picked on the calendar: today's Move as today's, any other day's for practice.
+    private func open(_ day: Date) {
+        runner?.cancel()
+        runner = nil
+        outcome = nil
+        tally = nil
+        tallyFailed = false
+        practiceDay = Calendar.current.isDateInToday(day) ? nil : day
+        start()
     }
 
     private func finish(_ result: Outcome) {

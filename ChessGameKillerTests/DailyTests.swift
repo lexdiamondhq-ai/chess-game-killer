@@ -139,6 +139,47 @@ final class DailyTests: XCTestCase {
         XCTAssertEqual(DailyStore(state: record, calendar: calendar).moveResult(on: date("2026-11-09")), .missed)
     }
 
+    func testTheCalendarMarksEachDayOfTheMonth() {
+        let today = date("2026-11-10", hour: 9)
+        let results: [String: Outcome] = ["2026-11-01": .firstTry, "2026-11-03": .withHint, "2026-11-04": .afterMistake,
+                                          "2026-11-05": .missed, "2026-10-31": .firstTry]
+        let november = DailyCalendarMonth(holding: today, today: today, results: results, calendar: calendar)
+        XCTAssertEqual(november.days.count, 30)
+        XCTAssertEqual(november.leading, 0, "November 1, 2026 is a Sunday")
+        XCTAssertEqual(november.days[0].mark, .found)
+        XCTAssertEqual(november.days[1].mark, .unplayed)
+        XCTAssertEqual(november.days[2].mark, .helped)
+        XCTAssertEqual(november.days[3].mark, .helped)
+        XCTAssertEqual(november.days[4].mark, .missed)
+        XCTAssertEqual(november.days[9].mark, .today)
+        XCTAssertTrue(november.days[9].isToday)
+        XCTAssertEqual(november.days[10].mark, .none, "tomorrow has nothing to show yet")
+        XCTAssertFalse(november.days[10].hasMove)
+        XCTAssertEqual([november.found, november.helped, november.missed], [1, 2, 1])
+        XCTAssertTrue(november.canStep(-1, today: today, calendar: calendar))
+        XCTAssertFalse(november.canStep(1, today: today, calendar: calendar))
+
+        // October holds the first Move; nothing comes before it.
+        let october = DailyCalendarMonth(holding: date("2026-10-15"), today: today, results: results, calendar: calendar)
+        XCTAssertEqual(october.leading, 4, "October 1, 2026 is a Thursday")
+        XCTAssertEqual(october.days.count, 31)
+        XCTAssertEqual(october.days[0].mark, .unplayed)
+        XCTAssertEqual(october.days[30].mark, .found)
+        XCTAssertFalse(october.canStep(-1, today: today, calendar: calendar))
+        XCTAssertTrue(october.canStep(1, today: today, calendar: calendar))
+        let september = DailyCalendarMonth(holding: date("2026-09-15"), today: today, results: results, calendar: calendar)
+        XCTAssertTrue(september.days.allSatisfy { !$0.hasMove })
+    }
+
+    func testTheCalendarKeepsADayPlayedBeforeResultsWereKept() {
+        var record = DailyRecord()
+        record.moveDay = "2026-11-08"
+        record.moveFound = true
+        record.moveResults = ["2026-11-09": .missed]
+        let store = DailyStore(state: record, calendar: calendar)
+        XCTAssertEqual(store.moveResults, ["2026-11-08": .firstTry, "2026-11-09": .missed])
+    }
+
     func testDaysInARowWithARestDayAWeekAndMilestones() {
         var record = DailyRecord()
         var milestones: [Int] = []
@@ -431,6 +472,25 @@ final class DailyTests: XCTestCase {
             .environment(PuzzleStore())
             .environment(TrainingStore(library: TrainingLibrary.shared))
         try show(view, "zz-daily-move-solved")
+    }
+
+    func testTheCalendarOfPastMoves() throws {
+        var record = DailyRecord()
+        record.seeded = true
+        let today = Date.now
+        let outcomes: [Outcome] = [.firstTry, .firstTry, .withHint, .firstTry, .missed, .firstTry]
+        for (back, outcome) in outcomes.enumerated() {
+            let day = Calendar.current.date(byAdding: .day, value: -back, to: today) ?? today
+            record.moveResults[Trainer.dayString(day)] = outcome
+        }
+        record.moveDay = Trainer.dayString(today)
+        record.moveFound = true
+        let theme = BoardTheme.named(.gilded)
+        let view = ZStack {
+            TrainingBackdrop(theme: theme)
+            DailyCalendarView(theme: theme, daily: DailyStore(state: record)) { _ in }
+        }
+        try show(view, "zz-daily-calendar")
     }
 
     // MARK: Drawing

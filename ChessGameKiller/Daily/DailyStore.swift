@@ -65,8 +65,14 @@ final class DailyStore {
     /// How Today's Move went on `date`, once played. A day played before results were kept
     /// reads as found or missed.
     func moveResult(on date: Date = .now) -> Outcome? {
-        guard playedMove(on: date) else { return nil }
-        return state.moveResults[Trainer.dayString(date, calendar: calendar)] ?? (state.moveFound ? .firstTry : .missed)
+        moveResults[Trainer.dayString(date, calendar: calendar)]
+    }
+
+    /// How every day's Move went, by day ("2026-11-09"), for the calendar.
+    var moveResults: [String: Outcome] {
+        var results = state.moveResults
+        if let day = state.moveDay, results[day] == nil { results[day] = state.moveFound ? .firstTry : .missed }
+        return results
     }
 
     /// Rated puzzles solved today, toward the three that make a day.
