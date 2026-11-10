@@ -305,7 +305,7 @@ struct Panel: View {
 
 // MARK: - Reading
 
-/// While the reader checks every square: our board knight drawn in light on a glass card,
+/// While the reader checks every square: the Gilded knight drawn in light on a glass card,
 /// "Processing" below (KnightLoadingView, Alex 2026-11-10). Its analysis follows by itself;
 /// Stop goes to the editor to set the pieces by hand.
 struct PhotoReadingView: View {
