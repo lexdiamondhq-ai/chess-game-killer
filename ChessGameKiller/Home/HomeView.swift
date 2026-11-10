@@ -65,11 +65,11 @@ struct HomeView: View {
     @State private var confirmingGrudge = false
     /// Settle it was pressed: the game starts as the Grudge's room closes.
     @State private var settlingGrudge = false
-    /// The rivals' hall is open, on this rival (nil: the one up next).
-    @State private var showingHall = false
-    @State private var hallStart: MatchController.Level?
-    /// The hall opens straight into the rival's welcome film.
-    @State private var hallIntro = false
+    /// The rivals' hall is open, on its rival and whether its film plays first. One value, so the
+    /// hall always opens on the rival asked for: with the rival kept apart from the open switch,
+    /// the hall could read the rival from before and open on the Cub (Alex, 2026-11-10: "When I
+    /// hit play it goes to cub rather than the rival I selected").
+    @State private var hall: HallVisit?
     @AppStorage("setup.clock") private var timeControl: TimeControl = .unlimited
     @AppStorage("haptics") private var hapticsOn = true
     /// The name friends see, from the last challenge: the home says hello with it.
@@ -563,9 +563,7 @@ struct HomeView: View {
         case .online: challenges?.playOnline()
         case .friend: challenges?.compose()
         case .newGame: secondary(upNext)
-        case .rivals:
-            hallStart = nil
-            showingHall = true
+        case .rivals: hall = HallVisit(start: nil, intro: false)
         case .grudge: showingGrudge = true
         case .games: actions.rewind()
         }
@@ -730,21 +728,19 @@ extension HomeView {
                 actions.resume()
             }
         }, playRival: { level in playOtherRival(level) }, options: { level in actions.playRival(level) }, rivals: { level in
-            hallStart = level
-            hallIntro = false
-            showingHall = true
+            hall = HallVisit(start: level, intro: false)
         }, chessDNA: actions.chessDNA, puzzles: actions.puzzles, replay: { id in
             if let game = vault.game(id) { actions.openGame(game) }
         })
         return HomeAuroraView(tone: tone, info: auroraInfo, actions: auroraActions)
-            .fullScreenCover(isPresented: $showingHall) {
-                RivalsHall(start: hallStart, intro: hallIntro, begin: { level in
+            .fullScreenCover(item: $hall) { visit in
+                RivalsHall(start: visit.start, intro: visit.intro, begin: { level in
                     // The film's last frame gives way to the game: the hall closes at once.
                     var quiet = Transaction()
                     quiet.disablesAnimations = true
-                    withTransaction(quiet) { showingHall = false }
+                    withTransaction(quiet) { hall = nil }
                     playRival(level)
-                }, close: { showingHall = false })
+                }, close: { hall = nil })
             }
             .sheet(isPresented: $showingGrudge, onDismiss: {
                 // The game starts once the room has gone, so nothing presents over a closing sheet.
@@ -808,10 +804,16 @@ extension HomeView {
     }
 
     private func showFilm(_ level: MatchController.Level) {
-        hallStart = level
-        hallIntro = true
-        showingHall = true
+        hall = HallVisit(start: level, intro: true)
     }
+}
+
+/// One visit to the rivals' hall: the rival it opens on (nil: the one up next) and whether that
+/// rival's welcome film plays first.
+private struct HallVisit: Identifiable {
+    let id = UUID()
+    let start: MatchController.Level?
+    let intro: Bool
 }
 
 // MARK: - The board home
