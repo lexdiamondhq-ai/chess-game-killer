@@ -61,13 +61,14 @@ final class Premium {
     /// Uses left now. Nil: unlimited. Zero for a locked feature without Premium.
     func remaining(_ feature: PremiumFeature) -> Int? {
         _ = uses
-        if feature.isLocked { return opens(feature) ? nil : 0 }
+        if feature.isLocked, !opens(feature) { return 0 }
         guard let allowance = allowance(feature) else { return nil }
         return ledger.remaining(feature, allowance: allowance)
     }
 
     /// Whether a counted feature can be used now, without taking a use.
     func canUse(_ feature: PremiumFeature, key: String? = nil) -> Bool {
+        if feature.isLocked, !opens(feature) { return false }
         guard let allowance = allowance(feature) else { return opens(feature) || !feature.isLocked }
         if let key, ledger.alreadyUsed(feature, key: key, allowance: allowance) { return true }
         return ledger.remaining(feature, allowance: allowance) > 0
@@ -77,7 +78,8 @@ final class Premium {
     /// The same `key` again in the same period is free.
     @discardableResult
     func use(_ feature: PremiumFeature, key: String? = nil) -> Bool {
-        if feature.isLocked { return opens(feature) }
+        // A locked feature is Premium's alone; one that costs money each time is still counted there.
+        if feature.isLocked, !opens(feature) { return false }
         guard let allowance = allowance(feature) else { return true }
         let took = ledger.take(feature, key: key, allowance: allowance)
         if took { uses += 1 }
