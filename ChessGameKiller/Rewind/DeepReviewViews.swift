@@ -175,10 +175,10 @@ struct DeepReviewCard: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
                 ProgressView().controlSize(.small)
-                Text("\(player.coach.name) is going through your game.")
+                Text("About fifteen seconds.")
                     .font(.app(.body))
             }
-            Text("It takes about fifteen seconds. \(player.coach.subjectCapitalized) reads every move before \(player.coach.subject) says a word.")
+            Text("\(player.coach.subjectCapitalized) reads every move before \(player.coach.subject) says a word.")
                 .font(.app(.subheadline))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
