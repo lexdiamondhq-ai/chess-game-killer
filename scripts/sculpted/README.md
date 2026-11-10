@@ -13,6 +13,9 @@ repository root with Blender's Python module (`pip install bpy==5.2.2 numpy scip
    for the gilded set (`gilded-pieces.bin`, copy to `Sculpted/gilded-pieces.dataset`). Each part is one
    finish, the ids `SculptedAssets.Finish` reads: body 0, metal 1, gem 2, pearl 3, and shade 4, the dark
    floor of the rook's well (an app that does not know 4 draws it as the body).
+   To change one piece without rebuilding the rest, `ONLY=K python scripts/sculpted/export.py -- gilded` writes
+   just that piece (`gilded-K-pieces.bin`) and `python scripts/sculpted/splice.py <set>.bin <piece>.bin <out>.bin`
+   puts it into the set; the same piece's sprites follow from step 4 with its names.
 3. `python scripts/sculpted/bake.py -- squares build/sculpted/out/squares.png 16` bakes the stone squares (albedo only),
    and `-- art build/sculpted/out/board-art.png 64` the lit board picture for the flat look.
 4. `python scripts/sculpted/sprites.py -- build/sculpted/sprites 48` renders the twelve flat-look sprites
@@ -53,8 +56,9 @@ repository root with Blender's Python module (`pip install bpy==5.2.2 numpy scip
 
 `pieces.py` holds the turned pieces (lathe profiles, flutes, booleans), `gilded.py` the gilded set
 (stepped bases, gold bands and crowns, the striped-mane knight), `board.py` the marble, frame and inlay.
-Both sets share their tops and heights, so each type is told by its top as much as its height: a long
-Latin cross (ivory on the white king, metal on the dark one: the `cross` finish, id 5), a crown of eight
+Both sets share their tops and heights, so each type is told by its top as much as its height: a closed
+crown of six beaded arches under an orb and a small cross, all in the set's metal (`king_crown` in `pieces.py`;
+the long Latin cross before it had its own finish, `cross`, id 5, which the app still reads), a crown of eight
 metal points tipped with balls round a ball on top (`queen_crown` in `pieces.py`) on a slim queen standing well
 under the king, which from the 3D camera above reads as a star round a ball and never as the rook's ring, a pointed mitre cut through to a metal core,
 a tower of five capped merlons round a dark well, the horse's head, one ball. Heights in squares, before

@@ -188,7 +188,7 @@ def merlon_caps(name,ri,ro,z,mat,count=5,notch=math.radians(31),t=0.012,e=0.004)
 # ---------- pieces ----------
 # Heights (squares, before the game's 1.1 scale): K 1.336 > B 1.0 > Q 0.92 > N 0.83 > R 0.742 > P 0.56.
 # Every piece is told by its top, made big enough to read on a phone, over a low base:
-#   king a long Latin cross, queen a crown of eight ball-tipped points round a ball (and far shorter),
+#   king a closed crown of beaded arches under an orb and cross, queen a crown of eight ball-tipped points round a ball (and far shorter),
 #   bishop a tall pointed mitre with a diagonal cut showing its metal core, rook a tower with
 #   five square merlons capped in metal round a dark well, knight a horse's head, pawn one ball on a collar.
 # The surfaces differ too: king straight flutes, queen spiral flutes, bishop fine flutes,
@@ -217,22 +217,69 @@ def squash_above(objs, z0, s):
         for v in o.data.vertices:
             if v.co.z>z0: v.co.z=z0+(v.co.z-z0)*s
         o.data.update()
-def cross_finish(M):
-    """The king's cross: the ivory king's in its own stone, the black king's in metal, so it shows
-    light against the dark frame behind the far rank. The game meshes carry it as its own finish
-    (`cross`, id 5), which the app draws that way."""
-    if 'cross' in M: return M['cross']
-    return M['body'] if M['body'].name.startswith('ivory') else M['metal']
-def crown_gems(name,p,z,M,size=0.024):
-    """Four stones set round a crown cup, one facing the player."""
-    out=[]
-    for i in range(4):
-        a=FRONT+i*math.pi/2; rr=radius_at(p,z)+0.005
-        g=uvsphere(f'{name}{i}',size,(rr*math.cos(a),rr*math.sin(a),z),M['gem'],(1,1,1))
-        g.scale=(0.55,0.55,1.0); g.rotation_euler=(0,0,a); out.append(g)
-    return out
 KING_H=1.336     # the king's height, cross included: every set's frame is fitted to it
-LATIN_TOP=1.46   # the Latin king as drawn, before it is brought down to KING_H
+LATIN_TOP=1.46   # the king as drawn, before it is brought down to KING_H
+# The king's crown, shared by both sets (Alex, 2026-11-09: "do something else with the King", after
+# the long Latin cross): a closed crown. A jewelled circlet, the stone's own cap inside it, six
+# beaded arches meeting under an orb, and a small cross with flared arms on the orb. From the side
+# a domed crown, from the 3D camera above a wheel of six spokes round a ball: never the queen's
+# open star of points, and still the tallest piece on the board by far.
+CROWN_Z=0.895; CROWN_R=0.205; CROWN_RISE=0.262
+def tube(name,pts,rad,mat,n=10):
+    """A round bar along a path; rad is one radius or one per point."""
+    bm=bmesh.new(); rings=[]
+    for i,pt in enumerate(pts):
+        a=Vector(pts[max(i-1,0)]); b=Vector(pts[min(i+1,len(pts)-1)]); t=(b-a).normalized()
+        u=t.cross(Vector((0,0,1))); u=u.normalized() if u.length>1e-6 else Vector((1,0,0)); v=t.cross(u)
+        r=rad[i] if hasattr(rad,'__len__') else rad
+        rings.append([bm.verts.new(Vector(pt)+r*(math.cos(TAU*k/n)*u+math.sin(TAU*k/n)*v)) for k in range(n)])
+    for a,b in zip(rings,rings[1:]):
+        for k in range(n): bm.faces.new((a[k],a[(k+1)%n],b[(k+1)%n],b[k]))
+    bm.faces.new(rings[0][::-1]); bm.faces.new(rings[-1])
+    bmesh.ops.recalc_face_normals(bm,faces=bm.faces)
+    me=bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
+    for q in me.polygons: q.use_smooth=True
+    ob=bpy.data.objects.new(name,me); bpy.context.scene.collection.objects.link(ob); me.materials.append(mat)
+    return ob
+def pearls(name,pts,size,mat,sub=2):
+    """Small round beads at the given points: one object."""
+    bm=bmesh.new()
+    for pt in pts: bmesh.ops.create_icosphere(bm,subdivisions=sub,radius=size,matrix=Matrix.Translation(pt))
+    me=bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
+    for q in me.polygons: q.use_smooth=True
+    ob=bpy.data.objects.new(name,me); bpy.context.scene.collection.objects.link(ob); me.materials.append(mat)
+    return ob
+def king_crown_profile():
+    """From the neck (0.11, 0.72): the cup, the wall the circlet sits on and the cap; ends on the axis."""
+    p=cove(0.11,0.72,0.2,0.835,14); p+=line(0.2,0.835,0.2,0.89,3)
+    p+=line(0.2,0.89,0.186,CROWN_Z,2)
+    p+=[(0.186*math.cos(t),CROWN_Z+0.235*math.sin(t)) for t in np.linspace(0,math.pi/2,24)[1:-1]]
+    p+=[(0.0,CROWN_Z+0.235)]
+    return p
+def king_crown(name,M,arches=6):
+    """The crown's metal: the circlet with a row of beads above and below and four stones (one faces
+    the player), the arches with pearls along them, the orb with its band, and the cross."""
+    r=CROWN_R+0.004; e=0.003
+    band=[(r-0.02,0.835),(r-e,0.835)]+arc(r-e,0.835+e,e,-math.pi/2,0,3)+arc(r-e,0.892-e,e,0,math.pi/2,3)+[(r-0.02,0.892)]
+    out=[ring_lathe(f'{name}crownband',band,M['metal']),
+         beads(f'{name}beadcrownlo',r,0.829,40,0.0085,M['metal']),beads(f'{name}beadcrownhi',r,0.898,40,0.0085,M['metal'])]
+    for i in range(4):
+        a=FRONT+i*math.pi/2
+        g=uvsphere(f'{name}gem{i}',0.026,((r+0.005)*math.cos(a),(r+0.005)*math.sin(a),0.8635),M['gem'])
+        g.scale=(0.55,0.55,1.0); g.rotation_euler=(0,0,a); out.append(g)
+    def arch(t,proud=0.0): return CROWN_R*math.cos(t)**0.75+0.012*math.sin(2*t)+proud, CROWN_Z+CROWN_RISE*math.sin(t)
+    for i in range(arches):
+        a=FRONT+TAU*(i+0.5)/arches                      # a gap, not an arch, faces the player: the stone shows there
+        path=[(rr*math.cos(a),rr*math.sin(a),z) for rr,z in (arch(t) for t in np.linspace(0,math.pi/2,22))]
+        out.append(tube(f'{name}arch{i}',path,[0.017-0.004*k/21 for k in range(22)],M['metal']))
+        dots=[(rr*math.cos(a),rr*math.sin(a),z+0.006) for rr,z in (arch(t,0.014) for t in np.linspace(0.12,1.25,7))]
+        out.append(pearls(f'{name}beadarch{i}',dots,0.0125,M['pearl']))
+    top=CROWN_Z+CROWN_RISE
+    out.append(lathe(f'{name}orbseat',[(0.0,top-0.017),(0.06,top-0.017),(0.066,top-0.005),(0.05,top+0.009),(0.0,top+0.009)],seg=64,mat=M['metal']))
+    out.append(uvsphere(f'{name}orbball',0.068,(0,0,top+0.065),M['metal']))
+    out.append(torus(f'{name}orbring',0.069,0.007,top+0.065,M['pearl']))
+    out+=pattee(f'{name}cross',top+0.113,LATIN_TOP,top+0.218,0.19,0.056,0.085,0.056,M['metal'])
+    return out
 QUEEN_H=0.92     # the queen's height, her ball's top: under the bishop, over the knight, far under the king
 # The queen's crown, shared by both sets: a slim neck flaring into a cup whose rim carries eight
 # points tipped with balls, round a dome under a ball on a stem. From the side a spiked crown under
@@ -261,20 +308,16 @@ def queen_crown(name,M,point_mat,tip_mat,ball_mat,n=8):
     out.append(uvsphere(f'{name}topball',QBALL_R,(0,0,zc),ball_mat))
     return out
 def king(M):
-    """A tall king under a long Latin cross: the cross alone says king."""
+    """A tall king under a closed crown: the crown alone says king."""
     R=0.31; p=base_profile(R); p+=body_start(R)
     p+=ogee(R-0.095,TOP,0.125,0.62,32)
     p+=line(0.125,0.62,0.15,0.632,2); p+=bead(0.168,0.632,0.03)
     p+=line(0.16,0.662,0.2,0.67,2); p+=bead(0.205,0.67,0.036)      # main collar (ring sits here)
     p+=line(0.19,0.706,0.11,0.72,2)
-    p+=cove(0.11,0.72,0.17,0.84); p+=bead(0.17,0.84,0.024,10)       # crown cup
-    p+=line(0.158,0.864,0.07,0.875,2)
-    p+=[(0.07*math.cos(t),0.875+0.03*math.sin(t)) for t in np.linspace(0,math.pi/2*0.9,8)]
-    top=p[-1]; p+=line(top[0],top[1],0.0,top[1],3)
-    body=lathe('K',p,mod=compose(flutes(0.19,0.6,28,0.012),gadroons(0.73,0.83,18,0.01)),mat=M['body'])
-    objs=[body,torus('Kring',0.215,0.0095,0.688,M['metal']),base_beads('Kbeadbase',R,M),beads('Kbeadcrown',0.18,0.852,36,0.0105,M['metal'])]
-    objs+=crown_gems('Kgem',p,0.79,M)
-    objs+=pattee('Kcross',0.89,LATIN_TOP,1.30,0.30,0.075,0.10,0.075,cross_finish(M))
+    p+=king_crown_profile()
+    body=lathe('K',p,mod=compose(flutes(0.19,0.6,28,0.012),gadroons(0.735,0.825,18,0.01)),mat=M['body'])
+    objs=[body,torus('Kring',0.215,0.0095,0.688,M['metal']),base_beads('Kbeadbase',R,M)]
+    objs+=king_crown('K',M)
     squash_above(objs,0.2,(KING_H-0.2)/(LATIN_TOP-0.2))
     return group('king',objs)
 def queen(M):

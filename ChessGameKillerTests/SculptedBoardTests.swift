@@ -118,11 +118,16 @@ final class SculptedBoardTests: XCTestCase {
         XCTAssertGreaterThan(h[.king] ?? 0, (h[.queen] ?? 9) + 0.4, "the king must tower over the queen")
     }
 
-    /// The king's cross is its own finish: ivory on the white king, metal on the dark one.
-    func testTheKingsCrossIsIvoryOnWhiteAndMetalOnBlack() {
+    /// The king wears a closed crown in both sets: metal arches strung with pearls over the stone's
+    /// own cap, under an orb and cross in the same metal on both sides. An older set's cross (its
+    /// own finish) still draws as it did: ivory on the white king, metal on the dark one.
+    func testTheKingWearsAClosedCrown() {
         let assets = SculptedAssets.shared
         for look in [SculptedLook.gilded, .noir] {
-            XCTAssertTrue(assets.parts(for: look)[.king]?.contains { $0.finish == .cross } ?? false, "\(look.name): the king has no cross")
+            let king = assets.parts(for: look)[.king] ?? []
+            XCTAssertTrue(king.contains { $0.finish == .pearl }, "\(look.name): the crown's arches lost their pearls")
+            XCTAssertTrue(king.contains { $0.finish == .gem }, "\(look.name): the circlet lost its stones")
+            XCTAssertFalse(king.contains { $0.finish == .cross }, "\(look.name): the cross is the crown's metal now")
             XCTAssertTrue(assets.material(.cross, for: .white, look: look) === assets.material(.body, for: .white, look: look))
             XCTAssertTrue(assets.material(.cross, for: .black, look: look) === assets.material(.metal, for: .black, look: look))
         }

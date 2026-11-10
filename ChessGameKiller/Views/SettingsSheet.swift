@@ -17,6 +17,7 @@ struct SettingsSheet: View {
     @AppStorage("rivalBanter") private var banterOn = true
     @AppStorage("sculpted3D") private var sculpted3D = true
     @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.tilted
+    @AppStorage(PieceSet.storageKey) private var pieceSet = PieceSet.stone
     @AppStorage(Heirloom.settingKey) private var heirloomOn = true
     @AppStorage(BoardTheme.coordinatesKey) private var coordinatesOn = true
     @AppStorage(HomeToneMode.key) private var homeTone = HomeToneMode.defaultMode
@@ -45,8 +46,8 @@ struct SettingsSheet: View {
 
                     PremiumSettingsCard(theme: theme) { showingPremium = true }
 
-                    // Light or dark lives here, not on the Today screen (Alex, 2026-11-07), and the
-                    // app icon sits with it (Alex, 2026-11-08).
+                    // Light or dark lives here, not on the Today screen (Alex, 2026-11-07). The app
+                    // icon sat with it; it has its own section lower down now (Alex, 2026-11-09).
                     section("Appearance") {
                         SettingsGroup(theme: theme) {
                             PickerRow(title: "Light or dark", subtitle: homeTone.blurb, symbol: "circle.lefthalf.filled", theme: theme) {
@@ -56,8 +57,6 @@ struct SettingsSheet: View {
                                     }
                                 }
                             }
-                            rule
-                            AppIconPicker(accent: accent)
                         }
                     }
 
@@ -86,6 +85,16 @@ struct SettingsSheet: View {
                                       symbol: "seal", isOn: $heirloomOn, theme: theme)
                             // The switches for the earlier homes are gone (Alex, 2026-11-08): the
                             // app has one home. HomeLayouts.settle() puts anyone who turned them off back.
+                        }
+                    }
+
+                    // The sets made for the tilted board, in tiles like the app icons (Alex,
+                    // 2026-11-09). The preview at the top wears the one picked.
+                    if theme.sculptedLook != nil {
+                        section("Pieces") {
+                            SettingsGroup(theme: theme) {
+                                PieceSetPicker(selection: $pieceSet, accent: accent)
+                            }
                         }
                     }
 
@@ -126,6 +135,13 @@ struct SettingsSheet: View {
                             ToggleRow(title: "Voice reactions", subtitle: reactionsSubtitle,
                                       symbol: "bubble.left.and.text.bubble.right.fill", isOn: $reactionsOn, theme: theme)
                                 .disabled(voiceMuted)
+                        }
+                    }
+
+                    // Moved down from Appearance, under Voice reactions (Alex, 2026-11-09).
+                    section("App icon") {
+                        SettingsGroup(theme: theme) {
+                            AppIconPicker(accent: accent)
                         }
                     }
 
@@ -239,7 +255,7 @@ struct SettingsSheet: View {
     private var preview: some View {
         VStack(spacing: 14) {
             BoardPreview(theme: theme, showBest: showBestMoves, size: 172,
-                         threeD: theme.sculptedLook != nil && sculpted3D)
+                         threeD: theme.sculptedLook != nil && sculpted3D, pieceSet: pieceSet)
                 .padding(.top, 6)
             Text("Live preview")
                 .font(.app(.caption, weight: .semibold))
@@ -316,6 +332,8 @@ struct BoardPreview: View {
     var size: CGFloat = 160
     /// The look's real 3D board, with the same position and marks.
     var threeD = false
+    /// The pieces that board wears.
+    var pieceSet = PieceSet.stone
 
     @AppStorage(BoardTheme.coordinatesKey) private var showsCoordinates = true
 
@@ -328,11 +346,12 @@ struct BoardPreview: View {
     var body: some View {
         if threeD, SculptedAssets.shared.isLoaded, let position = Self.position {
             // As tall as the flat preview, and as wide as the angled board needs.
-            SculptedStillBoard(position: position, look: theme.sculptedLook ?? .gilded, hints: stillHints,
+            SculptedStillBoard(position: position, look: pieceSet.dress(theme.sculptedLook ?? .gilded), hints: stillHints,
                                selected: Self.selected, targets: Self.targets)
                 .frame(width: size * SculptedBoardView.aspect, height: size)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Preview of the \(theme.name) board")
+                .accessibilityLabel(pieceSet == .stone ? "Preview of the \(theme.name) board"
+                                    : "Preview of the \(theme.name) board with the \(pieceSet.title) pieces")
         } else {
             flatPreview
         }

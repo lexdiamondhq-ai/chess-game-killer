@@ -18,8 +18,8 @@ final class SculptedAssets {
         case body = 0, metal = 1, gem = 2, pearl = 3
         /// The floor inside the rook's tower, which the studio light never reaches.
         case shade = 4
-        /// The king's cross: the ivory king's in its own stone, the dark king's in metal, so it
-        /// shows light against the dark frame behind the far rank.
+        /// The long cross of the first kings: the ivory king's in its own stone, the dark king's in
+        /// metal. The crowned king's cross is plain metal; a set exported before it still reads this.
         case cross = 5
     }
 
@@ -97,12 +97,17 @@ final class SculptedAssets {
         let made: SCNMaterial
         switch finish {
         case .body where color == .white:
-            made = Self.pbr(look.ivory, polish: look.ivoryPolish)
-            if look.ivoryEdge > 0 { made.shaderModifiers = [.surface: Self.edgeShading(look.ivoryEdge)] }
+            made = Self.pbr(look.ivory, polish: look.ivoryPolish, metalness: look.ivoryMetalness)
+            var surface = look.ivoryEdge > 0 ? Self.edgeShading(look.ivoryEdge) : ""
+            if look.nacre > 0 { surface += Self.nacreShading(look.nacre) }
+            if !surface.isEmpty { made.shaderModifiers = [.surface: surface] }
+            Self.finishBody(made, glow: look.ivoryGlow, clarity: look.clarity)
         case .body:
-            made = Self.pbr(look.ebony, polish: look.ebonyPolish)
+            made = Self.pbr(look.ebony, polish: look.ebonyPolish, metalness: look.ebonyMetalness)
+            if look.nacre > 0 { made.shaderModifiers = [.surface: Self.nacreShading(look.nacre)] }
+            Self.finishBody(made, glow: look.ebonyGlow, clarity: look.clarity, smoked: true)
         case .metal where darkMarks:
-            made = Self.pbr(look.ivoryMetal ?? look.platinum, roughness: 0.28, metalness: 1, coat: 0.6, coatRoughness: 0.05)
+            made = Self.pbr(look.ivoryMetal ?? look.platinum, roughness: 0.28, metalness: look.ivoryMarkMetalness, coat: 0.6, coatRoughness: 0.05)
         case .pearl where darkMarks:
             made = Self.pbr(look.ivoryPearl ?? look.pearl, roughness: 0.15, coat: 1, coatRoughness: 0.03)
         case .metal:
@@ -169,8 +174,48 @@ final class SculptedAssets {
         """
     }
 
-    static func pbr(_ color: UIColor, polish: SculptedLook.Polish) -> SCNMaterial {
-        pbr(color, roughness: polish.roughness, coat: polish.coat, coatRoughness: polish.coatRoughness)
+    static func pbr(_ color: UIColor, polish: SculptedLook.Polish, metalness: CGFloat = 0) -> SCNMaterial {
+        pbr(color, roughness: polish.roughness, metalness: metalness, coat: polish.coat, coatRoughness: polish.coatRoughness)
+    }
+
+    /// Mother-of-pearl: where the surface turns from the eye, its color drifts through rose, gold
+    /// and green, as nacre does under a light.
+    static func nacreShading(_ amount: CGFloat) -> String {
+        """
+        float turn = 1.0 - saturate(dot(normalize(_surface.normal), normalize(_surface.view)));
+        float3 shimmer = 0.5 + 0.5 * cos(6.2832 * (turn * 1.4 + float3(0.0, 0.33, 0.67)));
+        _surface.diffuse.rgb = mix(_surface.diffuse.rgb, _surface.diffuse.rgb * (0.75 + 0.5 * shimmer), \(Float(amount)) * turn);
+        """
+    }
+
+    /// A body's own faint glow, so polished metal never reflects the dark studio to black and jade
+    /// seems lit from inside; and for crystal, a body the board shows through. The dark side is
+    /// smoked glass, so `smoked` makes it far less clear than the other: it has to stay dark on a
+    /// cream square, where a clearer body turned as pale as the other side's.
+    static func finishBody(_ material: SCNMaterial, glow: UIColor?, clarity: CGFloat, smoked: Bool = false) {
+        if let glow { material.emission.contents = glow }
+        guard clarity > 0 else { return }
+        // Just under solid, so the body is drawn after the stone and blended over it; how solid
+        // each point is comes from `glassShading`.
+        material.transparency = 0.999
+        material.blendMode = .alpha
+        var modifiers = material.shaderModifiers ?? [:]
+        modifiers[.fragment] = glassShading(smoked ? clarity * 0.25 : clarity)
+        material.shaderModifiers = modifiers
+    }
+
+    /// Glass: clear where a body faces the eye, so the stone shows through its middle, and solid
+    /// toward its outline, where glass turns the light back. A bright glint stays solid anywhere.
+    static func glassShading(_ clarity: CGFloat) -> String {
+        """
+        #pragma transparent
+        #pragma body
+        float glassFacing = saturate(abs(dot(normalize(_surface.normal), normalize(_surface.view))));
+        float glassSolid = mix(\(Float(1 - clarity)), 1.0, pow(1.0 - glassFacing, 1.5));
+        float glassGlint = max(_output.color.r, max(_output.color.g, _output.color.b));
+        glassSolid = max(glassSolid, saturate(glassGlint - 1.0));
+        _output.color = float4(_output.color.rgb * glassSolid, _output.color.a * glassSolid);
+        """
     }
 
     static func pbr(
@@ -332,6 +377,20 @@ struct SculptedLook {
     var lacquerCoat: CGFloat = 0.18
     /// The line around the squares; nil is platinum.
     var inlay: UIColor?
+
+    // A piece set (PieceSet.swift) can change what the bodies are made of; these leave them as stone.
+    /// Metal bodies, such as the Sovereign set's gold and silver: 0 is stone, 1 is metal.
+    var ivoryMetalness: CGFloat = 0
+    var ebonyMetalness: CGFloat = 0
+    /// A glow of the body's own, as `metalGlow` is for the metal; nil for none.
+    var ivoryGlow: UIColor?
+    var ebonyGlow: UIColor?
+    /// How much the board shows through the bodies: 0 for stone, more for crystal.
+    var clarity: CGFloat = 0
+    /// Mother-of-pearl's shimmer toward the outline; 0 for none.
+    var nacre: CGFloat = 0
+    /// How metallic the ivory pieces' dark marks are: 1 is metal, 0 a glaze (the Porcelain set's cobalt).
+    var ivoryMarkMetalness: CGFloat = 1
 
     /// The studio the pieces reflect: a soft light tent, or a dark room with a few soft boxes.
     var studio = "sculpted-env"

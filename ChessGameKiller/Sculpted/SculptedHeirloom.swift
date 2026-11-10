@@ -17,9 +17,11 @@ extension SculptedAssets {
         if let cached = heirloomMaterials[key] { return cached }
         let body = material(.body, for: color, look: look)
         guard let made = body.copy() as? SCNMaterial else { return body }
-        let existing = body.shaderModifiers?[.surface] ?? ""
-        made.shaderModifiers = [.surface: existing + "\n" + Self.heirloomShader(heirloom, height: height(of: kind),
-                                                                                  ivory: color == .white, patina: patina)]
+        // Added to the body's own surface shading; its other shading (crystal's glass) stays.
+        var modifiers = body.shaderModifiers ?? [:]
+        modifiers[.surface] = (modifiers[.surface] ?? "") + "\n" + Self.heirloomShader(
+            heirloom, height: height(of: kind), ivory: color == .white, patina: patina)
+        made.shaderModifiers = modifiers
         heirloomMaterials[key] = made
         return made
     }
