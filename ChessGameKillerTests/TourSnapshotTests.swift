@@ -7,7 +7,8 @@ import XCTest
 /// The screens no other test pictures, at iPhone size, so the whole app can be looked over in
 /// one run: Settings from top to foot, the rivals' hall, the You panel on the board home, a
 /// lesson, Puzzles and Puzzle Rush, an opening line, Guess the Move, Today's Move before it is
-/// solved, a game in Rewind on the default look, Your games and How it works.
+/// solved, a game in Rewind on the default look and the coach's deep review of it, Your games
+/// and How it works.
 /// Saved to SNAPSHOT_DIR as tour-*.png, in the tone the run asked for (see SnapshotTone).
 @MainActor
 final class TourSnapshotTests: XCTestCase {
@@ -123,6 +124,32 @@ final class TourSnapshotTests: XCTestCase {
         let games = try show(RewindGamesView(theme: theme).environment(vault), wait: 2.5)
         try save(games, "tour-your-games")
         games.isHidden = true
+    }
+
+    /// The coach's deep review inside Rewind: waiting for it, then at a mistake, the board on the
+    /// position before the move with the better one drawn.
+    func testTheDeepReview() throws {
+        let vault = GameVault()
+        let game = RewindSample.game()
+        vault.record(game)
+        let waiting = try show(
+            RewindView(game: game, theme: theme, engine: nil, reviews: DeepReviewTestTransport([.hang]),
+                       reviewStore: DeepReviewSample.store(), reviewVoice: DeepReviewTestSpeaker(holds: true),
+                       opensReview: true).environment(vault),
+            wait: 2.5)
+        try save(waiting, "tour-deep-review-waiting")
+        waiting.isHidden = true
+
+        // The voice holds on the first part, so the picture is of that part: the mistake.
+        let review = DeepReview(coach: "leo", parts: Array(DeepReviewSample.review.parts.dropFirst(2)))
+        let reading = try show(
+            RewindView(game: game, theme: theme, engine: nil,
+                       reviews: DeepReviewTestTransport([.event(.review(review)), .event(.done)]),
+                       reviewStore: DeepReviewSample.store(), reviewVoice: DeepReviewTestSpeaker(holds: true),
+                       opensReview: true).environment(vault),
+            wait: 3)
+        try save(reading, "tour-deep-review")
+        reading.isHidden = true
     }
 
     func testHowItWorks() throws {

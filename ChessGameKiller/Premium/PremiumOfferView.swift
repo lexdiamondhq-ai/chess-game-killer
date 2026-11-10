@@ -210,7 +210,7 @@ private struct PremiumBenefitList: View {
         Benefit(symbol: "person.text.rectangle", title: "A coach that learns you",
                 detail: "Your style, strengths and leaks from every game, and a plan rebuilt after each one."),
         Benefit(symbol: "backward.circle", title: "Full Rewind on every game",
-                detail: "Ghost lines, second chances and what could have been."),
+                detail: "Your coach talks you through the whole game. Ghost lines and second chances."),
         Benefit(symbol: "puzzlepiece.extension", title: "Unlimited puzzles",
                 detail: "115,000 rated puzzles, Puzzle Rush, Cycles and your review queue."),
         Benefit(symbol: "graduationcap", title: "Every lesson and drill",

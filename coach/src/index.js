@@ -7,8 +7,11 @@
 // - answer.js: Claude call 2, Leo's words, with the server's own wording as a safety net.
 // - voice.js: Leo's voice on ElevenLabs.
 //
-// This file checks each request, keeps the limits and runs the stream. It also
-// exports TalkBudget, the Durable Object that counts the day's talks.
+// - review.js: POST /review, the deep review: the coach talks through a whole
+//   finished game in parts, each read aloud (lines: review, voice per part, done).
+//
+// This file checks each request, keeps the limits and runs the streams. It also
+// exports TalkBudget, the Durable Object that counts the day's talks and reviews.
 //
 // Only functions, classes and handler objects are exported: once the worker
 // has a Durable Object, the Workers runtime refuses a plain string or number
@@ -18,6 +21,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { coachOf, templateAnswer, wordAnswer } from "./answer.js";
 import { describePosition } from "./board.js";
 import { claudeTimeoutMs, cleanText, failureCode, parseClaims } from "./claims.js";
+import { checkReview, writeReview } from "./review.js";
 import { Chess } from "./vendor/chess.js";
 import { verifyTalk } from "./verify.js";
 import { recordingKey, speak, toBase64, voiceKey } from "./voice.js";
@@ -33,6 +37,12 @@ const MAX_THREATS = 16;
 const MAX_PV = 10;
 const DEFAULT_DAILY_TALKS = 400;
 const DEFAULT_DAILY_VOICE_CHARS = 40000;
+/** A whole game with its grades and lines. */
+const MAX_REVIEW_BODY_BYTES = 256 * 1024;
+/** Each review is one Opus call and about two minutes of voice, roughly 13 cents. */
+const DEFAULT_DAILY_REVIEWS = 150;
+/** ElevenLabs reads this many parts of a review at once. */
+const VOICES_AT_ONCE = 4;
 const ENCODER = new TextEncoder();
 const STREAM_HEADERS = {
   "content-type": "application/x-ndjson",
@@ -47,6 +57,7 @@ const REAL_STEPS = {
   verifyTalk,
   wordAnswer,
   templateAnswer,
+  writeReview,
   speak,
   makeClient,
   now: () => Date.now(),
@@ -54,7 +65,7 @@ const REAL_STEPS = {
 
 /**
  * The worker's request handler, built from its steps: { describePosition,
- * parseClaims, verifyTalk, wordAnswer, templateAnswer, speak, makeClient, now }.
+ * parseClaims, verifyTalk, wordAnswer, templateAnswer, writeReview, speak, makeClient, now }.
  * Each one left out is the real one.
  */
 export function createHandler(steps = {}) {
@@ -66,13 +77,14 @@ export function createHandler(steps = {}) {
         if (request.method === "GET" || request.method === "HEAD") return json({ ok: true });
         return json({ error: "method_not_allowed" }, 405, { allow: "GET, HEAD" });
       }
-      if (url.pathname !== "/talk") return json({ error: "not_found" }, 404);
+      if (url.pathname !== "/talk" && url.pathname !== "/review") return json({ error: "not_found" }, 404);
       if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+      const isReview = url.pathname === "/review";
       try {
-        return await talk(request, env, ctx, deps);
+        return isReview ? await review(request, env, ctx, deps) : await talk(request, env, ctx, deps);
       } catch (error) {
         // Only a code: never the body, which holds what the player said.
-        console.error(JSON.stringify({ talk: "failed", error: (error && error.name) || "error" }));
+        console.error(JSON.stringify({ [isReview ? "review" : "talk"]: "failed", error: (error && error.name) || "error" }));
         return json({ error: "internal" }, 500);
       }
     },
@@ -219,6 +231,132 @@ async function runTalk(talk, env, deps, writer) {
     if (open) await writer.close().catch(() => {});
   }
 }
+
+// ---------------------------------------------------------------------------
+// The deep review
+
+/** POST /review: everything that can be refused is refused before the stream starts. */
+async function review(request, env, ctx, deps) {
+  if (await overLimit(env.REVIEW_LIMITER, request)) {
+    return json({ error: "rate_limited" }, 429, { "retry-after": "60" });
+  }
+  const type = (request.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+  if (type !== "application/json") return json({ error: "unsupported_type" }, 415);
+  const body = await readBody(request, MAX_REVIEW_BODY_BYTES);
+  if (body === null) return json({ error: "too_large" }, 413);
+  let value;
+  try {
+    value = JSON.parse(body);
+  } catch {
+    return badRequest("The body isn't valid JSON.");
+  }
+  const checked = checkReview(value);
+  if (!checked.ok) return badRequest(checked.detail);
+  if (!anthropicKey(env)) return json({ error: "not_configured" }, 503);
+  // Reviews have their own daily allowance: each costs about ten talks.
+  if (!(await takeFromBudget(env, "review", 1, dailyLimit(env.DAILY_REVIEWS, DEFAULT_DAILY_REVIEWS)))) {
+    return json({ error: "daily_limit" }, 429);
+  }
+
+  const { readable, writable } = new TransformStream();
+  const work = runReview(checked.review, env, deps, writable.getWriter());
+  if (ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(work);
+  return new Response(readable, { status: 200, headers: STREAM_HEADERS });
+}
+
+/**
+ * Writes the lines: review (the parts' words) as soon as Claude has written
+ * and the grades have checked them, then one voice line per part as each is
+ * read (in any order; each names its part), then done. A failure writes one
+ * error line in place of the lines still to come. Never throws. Logs one line
+ * of codes and timings per review, never the game.
+ */
+async function runReview(game, env, deps, writer) {
+  const started = deps.now();
+  const log = { review: "done", plies: game.plies.length, parts: 0, chars: 0, write_ms: null, voice_ms: null, voiced: 0 };
+  let open = true;
+  const send = async (line) => {
+    if (!open) return false;
+    try {
+      await writer.write(ENCODER.encode(`${JSON.stringify(line)}\n`));
+      return true;
+    } catch {
+      // The player left: stop, so nothing more is spent on them.
+      open = false;
+      log.review = "hung_up";
+      return false;
+    }
+  };
+
+  try {
+    let parts;
+    try {
+      parts = await deps.writeReview(deps.makeClient(env), env, game);
+      if (!Array.isArray(parts) || parts.length === 0) throw new Error("no review");
+    } catch (error) {
+      log.review = "write_failed";
+      log.error = failureCode(error);
+      await send({ type: "error", error: streamError(log.error) });
+      return;
+    } finally {
+      log.write_ms = deps.now() - started;
+    }
+    log.parts = parts.length;
+    log.chars = parts.reduce((sum, part) => sum + part.text.length, 0);
+    if (!(await send({ type: "review", coach: game.coach, parts }))) return;
+
+    if (game.voice) {
+      const voiceStarted = deps.now();
+      // A few parts at a time, the first ones first, so the app can start playing early.
+      let next = 0;
+      const readers = Array.from({ length: Math.min(VOICES_AT_ONCE, parts.length) }, async () => {
+        while (open && next < parts.length) {
+          const index = next++;
+          const line = await partVoice(parts, index, env, deps, game.coach);
+          if (line.audio) log.voiced += 1;
+          await send(line);
+        }
+      });
+      await Promise.all(readers);
+      log.voice_ms = deps.now() - voiceStarted;
+      if (!open) return;
+    }
+    await send({ type: "done" });
+  } catch {
+    log.review = "failed";
+    await send({ type: "error", error: "internal" });
+  } finally {
+    log.total_ms = deps.now() - started;
+    console.log(JSON.stringify(log));
+    if (open) await writer.close().catch(() => {});
+  }
+}
+
+/**
+ * One part's voice line: the coach's MP3, or why there's none so the app reads
+ * the part with the device's voice. A review's parts are new words every time,
+ * so they aren't kept in the recordings, and the review's own daily allowance
+ * covers their cost.
+ */
+async function partVoice(parts, index, env, deps, coach) {
+  const line = { type: "voice", part: index };
+  if (!voiceKey(env)) return { ...line, unavailable: "not_configured" };
+  const around = {
+    before: parts.slice(0, index).map((part) => part.text).join(" "),
+    after: parts.slice(index + 1).map((part) => part.text).join(" "),
+  };
+  let audio = null;
+  try {
+    audio = await deps.speak(env, parts[index].text, undefined, coach, around);
+  } catch {
+    audio = null;
+  }
+  if (!(audio instanceof Uint8Array) || audio.length === 0) return { ...line, unavailable: "upstream" };
+  return { ...line, format: "mp3", audio: toBase64(audio) };
+}
+
+// ---------------------------------------------------------------------------
+// Voices and helpers for both streams
 
 /** The voice line: the coach's MP3, or why there's none so the app uses the device's voice. */
 async function voiceLine(text, env, deps, coach = "leo") {
@@ -421,7 +559,7 @@ function dailyLimit(value, fallback) {
 }
 
 /**
- * Takes `amount` from today's allowance of `kind` ("talk" or "voice"). True
+ * Takes `amount` from today's allowance of `kind` ("talk", "voice" or "review"). True
  * when it fit (or no budget is set up). Throws when the budget can't be asked,
  * so a broken budget never quietly lifts the ceiling.
  */
@@ -432,23 +570,30 @@ async function takeFromBudget(env, kind, amount, limit) {
   return answer.status === 200;
 }
 
+/** Where TalkBudget keeps each kind's count, and the allowance when a request names none. */
+const BUDGET_KINDS = Object.freeze({
+  talk: { field: "talks", fallback: DEFAULT_DAILY_TALKS },
+  voice: { field: "voice", fallback: DEFAULT_DAILY_VOICE_CHARS },
+  review: { field: "reviews", fallback: DEFAULT_DAILY_REVIEWS },
+});
+
 /**
- * Counts today's talks and characters of Leo's voice (days in UTC). One
- * instance serves the whole app, so the counts are exact.
+ * Counts today's talks, characters of Leo's voice and deep reviews (days in
+ * UTC). One instance serves the whole app, so the counts are exact.
  */
 export class TalkBudget {
   constructor(ctx) {
     this.ctx = ctx;
   }
 
-  /** POST /talk or /voice, with ?amount=&limit=. 200 when it fit, 429 when today's allowance is spent. */
+  /** POST /talk, /voice or /review, with ?amount=&limit=. 200 when it fit, 429 when today's allowance is spent. */
   async fetch(request) {
     const url = new URL(request.url);
-    const kind = { "/talk": "talk", "/voice": "voice" }[url.pathname];
-    if (!kind) return new Response("not found", { status: 404 });
+    const kind = url.pathname.slice(1);
+    if (!Object.prototype.hasOwnProperty.call(BUDGET_KINDS, kind)) return new Response("not found", { status: 404 });
     const amount = Number(url.searchParams.get("amount"));
     const limit = Number(url.searchParams.get("limit"));
-    const fallback = kind === "voice" ? DEFAULT_DAILY_VOICE_CHARS : DEFAULT_DAILY_TALKS;
+    const fallback = BUDGET_KINDS[kind].fallback;
     const ok = await this.take(
       kind,
       Number.isFinite(amount) && amount > 0 ? Math.ceil(amount) : 1,
@@ -457,12 +602,12 @@ export class TalkBudget {
     return new Response(ok ? "ok" : "spent", { status: ok ? 200 : 429 });
   }
 
-  /** Takes `amount` talks or voice characters, if today's count stays within `limit`. */
+  /** Takes `amount` talks, voice characters or reviews, if today's count stays within `limit`. */
   async take(kind, amount, limit, now = Date.now()) {
     const day = new Date(now).toISOString().slice(0, 10);
     const saved = await this.ctx.storage.get("today");
-    const today = saved && saved.day === day ? saved : { day, talks: 0, voice: 0 };
-    const field = kind === "voice" ? "voice" : "talks";
+    const today = saved && saved.day === day ? saved : { day, talks: 0, voice: 0, reviews: 0 };
+    const field = (BUDGET_KINDS[kind] || BUDGET_KINDS.talk).field;
     const used = Number(today[field]) || 0;
     if (used + amount > limit) return false;
     await this.ctx.storage.put("today", { ...today, [field]: used + amount });

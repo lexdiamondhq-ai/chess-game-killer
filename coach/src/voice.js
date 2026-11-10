@@ -35,6 +35,8 @@ const VERA_OUTPUT_FORMAT = "mp3_44100_128";
  * the device's voice is quicker. With Claude's two calls it stays inside the app's 35 s.
  */
 const DEFAULT_TIMEOUT_MS = 10000;
+/** How much of the talk around a part ElevenLabs is shown. */
+const CONTEXT_CHARS = 300;
 /** 320 characters of speech is about 20 seconds, about 160 KB at 64 kbps. Anything far bigger is wrong. */
 const MAX_AUDIO_BYTES = 2 * 1024 * 1024;
 
@@ -47,8 +49,12 @@ export function voiceKey(env) {
  * The coach ("leo" or "vera") saying `text`, as MP3 bytes. Null when there's no key, or when
  * ElevenLabs fails, answers with something that isn't audio, or takes longer
  * than VOICE_TIMEOUT_MS (10 s; tests shorten it).
+ *
+ * `around` is { before, after }: what the coach says just before and after `text`, when it is
+ * one part of a longer talk read part by part (the deep review), so each part is spoken as the
+ * middle of a talk rather than as a line of its own.
  */
-export async function speak(env, text, fetchImpl = fetch, coach = "leo") {
+export async function speak(env, text, fetchImpl = fetch, coach = "leo", around = null) {
   const key = voiceKey(env);
   const words = String(text || "").trim();
   if (!key || !words) return null;
@@ -62,6 +68,13 @@ export async function speak(env, text, fetchImpl = fetch, coach = "leo") {
   const settings = vera ? VERA_VOICE_SETTINGS : VOICE_SETTINGS;
   const body = { text: words, model_id: model };
   if (settings) body.voice_settings = settings;
+  // Only the models that take the words around a line (the newest ones refuse them).
+  if (around && /flash|turbo|multilingual/.test(model)) {
+    const before = String(around.before || "").trim().slice(-CONTEXT_CHARS);
+    const after = String(around.after || "").trim().slice(0, CONTEXT_CHARS);
+    if (before) body.previous_text = before;
+    if (after) body.next_text = after;
+  }
   try {
     const response = await fetchImpl(`${API}/${voice}?output_format=${vera ? VERA_OUTPUT_FORMAT : OUTPUT_FORMAT}`, {
       method: "POST",
