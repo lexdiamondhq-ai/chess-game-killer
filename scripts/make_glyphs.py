@@ -339,6 +339,108 @@ def today():
     return svg([page, rings, centered_pawn(12, 14.75, 0.42)])
 
 
+# --- Home's fine emblems (Alex, 2026-11-10: "more elegant with color", picked Jewel and gold):
+# hairline drawings shown in gold on a deep jewel tile. An eye for Puzzles (Sharpen your eye), a
+# laurel round a pawn for Coach Leo's training, and one drawing for each Chess DNA style. Each
+# returns (strokes, fills); fine() turns that into an SVG with hairline strokes. ---
+
+FINE_LINE = 1.05
+
+
+def fine(drawing):
+    strokes, fills = drawing()
+    return svg(fills, [(d, FINE_LINE) for d in strokes])
+
+
+def leaf(cx, cy, ang, l=2.2, w=0.95):
+    a = math.radians(ang)
+    dx, dy = math.cos(a), math.sin(a)
+    nx, ny = -dy, dx
+    x0, y0 = cx - dx * l / 2, cy - dy * l / 2
+    x1, y1 = cx + dx * l / 2, cy + dy * l / 2
+    return (f"M{x0:.2f} {y0:.2f}Q{cx + nx * w:.2f} {cy + ny * w:.2f} {x1:.2f} {y1:.2f}"
+            f"Q{cx - nx * w:.2f} {cy - ny * w:.2f} {x0:.2f} {y0:.2f}Z")
+
+
+def fine_eye():
+    s = ["M1.8 12C5 6.6 8.4 5.2 12 5.2C15.6 5.2 19 6.6 22.2 12C19 17.4 15.6 18.8 12 18.8C8.4 18.8 5 17.4 1.8 12Z",
+         circle(12, 12, 4.2)]
+    f = [circle(12, 12, 1.9),
+         # a small sparkle on the iris
+         "M14.1 9.2L14.45 10.05L15.3 10.4L14.45 10.75L14.1 11.6L13.75 10.75L12.9 10.4L13.75 10.05Z"]
+    return s, f
+
+
+def fine_laurel():
+    R, cx, cy = 9.0, 12.0, 11.6
+    def pt(deg):
+        a = math.radians(deg)
+        return cx + R * math.cos(a), cy + R * math.sin(a)
+    sx, sy = pt(105); ex, ey = pt(215)
+    stem_l = f"M{sx:.2f} {sy:.2f}A{R} {R} 0 0 1 {ex:.2f} {ey:.2f}"
+    stem_r = f"M{24 - sx:.2f} {sy:.2f}A{R} {R} 0 0 0 {24 - ex:.2f} {ey:.2f}"
+    f = []
+    for deg in [118, 138, 158, 178, 198, 216]:
+        x, y = pt(deg)
+        tang = deg + 90  # direction of travel up the left branch
+        for side in (-38, 38):
+            a = math.radians(tang + side)
+            lx, ly = x + 1.25 * math.cos(a), y + 1.25 * math.sin(a)
+            f.append(leaf(lx, ly, tang + side, l=2.7, w=0.95))
+            f.append(leaf(24 - lx, ly, 180 - (tang + side), l=2.7, w=0.95))
+    f.append(pawn(dx=12 - 12 * 0.56, dy=4.6, s=0.56))
+    return [stem_l, stem_r], f
+
+
+def fine_rapiers():
+    s = ["M4.5 19.5L19.2 4.8", "M19.5 19.5L4.8 4.8",
+         "M5.4 15.8L8.2 18.6", "M18.6 15.8L15.8 18.6"]
+    f = [circle(3.9, 20.1, 1.0), circle(20.1, 20.1, 1.0),
+         "M19.2 4.8L21 3L20.2 5.8Z", "M4.8 4.8L3 3L3.8 5.8Z"]
+    return s, f
+
+
+def fine_fork():
+    k = knight(dx=-2.0, dy=3.2, s=0.86, eye=False)
+    s = ["M14.6 8.0L20.4 3.0", "M16.0 11.8L21.8 11.8", k]
+    f = ["M21.6 2.0L21.4 5.6L18.2 2.4Z", "M23.2 11.8L20.0 13.6L20.0 10.0Z"]
+    return s, f
+
+
+def fine_shield():
+    s = ["M12 2L19.8 4.8V11.2C19.8 16.2 16.4 19.8 12 21.8C7.6 19.8 4.2 16.2 4.2 11.2V4.8Z",
+         "M15.2 14.2C16.4 11.4 14.8 8.6 11.8 8.6H9.2"]
+    f = ["M9.6 6.6L7.2 8.6L9.6 10.6Z"]
+    return s, f
+
+
+def fine_hourglass():
+    s = ["M6.2 2.6H17.8", "M6.2 21.4H17.8",
+         "M7.4 2.6C7.4 7.6 10.6 9.6 10.6 12C10.6 14.4 7.4 16.4 7.4 21.4",
+         "M16.6 2.6C16.6 7.6 13.4 9.6 13.4 12C13.4 14.4 16.6 16.4 16.6 21.4"]
+    f = ["M9.0 6.4H15.0C14.6 8.2 12.8 9.6 12.0 10.6C11.2 9.6 9.4 8.2 9.0 6.4Z",
+         "M8.6 20.6C9.0 18.4 10.8 17.2 12 16.8C13.2 17.2 15 18.4 15.4 20.6Z"]
+    return s, f
+
+
+def fine_column():
+    s = ["M4.2 5.4L12 2.2L19.8 5.4Z", "M5.4 7.2H18.6",
+         "M7.6 7.2V18.2", "M10.5 7.2V18.2", "M13.5 7.2V18.2", "M16.4 7.2V18.2",
+         "M5.4 18.2H18.6", "M4.0 20.8H20.0"]
+    return s, []
+
+
+def fine_compass():
+    pts = []
+    for i in range(16):
+        a = math.radians(i * 22.5 - 90)
+        r = 10.6 if i % 4 == 0 else (6.0 if i % 2 == 0 else 2.4)
+        pts.append((12 + r * math.cos(a), 12 + r * math.sin(a)))
+    star = "M" + "L".join(f"{x:.2f} {y:.2f}" for x, y in pts) + "Z"
+    return [star, circle(12, 12, 6.8)], [circle(12, 12, 1.1)]
+
+
+
 GLYPHS = {
     "glyph-home": svg([rook()]),
     "glyph-train": svg([knight()]),
@@ -361,6 +463,14 @@ GLYPHS = {
     "glyph-online": online(),
     "glyph-scan": scan(),
     "glyph-today": today(),
+    "glyph-fine-eye": fine(fine_eye),
+    "glyph-fine-laurel": fine(fine_laurel),
+    "glyph-fine-attacker": fine(fine_rapiers),
+    "glyph-fine-tactician": fine(fine_fork),
+    "glyph-fine-counterpuncher": fine(fine_shield),
+    "glyph-fine-grinder": fine(fine_hourglass),
+    "glyph-fine-builder": fine(fine_column),
+    "glyph-fine-all-rounder": fine(fine_compass),
 }
 
 
