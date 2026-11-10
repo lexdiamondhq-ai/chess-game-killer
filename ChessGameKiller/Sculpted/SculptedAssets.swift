@@ -18,8 +18,8 @@ final class SculptedAssets {
         case body = 0, metal = 1, gem = 2, pearl = 3
         /// The floor inside the rook's tower, which the studio light never reaches.
         case shade = 4
-        /// The king's cross: the ivory king's in its own stone, the dark king's in metal, so it
-        /// shows light against the dark frame behind the far rank.
+        /// The long cross of the first kings: the ivory king's in its own stone, the dark king's in
+        /// metal. The crowned king's cross is plain metal; a set exported before it still reads this.
         case cross = 5
     }
 
