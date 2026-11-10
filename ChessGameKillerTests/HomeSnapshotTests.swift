@@ -154,8 +154,9 @@ final class HomeSnapshotTests: XCTestCase {
             let page = VStack(spacing: 0) {
                 HomeAuroraSection(title: "For today", palette: palette)
                 VStack(spacing: 10) {
-                    HomeAuroraTodayCard(fen: finest.fen, flipped: false, title: "White to play and win",
-                                        detail: "Keep your 5-day streak", played: false, palette: palette, open: {})
+                    HomeAuroraTodayCard(eyebrow: "Today's Move", fen: finest.fen, flipped: false,
+                                        title: "White to play and win", detail: "Keep your 5-day streak",
+                                        button: "Play", symbol: "play.fill", palette: palette, open: {})
                     HomeAuroraFinestRow(finest: finest, palette: palette, replay: {})
                     HomeAuroraRow(eyebrow: "Puzzles", title: "Sharpen your eye", detail: "Tactics at your level, one after another",
                                   accent: palette.violet, palette: palette, action: {}) {

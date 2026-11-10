@@ -1,16 +1,20 @@
 import SwiftUI
 import UIKit
 
-/// Today's Move in the large card For today opens with (Alex, 2026-11-09: "For Today should be
-/// todays move"; "still have the larger card view"; "just say todays move"): the day's position
-/// in a gold frame, whose move it is in serif, the streak line, and Play. A tap anywhere opens it.
+/// The large card For today opens with (Alex, 2026-11-09: "For Today should be todays move";
+/// "still have the larger card view"): a position in a gold frame, small caps, a serif title, a
+/// line, and one button. It holds Today's Move, and your games under way swipe in before it
+/// (Alex, 2026-11-10). A tap anywhere opens it.
 struct HomeAuroraTodayCard: View {
+    let eyebrow: String
     let fen: String?
     let flipped: Bool
     let title: String
     let detail: String
-    /// Played today: the card offers to see how it went instead of Play.
-    let played: Bool
+    let button: String
+    let symbol: String
+    /// Your move: the board wears a fine gold rim.
+    var lit = false
     let palette: HomeAuroraPalette
     let open: () -> Void
 
@@ -20,7 +24,7 @@ struct HomeAuroraTodayCard: View {
             HStack(spacing: 14) {
                 frame(side: 112)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("TODAY'S MOVE")
+                    Text(eyebrow.uppercased())
                         .font(.system(size: 10, weight: .bold))
                         .tracking(1.2)
                         .foregroundStyle(palette.gold)
@@ -36,7 +40,7 @@ struct HomeAuroraTodayCard: View {
                         .foregroundStyle(palette.ink2)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
-                    pill(played ? "See it" : "Play", symbol: played ? "checkmark" : "play.fill")
+                    pill(button, symbol: symbol)
                         .padding(.top, 6)
                 }
                 Spacer(minLength: 0)
@@ -56,12 +60,12 @@ struct HomeAuroraTodayCard: View {
         }
         .buttonStyle(HomeStagePress())
         .accessibilityElement(children: .combine)
-        .accessibilityHint(played ? "Shows how today's move went" : "Opens today's move")
+        .accessibilityHint(button)
     }
 
     private func frame(side: CGFloat) -> some View {
         let pad: CGFloat = side * 0.055
-        return HomeAuroraBoard(fen: fen, flipped: flipped, lit: false)
+        return HomeAuroraBoard(fen: fen, flipped: flipped, lit: lit)
             .frame(width: side - 2 * pad, height: side - 2 * pad)
             .padding(pad)
             .background(
