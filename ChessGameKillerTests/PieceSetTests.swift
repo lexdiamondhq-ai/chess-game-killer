@@ -69,6 +69,8 @@ final class PieceSetTests: XCTestCase {
         XCTAssertEqual(stone.transparency, 1)
         let crystal = assets.material(.body, for: .white, look: PieceSet.crystal.dress(.gilded))
         XCTAssertLessThan(crystal.transparency, 1)
+        XCTAssertNotNil(crystal.shaderModifiers?[.fragment])
+        XCTAssertNil(stone.shaderModifiers?[.fragment])
         XCTAssertFalse(crystal === stone)
         let gold = assets.material(.body, for: .white, look: PieceSet.sovereign.dress(.gilded))
         XCTAssertEqual((gold.metalness.contents as? NSNumber)?.doubleValue, 1)

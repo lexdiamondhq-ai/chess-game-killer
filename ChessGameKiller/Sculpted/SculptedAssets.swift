@@ -105,7 +105,7 @@ final class SculptedAssets {
         case .body:
             made = Self.pbr(look.ebony, polish: look.ebonyPolish, metalness: look.ebonyMetalness)
             if look.nacre > 0 { made.shaderModifiers = [.surface: Self.nacreShading(look.nacre)] }
-            Self.finishBody(made, glow: look.ebonyGlow, clarity: look.clarity)
+            Self.finishBody(made, glow: look.ebonyGlow, clarity: look.clarity, smoked: true)
         case .metal where darkMarks:
             made = Self.pbr(look.ivoryMetal ?? look.platinum, roughness: 0.28, metalness: look.ivoryMarkMetalness, coat: 0.6, coatRoughness: 0.05)
         case .pearl where darkMarks:
@@ -189,13 +189,32 @@ final class SculptedAssets {
     }
 
     /// A body's own faint glow, so polished metal never reflects the dark studio to black and jade
-    /// seems lit from inside; and for crystal, a body the board shows through.
-    static func finishBody(_ material: SCNMaterial, glow: UIColor?, clarity: CGFloat) {
+    /// seems lit from inside; and for crystal, a body the board shows through. The dark side is
+    /// smoked glass, so `smoked` makes it less clear than the other.
+    static func finishBody(_ material: SCNMaterial, glow: UIColor?, clarity: CGFloat, smoked: Bool = false) {
         if let glow { material.emission.contents = glow }
         guard clarity > 0 else { return }
-        material.transparency = 1 - clarity
-        material.transparencyMode = .dualLayer
+        // Just under solid, so the body is drawn after the stone and blended over it; how solid
+        // each point is comes from `glassShading`.
+        material.transparency = 0.999
         material.blendMode = .alpha
+        var modifiers = material.shaderModifiers ?? [:]
+        modifiers[.fragment] = glassShading(smoked ? clarity * 0.6 : clarity)
+        material.shaderModifiers = modifiers
+    }
+
+    /// Glass: clear where a body faces the eye, so the stone shows through its middle, and solid
+    /// toward its outline, where glass turns the light back. A bright glint stays solid anywhere.
+    static func glassShading(_ clarity: CGFloat) -> String {
+        """
+        #pragma transparent
+        #pragma body
+        float glassFacing = saturate(abs(dot(normalize(_surface.normal), normalize(_surface.view))));
+        float glassSolid = mix(\(Float(1 - clarity)), 1.0, pow(1.0 - glassFacing, 1.5));
+        float glassGlint = max(_output.color.r, max(_output.color.g, _output.color.b));
+        glassSolid = max(glassSolid, saturate(glassGlint - 1.0));
+        _output.color = float4(_output.color.rgb * glassSolid, _output.color.a * glassSolid);
+        """
     }
 
     static func pbr(

@@ -292,6 +292,8 @@ jobs:
           grep -E "error:|\*\* " build.log | head -60 || true
           grep -E "Executed" build.log | tail -3 || true
           grep -E "Restarting after|Fatal error" build.log | head -20 || true
+          # The test that was running when the app went down, for a crash with no failing test.
+          awk '/Test Case .* started/ { last = $0 } /Restarting after/ { print "RUNNING AT THE CRASH: " last }' build.log | head -5 || true
           # How the shared engine started, when it was slow to (see StockfishEngine.startEngine).
           grep -E "Stockfish: " build.log | head -10 || true
       - name: Repeat the failures
