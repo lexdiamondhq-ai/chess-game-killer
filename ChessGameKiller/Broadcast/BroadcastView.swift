@@ -72,7 +72,8 @@ struct BroadcastView: View {
                 corners(safe: geo.safeAreaInsets)
                     .frame(width: geo.size.width, height: geo.size.height)
             }
-            .frame(width: geo.size.width, height: geo.size.height)
+            // The film is taller than the screen: everything hangs from the top, not the middle.
+            .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
             .clipped()
         }
         .ignoresSafeArea()
