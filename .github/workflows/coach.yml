@@ -3,7 +3,8 @@ name: Coach server
 # Tests the Talk It Through server (coach/) and deploys it to Cloudflare.
 # Pull requests also run the live check (coach/test/live.mjs): the real
 # pipeline against the real APIs for every case in test/fixtures/talks.json,
-# printed in the run's summary. It costs about a cent a case.
+# printed in the run's summary. It costs about a cent a case. Then one deep
+# review of a whole game (coach/test/review-live.mjs), about four cents.
 #
 # Secrets: ANTHROPIC_API_KEY and CLOUDFLARE_API_TOKEN to deploy
 # (CLOUDFLARE_ACCOUNT_ID is optional; it is looked up from the token).
@@ -79,6 +80,13 @@ jobs:
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
         shell: bash
         run: node coach/test/live.mjs | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Leo's deep review of a whole game, for real
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+        shell: bash
+        run: node coach/test/review-live.mjs | tee -a "$GITHUB_STEP_SUMMARY"
 
   deploy:
     needs: test

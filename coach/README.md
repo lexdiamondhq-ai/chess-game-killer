@@ -86,3 +86,14 @@ turn down is answered by another model rather than refused. The first call's ins
 around 1,500 tokens in all, plus a few hundred tokens out each, thinking included. That comes to about half a cent to a
 cent a talk at list prices, so `DAILY_TALKS` caps Claude at roughly $4 a day. The live check prints the measured
 figure. The voice is 100 to 320 characters of ElevenLabs a talk; `DAILY_VOICE_CHARS` caps it at 40,000 a day.
+
+## The deep review
+
+`POST /review` is Leo's review of a whole finished game (PROTOCOL.md has the shapes). One call to Claude Opus 5.5 at
+medium effort writes it from the moves and the grades the phone's Stockfish already gave them (`src/review.js`), the
+grades check it, and each part is read aloud on its own so the app can move the board with his words.
+`npm test` covers it (`test/review.test.js`); `ANTHROPIC_API_KEY=… npm run live:review` writes one for the game in
+`test/fixtures/review-game.json` and prints it with its tokens and price, and the pull request's live check does the same.
+
+A review is about 2,800 tokens in and 400 words of thinking and writing out, about 3 cents on Opus at list prices
+(about 6 on Fable 5.2: set `REVIEW_MODEL`), plus about 1,400 characters of voice. `DAILY_REVIEWS` (150) caps the day.

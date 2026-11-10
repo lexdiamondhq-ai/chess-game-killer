@@ -28,13 +28,29 @@ VOICE_MODEL = "eleven_v4"
 # character of the lessons' model, in the same voice. Remove to match the lessons exactly.
 TALK_VOICE_MODEL = "eleven_flash_v2_5"
 
+# The deep review (POST /review): after a game the coach talks through the whole of it.
+# One call to a stronger model than Talk's (to try Fable: "claude-fable-5-2", about twice
+# the price), thinking a little more, with longer to answer.
+REVIEW_MODEL = "claude-opus-5-5"
+REVIEW_EFFORT = "medium"
+REVIEW_TIMEOUT_MS = "45000"
+# The most deep reviews a day across everyone. Each is about 13 cents (3 for Claude, about
+# 10 for two minutes of voice), so this caps the day at about 20 dollars.
+DAILY_REVIEWS = "150"
+
 # At most 12 talks a minute from one address, so a leaked URL can't run up the bill.
 [[ratelimits]]
 name = "TALK_LIMITER"
 namespace_id = "3001"
 simple = { limit = 12, period = 60 }
 
-# Counts the day's talks and voice characters. SQLite storage works on the Workers Free plan.
+# At most 4 deep reviews a minute from one address.
+[[ratelimits]]
+name = "REVIEW_LIMITER"
+namespace_id = "3003"
+simple = { limit = 4, period = 60 }
+
+# Counts the day's talks, voice characters and deep reviews. SQLite storage works on the Workers Free plan.
 [[durable_objects.bindings]]
 name = "BUDGET"
 class_name = "TalkBudget"
