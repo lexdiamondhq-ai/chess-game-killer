@@ -180,7 +180,8 @@ final class OnlineLobby {
     /// The line under the chips: "Blitz · 3 minutes each plus 2 seconds a move". No clock says it isn't rated.
     static func detail(_ clock: FriendClock?) -> String {
         guard let clock else { return "No clock · take all the time you like, not rated" }
-        return "\(clock.kind) · \(clock.phrase)"
+        // The app's own time controls keep the words they have everywhere else.
+        return clock.timeControl?.detail ?? "\(clock.kind) · \(clock.phrase)"
     }
 
     private(set) var players: [LobbyPlayer] = []

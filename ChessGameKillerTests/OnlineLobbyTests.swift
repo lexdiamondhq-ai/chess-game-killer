@@ -128,7 +128,6 @@ final class OnlineLobbyTests: XCTestCase {
         }
         XCTAssertEqual(OnlineLobby.clock(id: "junk"), FriendClock(initial: 300, increment: 0))
         XCTAssertEqual(OnlineLobby.detail(FriendClock(initial: 1800, increment: 0)), "Classical · 30 minutes each")
-        center.dismiss()
     }
 
     func testThePlayerKeyIsMadeOnceAndKept() {
