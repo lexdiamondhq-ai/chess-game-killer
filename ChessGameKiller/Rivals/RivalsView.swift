@@ -17,7 +17,6 @@ struct RivalsHall: View {
     let close: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(GameVault.self) private var vault: GameVault?
     @State private var ladder: RivalLadder
     @State private var selected: MatchController.Level?
     /// The rival whose film is playing.
@@ -71,7 +70,6 @@ struct RivalsHall: View {
                               step: { stepFilm(by: $0) }, close: close) {
                     VStack(spacing: 0) {
                         RivalFilmEnding(film: film, open: ladder.isOpen(level),
-                                        record: RivalRecord(vault?.games ?? [], against: film.rival),
                                         face: { withAnimation(.easeIn(duration: 0.3)) { showing = film } },
                                         notToday: close)
                         .padding(.horizontal, 24)
@@ -386,40 +384,13 @@ struct RivalHallWords: View {
     }
 }
 
-/// Your games against one rival: wins, losses and draws.
-struct RivalRecord: Equatable {
-    var wins = 0
-    var losses = 0
-    var draws = 0
-
-    init(wins: Int = 0, losses: Int = 0, draws: Int = 0) {
-        self.wins = wins
-        self.losses = losses
-        self.draws = draws
-    }
-
-    /// Counted from the games played here against the rival (not ones brought in from a site).
-    init(_ games: [SavedGame], against rival: Rival) {
-        for game in games where game.level == rival.level.rawValue && game.sourceID == nil
-            && (game.opponent == rival.name || rival.pastNames.contains(game.opponent)) {
-            switch game.result {
-            case .win: wins += 1
-            case .loss: losses += 1
-            case .draw: draws += 1
-            case .unfinished: break
-            }
-        }
-    }
-}
-
 /// How a rival's film ends in the hall (Alex, 2026-11-10, from a picture): its rank between gold
-/// rules, its name, a line on how it plays, its rating and your record against it, and Face in a
-/// dark glass capsule with its coin; "Not today" leaves the hall. For a locked rival the capsule
+/// rules, its name, a line on how it plays, and Face in a dark glass capsule with its coin; "Not
+/// today" leaves the hall. No rating or record (Alex, 2026-11-10: "give more room to see the video"). For a locked rival the capsule
 /// says who to beat first.
 struct RivalFilmEnding: View {
     let film: RivalFilm
     let open: Bool
-    let record: RivalRecord
     let face: () -> Void
     let notToday: () -> Void
 
@@ -452,14 +423,6 @@ struct RivalFilmEnding: View {
                 .foregroundStyle(.white.opacity(0.72))
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 12)
-            HStack(spacing: 0) {
-                stat(film.rival.elo, "RATING")
-                Rectangle().fill(.white.opacity(0.18)).frame(width: 1, height: 40)
-                stat("\(record.wins) · \(record.losses) · \(record.draws)", "WIN · LOSS · DRAW")
-            }
-            .padding(.top, 18)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Rating \(film.rival.elo). \(record.wins) wins, \(record.losses) losses, \(record.draws) draws.")
             capsule
                 .padding(.top, 22)
             Button("Not today", action: notToday)
@@ -474,20 +437,6 @@ struct RivalFilmEnding: View {
         Rectangle()
             .fill(Self.gold.opacity(0.55))
             .frame(width: 26, height: 1)
-    }
-
-    private func stat(_ value: String, _ label: String) -> some View {
-        VStack(spacing: 6) {
-            Text(value)
-                .font(.system(size: 20, weight: .medium, design: .serif))
-                .monospacedDigit()
-                .foregroundStyle(.white.opacity(0.92))
-            Text(label)
-                .font(.system(size: 10, weight: .bold))
-                .tracking(1.8)
-                .foregroundStyle(.white.opacity(0.4))
-        }
-        .frame(maxWidth: .infinity)
     }
 
     private var capsule: some View {
@@ -563,9 +512,9 @@ struct RivalHallFilm<Ending: View>: View {
                     if let player {
                         RivalFilmLayer(player: player)
                     }
-                    LinearGradient(stops: [.init(color: .clear, location: 0.3),
-                                           .init(color: .black.opacity(0.6), location: 0.5),
-                                           .init(color: .black.opacity(0.88), location: 0.68),
+                    LinearGradient(stops: [.init(color: .clear, location: 0.48),
+                                           .init(color: .black.opacity(0.6), location: 0.64),
+                                           .init(color: .black.opacity(0.88), location: 0.78),
                                            .init(color: .black.opacity(0.96), location: 1)],
                                    startPoint: .top, endPoint: .bottom)
                         .opacity(ended ? 1 : 0)
