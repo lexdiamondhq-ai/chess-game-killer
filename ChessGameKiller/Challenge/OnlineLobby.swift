@@ -137,8 +137,52 @@ final class OnlineLobby {
         case starting
     }
 
-    /// The clocks Play online offers: no clock first (just for fun, not rated), then the rated ones.
-    static let clocks: [TimeControl] = [.unlimited, .blitz3Plus2, .blitz5, .rapid10, .rapid15Plus10]
+    /// The quick picks always in view: no clock first (just for fun, not rated), then the rated ones.
+    static let quickPicks: [FriendClock?] = [nil, .init(initial: 180, increment: 2), .init(initial: 300, increment: 0),
+                                             .init(initial: 600, increment: 0), .init(initial: 900, increment: 10)]
+
+    /// One family of clocks under More times.
+    struct ClockGroup: Identifiable, Equatable {
+        let name: String
+        let clocks: [FriendClock]
+        var id: String { name }
+    }
+
+    /// Every clock Play online offers past the quick picks, by family. Each lands in the family
+    /// `FriendClock.kind` gives it, so the line under the chips agrees with its group.
+    static let moreClocks: [ClockGroup] = [
+        ClockGroup(name: "Bullet", clocks: [minutes(1, 0), minutes(1, 1), minutes(2, 1)]),
+        ClockGroup(name: "Blitz", clocks: [minutes(3, 0), minutes(3, 2), minutes(5, 0), minutes(5, 3)]),
+        ClockGroup(name: "Rapid", clocks: [minutes(10, 0), minutes(10, 5), minutes(15, 10), minutes(20, 0)]),
+        ClockGroup(name: "Classical", clocks: [minutes(30, 0), minutes(30, 20), minutes(45, 15), minutes(60, 0)]),
+    ]
+
+    private static func minutes(_ minutes: Int, _ increment: Int) -> FriendClock {
+        FriendClock(initial: minutes * 60, increment: increment)
+    }
+
+    /// How the picked clock is kept: "5+0", or "none" for no clock (the same as TimeControl's raw values).
+    static func clockID(_ clock: FriendClock?) -> String {
+        guard let clock else { return TimeControl.unlimited.rawValue }
+        return "\(clock.initial / 60)+\(clock.increment)"
+    }
+
+    /// The clock kept as `id`; nil for no clock. Anything unreadable is 5+0.
+    static func clock(id: String) -> FriendClock? {
+        if id == TimeControl.unlimited.rawValue { return nil }
+        let parts = id.split(separator: "+").compactMap { Int($0) }
+        guard parts.count == 2, parts[0] >= 1, parts[0] <= 60, parts[1] >= 0, parts[1] <= 60 else {
+            return minutes(5, 0)
+        }
+        return minutes(parts[0], parts[1])
+    }
+
+    /// The line under the chips: "Blitz · 3 minutes each plus 2 seconds a move". No clock says it isn't rated.
+    static func detail(_ clock: FriendClock?) -> String {
+        guard let clock else { return "No clock · take all the time you like, not rated" }
+        // The app's own time controls keep the words they have everywhere else.
+        return clock.timeControl?.detail ?? "\(clock.kind) · \(clock.phrase)"
+    }
 
     private(set) var players: [LobbyPlayer] = []
     private(set) var waiting = 0
