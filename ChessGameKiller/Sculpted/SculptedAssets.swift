@@ -190,7 +190,8 @@ final class SculptedAssets {
 
     /// A body's own faint glow, so polished metal never reflects the dark studio to black and jade
     /// seems lit from inside; and for crystal, a body the board shows through. The dark side is
-    /// smoked glass, so `smoked` makes it less clear than the other.
+    /// smoked glass, so `smoked` makes it far less clear than the other: it has to stay dark on a
+    /// cream square, where a clearer body turned as pale as the other side's.
     static func finishBody(_ material: SCNMaterial, glow: UIColor?, clarity: CGFloat, smoked: Bool = false) {
         if let glow { material.emission.contents = glow }
         guard clarity > 0 else { return }
@@ -199,7 +200,7 @@ final class SculptedAssets {
         material.transparency = 0.999
         material.blendMode = .alpha
         var modifiers = material.shaderModifiers ?? [:]
-        modifiers[.fragment] = glassShading(smoked ? clarity * 0.6 : clarity)
+        modifiers[.fragment] = glassShading(smoked ? clarity * 0.25 : clarity)
         material.shaderModifiers = modifiers
     }
 
