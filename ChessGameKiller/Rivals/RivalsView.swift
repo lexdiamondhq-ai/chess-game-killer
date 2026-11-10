@@ -131,21 +131,26 @@ struct RivalsHall: View {
 
     /// Deep ink, lit by the rival in front: its last frame, blurred far back.
     private var backdrop: some View {
-        ZStack {
-            Color(hex: 0x060608)
-            if let image = RivalFilm.of(selected ?? .beginner).cardImage {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .blur(radius: 60)
-                    .opacity(0.45)
-                    .id(selected)
-                    .transition(.opacity)
+        // The frame laid over the ink, not beside it: a filled image would widen the hall past
+        // the screen, and the film's ending with it.
+        Color(hex: 0x060608)
+            .overlay {
+                if let image = RivalFilm.of(selected ?? .beginner).cardImage {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .blur(radius: 60)
+                        .opacity(0.45)
+                        .id(selected)
+                        .transition(.opacity)
+                }
             }
-            LinearGradient(colors: [.black.opacity(0.55), .clear, .black.opacity(0.8)],
-                           startPoint: .top, endPoint: .bottom)
-        }
-        .ignoresSafeArea()
+            .overlay {
+                LinearGradient(colors: [.black.opacity(0.55), .clear, .black.opacity(0.8)],
+                               startPoint: .top, endPoint: .bottom)
+            }
+            .clipped()
+            .ignoresSafeArea()
         .animation(.easeInOut(duration: 0.6), value: selected)
     }
 
@@ -558,9 +563,10 @@ struct RivalHallFilm<Ending: View>: View {
                     if let player {
                         RivalFilmLayer(player: player)
                     }
-                    LinearGradient(stops: [.init(color: .clear, location: 0.45),
-                                           .init(color: .black.opacity(0.72), location: 0.75),
-                                           .init(color: .black.opacity(0.94), location: 1)],
+                    LinearGradient(stops: [.init(color: .clear, location: 0.3),
+                                           .init(color: .black.opacity(0.6), location: 0.5),
+                                           .init(color: .black.opacity(0.88), location: 0.68),
+                                           .init(color: .black.opacity(0.96), location: 1)],
                                    startPoint: .top, endPoint: .bottom)
                         .opacity(ended ? 1 : 0)
                 }
