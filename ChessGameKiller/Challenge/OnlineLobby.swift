@@ -47,6 +47,10 @@ struct LobbyPlayer: Decodable, Identifiable, Equatable, Sendable {
         name = clean.isEmpty ? "Player" : clean
         rating = try c.decodeIfPresent(Int.self, forKey: .rating) ?? 1200
         provisional = try c.decodeIfPresent(Bool.self, forKey: .provisional) ?? false
+        // The clock is always said: null for no clock. A player without one at all is broken.
+        guard c.contains(.clock) else {
+            throw DecodingError.keyNotFound(CodingKeys.clock, .init(codingPath: c.codingPath, debugDescription: "No clock"))
+        }
         clock = try c.decodeIfPresent(FriendClock.self, forKey: .clock)
         waitingFor = try c.decodeIfPresent(Double.self, forKey: .waitingFor) ?? 0
     }

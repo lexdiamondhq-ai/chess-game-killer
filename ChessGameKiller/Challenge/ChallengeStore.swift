@@ -70,7 +70,7 @@ struct FriendGame: Codable, Identifiable, Equatable, Sendable {
         result = state.result
         moveCount = state.moves.count
         fen = state.fen
-        rated = state.online
+        rated = state.online || state.rated
         opponentRating = state.ratings?[seat.opposite].label
         updatedAt = state.updatedAt > 0 ? Date(timeIntervalSince1970: state.updatedAt / 1000) : .now
     }
