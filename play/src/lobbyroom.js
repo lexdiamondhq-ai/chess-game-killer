@@ -74,10 +74,10 @@ export class Lobby extends DurableObject {
     return reply(200, tally);
   }
 
-  async list() {
+  async list({ untimed = false } = {}) {
     const now = Date.now();
     await this.#sweep(now);
-    return reply(200, lobby.listView(this.state, now));
+    return reply(200, lobby.listView(this.state, now, { untimed }));
   }
 
   async me({ playerHash }) {

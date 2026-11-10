@@ -86,6 +86,20 @@ final class ChallengeSnapshotTests: XCTestCase {
         center.dismiss()
     }
 
+    func testOnlineLobbyNoClock() throws {
+        let api = FakeChallengeAPI()
+        api.onlineRating = OnlineRating(rating: 1236, games: 4, provisional: true)
+        api.lobbyList = LobbyList(players: [
+            LobbyPlayer(id: "111111111111", name: "Sam Okafor", rating: 1310, clock: nil, waitingFor: 42_000),
+            LobbyPlayer(id: "222222222222", name: "Priya", rating: 1188, provisional: true, clock: FriendClock(initial: 300, increment: 0), waitingFor: 3_000),
+        ])
+        defaults.set(TimeControl.unlimited.rawValue, forKey: "online.clock")
+        let center = makeCenter(api)
+        center.playOnline()
+        try snapshot("online-lobby-no-clock", center: center, wait: 2.5)
+        center.dismiss()
+    }
+
     func testOnlineFindingAGame() throws {
         let api = FakeChallengeAPI()
         defaults.set(TimeControl.blitz5.rawValue, forKey: "online.clock")

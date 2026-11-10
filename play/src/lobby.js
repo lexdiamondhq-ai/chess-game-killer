@@ -17,7 +17,7 @@
 //   seat and token at the next check-in.
 //
 // Ratings are Elo, kept per player key: 1200 to start, moving faster for a
-// player's first games. Only games paired here are rated.
+// player's first games. Only games paired here are rated, and only those with a clock.
 //
 // Every function takes the time (`now`) as an argument, so tests can run the
 // lobby through minutes in milliseconds.
@@ -44,7 +44,7 @@ function invalid(message) {
 
 /**
  * Checks the body of a seek or of taking one on:
- * { name, clock (seek only; must be a clock), look?, player (a 32-hex key) }.
+ * { name, clock (seek only; a clock, or null for none), look?, player (a 32-hex key) }.
  */
 export function parseSeekInput(body, { needsClock = true, minClockSeconds = 60, isKey } = {}) {
   const input = body ?? {};
@@ -53,10 +53,12 @@ export function parseSeekInput(body, { needsClock = true, minClockSeconds = 60, 
   if (!isKey(input.player)) return invalid('"player" must be the app\'s player key: 32 lowercase hex characters.');
   let clock = null;
   if (needsClock) {
-    if (input.clock === null || input.clock === undefined) return invalid("Games with players online always have a clock.");
-    const parsed = parseClock(input.clock, minClockSeconds);
-    if (!parsed.ok) return parsed;
-    clock = parsed.clock;
+    // No clock (null) is allowed: such games are just for fun, not rated.
+    if (input.clock !== null && input.clock !== undefined) {
+      const parsed = parseClock(input.clock, minClockSeconds);
+      if (!parsed.ok) return parsed;
+      clock = parsed.clock;
+    }
   }
   return { ok: true, value: { name: cleanName(name), clock, look: cleanLook(input.look), player: input.player } };
 }
@@ -66,6 +68,7 @@ export function emptyLobby() {
 }
 
 function sameClock(a, b) {
+  if (!a || !b) return !a && !b;
   return a.initial === b.initial && a.increment === b.increment;
 }
 
@@ -94,15 +97,20 @@ export function seekView(seek, now) {
     name: seek.name,
     rating: seek.rating,
     provisional: seek.games < PROVISIONAL_GAMES,
-    clock: { initial: seek.clock.initial, increment: seek.clock.increment },
+    clock: seek.clock ? { initial: seek.clock.initial, increment: seek.clock.increment } : null,
     look: seek.look ?? null,
     waitingFor: Math.max(0, now - seek.createdAt),
   };
 }
 
-/** The lobby list: who is waiting, the longest waiting first. */
-export function listView(lobby, now) {
-  const open = openSeeks(lobby, now).sort((a, b) => a.createdAt - b.createdAt);
+/**
+ * The lobby list: who is waiting, the longest waiting first. Players waiting with
+ * no clock are listed only for apps that ask (`untimed`): older apps can't read them.
+ */
+export function listView(lobby, now, { untimed = false } = {}) {
+  const open = openSeeks(lobby, now)
+    .filter((seek) => untimed || seek.clock)
+    .sort((a, b) => a.createdAt - b.createdAt);
   return { players: open.slice(0, LIST_LIMIT).map((seek) => seekView(seek, now)), waiting: open.length, now };
 }
 

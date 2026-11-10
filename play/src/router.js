@@ -239,7 +239,7 @@ async function lobbyRequest(request, env, url, path) {
   const lobby = lobbyRoom(env);
   if (path === "/api/lobby" || path === "/api/lobby/") {
     if (method !== "GET" && method !== "HEAD") return wrongMethod("GET");
-    return fromRoom(await lobby.list());
+    return fromRoom(await lobby.list({ untimed: url.searchParams.get("untimed") === "1" }));
   }
   if (path === "/api/lobby/me" || path === "/api/lobby/me/") {
     if (method !== "POST") return wrongMethod("POST");

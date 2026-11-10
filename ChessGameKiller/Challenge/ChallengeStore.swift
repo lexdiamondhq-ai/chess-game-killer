@@ -20,7 +20,8 @@ struct FriendGame: Codable, Identifiable, Equatable, Sendable {
     var moveCount: Int
     /// The position now, for the home's small board; nil in a record from before it was kept.
     var fen: String?
-    /// Paired online from the lobby, rather than a friend's link.
+    /// Paired online from the lobby, rather than a friend's link. Called `rated` from when every online
+    /// game was; an online game with no clock isn't rated but is still marked here.
     var rated: Bool
     /// The opponent's rating in a rated game.
     var opponentRating: String?
@@ -69,7 +70,7 @@ struct FriendGame: Codable, Identifiable, Equatable, Sendable {
         result = state.result
         moveCount = state.moves.count
         fen = state.fen
-        rated = state.rated
+        rated = state.online
         opponentRating = state.ratings?[seat.opposite].label
         updatedAt = state.updatedAt > 0 ? Date(timeIntervalSince1970: state.updatedAt / 1000) : .now
     }

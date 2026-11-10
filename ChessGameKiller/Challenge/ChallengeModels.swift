@@ -228,7 +228,9 @@ struct FriendGameState: Codable, Equatable, Sendable {
     var leaveGraceMs: Double = 60_000
     /// The server's time when it sent this, in milliseconds since 1970.
     var now: Double = 0
-    /// Paired online with someone from the lobby: rated, and not a friend's game.
+    /// Paired online with someone from the lobby, not a friend's game. Such games have no leave rule.
+    var online = false
+    /// An online game with a clock: it counts for the players' ratings.
     var rated = false
     /// Each side's rating in a rated game; nil otherwise.
     var ratings: Ratings?
@@ -259,7 +261,7 @@ struct FriendGameState: Codable, Equatable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case code, status, createdAt, updatedAt, clock, creator, white, black, moves, san, fen, turn
-        case clocks, drawOffer, rematch, result, leaveGraceMs, now, rated, ratings
+        case clocks, drawOffer, rematch, result, leaveGraceMs, now, online, rated, ratings
     }
 
     subscript(seat: FriendSeat) -> Player {
@@ -292,6 +294,8 @@ extension FriendGameState {
         leaveGraceMs = try c.decodeIfPresent(Double.self, forKey: .leaveGraceMs) ?? 60_000
         now = try c.decodeIfPresent(Double.self, forKey: .now) ?? 0
         rated = try c.decodeIfPresent(Bool.self, forKey: .rated) ?? false
+        // An older server said only `rated`, which every online game was then.
+        online = try c.decodeIfPresent(Bool.self, forKey: .online) ?? rated
         // Ratings the app can't read never hide the game itself.
         ratings = (try? c.decodeIfPresent(Ratings.self, forKey: .ratings)) ?? nil
     }
@@ -677,7 +681,7 @@ enum FriendClockMath {
     /// Leaving counts only in a timed game under way once both sides have moved. It never ends the
     /// game by itself: after the grace period the other side may claim the win, or keep waiting.
     static func leaveRuleApplies(_ state: FriendGameState) -> Bool {
-        state.clock != nil && state.status == .active && state.moves.count >= 2
+        state.clock != nil && !state.online && state.status == .active && state.moves.count >= 2
     }
 
     /// When the other side may claim the win because `seat` left, in server milliseconds; nil when it isn't

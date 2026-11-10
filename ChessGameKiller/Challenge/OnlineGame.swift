@@ -150,13 +150,19 @@ final class OnlineGame {
         "vs \(opponentName) · \(clock?.label ?? "No clock")"
     }
 
-    /// Leaving counts: a timed game, under way, both sides have moved. Away past the grace period,
-    /// the other side may claim the win.
+    /// Leaving counts: a timed friend game, under way, both sides have moved. Away past the grace period,
+    /// the other side may claim the win. Online games have no leave rule.
     var leaveRuleApplies: Bool { state.map(FriendClockMath.leaveRuleApplies) ?? false }
     /// A timed game: closing it is leaving it.
     var isTimed: Bool { clock != nil }
+    /// A timed friend game: away for a while, the other side may claim the win.
+    var hasLeaveRule: Bool { isTimed && !(state?.online ?? false) }
+    /// An online game with no clock is just for fun: either side may end it with no result at any time.
+    var endsAnyTime: Bool { !isTimed && (state?.online ?? false) }
     /// Before both sides have moved, giving up aborts the game instead. A move still on its way counts.
-    var canAbort: Bool { phase == .playing && (state?.moves.count ?? 0) + (pending == nil ? 0 : 1) < 2 }
+    var canAbort: Bool {
+        phase == .playing && (endsAnyTime || (state?.moves.count ?? 0) + (pending == nil ? 0 : 1) < 2)
+    }
     var drawOfferedByMe: Bool { phase == .playing && state?.drawOffer == seat }
     var drawOfferedToMe: Bool { phase == .playing && state?.drawOffer == opponentSeat }
     var isMyTurn: Bool { phase == .playing && state?.turn == seat && pending == nil }

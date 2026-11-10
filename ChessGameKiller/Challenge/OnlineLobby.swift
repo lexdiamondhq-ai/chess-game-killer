@@ -1,10 +1,11 @@
 import Foundation
 import Observation
 
-// Play online: rated games with players waiting right now, not only friends with a link.
+// Play online: games with players waiting right now, not only friends with a link. Timed games are
+// rated; games with no clock are just for fun.
 // The server keeps a lobby (play/PROTOCOL.md, "Play online"): a player waits there with a clock,
 // and anyone can take them on by name, or find a game and be paired with the closest rating.
-// A paired game is an ordinary friend game on the server, rated, so OnlineGame plays it.
+// A paired game is an ordinary friend game on the server (rated when it has a clock), so OnlineGame plays it.
 
 /// One player waiting in the lobby.
 struct LobbyPlayer: Decodable, Identifiable, Equatable, Sendable {
@@ -12,18 +13,24 @@ struct LobbyPlayer: Decodable, Identifiable, Equatable, Sendable {
     var name: String
     var rating: Int
     var provisional = false
-    var clock: FriendClock
+    /// Nil: waiting for a game with no clock.
+    var clock: FriendClock?
     /// How long they have waited, in milliseconds.
     var waitingFor: Double = 0
 
     /// "1250", or "1200?" while their rating is still settling.
     var ratingLabel: String { "\(rating)\(provisional ? "?" : "")" }
 
+    /// "Blitz · 5+0", or "No clock".
+    var clockLine: String { clock.map { "\($0.kind) · \($0.label)" } ?? "No clock" }
+    /// "5 minutes each", or "no clock".
+    var clockPhrase: String { clock?.phrase ?? "no clock" }
+
     enum CodingKeys: String, CodingKey {
         case id, name, rating, provisional, clock, waitingFor
     }
 
-    init(id: String, name: String, rating: Int, provisional: Bool = false, clock: FriendClock, waitingFor: Double = 0) {
+    init(id: String, name: String, rating: Int, provisional: Bool = false, clock: FriendClock?, waitingFor: Double = 0) {
         self.id = id
         self.name = name
         self.rating = rating
@@ -40,7 +47,7 @@ struct LobbyPlayer: Decodable, Identifiable, Equatable, Sendable {
         name = clean.isEmpty ? "Player" : clean
         rating = try c.decodeIfPresent(Int.self, forKey: .rating) ?? 1200
         provisional = try c.decodeIfPresent(Bool.self, forKey: .provisional) ?? false
-        clock = try c.decode(FriendClock.self, forKey: .clock)
+        clock = try c.decodeIfPresent(FriendClock.self, forKey: .clock)
         waitingFor = try c.decodeIfPresent(Double.self, forKey: .waitingFor) ?? 0
     }
 }
@@ -120,14 +127,14 @@ final class OnlineLobby {
     enum Phase: Equatable {
         /// Looking at who is waiting.
         case browsing
-        /// Waiting in the lobby at a clock, since a moment.
-        case searching(FriendClock, since: Date)
+        /// Waiting in the lobby at a clock (nil: no clock), since a moment.
+        case searching(FriendClock?, since: Date)
         /// A game was found: opening it.
         case starting
     }
 
-    /// The clocks Play online offers. Online games always have a clock, so leaving can be claimed.
-    static let clocks: [TimeControl] = [.blitz3Plus2, .blitz5, .rapid10, .rapid15Plus10]
+    /// The clocks Play online offers: no clock first (just for fun, not rated), then the rated ones.
+    static let clocks: [TimeControl] = [.unlimited, .blitz3Plus2, .blitz5, .rapid10, .rapid15Plus10]
 
     private(set) var players: [LobbyPlayer] = []
     private(set) var waiting = 0
@@ -160,10 +167,9 @@ final class OnlineLobby {
         return false
     }
 
-    /// Players waiting at `clock` first, then the rest; never the player's own seek.
+    /// Players waiting at `clock` (nil: no clock) first, then the rest; never the player's own seek.
     func sorted(for clock: FriendClock?) -> [LobbyPlayer] {
         let others = players.filter { $0.id != seekID }
-        guard let clock else { return others }
         return others.filter { $0.clock == clock } + others.filter { $0.clock != clock }
     }
 
@@ -225,8 +231,8 @@ final class OnlineLobby {
 
     // MARK: Playing
 
-    /// Waits for a game at `clock`, taking on the closest-rated player already waiting at it.
-    func find(clock: FriendClock, name: String) async {
+    /// Waits for a game at `clock` (nil: no clock), taking on the closest-rated player already waiting at it.
+    func find(clock: FriendClock?, name: String) async {
         guard let center, phase == .browsing || isSearching, seekID == nil else { return }
         center.rememberName(name)
         problem = nil

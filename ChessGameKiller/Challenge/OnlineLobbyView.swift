@@ -13,9 +13,8 @@ struct OnlineLobbyView: View {
     @AppStorage("online.clock") private var control: TimeControl = .blitz5
     @AppStorage("haptics") private var hapticsOn = true
 
-    private var clock: FriendClock {
-        FriendClock(control) ?? FriendClock(initial: 300, increment: 0)
-    }
+    /// The server's clock for the picked control; nil for no clock.
+    private var clock: FriendClock? { FriendClock(control) }
 
     var body: some View {
         ScrollView {
@@ -74,17 +73,28 @@ struct OnlineLobbyView: View {
             ChallengeSectionTitle(title: "Clock")
             HStack(spacing: 8) {
                 ForEach(OnlineLobby.clocks) { option in
-                    ChallengeChip(title: option.name, isOn: control == option, theme: theme) {
+                    ChallengeChip(title: Self.chipTitle(option), isOn: control == option, theme: theme,
+                                  size: option.isTimed ? 15 : 24) {
                         control = option
                     }
-                    .accessibilityLabel(option.detail)
+                    .accessibilityLabel(Self.detail(option))
                     .disabled(lobby.isSearching)
                 }
             }
-            Text(control.detail)
+            Text(Self.detail(control))
                 .font(theme.challengeFont(12))
                 .foregroundStyle(.secondary)
         }
+    }
+
+    /// "3+2", or ∞ for no clock: five chips share the row.
+    static func chipTitle(_ control: TimeControl) -> String {
+        control.isTimed ? control.name : "∞"
+    }
+
+    /// The line under the chips. No clock says it isn't rated.
+    static func detail(_ control: TimeControl) -> String {
+        control.isTimed ? control.detail : "No clock · take all the time you like, not rated"
     }
 
     @ViewBuilder
@@ -170,7 +180,7 @@ struct OnlineLobbyView: View {
                 Button {
                     Task { await lobby.find(clock: clock, name: name) }
                 } label: {
-                    Label("Find a game · \(clock.label)", systemImage: "bolt.fill")
+                    Label("Find a game · \(clock?.label ?? "No clock")", systemImage: "bolt.fill")
                 }
                 .buttonStyle(ChallengeButtonStyle(kind: .primary, theme: theme))
                 .disabled(lobby.challenging != nil)
@@ -210,7 +220,7 @@ struct OnlinePlayerRow: View {
                         .font(theme.challengeFont(13, .medium).monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
-                Text("\(player.clock.kind) · \(player.clock.label) · \(Self.waited(player.waitingFor))")
+                Text("\(player.clockLine) · \(Self.waited(player.waitingFor))")
                     .font(theme.challengeFont(12.5).monospacedDigit())
                     .foregroundStyle(sameClock ? AnyShapeStyle(theme.challengeAccent) : AnyShapeStyle(HierarchicalShapeStyle.secondary))
                     .lineLimit(1)
@@ -225,7 +235,7 @@ struct OnlinePlayerRow: View {
             .buttonStyle(ChallengeButtonStyle(kind: sameClock ? .primary : .glass, theme: theme, height: 38))
             .frame(width: 86)
             .disabled(isBusy)
-            .accessibilityLabel("Play \(player.name), rated \(player.ratingLabel), \(player.clock.phrase)")
+            .accessibilityLabel("Play \(player.name), rated \(player.ratingLabel), \(player.clockPhrase)")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
@@ -242,7 +252,8 @@ struct OnlinePlayerRow: View {
 
 /// While waiting in the lobby: the clock, a count-up, and Cancel.
 struct OnlineSearchingBar: View {
-    let clock: FriendClock
+    /// Nil: no clock.
+    let clock: FriendClock?
     let since: Date
     let theme: BoardTheme
     let cancel: () -> Void
@@ -252,7 +263,7 @@ struct OnlineSearchingBar: View {
             OnlineLiveDot(theme: theme, size: 10)
                 .padding(.leading, 6)
             VStack(alignment: .leading, spacing: 1) {
-                Text("Finding an opponent · \(clock.label)")
+                Text("Finding an opponent · \(clock?.label ?? "No clock")")
                     .font(theme.challengeFont(15, .semibold))
                     .lineLimit(1)
                 TimelineView(.periodic(from: since, by: 1)) { context in
@@ -304,7 +315,7 @@ struct OnlineLiveDot: View {
 struct OnlineFairPlayCard: View {
     let theme: BoardTheme
 
-    static let text = "Online games are rated and fair: no hints or analysis. If you leave the app for over a minute, your opponent can claim the win. Screenshots are reported, and you can report a name or cheating from the game."
+    static let text = "Online games are fair: no hints or analysis. If you leave the app, your clock keeps running. Screenshots are reported, and you can report a name or cheating from the game."
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
