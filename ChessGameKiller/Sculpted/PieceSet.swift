@@ -28,21 +28,7 @@ enum PieceSet: String, CaseIterable, Identifiable {
         case .stone: return "Stone"
         case .blackPearl: return "Black Pearl"
         case .jade: return "Imperial Jade"
-        case .crystal:
-            // Clear crystal and smoked crystal the stone shows through, with gold. Half see-through:
-            // the squares read through each body, and the ivory side darkens toward its outline as
-            // glass does, so it keeps its shape on the cream squares.
-            dressed.pieces = "gilded-pieces"
-            golden()
-            dressed.ivory = UIColor(red: 0.84, green: 0.9, blue: 0.96, alpha: 1)
-            dressed.ivoryPolish = .init(roughness: 0.04, coat: 1, coatRoughness: 0.01)
-            dressed.ivoryEdge = 0.5
-            dressed.ebony = UIColor(red: 0.1, green: 0.075, blue: 0.06, alpha: 1)
-            dressed.ebonyPolish = .init(roughness: 0.04, coat: 1, coatRoughness: 0.01)
-            dressed.clarity = 0.5
-            dressed.ivoryShade = UIColor(red: 0.5, green: 0.5, blue: 0.52, alpha: 1)
-            dressed.sapphire = UIColor(red: 1, green: 0.62, blue: 0.22, alpha: 1)
-            dressed.gemGlow = UIColor(red: 1, green: 0.5, blue: 0.1, alpha: 1)
+        case .crystal: return "Crystal"
         case .sovereign: return "Sovereign"
         case .porcelain: return "Porcelain"
         }
@@ -101,15 +87,17 @@ enum PieceSet: String, CaseIterable, Identifiable {
             dressed.sapphire = UIColor(red: 0.75, green: 0.06, blue: 0.08, alpha: 1)
             dressed.gemGlow = UIColor(red: 0.6, green: 0.02, blue: 0.03, alpha: 1)
         case .crystal:
-            // Clear crystal and smoked crystal the stone shows through, with gold.
+            // Clear crystal and smoked crystal the stone shows through, with gold. Half see-through:
+            // the squares read through each body, and the ivory side darkens toward its outline as
+            // glass does, so it keeps its shape on the cream squares.
             dressed.pieces = "gilded-pieces"
             golden()
-            dressed.ivory = UIColor(red: 0.95, green: 0.96, blue: 0.98, alpha: 1)
+            dressed.ivory = UIColor(red: 0.84, green: 0.9, blue: 0.96, alpha: 1)
             dressed.ivoryPolish = .init(roughness: 0.04, coat: 1, coatRoughness: 0.01)
-            dressed.ivoryEdge = 0.2
-            dressed.ebony = UIColor(red: 0.3, green: 0.2, blue: 0.12, alpha: 1)
+            dressed.ivoryEdge = 0.5
+            dressed.ebony = UIColor(red: 0.1, green: 0.075, blue: 0.06, alpha: 1)
             dressed.ebonyPolish = .init(roughness: 0.04, coat: 1, coatRoughness: 0.01)
-            dressed.clarity = 0.3
+            dressed.clarity = 0.5
             dressed.ivoryShade = UIColor(red: 0.5, green: 0.5, blue: 0.52, alpha: 1)
             dressed.sapphire = UIColor(red: 1, green: 0.62, blue: 0.22, alpha: 1)
             dressed.gemGlow = UIColor(red: 1, green: 0.5, blue: 0.1, alpha: 1)
