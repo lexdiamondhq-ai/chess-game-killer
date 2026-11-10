@@ -776,7 +776,9 @@ struct HomeAuroraNextRival: View {
                             .opacity(0.7)
                             .accessibilityLabel("Locked. Beat \(lockedBy.name) first")
                     } else {
-                        Button(action: play) { pill("Play", symbol: "play.fill") }
+                        Button(action: play) {
+                            pill(card.upNext?.inProgress == true ? "Resume" : "Play", symbol: "play.fill")
+                        }
                             .buttonStyle(HomeStagePress())
                             .accessibilityLabel("Play \(rival.name)")
                         Button(action: change) { pill("Options", symbol: "slider.horizontal.3") }
@@ -1369,7 +1371,9 @@ struct HomeAuroraGameCard: Identifiable, Equatable {
         flipped = upNext.playerColor == .black
         yourMove = false
         eyebrow = "Your next game"
-        status = "Up next"
+        // A game against this rival is under way: the card picks it up (its board is under
+        // For today with your other games).
+        status = upNext.inProgress ? "Playing now" : "Up next"
         headline = "\(upNext.rival.name) is ready\nwhen "
         headlineEnd = "you are"
         // The title names the rival; the button just plays, with Change beside it.
