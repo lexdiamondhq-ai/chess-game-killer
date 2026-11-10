@@ -5,7 +5,8 @@ import UIKit
 
 /// The rivals' hall, opened from Rivals on Home (Alex, 2026-11-07): one card for each rival,
 /// swiped through, its film's last frame above a short line on how it plays. Landing on a rival
-/// plays its film large first; its words and Face come in when the film ends. Face plays the
+/// plays its film full screen; when it ends the film holds its last frame and the rival's words
+/// and Face rise at the bottom, over I to V for swiping on to the others. Face plays the
 /// rival's welcome film, then Begin starts the game. Every rival after the Cub stays locked
 /// until the rival before it is beaten; their cards still show, saying who to beat.
 struct RivalsHall: View {
@@ -25,12 +26,15 @@ struct RivalsHall: View {
     @State private var watched: MatchController.Level?
     /// The rival whose film is playing large, over the whole hall, as you land on it.
     @State private var playing: MatchController.Level?
+    /// The playing film has ended: it holds its last frame, with the rival's words and Face.
+    @State private var ended: MatchController.Level?
 
     private static let gold = Color(hex: 0xE8C27A)
 
     /// `intro` opens straight into the start rival's welcome film: every time you face a rival
     /// from Home's Play, its film plays before the game (Alex, 2026-11-09).
-    init(start: MatchController.Level? = nil, intro: Bool = false,
+    /// `ended` (for pictures) opens on that rival's film already ended, its words showing.
+    init(start: MatchController.Level? = nil, intro: Bool = false, ended: MatchController.Level? = nil,
          begin: @escaping (MatchController.Level) -> Void, close: @escaping () -> Void) {
         self.start = start
         self.begin = begin
@@ -39,6 +43,9 @@ struct RivalsHall: View {
         _ladder = State(initialValue: ladder)
         _selected = State(initialValue: start ?? ladder.current)
         _showing = State(initialValue: intro ? start.map(RivalFilm.of) : nil)
+        _playing = State(initialValue: ended)
+        _ended = State(initialValue: ended)
+        if let ended { _selected = State(initialValue: ended) }
     }
 
     var body: some View {
@@ -52,13 +59,27 @@ struct RivalsHall: View {
                 rungs
                     .padding(.bottom, 18)
             }
-            if let level = playing, showing == nil {
+            if let level = playing {
                 // The rival in front plays its film large, the whole screen, as you swipe to it
                 // (Alex, 2026-11-10: "The videos of the rivals should be the larger videos, then
-                // once its done the bottom buttons appear"). When it ends the card settles back
-                // with its words and Face.
-                RivalHallFilm(film: RivalFilm.of(level), done: { finishFilm(level) },
-                              step: { stepFilm(by: $0) })
+                // once its done the bottom buttons appear"). When it ends it stays large, holding
+                // its last frame, with the rival's words and Face at the bottom and I to V under
+                // them to swipe on, instead of going back to the cards (Alex, 2026-11-10).
+                let film = RivalFilm.of(level)
+                RivalHallFilm(film: film, ended: ended == level, done: { finishFilm(level) },
+                              step: { stepFilm(by: $0) }, close: close) {
+                    VStack(spacing: 0) {
+                        RivalHallWords(film: film, open: ladder.isOpen(level)) {
+                            withAnimation(.easeIn(duration: 0.3)) { showing = film }
+                        }
+                        .padding(.horizontal, 28)
+                        .opacity(ended == level ? 1 : 0)
+                        .offset(y: ended == level ? 0 : 18)
+                        .allowsHitTesting(ended == level)
+                        rungs
+                    }
+                    .padding(.bottom, 18)
+                }
                     .id(level)
                     .transition(reduceMotion ? .opacity : .scale(scale: 0.82).combined(with: .opacity))
                     .zIndex(1)
@@ -69,7 +90,7 @@ struct RivalsHall: View {
                     withAnimation(.easeOut(duration: 0.35)) { showing = nil }
                 })
                 .transition(.opacity)
-                .zIndex(1)
+                .zIndex(2)
             }
         }
         .preferredColorScheme(.dark)
@@ -87,15 +108,14 @@ struct RivalsHall: View {
 
     /// Opens the rival's film large over the hall, unless it was just watched in full.
     private func playFilm(_ level: MatchController.Level?) {
-        guard let level, level != watched, showing == nil, !Welcome.isUnderTest,
-              RivalFilm.of(level).filmURL != nil else { return }
+        guard let level, level != watched, showing == nil, !Welcome.isUnderTest else { return }
         withAnimation(.spring(response: 0.5, dampingFraction: 0.88)) { playing = level }
     }
 
-    /// The film ended, or was tapped or swiped down: the card comes back with Face.
+    /// The film ended, or was tapped: it holds its last frame, and the words and Face rise.
     private func finishFilm(_ level: MatchController.Level) {
         guard playing == level else { return }
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.9)) { playing = nil }
+        withAnimation(.easeOut(duration: 0.6)) { ended = level }
     }
 
     /// A sideways swipe on a playing film goes on to the next rival (or back), and plays its film.
@@ -103,10 +123,7 @@ struct RivalsHall: View {
         let all = RivalFilm.all.map(\.level)
         guard let current = selected, let index = all.firstIndex(of: current) else { return }
         let next = index + offset
-        guard all.indices.contains(next) else {
-            if let playing { finishFilm(playing) }
-            return
-        }
+        guard all.indices.contains(next) else { return }
         withAnimation(.spring(response: 0.45, dampingFraction: 0.86)) { selected = all[next] }
     }
 
@@ -291,6 +308,24 @@ struct RivalHallCard: View {
     }
 
     private var words: some View {
+        RivalHallWords(film: film, open: open, face: face)
+    }
+}
+
+/// A rival's rank and name, a line on how it plays, and Face, or for a locked rival who to beat
+/// first: on its card, and over its film once the film ends.
+struct RivalHallWords: View {
+    let film: RivalFilm
+    let open: Bool
+    let face: () -> Void
+
+    private static let gold = Color(hex: 0xE8C27A)
+
+    var body: some View {
+        words
+    }
+
+    private var words: some View {
         VStack(spacing: 10) {
             Text("RANK \(film.numeral)  ·  \(film.rival.elo)")
                 .font(.system(size: 11, weight: .bold).monospacedDigit())
@@ -352,43 +387,74 @@ extension String {
 }
 
 /// A rival's film large over the hall as you land on it: full screen, with sound, nothing over
-/// the art. It ends by itself; a tap or a swipe down ends it sooner, and a sideways swipe goes
-/// on to the next rival's film.
-struct RivalHallFilm: View {
+/// the art but I to V at the bottom. A tap ends it sooner; then it holds its last frame and its
+/// ending (the rival's words and Face) rises at the bottom. A sideways swipe goes on to the next
+/// rival's film, and a swipe down leaves the hall.
+struct RivalHallFilm<Ending: View>: View {
     let film: RivalFilm
+    /// The film has ended: its ending shows, and a tap no longer does anything.
+    let ended: Bool
     let done: () -> Void
     /// -1 for the rival before, +1 for the next.
     let step: (Int) -> Void
+    let close: () -> Void
+    @ViewBuilder let ending: () -> Ending
 
     @State private var player: AVPlayer?
 
     var body: some View {
-        ZStack {
-            Color.black
-            if let image = film.cardImage {
-                Image(uiImage: image).resizable().scaledToFill()
+        Color.clear
+            .overlay(alignment: .bottom) { ending() }
+            .background {
+                ZStack {
+                    Color.black
+                    if let image = film.cardImage {
+                        Image(uiImage: image).resizable().scaledToFill()
+                    }
+                    if let player {
+                        RivalFilmLayer(player: player)
+                    }
+                    LinearGradient(stops: [.init(color: .clear, location: 0.45),
+                                           .init(color: .black.opacity(0.72), location: 0.75),
+                                           .init(color: .black.opacity(0.94), location: 1)],
+                                   startPoint: .top, endPoint: .bottom)
+                        .opacity(ended ? 1 : 0)
+                }
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
             }
-            if let player {
-                RivalFilmLayer(player: player)
+        .overlay(alignment: .topLeading) {
+            if ended {
+                Button(action: close) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .frame(width: 44, height: 44)
+                        .background(.ultraThinMaterial, in: Circle())
+                }
+                .accessibilityLabel("Close")
+                .padding(.horizontal, 16)
+                .padding(.top, 6)
+                .transition(.opacity)
             }
         }
-        .ignoresSafeArea()
         .contentShape(Rectangle())
-        .onTapGesture(perform: leave)
+        .onTapGesture { if !ended { leave() } }
         .gesture(DragGesture(minimumDistance: 24).onEnded { drag in
             let t = drag.translation
             if abs(t.width) > 70, abs(t.width) > abs(t.height) {
                 player?.pause()
                 step(t.width < 0 ? 1 : -1)
             } else if t.height > 90 {
-                leave()
+                player?.pause()
+                close()
             }
         })
-        .accessibilityElement(children: .ignore)
+        .accessibilityElement(children: ended ? .contain : .ignore)
         .accessibilityLabel("\(film.rival.name)'s film")
-        .accessibilityAddTraits(.isButton)
-        .accessibilityHint("Ends the film")
-        .accessibilityAction(.escape, leave)
+        .accessibilityAddTraits(ended ? [] : .isButton)
+        .accessibilityHint(ended ? "" : "Ends the film")
+        .accessibilityAction(.escape) { player?.pause(); close() }
         .task { await play() }
         .onDisappear { player?.pause() }
         .onReceive(NotificationCenter.default.publisher(for: AVPlayerItem.didPlayToEndTimeNotification)) { note in
@@ -397,7 +463,8 @@ struct RivalHallFilm: View {
     }
 
     private func play() async {
-        guard let url = film.filmURL else {
+        guard !ended else { return }
+        guard let url = film.filmURL, !Welcome.isUnderTest else {
             done()
             return
         }

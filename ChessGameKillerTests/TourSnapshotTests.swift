@@ -48,6 +48,14 @@ final class TourSnapshotTests: XCTestCase {
         window.isHidden = true
     }
 
+    /// A rival's film over the hall once it has ended: its last frame, its words and Face, and
+    /// I to V under them.
+    func testTheRivalsHallFilmEnded() throws {
+        let window = try show(RivalsHall(ended: .club, begin: { _ in }, close: {}), wait: 3)
+        try save(window, "tour-rivals-hall-ended")
+        window.isHidden = true
+    }
+
     func testTheYouPanelOnTheBoardHome() throws {
         let window = try show(HomeSample.home(showsYou: true), wait: 3)
         try save(window, "tour-home-you")
