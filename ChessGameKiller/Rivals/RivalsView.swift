@@ -504,23 +504,30 @@ struct RivalHallFilm<Ending: View>: View {
         Color.clear
             .overlay(alignment: .bottom) { ending() }
             .background {
-                ZStack {
-                    Color.black
-                    if let image = film.cardImage {
-                        Image(uiImage: image).resizable().scaledToFill()
+                // Laid over the black, so the screen sets their frame and the film sits centred: a
+                // filled image beside them would widen the frame and push the film off centre.
+                Color.black
+                    .overlay {
+                        if let image = film.cardImage {
+                            Image(uiImage: image).resizable().scaledToFill()
+                        }
                     }
-                    if let player {
-                        RivalFilmLayer(player: player)
+                    .overlay {
+                        if let player {
+                            RivalFilmLayer(player: player)
+                        }
                     }
-                    LinearGradient(stops: [.init(color: .clear, location: 0.48),
-                                           .init(color: .black.opacity(0.6), location: 0.64),
-                                           .init(color: .black.opacity(0.88), location: 0.78),
-                                           .init(color: .black.opacity(0.96), location: 1)],
-                                   startPoint: .top, endPoint: .bottom)
-                        .opacity(ended ? 1 : 0)
-                }
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
+                    .overlay {
+                        LinearGradient(stops: [.init(color: .clear, location: 0.48),
+                                               .init(color: .black.opacity(0.6), location: 0.64),
+                                               .init(color: .black.opacity(0.88), location: 0.78),
+                                               .init(color: .black.opacity(0.96), location: 1)],
+                                       startPoint: .top, endPoint: .bottom)
+                            .opacity(ended ? 1 : 0)
+                    }
+                    .clipped()
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
             }
         .contentShape(Rectangle())
         .onTapGesture { if !ended { leave() } }
@@ -541,8 +548,10 @@ struct RivalHallFilm<Ending: View>: View {
         .accessibilityAction(.escape) { player?.pause(); close() }
         .task { await play() }
         .onDisappear { player?.pause() }
-        .onReceive(NotificationCenter.default.publisher(for: AVPlayerItem.didPlayToEndTimeNotification)) { note in
-            if let item = note.object as? AVPlayerItem, item === player?.currentItem { done() }
+        // The end can be posted off the main thread: brought back to it before the words rise.
+        .onReceive(NotificationCenter.default.publisher(for: AVPlayerItem.didPlayToEndTimeNotification)
+            .receive(on: DispatchQueue.main)) { note in
+            if let item = note.object as? AVPlayerItem, item === player?.currentItem, !ended { done() }
         }
     }
 
@@ -559,6 +568,11 @@ struct RivalHallFilm<Ending: View>: View {
         player.actionAtItemEnd = .pause
         self.player = player
         player.play()
+        // In case the end is never heard: the words rise once the film's length has passed.
+        guard let length = try? await player.currentItem?.asset.load(.duration), length.isNumeric else { return }
+        try? await Task.sleep(for: .seconds(length.seconds + 0.4))
+        guard !Task.isCancelled, !ended else { return }
+        done()
     }
 
     private func leave() {
