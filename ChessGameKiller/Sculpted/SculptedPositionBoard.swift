@@ -26,7 +26,9 @@ struct SculptedPositionBoard: View {
 
     @State private var stage = SculptedStage()
 
-    private var look: SculptedLook { theme.sculptedLook ?? .gilded }
+    /// The pieces chosen in Settings; a change there brings the board back in them.
+    @AppStorage(PieceSet.storageKey) private var pieceSet = PieceSet.stone
+    private var look: SculptedLook { pieceSet.dress(theme.sculptedLook ?? .gilded) }
 
     var body: some View {
         GeometryReader { geo in

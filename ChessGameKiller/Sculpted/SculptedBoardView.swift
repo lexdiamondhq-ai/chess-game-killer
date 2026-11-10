@@ -82,7 +82,9 @@ struct SculptedBoardView: View {
 
     private var game: GameModel { match.game }
     private var flipped: Bool { match.isBoardFlipped }
-    private var look: SculptedLook { theme.sculptedLook ?? .gilded }
+    /// The pieces chosen in Settings; a change there brings the board back in them.
+    @AppStorage(PieceSet.storageKey) private var pieceSet = PieceSet.stone
+    private var look: SculptedLook { pieceSet.dress(theme.sculptedLook ?? .gilded) }
     /// Someone at the table: the rival sits across the board as its own soft light, the same
     /// light the home's window shows before the game.
     private var presence: SculptedPresence? {

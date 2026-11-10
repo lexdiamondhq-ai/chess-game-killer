@@ -97,12 +97,17 @@ final class SculptedAssets {
         let made: SCNMaterial
         switch finish {
         case .body where color == .white:
-            made = Self.pbr(look.ivory, polish: look.ivoryPolish)
-            if look.ivoryEdge > 0 { made.shaderModifiers = [.surface: Self.edgeShading(look.ivoryEdge)] }
+            made = Self.pbr(look.ivory, polish: look.ivoryPolish, metalness: look.ivoryMetalness)
+            var surface = look.ivoryEdge > 0 ? Self.edgeShading(look.ivoryEdge) : ""
+            if look.nacre > 0 { surface += Self.nacreShading(look.nacre) }
+            if !surface.isEmpty { made.shaderModifiers = [.surface: surface] }
+            Self.finishBody(made, glow: look.ivoryGlow, clarity: look.clarity)
         case .body:
-            made = Self.pbr(look.ebony, polish: look.ebonyPolish)
+            made = Self.pbr(look.ebony, polish: look.ebonyPolish, metalness: look.ebonyMetalness)
+            if look.nacre > 0 { made.shaderModifiers = [.surface: Self.nacreShading(look.nacre)] }
+            Self.finishBody(made, glow: look.ebonyGlow, clarity: look.clarity)
         case .metal where darkMarks:
-            made = Self.pbr(look.ivoryMetal ?? look.platinum, roughness: 0.28, metalness: 1, coat: 0.6, coatRoughness: 0.05)
+            made = Self.pbr(look.ivoryMetal ?? look.platinum, roughness: 0.28, metalness: look.ivoryMarkMetalness, coat: 0.6, coatRoughness: 0.05)
         case .pearl where darkMarks:
             made = Self.pbr(look.ivoryPearl ?? look.pearl, roughness: 0.15, coat: 1, coatRoughness: 0.03)
         case .metal:
@@ -169,8 +174,28 @@ final class SculptedAssets {
         """
     }
 
-    static func pbr(_ color: UIColor, polish: SculptedLook.Polish) -> SCNMaterial {
-        pbr(color, roughness: polish.roughness, coat: polish.coat, coatRoughness: polish.coatRoughness)
+    static func pbr(_ color: UIColor, polish: SculptedLook.Polish, metalness: CGFloat = 0) -> SCNMaterial {
+        pbr(color, roughness: polish.roughness, metalness: metalness, coat: polish.coat, coatRoughness: polish.coatRoughness)
+    }
+
+    /// Mother-of-pearl: where the surface turns from the eye, its color drifts through rose, gold
+    /// and green, as nacre does under a light.
+    static func nacreShading(_ amount: CGFloat) -> String {
+        """
+        float turn = 1.0 - saturate(dot(normalize(_surface.normal), normalize(_surface.view)));
+        float3 shimmer = 0.5 + 0.5 * cos(6.2832 * (turn * 1.4 + float3(0.0, 0.33, 0.67)));
+        _surface.diffuse.rgb = mix(_surface.diffuse.rgb, _surface.diffuse.rgb * (0.75 + 0.5 * shimmer), \(Float(amount)) * turn);
+        """
+    }
+
+    /// A body's own faint glow, so polished metal never reflects the dark studio to black and jade
+    /// seems lit from inside; and for crystal, a body the board shows through.
+    static func finishBody(_ material: SCNMaterial, glow: UIColor?, clarity: CGFloat) {
+        if let glow { material.emission.contents = glow }
+        guard clarity > 0 else { return }
+        material.transparency = 1 - clarity
+        material.transparencyMode = .dualLayer
+        material.blendMode = .alpha
     }
 
     static func pbr(
@@ -332,6 +357,20 @@ struct SculptedLook {
     var lacquerCoat: CGFloat = 0.18
     /// The line around the squares; nil is platinum.
     var inlay: UIColor?
+
+    // A piece set (PieceSet.swift) can change what the bodies are made of; these leave them as stone.
+    /// Metal bodies, such as the Sovereign set's gold and silver: 0 is stone, 1 is metal.
+    var ivoryMetalness: CGFloat = 0
+    var ebonyMetalness: CGFloat = 0
+    /// A glow of the body's own, as `metalGlow` is for the metal; nil for none.
+    var ivoryGlow: UIColor?
+    var ebonyGlow: UIColor?
+    /// How much the board shows through the bodies: 0 for stone, more for crystal.
+    var clarity: CGFloat = 0
+    /// Mother-of-pearl's shimmer toward the outline; 0 for none.
+    var nacre: CGFloat = 0
+    /// How metallic the ivory pieces' dark marks are: 1 is metal, 0 a glaze (the Porcelain set's cobalt).
+    var ivoryMarkMetalness: CGFloat = 1
 
     /// The studio the pieces reflect: a soft light tent, or a dark room with a few soft boxes.
     var studio = "sculpted-env"

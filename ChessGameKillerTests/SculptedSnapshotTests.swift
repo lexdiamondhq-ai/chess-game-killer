@@ -58,6 +58,24 @@ final class SculptedSnapshotTests: XCTestCase {
         window.isHidden = true
     }
 
+    /// Every piece set from Settings > Pieces on the gilded board, whole and close up, and two on
+    /// other stone, to judge each finish by eye.
+    func testPieceSets() throws {
+        let plain = SculptedBoardState(pieces: Self.pieces)
+        for set in PieceSet.allCases {
+            let (scene, window) = try stage(plain, look: set.dress(.gilded), side: 402)
+            let image = scene.snapshot()
+            try save(image, "pieceset-\(set.rawValue)")
+            try save(crop(image, x: 0.25, y: 0.3, side: 0.5), "pieceset-\(set.rawValue)-crop")
+            window.isHidden = true
+        }
+        for (set, look) in [(PieceSet.porcelain, SculptedLook.midnight), (.blackPearl, .noir), (.sovereign, .bordeaux)] {
+            let (scene, window) = try stage(plain, look: set.dress(look), side: 402)
+            try save(scene.snapshot(), "pieceset-\(set.rawValue)-on-\(look.name.lowercased())")
+            window.isHidden = true
+        }
+    }
+
     /// Hints on and the king picked up: brackets on the pieces the coach would move (the
     /// runner-up fainter), dots where the king can go, and a halo on its best square.
     func testHintMarks() throws {
