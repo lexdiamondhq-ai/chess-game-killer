@@ -262,12 +262,14 @@ struct ChallengeChip: View {
     let title: String
     let isOn: Bool
     let theme: BoardTheme
+    /// The title's size: larger for a lone symbol like ∞.
+    var size: CGFloat = 15
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(theme.challengeFont(15, .semibold).monospacedDigit())
+                .font(theme.challengeFont(size, .semibold).monospacedDigit())
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .foregroundStyle(isOn ? theme.onChallengeAccent : Color.primary)

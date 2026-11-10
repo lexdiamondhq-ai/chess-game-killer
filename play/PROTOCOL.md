@@ -35,7 +35,7 @@ link by text or email; the friend opens it in the app or plays right in the brow
 ## Fair play (friend games)
 
 - No hints, arrows, grades or analysis in the app during a friend game. (After the game it may be reviewed.)
-- **Leaving lets the other side claim the win.** Only when `clock != null`, the game is `active` and both sides have
+- **Leaving lets the other side claim the win.** Only in friend games (not online ones), when `clock != null`, the game is `active` and both sides have
   moved (ply ≥ 2): a seat is *away* from the moment its client posts `away` or its last WebSocket closes. Once it has
   been away `leaveGraceMs` (60000), the other side may post `claim_win` and win with reason `left`, or keep waiting.
   Leaving never ends a game by itself: the absent side's clock keeps running, so an unclaimed game still ends on time.
@@ -140,15 +140,18 @@ the server (try again). A move before the friend has joined is `not_your_turn`.
 Players with the app can also play someone online they don't know: they wait in the lobby with a clock, and
 anyone can take them on by name, or ask for a quick pairing. One Durable Object (class `Lobby`, binding
 `LOBBY`, named `"lobby"`) holds everyone waiting and the ratings. Games paired there are ordinary games
-(everything above applies, fair play included) that are also **rated**.
+(everything above applies, fair play included) that are also **rated** when they have a clock. Online games have
+no leave rule: a player who leaves just spends their own clock. A game with **no clock** is just for fun: not rated,
+and either side may `abort` it at any time (no result).
 
 - **Player key**: 32 lowercase hex characters the app makes once and keeps. It is the app's private id for its
   player: ratings are kept by its hash. It is never shown to anyone.
 - **Ratings**: Elo, 1200 to start; K = 40 for a player's first 10 games (shown as provisional), then 20.
   Aborted, cancelled and expired games don't count. A rematch of a rated game is rated too.
 - **A seek** is one player waiting at a clock. A waiting app checks in every 2 s; a seek not checked for 20 s
-  leaves the lobby. A player waits once: a new seek replaces their old one. Online games always have a clock.
-- GameState gains `rated` (true for games paired here) and `ratings`: `null`, or for each side
+  leaves the lobby. A player waits once: a new seek replaces their old one. A seek's `clock` may be `null` (no clock):
+  it pairs only with other no-clock seeks, and `GET /api/lobby` lists those only with `?untimed=1` (older apps can't read them).
+- GameState gains `online` (true for games paired here), `rated` (true for those with a clock) and `ratings`: `null`, or for each side
   `{ "rating", "provisional", "after", "change" }` (`after` and `change` are `null` until the game is over and counted).
 
 | Method & path | Body | Reply |

@@ -23,10 +23,11 @@ function seek(lobby, id, { player = id, rating = 1200, games = 0, clock = BLITZ,
   return addSeek(lobby, { id, tokenHash: `t-${id}`, playerHash: player, name, rating, games, clock, look: null }, at);
 }
 
-test("a seek needs a name, a player key and a clock", () => {
+test("a seek needs a name and a player key, and has a clock or none", () => {
   const ok = parseSeekInput({ name: "  Alex  ", clock: BLITZ, player: KEY, look: "gilded" }, { isKey: isToken });
   assert.deepEqual(ok, { ok: true, value: { name: "Alex", clock: BLITZ, look: "gilded", player: KEY } });
-  assert.equal(parseSeekInput({ name: "A", clock: null, player: KEY }, { isKey: isToken }).ok, false);
+  assert.deepEqual(parseSeekInput({ name: "A", clock: null, player: KEY }, { isKey: isToken }).value.clock, null);
+  assert.equal(parseSeekInput({ name: "A", clock: { initial: 5 }, player: KEY }, { isKey: isToken }).ok, false);
   assert.equal(parseSeekInput({ name: "A", clock: BLITZ, player: "nope" }, { isKey: isToken }).ok, false);
   assert.equal(parseSeekInput({ name: 3, clock: BLITZ, player: KEY }, { isKey: isToken }).ok, false);
   // Taking a waiting player on needs no clock: theirs is used.
@@ -91,12 +92,12 @@ test("Elo: a win against an equal player gains 20 while settling, 10 after", () 
   assert.equal(upset.white.rating - 1200, 18);
 });
 
-function pairedGame() {
+function pairedGame(clock = BLITZ) {
   return createPairedGame({
     code: "ONL1NE",
     white: { name: "Alex", tokenHash: "hw" },
     black: { name: "Sam", tokenHash: "hb" },
-    clock: BLITZ,
+    clock,
     look: "gilded",
     rated: { white: { player: "pw", rating: 1200, games: 0 }, black: { player: "pb", rating: 1450, games: 20 } },
     now: T0,
@@ -147,4 +148,46 @@ test("a rematch of a rated game is rated, colors swapped, from the newest rating
   assert.deepEqual(next.rated.white, { player: "pb", rating: 1436, games: 21 });
   assert.deepEqual(next.rated.black, { player: "pw", rating: 1232, games: 1 });
   assert.equal(next.rated.reported, false);
+});
+
+// ---------------------------------------------------------------------------
+// No clock: just for fun
+
+test("players waiting with no clock pair only with each other, and only apps that ask see them", () => {
+  const lobby = emptyLobby();
+  seek(lobby, "timed", { clock: BLITZ });
+  seek(lobby, "free", { clock: null });
+  assert.equal(bestOpponent(lobby, { clock: null, playerHash: "me", rating: 1200 }, T0).id, "free");
+  assert.equal(bestOpponent(lobby, { clock: BLITZ, playerHash: "me", rating: 1200 }, T0).id, "timed");
+  assert.deepEqual(listView(lobby, T0).players.map((p) => p.id), ["timed"]);
+  const all = listView(lobby, T0, { untimed: true }).players;
+  assert.deepEqual(all.map((p) => p.id), ["timed", "free"]);
+  assert.equal(all[1].clock, null);
+});
+
+test("an online game with no clock isn't rated, and either side can end it with no result at any time", () => {
+  const game = pairedGame(null);
+  const state = view(game, T0);
+  assert.equal(state.online, true);
+  assert.equal(state.rated, false);
+  assert.equal(state.ratings, null);
+  game.moves = ["e2e4", "e7e5", "g1f3"];
+  assert.equal(act(game, "white", "abort", T0 + 1000).ok, true);
+  assert.deepEqual(game.result, { winner: null, reason: "aborted" });
+  assert.equal(needsRatingReport(game), false);
+  // A rematch stays online and unrated.
+  const next = rematchRecord(game, "R3MTCH", T0 + 2000);
+  assert.equal(view(next, T0 + 2000).online, true);
+  assert.equal(view(next, T0 + 2000).rated, false);
+});
+
+test("online games have no leave rule: leaving just spends your clock", () => {
+  const game = pairedGame();
+  game.moves = ["e2e4", "e7e5"];
+  game.timedFrom = T0;
+  act(game, "white", "away", T0 + 1000);
+  assert.equal(view(game, T0 + 2 * 60 * 1000).white.claimableAt, null);
+  assert.equal(act(game, "black", "claim_win", T0 + 2 * 60 * 1000).error, "cannot_claim");
+  // A timed online game can't be aborted once both sides have moved.
+  assert.equal(act(game, "white", "abort", T0 + 2 * 60 * 1000).error, "bad_request");
 });

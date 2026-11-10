@@ -102,7 +102,7 @@ final class ChallengeCenter {
     func open(code text: String) {
         guard let code = ChallengeLink.code(fromText: text) else { return }
         if case .game(let game)? = screen, game.code == code { return }
-        // Leaving a timed game under way lets the friend claim the win after a minute, so the link waits for it to close.
+        // Leaving a timed game under way runs your clock down (or lets a friend claim the win), so the link waits for it to close.
         if case .game(let game)? = screen, game.phase == .playing, game.isTimed {
             heldCode = code
             game.notify("Finish this game first. The other challenge opens after it.", symbol: "hourglass")

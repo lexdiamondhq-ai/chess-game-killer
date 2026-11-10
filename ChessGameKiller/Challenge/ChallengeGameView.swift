@@ -255,8 +255,10 @@ struct ChallengeGameView: View {
     /// The fair-play rules, on the first screen of a game.
     private var fairPlayLine: String {
         var line = "Fair play: no hints or analysis."
-        if game.isTimed {
+        if game.hasLeaveRule {
             line += " Leave for over \(game.graceWords) and \(game.opponentName) can claim the win."
+        } else if game.isTimed {
+            line += " If you leave, your clock keeps running."
         }
         return line + " \(game.opponentName) is told if you take a screenshot."
     }
@@ -326,7 +328,7 @@ struct ChallengeGameView: View {
                 }
             }
             .disabled(game.drawOfferedByMe || game.sending != nil)
-            DockButton(title: game.canAbort ? "Abort" : "Resign", symbol: "flag", theme: theme) {
+            DockButton(title: game.endsAnyTime ? "End" : game.canAbort ? "Abort" : "Resign", symbol: "flag", theme: theme) {
                 confirming = game.canAbort ? .abort : .resign
             }
             .disabled(game.sending != nil)
@@ -597,7 +599,8 @@ struct ChallengeGameView: View {
     // MARK: Leaving, resigning, cancelling
 
     private func close() {
-        // Closing a timed game under way is leaving it: away long enough, the friend can claim the win.
+        // Closing a timed game under way is leaving it: the clock runs on (and in a friend game, away
+        // long enough, the friend can claim the win).
         if game.phase == .playing, game.isTimed {
             confirming = .leave
         } else {
@@ -612,7 +615,7 @@ struct ChallengeGameView: View {
     private var confirmTitle: String {
         switch confirming {
         case .resign?: return "Resign this game?"
-        case .abort?: return "Abort this game?"
+        case .abort?: return game.endsAnyTime ? "End this game?" : "Abort this game?"
         case .leave?: return "Leave the game?"
         case .cancelChallenge?: return "Cancel this challenge?"
         case .reportName?: return "Report \(game.opponentName)'s name?"
@@ -624,8 +627,14 @@ struct ChallengeGameView: View {
     private func confirmMessage(_ item: Confirmation) -> String {
         switch item {
         case .resign: return "\(game.opponentName) wins."
-        case .abort: return "Neither of you has moved yet, so nobody wins or loses."
-        case .leave: return "Your clock keeps running. Away for over \(game.graceWords), \(game.opponentName) can claim the win."
+        case .abort:
+            return game.endsAnyTime
+                ? "This game has no clock, so it ends with no result. Nobody wins or loses."
+                : "Neither of you has moved yet, so nobody wins or loses."
+        case .leave:
+            return game.hasLeaveRule
+                ? "Your clock keeps running. Away for over \(game.graceWords), \(game.opponentName) can claim the win."
+                : "Your clock keeps running while you're away."
         case .cancelChallenge: return "The link stops working, and your friend can't join."
         case .reportName: return "Their name is hidden from now on, and we'll take a look."
         case .reportCheating: return "We'll take a look at this game."

@@ -67,6 +67,52 @@ final class OnlineLobbyTests: XCTestCase {
         XCTAssertNil(friend.ratings)
     }
 
+    // MARK: No clock
+
+    func testNoClockPlayersAndGamesAreReadAndUnrated() throws {
+        let list = try JSONDecoder().decode(LobbyList.self, from: Data("""
+        {"players":[{"id":"a1b2c3d4e5f6","name":"Sam","rating":1450,"clock":null,"waitingFor":1000}],"waiting":1}
+        """.utf8))
+        XCTAssertNil(list.players.first?.clock)
+        XCTAssertEqual(list.players.first?.clockLine, "No clock")
+
+        let game = try JSONDecoder().decode(FriendGameState.self, from: Data(#"{"code":"onl1ne","status":"active","online":true,"rated":false}"#.utf8))
+        XCTAssertTrue(game.online)
+        XCTAssertFalse(game.rated)
+        // An older server only said `rated`, which every online game was.
+        let older = try JSONDecoder().decode(FriendGameState.self, from: Data(#"{"code":"onl1ne","status":"active","rated":true}"#.utf8))
+        XCTAssertTrue(older.online)
+    }
+
+    func testOnlineGamesHaveNoLeaveRule() {
+        var state = rated()
+        state.status = .active
+        state.moves = ["e2e4", "e7e5"]
+        state.white.away = 1000
+        state.online = true
+        XCTAssertFalse(FriendClockMath.leaveRuleApplies(state))
+        XCTAssertNil(FriendClockMath.awayDeadline(state, seat: .white))
+        state.online = false
+        XCTAssertTrue(FriendClockMath.leaveRuleApplies(state), "friend games keep it")
+    }
+
+    func testFindingAGameWithNoClockAsksForNone() async throws {
+        let api = FakeChallengeAPI()
+        let free = LobbyPlayer(id: "111111111111", name: "Lee", rating: 1500, clock: nil)
+        let blitz = LobbyPlayer(id: "222222222222", name: "Max", rating: 1100, clock: Self.blitz)
+        api.lobbyList = LobbyList(players: [blitz, free])
+        let center = center(api)
+        center.playOnline()
+        let lobby = try lobby(of: center)
+        await lobby.tick()
+        XCTAssertEqual(lobby.sorted(for: nil).map(\.name), ["Lee", "Max"])
+        await lobby.find(clock: nil, name: "Alex")
+        XCTAssertEqual(api.seeks.count, 1)
+        XCTAssertNil(api.seeks.first?.clock)
+        XCTAssertEqual(OnlineLobby.clocks.first, .unlimited)
+        center.dismiss()
+    }
+
     func testThePlayerKeyIsMadeOnceAndKept() {
         let key = OnlinePlayerKey.current(defaults)
         XCTAssertEqual(key.count, 32)

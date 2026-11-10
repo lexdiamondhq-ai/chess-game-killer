@@ -133,7 +133,7 @@ final class FakeChallengeAPI: ChallengeAPI {
     /// The reply to a cancel; "cancelled" by default.
     var cancelReply: LobbyReply?
 
-    private(set) var seeks: [(name: String, clock: FriendClock, player: String)] = []
+    private(set) var seeks: [(name: String, clock: FriendClock?, player: String)] = []
     private(set) var checks: [String] = []
     private(set) var cancels: [String] = []
     private(set) var plays: [(id: String, name: String, player: String)] = []
@@ -148,7 +148,7 @@ final class FakeChallengeAPI: ChallengeAPI {
         return onlineRating
     }
 
-    func seek(name: String, clock: FriendClock, player: String) async throws -> LobbyReply {
+    func seek(name: String, clock: FriendClock?, player: String) async throws -> LobbyReply {
         seeks.append((name, clock, player))
         if let failure { throw failure }
         if let seekReply { return seekReply }

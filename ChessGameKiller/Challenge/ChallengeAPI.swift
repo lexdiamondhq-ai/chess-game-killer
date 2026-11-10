@@ -43,8 +43,8 @@ protocol ChallengeAPI: AnyObject {
     func lobby() async throws -> LobbyList
     /// The player's online rating, by their player key.
     func rating(player: String) async throws -> OnlineRating
-    /// Waits for a game at `clock`, first taking on the closest-rated player already waiting at it.
-    func seek(name: String, clock: FriendClock, player: String) async throws -> LobbyReply
+    /// Waits for a game at `clock` (nil: no clock), first taking on the closest-rated player already waiting at it.
+    func seek(name: String, clock: FriendClock?, player: String) async throws -> LobbyReply
     /// Checks in while waiting: still waiting, or the game someone started with you.
     func checkSeek(_ id: String, token: String) async throws -> LobbyReply
     /// Stops waiting, unless someone took you on first (then the reply holds the game).
@@ -117,7 +117,8 @@ final class LiveChallengeAPI: ChallengeAPI {
     }
 
     func lobby() async throws -> LobbyList {
-        try await send("GET", "api/lobby")
+        // `untimed=1`: this app can read players waiting with no clock.
+        try await send("GET", "api/lobby", query: [URLQueryItem(name: "untimed", value: "1")])
     }
 
     func rating(player: String) async throws -> OnlineRating {
@@ -126,7 +127,7 @@ final class LiveChallengeAPI: ChallengeAPI {
         return you
     }
 
-    func seek(name: String, clock: FriendClock, player: String) async throws -> LobbyReply {
+    func seek(name: String, clock: FriendClock?, player: String) async throws -> LobbyReply {
         try await send("POST", "api/lobby/seeks", body: SeekBody(name: name, clock: clock, look: Self.currentLook(), player: player))
     }
 
@@ -194,9 +195,20 @@ final class LiveChallengeAPI: ChallengeAPI {
 
     private struct SeekBody: Encodable {
         let name: String
-        let clock: FriendClock
+        let clock: FriendClock?
         let look: String
         let player: String
+
+        // No clock is sent as null, not left out.
+        func encode(to encoder: Encoder) throws {
+            var c = encoder.container(keyedBy: CodingKeys.self)
+            try c.encode(name, forKey: .name)
+            try c.encode(clock, forKey: .clock)
+            try c.encode(look, forKey: .look)
+            try c.encode(player, forKey: .player)
+        }
+
+        enum CodingKeys: String, CodingKey { case name, clock, look, player }
     }
 
     private struct TakeBody: Encodable {
@@ -220,9 +232,12 @@ final class LiveChallengeAPI: ChallengeAPI {
         let type: String
     }
 
-    private func send<Reply: Decodable>(_ method: String, _ path: String, body: (any Encodable)? = nil,
+    private func send<Reply: Decodable>(_ method: String, _ path: String, query: [URLQueryItem] = [],
+                                        body: (any Encodable)? = nil,
                                         token: String? = nil, retried: Bool = false) async throws -> Reply {
-        var request = URLRequest(url: base.appending(path: path))
+        var url = base.appending(path: path)
+        if !query.isEmpty { url.append(queryItems: query) }
+        var request = URLRequest(url: url)
         request.httpMethod = method
         request.timeoutInterval = 15
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -252,7 +267,7 @@ final class LiveChallengeAPI: ChallengeAPI {
                 let wait = Self.retryAfter(http.value(forHTTPHeaderField: "Retry-After"))
                 if wait <= Self.longestRetryWait {
                     try await Task.sleep(for: .seconds(wait))
-                    return try await send(method, path, body: body, token: token, retried: true)
+                    return try await send(method, path, query: query, body: body, token: token, retried: true)
                 }
             }
             let reply = try? JSONDecoder().decode(ChallengeErrorReply.self, from: data)
