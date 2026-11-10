@@ -30,12 +30,19 @@ SOUNDS = {
     "capture": ("A wooden chess piece takes another on a hardwood board: one firm knock, then the "
                 "taken piece tips over and settles with a soft wooden clatter. Close-up, dry room, "
                 "elegant, no glass, no explosion, no music", 0.9),
-    "check": ("A weighted wooden chess piece set down firmly on a hardwood board, followed by a "
-              "single soft, clear, low bell tone that fades quickly. Elegant and understated, "
-              "not alarming, no music", 0.9),
+    "check": ("A heavy weighted wooden chess piece with a felt base set down firmly on a thick "
+              "hardwood board, followed by two quick, warm, low bronze bell notes, the second a "
+              "step lower, fading quickly. Elegant, serious, no music", 1.2),
     "castle": ("Two weighted wooden chess pieces with felt bases set down on a hardwood board one "
                "right after the other: two soft knocks a fraction of a second apart. Close-up, "
                "dry room, no music", 0.7),
+    # Deeper, more vibrant (Alex, 2026-11-10): move, capture and castle in the app are these
+    # takes made two semitones lower with more warmth and sparkle and a small wooden room:
+    #   asetrate=44100*0.891,aresample=44100,atempo=1.122,bass=g=5:f=140,
+    #   equalizer=f=2800:t=q:w=1:g=2.5,aecho=0.8:0.5:28|46:0.18|0.10
+    # brought back to the old files' loudness, then tidied. check.mp3 is the take above with
+    # bass=g=3:f=140, equalizer=f=2800:t=q:w=1:g=1.5 and the same small room. A fresh take of
+    # any of them needs that chain again.
     # The endings: warm and acoustic like the pieces, never arcade synths.
     "win": ("A short, elegant success chime: three warm rising notes on a soft celesta and a "
             "felt piano, a gentle shimmer at the end. Clean, luxurious, understated, no synths, "
