@@ -10,11 +10,15 @@ struct OnlineLobbyView: View {
 
     @Environment(ChallengeCenter.self) private var center
     @AppStorage(ChallengeName.key) private var name = ""
-    @AppStorage("online.clock") private var control: TimeControl = .blitz5
+    /// The picked clock, as `OnlineLobby.clockID` keeps it.
+    @AppStorage("online.clock") private var clockID = "5+0"
     @AppStorage("haptics") private var hapticsOn = true
+    /// More times is folded open. It starts open when the picked clock lives there.
+    @State private var showsMore: Bool?
 
-    /// The server's clock for the picked control; nil for no clock.
-    private var clock: FriendClock? { FriendClock(control) }
+    /// The server's clock for the pick; nil for no clock.
+    private var clock: FriendClock? { OnlineLobby.clock(id: clockID) }
+    private var isMoreOpen: Bool { showsMore ?? !OnlineLobby.quickPicks.contains(clock) }
 
     var body: some View {
         ScrollView {
@@ -50,7 +54,7 @@ struct OnlineLobbyView: View {
         .onAppear { lobby.start() }
         .animation(.snappy(duration: 0.3), value: lobby.players)
         .animation(.snappy(duration: 0.3), value: lobby.phase)
-        .sensoryFeedback(.selection, trigger: control) { _, _ in hapticsOn }
+        .sensoryFeedback(.selection, trigger: clockID) { _, _ in hapticsOn }
         .sensoryFeedback(.success, trigger: lobby.phase) { _, new in hapticsOn && new == .starting }
     }
 
@@ -72,29 +76,65 @@ struct OnlineLobbyView: View {
         VStack(alignment: .leading, spacing: 10) {
             ChallengeSectionTitle(title: "Clock")
             HStack(spacing: 8) {
-                ForEach(OnlineLobby.clocks) { option in
-                    ChallengeChip(title: Self.chipTitle(option), isOn: control == option, theme: theme,
-                                  size: option.isTimed ? 15 : 24) {
-                        control = option
-                    }
-                    .accessibilityLabel(Self.detail(option))
-                    .disabled(lobby.isSearching)
+                ForEach(OnlineLobby.quickPicks, id: \.self) { option in
+                    clockChip(option)
                 }
             }
-            Text(Self.detail(control))
+            Button {
+                withAnimation(.snappy(duration: 0.3)) { showsMore = !isMoreOpen }
+            } label: {
+                HStack(spacing: 4) {
+                    Text("More times")
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 11, weight: .bold))
+                        .rotationEffect(.degrees(isMoreOpen ? 180 : 0))
+                }
+                .font(theme.challengeFont(14, .semibold))
+                .foregroundStyle(theme.challengeAccent)
+                .frame(maxWidth: .infinity, minHeight: 32)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(isMoreOpen ? "Fewer times" : "More times")
+            if isMoreOpen {
+                moreClocks
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+            Text(OnlineLobby.detail(clock))
                 .font(theme.challengeFont(12))
                 .foregroundStyle(.secondary)
         }
     }
 
-    /// "3+2", or ∞ for no clock: five chips share the row.
-    static func chipTitle(_ control: TimeControl) -> String {
-        control.isTimed ? control.name : "∞"
+    /// Bullet, Blitz, Rapid and Classical, each a row of chips, on a glass card.
+    private var moreClocks: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(OnlineLobby.moreClocks) { group in
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(group.name.uppercased())
+                        .font(theme.challengeFont(11.5, .semibold))
+                        .tracking(0.8)
+                        .foregroundStyle(.secondary)
+                        .accessibilityAddTraits(.isHeader)
+                    HStack(spacing: 6) {
+                        ForEach(group.clocks, id: \.self) { option in
+                            clockChip(option, size: 14)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .challengeGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
-    /// The line under the chips. No clock says it isn't rated.
-    static func detail(_ control: TimeControl) -> String {
-        control.isTimed ? control.detail : "No clock · take all the time you like, not rated"
+    private func clockChip(_ option: FriendClock?, size: CGFloat = 15) -> some View {
+        ChallengeChip(title: option?.label ?? "∞", isOn: clock == option, theme: theme,
+                      size: option == nil ? 24 : size) {
+            clockID = OnlineLobby.clockID(option)
+        }
+        .accessibilityLabel(OnlineLobby.detail(option))
+        .disabled(lobby.isSearching)
     }
 
     @ViewBuilder

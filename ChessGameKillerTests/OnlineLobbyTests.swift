@@ -109,7 +109,25 @@ final class OnlineLobbyTests: XCTestCase {
         await lobby.find(clock: nil, name: "Alex")
         XCTAssertEqual(api.seeks.count, 1)
         XCTAssertNil(api.seeks.first?.clock)
-        XCTAssertEqual(OnlineLobby.clocks.first, .unlimited)
+        XCTAssertEqual(OnlineLobby.quickPicks.first, .some(nil))
+        center.dismiss()
+    }
+
+    func testMoreTimesAreKeptAndReadBack() {
+        // Every clock under More times is a valid server clock, in the family its group names.
+        for group in OnlineLobby.moreClocks {
+            for clock in group.clocks {
+                XCTAssertEqual(clock.kind, group.name, clock.label)
+                XCTAssertTrue((60...3600).contains(clock.initial) && (0...60).contains(clock.increment))
+                XCTAssertEqual(OnlineLobby.clock(id: OnlineLobby.clockID(clock)), clock)
+            }
+        }
+        // What earlier versions kept still reads: TimeControl's raw values.
+        for control in TimeControl.allCases {
+            XCTAssertEqual(OnlineLobby.clock(id: control.rawValue), FriendClock(control))
+        }
+        XCTAssertEqual(OnlineLobby.clock(id: "junk"), FriendClock(initial: 300, increment: 0))
+        XCTAssertEqual(OnlineLobby.detail(FriendClock(initial: 1800, increment: 0)), "Classical · 30 minutes each")
         center.dismiss()
     }
 

@@ -100,6 +100,17 @@ final class ChallengeSnapshotTests: XCTestCase {
         center.dismiss()
     }
 
+    func testOnlineLobbyMoreTimes() throws {
+        let api = FakeChallengeAPI()
+        api.onlineRating = OnlineRating(rating: 1236, games: 4, provisional: true)
+        // A clock from More times: the section starts open with it picked.
+        defaults.set("30+0", forKey: "online.clock")
+        let center = makeCenter(api)
+        center.playOnline()
+        try snapshot("online-lobby-more-times", center: center, wait: 2.5)
+        center.dismiss()
+    }
+
     func testOnlineFindingAGame() throws {
         let api = FakeChallengeAPI()
         defaults.set(TimeControl.blitz5.rawValue, forKey: "online.clock")
