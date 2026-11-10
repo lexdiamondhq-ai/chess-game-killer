@@ -389,7 +389,7 @@ extension String {
 /// A rival's film large over the hall as you land on it: full screen, with sound, nothing over
 /// the art but I to V at the bottom. A tap ends it sooner; then it holds its last frame and its
 /// ending (the rival's words and Face) rises at the bottom. A sideways swipe goes on to the next
-/// rival's film, and a swipe down leaves the hall.
+/// rival's film, and a swipe down leaves the hall: no button sits over the art (Alex, 2026-11-08).
 struct RivalHallFilm<Ending: View>: View {
     let film: RivalFilm
     /// The film has ended: its ending shows, and a tap no longer does anything.
@@ -423,21 +423,6 @@ struct RivalHallFilm<Ending: View>: View {
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
             }
-        .overlay(alignment: .topLeading) {
-            if ended {
-                Button(action: close) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.85))
-                        .frame(width: 44, height: 44)
-                        .background(.ultraThinMaterial, in: Circle())
-                }
-                .accessibilityLabel("Close")
-                .padding(.horizontal, 16)
-                .padding(.top, 6)
-                .transition(.opacity)
-            }
-        }
         .contentShape(Rectangle())
         .onTapGesture { if !ended { leave() } }
         .gesture(DragGesture(minimumDistance: 24).onEnded { drag in
