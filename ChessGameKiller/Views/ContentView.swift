@@ -11,6 +11,7 @@ struct ContentView: View {
     @State private var showingNewGame = true
     @State private var showingSettings = false
     @State private var confirmingResign = false
+    @State private var confirmingDraw = false
     /// The welcome's Play, waiting on the first rival's film: its Begin starts this game.
     @State private var welcomeFilm: WelcomeFilm?
     @State private var showingAnalyze = false
@@ -829,8 +830,15 @@ struct ContentView: View {
                 }
             }
             // Resign is also here, not only in the dock's pull-up (Alex, 2026-11-09: "How to resign").
+            // Offer a draw sits just above it (Alex, 2026-11-10, option B).
             if match.canResign {
                 Section {
+                    Button {
+                        confirmingDraw = true
+                    } label: {
+                        Label("Offer a draw", systemImage: "equal.circle")
+                    }
+                    .disabled(!match.canOfferDraw)
                     Button(role: .destructive) {
                         confirmingResign = true
                     } label: {
@@ -846,6 +854,14 @@ struct ContentView: View {
                 withAnimation(.snappy) { match.resign() }
             }
             Button("Keep playing", role: .cancel) {}
+        }
+        .confirmationDialog("Offer \(match.opponentName) a draw?", isPresented: $confirmingDraw, titleVisibility: .visible) {
+            Button("Offer a draw") {
+                withAnimation(.snappy) { _ = match.offerDraw() }
+            }
+            Button("Keep playing", role: .cancel) {}
+        } message: {
+            Text("If it's accepted, the game ends level.")
         }
     }
 

@@ -198,7 +198,7 @@ private struct ResultText {
             switch outcome {
             case .timeout(let loser):
                 return loser == player ? "\(rival) \(rival.agreeing("wins", "win")) on time" : "You win on time"
-            case .timeoutDraw:
+            case .timeoutDraw, .agreedDraw:
                 return "Draw"
             case .resigned(let loser):
                 return loser == player ? "You resigned" : "\(rival) \(rival.agreeing("resigns", "resign"))"
@@ -217,6 +217,8 @@ private struct ResultText {
                 return flagged == player
                     ? "Your clock ran out, but \(rival.midSentence) can't checkmate with what's left."
                     : "\(rival.possessive) clock ran out, but you can't checkmate with what's left."
+            case .agreedDraw:
+                return "You offered a draw and \(rival.midSentence) accepted."
             case .resigned(let loser):
                 return loser == player ? "\(rival) \(rival.agreeing("takes", "take")) this one." : "You win. There was no way back for \(rival.midSentence)."
             }

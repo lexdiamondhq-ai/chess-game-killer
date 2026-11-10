@@ -216,7 +216,7 @@ final class RivalsTests: XCTestCase {
     func testTheGrudgeOnlySaysShortTrueThings() {
         let moments: [RivalMoment] = [
             .greeting, .tookPiece(.knight), .lostPiece(.queen), .givesCheck, .playerBlunder,
-            .playerGreatMove, .rivalResigns, .playerResigned, .rivalWins, .playerWins, .draw,
+            .playerGreatMove, .rivalResigns, .playerResigned, .rivalWins, .playerWins, .draw, .drawDeclined,
         ]
         var records: [GrudgeRecord?] = [nil]
         for (you, it, run) in [(0, 4, 0), (3, 3, 2), (9, 2, 1)] {

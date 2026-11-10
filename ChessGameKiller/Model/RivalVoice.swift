@@ -20,11 +20,13 @@ enum RivalMoment: Equatable {
     case rivalWins
     case playerWins
     case draw
+    /// The person offered a draw and the rival said no.
+    case drawDeclined
 
     /// Moments that are always worth a line; the rest wait their turn.
     var isBig: Bool {
         switch self {
-        case .greeting, .rivalResigns, .playerResigned, .rivalWins, .playerWins, .draw: return true
+        case .greeting, .rivalResigns, .playerResigned, .rivalWins, .playerWins, .draw, .drawDeclined: return true
         case .tookPiece(let kind), .lostPiece(let kind): return kind == .queen
         default: return false
         }
@@ -120,6 +122,11 @@ enum RivalVoice {
         case (.playerWins, .expert): return ["You beat the 2000s. Seriously."]
         case (.playerWins, .grandmaster): return ["Well played. You earned that."]
         case (.draw, _): return ["A draw. Fair enough."]
+        case (.drawDeclined, .beginner): return ["A draw? No way, we're doing fine!"]
+        case (.drawDeclined, .casual): return ["Nah, let's keep playing."]
+        case (.drawDeclined, .club): return ["No thanks. We'll play on."]
+        case (.drawDeclined, .expert): return ["Declined."]
+        case (.drawDeclined, .grandmaster): return ["A draw? Never."]
         }
     }
 }
@@ -170,6 +177,8 @@ enum GrudgeVoice {
             return quiet ? ["…"] : ["Lucky.", "Enjoy it. It's going on the list."]
         case .draw:
             return ["A draw. We'll finish this."]
+        case .drawDeclined:
+            return quiet ? ["No."] : ["No. Play it out.", "A draw? Not with you."]
         }
     }
 
