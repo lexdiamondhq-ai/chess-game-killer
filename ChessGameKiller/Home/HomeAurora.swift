@@ -1230,6 +1230,10 @@ struct HomeGrudgeRoom: View {
 /// letters as they would in a real inscription (Alex: "the lines would be inside the letters").
 /// An inner shadow under each top edge, a faint shadowed wall above and a lit lower lip give
 /// the cut its depth; "of" is gold leaf laid in the same cut.
+/// On dark marble a darkened groove went black on black and the name vanished (Alex,
+/// 2026-11-10, "Can't see the beauty of chess"), so there the cut is filled with pale
+/// limestone instead (option B): the fill screens onto the slab, lightening it, and the veins
+/// still run through the letters, brighter than the stone around them. "of" stays gold.
 /// Cinzel Decorative's lowercase h carries a swash crossbar that read as broken, so the H is
 /// plain Cinzel's.
 struct HomeAuroraCarving: View {
@@ -1246,9 +1250,11 @@ struct HomeAuroraCarving: View {
     private var font: Font { .custom(Self.fontName, size: Self.size, relativeTo: .largeTitle) }
     private var plain: Font { .custom(Self.plainFontName, size: Self.size, relativeTo: .largeTitle) }
 
-    /// How much each groove darkens the marble: a warm grey, and gold for "of".
-    private var stone: Color { palette.dark ? Color(hex: 0x8C8781) : Color(hex: 0xDCD2C2) }
-    private var gold: Color { palette.dark ? Color(hex: 0xE0B064) : Color(hex: 0xD9A24A) }
+    /// The floor of each groove: on light marble a warm grey that darkens the stone (multiply),
+    /// on dark marble pale limestone that lightens it (screen). Gold for "of".
+    private var stone: Color { palette.dark ? Color(hex: 0xC9C0B2) : Color(hex: 0xDCD2C2) }
+    private var gold: Color { palette.dark ? Color(hex: 0xD9A856) : Color(hex: 0xD9A24A) }
+    private var floorBlend: BlendMode { palette.dark ? .screen : .multiply }
 
     private func words(_ body: AnyShapeStyle, of: AnyShapeStyle) -> Text {
         Text("Beauty ").font(font).foregroundStyle(body)
@@ -1270,7 +1276,7 @@ struct HomeAuroraCarving: View {
     var body: some View {
         ZStack {
             // The lit lower lip of each cut.
-            words(Color.white.opacity(palette.dark ? 0.1 : 0.9))
+            words(Color.white.opacity(palette.dark ? 0.16 : 0.9))
                 .offset(y: 1.2)
                 .opacity(reveal)
             // The shadowed upper wall, just above.
@@ -1278,10 +1284,10 @@ struct HomeAuroraCarving: View {
                 .offset(y: -0.7)
                 .opacity(reveal)
                 .blendMode(.multiply)
-            // The floor of the cut: it darkens the marble, veins and all.
+            // The floor of the cut: it tints the marble, veins and all.
             words(cut(stone), of: cut(gold))
                 .opacity(reveal)
-                .blendMode(.multiply)
+                .blendMode(floorBlend)
         }
         .tracking(1.5)
         .lineLimit(1)
