@@ -57,8 +57,6 @@ struct SculptedBoardView: View {
     var browsing: Position?
     /// Called when the player taps the board while looking back.
     var endBrowsing: (() -> Void)?
-    /// Ghost Vision, when the player can hold the board to see ahead.
-    var vision: GhostVision?
     /// Seen from the player's chair, or from above with the flat pieces (Flat).
     var framing: SculptedCamera.Framing = .standing
 
@@ -200,21 +198,10 @@ struct SculptedBoardView: View {
             lastCapture: game.captureEvents.last,
             halos: halos,
             heirlooms: heirlooms,
-            finale: finale,
-            ghosts: ghosts
+            finale: finale
         )
         state.framing = framing
         return state
-    }
-
-    /// Ghost Vision's steps while the player holds the board.
-    private var ghosts: [SculptedGhostStep] {
-        guard let vision, vision.isHolding, let line = match.ghostLine else { return [] }
-        let focus: Int = vision.shownFocus(steps: line.steps.count)
-        return line.steps.filter { $0.index <= focus }.map { step in
-            SculptedGhostStep(moves: step.moves, captured: step.captured?.square,
-                              opacity: Float(GhostLine.opacity(of: step.index, focus: focus)))
-        }
     }
 
     /// Each army piece's history on the piece, when the player keeps "Piece history" on.
@@ -248,7 +235,6 @@ struct SculptedBoardView: View {
             endBrowsing?()
             return
         }
-        if vision?.swallowsTap == true { return }
         guard let square = stage.scene(for: look).square(at: point) else { return }
         withAnimation(.snappy(duration: 0.22)) { match.tap(square) }
     }

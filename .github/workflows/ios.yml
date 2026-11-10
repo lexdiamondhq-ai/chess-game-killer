@@ -186,10 +186,6 @@ jobs:
           shoot classic -showcaseLook classic
           shoot grudge -showcaseLook gilded -showcaseRival grudge -showcaseClock 3+2
           shoot coach -showcaseLook gilded -showcase3D NO -showcaseCoach open
-          # Ghost Vision held: the engine's line ahead as see-through pieces, then slid back a step.
-          shoot ghost-3d -showcaseLook gilded -showcase3D YES -showcaseGhost all
-          shoot ghost-flat -showcaseLook gilded -showcase3D NO -showcaseGhost all
-          shoot ghost-step -showcaseLook midnight -showcase3D NO -showcaseGhost 1
           # The Board view setting: flat from above, each piece seated in its own square.
           shoot flat-3d -showcaseLook gilded -showcase3D YES -boardTilt flat
           shoot sculpted-flat -showcaseLook sculpted -showcase3D YES -boardTilt flat
@@ -235,7 +231,7 @@ jobs:
           home welcome-2 -showcaseWelcome 1
           home welcome-3 -showcaseWelcome 2
           home welcome-4 -showcaseWelcome 3
-          shoot tip-ghost -showcaseLook gilded -showcase3D NO -showcaseTip ghostVision
+          shoot tip-orb -showcaseLook gilded -showcase3D NO -showcaseTip coachOrb
           xcrun simctl terminate "$UDID" $BUNDLE 2>/dev/null || true
       - name: Upload build log
         if: always()

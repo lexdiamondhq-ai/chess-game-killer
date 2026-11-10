@@ -67,9 +67,6 @@ struct ContentView: View {
     /// Tilted or flat 3D board (Settings, Board view).
     @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.tilted
     @AppStorage(BoardTheme.coordinatesKey) private var showsCoordinates = true
-    /// Hold the board to see the engine's line ahead (counts as help).
-    @AppStorage(GhostVision.storageKey) private var ghostVisionOn = true
-    @State private var vision = GhostVision()
     /// Talk it through, open over the game.
     @State private var talk: TalkSession?
     /// The move the player pressed Play on in Talk it through, made once the talk has slid away.
@@ -81,13 +78,12 @@ struct ContentView: View {
     /// The app opens on the home screen when it is on, otherwise on the New Game sheet;
     /// tests and screenshots that picture the game screen skip both, and may open the coach.
     init(startsWithNewGame: Bool = true, startsAtHome: Bool? = nil,
-         match: MatchController? = nil, coachOpen: Bool = false, vision: GhostVision? = nil) {
+         match: MatchController? = nil, coachOpen: Bool = false) {
         let trainingStore = TrainingStore.live()
         _training = State(initialValue: trainingStore)
         // The training streak carries over into the daily one the first time.
         _daily = State(initialValue: DailyStore.live(trainingStreak: trainingStore.progress.streak))
         if let match { _match = State(initialValue: match) }
-        if let vision { _vision = State(initialValue: vision) }
         let home = startsAtHome ?? (startsWithNewGame && HomeScreen.isOn())
         let welcome = startsWithNewGame && !Welcome.isUnderTest && Welcome.shouldShow()
         _showingHome = State(initialValue: home)
@@ -552,9 +548,9 @@ struct ContentView: View {
         }
     }
 
-    /// Tips keep out of the way of the army's news, the unfolded coach and a held board.
+    /// Tips keep out of the way of the army's news and the unfolded coach.
     private var tipsBlocked: Bool {
-        armyNews != nil || coachExpanded || vision.isHolding || showingWelcome
+        armyNews != nil || coachExpanded || showingWelcome
     }
 
     /// The welcome is done: the first rival's film, then its game; or leave the player on the
@@ -634,8 +630,7 @@ struct ContentView: View {
                 }
                 // A one-line tip the first time a hidden gesture or a rule would help.
                 .overlay(alignment: .bottom) {
-                    GameTips(match: match, theme: theme, ghostVisionOn: ghostVisionOn,
-                             blocked: tipsBlocked)
+                    GameTips(match: match, theme: theme, blocked: tipsBlocked)
                         .frame(maxWidth: Self.dockMaxWidth)
                         .padding(.horizontal, Self.inset)
                         .padding(.bottom, 8)
@@ -734,25 +729,18 @@ struct ContentView: View {
 
     /// The live board.
     private var board: some View {
-        BoardView(match: match, theme: theme, vision: ghostVisionOn ? vision : nil, framing: framing)
+        BoardView(match: match, theme: theme, framing: framing)
     }
 
     /// The moves, beside them the Tilted / Flat switch.
-    @ViewBuilder
     private var ribbonRow: some View {
-        if ghostVisionOn, vision.isHolding {
-            // Ghost Vision's line takes the whole row while the board is held.
-            GhostStrip(line: match.ghostLine, focus: vision.focus, theme: theme)
-                .transition(.opacity)
-        } else {
-            HStack(spacing: 8) {
-                // The moves on their own glass, like the players' lines above them.
-                MoveRibbon(moves: match.game.moves, theme: theme)
-                    .padding(.horizontal, 14)
-                    .frame(maxHeight: .infinity)
-                    .glassPane(Capsule())
-                BoardViewSwitch(theme: theme)
-            }
+        HStack(spacing: 8) {
+            // The moves on their own glass, like the players' lines above them.
+            MoveRibbon(moves: match.game.moves, theme: theme)
+                .padding(.horizontal, 14)
+                .frame(maxHeight: .infinity)
+                .glassPane(Capsule())
+            BoardViewSwitch(theme: theme)
         }
     }
 

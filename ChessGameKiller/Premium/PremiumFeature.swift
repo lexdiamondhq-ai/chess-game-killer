@@ -9,7 +9,6 @@ import Foundation
 ///   that costs money each time can still carry Premium's fair-use guard (`premium`).
 enum PremiumFeature: String, CaseIterable, Identifiable, Codable {
     // Counted
-    case ghostVision
     case talk
     case scan
     case ratedPuzzle
@@ -50,7 +49,6 @@ enum PremiumFeature: String, CaseIterable, Identifiable, Codable {
     /// The free allowance. Nil: only Premium opens it.
     var free: Allowance? {
         switch self {
-        case .ghostVision: return .perDay(3)
         case .talk: return .perWeek(3)
         case .scan: return .perWeek(3)
         case .ratedPuzzle: return .perDay(15)
@@ -81,7 +79,6 @@ enum PremiumFeature: String, CaseIterable, Identifiable, Codable {
     /// The feature's name, as the offer screen says it.
     var title: String {
         switch self {
-        case .ghostVision: return "Ghost Vision"
         case .talk: return "Talk It Through"
         case .scan: return "Photo scans"
         case .ratedPuzzle: return "Rated puzzles"
@@ -105,7 +102,6 @@ enum PremiumFeature: String, CaseIterable, Identifiable, Codable {
     /// One line on where the free part stops, for the offer screen and limit cards.
     var limitLine: String {
         switch self {
-        case .ghostVision: return "That's today's 3 free Ghost Visions. Premium sees ahead whenever you like."
         case .talk: return "That's your 3 free talks this week. Premium talks it through as much as you like."
         case .scan: return "That's your 3 free photo scans this week. Premium scans as many as you like. Setting up by hand is always free."
         case .ratedPuzzle: return "That's today's 15 free puzzles. More tomorrow, or unlimited with Premium."

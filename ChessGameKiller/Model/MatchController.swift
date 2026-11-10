@@ -132,9 +132,6 @@ final class MatchController {
         guard !isOver, game.humanColors.contains(game.sideToMove) else { return nil }
         return hints.first { $0.rank == 0 }
     }
-    /// Ghost Vision: the engine's best line from the position on the board, a few moves ahead.
-    /// Found with the hints, whether or not they are shown; nil until the search reports.
-    private(set) var lookahead: GhostLine?
     /// The coach's verdict on the person's last graded move, while verdicts are on.
     private(set) var review: MoveReview?
     /// The same verdict, written into the person's own line by the board for a few seconds.
@@ -530,11 +527,6 @@ final class MatchController {
     /// Whether the person can resign now: a game under way that isn't over.
     var canResign: Bool { hasStarted && !isOver && game.plyCount > 0 }
 
-    /// Whether Ghost Vision can show the line now: the person's turn in a game under way.
-    var canPeekAhead: Bool {
-        hasStarted && !isOver && !isSuspended && game.isHumanTurn && game.pendingPromotion == nil
-    }
-
     /// The person looked at the engine's lines for the game in progress: like Undo, that is help.
     func markAssisted() {
         guard canResign else { return }
@@ -553,7 +545,6 @@ final class MatchController {
         workPending = false
         hints = []
         cachedHints = []
-        lookahead = nil
         clearVerdictLine()
         if game.pendingPromotion != nil { game.undo() }
         game.clearSelection()
@@ -729,7 +720,6 @@ final class MatchController {
         clearVerdictLine()
         hints = []
         cachedHints = []
-        lookahead = nil
         onReview?(nil, true)
     }
 
@@ -749,7 +739,6 @@ final class MatchController {
         moveLanded(played)
         hints = []
         cachedHints = []
-        lookahead = nil
         restartWork()
     }
 
@@ -1084,7 +1073,6 @@ final class MatchController {
         setEvaluation(game.sideToMove == .white ? best.evaluation : best.evaluation.flipped, for: fen)
         rivalConsidersResigning(best.evaluation)
         if isOver { return }
-        lookahead = GhostLine.build(fen: fen, line: best)
         cachedHints = lines.prefix(2).enumerated().compactMap { index, line in
             guard
                 let uci = line.firstMove,

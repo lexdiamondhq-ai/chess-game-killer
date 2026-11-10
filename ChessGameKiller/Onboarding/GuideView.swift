@@ -12,8 +12,6 @@ struct GuideView: View {
 
     /// The hidden gestures, by what they do. (Gesture, then what it's called in the app.)
     static let gestures: [(symbol: String, title: String, text: String)] = [
-        ("eye", "Hold the board to see ahead",
-         "Ghost Vision. Your turn in a game: hold a finger on the board and the best line appears a few moves ahead. Slide left to step back through it. Counts as help."),
         ("circle.circle", "Tap the orb for the coach",
          "The round button in the middle of the dock opens the coach: grades, the best moves, undo and new game."),
         ("arrow.down", "Pull the home board down",

@@ -4,8 +4,6 @@ import Foundation
 enum AppTip: String, CaseIterable, Identifiable {
     /// After the player's first move: what the orb is.
     case coachOrb
-    /// A few moves in, with the engine's line ready: hold the board to see ahead.
-    case ghostVision
     /// Right after the first Undo in a game against a rival.
     case undoHelp
     /// On the home, once a game has been played: the gold knight in the dock has shortcuts.
@@ -16,7 +14,6 @@ enum AppTip: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .coachOrb: return "circle.circle"
-        case .ghostVision: return "eye"
         case .undoHelp: return "hand.raised"
         case .jewelShortcuts: return "hand.tap"
         }
@@ -26,8 +23,6 @@ enum AppTip: String, CaseIterable, Identifiable {
         switch self {
         case .coachOrb:
             return "Tap the orb for your coach: grades, better moves and undo."
-        case .ghostVision:
-            return "Hold the board to see the best line ahead. Counts as help."
         case .undoHelp:
             return "Undo counts as help: this game now earns your pieces half the XP."
         case .jewelShortcuts:
@@ -46,7 +41,7 @@ enum TipBook {
         defaults.bool(forKey: "tipsOff") || defaults.string(forKey: "showcase") != nil
     }
 
-    /// The tip CI asks to picture with `-showcaseTip ghostVision`.
+    /// The tip CI asks to picture with `-showcaseTip coachOrb`.
     static func showcased(_ defaults: UserDefaults = .standard) -> AppTip? {
         defaults.string(forKey: "showcaseTip").flatMap(AppTip.init(rawValue:))
     }
@@ -71,14 +66,12 @@ enum TipBook {
     /// The tip a moment in a game calls for, if any, in order of how much it helps.
     /// - Parameters:
     ///   - playerMoves: moves the player has made this game.
-    ///   - lineReady: Ghost Vision has a line to show (it's on and the engine found one).
     ///   - justUndid: the player just took a move back in a game that earns XP.
-    static func next(playerMoves: Int, lineReady: Bool, justUndid: Bool,
+    static func next(playerMoves: Int, justUndid: Bool,
                      _ defaults: UserDefaults = .standard) -> AppTip? {
         let wanted: [AppTip] = [
             justUndid ? .undoHelp : nil,
             playerMoves >= 1 ? .coachOrb : nil,
-            playerMoves >= 3 && lineReady ? .ghostVision : nil,
         ].compactMap { $0 }
         return wanted.first { canShow($0, defaults) }
     }

@@ -35,8 +35,6 @@ final class PremiumTests: XCTestCase {
     // MARK: The plan
 
     func testThePlanAsAgreed() {
-        XCTAssertEqual(PremiumFeature.ghostVision.free, .perDay(3))
-        XCTAssertNil(PremiumFeature.ghostVision.premium)
         XCTAssertEqual(PremiumFeature.talk.free, .perWeek(3))
         XCTAssertEqual(PremiumFeature.talk.premium, .perDay(50))
         XCTAssertEqual(PremiumFeature.scan.free, .perWeek(3))
@@ -60,16 +58,16 @@ final class PremiumTests: XCTestCase {
         let ledger = AllowanceLedger(defaults: defaults, calendar: calendar())
         let morning = date("2026-10-24T09:00:00-05:00")
         let allowance = PremiumFeature.Allowance.perDay(3)
-        XCTAssertTrue(ledger.take(.ghostVision, allowance: allowance, now: morning))
-        XCTAssertTrue(ledger.take(.ghostVision, allowance: allowance, now: morning))
-        XCTAssertTrue(ledger.take(.ghostVision, allowance: allowance, now: morning))
-        XCTAssertFalse(ledger.take(.ghostVision, allowance: allowance, now: morning))
-        XCTAssertEqual(ledger.remaining(.ghostVision, allowance: allowance, now: morning), 0)
+        XCTAssertTrue(ledger.take(.ratedPuzzle, allowance: allowance, now: morning))
+        XCTAssertTrue(ledger.take(.ratedPuzzle, allowance: allowance, now: morning))
+        XCTAssertTrue(ledger.take(.ratedPuzzle, allowance: allowance, now: morning))
+        XCTAssertFalse(ledger.take(.ratedPuzzle, allowance: allowance, now: morning))
+        XCTAssertEqual(ledger.remaining(.ratedPuzzle, allowance: allowance, now: morning), 0)
         let lateNight = date("2026-10-24T23:59:00-05:00")
-        XCTAssertFalse(ledger.take(.ghostVision, allowance: allowance, now: lateNight))
+        XCTAssertFalse(ledger.take(.ratedPuzzle, allowance: allowance, now: lateNight))
         let tomorrow = date("2026-10-25T00:01:00-05:00")
-        XCTAssertEqual(ledger.remaining(.ghostVision, allowance: allowance, now: tomorrow), 3)
-        XCTAssertTrue(ledger.take(.ghostVision, allowance: allowance, now: tomorrow))
+        XCTAssertEqual(ledger.remaining(.ratedPuzzle, allowance: allowance, now: tomorrow), 3)
+        XCTAssertTrue(ledger.take(.ratedPuzzle, allowance: allowance, now: tomorrow))
     }
 
     func testAWeekAllowanceLastsTheWeek() {
@@ -104,22 +102,21 @@ final class PremiumTests: XCTestCase {
 
     // MARK: Free, Premium and unlimited
 
-    func testAFreePlayerRunsOutOfGhostVision() {
+    func testAFreePlayerRunsOutOfTalks() {
         let premium = Premium(defaults: defaults, isPremium: false)
-        XCTAssertEqual(premium.remaining(.ghostVision), 3)
-        XCTAssertTrue(premium.use(.ghostVision, key: "fen-a"))
-        XCTAssertTrue(premium.use(.ghostVision, key: "fen-a"), "the same position again is free")
-        XCTAssertTrue(premium.use(.ghostVision, key: "fen-b"))
-        XCTAssertTrue(premium.use(.ghostVision, key: "fen-c"))
-        XCTAssertFalse(premium.canUse(.ghostVision))
-        XCTAssertTrue(premium.canUse(.ghostVision, key: "fen-b"))
-        XCTAssertFalse(premium.use(.ghostVision, key: "fen-d"))
+        XCTAssertEqual(premium.remaining(.talk), 3)
+        XCTAssertTrue(premium.use(.talk, key: "game-a"))
+        XCTAssertTrue(premium.use(.talk, key: "game-a"), "the same key again is free")
+        XCTAssertTrue(premium.use(.talk, key: "game-b"))
+        XCTAssertTrue(premium.use(.talk, key: "game-c"))
+        XCTAssertFalse(premium.canUse(.talk))
+        XCTAssertTrue(premium.canUse(.talk, key: "game-b"))
+        XCTAssertFalse(premium.use(.talk, key: "game-d"))
     }
 
     func testPremiumHasNoLimitWhereNothingIsSpent() {
         let premium = Premium(defaults: defaults, isPremium: true)
-        for _ in 0..<50 { XCTAssertTrue(premium.use(.ghostVision)) }
-        XCTAssertNil(premium.remaining(.ghostVision))
+        for _ in 0..<50 { XCTAssertTrue(premium.use(.ratedPuzzle)) }
         XCTAssertNil(premium.remaining(.ratedPuzzle))
         XCTAssertTrue(premium.opens(.lessons))
         XCTAssertTrue(premium.opens(.boardLooks))
@@ -152,7 +149,7 @@ final class PremiumTests: XCTestCase {
         XCTAssertFalse(premium.use(.puzzleCycles))
         XCTAssertFalse(premium.canUse(.trainingRooms))
         XCTAssertEqual(premium.remaining(.masterGames), 0)
-        XCTAssertTrue(premium.opens(.ghostVision), "a counted feature isn't locked")
+        XCTAssertTrue(premium.opens(.ratedPuzzle), "a counted feature isn't locked")
     }
 
     func testUnlimitedOpensEverything() {
@@ -238,7 +235,7 @@ final class PremiumTests: XCTestCase {
         }
         UserDefaults.standard.set("gilded", forKey: "boardTheme")
         try snapshot("premium-offer", PremiumOfferView(feature: nil))
-        try snapshot("premium-offer-ghost", PremiumOfferView(feature: .ghostVision))
+        try snapshot("premium-offer-talk", PremiumOfferView(feature: .talk))
         UserDefaults.standard.set("midnight", forKey: "boardTheme")
         try snapshot("premium-offer-midnight", PremiumOfferView(feature: .ratedPuzzle))
         let card = ZStack {
