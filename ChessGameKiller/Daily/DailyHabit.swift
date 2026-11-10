@@ -29,6 +29,9 @@ struct DailyRecord: Codable, Equatable {
     var moveDay: String?
     var moveNumber: Int?
     var moveFound = false
+    /// How each day's Move went, by day ("2026-11-09"), from the first try that day. Today's Move
+    /// opens on its result once played, and these are the days a calendar of past Moves can show.
+    var moveResults: [String: Outcome] = [:]
     /// The hour of the day the goal was met, latest last, for the reminder's time.
     var hours: [Int] = []
     /// Streak milestones already marked on a piece (7, 30, 100, 365).
@@ -43,7 +46,7 @@ struct DailyRecord: Codable, Equatable {
     init() {}
 
     private enum CodingKeys: String, CodingKey {
-        case streak, day, puzzlesSolved, moveDay, moveNumber, moveFound, hours, marks, lastMark, seeded, reminderAsked
+        case streak, day, puzzlesSolved, moveDay, moveNumber, moveFound, moveResults, hours, marks, lastMark, seeded, reminderAsked
     }
 
     init(from decoder: Decoder) throws {
@@ -54,6 +57,7 @@ struct DailyRecord: Codable, Equatable {
         moveDay = try c.decodeIfPresent(String.self, forKey: .moveDay)
         moveNumber = try c.decodeIfPresent(Int.self, forKey: .moveNumber)
         moveFound = try c.decodeIfPresent(Bool.self, forKey: .moveFound) ?? false
+        moveResults = (try? c.decodeIfPresent([String: Outcome].self, forKey: .moveResults)) ?? [:]
         hours = try c.decodeIfPresent([Int].self, forKey: .hours) ?? []
         marks = try c.decodeIfPresent([Int].self, forKey: .marks) ?? []
         lastMark = try? c.decodeIfPresent(StreakMark.self, forKey: .lastMark)
@@ -136,6 +140,16 @@ enum DailyRules {
     /// Days in a row on `date`, or 0 once the streak has lapsed.
     static func streak(_ record: DailyRecord, on date: Date, calendar: Calendar = .current) -> Int {
         Trainer.isAlive(record.streak, on: date, calendar: calendar) ? record.streak.current : 0
+    }
+
+    /// The week's rest day is spent: a missed day in the last seven was forgiven, so the next
+    /// miss ends the streak. False once the streak has lapsed or the week is up.
+    static func restDayUsed(_ record: DailyRecord, on date: Date, calendar: Calendar = .current) -> Bool {
+        guard streak(record, on: date, calendar: calendar) > 0,
+              let rest = record.streak.restDay, let restDate = Trainer.date(from: rest, calendar: calendar) else { return false }
+        let since = calendar.dateComponents([.day], from: calendar.startOfDay(for: restDate),
+                                            to: calendar.startOfDay(for: date)).day ?? 99
+        return since < 7
     }
 
     /// The last day the streak still stands if nothing more is done: tomorrow, or the day after

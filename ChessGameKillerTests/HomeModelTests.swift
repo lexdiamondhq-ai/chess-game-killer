@@ -107,8 +107,9 @@ final class HomeModelTests: XCTestCase {
         XCTAssertEqual(ladder.rungs[MatchController.Level.expert.rawValue].standing, .behind)
         XCTAssertEqual(ladder.nextToBeat, .expert, "The gentlest rival you don't lead yet")
         XCTAssertEqual(ladder.gamesCounted, 9)
-        // Average 1600, five wins and three losses over nine games: about 1689, so 1700.
-        XCTAssertEqual(ladder.yourRating, 1700)
+        // From 1200: five wins (four over stronger or equal rivals), a draw, three losses
+        // to stronger rivals. About 1338; games on the same day may fall in either order.
+        XCTAssertEqual(Double(ladder.yourRating ?? 0), 1338, accuracy: 3)
     }
 
     func testANewPlayerHasNoRatingYet() {
@@ -116,10 +117,35 @@ final class HomeModelTests: XCTestCase {
         XCTAssertNil(empty.yourRating)
         XCTAssertEqual(empty.nextToBeat, .beginner)
         XCTAssertTrue(empty.rungs.allSatisfy { $0.standing == .notPlayed && $0.score == nil })
-        XCTAssertNil(HomeLadder.performance([(1500, 1), (1500, 1)]), "Two games say too little")
-        XCTAssertEqual(HomeLadder.performance([(1500, 1), (1500, 1), (1500, 0)]), 1650)
-        XCTAssertEqual(HomeLadder.performance([(3000, 1), (3000, 1), (3000, 1)]), 3000, "Never above Singularity")
-        XCTAssertEqual(HomeLadder.performance([(800, 0), (800, 0), (800, 0)]), 400)
+        XCTAssertNil(HomeLadder.elo([(1500, 1), (1500, 1)]), "Two games say too little")
+        XCTAssertEqual(HomeLadder.elo([(1500, 1), (1500, 1), (1500, 0)]), 1259)
+        XCTAssertEqual(HomeLadder.elo([(1000, 0), (1000, 0), (1000, 0)]), 1113, "Losing to a weaker rival costs most")
+    }
+
+    /// The count starts where the welcome's answer put the player (audit, 2026-11-09), so a club
+    /// player's first number isn't a beginner's; an install that never answered starts at 1,200.
+    func testTheRatingStartsWhereTheWelcomeSaid() {
+        XCTAssertEqual(HomeLadder.elo([(1500, 1), (1500, 1), (1500, 0)], from: 1800), 1778)
+        XCTAssertEqual(HomeLadder.elo([(1000, 0), (1000, 0), (1000, 0)], from: 1000), 943)
+        let suite = "HomeLadderStart"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        XCTAssertEqual(HomeLadder.savedStart(defaults), 1200)
+        WelcomeChoice(experience: .club, look: .gilded).apply(defaults)
+        XCTAssertEqual(HomeLadder.savedStart(defaults), 1800)
+        let club = HomeLadder(games: HomeSample.games(), start: HomeLadder.savedStart(defaults))
+        let anyone = HomeLadder(games: HomeSample.games(), start: HomeLadder.startingRating)
+        XCTAssertGreaterThan(club.yourRating ?? 0, anyone.yourRating ?? 0, "The same games count from higher up")
+        XCTAssertEqual(club.gamesCounted, anyone.gamesCounted)
+        defaults.removePersistentDomain(forName: suite)
+    }
+
+    /// Losing can never raise your rating, however strong the rival (Alex, 2026-11-09: the old
+    /// performance formula made ten losses to Lionheart read 1,600).
+    func testLosingToAStrongRivalNeverRaisesYourRating() {
+        let losses = Array(repeating: (rating: 2000, score: 0.0), count: 10)
+        XCTAssertEqual(HomeLadder.elo(losses), 1196)
+        XCTAssertLessThanOrEqual(HomeLadder.elo(Array(repeating: (2500, 0.0), count: 5)) ?? .max, 1200)
     }
 
     func testUnfinishedGamesDoNotCount() {
@@ -194,11 +220,12 @@ final class HomeModelTests: XCTestCase {
 
     /// Rooms holds only what the Today page doesn't (Alex, 2026-11-08): the ways to play a
     /// person, a new game on your own side and clock, and your games. Today's Move, Puzzles,
-    /// Analyze and the coach are on Today, so they aren't repeated here. The rivals' hall is the fifth.
+    /// Analyze and the coach are on Today, so they aren't repeated here. The rivals' hall is the
+    /// fifth, and Your Grudge sits beside it (Alex, 2026-11-09: "place in rooms").
     func testRoomsHoldOnlyWhatTodayDoesNot() {
         let rooms = HomeShortcutKind.list(online: true)
-        XCTAssertEqual(rooms, [.online, .friend, .newGame, .rivals, .games])
-        XCTAssertLessThanOrEqual(rooms.count, 5, "One row")
+        XCTAssertEqual(rooms, [.online, .friend, .newGame, .rivals, .grudge, .games])
+        XCTAssertLessThanOrEqual(rooms.count, 6, "Two even rows of three at most")
         XCTAssertEqual(Set(rooms.map(\.title)).count, rooms.count, "Each has a name of its own")
         for kind in rooms {
             XCTAssertFalse(kind.glyph.isEmpty, "\(kind.title) has an icon")
@@ -208,7 +235,7 @@ final class HomeModelTests: XCTestCase {
 
     /// With no other players to reach, Online and A friend are left out and the rest keep their order.
     func testWithoutOtherPlayersRoomsKeepTheRest() {
-        XCTAssertEqual(HomeShortcutKind.list(online: false), [.newGame, .rivals, .games])
+        XCTAssertEqual(HomeShortcutKind.list(online: false), [.newGame, .rivals, .grudge, .games])
     }
 
     /// The app has one home: a switch for an earlier home turned off before goes back to its default.
@@ -220,6 +247,15 @@ final class HomeModelTests: XCTestCase {
         XCTAssertTrue(HomeScreen.isOn(defaults))
         XCTAssertTrue(HomeStageLayout.isOn(defaults))
         XCTAssertTrue(HomeLayout.usesSheet(defaults))
+    }
+
+    /// The "3D pieces" switch left Settings: one turned off before goes back to its default, on.
+    func testEveryoneLandsOnTheStoneBoard() {
+        let defaults = UserDefaults(suiteName: "SculptedSettingTests")!
+        defer { defaults.removePersistentDomain(forName: "SculptedSettingTests") }
+        defaults.set(false, forKey: SculptedSetting.key)
+        SculptedSetting.settle(defaults)
+        XCTAssertNil(defaults.object(forKey: SculptedSetting.key))
     }
 
     // MARK: Helpers

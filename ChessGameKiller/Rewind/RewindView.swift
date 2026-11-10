@@ -5,7 +5,8 @@ import SwiftUI
 /// below it to drag through, and Leo's word on each moment that mattered.
 /// At a mistake: walk the better line as ghosts, as deep as the review level
 /// goes, follow the other side's best tries or play your own move against
-/// Stockfish, then take the move back and find it yourself.
+/// Stockfish, then take the move back and find it yourself. With Premium the coach
+/// also talks through the whole game once, the board following his words (DeepReview.swift).
 struct RewindView: View {
     let theme: BoardTheme
     /// The rival of a game in progress that a rematch would cost, so the person is asked first.
@@ -36,10 +37,26 @@ struct RewindView: View {
     @State private var confirmingRematch = false
     /// Ghost lines and second chances are the full Rewind: free once a day, any game with Premium.
     @State private var offer: PremiumFeature?
+    /// The coach's deep review, while it is open.
+    @State private var deep: DeepReviewPlayer?
+    /// Where the review last put the board. Anywhere else, the player has taken the board back.
+    @State private var deepPly: Int?
+    /// Whose review is already kept with this game, when one is: hearing it again is free.
+    @State private var keptCoach: Coach?
+    private let reviews: DeepReviewTransport
+    private let reviewStore: DeepReviewStore
+    /// Who reads the review aloud. Nil: the coach's own voice.
+    private let reviewVoice: TalkSpeaker?
+    private let opensReview: Bool
 
     init(game: SavedGame, theme: BoardTheme, startAt ply: Int? = nil, opensLine: Bool = false,
          engine: ChessEngine? = StockfishEngine.shared, forfeits: String? = nil, leave: (() -> Void)? = nil,
-         onPlayAgain: ((SavedGame) -> Void)? = nil) {
+         onPlayAgain: ((SavedGame) -> Void)? = nil, reviews: DeepReviewTransport = DeepReviewAPI.live,
+         reviewStore: DeepReviewStore = .live, reviewVoice: TalkSpeaker? = nil, opensReview: Bool = false) {
+        self.reviews = reviews
+        self.reviewStore = reviewStore
+        self.reviewVoice = reviewVoice
+        self.opensReview = opensReview
         self.theme = theme
         self.forfeits = forfeits
         self.leave = leave
@@ -78,6 +95,13 @@ struct RewindView: View {
                     .frame(maxWidth: 640)
                     .padding(.top, 10)
                     .padding(.horizontal, 8)
+                    if deep == nil, explorer == nil, DeepReviewRequest.offered(for: game) {
+                        DeepReviewRow(theme: theme, coach: keptCoach ?? Coach.current, kept: keptCoach != nil,
+                                      open: Premium.shared.opens(.deepReview)) { openDeepReview() }
+                            .frame(maxWidth: 640)
+                            .padding(.top, 10)
+                            .padding(.horizontal, 12)
+                    }
                     // The card runs to the bottom, so its buttons always sit in the same place.
                     card
                         .frame(maxWidth: 640, maxHeight: 440)
@@ -91,6 +115,16 @@ struct RewindView: View {
         .tint(accent)
         .onChange(of: ply) { _, now in
             if now != ghostAnchor { stopGhost() }
+            // The player moved the board themselves: the coach waits.
+            if let deep, now != deepPly { deep.pause() }
+        }
+        .onChange(of: deepStop) { _, _ in followReview() }
+        .onChange(of: deep?.phase) { _, phase in
+            if phase == .playing { followReview() }
+        }
+        // A call or the Home screen: the coach waits rather than talking to nobody.
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+            deep?.pause()
         }
         .onChange(of: levelID) { _, _ in explorer?.setLevel(level) }
         .onAppear {
@@ -98,8 +132,13 @@ struct RewindView: View {
             if opensLine, explorer == nil, Premium.shared.use(.fullRewind, key: game.id.uuidString) {
                 startGhost(autoplays: false)
             }
+            keptCoach = reviewStore.review(for: game.id)?.speaker
+            if opensReview, deep == nil { openDeepReview() }
         }
-        .onDisappear { stopGhost() }
+        .onDisappear {
+            stopGhost()
+            deep?.close()
+        }
         .sensoryFeedback(.selection, trigger: ply)
         .sheet(item: $chance) { chance in
             SecondChanceSheet(chance: chance, theme: theme) { solved in
@@ -132,8 +171,10 @@ struct RewindView: View {
     private var header: some View {
         HStack {
             Button {
-                // Out of a line first, then out of Rewind.
-                if explorer != nil {
+                // Out of the review or a line first, then out of Rewind.
+                if deep != nil {
+                    closeDeepReview()
+                } else if explorer != nil {
                     stopGhost()
                 } else if let leave {
                     leave()
@@ -146,7 +187,7 @@ struct RewindView: View {
                     .frame(width: 44, height: 44)
             }
             .tint(.primary)
-            .accessibilityLabel(explorer == nil ? "Back" : "Back to the game")
+            .accessibilityLabel(explorer == nil && deep == nil ? "Back" : "Back to the game")
             .frame(width: Self.headerSide, alignment: .leading)
             Spacer(minLength: 0)
             if let explorer {
@@ -168,7 +209,7 @@ struct RewindView: View {
             Spacer(minLength: 0)
             ZStack(alignment: .trailing) {
                 // A word, not a play symbol: here ▶︎ would read as "play the replay".
-                if let onPlayAgain, game.level != nil, explorer == nil {
+                if let onPlayAgain, game.level != nil, explorer == nil, deep == nil {
                     Button("Rematch") {
                         if forfeits == nil { onPlayAgain(game) } else { confirmingRematch = true }
                     }
@@ -339,6 +380,9 @@ struct RewindView: View {
             }
             return shown
         }
+        if let part = deep?.part, part.boardPly(in: game) == ply, let shown = reviewPosition(part) {
+            return shown
+        }
         var shown = ShownPosition(fen: game.positions[min(ply, game.positions.count - 1)])
         if let focused, let squares = Notation.squares(of: focused.uci) {
             let color = RewindPalette.hex(for: focused, rewritten: game.rewritten.contains(focused.ply))
@@ -351,6 +395,39 @@ struct RewindView: View {
             }
         }
         return shown
+    }
+
+    /// The board for a part of the deep review. At a mistake: the position before it, the move
+    /// played lit in its grade's color and the engine's move drawn. At any other move: the
+    /// position after it, the move lit in gold.
+    private func reviewPosition(_ part: DeepReviewPart) -> ShownPosition? {
+        guard let at = part.ply, at >= 1, at <= game.moves.count, game.positions.count > at else { return nil }
+        let moment = game.moments.first { $0.ply == at }
+        if part.kind == .mistake, let moment {
+            var shown = ShownPosition(fen: game.positions[at - 1])
+            let color = RewindPalette.hex(for: moment, rewritten: false)
+            if let squares = Notation.squares(of: moment.uci) {
+                shown.lit[squares.from] = (color, 0.32)
+                shown.lit[squares.to] = (color, 0.2)
+            }
+            if let best = moment.bestUCI, let squares = Notation.squares(of: best) {
+                shown.hints.append(MoveHint(rank: 0, from: squares.from, to: squares.to, san: moment.best ?? "",
+                                            uci: best, evaluation: .centipawns(0)))
+            }
+            return shown
+        }
+        var shown = ShownPosition(fen: game.positions[at])
+        if let uci = moment?.uci ?? playedUCI(at), let squares = Notation.squares(of: uci) {
+            shown.lit[squares.from] = (RewindPalette.goldHex, 0.22)
+            shown.lit[squares.to] = (RewindPalette.goldHex, 0.38)
+        }
+        return shown
+    }
+
+    /// The move that made a ply, in engine notation, for a move nobody graded (the opponent's).
+    private func playedUCI(_ at: Int) -> String? {
+        guard at >= 1, at <= game.moves.count, let position = Position(fen: game.positions[at - 1]) else { return nil }
+        return GameImportBuilder.uci(forSAN: game.moves[at - 1], on: Board(position: position))
     }
 
     private var ghostBranch: (ply: Int, value: Double)? {
@@ -367,8 +444,11 @@ struct RewindView: View {
     private var card: some View {
         let note = focused.map { RewindNote.make(for: $0, library: training?.library) }
         return VStack(alignment: .leading, spacing: 0) {
-            if let explorer, let focused, let note {
+            if let deep {
+                DeepReviewCard(theme: theme, player: deep) { closeDeepReview() }
+            } else if let explorer, let focused, let note {
                 ExplorerCard(
+                    theme: theme,
                     explorer: explorer,
                     canTryIt: !game.rewritten.contains(focused.ply),
                     isPlaying: autoplay != nil,
@@ -407,6 +487,7 @@ struct RewindView: View {
         .padding(.horizontal, 12)
         .animation(.snappy(duration: 0.25), value: focused?.ply)
         .animation(.snappy(duration: 0.25), value: explorer == nil)
+        .animation(.snappy(duration: 0.25), value: deep == nil)
     }
 
     private func momentText(_ moment: SavedMoment, note: RewindNote) -> some View {
@@ -513,6 +594,48 @@ struct RewindView: View {
         }
         .font(.app(.subheadline, weight: .semibold))
         .tint(.primary)
+    }
+
+    // MARK: The deep review
+
+    /// Where the part being read wants the board. Nil: it is about no one move.
+    private var deepStop: Int? {
+        deep?.part?.boardPly(in: game)
+    }
+
+    /// Opens the coach's review of this game. One kept with the game is free to hear again;
+    /// a new one is Premium's, and counts only once it has arrived.
+    private func openDeepReview() {
+        stopGhost()
+        let key = game.id.uuidString
+        if !reviewStore.has(game.id), !Premium.shared.canUse(.deepReview, key: key) {
+            offer = .deepReview
+            return
+        }
+        let player = DeepReviewPlayer(game: game, transport: reviews, store: reviewStore, speaker: reviewVoice) {
+            _ = Premium.shared.use(.deepReview, key: key)
+        }
+        deepPly = nil
+        withAnimation(.snappy) { deep = player }
+        player.start()
+    }
+
+    private func closeDeepReview() {
+        deep?.close()
+        deepPly = nil
+        keptCoach = reviewStore.review(for: game.id)?.speaker
+        withAnimation(.snappy) { deep = nil }
+    }
+
+    /// Moves the board to the part being read. A part about no one move leaves it where it is.
+    private func followReview() {
+        guard deep != nil else { return }
+        guard let stop = deepStop else {
+            deepPly = ply
+            return
+        }
+        deepPly = stop
+        if ply != stop { withAnimation(.easeInOut(duration: 0.35)) { ply = stop } }
     }
 
     // MARK: Actions
@@ -632,7 +755,7 @@ private struct SecondChanceSheet: View {
                         if solved {
                             Label("Rewritten", systemImage: "checkmark.seal.fill")
                                 .font(.app(.headline))
-                                .foregroundStyle(RewindPalette.gold)
+                                .foregroundStyle(RewindPalette.goldInk(on: theme))
                                 .transition(.scale.combined(with: .opacity))
                         }
                     }
@@ -659,6 +782,7 @@ private struct SecondChanceSheet: View {
 /// The better line from a moment: every move tappable, Leo's word on the one on
 /// the board, where it leads, and the other side's best tries to follow instead.
 private struct ExplorerCard: View {
+    let theme: BoardTheme
     let explorer: LineExplorer
     let canTryIt: Bool
     let isPlaying: Bool
@@ -737,10 +861,10 @@ private struct ExplorerCard: View {
             .lineLimit(1)
             .padding(.horizontal, 10)
             .frame(minHeight: 32)
-            .foregroundStyle(lit ? RewindPalette.gold : Color.secondary)
+            .foregroundStyle(lit ? RewindPalette.goldInk(on: theme) : Color.secondary)
             .background {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(lit ? RewindPalette.gold.opacity(0.16) : Color.primary.opacity(0.05))
+                    .fill(lit ? RewindPalette.goldInk(on: theme).opacity(0.16) : Color.primary.opacity(0.05))
             }
         }
         .buttonStyle(.plain)
@@ -833,7 +957,7 @@ private struct ExplorerCard: View {
             } else {
                 Label("Rewritten", systemImage: "checkmark.seal.fill")
                     .font(.app(.subheadline, weight: .semibold))
-                    .foregroundStyle(RewindPalette.gold)
+                    .foregroundStyle(RewindPalette.goldInk(on: theme))
             }
         }
     }

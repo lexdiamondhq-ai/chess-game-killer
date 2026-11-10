@@ -114,6 +114,72 @@ final class DailyTests: XCTestCase {
         XCTAssertEqual(record.moveDay, "2026-10-29")
     }
 
+    func testTodaysMoveOpensOnItsResultOncePlayed() {
+        let store = DailyStore(calendar: calendar)
+        let day = date("2026-11-09", hour: 9)
+        XCTAssertNil(store.moveResult(on: day))
+        store.recordTodaysMove(.afterMistake, at: day)
+        // A second go the same day changes nothing: the first try stands.
+        store.recordTodaysMove(.firstTry, at: date("2026-11-09", hour: 21))
+        XCTAssertEqual(store.moveResult(on: day), .afterMistake)
+        XCTAssertFalse(store.state.moveFound)
+        XCTAssertEqual(store.state.moveResults, ["2026-11-09": .afterMistake])
+        // The next day there's a new one to play.
+        XCTAssertNil(store.moveResult(on: date("2026-11-10")))
+        store.recordTodaysMove(.firstTry, at: date("2026-11-10"))
+        XCTAssertEqual(store.state.moveResults.count, 2)
+    }
+
+    func testADayPlayedBeforeResultsWereKeptReadsAsFoundOrMissed() {
+        var record = DailyRecord()
+        record.moveDay = "2026-11-09"
+        record.moveFound = true
+        XCTAssertEqual(DailyStore(state: record, calendar: calendar).moveResult(on: date("2026-11-09")), .firstTry)
+        record.moveFound = false
+        XCTAssertEqual(DailyStore(state: record, calendar: calendar).moveResult(on: date("2026-11-09")), .missed)
+    }
+
+    func testTheCalendarMarksEachDayOfTheMonth() {
+        let today = date("2026-11-10", hour: 9)
+        let results: [String: Outcome] = ["2026-11-01": .firstTry, "2026-11-03": .withHint, "2026-11-04": .afterMistake,
+                                          "2026-11-05": .missed, "2026-10-31": .firstTry]
+        let november = DailyCalendarMonth(holding: today, today: today, results: results, calendar: calendar)
+        XCTAssertEqual(november.days.count, 30)
+        XCTAssertEqual(november.leading, 0, "November 1, 2026 is a Sunday")
+        XCTAssertEqual(november.days[0].mark, .found)
+        XCTAssertEqual(november.days[1].mark, .unplayed)
+        XCTAssertEqual(november.days[2].mark, .helped)
+        XCTAssertEqual(november.days[3].mark, .helped)
+        XCTAssertEqual(november.days[4].mark, .missed)
+        XCTAssertEqual(november.days[9].mark, .today)
+        XCTAssertTrue(november.days[9].isToday)
+        XCTAssertEqual(november.days[10].mark, .none, "tomorrow has nothing to show yet")
+        XCTAssertFalse(november.days[10].hasMove)
+        XCTAssertEqual([november.found, november.helped, november.missed], [1, 2, 1])
+        XCTAssertTrue(november.canStep(-1, today: today, calendar: calendar))
+        XCTAssertFalse(november.canStep(1, today: today, calendar: calendar))
+
+        // October holds the first Move; nothing comes before it.
+        let october = DailyCalendarMonth(holding: date("2026-10-15"), today: today, results: results, calendar: calendar)
+        XCTAssertEqual(october.leading, 4, "October 1, 2026 is a Thursday")
+        XCTAssertEqual(october.days.count, 31)
+        XCTAssertEqual(october.days[0].mark, .unplayed)
+        XCTAssertEqual(october.days[30].mark, .found)
+        XCTAssertFalse(october.canStep(-1, today: today, calendar: calendar))
+        XCTAssertTrue(october.canStep(1, today: today, calendar: calendar))
+        let september = DailyCalendarMonth(holding: date("2026-09-15"), today: today, results: results, calendar: calendar)
+        XCTAssertTrue(september.days.allSatisfy { !$0.hasMove })
+    }
+
+    func testTheCalendarKeepsADayPlayedBeforeResultsWereKept() {
+        var record = DailyRecord()
+        record.moveDay = "2026-11-08"
+        record.moveFound = true
+        record.moveResults = ["2026-11-09": .missed]
+        let store = DailyStore(state: record, calendar: calendar)
+        XCTAssertEqual(store.moveResults, ["2026-11-08": .firstTry, "2026-11-09": .missed])
+    }
+
     func testDaysInARowWithARestDayAWeekAndMilestones() {
         var record = DailyRecord()
         var milestones: [Int] = []
@@ -127,13 +193,36 @@ final class DailyTests: XCTestCase {
         XCTAssertEqual(record.streak.current, 7)
         XCTAssertEqual(milestones, [7])
         XCTAssertEqual(DailyRules.aliveThrough(record, calendar: calendar), "2026-10-09", "tomorrow, or the day after on the rest day")
+        XCTAssertFalse(DailyRules.restDayUsed(record, on: date("2026-10-08"), calendar: calendar), "still free")
         let afterRest = DailyRules.record(.game, in: record, at: date("2026-10-09"), calendar: calendar)
         XCTAssertTrue(afterRest.outcome.usedRestDay)
         XCTAssertEqual(afterRest.record.streak.current, 8)
         XCTAssertNil(afterRest.outcome.milestone, "a mark is earned once")
-        // The rest day is used up for the week: the next gap ends the streak.
+        // The rest day is used up for the week: Home says so, and the next gap ends the streak.
+        XCTAssertTrue(DailyRules.restDayUsed(afterRest.record, on: date("2026-10-09"), calendar: calendar))
         XCTAssertEqual(DailyRules.aliveThrough(afterRest.record, calendar: calendar), "2026-10-10")
         XCTAssertEqual(DailyRules.streak(afterRest.record, on: date("2026-10-11"), calendar: calendar), 0)
+        XCTAssertFalse(DailyRules.restDayUsed(afterRest.record, on: date("2026-10-11"), calendar: calendar), "no streak, nothing to spend")
+        // Kept up every day, the rest day is free again a week after it was spent.
+        var kept = afterRest.record
+        for offset in 1...5 {
+            let day = calendar.date(byAdding: .day, value: offset, to: date("2026-10-09"))!
+            kept = DailyRules.record(.game, in: kept, at: day, calendar: calendar).record
+        }
+        XCTAssertTrue(DailyRules.restDayUsed(kept, on: date("2026-10-14"), calendar: calendar))
+        XCTAssertFalse(DailyRules.restDayUsed(kept, on: date("2026-10-15"), calendar: calendar))
+        XCTAssertEqual(DailyRules.aliveThrough(kept, calendar: calendar), "2026-10-16", "the day after is covered again")
+    }
+
+    /// Home's streak line says when the week's rest day is spent, on every home.
+    func testHomeSaysWhenTheRestDayIsSpent() {
+        var state = HomeDailyState()
+        state.streak = 8
+        XCTAssertFalse(state.detail.hasPrefix("Rest day used"))
+        state.restDayUsed = true
+        XCTAssertTrue(state.detail.hasPrefix("Rest day used this week."), state.detail)
+        state.doneToday = true
+        XCTAssertFalse(state.detail.hasPrefix("Rest day used"), "once today is done, the day is safe")
     }
 
     func testTheTrainingStreakCarriesOverOnce() {
@@ -383,6 +472,25 @@ final class DailyTests: XCTestCase {
             .environment(PuzzleStore())
             .environment(TrainingStore(library: TrainingLibrary.shared))
         try show(view, "zz-daily-move-solved")
+    }
+
+    func testTheCalendarOfPastMoves() throws {
+        var record = DailyRecord()
+        record.seeded = true
+        let today = Date.now
+        let outcomes: [Outcome] = [.firstTry, .firstTry, .withHint, .firstTry, .missed, .firstTry]
+        for (back, outcome) in outcomes.enumerated() {
+            let day = Calendar.current.date(byAdding: .day, value: -back, to: today) ?? today
+            record.moveResults[Trainer.dayString(day)] = outcome
+        }
+        record.moveDay = Trainer.dayString(today)
+        record.moveFound = true
+        let theme = BoardTheme.named(.gilded)
+        let view = ZStack {
+            TrainingBackdrop(theme: theme)
+            DailyCalendarView(theme: theme, daily: DailyStore(state: record)) { _ in }
+        }
+        try show(view, "zz-daily-calendar")
     }
 
     // MARK: Drawing

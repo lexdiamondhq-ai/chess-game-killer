@@ -119,6 +119,8 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
+        # Made once when the tests load: draws their pictures in the tone CI asks for (SnapshotTone.swift).
+        INFOPLIST_KEY_NSPrincipalClass: SnapshotTone
 schemes:
   ChessGameKiller:
     build:

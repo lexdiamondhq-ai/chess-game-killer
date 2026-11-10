@@ -305,46 +305,27 @@ struct Panel: View {
 
 // MARK: - Reading
 
-/// The photo, big, while the reader checks every square; its analysis follows by itself.
+/// While the reader checks every square: the Gilded knight drawn in light on a glass card,
+/// "Processing" below (KnightLoadingView, Alex 2026-11-10). Its analysis follows by itself;
+/// Stop goes to the editor to set the pieces by hand.
 struct PhotoReadingView: View {
     let session: ScanSession
     let theme: BoardTheme
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 18) {
-                if let photo = session.photo {
-                    Image(uiImage: photo)
-                        .resizable()
-                        .scaledToFit()
-                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        .frame(maxHeight: 420)
-                        .accessibilityLabel("Your photo")
+        KnightLoadingView()
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Stop") { withAnimation(.snappy) { session.stopReading() } }
+                        .accessibilityLabel("Stop reading the photo")
+                        .accessibilityHint("Then set up the pieces by hand")
                 }
-                VStack(spacing: 6) {
-                    HStack(spacing: 10) {
-                        ProgressView()
-                        Text("Reading the board")
-                            .font(.app(.headline))
-                    }
-                    Text("I'm checking every square, then I'll find the best moves. This can take up to a minute.")
-                        .font(.app(.subheadline))
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Button("Stop") { withAnimation(.snappy) { session.stopReading() } }
-                    .buttonStyle(.bordered)
-                    .accessibilityLabel("Stop reading the photo")
-                    .accessibilityHint("Then set up the pieces by hand")
             }
-            .padding(20)
-            .frame(maxWidth: .infinity)
-        }
-        .navigationTitle("Reading your photo")
-        .navigationBarTitleDisplayMode(.inline)
-        // Backing out while it's read drops the read, so its analysis can't open later.
-        .onDisappear { session.leaveReading() }
+            // Backing out while it's read drops the read, so its analysis can't open later.
+            .onDisappear { session.leaveReading() }
     }
 }
 
@@ -754,6 +735,7 @@ struct AnalysisView: View {
                 stepper
                 madeMoves
                 lines
+                help
             }
             .padding(16)
             .animation(.snappy, value: model.lines)
@@ -803,6 +785,24 @@ struct AnalysisView: View {
             }
         }
     }
+
+    // MARK: Help
+
+    /// At the foot of the page, the website's short directions for Analyze (Alex, 2026-11-09:
+    /// "so people don't get confused").
+    private var help: some View {
+        Link(destination: AnalysisView.faq) {
+            Label("How Analyze works", systemImage: "questionmark.circle")
+                .font(.app(.footnote, weight: .semibold))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 4)
+        .accessibilityHint("Opens the questions page on the website")
+    }
+
+    /// play/public/faq, served beside the privacy and support pages.
+    static let faq = URL(string: "https://play.chess-game-killer.workers.dev/faq/")!
 
     // MARK: The photo
 

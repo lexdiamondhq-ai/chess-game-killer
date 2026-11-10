@@ -522,7 +522,7 @@ struct NewGameSheet: View {
             ForEach(Rival.all) { rival in
                 let isOn = rival.level == draftLevel
                 Capsule()
-                    .fill(isOn ? rival.hue : Color.secondary.opacity(0.3))
+                    .fill(isOn ? rival.ink(on: theme) : Color.secondary.opacity(0.3))
                     .frame(width: isOn ? 18 : 6, height: 6)
                     .shadow(color: isOn && theme.glows ? rival.hue.opacity(0.8) : .clear, radius: 6)
             }
@@ -635,7 +635,7 @@ private struct RivalCard: View {
         } else if let holding {
             Label("Holding \(holding)", systemImage: "lock.fill")
                 .font(.app(.caption, weight: .bold))
-                .foregroundStyle(rival.hue)
+                .foregroundStyle(rival.ink(on: theme))
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
         } else {
@@ -643,7 +643,7 @@ private struct RivalCard: View {
                 ForEach(0..<5, id: \.self) { index in
                     let lit = index < rival.strength
                     Capsule()
-                        .fill(lit ? rival.hue : Color.primary.opacity(0.14))
+                        .fill(lit ? rival.ink(on: theme) : Color.primary.opacity(0.14))
                         .frame(width: 22, height: 5)
                         .shadow(color: lit && theme.glows ? rival.hue.opacity(0.8) : .clear, radius: 4)
                 }
@@ -677,7 +677,7 @@ private struct RivalCard: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                     .fixedSize(horizontal: false, vertical: true)
-                (Text(rival.level.name).foregroundStyle(rival.hue) + Text(" · Elo \(rival.elo)"))
+                (Text(rival.level.name).foregroundStyle(rival.ink(on: theme)) + Text(" · Elo \(rival.elo)"))
                     .font(.app(.caption, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)

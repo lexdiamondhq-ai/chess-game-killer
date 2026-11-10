@@ -10,6 +10,13 @@ enum RewindPalette {
     static let amber = Color(hex: amberHex)
     static let coral = Color(hex: coralHex)
 
+    /// Gold for words and small marks on the page around the board. The pale gold is made for
+    /// a dark page; on a light one a WIN tag or the move in hand all but disappeared, so there
+    /// the words take the pieces' deeper metal.
+    static func goldInk(on theme: BoardTheme) -> Color {
+        theme.screenIsDark ? gold : theme.trainingAccent
+    }
+
     static func color(for moment: SavedMoment, rewritten: Bool) -> Color {
         Color(hex: hex(for: moment, rewritten: rewritten))
     }

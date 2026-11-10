@@ -299,3 +299,77 @@ move notation.
 
 The per-player allowances in the Premium plan (3 a week free, 30 a day Premium) aren't built yet: they wait
 for the subscription.
+
+## POST /review
+
+The deep review: once a game is over, the coach talks through all of it, once, the way a coach at the
+board would. He finds the game's story (the one or two ideas that decided it), praises what was played
+well, shows the moments that cost the most, and leaves one habit to take into the next game.
+
+**The phone's Stockfish graded the game; Claude only tells its story.** The app sends the game with the
+grades it already has. The server replays it by the rules, gives Claude the moves and grades as plain
+facts, and checks what comes back: a part called a mistake has to be one of the player's costly moves and
+may only suggest the engine's move, praise has to be for a move the engine liked, and no part may name a
+move number the game never reached. Parts that fail are dropped; with too little left there is no review.
+
+`content-type: application/json`, at most 256 KB.
+
+```json
+{
+  "v": 1,
+  "player": "white",
+  "rival": "The Berserker",
+  "rating": 1350,
+  "rivalRating": 1600,
+  "result": "loss",
+  "start": null,
+  "moves": ["e4", "e5", "Nf3", "Nc6", "…"],
+  "graded": [
+    {"ply": 19, "grade": "mistake", "before": 0.02, "after": -0.24, "best": "cxd4", "line": ["cxd4", "Bxf3", "Qxf3"]}
+  ],
+  "coach": null,
+  "voice": true
+}
+```
+
+- `player` `"white"` or `"black"`; `result` `"win"`, `"loss"` or `"draw"`, the player's.
+- `moves`: the whole game in SAN, 12 to 600 plies, from `start` (a FEN) or the usual first position.
+- `graded`: one entry for each move of the player's that the app graded. `ply` counts from 1. `grade` is
+  on the app's scale (`checkmate`, `best`, `excellent`, `good`, `inaccuracy`, `mistake`, `blunder`).
+  `before` and `after` are the player's winning chances around the move, from −1 to 1. `best` is the
+  engine's move in SAN when it wasn't the one played, and `line` up to six moves of its line.
+  At least one entry has to be usable; the rest are dropped rather than refused (an opponent's ply, an
+  unknown grade, a `best` that isn't legal there; a `line` is cut at its first move that isn't).
+- `rival`, `rating`, `rivalRating`, `coach` (`"vera"` for Vera, else Leo) and `voice` (default true) are optional.
+
+Errors before the stream are the same as a talk's, with its own limits: `rate_limited` is 4 a minute per
+address and `daily_limit` is the day's reviews across everyone.
+
+The stream is `application/x-ndjson`:
+
+```json
+{"type": "review", "coach": "leo", "parts": [
+  {"label": "The opening", "kind": "intro", "ply": null, "text": "Let's look at this one together…"},
+  {"label": "The pawn on d4", "kind": "mistake", "ply": 19, "text": "On move 10 you played bishop to f4…"},
+  {"label": "One habit", "kind": "habit", "ply": null, "text": "When they take something, ask whether you can take back."}
+]}
+{"type": "voice", "part": 0, "format": "mp3", "audio": "<base64>"}
+{"type": "voice", "part": 2, "unavailable": "upstream"}
+{"type": "voice", "part": 1, "format": "mp3", "audio": "<base64>"}
+{"type": "done"}
+```
+
+- `review` comes first, 3 to 14 parts, about 230 words in all. `kind` is `intro`, `praise`, `mistake`,
+  `moment` or `habit`. `ply` is the move the part is about (counted from 1), or null when it is about no
+  one move. For a `mistake` the app shows the position before the move with the engine's move from its own
+  grades; for the others, the position after it. `label` names the chapter: parts next to each other can share one.
+- One `voice` line per part follows, **in any order**; each names its `part`. `unavailable` is
+  `not_configured` or `upstream`, and the app reads that part with the device's voice. With `voice: false`
+  there are none.
+- `done` ends it. If Claude fails, the only line is `{"type": "error", "error": "upstream" | "timeout" | "internal"}`:
+  there is no fallback wording for a review, and the app doesn't count it against the player's allowance.
+
+Settings: `REVIEW_MODEL` (`claude-opus-5-5`), `REVIEW_EFFORT` (`medium`), `REVIEW_TIMEOUT_MS` (45000) and
+`DAILY_REVIEWS` (150) across everyone per UTC day, counted apart from talks. A review's voice isn't taken
+from `DAILY_VOICE_CHARS` and isn't kept in the recordings. The player's own allowance (20 a day on Premium)
+is kept by the app.

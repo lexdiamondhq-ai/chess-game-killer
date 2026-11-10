@@ -5,10 +5,10 @@ import Foundation
 ///
 /// Two kinds of feature:
 /// - counted ones, which free players can use a few times a day or week (`free` is set);
-/// - locked ones, which only Premium opens (`free` is nil and `isLocked` is true).
+/// - locked ones, which only Premium opens (`free` is nil and `isLocked` is true). A locked one
+///   that costs money each time can still carry Premium's fair-use guard (`premium`).
 enum PremiumFeature: String, CaseIterable, Identifiable, Codable {
     // Counted
-    case ghostVision
     case talk
     case scan
     case ratedPuzzle
@@ -26,6 +26,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable, Codable {
     case masterGames
     case boardLooks
     case coachProfile
+    case deepReview
 
     var id: String { rawValue }
 
@@ -48,25 +49,27 @@ enum PremiumFeature: String, CaseIterable, Identifiable, Codable {
     /// The free allowance. Nil: only Premium opens it.
     var free: Allowance? {
         switch self {
-        case .ghostVision: return .perDay(3)
         case .talk: return .perWeek(3)
         case .scan: return .perWeek(3)
         case .ratedPuzzle: return .perDay(15)
         case .puzzleRush: return .perDay(1)
         case .fullRewind: return .perDay(1)
         case .openingDrill, .endgameDrill, .calculationDrill: return .perDay(1)
-        case .lessons, .puzzleCycles, .puzzleReview, .trainingRooms, .allOpenings, .masterGames, .boardLooks, .coachProfile:
+        case .lessons, .puzzleCycles, .puzzleReview, .trainingRooms, .allOpenings, .masterGames, .boardLooks, .coachProfile,
+             .deepReview:
             return nil
         }
     }
 
     /// Premium's allowance. Nil: unlimited. Premium is unlimited in practice: the features that
     /// cost money per use keep a fair-use guard far above normal play, only so a script or a
-    /// shared account can't run up the bill. (Each talk or scan is roughly 1 to 4 cents.)
+    /// shared account can't run up the bill. (Each talk or scan is roughly 1 to 4 cents, a deep
+    /// review about 13. Hearing a game's review again is free: it is kept with the game.)
     var premium: Allowance? {
         switch self {
         case .talk: return .perDay(50)
         case .scan: return .perDay(30)
+        case .deepReview: return .perDay(20)
         default: return nil
         }
     }
@@ -76,7 +79,6 @@ enum PremiumFeature: String, CaseIterable, Identifiable, Codable {
     /// The feature's name, as the offer screen says it.
     var title: String {
         switch self {
-        case .ghostVision: return "Ghost Vision"
         case .talk: return "Talk It Through"
         case .scan: return "Photo scans"
         case .ratedPuzzle: return "Rated puzzles"
@@ -93,13 +95,13 @@ enum PremiumFeature: String, CaseIterable, Identifiable, Codable {
         case .masterGames: return "Master games"
         case .boardLooks: return "Every board look"
         case .coachProfile: return "Your style profile"
+        case .deepReview: return "Deep reviews"
         }
     }
 
     /// One line on where the free part stops, for the offer screen and limit cards.
     var limitLine: String {
         switch self {
-        case .ghostVision: return "That's today's 3 free Ghost Visions. Premium sees ahead whenever you like."
         case .talk: return "That's your 3 free talks this week. Premium talks it through as much as you like."
         case .scan: return "That's your 3 free photo scans this week. Premium scans as many as you like. Setting up by hand is always free."
         case .ratedPuzzle: return "That's today's 15 free puzzles. More tomorrow, or unlimited with Premium."
@@ -114,8 +116,10 @@ enum PremiumFeature: String, CaseIterable, Identifiable, Codable {
         case .trainingRooms: return "Candidate moves and Guess the Move come with Premium."
         case .allOpenings: return "The popular openings are free. Premium opens all 3,865 named lines and search."
         case .masterGames: return "Browsing master games, and how players at your level answer, come with Premium."
-        case .boardLooks: return "Gilded, Classic, Noir and Midnight are free, and so is each rival board once you beat the rival it belongs to, from the Cub to the Ashen King. Premium opens every look."
+        // The rival boards (Spark to Singularity) left Settings on 2026-11-08, so they are no longer promised here.
+        case .boardLooks: return "Gilded, Classic, Noir and Midnight are free. Premium opens every look."
         case .coachProfile: return "Your top weakness is free. Premium shows your whole style and a plan rebuilt after every game."
+        case .deepReview: return "The line and key moments are free for every game. With Premium your coach talks you through the whole game, as often as you like."
         }
     }
 }
@@ -127,6 +131,7 @@ extension PremiumFeature {
         switch self {
         case .talk: return "That's a lot of talking for one day: Leo needs a rest. He's back tomorrow."
         case .scan: return "That's a lot of scans for one day. More tomorrow, and setting up by hand is always free."
+        case .deepReview: return "That's a lot of reviews for one day: your coach needs a rest. More tomorrow, and the ones you've heard are yours to hear again."
         default: return nil
         }
     }

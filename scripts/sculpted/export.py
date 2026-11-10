@@ -10,16 +10,19 @@ SET=args.pop(0) if args and args[0] in ('classic','gilded') else 'classic'
 bpy.ops.wm.read_factory_settings(use_empty=True)
 MATS=('body','metal','gem','pearl','shade','cross')   # the finish ids SculptedAssets.Finish reads; cross = ivory's stone or ebony's metal
 M={k:bpy.data.materials.new(k) for k in MATS}
+# ONLY=K (letters) exports just those pieces, to <set>-<letters>.bin, without the knight's sources:
+# splice.py then puts them into the set in the asset catalog.
+ONLY=__import__('os').environ.get('ONLY','')
 if SET=='gilded':
     import gilded as G
-    knight_parts=G.load_knight()
+    knight_parts=G.load_knight() if not ONLY or 'N' in ONLY else None
     def gilded_knight(m):
         # The gilded knight faces right, as in its artwork: turned half round from the classic one.
         g=G.knight(m,*knight_parts); g.rotation_euler=(0,0,math.pi); return g
     B={'K':G.king,'Q':G.queen,'B':G.bishop,'R':G.rook,'P':G.pawn,'N':gilded_knight}
     NAME='gilded'
 else:
-    kv=np.load('scripts/sculpted/kv.npy'); kf=np.load('scripts/sculpted/kf.npy')
+    kv,kf=(np.load('scripts/sculpted/kv.npy'),np.load('scripts/sculpted/kf.npy')) if not ONLY or 'N' in ONLY else (None,None)
     B={'K':P.king,'Q':P.queen,'B':P.bishop,'R':P.rook,'P':P.pawn,'N':lambda m:P.knight(m,kv,kf)}
     NAME='sculpted'
 # triangle budgets per object name prefix (body parts get the most). Raised on 2026-11-04: the
@@ -57,6 +60,7 @@ def budget(name):
 out={}
 stats={}
 dg=bpy.context.evaluated_depsgraph_get()
+if ONLY: B={t:f for t,f in B.items() if t in ONLY}; NAME=f'{NAME}-{ONLY}'
 for t,f in B.items():
     g=f(M); dg.update()
     parts={k:[] for k in MATS}
@@ -110,6 +114,7 @@ for t,merged in out.items():
         buf+=pos.tobytes(); buf+=nor.tobytes(); buf+=idx.tobytes()
 raw=bytes(buf)
 c=zlib.compressobj(9,zlib.DEFLATED,-15); comp=c.compress(raw)+c.flush()
+__import__('os').makedirs('build/sculpted',exist_ok=True)
 open(f'build/sculpted/{NAME}-pieces.bin','wb').write(comp)
 np.savez(f'build/sculpted/{NAME}-meshes.npz',**{f'{t}_{k}_{a}':v for t,m in out.items() for k,arrs in m.items() for a,v in zip('pni',arrs)})
 tot=0

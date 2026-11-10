@@ -106,6 +106,90 @@ final class HomeSnapshotTests: XCTestCase {
         XCTAssertEqual(metrics.nearest(to: 0), .board)
     }
 
+    /// Your Chess DNA under For today on the Aurora home, where Your Grudge was (2026-11-09):
+    /// a few weeks in, by day and by night, and before Coach Leo has read enough games.
+    func testTheChessDNACardOnHome() throws {
+        let sample = TrainSample(settled: true)
+        let dna = ChessDNA.make(games: sample.vault.games, puzzleStats: sample.puzzles.themeStats,
+                                puzzlesPlayed: sample.puzzles.progress.played)
+        XCTAssertGreaterThan(dna.gamesRead, 0)
+        let fresh = ChessDNA.make(games: [])
+        for dark in [false, true] {
+            let palette = HomeAuroraPalette(dark: dark)
+            let page = ScrollView {
+                VStack(spacing: 0) {
+                    HomeAuroraSection(title: "Your Chess DNA", palette: palette, note: ChessDNAView.basis(dna))
+                    HomeAuroraDNA(dna: dna, palette: palette, action: {})
+                        .padding(.horizontal, 16)
+                    HomeAuroraSection(title: "Before three games", palette: palette)
+                    HomeAuroraDNA(dna: fresh, palette: palette, action: {})
+                        .padding(.horizontal, 16)
+                }
+                .padding(.top, 60)
+            }
+            .background(palette.sheet.ignoresSafeArea())
+            .background(palette.bg.ignoresSafeArea())
+            .environment(\.colorScheme, dark ? .dark : .light)
+            let window = try show(page, wait: 2)
+            try save(window, "zz-home-dna-\(dark ? "dark" : "light")")
+            window.isHidden = true
+        }
+    }
+
+    /// For today with Today's Move in the large card and your finest move as a row under it; Rooms
+    /// with Your Grudge beside the rivals, two rows of three; and Your Grudge's own room (Alex,
+    /// 2026-11-09). By day and by night.
+    func testForTodayRoomsAndTheGrudgesRoom() throws {
+        let defaults = UserDefaults(suiteName: "HomeGrudgeRoomTests")!
+        defer { defaults.removePersistentDomain(forName: "HomeGrudgeRoomTests") }
+        let grudges = GrudgeStore(defaults: defaults)
+        grudges.crowdWon(level: .club, moves: ["e4", "e5"], playerColor: .white, positions: [])
+        grudges.markSeen()
+        let game = RewindSample.game(date: .now.addingTimeInterval(-86_400))
+        let finest = try XCTUnwrap(HomeFinestMove.pick(games: [game]))
+        let shortcuts: [HomeShortcut] = HomeShortcutKind.list(online: true).map { HomeShortcut(kind: $0, action: {}) }
+        for dark in [false, true] {
+            let palette = HomeAuroraPalette(dark: dark)
+            let tone = HomeTone.of(.gilded, mode: dark ? .dark : .light)
+            let page = VStack(spacing: 0) {
+                HomeAuroraSection(title: "For today", palette: palette)
+                VStack(spacing: 10) {
+                    HomeAuroraTodayCard(eyebrow: "Today's Move", fen: finest.fen, flipped: false,
+                                        title: "White to play and win", detail: "Keep your 5-day streak",
+                                        button: "Play", symbol: "play.fill", palette: palette, open: {})
+                    HomeAuroraFinestRow(finest: finest, palette: palette, replay: {})
+                    HomeAuroraRow(eyebrow: "Puzzles", title: "Sharpen your eye", detail: "Tactics at your level, one after another",
+                                  accent: palette.violet, palette: palette, action: {}) {
+                        HomeAuroraEmblem(glyph: Glyphs.puzzles, fill: HomeAuroraPalette.violetTile)
+                    }
+                }
+                .padding(.horizontal, 16)
+                Spacer(minLength: 24)
+                HomeShortcutsPanel(tone: tone, next: .club, underWay: false, shortcuts: shortcuts,
+                                   playRival: { _ in }, close: {}, asRooms: true)
+                    .padding(.horizontal, 16)
+            }
+            .padding(.top, 60)
+            .padding(.bottom, 30)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .background(palette.sheet.ignoresSafeArea())
+            .background(palette.bg.ignoresSafeArea())
+            .environment(\.colorScheme, dark ? .dark : .light)
+            let window = try show(page, wait: 2)
+            try save(window, "zz-home-rooms-grudge-\(dark ? "dark" : "light")")
+            window.isHidden = true
+
+            let room = palette.bg.ignoresSafeArea().sheet(isPresented: .constant(true)) {
+                HomeGrudgeRoom(grudges: grudges, palette: palette, settle: {})
+            }
+            .environment(\.colorScheme, dark ? .dark : .light)
+            let roomWindow = try show(room, wait: 5)
+            try save(roomWindow, "zz-home-grudge-room-\(dark ? "dark" : "light")")
+            roomWindow.rootViewController?.presentedViewController?.dismiss(animated: false)
+            roomWindow.isHidden = true
+        }
+    }
+
     func testHomeScrolling() throws {
         let window = try show(HomeSample.home())
         // The page fits on about a screen: at rest, partway (the board turning in its window), and at its foot.

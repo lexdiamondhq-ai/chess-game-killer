@@ -15,6 +15,8 @@ struct HomeActions {
     /// Opens Analyze on this position, ready to play through.
     var analyzePosition: (String) -> Void = { _ in }
     var train: () -> Void = {}
+    /// Opens Learn on its Chess DNA page.
+    var chessDNA: () -> Void = {}
     /// Starts today's session with Coach Leo.
     var trainToday: (SessionPlan) -> Void = { _ in }
     var puzzles: () -> Void = {}
@@ -56,10 +58,13 @@ struct HomeView: View {
     @AppStorage("setup.side") private var side: SideChoice = .white
     /// Nil until a rival has been picked: a first game is against Spark.
     @AppStorage("setup.level") private var storedLevel: Int?
-    @AppStorage("setup.grudge") private var grudgeOn = false
     @Environment(GrudgeStore.self) private var grudges: GrudgeStore?
-    /// Your Grudge picked from Home while a game is under way: asks before that game is lost.
+    /// Your Grudge's room is open, from Rooms (Alex, 2026-11-09: "place in rooms").
+    @State private var showingGrudge = false
+    /// Your Grudge picked while a game is under way: asks before that game is lost.
     @State private var confirmingGrudge = false
+    /// Settle it was pressed: the game starts as the Grudge's room closes.
+    @State private var settlingGrudge = false
     /// The rivals' hall is open, on this rival (nil: the one up next).
     @State private var showingHall = false
     @State private var hallStart: MatchController.Level?
@@ -82,6 +87,8 @@ struct HomeView: View {
     @State private var plan: SessionPlan?
     /// Your finest move of the week for Today, read from your games once rather than on every redraw.
     @State private var finestMove: HomeFinestMove?
+    /// Your Chess DNA for the Home card, read from your games once rather than on every redraw.
+    @State private var dna: ChessDNA?
     /// The board window has scrolled out of sight; the dock carries its button instead.
     @State private var windowGone = false
     /// The jewel's shortcuts are open above it.
@@ -152,10 +159,12 @@ struct HomeView: View {
     /// The pieces on the small boards match the board in the window.
     private var pieceTheme: BoardTheme { theme.sculptedLook == nil ? .named(.gilded) : theme }
 
+    /// The next game is always against a rival: Your Grudge has its own room now, so its last
+    /// game never takes over the Next game card (Alex, 2026-11-09: "replace that card with the
+    /// next Rival opponent").
     private var upNext: HomeUpNext {
         HomeUpNext.make(match: match, side: side, level: nextLevel,
-                        timeControl: timeControl, hasPlayed: !vault.games.isEmpty,
-                        grudge: grudgeOn ? grudges?.record : nil)
+                        timeControl: timeControl, hasPlayed: !vault.games.isEmpty)
     }
 
     /// The rival up next: the one you played last, while it's open to you; otherwise the first
@@ -261,10 +270,15 @@ struct HomeView: View {
         return "\(vault.games.count) \(graded) \(Trainer.dayString(.now))"
     }
 
-    /// Reads the games off the main thread for the week's finest move.
+    /// Reads the games off the main thread for the week's finest move and your Chess DNA.
     private func readToday() async {
         let games: [SavedGame] = vault.games
         finestMove = await Task.detached(priority: .utility) { HomeFinestMove.pick(games: games) }.value
+        let stats = puzzles.themeStats
+        let played = puzzles.progress.played
+        dna = await Task.detached(priority: .utility) {
+            ChessDNA.make(games: games, puzzleStats: stats, puzzlesPlayed: played)
+        }.value
     }
 
     // MARK: The page
@@ -446,6 +460,7 @@ struct HomeView: View {
         var state = HomeDailyState()
         state.streak = daily.streak
         state.doneToday = daily.doneToday
+        state.restDayUsed = daily.restDayUsed
         state.number = today?.number ?? 0
         state.difficulty = today?.difficulty ?? ""
         state.played = daily.playedTodaysMove
@@ -525,7 +540,6 @@ struct HomeView: View {
     /// last time. During a game the New Game sheet opens on that rival instead, and asks
     /// before the game under way ends.
     private func playRival(_ level: MatchController.Level) {
-        grudgeOn = false
         if upNext.inProgress {
             actions.playRival(level)
             return
@@ -537,7 +551,8 @@ struct HomeView: View {
     /// Rooms: Online and A friend (when the app has them), a new game, the rivals and your games.
     private var shortcutList: [HomeShortcut] {
         let waiting: Int = challenges?.onlineWaiting ?? 0
-        return HomeShortcutKind.list(online: challenges != nil).map { kind in
+        // Your Grudge's room opens over the Aurora home only.
+        return HomeShortcutKind.list(online: challenges != nil).filter { stageOn || $0 != .grudge }.map { kind in
             HomeShortcut(kind: kind, live: kind == .online && waiting > 0) { open(kind) }
         }
     }
@@ -551,6 +566,7 @@ struct HomeView: View {
         case .rivals:
             hallStart = nil
             showingHall = true
+        case .grudge: showingGrudge = true
         case .games: actions.rewind()
         }
     }
@@ -706,7 +722,7 @@ extension HomeView {
             you: { openYou(.bottom) },
             rooms: openShortcuts)
         let auroraInfo = HomeAuroraInfo(stage: info, games: currentGameList(upNext), look: look,
-                                        pieces: match.game.pieces.map(\.piece), finest: finestMove)
+                                        pieces: match.game.pieces.map(\.piece), finest: finestMove, dna: dna)
         let auroraActions = HomeAuroraActions(stage: stageActions, open: { game in
             if let friend = game.friendGame {
                 challenges?.play(friend)
@@ -717,7 +733,7 @@ extension HomeView {
             hallStart = level
             hallIntro = false
             showingHall = true
-        }, playGrudge: playGrudge, puzzles: actions.puzzles, replay: { id in
+        }, chessDNA: actions.chessDNA, puzzles: actions.puzzles, replay: { id in
             if let game = vault.game(id) { actions.openGame(game) }
         })
         return HomeAuroraView(tone: tone, info: auroraInfo, actions: auroraActions)
@@ -730,6 +746,19 @@ extension HomeView {
                     playRival(level)
                 }, close: { showingHall = false })
             }
+            .sheet(isPresented: $showingGrudge, onDismiss: {
+                // The game starts once the room has gone, so nothing presents over a closing sheet.
+                guard settlingGrudge else { return }
+                settlingGrudge = false
+                playGrudge()
+            }) {
+                if let grudges {
+                    HomeGrudgeRoom(grudges: grudges, palette: HomeAuroraPalette(dark: tone.scheme == .dark)) {
+                        settlingGrudge = true
+                        showingGrudge = false
+                    }
+                }
+            }
             .confirmationDialog("Leave your game against \(match.opponentName)?",
                                 isPresented: $confirmingGrudge, titleVisibility: .visible) {
                 Button("Resign and play Your Grudge", role: .destructive) { startGrudge() }
@@ -737,6 +766,24 @@ extension HomeView {
             } message: {
                 Text("It counts as a loss for your army.")
             }
+    }
+
+    /// Settle it, in Your Grudge's room: the game starts at once on the side and clock picked
+    /// last time. A game under way that would count as a loss is asked about first.
+    private func playGrudge() {
+        if match.newGameForfeits {
+            confirmingGrudge = true
+        } else {
+            startGrudge()
+        }
+    }
+
+    private func startGrudge() {
+        guard let record = grudges?.record else { return }
+        var setup = MatchController.Setup(playerColor: side.color, level: record.level, timeControl: timeControl)
+        setup.grudge = true
+        setup.grudgeSkill = record.skill
+        actions.start(setup)
     }
 
     /// Play on the next game. Every time you face a rival, its welcome film plays first and its
@@ -764,25 +811,6 @@ extension HomeView {
         hallStart = level
         hallIntro = true
         showingHall = true
-    }
-
-    /// Your Grudge, from Home: the game starts at once on the side and clock picked last time.
-    /// A game under way that would count as a loss is asked about first.
-    private func playGrudge() {
-        if match.newGameForfeits {
-            confirmingGrudge = true
-        } else {
-            startGrudge()
-        }
-    }
-
-    private func startGrudge() {
-        guard let record = grudges?.record else { return }
-        grudgeOn = true
-        var setup = MatchController.Setup(playerColor: side.color, level: record.level, timeControl: timeControl)
-        setup.grudge = true
-        setup.grudgeSkill = record.skill
-        actions.start(setup)
     }
 }
 

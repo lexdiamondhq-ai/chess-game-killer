@@ -8,6 +8,7 @@
     "dev": "wrangler dev",
     "check": "wrangler deploy --dry-run --outdir dist",
     "live": "node test/live.mjs",
+    "live:review": "node test/review-live.mjs",
     "smoke": "node test/smoke.mjs"
   },
   "dependencies": {

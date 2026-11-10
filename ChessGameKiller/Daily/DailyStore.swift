@@ -42,6 +42,11 @@ final class DailyStore {
 
     var bestStreak: Int { max(state.streak.best, streak) }
 
+    /// The week's rest day is spent, so a miss now ends the streak.
+    func restDayUsed(on date: Date = .now) -> Bool { DailyRules.restDayUsed(state, on: date, calendar: calendar) }
+
+    var restDayUsed: Bool { restDayUsed() }
+
     /// The day's goal is met.
     func isDone(on date: Date = .now) -> Bool { DailyRules.isDone(state, on: date, calendar: calendar) }
 
@@ -56,6 +61,19 @@ final class DailyStore {
     }
 
     var playedTodaysMove: Bool { playedMove() }
+
+    /// How Today's Move went on `date`, once played. A day played before results were kept
+    /// reads as found or missed.
+    func moveResult(on date: Date = .now) -> Outcome? {
+        moveResults[Trainer.dayString(date, calendar: calendar)]
+    }
+
+    /// How every day's Move went, by day ("2026-11-09"), for the calendar.
+    var moveResults: [String: Outcome] {
+        var results = state.moveResults
+        if let day = state.moveDay, results[day] == nil { results[day] = state.moveFound ? .firstTry : .missed }
+        return results
+    }
 
     /// Rated puzzles solved today, toward the three that make a day.
     var puzzlesToday: Int {
@@ -103,6 +121,15 @@ final class DailyStore {
         save()
         onChange?()
         return result.outcome
+    }
+
+    /// Today's Move, played to the end: makes the day and keeps how it went. Only the day's
+    /// first try counts; the result stays as it was.
+    @discardableResult
+    func recordTodaysMove(_ outcome: Outcome, at date: Date = .now) -> DailyOutcome {
+        let day = Trainer.dayString(date, calendar: calendar)
+        if state.moveResults[day] == nil, !playedMove(on: date) { state.moveResults[day] = outcome }
+        return record(.todaysMove(found: outcome == .firstTry), at: date)
     }
 
     /// The reminder question was answered (either way): it isn't asked again.

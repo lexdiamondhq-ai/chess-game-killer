@@ -16,6 +16,8 @@ struct HomeAuroraInfo {
     var pieces: [Piece]
     /// Your finest move of the week, framed, when you played one.
     var finest: HomeFinestMove? = nil
+    /// Your Chess DNA, once it has been read from your games.
+    var dna: ChessDNA? = nil
 }
 
 struct HomeAuroraActions {
@@ -28,8 +30,8 @@ struct HomeAuroraActions {
     var options: (MatchController.Level) -> Void = { _ in }
     /// Opens the rivals' hall, on this rival or on the one up next.
     var rivals: (MatchController.Level?) -> Void = { _ in }
-    /// Starts a game against your Grudge.
-    var playGrudge: () -> Void = {}
+    /// Opens your Chess DNA.
+    var chessDNA: () -> Void = {}
     /// Opens Puzzles.
     var puzzles: () -> Void = {}
     /// Opens one of your finished games in Rewind.
@@ -40,17 +42,19 @@ struct HomeAuroraActions {
 struct HomeAuroraPalette {
     let dark: Bool
 
-    var bg: Color { dark ? Color(hex: 0x08080C) : Color(hex: 0xF6F3EE) }
-    var bgLow: Color { dark ? Color(hex: 0x0C0B10) : Color(hex: 0xEFEAE2) }
+    // Dark is the warm espresso of the other dark screens (Alex, 2026-11-09): the page, the
+    // cards and the sheet were a cool blue-black that only Home wore. The glows above are kept.
+    var bg: Color { dark ? Color(hex: 0x100B08) : Color(hex: 0xF6F3EE) }
+    var bgLow: Color { dark ? Color(hex: 0x140F0C) : Color(hex: 0xEFEAE2) }
     var ink: Color { dark ? Color(hex: 0xF2EEE6) : Color(hex: 0x1C1813) }
     var ink2: Color { ink.opacity(dark ? 0.62 : 0.6) }
     var ink3: Color { ink.opacity(dark ? 0.36 : 0.38) }
     var line: Color { dark ? Color.white.opacity(0.08) : Color(hex: 0x1C1813).opacity(0.08) }
     var glass: Color { dark ? Color.white.opacity(0.06) : Color.white.opacity(0.72) }
     var glassHi: Color { dark ? Color.white.opacity(0.12) : Color.white }
-    var card: Color { dark ? Color(hex: 0x15171F) : Color.white }
+    var card: Color { dark ? Color(hex: 0x1D1814) : Color.white }
     /// The page that slides up over the board.
-    var sheet: Color { dark ? Color(hex: 0x0C0D12).opacity(0.97) : Color(hex: 0xF8F5F0).opacity(0.98) }
+    var sheet: Color { dark ? Color(hex: 0x110C09).opacity(0.97) : Color(hex: 0xF8F5F0).opacity(0.98) }
     var gold: Color { dark ? Color(hex: 0xE8C27A) : Color(hex: 0xB7832E) }
     var rose: Color { dark ? Color(hex: 0xF0708A) : Color(hex: 0xD9466A) }
     var violet: Color { dark ? Color(hex: 0x8B6CFF) : Color(hex: 0x6A4BE0) }
@@ -85,28 +89,22 @@ struct HomeAuroraView: View {
     @State private var headerHeight: CGFloat = 52
     /// Which position of the game of the day the turning board shows: it plays itself slowly.
     @State private var boardFrame = 0
-    /// Your Grudge. Absent in previews: no Grudge on the page.
-    @Environment(GrudgeStore.self) private var grudges: GrudgeStore?
-    /// The score when you last saw your Grudge ("7-11"), so what changed since plays out.
-    @AppStorage("grudge.lastSeen") private var grudgeLastSeen = ""
-    /// The Grudge's card opened into its summons.
-    @State private var grudgeOpen = false
-    /// The score the summons counts up from, read once as it opens.
-    @State private var grudgeSince: (you: Int, it: Int)?
-    /// The first time you meet it, its birth plays instead.
-    @State private var grudgeBorn = false
     /// The rival in front on the Up next card, as you swipe through them. Nil: the one up next.
     @State private var rivalShown: MatchController.Level?
+    /// The card in front under For today, as you swipe through your games and Today's Move.
+    @State private var todayShown: String?
+    /// How far the bottom bar has faded, 0 to 1: it goes as you scroll down, comes back up.
+    @State private var barHidden: CGFloat = 0
 
     private var palette: HomeAuroraPalette { HomeAuroraPalette(dark: tone.scheme == .dark) }
     private var stage: HomeStageInfo { info.stage }
 
     /// Your games, or the next game when none is going. Only games: Today's Move and the game
     /// of the day are rows under For today (Alex, 2026-11-08).
+    /// The games you're playing live under For today now (Alex, 2026-11-10), so the top card is
+    /// always the rival up next.
     private var cards: [HomeAuroraGameCard] {
-        info.games.isEmpty
-            ? [HomeAuroraGameCard.next(stage.upNext, fen: stage.gameFEN)]
-            : info.games.map(HomeAuroraGameCard.init)
+        [HomeAuroraGameCard.next(stage.upNext, fen: stage.gameFEN)]
     }
 
     var body: some View {
@@ -141,6 +139,8 @@ struct HomeAuroraView: View {
                             .onGeometryChange(for: CGFloat.self) { proxy in
                                 -proxy.frame(in: .scrollView).minY
                             } action: { value in
+                                hideBar(from: pulled, to: value,
+                                        tuckStart: boardHeight + 18 - headerHeight - 6)
                                 pulled = value
                             }
                         page
@@ -186,6 +186,14 @@ struct HomeAuroraView: View {
                                 .ignoresSafeArea(edges: .bottom)
                                 .allowsHitTesting(false)
                         }
+                        // The bar fades as you read down the page, from where the header
+                        // tucks away, and is back the moment you scroll up (Alex, 2026-11-09:
+                        // "slowly disappear as you are scrolling down, about the same time as
+                        // the top area"; "it reappears as soon as you start to scroll up").
+                        .opacity(1 - Double(barHidden))
+                        .offset(y: reduceMotion ? 0 : 18 * barHidden)
+                        .allowsHitTesting(barHidden < 0.5)
+                        .accessibilityHidden(barHidden >= 1)
                 }
             }
         }
@@ -193,6 +201,17 @@ struct HomeAuroraView: View {
         .onAppear { music.homeAppeared() }
         .onDisappear { music.homeDisappeared() }
         .task(id: reduceMotion) { await playThrough() }
+    }
+
+    /// Scrolling down past where the header tucks away fades the bar over about 80 points;
+    /// any scroll up, or a return above that point, brings it straight back.
+    private func hideBar(from old: CGFloat, to new: CGFloat, tuckStart: CGFloat) {
+        let delta: CGFloat = new - old
+        if new <= tuckStart || delta < -2 {
+            if barHidden > 0 { withAnimation(.easeOut(duration: 0.25)) { barHidden = 0 } }
+        } else if delta > 0 {
+            barHidden = min(1, barHidden + delta / 80)
+        }
     }
 
     /// The pieces move slowly: the game of the day's finish, a move every few seconds, a rest on
@@ -286,27 +305,20 @@ struct HomeAuroraView: View {
                 .padding(.top, 10)
             // The Face a rival coins are gone: the rival you're on stands big in the Next game
             // card instead (Alex, 2026-11-08). All rivals moves to this heading's corner.
-            if info.games.isEmpty {
-                HomeAuroraSection(title: gamesTitle, palette: palette, note: "All rivals",
-                                  action: { actions.rivals(nil) })
-            } else {
-                HomeAuroraSection(title: gamesTitle, palette: palette, note: gamesNote)
-            }
+            HomeAuroraSection(title: "Next game", palette: palette, note: "All rivals",
+                              action: { actions.rivals(nil) })
             gameRow
-            HomeAuroraSection(title: "For today", palette: palette, note: nil)
+            HomeAuroraSection(title: "For today", palette: palette, note: gamesNote)
             VStack(spacing: 10) {
-                if let finest = info.finest {
-                    HomeAuroraFinestMove(finest: finest, palette: palette) { actions.replay(finest.gameID) }
-                }
                 todayRows
             }
             .padding(.horizontal, 16)
-            // Under For today (Alex, 2026-11-07).
-            if let grudges {
-                HomeAuroraSection(title: "Your Grudge", palette: palette,
-                                  note: grudges.unseen ? "It's waiting" : nil)
-                HomeAuroraGrudge(record: grudges.record, isOpen: grudgeOpen, palette: palette,
-                                 born: grudgeBorn, lastSeen: grudgeSince, select: toggleGrudge, settle: settleGrudge)
+            // Your Chess DNA under For today, where Your Grudge was (Alex, 2026-11-09: "Chess DNA
+            // is a nice selling point. We should highlight this instead of grudge").
+            if let dna = info.dna {
+                HomeAuroraSection(title: "Your Chess DNA", palette: palette,
+                                  note: dna.gamesRead > 0 ? ChessDNAView.basis(dna) : nil)
+                HomeAuroraDNA(dna: dna, palette: palette, action: actions.chessDNA)
                     .padding(.horizontal, 16)
             }
         }
@@ -322,11 +334,6 @@ struct HomeAuroraView: View {
                 .shadow(color: .black.opacity(palette.dark ? 0.5 : 0.1), radius: 30, y: -10)
                 .ignoresSafeArea(edges: .bottom)
         }
-    }
-
-    private var gamesTitle: String {
-        if info.games.isEmpty { return "Next game" }
-        return info.games.count == 1 ? "Your game" : "Your games"
     }
 
     private var gamesNote: String? {
@@ -380,21 +387,28 @@ struct HomeAuroraView: View {
         let levels: [MatchController.Level] = MatchController.Level.allCases
         let shown: MatchController.Level = rivalShown ?? upNext.level
         return VStack(spacing: 12) {
-            ScrollView(.horizontal) {
-                HStack(alignment: .top, spacing: 16) {
-                    ForEach(levels) { level in
-                        rivalCard(level, card: card, upNext: upNext, ladder: ladder)
-                            .containerRelativeFrame(.horizontal)
-                            .id(level)
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal) {
+                    HStack(alignment: .top, spacing: 16) {
+                        ForEach(levels) { level in
+                            rivalCard(level, card: card, upNext: upNext, ladder: ladder)
+                                .containerRelativeFrame(.horizontal)
+                                .id(level)
+                        }
                     }
+                    .scrollTargetLayout()
                 }
-                .scrollTargetLayout()
+                .scrollTargetBehavior(.viewAligned)
+                .scrollIndicators(.hidden)
+                .scrollClipDisabled()
+                .scrollPosition(id: Binding(get: { rivalShown ?? upNext.level }, set: { rivalShown = $0 }))
+                // The tick follows the rival in front, so putting the pager in place below is silent.
+                .sensoryFeedback(.selection, trigger: shown) { _, _ in hapticsOn }
+                // A position handed over as the pager first appears is not always kept: the home
+                // opened on the first rival, beaten or not, under dashes that pointed at the next
+                // one. So the pager is put on the rival up next by hand, once it is laid out.
+                .task { proxy.scrollTo(shown, anchor: .leading) }
             }
-            .scrollTargetBehavior(.viewAligned)
-            .scrollIndicators(.hidden)
-            .scrollClipDisabled()
-            .scrollPosition(id: Binding(get: { rivalShown ?? upNext.level }, set: { rivalShown = $0 }))
-            .sensoryFeedback(.selection, trigger: rivalShown) { _, _ in hapticsOn }
             HStack(spacing: 6) {
                 ForEach(levels) { level in
                     Capsule()
@@ -439,13 +453,14 @@ struct HomeAuroraView: View {
         }
     }
 
-    /// Rating, level and streak, small in the header: serif figures over fine caps, parted by
+    /// Rating, rank and streak, small in the header: serif figures over fine caps, parted by
     /// gold hairlines. Each opens what it counts.
     private var numbers: some View {
         HStack(spacing: 0) {
             number(stage.rating.map { $0.formatted(.number) } ?? "New", label: "Rating", action: actions.stage.you)
             hairline
-            number("\(stage.rankNumber)", label: "Level", action: actions.stage.learn)
+            // Your training rank, Pawn to King. "Level" beside Rating read as the rival's level.
+            number("\(stage.rankNumber)", label: "Rank", action: actions.stage.learn)
             hairline
             number("\(stage.day.streak)", label: "Streak", action: actions.stage.dailyMove)
         }
@@ -481,9 +496,17 @@ struct HomeAuroraView: View {
 
     @ViewBuilder
     private var todayRows: some View {
-        HomeAuroraRow(eyebrow: "Today's Move", title: todayTitle, detail: todayDetail,
-                      accent: palette.rose, palette: palette, action: actions.stage.dailyMove) {
-            HomeAuroraEmblem(glyph: Glyphs.today, fill: HomeAuroraPalette.roseTile)
+        // Today's Move leads For today in the large gold-framed card; your finest move follows
+        // as a row the size of Puzzles (Alex, 2026-11-09: "For Today should be todays move, the
+        // finest move should be below in the same size area as the puzzles format"; "still have
+        // the larger card view"; "just say todays move instead of your finest move").
+        // With games under way, the large card swipes: your games first, the ones waiting on
+        // you leading, then Today's Move (Alex, 2026-11-10: "if theres a game they're currently
+        // playing, show that and allow them to swipe through for other games they may have and
+        // today's move").
+        todayPager
+        if let finest = info.finest {
+            HomeAuroraFinestRow(finest: finest, palette: palette) { actions.replay(finest.gameID) }
         }
         HomeAuroraRow(eyebrow: "Puzzles", title: "Sharpen your eye", detail: "Tactics at your level, one after another",
                       accent: palette.violet, palette: palette, action: actions.puzzles) {
@@ -503,6 +526,58 @@ struct HomeAuroraView: View {
         }
     }
 
+    /// Your games under way, then Today's Move, one large card each; gold dashes under them when
+    /// there is more than one.
+    @ViewBuilder
+    private var todayPager: some View {
+        let today = HomeAuroraTodayCard(eyebrow: "Today's Move", fen: stage.todayFEN,
+                                        flipped: stage.todaySolver == .black, title: todayTitle,
+                                        detail: todayDetail, button: stage.day.played ? "See it" : "Play",
+                                        symbol: stage.day.played ? "checkmark" : "play.fill",
+                                        palette: palette, open: actions.stage.dailyMove)
+        let games: [HomeCurrentGame] = info.games.filter(\.isYourMove) + info.games.filter { !$0.isYourMove }
+        if games.isEmpty {
+            today
+        } else {
+            let ids: [String] = games.map(\.id) + ["today"]
+            let shown: String = todayShown ?? ids[0]
+            VStack(spacing: 12) {
+                ScrollView(.horizontal) {
+                    HStack(alignment: .top, spacing: 16) {
+                        ForEach(games) { game in
+                            let card = HomeAuroraGameCard(game)
+                            HomeAuroraTodayCard(eyebrow: card.eyebrow, fen: game.fen, flipped: game.flipped,
+                                                title: game.title, detail: card.tags.joined(separator: " · "),
+                                                button: game.isYourMove ? "Your move" : "See the game",
+                                                symbol: game.isYourMove ? "play.fill" : "eye",
+                                                lit: game.isYourMove, palette: palette) { actions.open(game) }
+                                .containerRelativeFrame(.horizontal)
+                                .id(game.id)
+                        }
+                        today
+                            .containerRelativeFrame(.horizontal)
+                            .id("today")
+                    }
+                    .scrollTargetLayout()
+                }
+                .scrollTargetBehavior(.viewAligned)
+                .scrollIndicators(.hidden)
+                .scrollClipDisabled()
+                .scrollPosition(id: $todayShown)
+                .sensoryFeedback(.selection, trigger: todayShown) { _, _ in hapticsOn }
+                HStack(spacing: 6) {
+                    ForEach(ids, id: \.self) { id in
+                        Capsule()
+                            .fill(id == shown ? palette.gold : palette.gold.opacity(0.3))
+                            .frame(width: id == shown ? 16 : 5, height: 5)
+                    }
+                }
+                .animation(.snappy, value: shown)
+                .accessibilityHidden(true)
+            }
+        }
+    }
+
     /// The game of the day, in Analyze from its first position, ready to play through.
     private func openMasterpiece() {
         if let fen = stage.masterpiece?.frames.first { actions.stage.analyzePosition(fen) }
@@ -516,6 +591,8 @@ struct HomeAuroraView: View {
     private var todayDetail: String {
         if stage.day.played { return "Back tomorrow for the next one" }
         let streak: Int = stage.day.streak
+        // The week's rest day is spent: a miss now ends the streak, so say so where it's kept.
+        if stage.day.restDayUsed { return "Rest day used. Keep your \(streak)-day streak" }
         return streak > 0 ? "Keep your \(streak)-day streak" : "One puzzle, the same for everyone"
     }
 
@@ -523,25 +600,6 @@ struct HomeAuroraView: View {
         if stage.trainedToday { return "Done today. Another round?" }
         guard let plan = stage.plan else { return "Pick up where you stopped" }
         return "\(plan.minutes) min with Leo"
-    }
-
-    /// Opens the Grudge's card into its summons, counting from when you last met; or closes it.
-    private func toggleGrudge() {
-        guard let grudges, let record = grudges.record else { return }
-        if !grudgeOpen {
-            let parts = grudgeLastSeen.split(separator: "-").compactMap { Int($0) }
-            grudgeSince = parts.count == 2 ? (you: parts[0], it: parts[1]) : nil
-            grudgeBorn = grudges.unseen
-            // Seen now: next time the summons counts from here.
-            grudgeLastSeen = "\(record.yourWins)-\(record.itsWins)"
-            grudges.markSeen()
-        }
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) { grudgeOpen.toggle() }
-    }
-
-    private func settleGrudge() {
-        actions.playGrudge()
-        grudgeOpen = false
     }
 
     private func open(_ card: HomeAuroraGameCard) {
@@ -589,14 +647,13 @@ struct HomeAuroraGameTile: View {
                         .foregroundStyle(palette.ink)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
-                    Text(card.tags.joined(separator: " · "))
-                        .font(.system(size: 12.5))
-                        .foregroundStyle(palette.ink2)
-                        .lineLimit(1)
+                    tagLine
                     Spacer(minLength: 0)
                     HStack(spacing: 6) {
                         Text(card.button)
                             .font(.system(size: 13, weight: .bold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                         Image(systemName: "arrow.right")
                             .font(.system(size: 11, weight: .bold))
                     }
@@ -611,7 +668,9 @@ struct HomeAuroraGameTile: View {
                         }
                     }
                 }
-                Spacer(minLength: 0)
+                // The words take all the room beside the board. (A spacer after them cost its
+                // own gap, and "Make your move" was cut to "Make your m…".)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(12)
             .frame(height: 128)
@@ -638,6 +697,22 @@ struct HomeAuroraGameTile: View {
                 .accessibilityHint("Pick your side, clock and rival")
             }
         }
+    }
+}
+
+extension HomeAuroraGameTile {
+    /// Who, the clock and your side on one line. When the line runs out of room your side goes
+    /// first, since the board beside it already shows it, rather than the line ending "You'…".
+    private var tagLine: some View {
+        let all: String = card.tags.joined(separator: " · ")
+        let short: String = card.tags.count > 1 ? card.tags.dropLast().joined(separator: " · ") : all
+        return ViewThatFits(in: .horizontal) {
+            Text(all)
+            Text(short)
+        }
+        .font(.system(size: 12.5))
+        .foregroundStyle(palette.ink2)
+        .lineLimit(1)
     }
 }
 
@@ -701,7 +776,9 @@ struct HomeAuroraNextRival: View {
                             .opacity(0.7)
                             .accessibilityLabel("Locked. Beat \(lockedBy.name) first")
                     } else {
-                        Button(action: play) { pill("Play", symbol: "play.fill") }
+                        Button(action: play) {
+                            pill(card.upNext?.inProgress == true ? "Resume" : "Play", symbol: "play.fill")
+                        }
                             .buttonStyle(HomeStagePress())
                             .accessibilityLabel("Play \(rival.name)")
                         Button(action: change) { pill("Options", symbol: "slider.horizontal.3") }
@@ -855,6 +932,159 @@ struct HomeAuroraRow<Picture: View>: View {
     }
 }
 
+/// Your Chess DNA on Home (Alex, 2026-11-09), dressed like the rows for today: a white card with
+/// a thin gold edge, your style in serif with its portrait, a gold emblem at the right, then the
+/// four habits as fine gold bars and your weapon and leak. A tap opens the Chess DNA page. Before
+/// three games are read, it says how many more Coach Leo needs.
+struct HomeAuroraDNA: View {
+    let dna: ChessDNA
+    let palette: HomeAuroraPalette
+    let action: () -> Void
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 14) {
+                header
+                if dna.hasStyle {
+                    bars
+                }
+                if dna.weapon != nil || dna.leak != nil {
+                    HStack(alignment: .top, spacing: 10) {
+                        if let weapon = dna.weapon {
+                            chip("Weapon", weapon.title, symbol: weapon.symbol, tint: palette.teal)
+                        }
+                        if let leak = dna.leak {
+                            chip("Leak", leak.headline, symbol: leak.area.symbol, tint: palette.rose)
+                        }
+                    }
+                }
+            }
+            .padding(.vertical, 14)
+            .padding(.leading, 14)
+            .padding(.trailing, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(shape.fill(palette.card))
+            .overlay(shape.strokeBorder(palette.line, lineWidth: 1))
+            .contentShape(shape)
+        }
+        .buttonStyle(HomeStagePress())
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Opens your Chess DNA")
+    }
+
+    private var header: some View {
+        HStack(spacing: 14) {
+            Capsule()
+                .fill(LinearGradient(colors: [palette.gold, palette.gold.opacity(0.2)], startPoint: .top, endPoint: .bottom))
+                .frame(width: 3)
+                .padding(.vertical, 4)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(dna.hasStyle ? "YOUR STYLE" : "STILL READING YOU")
+                    .font(.system(size: 10.5, weight: .bold))
+                    .tracking(1.3)
+                    .foregroundStyle(palette.gold)
+                Text(dna.style?.title ?? "Your style, named")
+                    .font(.system(size: 19, weight: .regular, design: .serif))
+                    .foregroundStyle(palette.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Text(detail)
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(palette.ink2)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(HomeAuroraPalette.goldTile)
+                .overlay {
+                    Image(systemName: dna.style?.symbol ?? "circle.hexagongrid.fill")
+                        .font(.system(size: 26, weight: .semibold))
+                        .foregroundStyle(Color.white)
+                }
+                .frame(width: 64, height: 64)
+                .accessibilityHidden(true)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var detail: String {
+        if let style = dna.style { return style.portrait }
+        let left = max(1, ChessDNA.gamesForStyle - dna.gamesRead)
+        let games = left == 1 ? "one more game" : "\(left) more games"
+        return "Play \(games) against any rival and \(Coach.current.name) will read how you play."
+    }
+
+    /// The four habits two by two, each a fine gold line with a dot where you sit.
+    private var bars: some View {
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 18), GridItem(.flexible(), spacing: 18)],
+                  alignment: .leading, spacing: 12) {
+            ForEach(dna.traits) { trait in
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(trait.kind.title)
+                            .font(.system(size: 12.5, weight: .medium))
+                            .foregroundStyle(palette.ink)
+                        Spacer(minLength: 4)
+                        Text(trait.word)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(trait.value == nil ? palette.ink3 : palette.gold)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                    track(trait.value)
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(trait.kind.title): \(trait.word)")
+            }
+        }
+        .padding(.leading, 17)
+    }
+
+    private func track(_ value: Double?) -> some View {
+        GeometryReader { geo in
+            let dot: CGFloat = 8
+            let x: CGFloat = (geo.size.width - dot) * CGFloat(value ?? 0.5)
+            ZStack(alignment: .leading) {
+                Capsule().fill(palette.ink.opacity(0.08)).frame(height: 2)
+                Capsule().fill(palette.gold.opacity(0.55)).frame(width: x + dot / 2, height: 2)
+                    .opacity(value == nil ? 0 : 1)
+                Circle().fill(palette.gold).frame(width: dot, height: dot)
+                    .offset(x: x)
+                    .opacity(value == nil ? 0.25 : 1)
+            }
+            .frame(height: dot)
+        }
+        .frame(height: 8)
+    }
+
+    private func chip(_ label: String, _ title: String, symbol: String, tint: Color) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: symbol)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 16)
+                .padding(.top, 1)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label.uppercased())
+                    .font(.system(size: 9.5, weight: .bold))
+                    .tracking(1.2)
+                    .foregroundStyle(tint)
+                Text(title)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(palette.ink)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(tint.opacity(palette.dark ? 0.12 : 0.07)))
+    }
+}
+
 /// Your Grudge on Home, dressed like the rows for today (Alex, 2026-11-07: "match the other
 /// areas"): a white card with a thin red edge, small caps, a serif line, and the onyx king at the
 /// right. A tap opens it into the summons, with Settle it to start the game; another tap on the
@@ -936,6 +1166,61 @@ struct HomeAuroraGrudge: View {
         .padding(.leading, 14)
         .padding(.trailing, 12)
         .contentShape(Rectangle())
+    }
+}
+
+/// Your Grudge's room, from Rooms (Alex, 2026-11-09: "place in rooms"): a sheet the height of
+/// what it holds, the summons with Settle it once the Grudge is born, and before then the card
+/// that says what wakes it. Meeting it here counts as seeing it, so the summons plays what
+/// changed since last time, or its birth the first time.
+struct HomeGrudgeRoom: View {
+    let grudges: GrudgeStore
+    let palette: HomeAuroraPalette
+    let settle: () -> Void
+
+    /// The score when you last saw your Grudge ("7-11"), so what changed since plays out.
+    @AppStorage("grudge.lastSeen") private var lastSeen = ""
+    @State private var since: (you: Int, it: Int)?
+    @State private var born = false
+    @State private var met = false
+    @State private var height: CGFloat = 420
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Your Grudge")
+                .font(.system(size: 20, weight: .medium, design: .serif))
+                .foregroundStyle(palette.ink)
+                .padding(.horizontal, 4)
+                .accessibilityAddTraits(.isHeader)
+            if met {
+                HomeAuroraGrudge(record: grudges.record, isOpen: grudges.record != nil, palette: palette,
+                                 born: born, lastSeen: since, select: {}, settle: settle)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 26)
+        .padding(.bottom, 12)
+        .frame(maxWidth: .infinity, alignment: .top)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
+        .presentationDetents([.height(height)])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(palette.sheet)
+        .presentationCornerRadius(34)
+        .environment(\.colorScheme, palette.dark ? .dark : .light)
+        .onAppear(perform: meet)
+    }
+
+    /// Reads when you last met it, then marks it seen from here.
+    private func meet() {
+        guard !met else { return }
+        if let record = grudges.record {
+            let parts = lastSeen.split(separator: "-").compactMap { Int($0) }
+            since = parts.count == 2 ? (you: parts[0], it: parts[1]) : nil
+            born = grudges.unseen
+            lastSeen = "\(record.yourWins)-\(record.itsWins)"
+            grudges.markSeen()
+        }
+        met = true
     }
 }
 
@@ -1086,7 +1371,9 @@ struct HomeAuroraGameCard: Identifiable, Equatable {
         flipped = upNext.playerColor == .black
         yourMove = false
         eyebrow = "Your next game"
-        status = "Up next"
+        // A game against this rival is under way: the card picks it up (its board is under
+        // For today with your other games).
+        status = upNext.inProgress ? "Playing now" : "Up next"
         headline = "\(upNext.rival.name) is ready\nwhen "
         headlineEnd = "you are"
         // The title names the rival; the button just plays, with Change beside it.
@@ -1445,8 +1732,15 @@ struct HomeAuroraTabBar: View {
         }
     }
 
+    /// The knight carries its name like the tabs do, so nobody has to guess what it opens.
     private var knight: some View {
-                Glyph(name: Glyphs.train, size: 32, weight: .bold)
+                VStack(spacing: 1) {
+                    // The Gilded knight, a touch larger so its mane stripes read (Alex, 2026-11-10).
+                    AnalyzeKnightGlyph()
+                        .frame(width: 25, height: 30)
+                    Text("Analyze")
+                        .font(.system(size: 9.5, weight: .semibold))
+                }
                     .foregroundStyle(Color(hex: 0x2A1C08))
                     .frame(width: 64, height: 64)
                     .background {

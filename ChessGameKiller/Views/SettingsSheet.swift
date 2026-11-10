@@ -8,7 +8,6 @@ struct SettingsSheet: View {
     @AppStorage("showBestMoves") private var showBestMoves = false
     @AppStorage("showSecondBest") private var showSecondBest = true
     @AppStorage("coachVerdicts") private var showVerdicts = true
-    @AppStorage(GhostVision.storageKey) private var ghostVisionOn = true
     @AppStorage("soundEffects") private var soundOn = true
     @AppStorage("haptics") private var hapticsOn = true
     /// Home's music. Its switch moved here from Home's header (Alex, 2026-11-07).
@@ -17,6 +16,7 @@ struct SettingsSheet: View {
     @AppStorage("rivalBanter") private var banterOn = true
     @AppStorage("sculpted3D") private var sculpted3D = true
     @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.tilted
+    @AppStorage(PieceSet.storageKey) private var pieceSet = PieceSet.stone
     @AppStorage(Heirloom.settingKey) private var heirloomOn = true
     @AppStorage(BoardTheme.coordinatesKey) private var coordinatesOn = true
     @AppStorage(HomeToneMode.key) private var homeTone = HomeToneMode.defaultMode
@@ -45,8 +45,8 @@ struct SettingsSheet: View {
 
                     PremiumSettingsCard(theme: theme) { showingPremium = true }
 
-                    // Light or dark lives here, not on the Today screen (Alex, 2026-11-07), and the
-                    // app icon sits with it (Alex, 2026-11-08).
+                    // Light or dark lives here, not on the Today screen (Alex, 2026-11-07). The app
+                    // icon sat with it; it has its own section lower down now (Alex, 2026-11-09).
                     section("Appearance") {
                         SettingsGroup(theme: theme) {
                             PickerRow(title: "Light or dark", subtitle: homeTone.blurb, symbol: "circle.lefthalf.filled", theme: theme) {
@@ -56,8 +56,25 @@ struct SettingsSheet: View {
                                     }
                                 }
                             }
-                            rule
-                            AppIconPicker(accent: accent)
+                        }
+                    }
+
+                    // The sets made for the tilted board, in tiles like the app icons (Alex,
+                    // 2026-11-09), under Light or dark and above the boards (Alex, 2026-11-10), so
+                    // the preview at the top is in sight as it changes into the one picked. On a
+                    // look that plays flat the tiles stay in place, dimmed, so picking a board
+                    // never moves the boards under the finger.
+                    section("Pieces") {
+                        SettingsGroup(theme: theme) {
+                            PieceSetPicker(selection: $pieceSet, accent: accent)
+                        }
+                        .opacity(theme.sculptedLook == nil ? 0.4 : 1)
+                        .disabled(theme.sculptedLook == nil)
+                        if theme.sculptedLook == nil {
+                            Text("\(theme.name) plays flat. Pick a stone board to choose its pieces.")
+                                .font(.app(.footnote))
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 4)
                         }
                     }
 
@@ -66,20 +83,18 @@ struct SettingsSheet: View {
                         // (Alex, 2026-11-08: "Remove the rival options").
                         themeGrid(Self.looks)
                         SettingsGroup(theme: theme) {
+                            // The "3D pieces" switch is gone (Alex, 2026-11-09: retire the old flat
+                            // board). A look with a 3D board always plays on it, Tilted or Flat;
+                            // SculptedSetting.settle() puts anyone who turned it off back.
                             if theme.sculptedLook != nil {
-                                ToggleRow(title: "3D pieces", subtitle: "Carved pieces that lift, glide and fall. Off draws the same set flat.",
-                                          symbol: "cube", isOn: $sculpted3D, theme: theme)
-                                rule
-                                if sculpted3D {
-                                    PickerRow(title: "Board view", subtitle: tilt.blurb, symbol: "perspective", theme: theme) {
-                                        Picker("Board view", selection: $tilt) {
-                                            ForEach(BoardTilt.allCases) { choice in
-                                                Text(choice.title).tag(choice)
-                                            }
+                                PickerRow(title: "Board view", subtitle: tilt.blurb, symbol: "perspective", theme: theme) {
+                                    Picker("Board view", selection: $tilt) {
+                                        ForEach(BoardTilt.allCases) { choice in
+                                            Text(choice.title).tag(choice)
                                         }
                                     }
-                                    rule
                                 }
+                                rule
                             }
                             ToggleRow(title: "Coordinates", subtitle: "The letters and numbers along the board's edge. Off hides them.",
                                       symbol: "textformat.abc", isOn: $coordinatesOn, theme: theme)
@@ -101,9 +116,6 @@ struct SettingsSheet: View {
                             ToggleRow(title: "Runner-up in the coach", subtitle: "The coach panel lists a second choice too. The board only ever lights the best.",
                                       symbol: "lightbulb", isOn: $showSecondBest, theme: theme)
                                 .disabled(!showBestMoves)
-                            rule
-                            ToggleRow(title: "See ahead", subtitle: "Ghost Vision. Hold the board to see the computer's line a few moves ahead. Slide left to step back through it. Counts as help.",
-                                      symbol: "eye", isOn: $ghostVisionOn, theme: theme)
                             rule
                             ToggleRow(title: "Move grades", subtitle: "Rates each move you play, from Best to Blunder.",
                                       symbol: "star.fill", isOn: $showVerdicts, theme: theme)
@@ -128,6 +140,13 @@ struct SettingsSheet: View {
                             ToggleRow(title: "Voice reactions", subtitle: reactionsSubtitle,
                                       symbol: "bubble.left.and.text.bubble.right.fill", isOn: $reactionsOn, theme: theme)
                                 .disabled(voiceMuted)
+                        }
+                    }
+
+                    // Moved down from Appearance, under Voice reactions (Alex, 2026-11-09).
+                    section("App icon") {
+                        SettingsGroup(theme: theme) {
+                            AppIconPicker(accent: accent)
                         }
                     }
 
@@ -241,7 +260,7 @@ struct SettingsSheet: View {
     private var preview: some View {
         VStack(spacing: 14) {
             BoardPreview(theme: theme, showBest: showBestMoves, size: 172,
-                         threeD: theme.sculptedLook != nil && sculpted3D)
+                         threeD: theme.sculptedLook != nil && sculpted3D, pieceSet: pieceSet)
                 .padding(.top, 6)
             Text("Live preview")
                 .font(.app(.caption, weight: .semibold))
@@ -318,6 +337,8 @@ struct BoardPreview: View {
     var size: CGFloat = 160
     /// The look's real 3D board, with the same position and marks.
     var threeD = false
+    /// The pieces that board wears.
+    var pieceSet = PieceSet.stone
 
     @AppStorage(BoardTheme.coordinatesKey) private var showsCoordinates = true
 
@@ -330,11 +351,12 @@ struct BoardPreview: View {
     var body: some View {
         if threeD, SculptedAssets.shared.isLoaded, let position = Self.position {
             // As tall as the flat preview, and as wide as the angled board needs.
-            SculptedStillBoard(position: position, look: theme.sculptedLook ?? .gilded, hints: stillHints,
+            SculptedStillBoard(position: position, look: pieceSet.dress(theme.sculptedLook ?? .gilded), hints: stillHints,
                                selected: Self.selected, targets: Self.targets)
                 .frame(width: size * SculptedBoardView.aspect, height: size)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Preview of the \(theme.name) board")
+                .accessibilityLabel(pieceSet == .stone ? "Preview of the \(theme.name) board"
+                                    : "Preview of the \(theme.name) board with the \(pieceSet.title) pieces")
         } else {
             flatPreview
         }

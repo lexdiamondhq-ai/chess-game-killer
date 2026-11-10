@@ -210,15 +210,15 @@ private struct PremiumBenefitList: View {
         Benefit(symbol: "person.text.rectangle", title: "A coach that learns you",
                 detail: "Your style, strengths and leaks from every game, and a plan rebuilt after each one."),
         Benefit(symbol: "backward.circle", title: "Full Rewind on every game",
-                detail: "Ghost lines, second chances and what could have been."),
+                detail: "Your coach talks you through the whole game. Ghost lines and second chances."),
         Benefit(symbol: "puzzlepiece.extension", title: "Unlimited puzzles",
                 detail: "115,000 rated puzzles, Puzzle Rush, Cycles and your review queue."),
         Benefit(symbol: "graduationcap", title: "Every lesson and drill",
                 detail: "All 15 lessons, 3,865 openings, 22 endgames, master games and Blindfold."),
-        Benefit(symbol: "eye", title: "Ghost Vision any time",
-                detail: "Plus Talk It Through and photo scans, as often as you like."),
+        Benefit(symbol: "bubble.left.and.bubble.right", title: "Talk It Through any time",
+                detail: "Plus photo scans, as often as you like."),
         Benefit(symbol: "square.grid.3x3", title: "Every board look",
-                detail: "Every set and every rival's board."),
+                detail: "Every set of pieces and its board."),
     ]
 
     var body: some View {

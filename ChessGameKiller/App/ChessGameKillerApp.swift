@@ -12,6 +12,8 @@ struct ChessGameKillerApp: App {
         LookIntroduction.applyOnce()
         HintsIntroduction.applyOnce()
         HomeLayouts.settle()
+        // Before the showcase, which may ask for the flat board for a screenshot.
+        SculptedSetting.settle()
         showcase = Showcase.fromLaunchArguments()
         // A tapped daily reminder opens Today's Move.
         UNUserNotificationCenter.current().delegate = DailyNotificationDelegate.shared
@@ -29,7 +31,7 @@ struct ChessGameKillerApp: App {
                 Group {
                     if let showcase {
                         ContentView(startsWithNewGame: false, startsAtHome: showcase.atHome,
-                                    match: showcase.match, coachOpen: showcase.coachOpen, vision: showcase.vision)
+                                    match: showcase.match, coachOpen: showcase.coachOpen)
                     } else {
                         ContentView()
                     }
@@ -89,7 +91,6 @@ enum HintsIntroduction {
 ///
 /// Other arguments: `-showcaseLook midnight` (any look's id), `-showcase3D NO`,
 /// `-showcaseRival 1000s` (a crowd, or `grudge`), `-showcaseClock 15+10` (or `none`), `-showcaseCoach open`,
-/// `-showcaseGhost all` (Ghost Vision held, the whole line) or `-showcaseGhost 1` (held, slid back to its second move),
 /// `-showcaseHome YES` (the home, with that game under way).
 /// `-showcaseGames YES`, with or without `-showcase game`, lists a few friend and online games
 /// on the home's Current games.
@@ -97,8 +98,6 @@ enum HintsIntroduction {
 struct Showcase {
     let match: MatchController
     let coachOpen: Bool
-    /// Ghost Vision, already held, when asked for.
-    var vision: GhostVision?
     /// Opens on the home, with the game under way.
     var atHome = false
 
@@ -127,12 +126,7 @@ struct Showcase {
         for move in moves {
             _ = match.game.playEngineMove(move)
         }
-        var vision: GhostVision?
-        if let ghost = defaults.string(forKey: "showcaseGhost") {
-            defaults.set(true, forKey: GhostVision.storageKey)
-            vision = GhostVision(holding: true, focus: Int(ghost))
-        }
-        return Showcase(match: match, coachOpen: defaults.string(forKey: "showcaseCoach") == "open", vision: vision,
+        return Showcase(match: match, coachOpen: defaults.string(forKey: "showcaseCoach") == "open",
                         atHome: flag("showcaseHome", in: defaults) ?? false)
     }
 

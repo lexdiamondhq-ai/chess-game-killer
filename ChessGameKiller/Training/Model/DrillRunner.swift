@@ -331,6 +331,33 @@ final class DrillRunner {
         }
     }
 
+    /// Plays a find-the-move drill through to its answer with arrows, without asking: Today's
+    /// Move, opened again once played. Starts over from the first position each time.
+    func review() {
+        guard kind == .move, let position = Position(fen: startFEN) else { return }
+        pending?.cancel()
+        game = GameModel(position: position)
+        game.humanColors = []
+        index = 0
+        arrows = []
+        marks = []
+        labels = []
+        tone = .coach
+        message = prompt
+        phase = .intro
+        pending = Task { [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(for: .milliseconds(650))
+            guard !Task.isCancelled else { return }
+            if let setup = self.setup {
+                self.playMove(setup)
+                try? await Task.sleep(for: .milliseconds(500))
+                guard !Task.isCancelled else { return }
+            }
+            self.showLine()
+        }
+    }
+
     /// Starts a playout over from its first position.
     func restart() {
         guard kind == .playout, let position = Position(fen: startFEN) else { return }

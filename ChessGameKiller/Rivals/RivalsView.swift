@@ -1,9 +1,12 @@
 import AVFoundation
+import Combine
 import SwiftUI
 import UIKit
 
 /// The rivals' hall, opened from Rivals on Home (Alex, 2026-11-07): one card for each rival,
-/// swiped through, its film's last frame above a short line on how it plays. Face plays the
+/// swiped through, its film's last frame above a short line on how it plays. Landing on a rival
+/// plays its film full screen; when it ends the film holds its last frame and the rival's words
+/// and Face rise at the bottom, over I to V for swiping on to the others. Face plays the
 /// rival's welcome film, then Begin starts the game. Every rival after the Cub stays locked
 /// until the rival before it is beaten; their cards still show, saying who to beat.
 struct RivalsHall: View {
@@ -14,16 +17,25 @@ struct RivalsHall: View {
     let close: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(GameVault.self) private var vault: GameVault?
     @State private var ladder: RivalLadder
     @State private var selected: MatchController.Level?
     /// The rival whose film is playing.
     @State private var showing: RivalFilm?
+    /// Just watched in full: back from its welcome, its card doesn't play the film again until
+    /// you swipe away and back.
+    @State private var watched: MatchController.Level?
+    /// The rival whose film is playing large, over the whole hall, as you land on it.
+    @State private var playing: MatchController.Level?
+    /// The playing film has ended: it holds its last frame, with the rival's words and Face.
+    @State private var ended: MatchController.Level?
 
     private static let gold = Color(hex: 0xE8C27A)
 
     /// `intro` opens straight into the start rival's welcome film: every time you face a rival
     /// from Home's Play, its film plays before the game (Alex, 2026-11-09).
-    init(start: MatchController.Level? = nil, intro: Bool = false,
+    /// `ended` (for pictures) opens on that rival's film already ended, its words showing.
+    init(start: MatchController.Level? = nil, intro: Bool = false, ended: MatchController.Level? = nil,
          begin: @escaping (MatchController.Level) -> Void, close: @escaping () -> Void) {
         self.start = start
         self.begin = begin
@@ -32,6 +44,9 @@ struct RivalsHall: View {
         _ladder = State(initialValue: ladder)
         _selected = State(initialValue: start ?? ladder.current)
         _showing = State(initialValue: intro ? start.map(RivalFilm.of) : nil)
+        _playing = State(initialValue: ended)
+        _ended = State(initialValue: ended)
+        if let ended { _selected = State(initialValue: ended) }
     }
 
     var body: some View {
@@ -45,39 +60,97 @@ struct RivalsHall: View {
                 rungs
                     .padding(.bottom, 18)
             }
+            if let level = playing {
+                // The rival in front plays its film large, the whole screen, as you swipe to it
+                // (Alex, 2026-11-10: "The videos of the rivals should be the larger videos, then
+                // once its done the bottom buttons appear"). When it ends it stays large, holding
+                // its last frame, with the rival's words and Face at the bottom and I to V under
+                // them to swipe on, instead of going back to the cards (Alex, 2026-11-10).
+                let film = RivalFilm.of(level)
+                RivalHallFilm(film: film, ended: ended == level, done: { finishFilm(level) },
+                              step: { stepFilm(by: $0) }, close: close) {
+                    VStack(spacing: 0) {
+                        RivalFilmEnding(film: film, open: ladder.isOpen(level),
+                                        record: RivalRecord(vault?.games ?? [], against: film.rival),
+                                        face: { withAnimation(.easeIn(duration: 0.3)) { showing = film } },
+                                        notToday: close)
+                        .padding(.horizontal, 24)
+                        .opacity(ended == level ? 1 : 0)
+                        .offset(y: ended == level ? 0 : 18)
+                        .allowsHitTesting(ended == level)
+                        rungs
+                    }
+                    .padding(.bottom, 18)
+                }
+                    .id(level)
+                    .transition(reduceMotion ? .opacity : .scale(scale: 0.82).combined(with: .opacity))
+                    .zIndex(1)
+            }
             if let film = showing {
                 RivalWelcome(film: film, begin: { begin(film.level) }, back: {
+                    watched = film.level
                     withAnimation(.easeOut(duration: 0.35)) { showing = nil }
                 })
                 .transition(.opacity)
-                .zIndex(1)
+                .zIndex(2)
             }
         }
         .preferredColorScheme(.dark)
-        .statusBarHidden(showing != nil)
+        .statusBarHidden(showing != nil || playing != nil)
         .onAppear {
             HomeMusic.shared.setCovered(true)
+            if showing == nil { playFilm(selected) }
         }
         .onDisappear { HomeMusic.shared.setCovered(false) }
+        .onChange(of: selected) { _, level in
+            watched = nil
+            playFilm(level)
+        }
+    }
+
+    /// Opens the rival's film large over the hall, unless it was just watched in full.
+    private func playFilm(_ level: MatchController.Level?) {
+        guard let level, level != watched, showing == nil, !Welcome.isUnderTest else { return }
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.88)) { playing = level }
+    }
+
+    /// The film ended, or was tapped: it holds its last frame, and the words and Face rise.
+    private func finishFilm(_ level: MatchController.Level) {
+        guard playing == level else { return }
+        withAnimation(.easeOut(duration: 0.6)) { ended = level }
+    }
+
+    /// A sideways swipe on a playing film goes on to the next rival (or back), and plays its film.
+    private func stepFilm(by offset: Int) {
+        let all = RivalFilm.all.map(\.level)
+        guard let current = selected, let index = all.firstIndex(of: current) else { return }
+        let next = index + offset
+        guard all.indices.contains(next) else { return }
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.86)) { selected = all[next] }
     }
 
     /// Deep ink, lit by the rival in front: its last frame, blurred far back.
     private var backdrop: some View {
-        ZStack {
-            Color(hex: 0x060608)
-            if let image = RivalFilm.of(selected ?? .beginner).cardImage {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .blur(radius: 60)
-                    .opacity(0.45)
-                    .id(selected)
-                    .transition(.opacity)
+        // The frame laid over the ink, not beside it: a filled image would widen the hall past
+        // the screen, and the film's ending with it.
+        Color(hex: 0x060608)
+            .overlay {
+                if let image = RivalFilm.of(selected ?? .beginner).cardImage {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .blur(radius: 60)
+                        .opacity(0.45)
+                        .id(selected)
+                        .transition(.opacity)
+                }
             }
-            LinearGradient(colors: [.black.opacity(0.55), .clear, .black.opacity(0.8)],
-                           startPoint: .top, endPoint: .bottom)
-        }
-        .ignoresSafeArea()
+            .overlay {
+                LinearGradient(colors: [.black.opacity(0.55), .clear, .black.opacity(0.8)],
+                               startPoint: .top, endPoint: .bottom)
+            }
+            .clipped()
+            .ignoresSafeArea()
         .animation(.easeInOut(duration: 0.6), value: selected)
     }
 
@@ -115,27 +188,35 @@ struct RivalsHall: View {
         let height = max(320, size.height - 8)
         let width = min(size.width * 0.82, height * 0.6)
         let side = (size.width - width) / 2
-        return ScrollView(.horizontal, showsIndicators: false) {
-            LazyHStack(spacing: 14) {
-                ForEach(RivalFilm.all, id: \.level) { film in
-                    RivalHallCard(film: film, open: ladder.isOpen(film.level), beaten: ladder.beaten(film.rival)) {
-                        withAnimation(.easeIn(duration: 0.3)) { showing = film }
+        return ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 14) {
+                    ForEach(RivalFilm.all, id: \.level) { film in
+                        // Each rival's film plays as you swipe to it (Alex, 2026-11-09: "when you
+                        // select all rivals you should get the video introduction of each").
+                        RivalHallCard(film: film, open: ladder.isOpen(film.level), beaten: ladder.beaten(film.rival),
+                                      waiting: film.level == playing) {
+                            withAnimation(.easeIn(duration: 0.3)) { showing = film }
+                        }
+                        .frame(width: width, height: height)
+                        .scrollTransition(axis: .horizontal) { content, phase in
+                            content
+                                .scaleEffect(phase.isIdentity || reduceMotion ? 1 : 0.9)
+                                .opacity(phase.isIdentity ? 1 : 0.55)
+                        }
+                        .id(film.level)
                     }
-                    .frame(width: width, height: height)
-                    .scrollTransition(axis: .horizontal) { content, phase in
-                        content
-                            .scaleEffect(phase.isIdentity || reduceMotion ? 1 : 0.9)
-                            .opacity(phase.isIdentity ? 1 : 0.55)
-                    }
-                    .id(film.level)
                 }
+                .scrollTargetLayout()
             }
-            .scrollTargetLayout()
+            .contentMargins(.horizontal, side, for: .scrollContent)
+            .scrollTargetBehavior(.viewAligned)
+            .scrollPosition(id: $selected)
+            .frame(height: size.height)
+            // As on Home's Next game: the hall is put on its rival by hand as it opens, since a
+            // position handed over before the cards are laid out is not always kept.
+            .task { if let selected { proxy.scrollTo(selected, anchor: .center) } }
         }
-        .contentMargins(.horizontal, side, for: .scrollContent)
-        .scrollTargetBehavior(.viewAligned)
-        .scrollPosition(id: $selected)
-        .frame(height: size.height)
     }
 
     /// I to V under the cards: the one in front in gold, beaten ones marked, locked ones dim.
@@ -174,6 +255,8 @@ struct RivalHallCard: View {
     let film: RivalFilm
     let open: Bool
     let beaten: Bool
+    /// Its film is playing large over the hall: the words and Face wait until it ends.
+    var waiting = false
     let face: () -> Void
 
     private static let gold = Color(hex: 0xE8C27A)
@@ -189,6 +272,10 @@ struct RivalHallCard: View {
             words
                 .padding(.horizontal, 22)
                 .padding(.bottom, 22)
+                .opacity(waiting ? 0 : 1)
+                .offset(y: waiting ? 16 : 0)
+                .animation(.easeOut(duration: 0.5).delay(waiting ? 0 : 0.25), value: waiting)
+                .allowsHitTesting(!waiting)
         }
         .clipShape(shape)
         .overlay {
@@ -223,7 +310,26 @@ struct RivalHallCard: View {
             } else {
                 Color(hex: 0x15171F)
             }
+
         }
+    }
+
+    private var words: some View {
+        RivalHallWords(film: film, open: open, face: face)
+    }
+}
+
+/// A rival's rank and name, a line on how it plays, and Face, or for a locked rival who to beat
+/// first: on its card, and over its film once the film ends.
+struct RivalHallWords: View {
+    let film: RivalFilm
+    let open: Bool
+    let face: () -> Void
+
+    private static let gold = Color(hex: 0xE8C27A)
+
+    var body: some View {
+        words
     }
 
     private var words: some View {
@@ -280,10 +386,235 @@ struct RivalHallCard: View {
     }
 }
 
+/// Your games against one rival: wins, losses and draws.
+struct RivalRecord: Equatable {
+    var wins = 0
+    var losses = 0
+    var draws = 0
+
+    init(wins: Int = 0, losses: Int = 0, draws: Int = 0) {
+        self.wins = wins
+        self.losses = losses
+        self.draws = draws
+    }
+
+    /// Counted from the games played here against the rival (not ones brought in from a site).
+    init(_ games: [SavedGame], against rival: Rival) {
+        for game in games where game.level == rival.level.rawValue && game.sourceID == nil
+            && (game.opponent == rival.name || rival.pastNames.contains(game.opponent)) {
+            switch game.result {
+            case .win: wins += 1
+            case .loss: losses += 1
+            case .draw: draws += 1
+            case .unfinished: break
+            }
+        }
+    }
+}
+
+/// How a rival's film ends in the hall (Alex, 2026-11-10, from a picture): its rank between gold
+/// rules, its name, a line on how it plays, its rating and your record against it, and Face in a
+/// dark glass capsule with its coin; "Not today" leaves the hall. For a locked rival the capsule
+/// says who to beat first.
+struct RivalFilmEnding: View {
+    let film: RivalFilm
+    let open: Bool
+    let record: RivalRecord
+    let face: () -> Void
+    let notToday: () -> Void
+
+    private static let gold = Color(hex: 0xE8C27A)
+    private static let paleGold = Color(hex: 0xF3DDA8)
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 14) {
+                rule
+                Text("RANK \(film.numeral)")
+                    .font(.custom(HomeCarvingFont.plain, size: 15, relativeTo: .footnote))
+                    .tracking(3)
+                    .foregroundStyle(Self.gold)
+                rule
+            }
+            Text(film.rival.name.uppercased())
+                .font(.custom(HomeCarvingFont.plain, size: 34, relativeTo: .largeTitle))
+                .tracking(2.5)
+                .foregroundStyle(LinearGradient(colors: [Self.paleGold, Self.gold],
+                                                startPoint: .top, endPoint: .bottom))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .shadow(color: .black.opacity(0.7), radius: 10)
+                .padding(.top, 8)
+            Text(film.lore)
+                .font(.system(size: 18, weight: .regular, design: .serif))
+                .italic()
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.white.opacity(0.72))
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 12)
+            HStack(spacing: 0) {
+                stat(film.rival.elo, "RATING")
+                Rectangle().fill(.white.opacity(0.18)).frame(width: 1, height: 40)
+                stat("\(record.wins) · \(record.losses) · \(record.draws)", "WIN · LOSS · DRAW")
+            }
+            .padding(.top, 18)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Rating \(film.rival.elo). \(record.wins) wins, \(record.losses) losses, \(record.draws) draws.")
+            capsule
+                .padding(.top, 22)
+            Button("Not today", action: notToday)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.42))
+                .frame(minHeight: 44)
+                .padding(.top, 4)
+        }
+    }
+
+    private var rule: some View {
+        Rectangle()
+            .fill(Self.gold.opacity(0.55))
+            .frame(width: 26, height: 1)
+    }
+
+    private func stat(_ value: String, _ label: String) -> some View {
+        VStack(spacing: 6) {
+            Text(value)
+                .font(.system(size: 20, weight: .medium, design: .serif))
+                .monospacedDigit()
+                .foregroundStyle(.white.opacity(0.92))
+            Text(label)
+                .font(.system(size: 10, weight: .bold))
+                .tracking(1.8)
+                .foregroundStyle(.white.opacity(0.4))
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var capsule: some View {
+        Button(action: face) {
+            HStack(spacing: 14) {
+                RivalCoin(rival: film.rival, size: 32)
+                    .saturation(open ? 1 : 0.2)
+                if open {
+                    Text("FACE \(film.rival.name.uppercased())")
+                        .font(.custom(HomeCarvingFont.plain, size: 16, relativeTo: .body))
+                        .tracking(2)
+                        .foregroundStyle(LinearGradient(colors: [Self.paleGold, Self.gold],
+                                                        startPoint: .top, endPoint: .bottom))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                } else {
+                    Text("Beat \((film.previous?.name ?? "").lowercasedFirstWord) first")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                }
+            }
+            .padding(.horizontal, 24)
+            .frame(maxWidth: .infinity, minHeight: 60)
+            .background(Capsule().fill(Color(hex: 0x14110D).opacity(0.92)))
+            .overlay(Capsule().strokeBorder(LinearGradient(colors: [Self.gold.opacity(open ? 0.7 : 0.25),
+                                                                     Self.gold.opacity(open ? 0.3 : 0.1)],
+                                                            startPoint: .top, endPoint: .bottom),
+                                            lineWidth: 1))
+            .shadow(color: Self.gold.opacity(open ? 0.18 : 0), radius: 14, y: 4)
+        }
+        .buttonStyle(HomeStagePress())
+        .disabled(!open)
+        .accessibilityLabel(open ? "Face \(film.rival.name)"
+                                 : "Locked. Beat \(film.previous?.name ?? "the rival before") first.")
+        .accessibilityHint(open ? "Plays \(film.rival.name)'s welcome, then starts the game" : "")
+    }
+}
+
 extension String {
     /// "The Lionheart" as it reads mid-sentence: "the Lionheart".
     var lowercasedFirstWord: String {
         hasPrefix("The ") ? "the " + dropFirst(4) : self
+    }
+}
+
+/// A rival's film large over the hall as you land on it: full screen, with sound, nothing over
+/// the art but I to V at the bottom. A tap ends it sooner; then it holds its last frame and its
+/// ending (the rival's words and Face) rises at the bottom. A sideways swipe goes on to the next
+/// rival's film, and a swipe down leaves the hall: no button sits over the art (Alex, 2026-11-08).
+struct RivalHallFilm<Ending: View>: View {
+    let film: RivalFilm
+    /// The film has ended: its ending shows, and a tap no longer does anything.
+    let ended: Bool
+    let done: () -> Void
+    /// -1 for the rival before, +1 for the next.
+    let step: (Int) -> Void
+    let close: () -> Void
+    @ViewBuilder let ending: () -> Ending
+
+    @State private var player: AVPlayer?
+
+    var body: some View {
+        Color.clear
+            .overlay(alignment: .bottom) { ending() }
+            .background {
+                ZStack {
+                    Color.black
+                    if let image = film.cardImage {
+                        Image(uiImage: image).resizable().scaledToFill()
+                    }
+                    if let player {
+                        RivalFilmLayer(player: player)
+                    }
+                    LinearGradient(stops: [.init(color: .clear, location: 0.3),
+                                           .init(color: .black.opacity(0.6), location: 0.5),
+                                           .init(color: .black.opacity(0.88), location: 0.68),
+                                           .init(color: .black.opacity(0.96), location: 1)],
+                                   startPoint: .top, endPoint: .bottom)
+                        .opacity(ended ? 1 : 0)
+                }
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+            }
+        .contentShape(Rectangle())
+        .onTapGesture { if !ended { leave() } }
+        .gesture(DragGesture(minimumDistance: 24).onEnded { drag in
+            let t = drag.translation
+            if abs(t.width) > 70, abs(t.width) > abs(t.height) {
+                player?.pause()
+                step(t.width < 0 ? 1 : -1)
+            } else if t.height > 90 {
+                player?.pause()
+                close()
+            }
+        })
+        .accessibilityElement(children: ended ? .contain : .ignore)
+        .accessibilityLabel("\(film.rival.name)'s film")
+        .accessibilityAddTraits(ended ? [] : .isButton)
+        .accessibilityHint(ended ? "" : "Ends the film")
+        .accessibilityAction(.escape) { player?.pause(); close() }
+        .task { await play() }
+        .onDisappear { player?.pause() }
+        .onReceive(NotificationCenter.default.publisher(for: AVPlayerItem.didPlayToEndTimeNotification)) { note in
+            if let item = note.object as? AVPlayerItem, item === player?.currentItem { done() }
+        }
+    }
+
+    private func play() async {
+        guard !ended else { return }
+        guard let url = film.filmURL, !Welcome.isUnderTest else {
+            done()
+            return
+        }
+        // A film you came to watch: it plays with the ring switch off, like the welcome.
+        try? AVAudioSession.sharedInstance().setCategory(.playback, options: [.mixWithOthers])
+        try? AVAudioSession.sharedInstance().setActive(true)
+        let player = AVPlayer(url: url)
+        player.actionAtItemEnd = .pause
+        self.player = player
+        player.play()
+    }
+
+    private func leave() {
+        player?.pause()
+        done()
     }
 }
 

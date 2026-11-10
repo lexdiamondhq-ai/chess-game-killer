@@ -88,14 +88,6 @@ struct SculptedFinale: Equatable {
     let square: Square
 }
 
-/// One step of a Ghost Vision line on the 3D board: its pieces see-through where they land,
-/// a dotted trail from where the main one set out, and red corners on a piece it takes.
-struct SculptedGhostStep: Equatable {
-    let moves: [GhostLine.Move]
-    let captured: Square?
-    let opacity: Float
-}
-
 /// Everything the 3D board shows, copied out of the game so the scene can tell what changed.
 struct SculptedBoardState: Equatable {
     var pieces: [PlacedPiece] = []
@@ -115,8 +107,6 @@ struct SculptedBoardState: Equatable {
     var heirlooms: [Int: Heirloom] = [:]
     /// Set once the game is decided.
     var finale: SculptedFinale?
-    /// Ghost Vision's line, nearest step first, while the player holds the board.
-    var ghosts: [SculptedGhostStep] = []
     /// Seen from the player's chair, or from above with each piece inside its square (Flat).
     var framing: SculptedCamera.Framing = .standing
     /// The pieces come without lasting ids (an earlier position of the game, a preview):
@@ -177,11 +167,6 @@ final class SculptedBoardScene {
     private let labelsNode = SCNNode()
     /// Dust puffs and other passing effects.
     private let effectsNode = SCNNode()
-    /// Ghost Vision's see-through pieces, and their trails and capture marks.
-    private let ghostsNode = SCNNode()
-    private let ghostMarksNode = SCNNode()
-    /// The ghost pieces shown, by step and piece, so a slide of the thumb only fades them.
-    private var ghostNodes: [String: PieceNode] = [:]
     private var keyLight: SCNLight?
     private var rimLight: SCNLight?
     /// Someone at the table's light, made the first time there is one.
@@ -230,7 +215,7 @@ final class SculptedBoardScene {
         buildCamera()
         buildLights()
         buildBoard()
-        for node in [piecesNode, marksNode, labelsNode, effectsNode, ghostsNode, ghostMarksNode] {
+        for node in [piecesNode, marksNode, labelsNode, effectsNode] {
             scene.rootNode.addChildNode(node)
         }
         buildLabels(flipped: false)
@@ -399,9 +384,6 @@ final class SculptedBoardScene {
         }
         if old.heirlooms != new.heirlooms || old.pieces != new.pieces {
             updateHeirlooms(new)
-        }
-        if old.ghosts != new.ghosts || old.flipped != new.flipped {
-            updateGhosts(new)
         }
     }
 
@@ -1270,112 +1252,6 @@ final class SculptedBoardScene {
         simd_float4x4(diagonal: SIMD4(s, s, s, 1))
     }
 
-    // MARK: Ghost Vision
-
-    /// Shows Ghost Vision's steps: each step's pieces at its own opacity, built the first time
-    /// they show and only faded after that, so sliding through the line stays smooth.
-    private func updateGhosts(_ new: SculptedBoardState) {
-        var wanted: [String: (move: GhostLine.Move, opacity: Float)] = [:]
-        for (index, step) in new.ghosts.enumerated() {
-            for (part, move) in step.moves.enumerated() {
-                wanted["\(index)-\(part)-\(move.piece)"] = (move, step.opacity)
-            }
-        }
-        for (key, node) in ghostNodes where wanted[key] == nil {
-            ghostNodes[key] = nil
-            node.root.runAction(.sequence([.fadeOut(duration: 0.18), .removeFromParentNode()]))
-        }
-        let facing = simd_quatf(angle: new.flipped ? .pi : 0, axis: SculptedCamera.up)
-        for (key, ghost) in wanted {
-            let target = CGFloat(ghost.opacity)
-            if let node = ghostNodes[key] {
-                node.root.simdOrientation = facing
-                node.root.runAction(.fadeOpacity(to: target, duration: 0.14), forKey: "ghost")
-                continue
-            }
-            let node = makeGhost(ghost.move.piece)
-            node.root.simdPosition = SculptedCamera.position(of: ghost.move.to)
-            node.root.simdOrientation = facing
-            node.root.opacity = 0
-            node.root.runAction(.fadeOpacity(to: target, duration: 0.18), forKey: "ghost")
-            ghostsNode.addChildNode(node.root)
-            ghostNodes[key] = node
-        }
-
-        // Trails and capture marks are flat and cheap: drawn again each time.
-        ghostMarksNode.childNodes.forEach { $0.removeFromParentNode() }
-        for step in new.ghosts {
-            guard let main = step.moves.first else { continue }
-            let strength = CGFloat(min(1, step.opacity * 1.5))
-            let start: SIMD3<Float> = SculptedCamera.position(of: main.from)
-            let end: SIMD3<Float> = SculptedCamera.position(of: main.to)
-            let length: Float = simd_length(end - start)
-            let clear: Float = 0.36
-            if length > clear * 2 {
-                let count = max(1, Int(((length - clear * 2) / 0.3).rounded()))
-                for index in 0...count {
-                    let along: Float = clear + (length - clear * 2) * Float(index) / Float(count)
-                    let t: Float = along / length
-                    let path: SIMD3<Float> = end - start
-                    let lift = SIMD3<Float>(0, 0.0026, 0)
-                    let dot = SCNNode(geometry: ghostDot)
-                    dot.simdPosition = start + path * t + lift
-                    dot.simdOrientation = Self.flat
-                    dot.renderingOrder = 12
-                    dot.castsShadow = false
-                    dot.opacity = strength
-                    ghostMarksNode.addChildNode(dot)
-                }
-            }
-            if let taken = step.captured {
-                let mark = SCNNode(geometry: ghostCaptureMark)
-                mark.simdPosition = SculptedCamera.position(of: taken) + SIMD3<Float>(0, 0.0027, 0)
-                mark.simdOrientation = Self.flat
-                mark.renderingOrder = 13
-                mark.castsShadow = false
-                mark.opacity = CGFloat(min(1, step.opacity * 1.6))
-                ghostMarksNode.addChildNode(mark)
-            }
-        }
-    }
-
-    /// A see-through copy of a piece: no shadow, no contact blob, never hit by a tap.
-    private func makeGhost(_ piece: Piece) -> PieceNode {
-        let model = assets.makePiece(piece.kind, color: piece.color, look: look)
-        model.enumerateHierarchy { child, _ in
-            child.castsShadow = false
-            child.categoryBitMask = 1
-        }
-        let contact = SCNNode()
-        let node = PieceNode(id: -1, piece: piece, model: model, contact: contact)
-        node.root.name = "ghost"
-        node.root.renderingOrder = 20
-        node.root.addChildNode(model)
-        layDown(node, framing: framing)
-        node.model.enumerateHierarchy { child, _ in
-            child.castsShadow = false
-            child.categoryBitMask = 1
-        }
-        setPose(node, y: 0)
-        return node
-    }
-
-    private lazy var ghostDot: SCNGeometry = {
-        let plane = SCNPlane(width: 0.1, height: 0.1)
-        plane.cornerRadius = 0.05
-        let material = SCNMaterial()
-        material.lightingModel = .constant
-        material.diffuse.contents = look.accent
-        material.writesToDepthBuffer = false
-        material.blendMode = .alpha
-        plane.materials = [material]
-        return plane
-    }()
-
-    private lazy var ghostCaptureMark = Self.mark(size: 1, color: look.check, alpha: 0.95,
-                                                  mask: MarkImages.target(capture: true, hint: nil).mark,
-                                                  throughPieces: true)
-
     // MARK: Halos
 
     private func updateHalos(_ new: SculptedBoardState) {
@@ -1858,17 +1734,10 @@ final class SculptedBoardScene {
     /// flat pieces, or back to the player's chair with the carved pieces standing.
     private func reframe(_ framing: SculptedCamera.Framing, animated: Bool) {
         light(for: framing)
-        for node in Array(nodes.values) + Array(ghostNodes.values) {
+        for node in nodes.values {
             node.model.removeAllActions()
             layDown(node, framing: framing)
             setPose(node, y: node.lifted ? Self.selectionLift : 0)
-        }
-        // Ghosts cast no shadow and never take a tap, whichever model they show.
-        for node in ghostNodes.values {
-            node.model.enumerateHierarchy { child, _ in
-                child.castsShadow = false
-                child.categoryBitMask = 1
-            }
         }
         if let state { updateHeirlooms(state) }
         guard heldCamera == nil else { return }

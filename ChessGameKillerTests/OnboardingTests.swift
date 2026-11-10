@@ -40,6 +40,7 @@ final class OnboardingTests: XCTestCase {
         XCTAssertEqual(defaults.string(forKey: "boardTheme"), "midnight")
         XCTAssertTrue(defaults.bool(forKey: "showBestMoves"), "New players see the best move")
         XCTAssertEqual(choice.setup(defaults).level, .beginner)
+        XCTAssertEqual(HomeLadder.savedStart(defaults), 1000, "The rating counts from a learner's")
 
         WelcomeChoice(experience: .club, look: .gilded).apply(defaults)
         XCTAssertEqual(defaults.integer(forKey: "setup.level"), MatchController.Level.expert.rawValue)
@@ -47,12 +48,14 @@ final class OnboardingTests: XCTestCase {
         // The rival the welcome promised is the one the next game is against, not the Cub.
         XCTAssertEqual(NewGameSheet.savedSetup(defaults).level, .expert)
         XCTAssertTrue(RivalLadder(defaults: defaults).isOpen(.expert))
+        XCTAssertEqual(HomeLadder.savedStart(defaults), 1800, "A club player's rating counts from a club player's")
     }
 
     func testEveryLevelLeadsToADifferentRival() {
         let levels = Experience.allCases.map(\.level)
         XCTAssertEqual(Set(levels).count, levels.count)
         XCTAssertEqual(levels.first, .beginner)
+        XCTAssertEqual(Experience.allCases.map(\.startingRating), [1000, 1200, 1500, 1800], "More chess, a higher start")
     }
 
     func testTheWelcomeOffersOnlyFreeLooks() {
@@ -65,26 +68,23 @@ final class OnboardingTests: XCTestCase {
     // MARK: Tips
 
     func testEachTipShowsOnce() {
-        XCTAssertEqual(TipBook.next(playerMoves: 1, lineReady: false, justUndid: false, defaults), .coachOrb)
+        XCTAssertEqual(TipBook.next(playerMoves: 1, justUndid: false, defaults), .coachOrb)
         TipBook.markSeen(.coachOrb, defaults)
-        XCTAssertNil(TipBook.next(playerMoves: 1, lineReady: false, justUndid: false, defaults))
-        // Seeing ahead waits for a few moves and a line to show.
-        XCTAssertNil(TipBook.next(playerMoves: 2, lineReady: true, justUndid: false, defaults))
-        XCTAssertNil(TipBook.next(playerMoves: 4, lineReady: false, justUndid: false, defaults))
-        XCTAssertEqual(TipBook.next(playerMoves: 4, lineReady: true, justUndid: false, defaults), .ghostVision)
+        XCTAssertNil(TipBook.next(playerMoves: 1, justUndid: false, defaults))
+        XCTAssertNil(TipBook.next(playerMoves: 4, justUndid: false, defaults))
         TipBook.resetAll(defaults)
-        XCTAssertEqual(TipBook.next(playerMoves: 1, lineReady: false, justUndid: false, defaults), .coachOrb)
+        XCTAssertEqual(TipBook.next(playerMoves: 1, justUndid: false, defaults), .coachOrb)
     }
 
     func testAnUndoIsExplainedFirst() {
-        XCTAssertEqual(TipBook.next(playerMoves: 5, lineReady: true, justUndid: true, defaults), .undoHelp)
+        XCTAssertEqual(TipBook.next(playerMoves: 5, justUndid: true, defaults), .undoHelp)
         TipBook.markSeen(.undoHelp, defaults)
-        XCTAssertEqual(TipBook.next(playerMoves: 5, lineReady: true, justUndid: true, defaults), .coachOrb)
+        XCTAssertEqual(TipBook.next(playerMoves: 5, justUndid: true, defaults), .coachOrb)
     }
 
     func testPicturesShowNoTipsUnlessAsked() {
         defaults.set(true, forKey: "tipsOff")
-        XCTAssertNil(TipBook.next(playerMoves: 1, lineReady: true, justUndid: true, defaults))
+        XCTAssertNil(TipBook.next(playerMoves: 1, justUndid: true, defaults))
     }
 
     func testTipsAreOneLine() {

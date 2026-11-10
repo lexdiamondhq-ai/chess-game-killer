@@ -11,6 +11,8 @@ struct ContentView: View {
     @State private var showingNewGame = true
     @State private var showingSettings = false
     @State private var confirmingResign = false
+    /// The welcome's Play, waiting on the first rival's film: its Begin starts this game.
+    @State private var welcomeFilm: WelcomeFilm?
     @State private var showingAnalyze = false
     /// The analyzer, kept while the app runs: closing Analyze and opening it again finds the same board.
     @State private var analyzer = ScanSession(reader: CloudBoardReader.live, engine: StockfishEngine.shared,
@@ -27,6 +29,8 @@ struct ContentView: View {
     @State private var showingDaily = false
     @State private var coach = GameCoach()
     @State private var showingTraining = false
+    /// The door Learn opens on, when Home asked for one (its Chess DNA card).
+    @State private var trainingDoor: TrainDoor?
     @State private var puzzles = PuzzleStore.live()
     @State private var showingPuzzles = false
     @State private var army = ArmyStore.live()
@@ -63,9 +67,6 @@ struct ContentView: View {
     /// Tilted or flat 3D board (Settings, Board view).
     @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.tilted
     @AppStorage(BoardTheme.coordinatesKey) private var showsCoordinates = true
-    /// Hold the board to see the engine's line ahead (counts as help).
-    @AppStorage(GhostVision.storageKey) private var ghostVisionOn = true
-    @State private var vision = GhostVision()
     /// Talk it through, open over the game.
     @State private var talk: TalkSession?
     /// The move the player pressed Play on in Talk it through, made once the talk has slid away.
@@ -77,13 +78,12 @@ struct ContentView: View {
     /// The app opens on the home screen when it is on, otherwise on the New Game sheet;
     /// tests and screenshots that picture the game screen skip both, and may open the coach.
     init(startsWithNewGame: Bool = true, startsAtHome: Bool? = nil,
-         match: MatchController? = nil, coachOpen: Bool = false, vision: GhostVision? = nil) {
+         match: MatchController? = nil, coachOpen: Bool = false) {
         let trainingStore = TrainingStore.live()
         _training = State(initialValue: trainingStore)
         // The training streak carries over into the daily one the first time.
         _daily = State(initialValue: DailyStore.live(trainingStreak: trainingStore.progress.streak))
         if let match { _match = State(initialValue: match) }
-        if let vision { _vision = State(initialValue: vision) }
         let home = startsAtHome ?? (startsWithNewGame && HomeScreen.isOn())
         let welcome = startsWithNewGame && !Welcome.isUnderTest && Welcome.shouldShow()
         _showingHome = State(initialValue: home)
@@ -224,7 +224,7 @@ struct ContentView: View {
                 if showing { setCoach(expanded: false) }
             }
             .onChange(of: showingTraining) { _, showing in
-                if showing { setCoach(expanded: false) }
+                if showing { setCoach(expanded: false) } else { trainingDoor = nil }
             }
             .onChange(of: showingPuzzles) { _, showing in
                 if showing { setCoach(expanded: false) }
@@ -258,7 +258,7 @@ struct ContentView: View {
     private var presented: some View {
         observed
             .fullScreenCover(isPresented: $showingTraining) {
-                TrainingHubView(theme: chosenTheme).environment(training).environment(puzzles).environment(vault)
+                TrainingHubView(theme: chosenTheme, door: trainingDoor).environment(training).environment(puzzles).environment(vault)
                     .environment(daily)
                     .homeZoom(.coach, in: homeZoom, when: showingHome)
             }
@@ -288,6 +288,24 @@ struct ContentView: View {
             .fullScreenCover(isPresented: $showingArmy) {
                 ArmyView(theme: chosenTheme, color: match.setup.playerColor).environment(army)
                     .homeZoom(.army, in: homeZoom, when: zoomsFromSheet)
+            }
+            // The welcome's Play shows the first rival's film, as Home's Play does, and its Begin
+            // starts the game (audit, 2026-11-09: the films are the app's entrance, so the first
+            // game shouldn't skip them). Backing out is "Look around first".
+            .fullScreenCover(item: $welcomeFilm) { film in
+                RivalsHall(start: film.id, intro: true, begin: { level in
+                    // The film's last frame gives way to the game: the hall closes at once.
+                    var quiet = Transaction()
+                    quiet.disablesAnimations = true
+                    withTransaction(quiet) { welcomeFilm = nil }
+                    var setup = film.choice.setup()
+                    setup.level = level
+                    withAnimation(.snappy) { match.start(setup) }
+                    leaveHome()
+                }, close: {
+                    welcomeFilm = nil
+                    lookAround()
+                })
             }
             .fullScreenCover(item: $coach.presentedLesson) { lesson in
                 LessonScreen(lesson: lesson, theme: chosenTheme).environment(training).environment(daily)
@@ -448,6 +466,10 @@ struct ContentView: View {
                 showingAnalyze = true
             },
             train: { showingTraining = true },
+            chessDNA: {
+                trainingDoor = .games
+                showingTraining = true
+            },
             trainToday: { plan in coach.presentedSession = plan },
             puzzles: { showingPuzzles = true },
             dailyMove: { openDaily() },
@@ -526,21 +548,27 @@ struct ContentView: View {
         }
     }
 
-    /// Tips keep out of the way of the army's news, the unfolded coach and a held board.
+    /// Tips keep out of the way of the army's news and the unfolded coach.
     private var tipsBlocked: Bool {
-        armyNews != nil || coachExpanded || vision.isHolding || showingWelcome
+        armyNews != nil || coachExpanded || showingWelcome
     }
 
-    /// The welcome is done: start the first game, or leave the player on the home (or the New Game sheet).
+    /// The welcome is done: the first rival's film, then its game; or leave the player on the
+    /// home (or the New Game sheet).
     private func finishWelcome(play: Bool, choice: WelcomeChoice) {
         withAnimation(.easeInOut(duration: 0.35)) { showingWelcome = false }
         syncCoachSettings()
         if play {
-            withAnimation(.snappy) { match.start(choice.setup()) }
-            leaveHome()
-        } else if !showingHome, !match.hasStarted {
-            showingNewGame = true
+            welcomeFilm = WelcomeFilm(choice: choice)
+        } else {
+            lookAround()
         }
+    }
+
+    /// "Look around first", or backing out of the first rival's film: the home stays, or the New
+    /// Game sheet opens over a bare board.
+    private func lookAround() {
+        if !showingHome, !match.hasStarted { showingNewGame = true }
     }
 
     private func leaveHome() {
@@ -602,8 +630,7 @@ struct ContentView: View {
                 }
                 // A one-line tip the first time a hidden gesture or a rule would help.
                 .overlay(alignment: .bottom) {
-                    GameTips(match: match, theme: theme, ghostVisionOn: ghostVisionOn,
-                             blocked: tipsBlocked)
+                    GameTips(match: match, theme: theme, blocked: tipsBlocked)
                         .frame(maxWidth: Self.dockMaxWidth)
                         .padding(.horizontal, Self.inset)
                         .padding(.bottom, 8)
@@ -702,25 +729,18 @@ struct ContentView: View {
 
     /// The live board.
     private var board: some View {
-        BoardView(match: match, theme: theme, vision: ghostVisionOn ? vision : nil, framing: framing)
+        BoardView(match: match, theme: theme, framing: framing)
     }
 
     /// The moves, beside them the Tilted / Flat switch.
-    @ViewBuilder
     private var ribbonRow: some View {
-        if ghostVisionOn, vision.isHolding {
-            // Ghost Vision's line takes the whole row while the board is held.
-            GhostStrip(line: match.ghostLine, focus: vision.focus, theme: theme)
-                .transition(.opacity)
-        } else {
-            HStack(spacing: 8) {
-                // The moves on their own glass, like the players' lines above them.
-                MoveRibbon(moves: match.game.moves, theme: theme)
-                    .padding(.horizontal, 14)
-                    .frame(maxHeight: .infinity)
-                    .glassPane(Capsule())
-                BoardViewSwitch(theme: theme)
-            }
+        HStack(spacing: 8) {
+            // The moves on their own glass, like the players' lines above them.
+            MoveRibbon(moves: match.game.moves, theme: theme)
+                .padding(.horizontal, 14)
+                .frame(maxHeight: .infinity)
+                .glassPane(Capsule())
+            BoardViewSwitch(theme: theme)
         }
     }
 
@@ -845,8 +865,9 @@ struct ContentView: View {
                 // that sat under the board (Alex, 2026-11-07). Analyze lives in the orb; Train and
                 // Puzzles wait off the game screen.
                 ExecutivePlate(match: match, theme: theme, color: bottomColor, inDock: true)
-                // Room for the grade, its advice and your captures under them, inside the dock.
-                .frame(height: 60)
+                // Room for the grade, its advice and your captures under them, inside the dock;
+                // in a timed game your clock sits under the words, so the line is a little taller.
+                .frame(height: match.clock == nil ? 60 : 72)
                 .padding(.leading, 10)
                 .padding(.trailing, 2)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -1044,3 +1065,10 @@ private struct PendingTalkMove: Equatable {
 }
 
 #Preview { ContentView() }
+
+/// What the welcome picked, held while the first rival's film plays.
+private struct WelcomeFilm: Identifiable {
+    let choice: WelcomeChoice
+    /// The rival whose film plays, and the hall's start.
+    var id: MatchController.Level { choice.experience.level }
+}

@@ -71,8 +71,7 @@ struct BoardViewSwitch: View {
         }
     }
 
-    /// The view on show, or nil while the board is drawn flat in 2D (3D pieces off, or a look
-    /// without a 3D board).
+    /// The view on show, or nil while the board is drawn flat in 2D (a look without a 3D board).
     static func showing(_ theme: BoardTheme, threeD: Bool, framing: SculptedCamera.Framing) -> BoardTilt? {
         guard BoardView.playsIn3D(theme, setting: threeD) else { return nil }
         return framing == .seated ? .flat : .tilted
@@ -93,5 +92,17 @@ struct BoardViewSwitch: View {
         change.leavesRivalBoard = theme.id != chosen.id
         if chosen.sculptedLook == nil { change.look = .gilded }
         return change
+    }
+}
+
+/// The "3D pieces" switch left Settings (Alex, 2026-11-09: retire the old flat board), so a
+/// switch turned off before goes back to its default, on, at launch: every look with a 3D board
+/// plays on it, Tilted or Flat. The setting itself stays for the screenshot runs and the tests,
+/// which still draw a look flat.
+enum SculptedSetting {
+    static let key = "sculpted3D"
+
+    static func settle(_ defaults: UserDefaults = .standard) {
+        defaults.removeObject(forKey: key)
     }
 }
