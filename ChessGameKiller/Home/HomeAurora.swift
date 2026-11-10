@@ -1684,7 +1684,7 @@ struct HomeAuroraTabBar: View {
     /// The knight carries its name like the tabs do, so nobody has to guess what it opens.
     private var knight: some View {
                 VStack(spacing: 1) {
-                    // Our board knight, a touch larger so its mane beads read (Alex, 2026-11-10).
+                    // The Gilded knight, a touch larger so its mane stripes read (Alex, 2026-11-10).
                     AnalyzeKnightGlyph()
                         .frame(width: 25, height: 30)
                     Text("Analyze")
