@@ -68,26 +68,23 @@ final class OnboardingTests: XCTestCase {
     // MARK: Tips
 
     func testEachTipShowsOnce() {
-        XCTAssertEqual(TipBook.next(playerMoves: 1, lineReady: false, justUndid: false, defaults), .coachOrb)
+        XCTAssertEqual(TipBook.next(playerMoves: 1, justUndid: false, defaults), .coachOrb)
         TipBook.markSeen(.coachOrb, defaults)
-        XCTAssertNil(TipBook.next(playerMoves: 1, lineReady: false, justUndid: false, defaults))
-        // Seeing ahead waits for a few moves and a line to show.
-        XCTAssertNil(TipBook.next(playerMoves: 2, lineReady: true, justUndid: false, defaults))
-        XCTAssertNil(TipBook.next(playerMoves: 4, lineReady: false, justUndid: false, defaults))
-        XCTAssertEqual(TipBook.next(playerMoves: 4, lineReady: true, justUndid: false, defaults), .ghostVision)
+        XCTAssertNil(TipBook.next(playerMoves: 1, justUndid: false, defaults))
+        XCTAssertNil(TipBook.next(playerMoves: 4, justUndid: false, defaults))
         TipBook.resetAll(defaults)
-        XCTAssertEqual(TipBook.next(playerMoves: 1, lineReady: false, justUndid: false, defaults), .coachOrb)
+        XCTAssertEqual(TipBook.next(playerMoves: 1, justUndid: false, defaults), .coachOrb)
     }
 
     func testAnUndoIsExplainedFirst() {
-        XCTAssertEqual(TipBook.next(playerMoves: 5, lineReady: true, justUndid: true, defaults), .undoHelp)
+        XCTAssertEqual(TipBook.next(playerMoves: 5, justUndid: true, defaults), .undoHelp)
         TipBook.markSeen(.undoHelp, defaults)
-        XCTAssertEqual(TipBook.next(playerMoves: 5, lineReady: true, justUndid: true, defaults), .coachOrb)
+        XCTAssertEqual(TipBook.next(playerMoves: 5, justUndid: true, defaults), .coachOrb)
     }
 
     func testPicturesShowNoTipsUnlessAsked() {
         defaults.set(true, forKey: "tipsOff")
-        XCTAssertNil(TipBook.next(playerMoves: 1, lineReady: true, justUndid: true, defaults))
+        XCTAssertNil(TipBook.next(playerMoves: 1, justUndid: true, defaults))
     }
 
     func testTipsAreOneLine() {

@@ -12,9 +12,6 @@ struct BoardView: View {
     /// itself; the flat board has it laid over the top instead.
     var browsing: Position?
     var endBrowsing: (() -> Void)?
-    /// Ghost Vision: hold the board to see the engine's line ahead. Nil where it isn't
-    /// allowed, such as a game against a friend.
-    var vision: GhostVision?
     /// How the 3D board is seen: Flat looks from above, each piece inside its square.
     var framing: SculptedCamera.Framing = .standing
     /// The ink for the letters and numbers in the flat board's frame, where the page behind the
@@ -39,13 +36,11 @@ struct BoardView: View {
     var body: some View {
         Group {
             if Self.playsIn3D(theme, setting: sculpted3D) {
-                SculptedBoardView(match: match, theme: theme, browsing: browsing, endBrowsing: endBrowsing, vision: vision,
-                                  framing: framing)
+                SculptedBoardView(match: match, theme: theme, browsing: browsing, endBrowsing: endBrowsing, framing: framing)
             } else {
                 flatBoard
             }
         }
-        .modifier(GhostVisionGesture(vision: vision, match: match, enabled: browsing == nil))
     }
 
     /// Whether this look plays on the real 3D board. The setting was the "3D pieces" switch; it
@@ -133,21 +128,12 @@ struct BoardView: View {
             if theme.spritePieces {
                 dotsOverPieces(size: sq)
             }
-            ghostLayer(size: sq)
             checkCallout(size: sq)
             // A flag that falls mid-promotion puts the pawn back; this just makes sure
             // the picker never outlives the game.
             if let promotion = game.pendingPromotion, !match.isOver {
                 promotionPicker(color: promotion.piece.color, size: sq)
             }
-        }
-    }
-
-    /// Ghost Vision's see-through pieces, while the player holds the board.
-    @ViewBuilder private func ghostLayer(size sq: CGFloat) -> some View {
-        if let vision, vision.isHolding, let line = match.ghostLine {
-            GhostLayer(line: line, focus: vision.shownFocus(steps: line.steps.count), theme: theme, size: sq,
-                       center: { (square: Square) -> CGPoint in center(of: square, size: sq) })
         }
     }
 
@@ -229,7 +215,6 @@ struct BoardView: View {
         // is drawn over the square behind it.
         .contentShape(Rectangle())
         .gesture(SpatialTapGesture().onEnded { value in
-            if vision?.swallowsTap == true { return }
             guard let tapped = tappedSquare(at: value.location, size: size) else { return }
             withAnimation(.snappy(duration: 0.22)) { match.tap(tapped) }
         })

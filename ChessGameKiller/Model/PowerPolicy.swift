@@ -75,7 +75,7 @@ final class PowerPolicy {
 }
 
 /// How much engine work the coach's part of a turn may cost: the look-ahead on the person's
-/// turn (the hints, the eval ring and Ghost Vision) and the grading of their move.
+/// turn (the hints and the eval ring) and the grading of their move.
 struct EngineBudget: Equatable {
     var lookaheadDepth: Int
     var lookaheadMs: Int

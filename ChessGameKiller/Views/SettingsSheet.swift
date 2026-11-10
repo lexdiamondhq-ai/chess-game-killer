@@ -8,7 +8,6 @@ struct SettingsSheet: View {
     @AppStorage("showBestMoves") private var showBestMoves = false
     @AppStorage("showSecondBest") private var showSecondBest = true
     @AppStorage("coachVerdicts") private var showVerdicts = true
-    @AppStorage(GhostVision.storageKey) private var ghostVisionOn = true
     @AppStorage("soundEffects") private var soundOn = true
     @AppStorage("haptics") private var hapticsOn = true
     /// Home's music. Its switch moved here from Home's header (Alex, 2026-11-07).
@@ -117,9 +116,6 @@ struct SettingsSheet: View {
                             ToggleRow(title: "Runner-up in the coach", subtitle: "The coach panel lists a second choice too. The board only ever lights the best.",
                                       symbol: "lightbulb", isOn: $showSecondBest, theme: theme)
                                 .disabled(!showBestMoves)
-                            rule
-                            ToggleRow(title: "See ahead", subtitle: "Ghost Vision. Hold the board to see the computer's line a few moves ahead. Slide left to step back through it. Counts as help.",
-                                      symbol: "eye", isOn: $ghostVisionOn, theme: theme)
                             rule
                             ToggleRow(title: "Move grades", subtitle: "Rates each move you play, from Best to Blunder.",
                                       symbol: "star.fill", isOn: $showVerdicts, theme: theme)
