@@ -803,7 +803,8 @@ private struct CoachPanel: View {
             } label: {
                 HStack(spacing: 10) {
                     RivalCoin(rival: rival, size: 28)
-                    Text("Face \(rival.name)")
+                    // "Face the Hunter", as the hall's own button writes it.
+                    Text("Face \(rival.name.lowercasedFirstWord)")
                         .font(.app(.headline))
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
