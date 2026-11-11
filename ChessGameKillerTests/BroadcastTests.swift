@@ -17,7 +17,8 @@ final class BroadcastTests: XCTestCase {
             XCTAssertNotNil(Bundle.main.url(forResource: clip.resource, withExtension: "mp4"), "\(clip.resource).mp4 is missing")
         }
         XCTAssertNotNil(BroadcastStage.plate, "The still plate is missing")
-        for mask in ["broadcast-knight-mask", "broadcast-knight-strip", "broadcast-knight-strip-wide"] {
+        XCTAssertNotNil(Bundle.main.url(forResource: BroadcastScript.skyFilm, withExtension: "mp4"), "The dragons' film is missing")
+        for mask in ["broadcast-knight-mask", "broadcast-knight-strip", "broadcast-knight-strip-wide", "broadcast-sky-mask"] {
             XCTAssertNotNil(Bundle.main.path(forResource: mask, ofType: "png"), "\(mask).png is missing")
         }
     }
@@ -99,9 +100,14 @@ final class BroadcastTests: XCTestCase {
         var script = BroadcastScript()
         var nods = 0
         var last: BroadcastClip?
+        var lastKnight: BroadcastClip?
+        var knightFilms = Set<BroadcastClip>()
         for _ in 0..<24 {
             let king = script.idle(.king)
             let knight = script.idle(.knight)
+            XCTAssertNotEqual(knight, lastKnight, "The challenger never does the same thing twice running")
+            lastKnight = knight
+            knightFilms.insert(knight)
             XCTAssertFalse(king.isReach || king.holds)
             XCTAssertFalse(knight.isReach || knight.holds)
             XCTAssertEqual(king.figure, .king)
@@ -113,6 +119,26 @@ final class BroadcastTests: XCTestCase {
             last = king
         }
         XCTAssertGreaterThan(nods, 0)
+        XCTAssertGreaterThanOrEqual(knightFilms.count, 7, "The challenger has plenty to do while he waits")
+    }
+
+    func testTheChallengerWincesAtALostPieceInAFilmThatCanBeCut() {
+        let wince = BroadcastScript.wince
+        XCTAssertEqual(wince.figure, .knight)
+        XCTAssertFalse(wince.isReach || wince.holds)
+        XCTAssertNil(wince.strip, "He stays inside his own shape")
+        XCTAssertTrue(BroadcastScript.allClips.contains(wince))
+    }
+
+    func testTheDragonsStandAsideOnlyWhereTheSkyIsTheKings() {
+        for name in ["loss-pawn", "loss-piece", "loss-queen", "win", "lose"] {
+            XCTAssertTrue(BroadcastClip.king(name).ownsSky, name)
+        }
+        for name in ["lean", "nod", "near", "far", "strike", "pleased"] {
+            XCTAssertFalse(BroadcastClip.king(name).ownsSky, name)
+        }
+        XCTAssertFalse(BroadcastClip.knight("lose").ownsSky, "The challenger's films never reach the sky")
+        XCTAssertEqual(BroadcastScript.skyShare, 352.0 / 1080.0, accuracy: 0.0001)
     }
 
     func testARivalCaptureIsSeenBeforeItIsPlayed() {

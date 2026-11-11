@@ -21,6 +21,8 @@ final class BroadcastFilmView: UIView {
     /// The film playing, or about to: its end is the one that counts.
     private var current: AVPlayerItem?
     private var paused = false
+    /// Hidden with nothing playing (`setAside`), until the next film is asked for.
+    private var resting = false
     /// When the fade under way is over. A film asked for during it waits those few frames:
     /// the screen it needs is still showing through.
     private var fadeEnds: CFTimeInterval = 0
@@ -112,6 +114,7 @@ final class BroadcastFilmView: UIView {
     private func start(_ url: URL, number: Int, fade: CFTimeInterval, handover: Double?) {
         let back = 1 - front
         let player = players[back]
+        resting = false
         forgetWatch()
         let item = AVPlayerItem(url: url)
         current = item
@@ -186,6 +189,39 @@ final class BroadcastFilmView: UIView {
         for index in strips.indices { setStrip(index, on: false) }
     }
 
+    /// Fades the whole view out and rests its films, or brings it back empty, ready for a
+    /// film to fade in from its first frame.
+    func setAside(_ hidden: Bool, over seconds: CFTimeInterval) {
+        showing += 1
+        let number = showing
+        forgetWatch()
+        current = nil
+        arriving = false
+        guard hidden else {
+            layer.removeAllAnimations()
+            rest()
+            alpha = 1
+            return
+        }
+        UIView.animate(withDuration: seconds, delay: 0, options: [.beginFromCurrentState, .curveEaseInOut]) {
+            self.alpha = 0
+        } completion: { [weak self] _ in
+            // Unless it has been asked back, or for something else, in the meantime.
+            guard let self, number == self.showing else { return }
+            self.rest()
+        }
+    }
+
+    /// Both screens dark and both films stopped where they are.
+    private func rest() {
+        resting = true
+        fadeEnds = 0
+        for (player, screen) in zip(players, screens) {
+            player.pause()
+            setOpacity(0, of: screen, over: 0)
+        }
+    }
+
     /// Holds the films where they are (the app left the screen), or carries on.
     func setPaused(_ paused: Bool) {
         guard self.paused != paused else { return }
@@ -194,6 +230,7 @@ final class BroadcastFilmView: UIView {
             players.forEach { $0.pause() }
             return
         }
+        guard !resting else { return }
         // The newest film, and the one it is fading in over.
         let newest = players[arriving ? 1 - front : front]
         if let item = newest.currentItem, !item.duration.isNumeric || item.currentTime() < item.duration {

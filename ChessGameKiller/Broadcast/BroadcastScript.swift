@@ -64,6 +64,13 @@ struct BroadcastClip: Hashable {
         }
     }
 
+    /// The King's films where the sky is part of the show: the storms that answer a capture
+    /// (the dragons breathe fire in them) and the two endings. The dragons' own film, which
+    /// beats their wings over every other film of his, stands aside for these.
+    var ownsSky: Bool {
+        figure == .king && (base == "loss" || holds)
+    }
+
     struct Strip: Equatable {
         /// The wider strip, past the middle of the table.
         let wide: Bool
@@ -121,9 +128,21 @@ struct BroadcastScript {
     /// (The storm's light in "pleased-pawn" and the like is baked to this handover.)
     static let handover: Double = 112.0 / 24.0
 
-    // The idle films, in a set order: a gesture now and then, and never the nod twice running.
+    /// The dragons' wing beats: one looping film of the top of the sky, laid over the King's
+    /// films and cut to the two dragons. In the King's own films they only move when they
+    /// breathe fire (Alex, 2026-11-10: "the dragons are not moving").
+    static let skyFilm = "broadcast-sky-dragons"
+    /// The share of the picture's height that film covers, from the top (352 of 1080 lines).
+    static let skyShare: Double = 352.0 / 1080.0
+    /// The challenger's flinch when the King takes one of the player's pieces.
+    static let wince = BroadcastClip.knight("wince")
+
+    // The idle films, in a set order: never the same one twice running. The challenger has
+    // the most to do (Alex, 2026-11-10: "the challenger needs to have more movements"): he
+    // rubs his brow, folds his arms, looks up at the storm, clasps his fists, with the quiet
+    // thinking film as a breath between.
     private static let kingIdles = ["lean", "nod", "lean", "lean", "nod"]
-    private static let knightIdles = ["think", "lean", "think", "think", "nod", "think"]
+    private static let knightIdles = ["brow", "think", "arms", "nod", "upward", "lean", "fists", "think"]
     private var kingTurn = 0
     private var knightTurn = 0
 
@@ -192,7 +211,8 @@ struct BroadcastScript {
     /// Every film the scene can ask for, so a test can check each is in the bundle.
     static var allClips: [BroadcastClip] {
         let king = ["lean", "nod", "near", "far", "strike", "pleased", "win", "lose"].map(BroadcastClip.king)
-        let knight = ["think", "nod", "lean", "near", "far", "strike", "pleased", "win", "lose"].map(BroadcastClip.knight)
+        let knight = ["think", "nod", "lean", "brow", "fists", "upward", "arms", "wince",
+                      "near", "far", "strike", "pleased", "win", "lose"].map(BroadcastClip.knight)
         let storms = BroadcastLoss.allCases.flatMap { [$0.storm, $0.strike, $0.after] }
         return king + knight + storms
     }

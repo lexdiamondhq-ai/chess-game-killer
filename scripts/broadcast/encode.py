@@ -36,6 +36,16 @@ def knight(src,name,mask,frames=120,light=None,offset=0,strength=0.85):
                 y=x*(1+(g[j]-1)*strength); knee=np.maximum(x,200); x=np.where(y>knee,knee+(y-knee)*0.5,y)
         enc.stdin.write((np.clip(x,0,255).astype(np.uint8)*k).tobytes())
     enc.stdin.close(); enc.wait()
+SKY_H=352  # the dragons' loop keeps only the top strip of the picture, where they fly
+def sky(src,name,frames=120):
+    """The dragons' wing beats: the sky's top strip, black outside the dragons' mask (src/sky-dragons-mask.png, cut clear of the King's crown)."""
+    m=Image.open(S+'sky-dragons-mask.png').split()[-1].resize((W,SKY_H),Image.BICUBIC).point(lambda v:255 if v>0 else 0).filter(ImageFilter.MaxFilter(33))
+    k=(np.asarray(m)>0)[...,None]
+    enc=subprocess.Popen(['ffmpeg','-loglevel','error','-y','-f','rawvideo','-pix_fmt','rgb24','-s',f'{W}x{SKY_H}','-r','24','-i','-','-vf','scale=out_color_matrix=bt709:out_range=tv']+X265+[OUT+f'broadcast-sky-{name}.mp4'],stdin=subprocess.PIPE)
+    for i,f in enumerate(read(P+src+'.mp4')):
+        if i>=frames: break
+        enc.stdin.write((f[:SKY_H]*k).tobytes())
+    enc.stdin.close(); enc.wait()
 EVENT_AT=67  # frames into the knight's strike when the King's storm clip starts (BroadcastScript.stormDelay)
 HANDOVER=114 # the strike's frame on screen when the film after it shows its first: started at 112 (BroadcastScript.handover), about two frames to load
 JOBS={
@@ -48,6 +58,11 @@ JOBS={
  'knight-near':lambda:knight('near','near','wide'),'knight-far':lambda:knight('far','far','wide'),'knight-strike':lambda:knight('strike','strike','wide'),
  'knight-pleased':lambda:knight('pleased','pleased','tight'),'knight-win':lambda:knight('win','win','tight',121),
  'knight-lose':lambda:knight('lose','lose','wide2',121,light='king-win'),
+ # More to do while he waits (Alex, 2026-11-10), and his wince when the King takes a piece.
+ 'knight-brow':lambda:knight('beard','brow','tight'),'knight-fists':lambda:knight('knuckles','fists','tight'),
+ 'knight-upward':lambda:knight('sky','upward','tight'),'knight-arms':lambda:knight('arms','arms','tight'),
+ 'knight-wince':lambda:knight('wince','wince','tight'),
+ 'sky-dragons':lambda:sky('dragons-wings','dragons'),
 }
 for e in ['pawn','piece','queen']:
     JOBS[f'knight-strike-{e}']=(lambda e=e:knight('strike',f'strike-{e}','wide',light=f'king-loss-{e}',offset=-EVENT_AT))

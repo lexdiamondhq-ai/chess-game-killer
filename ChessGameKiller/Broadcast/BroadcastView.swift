@@ -94,7 +94,8 @@ struct BroadcastView: View {
         .onChange(of: scenePhase) { _, phase in stage.setPaused(phase != .active) }
     }
 
-    /// The still plate, and over it the King's film, and over that the challenger's, cut to his shape.
+    /// The still plate, and over it the King's film, the dragons' wing beats in the sky, and
+    /// the challenger's film, cut to his shape.
     private func scene(_ frame: CGRect) -> some View {
         ZStack {
             if let plate = BroadcastStage.plate {
@@ -103,6 +104,12 @@ struct BroadcastView: View {
             }
             if let king = stage.king {
                 BroadcastFilm(view: king.view)
+            }
+            if let sky = stage.sky {
+                // The dragons' wing beats: only the top of the sky, where they fly.
+                BroadcastFilm(view: sky)
+                    .frame(height: frame.height * BroadcastScript.skyShare)
+                    .frame(maxHeight: .infinity, alignment: .top)
             }
             if let knight = stage.knight {
                 BroadcastFilm(view: knight.view)
