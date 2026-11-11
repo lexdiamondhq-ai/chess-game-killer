@@ -146,14 +146,8 @@ final class HomeSnapshotTests: XCTestCase {
     }
 
     /// For today with Today's Move in the large card and your finest move as a row under it; Rooms
-    /// with its two doors, New game and Your games (Alex, 2026-11-11); and Your Grudge's own room
-    /// (Alex, 2026-11-09). By day and by night.
-    func testForTodayRoomsAndTheGrudgesRoom() throws {
-        let defaults = UserDefaults(suiteName: "HomeGrudgeRoomTests")!
-        defer { defaults.removePersistentDomain(forName: "HomeGrudgeRoomTests") }
-        let grudges = GrudgeStore(defaults: defaults)
-        grudges.crowdWon(level: .club, moves: ["e4", "e5"], playerColor: .white, positions: [])
-        grudges.markSeen()
+    /// with its two doors, New game and Your games (Alex, 2026-11-11). By day and by night.
+    func testForTodayAndRooms() throws {
         let game = RewindSample.game(date: .now.addingTimeInterval(-86_400))
         let finest = try XCTUnwrap(HomeFinestMove.pick(games: [game]))
         let shortcuts: [HomeShortcut] = HomeShortcutKind.rooms.map { HomeShortcut(kind: $0, action: {}) }
@@ -200,17 +194,8 @@ final class HomeSnapshotTests: XCTestCase {
             .background(palette.bg.ignoresSafeArea())
             .environment(\.colorScheme, dark ? .dark : .light)
             let window = try show(page, wait: 2)
-            try save(window, "zz-home-rooms-grudge-\(dark ? "dark" : "light")")
+            try save(window, "zz-home-rooms-\(dark ? "dark" : "light")")
             window.isHidden = true
-
-            let room = palette.bg.ignoresSafeArea().sheet(isPresented: .constant(true)) {
-                HomeGrudgeRoom(grudges: grudges, palette: palette, settle: {})
-            }
-            .environment(\.colorScheme, dark ? .dark : .light)
-            let roomWindow = try show(room, wait: 5)
-            try save(roomWindow, "zz-home-grudge-room-\(dark ? "dark" : "light")")
-            roomWindow.rootViewController?.presentedViewController?.dismiss(animated: false)
-            roomWindow.isHidden = true
         }
     }
 

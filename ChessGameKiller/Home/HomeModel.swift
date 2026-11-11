@@ -30,11 +30,7 @@ struct HomeUpNext: Equatable {
     let moveNumber: Int
     /// Plies played so far.
     let plies: Int
-    /// Set when the game is against your Grudge: how hard it searches.
-    var grudgeSkill: Int? = nil
-
-    var isGrudge: Bool { grudgeSkill != nil }
-    var rival: Rival { isGrudge ? .grudge(level) : level.rival }
+    var rival: Rival { level.rival }
     var inProgress: Bool { kind == .resume }
 
     /// The side to move, so its face of the clock is the lit one.
@@ -45,7 +41,7 @@ struct HomeUpNext: Equatable {
     /// The game under way, or the next one from the choices saved last time.
     @MainActor
     static func make(match: MatchController, side: SideChoice, level: MatchController.Level?,
-                     timeControl: TimeControl, hasPlayed: Bool, grudge: GrudgeRecord? = nil) -> HomeUpNext {
+                     timeControl: TimeControl, hasPlayed: Bool) -> HomeUpNext {
         if match.hasStarted, !match.isOver {
             let you = match.setup.playerColor
             let clock = match.clock
@@ -55,21 +51,12 @@ struct HomeUpNext: Equatable {
                 yourTime: clock?.remaining(for: you), theirTime: clock?.remaining(for: you.opposite),
                 yourMove: match.game.isHumanTurn,
                 moveNumber: TrainingChess.moveNumber(match.game.fen),
-                plies: match.game.plyCount,
-                grudgeSkill: match.setup.grudge ? (match.setup.grudgeSkill ?? match.setup.level.skill) : nil
+                plies: match.game.plyCount
             )
         }
         // A first game is against Spark, who is learning too, unless a rival was picked already.
         let first = level == nil && !hasPlayed
         let color: Piece.Color = side == .black ? .black : .white
-        if let grudge, !first {
-            return HomeUpNext(
-                kind: .ready, level: grudge.level,
-                playerColor: color, randomSide: side == .random, timeControl: timeControl,
-                yourTime: nil, theirTime: nil, yourMove: color == .white, moveNumber: 1, plies: 0,
-                grudgeSkill: grudge.skill
-            )
-        }
         return HomeUpNext(
             kind: first ? .firstGame : .ready, level: first ? .beginner : (level ?? .club),
             playerColor: color, randomSide: side == .random, timeControl: timeControl,
@@ -79,10 +66,7 @@ struct HomeUpNext: Equatable {
 
     /// The game the Play button starts: this rival, the side and clock picked last time.
     func setup(side: SideChoice) -> MatchController.Setup {
-        var setup = MatchController.Setup(playerColor: side.color, level: level, timeControl: timeControl)
-        setup.grudge = isGrudge
-        setup.grudgeSkill = grudgeSkill
-        return setup
+        MatchController.Setup(playerColor: side.color, level: level, timeControl: timeControl)
     }
 }
 
@@ -173,7 +157,8 @@ struct HomeLadder: Equatable {
         // Oldest first, since each game moves the rating from where the one before left it.
         for game in games.sorted(by: { $0.date < $1.date }) {
             guard let raw = game.level, let level = MatchController.Level(rawValue: raw),
-                  !Rival.isGrudge(opponent: game.opponent) else { continue }
+                  // Games against the retired Your Grudge (removed 2026-11-11) don't count.
+                  game.opponent != "Your Grudge" else { continue }
             switch game.result {
             case .win:
                 rungs[level.rawValue].wins += 1

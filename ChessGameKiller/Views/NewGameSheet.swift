@@ -80,8 +80,6 @@ struct NewGameSheet: View {
 
     @AppStorage("setup.side") private var side: SideChoice = .white
     @AppStorage("setup.level") private var level: MatchController.Level = .club
-    /// Your Grudge is played from Home now; a game picked here is against a rival.
-    @AppStorage("setup.grudge") private var grudgeOn = false
     @AppStorage("setup.clock") private var timeControl: TimeControl = .unlimited
     @AppStorage("showBestMoves") private var showBestMoves = false
     @AppStorage("coachVerdicts") private var showVerdicts = true
@@ -153,7 +151,6 @@ struct NewGameSheet: View {
         timeControl = draftClock
         showBestMoves = draftCoach.showsHints
         showVerdicts = draftCoach.showsVerdicts
-        grudgeOn = false
         start(MatchController.Setup(playerColor: draftSide.color, level: draftLevel, timeControl: draftClock,
                                     stake: stake))
     }

@@ -19,9 +19,9 @@ struct ExecutivePlate: View {
     @ScaledMetric(relativeTo: .footnote) private var scaledStatusHeight: CGFloat = 16
     /// The status row's height. It stops growing where the line's type does.
     private var statusHeight: CGFloat { min(scaledStatusHeight, 21) * lineScale }
-    /// A rival (not Your Grudge) speaks in its own letters: blood red for the Ashen King,
+    /// A rival speaks in its own letters: blood red for the Ashen King,
     /// tarnished silver for the rest (Alex, 2026-11-08; `RivalLetters`).
-    private var speaksInBlood: Bool { isComputer && !inDock && !match.setup.grudge }
+    private var speaksInBlood: Bool { isComputer && !inDock }
     private var voice: RivalLetters.Voice { .init(match.setup.level) }
     /// The line under the rival's name (its taunt, remarks and captures) is half again as large
     /// as the rest (Alex, 2026-11-08).
@@ -325,7 +325,7 @@ struct ExecutivePlate: View {
     /// The status is the rival's taunt, waiting for your move.
     private var isTaunt: Bool { speaksInBlood && !match.isOver && !isActive }
 
-    /// The rival's taunt while it waits (`RivalTaunt`; the Grudge keeps its level), "Thinking…"
+    /// The rival's taunt while it waits (`RivalTaunt`), "Thinking…"
     /// on its turn; "Your move" on yours, and nothing while you wait (your captures say enough).
     /// The result once the game is over.
     private var status: String {
@@ -335,11 +335,7 @@ struct ExecutivePlate: View {
         }
         if isComputer {
             if isActive { return match.engineFailed ? "Coach offline" : "Thinking…" }
-            let rival = match.setup.rival
-            if rival.isGrudge {
-                return "\(rival.level.name) · \(rival.elo.replacingOccurrences(of: "~", with: ""))"
-            }
-            return RivalTaunt.line(for: rival.level, game: match.gameID, ply: match.game.plyCount)
+            return RivalTaunt.line(for: match.setup.level, game: match.gameID, ply: match.game.plyCount)
         }
         return isActive ? "Your move" : ""
     }

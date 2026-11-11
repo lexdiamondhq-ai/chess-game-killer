@@ -19,7 +19,7 @@ final class FakeCrowdBook: CrowdBookSource, @unchecked Sendable {
     }
 }
 
-/// The Crowd's moves and the Grudge's memory.
+/// The Crowd's moves and the rivals' faces.
 @MainActor
 final class RivalsTests: XCTestCase {
 
@@ -78,7 +78,7 @@ final class RivalsTests: XCTestCase {
         XCTAssertNotNil(CrowdBook.vote(from: rare, source: .masters, pick: 0), "masters' games are rarer, and enough")
     }
 
-    func testTheGrudgeLeansTowardLinesYouLost() throws {
+    func testAWeightLeansTheCrowdsDraw() throws {
         let lean: (String) -> Double = { $0 == "c4" ? 20 : 1 }
         let vote = try XCTUnwrap(CrowdBook.vote(from: opening, source: .masters, pick: 0.5, weight: lean))
         XCTAssertEqual(vote.san, "c4")
@@ -122,132 +122,11 @@ final class RivalsTests: XCTestCase {
         XCTAssertEqual(book.asked.count, 1)
     }
 
-    func testTheGrudgeSearchesAtItsOwnStrength() async {
-        let engine = FakeEngine()
-        let match = MatchController(engine: engine, sounds: nil)
-        var setup = MatchController.Setup(opponent: .computer, playerColor: .black, level: .club)
-        setup.grudge = true
-        setup.grudgeSkill = 12
-        match.start(setup)
-        await waitUntil("the Grudge opens") { match.game.plyCount == 1 }
-        let searches = await engine.moveSearches
-        XCTAssertEqual(searches.first, FakeEngine.MoveSearch(skill: 12, depth: 5, thinkTimeMs: 350))
-        XCTAssertEqual(match.opponentName, "Your Grudge")
-    }
-
-    // MARK: The Grudge
-
-    private func store() -> GrudgeStore {
-        let defaults = UserDefaults(suiteName: "RivalsTests")!
-        defaults.removePersistentDomain(forName: "RivalsTests")
-        return GrudgeStore(defaults: defaults)
-    }
-
-    func testTheFirstLossToACrowdWakesTheGrudgeOnce() {
-        let grudges = store()
-        XCTAssertFalse(grudges.isBorn)
-        XCTAssertTrue(grudges.crowdWon(level: .club, moves: [], playerColor: .white, positions: []))
-        XCTAssertTrue(grudges.unseen)
-        XCTAssertEqual(grudges.record?.itsWins, 1)
-        XCTAssertEqual(grudges.record?.skill, MatchController.Level.club.skill + 1)
-        XCTAssertEqual(grudges.record?.mood, .smug)
-        XCTAssertFalse(grudges.crowdWon(level: .expert, moves: [], playerColor: .white, positions: []), "only ever one")
-        grudges.markSeen()
-        XCTAssertFalse(grudges.unseen)
-        // It is still there next launch.
-        let again = GrudgeStore(defaults: UserDefaults(suiteName: "RivalsTests")!)
-        XCTAssertEqual(again.record?.itsWins, 1)
-        XCTAssertEqual(again.record?.skill, grudges.record?.skill)
-    }
-
-    func testYourWinsScarItAndTheTenthRebuildsIt() {
-        let grudges = store()
-        grudges.crowdWon(level: .casual, moves: [], playerColor: .white, positions: [])
-        grudges.recordGame(.youWon, moves: [], playerColor: .white, positions: [])
-        XCTAssertEqual(grudges.record?.scars, 1)
-        XCTAssertEqual(grudges.record?.mood, .even)
-        grudges.recordGame(.youWon, moves: [], playerColor: .white, positions: [])
-        XCTAssertEqual(grudges.record?.mood, .rattled)
-        for _ in 0..<8 { grudges.recordGame(.youWon, moves: [], playerColor: .white, positions: []) }
-        XCTAssertEqual(grudges.record?.scars, 0, "ten scars: rebuilt")
-        XCTAssertEqual(grudges.record?.form, 1)
-        XCTAssertEqual(grudges.record?.mood, .respect)
-        XCTAssertEqual(grudges.record?.score, "10 – 1")
-    }
-
-    func testEndingItsStreakMakesItFurious() {
-        let grudges = store()
-        grudges.crowdWon(level: .club, moves: [], playerColor: .white, positions: [])
-        grudges.recordGame(.itWon, moves: [], playerColor: .white, positions: [])
-        grudges.recordGame(.itWon, moves: [], playerColor: .white, positions: [])
-        XCTAssertEqual(grudges.record?.itsRun, 3)
-        grudges.recordGame(.youWon, moves: [], playerColor: .white, positions: [])
-        XCTAssertEqual(grudges.record?.mood, .furious)
-    }
-
-    func testItRemembersTheWorstPieceItTookAndWhere() throws {
-        let game = GameModel()
-        // 1.e4 e5 2.Qh5 Nc6 3.Qxf7+?? Kxf7: the queen is lost on f7, on Black's third move.
-        for move in ["e2e4", "e7e5", "d1h5", "b8c6", "h5f7", "e8f7"] { _ = game.playEngineMove(move) }
-        let moment = try XCTUnwrap(GrudgeStore.worstLoss(moves: game.moves, positions: game.positionFENs,
-                                                         playerColor: .white, date: .now))
-        XCTAssertEqual(moment.piece, "queen")
-        XCTAssertEqual(moment.square, "f7")
-        XCTAssertEqual(moment.move, 3)
-        XCTAssertEqual(GrudgeStore.destination(of: "exd8=Q+"), "d8")
-        XCTAssertEqual(GrudgeStore.pieceAt("e1", in: Position.standard.fen), "K")
-    }
-
-    func testItSteersBackIntoOpeningsYouLost() {
-        var record = GrudgeRecord(bornAt: .now, skill: 10)
-        record.openings["e4 c5 Nf3 d6"] = GrudgeRecord.Tally(wins: 0, draws: 0, losses: 3)
-        XCTAssertGreaterThan(record.lean(after: ["e4"], toward: "c5"), 2.5)
-        XCTAssertEqual(record.lean(after: ["e4"], toward: "e5"), 1)
-        XCTAssertEqual(record.lean(after: ["e4", "c5", "Nf3", "d6"], toward: "d4"), 1, "past the opening it plays its own game")
-    }
-
-    func testItsRatingFollowsItsSkill() {
-        XCTAssertEqual(GrudgeRecord.rating(forSkill: 10), 1500)
-        XCTAssertEqual(GrudgeRecord.rating(forSkill: 20), 3000)
-        XCTAssertEqual(GrudgeRecord.level(forSkill: 11), .club)
-        XCTAssertEqual(GrudgeRecord.level(forSkill: 19), .grandmaster)
-    }
-
-    func testTheGrudgeOnlySaysShortTrueThings() {
-        let moments: [RivalMoment] = [
-            .greeting, .tookPiece(.knight), .lostPiece(.queen), .givesCheck, .playerBlunder,
-            .playerGreatMove, .rivalResigns, .playerResigned, .rivalWins, .playerWins, .draw, .drawDeclined,
-        ]
-        var records: [GrudgeRecord?] = [nil]
-        for (you, it, run) in [(0, 4, 0), (3, 3, 2), (9, 2, 1)] {
-            var record = GrudgeRecord(bornAt: .now, skill: 10)
-            record.yourWins = you
-            record.itsWins = it
-            record.yourRun = run
-            records.append(record)
-        }
-        for record in records {
-            for moment in moments {
-                for line in GrudgeVoice.lines(for: moment, record: record) {
-                    XCTAssertLessThanOrEqual(line.count, 48, "too long for the bubble: \(line)")
-                }
-            }
-        }
-        let now = Date()
-        let tuesday = now.addingTimeInterval(-2 * 86_400)
-        let memory = GrudgeRecord.Moment(date: tuesday, move: 12, square: "e5", piece: "knight")
-        XCTAssertEqual(GrudgeVoice.recall(memory, now: now)?.hasSuffix(". Move 12. Remember?"), true)
-        let old = GrudgeRecord.Moment(date: now.addingTimeInterval(-30 * 86_400), move: 12, square: "e5", piece: "knight")
-        XCTAssertEqual(GrudgeVoice.recall(old, now: now), "Your knight on e5. Remember?")
-    }
-
-    func testSavedGamesKnowTheGrudgeFromTheCrowd() {
-        XCTAssertTrue(Rival.isGrudge(opponent: "Your Grudge"))
-        XCTAssertFalse(Rival.isGrudge(opponent: "The 1600s"))
-        XCTAssertEqual(Rival.named("grudge")?.isGrudge, true)
+    func testSavedNamesFindTheirRivals() {
+        XCTAssertNil(Rival.named("grudge"), "Your Grudge is gone (2026-11-11)")
         XCTAssertEqual(Rival.named("1000s")?.level, .beginner)
         XCTAssertEqual(Rival.named("The Masters")?.level, .grandmaster)
-        for rival in Rival.all + [Rival.grudge(.club)] {
+        for rival in Rival.all {
             XCTAssertNotNil(UIImage(named: rival.portraitName), "\(rival.portraitName) is missing")
             XCTAssertNotNil(UIImage(named: rival.glowName), "\(rival.glowName) is missing")
         }
@@ -258,10 +137,9 @@ final class RivalsTests: XCTestCase {
     func testRivalsHaveFacesAndKeepTheirFormerNames() {
         XCTAssertEqual(Rival.all.map(\.name), ["The Cub", "The Hunter", "The Berserker", "The Lionheart", "The Ashen King"])
         for rival in Rival.all {
-            XCTAssertNotNil(rival.coinName.flatMap { UIImage(named: $0) }, "\(rival.slug)'s coin is missing")
+            XCTAssertNotNil(UIImage(named: rival.coinName), "\(rival.slug)'s coin is missing")
             XCTAssertEqual(Rival.named(rival.formerName ?? "")?.level, rival.level)
         }
-        XCTAssertNil(Rival.grudge(.club).coinName)
 
         let old = SavedGame(id: UUID(), date: .now, opponent: "The 1600s", level: MatchController.Level.club.rawValue,
                             playerIsWhite: true, result: .win, accuracy: nil, positions: [], moves: [], moments: [])
@@ -284,40 +162,10 @@ final class RivalsTests: XCTestCase {
 
     // MARK: Pictures
 
-    /// The summons, caught a few seconds in, your Grudge's card on Home, and the New Game sheet
-    /// (rivals only: the Grudge lives on Home now).
+    /// The New Game sheet with the rivals.
     func testPictures() throws {
-        let defaults = UserDefaults.standard
-        let keys = ["setup.grudge", "grudge.lastSeen", GrudgeStore.key, GrudgeStore.unseenKey]
-        let saved = keys.map { defaults.object(forKey: $0) }
-        defer {
-            for (key, value) in zip(keys, saved) {
-                if let value { defaults.set(value, forKey: key) } else { defaults.removeObject(forKey: key) }
-            }
-        }
-        var record = GrudgeRecord(bornAt: .now, skill: 11)
-        record.yourWins = 7
-        record.itsWins = 11
-        record.scars = 7
-        record.lastLoss = GrudgeRecord.Moment(date: .now.addingTimeInterval(-86_400), move: 12, square: "e5", piece: "knight")
-        try snapshot("grudge-stage", view: GrudgeStage(record: record, lastSeen: (6, 11))
-            .padding(20)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.black), wait: 6)
-
-        // Its card on Home, resting and opened into the summons.
-        try snapshot("grudge-home-card", view: VStack(spacing: 16) {
-            HomeAuroraGrudge(record: record, isOpen: false, palette: HomeAuroraPalette(dark: false),
-                             select: {}, settle: {})
-            HomeAuroraGrudge(record: record, isOpen: true, palette: HomeAuroraPalette(dark: false),
-                             lastSeen: (6, 11), select: {}, settle: {})
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(hex: 0xF6F1E7)), wait: 6)
-
         try snapshot("crowd-new-game", view: Color.black.ignoresSafeArea().sheet(isPresented: .constant(true)) {
-            NewGameSheet(theme: .named(.gilded), start: { _ in }).environment(GrudgeStore(defaults: UserDefaults(suiteName: "RivalsTestsEmpty")!))
+            NewGameSheet(theme: .named(.gilded), start: { _ in })
         }, wait: 3)
     }
 

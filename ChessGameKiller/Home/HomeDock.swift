@@ -342,10 +342,10 @@ struct HomeJewelGold: View {
 /// page doesn't already hold (Alex, 2026-11-08: "Lets go with all"). A person online, a friend,
 /// a new game on your own side and clock, and your games. Today's Move, Puzzles, Analyze and
 /// the coach live on Today, so they are not repeated here. The rivals' hall joins them, the
-/// fifth room, as the review proposed once the hall landed. Your Grudge has its room beside the
-/// rivals since its Home card gave way to Chess DNA (Alex, 2026-11-09: "place in rooms").
+/// fifth room, as the review proposed once the hall landed. Your Grudge is gone from the app
+/// (Alex, 2026-11-11).
 enum HomeShortcutKind: String, CaseIterable, Identifiable {
-    case online, friend, newGame, rivals, grudge, games
+    case online, friend, newGame, rivals, games
 
     var id: String { rawValue }
 
@@ -358,7 +358,7 @@ enum HomeShortcutKind: String, CaseIterable, Identifiable {
 
     /// Rooms on the Aurora home (Alex, 2026-11-11): New game and Your games only. New game is
     /// the one door to every game: a rival, a friend or someone online. The rivals live on the
-    /// Next game card, and Your Grudge has no room.
+    /// Next game card.
     static let rooms: [HomeShortcutKind] = [.newGame, .games]
 
     var title: String {
@@ -367,7 +367,6 @@ enum HomeShortcutKind: String, CaseIterable, Identifiable {
         case .friend: return "A friend"
         case .newGame: return "New game"
         case .rivals: return "Rivals"
-        case .grudge: return "Your Grudge"
         case .games: return "Your games"
         }
     }
@@ -379,8 +378,6 @@ enum HomeShortcutKind: String, CaseIterable, Identifiable {
         case .newGame: return Glyphs.play
         // The shield the hall's own door wore on Home.
         case .rivals: return "shield.lefthalf.filled"
-        // The Grudge burns red behind its king.
-        case .grudge: return "flame.fill"
         case .games: return Glyphs.games
         }
     }
@@ -391,7 +388,6 @@ enum HomeShortcutKind: String, CaseIterable, Identifiable {
         case .friend: return "Send a friend a game by link"
         case .newGame: return "Pick your side, clock and rival"
         case .rivals: return "The five rivals, and the one to beat next"
-        case .grudge: return "The rival that remembers every game"
         case .games: return "Look back at the games you've played"
         }
     }
