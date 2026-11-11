@@ -14,6 +14,10 @@ struct FriendGame: Codable, Identifiable, Equatable, Sendable {
     var isCreator: Bool
     var opponentName: String?
     var clock: FriendClock?
+    /// A daily game's days per move; nil otherwise.
+    var days: Int?
+    /// In a daily game under way, when the side to move runs out of days.
+    var deadline: Date?
     var status: FriendGameState.Status
     var turn: FriendSeat
     var result: FriendGameState.Result?
@@ -65,6 +69,8 @@ struct FriendGame: Codable, Identifiable, Equatable, Sendable {
             opponentName = name
         }
         clock = state.clock
+        days = state.days
+        deadline = state.deadline.map { Date(timeIntervalSince1970: $0 / 1000) }
         status = state.status
         turn = state.turn
         result = state.result
@@ -88,7 +94,11 @@ struct FriendGame: Codable, Identifiable, Equatable, Sendable {
     var statusLine: String {
         switch status {
         case .waiting: return "Waiting for \(opponentName ?? "your friend") to join"
-        case .active: return isYourMove ? "Your move" : "Their move"
+        case .active:
+            let line = isYourMove ? "Your move" : "Their move"
+            // A daily game says how long the side to move has left.
+            guard let deadline else { return line }
+            return "\(line) · \(DailyDays.left(deadline.timeIntervalSinceNow * 1000)) left"
         case .over:
             guard let result else { return "Game over" }
             return FriendResultWords.short(result, me: seat)
@@ -105,7 +115,7 @@ struct FriendGame: Codable, Identifiable, Equatable, Sendable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, code, token, seat, isCreator, opponentName, clock, status, turn, result, moveCount
+        case id, code, token, seat, isCreator, opponentName, clock, days, deadline, status, turn, result, moveCount
         case fen, rated, opponentRating, createdAt, updatedAt, recorded
     }
 }
@@ -121,6 +131,8 @@ extension FriendGame {
         isCreator = try c.decodeIfPresent(Bool.self, forKey: .isCreator) ?? false
         opponentName = try c.decodeIfPresent(String.self, forKey: .opponentName)
         clock = try c.decodeIfPresent(FriendClock.self, forKey: .clock)
+        days = try c.decodeIfPresent(Int.self, forKey: .days)
+        deadline = try c.decodeIfPresent(Date.self, forKey: .deadline)
         status = (try? c.decodeIfPresent(FriendGameState.Status.self, forKey: .status)) ?? .active
         turn = (try? c.decodeIfPresent(FriendSeat.self, forKey: .turn)) ?? .white
         result = try? c.decodeIfPresent(FriendGameState.Result.self, forKey: .result)

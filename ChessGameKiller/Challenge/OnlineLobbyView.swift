@@ -12,12 +12,16 @@ struct OnlineLobbyView: View {
     @AppStorage(ChallengeName.key) private var name = ""
     /// The picked clock, as `OnlineLobby.clockID` keeps it.
     @AppStorage("online.clock") private var clockID = "5+0"
+    /// With ∞ picked: the days per move of a daily game, or 0 for no limit.
+    @AppStorage("online.days") private var dailyDays = 0
     @AppStorage("haptics") private var hapticsOn = true
     /// More times is folded open. It starts open when the picked clock lives there.
     @State private var showsMore: Bool?
 
     /// The server's clock for the pick; nil for no clock.
     private var clock: FriendClock? { OnlineLobby.clock(id: clockID) }
+    /// The days per move when ∞ is picked with a limit; nil otherwise.
+    private var days: Int? { clock == nil && DailyDays.options.contains(dailyDays) ? dailyDays : nil }
     private var isMoreOpen: Bool { showsMore ?? !OnlineLobby.quickPicks.contains(clock) }
 
     var body: some View {
@@ -55,6 +59,8 @@ struct OnlineLobbyView: View {
         .animation(.snappy(duration: 0.3), value: lobby.players)
         .animation(.snappy(duration: 0.3), value: lobby.phase)
         .sensoryFeedback(.selection, trigger: clockID) { _, _ in hapticsOn }
+        .sensoryFeedback(.selection, trigger: dailyDays) { _, _ in hapticsOn }
+        .animation(.snappy(duration: 0.3), value: clock == nil)
         .sensoryFeedback(.success, trigger: lobby.phase) { _, new in hapticsOn && new == .starting }
     }
 
@@ -96,11 +102,16 @@ struct OnlineLobbyView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(isMoreOpen ? "Fewer times" : "More times")
+            if clock == nil {
+                OnlineDaysStepper(days: $dailyDays, theme: theme)
+                    .disabled(lobby.isSearching)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
             if isMoreOpen {
                 moreClocks
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
-            Text(OnlineLobby.detail(clock))
+            Text(OnlineLobby.detail(clock, days: days))
                 .font(theme.challengeFont(12))
                 .foregroundStyle(.secondary)
         }
@@ -131,7 +142,7 @@ struct OnlineLobbyView: View {
     private func clockChip(_ option: FriendClock?, size: CGFloat = 15) -> some View {
         ChallengeChip(title: option?.label ?? "∞", isOn: clock == option, theme: theme,
                       size: option == nil ? 24 : size) {
-            clockID = OnlineLobby.clockID(option)
+            withAnimation(.snappy(duration: 0.3)) { clockID = OnlineLobby.clockID(option) }
         }
         .accessibilityLabel(OnlineLobby.detail(option))
         .disabled(lobby.isSearching)
@@ -139,7 +150,7 @@ struct OnlineLobbyView: View {
 
     @ViewBuilder
     private var waitingList: some View {
-        let players = lobby.sorted(for: clock)
+        let players = lobby.sorted(for: clock, days: days)
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 ChallengeSectionTitle(title: "Waiting now")
@@ -152,7 +163,7 @@ struct OnlineLobbyView: View {
             } else {
                 VStack(spacing: 0) {
                     ForEach(players) { player in
-                        OnlinePlayerRow(player: player, theme: theme, sameClock: player.clock == clock,
+                        OnlinePlayerRow(player: player, theme: theme, sameClock: player.plays(clock, days: days),
                                         isChallenging: lobby.challenging == player.id,
                                         isBusy: lobby.challenging != nil || lobby.phase == .starting) {
                             Task { await lobby.challenge(player, name: name) }
@@ -203,8 +214,15 @@ struct OnlineLobbyView: View {
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
             switch lobby.phase {
-            case .searching(let waitingClock, let since):
-                OnlineSearchingBar(clock: waitingClock, since: since, theme: theme) {
+            case .searching(let waitingClock, let waitingDays, let since):
+                if waitingDays != nil {
+                    Text("You can close this. When someone takes you on, the game shows up in your games.")
+                        .font(theme.challengeFont(12.5))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                OnlineSearchingBar(clock: waitingClock, days: waitingDays, since: since, theme: theme) {
                     Task { await lobby.cancel() }
                 }
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
@@ -218,9 +236,9 @@ struct OnlineLobbyView: View {
                 .challengeGlass(Capsule(style: .continuous))
             case .browsing:
                 Button {
-                    Task { await lobby.find(clock: clock, name: name) }
+                    Task { await lobby.find(clock: clock, days: days, name: name) }
                 } label: {
-                    Label("Find a game · \(clock?.label ?? "No clock")", systemImage: "bolt.fill")
+                    Label("Find a game · \(days.map(DailyDays.label) ?? clock?.label ?? "No clock")", systemImage: "bolt.fill")
                 }
                 .buttonStyle(ChallengeButtonStyle(kind: .primary, theme: theme))
                 .disabled(lobby.challenging != nil)
@@ -294,6 +312,8 @@ struct OnlinePlayerRow: View {
 struct OnlineSearchingBar: View {
     /// Nil: no clock.
     let clock: FriendClock?
+    /// A daily game's days per move.
+    var days: Int?
     let since: Date
     let theme: BoardTheme
     let cancel: () -> Void
@@ -303,12 +323,13 @@ struct OnlineSearchingBar: View {
             OnlineLiveDot(theme: theme, size: 10)
                 .padding(.leading, 6)
             VStack(alignment: .leading, spacing: 1) {
-                Text("Finding an opponent · \(clock?.label ?? "No clock")")
+                Text("Finding an opponent · \(days.map(DailyDays.label) ?? clock?.label ?? "No clock")")
                     .font(theme.challengeFont(15, .semibold))
                     .lineLimit(1)
                 TimelineView(.periodic(from: since, by: 1)) { context in
                     let seconds = max(0, Int(context.date.timeIntervalSince(since)))
-                    Text("You're in the lobby · \(seconds / 60):\(String(format: "%02d", seconds % 60))")
+                    Text(days == nil ? "You're in the lobby · \(seconds / 60):\(String(format: "%02d", seconds % 60))"
+                                     : "Posted for a week · \(Self.posted(seconds))")
                         .font(theme.challengeFont(12.5).monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
@@ -322,6 +343,92 @@ struct OnlineSearchingBar: View {
         .padding(.leading, 8)
         .challengeGlass(Capsule(style: .continuous))
         .accessibilityElement(children: .contain)
+    }
+}
+
+extension OnlineSearchingBar {
+    /// How long a daily seek has been up: "just now", "12 min", "3 h", "2 days".
+    static func posted(_ seconds: Int) -> String {
+        if seconds < 60 { return "just now" }
+        if seconds < 3600 { return "\(seconds / 60) min" }
+        if seconds < 86_400 { return "\(seconds / 3600) h" }
+        return DailyDays.label(seconds / 86_400)
+    }
+}
+
+/// With ∞ picked: a glass line to set the time per move, − and + either side of "2 days per move",
+/// stepping through No limit, 1, 2, 3, 5 and 7 days.
+struct OnlineDaysStepper: View {
+    @Binding var days: Int
+    let theme: BoardTheme
+
+    @Environment(\.isEnabled) private var isEnabled
+
+    /// No limit (0), then the days on offer.
+    private static let steps = [0] + DailyDays.options
+    private var index: Int { Self.steps.firstIndex(of: days) ?? 0 }
+
+    var body: some View {
+        VStack(spacing: 10) {
+            HStack {
+                stepButton("minus", to: index - 1)
+                    .accessibilityLabel("Fewer days")
+                Spacer(minLength: 8)
+                VStack(spacing: 2) {
+                    Text(days > 0 ? DailyDays.label(days) : "No limit")
+                        .font(theme.challengeFont(26, .bold).monospacedDigit())
+                        .contentTransition(.numericText(value: Double(days)))
+                    Text(days > 0 ? "per move" : "take all the time you like")
+                        .font(theme.challengeFont(12.5))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 8)
+                stepButton("plus", to: index + 1)
+                    .accessibilityLabel("More days")
+            }
+            HStack(spacing: 7) {
+                ForEach(Self.steps.indices, id: \.self) { step in
+                    Circle()
+                        .fill(step == index ? AnyShapeStyle(theme.challengeAccent) : AnyShapeStyle(Color.primary.opacity(0.18)))
+                        .frame(width: 6, height: 6)
+                }
+            }
+            .accessibilityHidden(true)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .challengeGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .opacity(isEnabled ? 1 : 0.5)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Time per move")
+        .accessibilityValue(days > 0 ? DailyDays.phrase(days) : "No limit")
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: go(to: index + 1)
+            case .decrement: go(to: index - 1)
+            @unknown default: break
+            }
+        }
+    }
+
+    private func stepButton(_ symbol: String, to target: Int) -> some View {
+        let possible = Self.steps.indices.contains(target)
+        return Button { go(to: target) } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(theme.challengeAccent)
+                .frame(width: 44, height: 44)
+                .background(Circle().fill(Color.primary.opacity(0.06)))
+                .overlay(Circle().strokeBorder(Color.primary.opacity(0.14), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .opacity(possible ? 1 : 0.35)
+        .disabled(!possible)
+    }
+
+    private func go(to target: Int) {
+        guard Self.steps.indices.contains(target) else { return }
+        withAnimation(.snappy(duration: 0.25)) { days = Self.steps[target] }
     }
 }
 

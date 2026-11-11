@@ -74,10 +74,10 @@ export class Lobby extends DurableObject {
     return reply(200, tally);
   }
 
-  async list({ untimed = false } = {}) {
+  async list({ untimed = false, daily = false } = {}) {
     const now = Date.now();
     await this.#sweep(now);
-    return reply(200, lobby.listView(this.state, now, { untimed }));
+    return reply(200, lobby.listView(this.state, now, { untimed, daily }));
   }
 
   async me({ playerHash }) {
@@ -88,12 +88,12 @@ export class Lobby extends DurableObject {
    * Waits for a game at a clock. With `pair`, first takes on the closest-rated
    * player already waiting at that clock, if there is one.
    */
-  async seek({ tokenHash, playerHash, name, clock, look, pair = true }) {
+  async seek({ tokenHash, playerHash, name, clock, days = null, look, pair = true }) {
     const record = await this.#rating(playerHash);
     const now = Date.now();
     await this.#sweep(now);
     if (pair) {
-      const opponent = lobby.bestOpponent(this.state, { clock, playerHash, rating: record.rating }, now);
+      const opponent = lobby.bestOpponent(this.state, { clock, days, playerHash, rating: record.rating }, now);
       if (opponent) {
         const paired = await this.#pair(opponent, { playerHash, name, look, record });
         if (paired) return reply(200, { match: paired, you: this.#you(record) });
@@ -103,7 +103,7 @@ export class Lobby extends DurableObject {
     const id = seekId();
     const added = lobby.addSeek(
       this.state,
-      { id, tokenHash, playerHash, name, rating: record.rating, games: record.games, clock, look },
+      { id, tokenHash, playerHash, name, rating: record.rating, games: record.games, clock, days, look },
       Date.now(),
     );
     if (!added.ok) return refuse(added.error, added.message);
@@ -142,7 +142,7 @@ export class Lobby extends DurableObject {
     const now = Date.now();
     await this.#sweep(now);
     const seek = this.state.seeks[id];
-    if (!seek || seek.match || seek.pairing || now - seek.seenAt > lobby.SEEK_STALE_MS) return refuse("not_found", GONE);
+    if (!seek || seek.match || seek.pairing || !lobby.openSeeks(this.state, now).includes(seek)) return refuse("not_found", GONE);
     if (seek.playerHash === playerHash) return refuse("bad_request", "That's you. Pick someone else.");
     const record = await this.#rating(playerHash);
     // Looked up again after waiting for storage: someone else may have taken it meanwhile.
@@ -180,6 +180,7 @@ export class Lobby extends DurableObject {
           white: { name: white.name, tokenHash: white.tokenHash },
           black: { name: black.name, tokenHash: black.tokenHash },
           clock: seek.clock,
+          days: seek.days ?? null,
           look: seek.look,
           rated: {
             white: { player: white.player, rating: white.rating, games: white.games },
@@ -190,12 +191,10 @@ export class Lobby extends DurableObject {
         const now = Date.now();
         seek.pairing = false;
         seek.match = { code, seat: seekerWhite ? "white" : "black", token: seekerToken, at: now };
-        // The taker's own earlier seek, if any, is no longer needed.
-        for (const [id, other] of Object.entries(this.state.seeks)) {
-          if (other.playerHash === taker.playerHash && !other.match) delete this.state.seeks[id];
-        }
+        // The taker's own earlier seek of the same kind, if any, is no longer needed.
+        lobby.dropSeeks(this.state, taker.playerHash, lobby.isDaily(seek));
         await this.#save();
-        console.log(JSON.stringify({ event: "online_pairing", code, clock: seek.clock }));
+        console.log(JSON.stringify({ event: "online_pairing", code, clock: seek.clock, days: seek.days ?? null }));
         return { code, seat: seekerWhite ? "black" : "white", token: takerToken, game: made.game };
       }
       throw new Error("no free game code after 5 tries");

@@ -61,6 +61,8 @@ Every REST reply carries `{ "game": GameState }`, and the WebSocket sends `{ "ty
   "createdAt": 1761187200000,
   "updatedAt": 1761187200000,
   "clock": { "initial": 600, "increment": 0 },
+  "days": null,
+  "deadline": null,
   "creator": "white",
   "look": "gilded",
   "white": { "name": "Alex", "seated": true, "online": true, "away": null, "claimableAt": null, "screenshots": 0, "recordings": 0 },
@@ -151,19 +153,26 @@ and either side may `abort` it at any time (no result).
 - **A seek** is one player waiting at a clock. A waiting app checks in every 2 s; a seek not checked for 20 s
   leaves the lobby. A player waits once: a new seek replaces their old one. A seek's `clock` may be `null` (no clock):
   it pairs only with other no-clock seeks, and `GET /api/lobby` lists those only with `?untimed=1` (older apps can't read them).
-- GameState gains `online` (true for games paired here), `rated` (true for those with a clock) and `ratings`: `null`, or for each side
+- **Daily games**: a seek may instead have `"days"`: 1, 2, 3, 5 or 7 per move (its `clock` is then `null`). It pairs only
+  with seeks at the same days and is listed only with `?daily=1`. Its player may close the app: a daily seek needs no
+  check-ins and stays up for 7 days, and once taken its game waits 7 days for the seek's next check-in. A player keeps
+  one live seek and one daily seek. The game has `days` and no clock, and is **rated**. GameState gains `days` (`null`
+  otherwise) and `deadline`: while the game is under way, when the side to move runs out of days (ms; each move starts
+  the days again). Running out loses on time (a draw without mating material, as with a clock); before both sides
+  have moved it aborts instead. A daily game has no leave rule and can't be aborted once both sides have moved.
+- GameState gains `online` (true for games paired here), `rated` (true for those with a clock or days) and `ratings`: `null`, or for each side
   `{ "rating", "provisional", "after", "change" }` (`after` and `change` are `null` until the game is over and counted).
 
 | Method & path | Body | Reply |
 | --- | --- | --- |
 | `GET /api/lobby` | – | `200 { "players": [Seek], "waiting", "now" }`, the longest waiting first (at most 40) |
 | `POST /api/lobby/me` | `{ "player" }` | `200 { "you": { "rating", "games", "provisional" } }` |
-| `POST /api/lobby/seeks` | `{ "name", "clock", "look"?, "player", "pair"? }` | `201 { "seek", "token", "you" }` waiting, or `200 { "match", "you" }` paired at once |
+| `POST /api/lobby/seeks` | `{ "name", "clock", "days"?, "look"?, "player", "pair"? }` | `201 { "seek", "token", "you" }` waiting, or `200 { "match", "you" }` paired at once |
 | `POST /api/lobby/seeks/{id}` | `{}` + Bearer seek token | `200 { "seek", "waiting" }` still waiting, or `200 { "match" }` |
 | `POST /api/lobby/seeks/{id}/cancel` | `{}` + Bearer seek token | `200 { "cancelled": true }`, or `200 { "match" }` if someone took you on first |
 | `POST /api/lobby/seeks/{id}/play` | `{ "name", "look"?, "player" }` | `200 { "match", "you" }`: you took that player on |
 
-- `Seek`: `{ "id", "name", "rating", "provisional", "clock", "look", "waitingFor" }` (ms). Never a token or key.
+- `Seek`: `{ "id", "name", "rating", "provisional", "clock", "days", "look", "waitingFor" }` (ms). Never a token or key.
 - `match`: `{ "code", "seat", "token", "game"? }`: the new game, your seat in it and your seat's token. From then
   on it is a game like any other (`/api/games/{code}/…`).
 - `pair` (default true): first take on the closest-rated player already waiting at the same clock, if any.

@@ -14,7 +14,7 @@ final class ChallengeSnapshotTests: XCTestCase {
 
     private let defaults = UserDefaults.standard
     private var saved: [String: Any?] = [:]
-    private static let keys = ["boardTheme", "sculpted3D", ChallengeName.key, "challenge.clock", "challenge.side", "online.clock",
+    private static let keys = ["boardTheme", "sculpted3D", ChallengeName.key, "challenge.clock", "challenge.side", "online.clock", "online.days",
                                FriendDirectory.youKey, FriendDirectory.peopleKey]
 
     /// The phone's own time, for games that must look recent. Clocks and absences count from the server's `now`.
@@ -133,6 +133,21 @@ final class ChallengeSnapshotTests: XCTestCase {
         let center = makeCenter(api)
         center.playOnline()
         try snapshot("online-lobby-no-clock", center: center, wait: 2.5)
+        center.dismiss()
+    }
+
+    func testOnlineLobbyDaily() throws {
+        let api = FakeChallengeAPI()
+        api.onlineRating = OnlineRating(rating: 1236, games: 4, provisional: true)
+        api.lobbyList = LobbyList(players: [
+            LobbyPlayer(id: "111111111111", name: "Sam Okafor", rating: 1310, clock: nil, days: 2, waitingFor: 5_400_000),
+            LobbyPlayer(id: "222222222222", name: "Priya", rating: 1188, provisional: true, clock: nil, waitingFor: 3_000),
+        ])
+        defaults.set(TimeControl.unlimited.rawValue, forKey: "online.clock")
+        defaults.set(2, forKey: "online.days")
+        let center = makeCenter(api)
+        center.playOnline()
+        try snapshot("online-lobby-daily", center: center, wait: 2.5)
         center.dismiss()
     }
 
