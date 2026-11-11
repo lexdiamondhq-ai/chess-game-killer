@@ -2,7 +2,8 @@ import Foundation
 import Observation
 
 // Play online: games with players waiting right now, not only friends with a link. Timed games are
-// rated; games with no clock are just for fun.
+// rated; games with no clock are just for fun. Daily games (days per move, no clock) are rated too,
+// and their waiting player may close the app: the seek stays up and the game is picked up later.
 // The server keeps a lobby (play/PROTOCOL.md, "Play online"): a player waits there with a clock,
 // and anyone can take them on by name, or find a game and be paired with the closest rating.
 // A paired game is an ordinary friend game on the server (rated when it has a clock), so OnlineGame plays it.
@@ -13,29 +14,43 @@ struct LobbyPlayer: Decodable, Identifiable, Equatable, Sendable {
     var name: String
     var rating: Int
     var provisional = false
-    /// Nil: waiting for a game with no clock.
+    /// Nil: waiting for a game with no clock (or a daily one).
     var clock: FriendClock?
+    /// Waiting for a daily game with this many days per move.
+    var days: Int?
     /// How long they have waited, in milliseconds.
     var waitingFor: Double = 0
 
     /// "1250", or "1200?" while their rating is still settling.
     var ratingLabel: String { "\(rating)\(provisional ? "?" : "")" }
 
-    /// "Blitz · 5+0", or "No clock".
-    var clockLine: String { clock.map { "\($0.kind) · \($0.label)" } ?? "No clock" }
-    /// "5 minutes each", or "no clock".
-    var clockPhrase: String { clock?.phrase ?? "no clock" }
-
-    enum CodingKeys: String, CodingKey {
-        case id, name, rating, provisional, clock, waitingFor
+    /// "Blitz · 5+0", "Daily · 2 days", or "No clock".
+    var clockLine: String {
+        if let days { return "Daily · \(DailyDays.label(days))" }
+        return clock.map { "\($0.kind) · \($0.label)" } ?? "No clock"
+    }
+    /// "5 minutes each", "2 days a move", or "no clock".
+    var clockPhrase: String {
+        if let days { return DailyDays.phrase(days) }
+        return clock?.phrase ?? "no clock"
     }
 
-    init(id: String, name: String, rating: Int, provisional: Bool = false, clock: FriendClock?, waitingFor: Double = 0) {
+    /// Waiting at this clock, or these days per move.
+    func plays(_ clock: FriendClock?, days: Int?) -> Bool {
+        self.days == days && (days != nil || self.clock == clock)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, rating, provisional, clock, days, waitingFor
+    }
+
+    init(id: String, name: String, rating: Int, provisional: Bool = false, clock: FriendClock?, days: Int? = nil, waitingFor: Double = 0) {
         self.id = id
         self.name = name
         self.rating = rating
         self.provisional = provisional
         self.clock = clock
+        self.days = days
         self.waitingFor = waitingFor
     }
 
@@ -52,6 +67,7 @@ struct LobbyPlayer: Decodable, Identifiable, Equatable, Sendable {
             throw DecodingError.keyNotFound(CodingKeys.clock, .init(codingPath: c.codingPath, debugDescription: "No clock"))
         }
         clock = try c.decodeIfPresent(FriendClock.self, forKey: .clock)
+        days = try c.decodeIfPresent(Int.self, forKey: .days)
         waitingFor = try c.decodeIfPresent(Double.self, forKey: .waitingFor) ?? 0
     }
 }
@@ -124,6 +140,54 @@ enum OnlinePlayerKey {
     }
 }
 
+/// A daily seek left up while the app is closed: the lobby keeps it a week, and the game someone
+/// starts with it waits there until this phone picks it up.
+struct PendingDailySeek: Codable, Equatable, Sendable {
+    var id: String
+    var token: String
+    var days: Int
+    var since: Date
+
+    static let key = "online.dailySeek"
+
+    static func load(_ defaults: UserDefaults = .standard) -> PendingDailySeek? {
+        guard let data = defaults.data(forKey: key), let seek = try? JSONDecoder().decode(Self.self, from: data) else { return nil }
+        // The lobby lets a daily seek go after a week.
+        return Date.now.timeIntervalSince(seek.since) < 7 * 86_400 ? seek : nil
+    }
+
+    static func save(_ seek: PendingDailySeek?, _ defaults: UserDefaults = .standard) {
+        if let seek, let data = try? JSONEncoder().encode(seek) {
+            defaults.set(data, forKey: key)
+        } else {
+            defaults.removeObject(forKey: key)
+        }
+    }
+
+    /// Checks a daily seek left up, and adds the game to the player's games once someone took it on.
+    /// Called with the games refresh, so a game started while the app was closed appears on Home.
+    @MainActor
+    static func collect(api: ChallengeAPI, store: ChallengeStore, defaults: UserDefaults = .standard) async {
+        guard let pending = load(defaults) else {
+            save(nil, defaults)
+            return
+        }
+        do {
+            let reply = try await api.checkSeek(pending.id, token: pending.token)
+            guard let match = reply.match else { return }
+            save(nil, defaults)
+            var record = FriendGame(code: match.code, token: match.token, seat: match.seat, isCreator: false, status: .active)
+            if let state = try? await api.game(match.code) {
+                record = FriendGame(code: match.code, token: match.token, seat: match.seat, state: state)
+            }
+            store.add(record)
+        } catch let error as ChallengeError where error.isNotFound {
+            // The lobby let it go (a week passed, or it was cancelled).
+            save(nil, defaults)
+        } catch {}
+    }
+}
+
 /// The Play online screen's work: who is waiting, taking one of them on, and finding a game.
 @MainActor
 @Observable
@@ -131,8 +195,8 @@ final class OnlineLobby {
     enum Phase: Equatable {
         /// Looking at who is waiting.
         case browsing
-        /// Waiting in the lobby at a clock (nil: no clock), since a moment.
-        case searching(FriendClock?, since: Date)
+        /// Waiting in the lobby at a clock (nil: no clock), or with days per move for a daily game, since a moment.
+        case searching(FriendClock?, days: Int?, since: Date)
         /// A game was found: opening it.
         case starting
     }
@@ -178,7 +242,10 @@ final class OnlineLobby {
     }
 
     /// The line under the chips: "Blitz · 3 minutes each plus 2 seconds a move". No clock says it isn't rated.
-    static func detail(_ clock: FriendClock?) -> String {
+    static func detail(_ clock: FriendClock?, days: Int? = nil) -> String {
+        if clock == nil, let days {
+            return "\(DailyDays.phrase(days)) · rated · play over days, close the app between moves"
+        }
         guard let clock else { return "No clock · take all the time you like, not rated" }
         // The app's own time controls keep the words they have everywhere else.
         return clock.timeControl?.detail ?? "\(clock.kind) · \(clock.phrase)"
@@ -215,10 +282,16 @@ final class OnlineLobby {
         return false
     }
 
-    /// Players waiting at `clock` (nil: no clock) first, then the rest; never the player's own seek.
-    func sorted(for clock: FriendClock?) -> [LobbyPlayer] {
+    /// Players waiting at `clock` (nil: no clock) or `days` first, then the rest; never the player's own seek.
+    func sorted(for clock: FriendClock?, days: Int? = nil) -> [LobbyPlayer] {
         let others = players.filter { $0.id != seekID }
-        return others.filter { $0.clock == clock } + others.filter { $0.clock != clock }
+        return others.filter { $0.plays(clock, days: days) } + others.filter { !$0.plays(clock, days: days) }
+    }
+
+    /// Waiting for a daily game, which stays up when the screen closes.
+    var isWaitingDaily: Bool {
+        if case .searching(_, let days?, _) = phase { return days > 0 }
+        return false
     }
 
     // MARK: Running
@@ -226,6 +299,12 @@ final class OnlineLobby {
     /// Keeps the list fresh (and a waiting seek checked in) while the screen is up.
     func start() {
         guard loop == nil else { return }
+        // A daily seek left up earlier: still waiting for it.
+        if phase == .browsing, seekID == nil, let pending = PendingDailySeek.load(defaults) {
+            seekID = pending.id
+            seekToken = pending.token
+            phase = .searching(nil, days: pending.days, since: pending.since)
+        }
         loop = Task { [weak self] in
             if let self, self.you == nil {
                 self.you = try? await self.center?.api.rating(player: self.player)
@@ -237,10 +316,17 @@ final class OnlineLobby {
         }
     }
 
-    /// The screen closed: stop checking, and leave the lobby.
+    /// The screen closed: stop checking, and leave the lobby. A daily seek stays up: its game is picked
+    /// up with the player's games once someone takes it on.
     func stop() {
         loop?.cancel()
         loop = nil
+        if isWaitingDaily {
+            seekID = nil
+            seekToken = nil
+            phase = .browsing
+            return
+        }
         guard let id = seekID, let token = seekToken, let api = center?.api else { return }
         seekID = nil
         seekToken = nil
@@ -259,10 +345,11 @@ final class OnlineLobby {
                 }
             } catch let error as ChallengeError where error.isNotFound {
                 // The lobby lost the seek (the server restarted, say): wait again.
-                if case .searching(let clock, _) = phase {
+                if case .searching(let clock, let days, _) = phase {
                     seekID = nil
                     seekToken = nil
-                    await find(clock: clock, name: center?.playerName ?? "")
+                    PendingDailySeek.save(nil, defaults)
+                    await find(clock: clock, days: days, name: center?.playerName ?? "")
                 }
             } catch {}
         }
@@ -279,14 +366,16 @@ final class OnlineLobby {
 
     // MARK: Playing
 
-    /// Waits for a game at `clock` (nil: no clock), taking on the closest-rated player already waiting at it.
-    func find(clock: FriendClock?, name: String) async {
+    /// Waits for a game at `clock` (nil: no clock), or with `days` per move, taking on the closest-rated player
+    /// already waiting at the same.
+    func find(clock: FriendClock?, days: Int? = nil, name: String) async {
         guard let center, phase == .browsing || isSearching, seekID == nil else { return }
         center.rememberName(name)
         problem = nil
-        phase = .searching(clock, since: .now)
+        let days = clock == nil ? days : nil
+        phase = .searching(clock, days: days, since: .now)
         do {
-            let reply = try await center.api.seek(name: ChallengeName.clean(name), clock: clock, player: player)
+            let reply = try await center.api.seek(name: ChallengeName.clean(name), clock: clock, days: days, player: player)
             if let you = reply.you { self.you = you }
             if let match = reply.match {
                 await open(match)
@@ -298,6 +387,9 @@ final class OnlineLobby {
                 }
                 seekID = seek.id
                 seekToken = token
+                if let days {
+                    PendingDailySeek.save(PendingDailySeek(id: seek.id, token: token, days: days, since: .now), defaults)
+                }
                 if let waiting = reply.waiting { self.waiting = waiting }
             } else {
                 phase = .browsing
@@ -323,6 +415,7 @@ final class OnlineLobby {
         seekID = nil
         seekToken = nil
         phase = .browsing
+        PendingDailySeek.save(nil, defaults)
         if let reply = try? await center.api.cancelSeek(id, token: token), let match = reply.match {
             await open(match)
         }
@@ -336,7 +429,16 @@ final class OnlineLobby {
         problem = nil
         defer { challenging = nil }
         // Waiting meanwhile? Leave the lobby first, so nobody else pairs with this player too.
-        if seekID != nil { await cancel() }
+        // A daily seek can stay up: it is a game for later.
+        if seekID != nil {
+            if isWaitingDaily {
+                seekID = nil
+                seekToken = nil
+                phase = .browsing
+            } else {
+                await cancel()
+            }
+        }
         guard phase == .browsing else { return }
         do {
             let reply = try await center.api.play(opponent.id, name: ChallengeName.clean(name), player: player)
@@ -358,6 +460,7 @@ final class OnlineLobby {
     private func open(_ match: LobbyMatch) async {
         guard let center else { return }
         phase = .starting
+        if let pending = PendingDailySeek.load(defaults), pending.id == seekID { PendingDailySeek.save(nil, defaults) }
         seekID = nil
         seekToken = nil
         var state = match.game

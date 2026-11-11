@@ -193,6 +193,47 @@ final class OnlineLobbyTests: XCTestCase {
         XCTAssertFalse(lobby.isSearching)
     }
 
+    func testADailySeekStaysUpWhenTheScreenClosesAndItsGameArrivesLater() async throws {
+        let api = FakeChallengeAPI()
+        let center = center(api)
+        center.playOnline()
+        let lobby = try lobby(of: center)
+        await lobby.find(clock: nil, days: 2, name: "Alex")
+        XCTAssertEqual(api.seeks.first?.days, 2)
+        XCTAssertNil(api.seeks.first?.clock)
+        XCTAssertTrue(lobby.isWaitingDaily)
+        center.dismiss()
+        try? await Task.sleep(for: .milliseconds(200))
+        XCTAssertEqual(api.cancels, [], "a daily seek is left up")
+        XCTAssertEqual(PendingDailySeek.load(defaults)?.days, 2)
+
+        // Someone takes it on while the app is closed: the games refresh picks the game up.
+        var state = FriendGameState.sample(code: "D4ILY1", clock: nil, white: "Sam", black: "Alex")
+        state.days = 2
+        state.deadline = Date.now.timeIntervalSince1970 * 1000 + 86_400_000
+        api.games[state.code] = state
+        api.checkReplies = [LobbyReply(match: LobbyMatch(code: state.code, seat: .black, token: "token-black"))]
+        await center.refreshGames(force: true)
+        let record = try XCTUnwrap(center.store.game(code: "D4ILY1"))
+        XCTAssertEqual(record.days, 2)
+        XCTAssertTrue(record.statusLine.hasPrefix("Their move · "), record.statusLine)
+        XCTAssertNil(PendingDailySeek.load(defaults))
+    }
+
+    func testDailyWords() throws {
+        XCTAssertEqual(DailyDays.label(1), "1 day")
+        XCTAssertEqual(DailyDays.phrase(3), "3 days a move")
+        XCTAssertEqual(DailyDays.left(26 * 3_600_000), "1d 2h")
+        XCTAssertEqual(DailyDays.left(5 * 3_600_000 + 12 * 60_000), "5h 12m")
+        XCTAssertEqual(DailyDays.left(-5), "0m")
+        let player = try JSONDecoder().decode(LobbyPlayer.self, from: Data("""
+        {"id":"a1b2c3d4e5f6","name":"Sam","rating":1450,"clock":null,"days":3,"waitingFor":0}
+        """.utf8))
+        XCTAssertEqual(player.clockLine, "Daily · 3 days")
+        XCTAssertTrue(player.plays(nil, days: 3))
+        XCTAssertFalse(player.plays(nil, days: nil))
+    }
+
     func testCancellingJustAsSomeoneTookYouOnOpensTheGame() async throws {
         let api = FakeChallengeAPI()
         let state = rated()

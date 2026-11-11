@@ -259,6 +259,8 @@ struct ChallengeGameView: View {
             line += " Leave for over \(game.graceWords) and \(game.opponentName) can claim the win."
         } else if game.isTimed {
             line += " If you leave, your clock keeps running."
+        } else if let days = game.days {
+            line += " You have \(DailyDays.label(days)) for each move: close the app between moves."
         }
         return line + " \(game.opponentName) is told if you take a screenshot."
     }
@@ -482,7 +484,7 @@ struct ChallengeGameView: View {
 
     /// "10+0 · You play White".
     private var lobbyDetail: String {
-        "\(game.clock?.label ?? "No clock") · You play \(game.seat.name)"
+        "\(game.paceLabel) · You play \(game.seat.name)"
     }
 
     /// The result beside Rematch, in one row about the dock's height, so it takes the dock's place
@@ -700,6 +702,8 @@ struct FriendPlate: View {
             Spacer(minLength: 8)
             if game.clock != nil, game.phase != .waiting || isMe {
                 FriendClockBox(game: game, seat: seat, theme: theme)
+            } else if game.days != nil, game.phase == .playing, game.state?.turn == seat {
+                FriendDaysBox(game: game, seat: seat, theme: theme)
             }
         }
         .padding(.horizontal, 4)
@@ -894,6 +898,37 @@ struct FriendClockBox: View {
     /// Light), or bright white on the older home.
     private var runningFace: Color { theme.screenTone?.ivory ?? Color.white.opacity(0.92) }
     private var runningInk: Color { theme.screenTone?.onIvory ?? Color.black.opacity(0.88) }
+}
+
+/// A daily game: the time the side to move has left, "1d 4h", in the same quiet box as a clock.
+struct FriendDaysBox: View {
+    let game: OnlineGame
+    let seat: FriendSeat
+    let theme: BoardTheme
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 30)) { _ in
+            let left = game.daysLeft() ?? 0
+            let urgent = left < 3_600_000
+            let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
+            HStack(spacing: 5) {
+                Image(systemName: "hourglass")
+                    .font(.system(size: 13, weight: .semibold))
+                Text(DailyDays.left(left))
+                    .font(.system(size: 17, weight: .medium).monospacedDigit())
+            }
+            .foregroundStyle(urgent ? ChallengeColors.urgent : theme.challengeAccent)
+            .lineLimit(1)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 6)
+            .background {
+                shape.fill(Color.primary.opacity(0.04))
+                    .overlay(shape.strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(seat.name) has \(DailyDays.left(left)) left to move")
+        }
+    }
 }
 
 /// A soft dot that breathes while the lobby waits.

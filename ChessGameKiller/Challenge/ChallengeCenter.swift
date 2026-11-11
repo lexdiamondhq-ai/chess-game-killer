@@ -204,6 +204,8 @@ final class ChallengeCenter {
         if holdsStill { return }
         if !force, let lastRefresh, Date.now.timeIntervalSince(lastRefresh) < Self.refreshInterval { return }
         lastRefresh = .now
+        // A daily game someone started while the app was closed joins the list first.
+        if case .online? = screen {} else { await PendingDailySeek.collect(api: api, store: store, defaults: defaults) }
         // Games still going, and finished ones not yet kept with the player's games.
         let due = store.games.filter { !$0.isOver || !$0.recorded }
         for record in due {

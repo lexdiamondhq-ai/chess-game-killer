@@ -241,7 +241,7 @@ async function lobbyRequest(request, env, url, path) {
   const lobby = lobbyRoom(env);
   if (path === "/api/lobby" || path === "/api/lobby/") {
     if (method !== "GET" && method !== "HEAD") return wrongMethod("GET");
-    return fromRoom(await lobby.list({ untimed: url.searchParams.get("untimed") === "1" }));
+    return fromRoom(await lobby.list({ untimed: url.searchParams.get("untimed") === "1", daily: url.searchParams.get("daily") === "1" }));
   }
   if (path === "/api/lobby/me" || path === "/api/lobby/me/") {
     if (method !== "POST") return wrongMethod("POST");
@@ -263,6 +263,7 @@ async function lobbyRequest(request, env, url, path) {
       playerHash: await hashToken(input.value.player),
       name: input.value.name,
       clock: input.value.clock,
+      days: input.value.days,
       look: input.value.look,
       pair: body.value.pair !== false,
     });

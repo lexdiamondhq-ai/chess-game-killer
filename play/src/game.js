@@ -51,6 +51,17 @@ export const IDLE_EXPIRY_MS = 30 * DAY;
 export const KEEP_FINISHED_MS = 30 * DAY;
 
 export const MAX_CLOCK_SECONDS = 3600;
+/** Daily games: the days each side has for every move. */
+export const DAYS_PER_MOVE = [1, 2, 3, 5, 7];
+
+/**
+ * Checks the days per move of a daily game: null (or left out) for none, otherwise one of DAYS_PER_MOVE.
+ */
+export function parseDays(days) {
+  if (days === null || days === undefined) return { ok: true, days: null };
+  if (!DAYS_PER_MOVE.includes(days)) return invalid(`"days" must be null or one of ${DAYS_PER_MOVE.join(", ")}.`);
+  return { ok: true, days };
+}
 export const MAX_INCREMENT_SECONDS = 60;
 
 const UCI_PATTERN = /^[a-h][1-8][a-h][1-8][qrbn]?$/;
@@ -140,7 +151,7 @@ function newSeat(name, tokenHash) {
  * A new game with its creator seated. A "random" side is settled here, once,
  * so the creator knows their color from the start. pickSide is for tests.
  */
-export function createGame({ code, name, side = "random", clock = null, look = null, tokenHash, now, leaveGraceMs = DEFAULT_LEAVE_GRACE_MS, pickSide = randomSide }) {
+export function createGame({ code, name, side = "random", clock = null, days = null, look = null, tokenHash, now, leaveGraceMs = DEFAULT_LEAVE_GRACE_MS, pickSide = randomSide }) {
   const seat = side === "white" || side === "black" ? side : pickSide();
   const game = {
     v: 1,
@@ -148,6 +159,8 @@ export function createGame({ code, name, side = "random", clock = null, look = n
     createdAt: now,
     updatedAt: now,
     clock: clock ? { initial: clock.initial, increment: clock.increment } : null,
+    // A daily game: no clock, but each move must come within this many days.
+    days: clock ? null : days ?? null,
     creator: seat,
     look: cleanLook(look),
     leaveGraceMs,
@@ -181,14 +194,14 @@ export function createGame({ code, name, side = "random", clock = null, look = n
  * to the lobby, which keeps the ratings. A game with no clock isn't rated.
  * Online games have no leave rule. White counts as the creator.
  */
-export function createPairedGame({ code, white, black, clock, look = null, rated, now, leaveGraceMs = DEFAULT_LEAVE_GRACE_MS }) {
-  const game = createGame({ code, name: white.name, side: "white", clock, look, tokenHash: white.tokenHash, now, leaveGraceMs });
+export function createPairedGame({ code, white, black, clock, days = null, look = null, rated, now, leaveGraceMs = DEFAULT_LEAVE_GRACE_MS }) {
+  const game = createGame({ code, name: white.name, side: "white", clock, days, look, tokenHash: white.tokenHash, now, leaveGraceMs });
   game.black = newSeat(black.name, black.tokenHash);
   game.joinedAt = now;
   game.lastMoveAt = now;
   game.online = true;
-  // Games without a clock are just for fun: not rated.
-  if (clock) {
+  // Games with no clock and no days per move are just for fun: not rated.
+  if (clock || game.days) {
     game.rated = {
       white: { player: rated.white.player, rating: rated.white.rating, games: rated.white.games },
       black: { player: rated.black.player, rating: rated.black.rating, games: rated.black.games },
@@ -235,6 +248,7 @@ export function rematchRecord(game, code, now, leaveGraceMs = game.leaveGraceMs)
     name: game.black.name,
     side: "white",
     clock: game.clock,
+    days: game.days ?? null,
     look: game.look,
     tokenHash: game.black.tokenHash,
     now,
@@ -356,9 +370,28 @@ function nextEvent(game) {
         : { at, winner: null, reason: "timeout_insufficient" },
     );
   }
+  const deadline = moveDeadline(game);
+  if (deadline !== null) {
+    // A daily game: the side to move runs out of days. Before both sides have
+    // moved that just calls the game off, like an abort.
+    const loser = turnOf(game);
+    const winner = other(loser);
+    if (game.moves.length < 2) events.push({ at: deadline, winner: null, reason: "aborted" });
+    else if (hasMatingMaterial(game.fen, winner)) events.push({ at: deadline, winner, reason: "timeout" });
+    else events.push({ at: deadline, winner: null, reason: "timeout_insufficient" });
+  }
   events.push({ at: (game.lastMoveAt ?? game.createdAt) + IDLE_EXPIRY_MS, winner: null, reason: "expired" });
   // The earliest wins; on a tie the first listed (a flag beats expiry).
   return events.reduce((first, event) => (event.at < first.at ? event : first));
+}
+
+/**
+ * In a daily game under way, when the side to move runs out of days (ms): their days
+ * count from the last move (or from when the game began). Null otherwise.
+ */
+export function moveDeadline(game) {
+  if (!game.days || game.result || statusOf(game) !== "active") return null;
+  return (game.lastMoveAt ?? game.joinedAt ?? game.createdAt) + game.days * DAY;
 }
 
 /**
@@ -665,9 +698,9 @@ export function act(game, seat, type, now) {
   }
 }
 
-/** An online game with no clock is just for fun: either side may end it with no result at any time. */
+/** An online game with no clock (and no days per move) is just for fun: either side may end it with no result at any time. */
 export function endsAnyTime(game) {
-  return isOnline(game) && game.clock === null;
+  return isOnline(game) && game.clock === null && !game.days;
 }
 
 /** Paired in the online lobby (games from before `online` was kept are the rated ones). */
@@ -752,6 +785,8 @@ export function view(game, now, connected = {}) {
     createdAt: game.createdAt,
     updatedAt: game.updatedAt,
     clock: game.clock ? { initial: game.clock.initial, increment: game.clock.increment } : null,
+    days: game.days ?? null,
+    deadline: moveDeadline(game),
     creator: game.creator,
     look: game.look ?? null,
     white: seatView(game, "white", connected.white),
