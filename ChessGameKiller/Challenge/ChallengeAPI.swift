@@ -26,8 +26,8 @@ enum ChallengeAction: String, Sendable {
 /// The game server, as the app uses it. The live one talks to play/; tests use a fake.
 @MainActor
 protocol ChallengeAPI: AnyObject {
-    /// Makes a challenge. `side` is the creator's; `clock` nil for no clock.
-    func create(name: String, side: SideChoice, clock: FriendClock?) async throws -> CreatedChallenge
+    /// Makes a challenge. `side` is the creator's; `clock` nil for no clock, and then `days` per move for a daily game.
+    func create(name: String, side: SideChoice, clock: FriendClock?, days: Int?) async throws -> CreatedChallenge
     func game(_ code: String) async throws -> FriendGameState
     /// Takes the open seat, or with a token that already holds one, gets that seat back.
     func join(_ code: String, name: String, token: String?) async throws -> SeatTicket
@@ -89,8 +89,9 @@ final class LiveChallengeAPI: ChallengeAPI {
         self.session = session
     }
 
-    func create(name: String, side: SideChoice, clock: FriendClock?) async throws -> CreatedChallenge {
-        try await send("POST", "api/games", body: CreateBody(name: name, side: side.rawValue, clock: clock, look: Self.currentLook()))
+    func create(name: String, side: SideChoice, clock: FriendClock?, days: Int?) async throws -> CreatedChallenge {
+        try await send("POST", "api/games", body: CreateBody(name: name, side: side.rawValue, clock: days == nil ? clock : nil,
+                                                             days: days, look: Self.currentLook()))
     }
 
     func game(_ code: String) async throws -> FriendGameState {
@@ -175,10 +176,11 @@ final class LiveChallengeAPI: ChallengeAPI {
         let name: String
         let side: String
         let clock: FriendClock?
+        let days: Int?
         let look: String
 
         enum CodingKeys: String, CodingKey {
-            case name, side, clock, look
+            case name, side, clock, days, look
         }
 
         // No clock is sent as an explicit null, as the protocol spells it.
@@ -187,6 +189,7 @@ final class LiveChallengeAPI: ChallengeAPI {
             try container.encode(name, forKey: .name)
             try container.encode(side, forKey: .side)
             try container.encode(clock, forKey: .clock)
+            try container.encodeIfPresent(days, forKey: .days)
             try container.encode(look, forKey: .look)
         }
     }

@@ -15,14 +15,11 @@ struct OnlineLobbyView: View {
     /// With ∞ picked: the days per move of a daily game, or 0 for no limit.
     @AppStorage("online.days") private var dailyDays = 0
     @AppStorage("haptics") private var hapticsOn = true
-    /// More times is folded open. It starts open when the picked clock lives there.
-    @State private var showsMore: Bool?
 
     /// The server's clock for the pick; nil for no clock.
     private var clock: FriendClock? { OnlineLobby.clock(id: clockID) }
     /// The days per move when ∞ is picked with a limit; nil otherwise.
     private var days: Int? { clock == nil && DailyDays.options.contains(dailyDays) ? dailyDays : nil }
-    private var isMoreOpen: Bool { showsMore ?? !OnlineLobby.quickPicks.contains(clock) }
 
     var body: some View {
         ScrollView {
@@ -60,7 +57,6 @@ struct OnlineLobbyView: View {
         .animation(.snappy(duration: 0.3), value: lobby.phase)
         .sensoryFeedback(.selection, trigger: clockID) { _, _ in hapticsOn }
         .sensoryFeedback(.selection, trigger: dailyDays) { _, _ in hapticsOn }
-        .animation(.snappy(duration: 0.3), value: clock == nil)
         .sensoryFeedback(.success, trigger: lobby.phase) { _, new in hapticsOn && new == .starting }
     }
 
@@ -81,73 +77,8 @@ struct OnlineLobbyView: View {
     }
 
     private var clockPicker: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ChallengeSectionTitle(title: "Clock")
-            HStack(spacing: 8) {
-                ForEach(OnlineLobby.quickPicks, id: \.self) { option in
-                    clockChip(option)
-                }
-            }
-            Button {
-                withAnimation(.snappy(duration: 0.3)) { showsMore = !isMoreOpen }
-            } label: {
-                HStack(spacing: 4) {
-                    Text("More times")
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 11, weight: .bold))
-                        .rotationEffect(.degrees(isMoreOpen ? 180 : 0))
-                }
-                .font(theme.challengeFont(14, .semibold))
-                .foregroundStyle(theme.challengeAccent)
-                .frame(maxWidth: .infinity, minHeight: 32)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(isMoreOpen ? "Fewer times" : "More times")
-            if clock == nil {
-                OnlineDaysStepper(days: $dailyDays, theme: theme)
-                    .disabled(lobby.isSearching)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-            if isMoreOpen {
-                moreClocks
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-            Text(OnlineLobby.detail(clock, days: days))
-                .font(theme.challengeFont(12))
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    /// Bullet, Blitz, Rapid and Classical, each a row of chips, on a glass card.
-    private var moreClocks: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ForEach(OnlineLobby.moreClocks) { group in
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(group.name.uppercased())
-                        .font(theme.challengeFont(11.5, .semibold))
-                        .tracking(0.8)
-                        .foregroundStyle(.secondary)
-                        .accessibilityAddTraits(.isHeader)
-                    HStack(spacing: 6) {
-                        ForEach(group.clocks, id: \.self) { option in
-                            clockChip(option, size: 14)
-                        }
-                    }
-                }
-            }
-        }
-        .padding(14)
-        .challengeGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
-    }
-
-    private func clockChip(_ option: FriendClock?, size: CGFloat = 15) -> some View {
-        ChallengeChip(title: option?.label ?? "∞", isOn: clock == option, theme: theme,
-                      size: option == nil ? 24 : size) {
-            withAnimation(.snappy(duration: 0.3)) { clockID = OnlineLobby.clockID(option) }
-        }
-        .accessibilityLabel(OnlineLobby.detail(option))
-        .disabled(lobby.isSearching)
+        ChallengeClockPicker(clockID: $clockID, dailyDays: $dailyDays, theme: theme, locked: lobby.isSearching,
+                             detail: { OnlineLobby.detail($0, days: $1) })
     }
 
     @ViewBuilder

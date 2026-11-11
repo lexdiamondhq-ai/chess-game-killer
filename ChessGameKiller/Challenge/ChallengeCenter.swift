@@ -311,14 +311,14 @@ final class ChallengeComposer {
         }
     }
 
-    func create(name: String, clock: FriendClock?, side: SideChoice) async {
+    func create(name: String, clock: FriendClock?, days: Int? = nil, side: SideChoice) async {
         guard !isCreating, created == nil, let center else { return }
         isCreating = true
         problem = nil
         defer { isCreating = false }
         center.rememberName(name)
         do {
-            let reply = try await center.api.create(name: ChallengeName.clean(name), side: side, clock: clock)
+            let reply = try await center.api.create(name: ChallengeName.clean(name), side: side, clock: clock, days: clock == nil ? days : nil)
             let record = FriendGame(code: reply.code, token: reply.token, seat: reply.seat, state: reply.game)
             center.store.add(record)
             // Closed while the challenge was being made: it waits in Friend games, with nothing left running.

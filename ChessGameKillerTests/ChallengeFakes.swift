@@ -11,6 +11,7 @@ final class FakeChallengeAPI: ChallengeAPI {
         let name: String
         let side: SideChoice
         let clock: FriendClock?
+        var days: Int? = nil
     }
 
     struct JoinRequest: Equatable {
@@ -58,8 +59,8 @@ final class FakeChallengeAPI: ChallengeAPI {
 
     static let notFound = ChallengeError.server(status: 404, code: "not_found", message: nil, game: nil)
 
-    func create(name: String, side: SideChoice, clock: FriendClock?) async throws -> CreatedChallenge {
-        creates.append(CreateRequest(name: name, side: side, clock: clock))
+    func create(name: String, side: SideChoice, clock: FriendClock?, days: Int?) async throws -> CreatedChallenge {
+        creates.append(CreateRequest(name: name, side: side, clock: clock, days: days))
         if let failure { throw failure }
         guard let created else { throw ChallengeError.unreachable }
         games[created.code] = created.game

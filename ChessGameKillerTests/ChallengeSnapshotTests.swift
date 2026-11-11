@@ -14,7 +14,7 @@ final class ChallengeSnapshotTests: XCTestCase {
 
     private let defaults = UserDefaults.standard
     private var saved: [String: Any?] = [:]
-    private static let keys = ["boardTheme", "sculpted3D", ChallengeName.key, "challenge.clock", "challenge.side", "online.clock", "online.days",
+    private static let keys = ["boardTheme", "sculpted3D", ChallengeName.key, "challenge.clock", "challenge.days", "challenge.side", "online.clock", "online.days",
                                FriendDirectory.youKey, FriendDirectory.peopleKey]
 
     /// The phone's own time, for games that must look recent. Clocks and absences count from the server's `now`.

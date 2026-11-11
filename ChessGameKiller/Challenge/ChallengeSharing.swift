@@ -95,19 +95,19 @@ struct ChallengeInviteContent: Equatable {
     let subject: String
     let emailBody: String
 
-    init(code: String, url: URL, from name: String, clock: FriendClock?, friendPlays side: FriendSeat) {
+    init(code: String, url: URL, from name: String, clock: FriendClock?, days: Int? = nil, friendPlays side: FriendSeat) {
         self.url = url
         self.code = code
-        message = ChallengeInviteText.message(from: name, clock: clock, friendPlays: side, url: url)
-        lead = ChallengeInviteText.lead(from: name, clock: clock, friendPlays: side)
+        message = ChallengeInviteText.message(from: name, clock: clock, days: days, friendPlays: side, url: url)
+        lead = ChallengeInviteText.lead(from: name, clock: clock, days: days, friendPlays: side)
         subject = ChallengeInviteText.subject(from: name)
-        emailBody = ChallengeInviteText.emailBody(from: name, clock: clock, friendPlays: side, url: url, code: code)
+        emailBody = ChallengeInviteText.emailBody(from: name, clock: clock, days: days, friendPlays: side, url: url, code: code)
     }
 
     /// The invite to a player's own game, from its record.
     init(game: FriendGame, name: String) {
         self.init(code: game.code, url: ChallengeLink.inviteURL(for: game.code), from: name, clock: game.clock,
-                  friendPlays: game.seat.opposite)
+                  days: game.days, friendPlays: game.seat.opposite)
     }
 }
 
