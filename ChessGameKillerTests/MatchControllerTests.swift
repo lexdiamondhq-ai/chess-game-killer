@@ -643,6 +643,42 @@ final class MatchControllerTests: XCTestCase {
         XCTAssertEqual(sounds.played.last, .victory)
     }
 
+    func testARivalTakesADrawInALevelPosition() async {
+        let sounds = SilentSounds()
+        let match = MatchController(engine: FakeEngine(score: 0), sounds: sounds)
+        match.start(.init(opponent: .computer, playerColor: .white, level: .club))
+        XCTAssertFalse(match.canOfferDraw, "nothing to offer before the first move")
+        tapMove(match, "e2e4")
+        await waitUntil("the computer answers and looks again") { match.game.plyCount == 2 && match.evaluation != nil }
+        XCTAssertTrue(match.offerDraw())
+        XCTAssertEqual(match.outcome, .agreedDraw)
+        XCTAssertNil(match.winner)
+        XCTAssertTrue(match.isOver)
+        XCTAssertEqual(sounds.played.last, .gameOver)
+        XCTAssertNotNil(match.savedGame(), "a drawn game is kept, and counts as half a point")
+    }
+
+    func testARivalThatIsAheadTurnsTheDrawDown() async {
+        // Every position scores the person three pawns down on their turn.
+        let match = MatchController(engine: FakeEngine(score: -300), sounds: nil)
+        match.start(.init(opponent: .computer, playerColor: .white, level: .club))
+        tapMove(match, "e2e4")
+        await waitUntil("the computer answers and looks again") { match.game.plyCount == 2 && match.evaluation != nil }
+        XCTAssertFalse(match.offerDraw())
+        XCTAssertNil(match.outcome)
+        XCTAssertFalse(match.canOfferDraw, "not again right away")
+    }
+
+    func testWhenARivalTakesADraw() {
+        XCTAssertTrue(MatchController.rivalTakesDraw(evaluation: .centipawns(0), rival: .black))
+        XCTAssertTrue(MatchController.rivalTakesDraw(evaluation: .centipawns(-50), rival: .black), "half a pawn up is still level")
+        XCTAssertFalse(MatchController.rivalTakesDraw(evaluation: .centipawns(-120), rival: .black))
+        XCTAssertTrue(MatchController.rivalTakesDraw(evaluation: .centipawns(400), rival: .black), "a rival that is worse takes it")
+        XCTAssertFalse(MatchController.rivalTakesDraw(evaluation: .mate(3), rival: .white))
+        XCTAssertTrue(MatchController.rivalTakesDraw(evaluation: .mate(-3), rival: .white))
+        XCTAssertFalse(MatchController.rivalTakesDraw(evaluation: nil, rival: .white))
+    }
+
     func testCheckmatingTheRivalPlaysTheVictoryTheme() async {
         let sounds = SilentSounds()
         let match = MatchController(engine: FakeEngine(), sounds: sounds)
@@ -655,7 +691,7 @@ final class MatchControllerTests: XCTestCase {
     func testEveryRivalHasSomethingToSay() {
         let moments: [RivalMoment] = [
             .greeting, .tookPiece(.knight), .lostPiece(.queen), .givesCheck, .playerBlunder,
-            .playerGreatMove, .rivalResigns, .playerResigned, .rivalWins, .playerWins, .draw,
+            .playerGreatMove, .rivalResigns, .playerResigned, .rivalWins, .playerWins, .draw, .drawDeclined,
         ]
         for level in MatchController.Level.allCases {
             for moment in moments {
