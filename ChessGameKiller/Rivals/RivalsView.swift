@@ -582,7 +582,7 @@ struct RivalHallFilm<Ending: View>: View {
 }
 
 /// A rival's welcome: its film, full screen and with sound, opening from a point of torchlight;
-/// then, when it ends, its name, and Begin. A tap skips to the name; a swipe down goes back. Nothing sits over
+/// then, at the rival's moment, its name and Begin while the film plays on. A tap skips to the name; a swipe down goes back. Nothing sits over
 /// the art. The film's last frame holds behind it.
 struct RivalWelcome: View {
     let film: RivalFilm
@@ -696,11 +696,10 @@ struct RivalWelcome: View {
         self.player = player
         if !Welcome.isUnderTest { player.play() }
         withAnimation(reduceMotion ? .easeOut(duration: 0.4) : .easeOut(duration: 1.8)) { iris = 1 }
-        // The name and Begin rise when the film ends (Alex, 2026-11-10: "the buttons to play
-        // the rival should appear at the end of each video"); a tap still brings them sooner.
-        let length = (try? await player.currentItem?.asset.load(.duration)).flatMap { $0.isNumeric ? $0.seconds : nil }
-        let wait = Welcome.isUnderTest ? film.beat + 0.8 : (length ?? film.beat + 0.8)
-        try? await Task.sleep(for: .seconds(wait))
+        // The name and Begin rise at the rival's moment, a few seconds in, and the film plays on
+        // beneath them to its end (Alex, 2026-11-11: waiting the whole film "takes too long").
+        // A tap still brings them sooner.
+        try? await Task.sleep(for: .seconds(film.beat + 0.8))
         guard !Task.isCancelled else { return }
         showTitle()
     }
