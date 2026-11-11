@@ -1188,7 +1188,7 @@ extension HomeView {
         }
     }
 
-    /// You: the home's colors, your games, Settings and Pro.
+    /// You: the home's colors, your games, Settings and Premium.
     private var sheetYou: some View {
         VStack(alignment: .leading, spacing: Self.gap) {
             sheetCard {
@@ -1210,7 +1210,7 @@ extension HomeView {
                     .homeRise(1)
                 if let premium = actions.premium {
                     HomeHairline(tone: tone)
-                    HomeLinkRow(glyph: Glyphs.king, title: "Beauty of Chess Pro", detail: "Everything, with no limits", tone: tone, action: premium)
+                    HomeLinkRow(glyph: Glyphs.king, title: "Premium", detail: "Everything, with no limits", tone: tone, action: premium)
                         .homeRise(2)
                 }
             }
