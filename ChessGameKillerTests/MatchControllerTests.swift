@@ -663,7 +663,11 @@ final class MatchControllerTests: XCTestCase {
         let match = MatchController(engine: FakeEngine(score: -300), sounds: nil)
         match.start(.init(opponent: .computer, playerColor: .white, level: .club))
         tapMove(match, "e2e4")
-        await waitUntil("the computer answers and looks again") { match.game.plyCount == 2 && match.evaluation != nil }
+        // The grade of 1.e4 shows White three pawns up (+300) until the look at the position
+        // after the reply lands, so wait for that look itself, not just any evaluation.
+        await waitUntil("the computer answers and looks again") {
+            match.game.plyCount == 2 && match.evaluation == .centipawns(-300)
+        }
         XCTAssertFalse(match.offerDraw())
         XCTAssertNil(match.outcome)
         XCTAssertFalse(match.canOfferDraw, "not again right away")
