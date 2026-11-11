@@ -48,6 +48,9 @@ final class BroadcastStage {
     /// pictures, where the still plate stands in.
     private(set) var king: Track?
     private(set) var knight: Track?
+    /// The dragons' wing beats, laid over the top of the King's films. Nil before the scene
+    /// runs, and if its film or mask is missing: the dragons then hold still, as painted.
+    private(set) var sky: BroadcastFilmView?
 
     @ObservationIgnored private var script = BroadcastScript()
     @ObservationIgnored private weak var match: MatchController?
@@ -58,6 +61,8 @@ final class BroadcastStage {
     @ObservationIgnored private var kingFreeAt: CFTimeInterval = 0
     /// The endings are playing, or waiting on the last move's film.
     @ObservationIgnored private var ended = false
+    /// The dragons' film is on show: not during a storm or an ending, where the sky is the King's.
+    @ObservationIgnored private var skyShown = false
 
     /// The still both figures start from, shown until the films are playing.
     static let plate: UIImage? = image("broadcast-plate", "jpg")
@@ -70,6 +75,8 @@ final class BroadcastStage {
     private static func masks() -> [UIImage] {
         ["broadcast-knight-mask", "broadcast-knight-strip", "broadcast-knight-strip-wide"].compactMap { image($0, "png") }
     }
+
+    private static let skyURL = Bundle.main.url(forResource: BroadcastScript.skyFilm, withExtension: "mp4")
 
     // MARK: On and off the screen
 
@@ -95,6 +102,12 @@ final class BroadcastStage {
         }
         self.king = king
         self.knight = knight
+        if let mask = Self.image("broadcast-sky-mask", "png"), Self.skyURL != nil {
+            let sky = BroadcastFilmView(masks: [mask])
+            sky.onEnd = { [weak self] in self?.skyLoops() }
+            self.sky = sky
+        }
+        skyShown = false
         // The King's move waits for his hand.
         match.rivalStage = { [weak self] uci in
             await self?.kingActs(uci)
@@ -111,7 +124,7 @@ final class BroadcastStage {
             await BroadcastStage.pause(BroadcastStage.kingFollows)
             // Unless his hand is already out: a move he had chosen as the phone turned.
             guard let self, self.run == run, let king = self.king, king.clip == nil else { return }
-            king.play(BroadcastScript.opening(.king))
+            self.play(BroadcastScript.opening(.king), onKing: king)
         }
     }
 
@@ -125,14 +138,18 @@ final class BroadcastStage {
         match = nil
         king?.view.stop()
         knight?.view.stop()
+        sky?.stop()
         king = nil
         knight = nil
+        sky = nil
+        skyShown = false
     }
 
     /// The app left the screen or came back: the films wait with it.
     func setPaused(_ paused: Bool) {
         king?.view.setPaused(paused)
         knight?.view.setPaused(paused)
+        sky?.setPaused(paused)
     }
 
     // MARK: Following the game
@@ -169,7 +186,7 @@ final class BroadcastStage {
         knight?.view.clearStrips()
         king?.upNext = nil
         knight?.upNext = nil
-        king?.play(BroadcastScript.opening(.king))
+        if let king { play(BroadcastScript.opening(.king), onKing: king) }
         knight?.play(BroadcastScript.opening(.knight))
     }
 
@@ -183,6 +200,13 @@ final class BroadcastStage {
         } else if played.isCapture {
             // His hand is already on the piece (`kingActs`); what follows is his satisfaction.
             king?.upNext = .king("pleased")
+            // The challenger feels it, unless that move ended the game: then the endings follow.
+            guard !match.isOver, let knight else { return }
+            if knight.busyFor > 0 {
+                knight.upNext = BroadcastScript.wince
+            } else {
+                play(BroadcastScript.wince, on: knight)
+            }
         }
     }
 
@@ -199,7 +223,7 @@ final class BroadcastStage {
             await BroadcastStage.pause(BroadcastScript.stormDelay)
             guard let self, self.run == run, !self.ended, let king = self.king else { return }
             king.upNext = nil
-            king.play(storm)
+            self.play(storm, onKing: king)
         }
     }
 
@@ -215,7 +239,7 @@ final class BroadcastStage {
         let cue = BroadcastScript.kingMoves(uci: uci, color: color,
                                             captures: BroadcastScript.captures(uci: uci, in: match.game))
         king.upNext = nil
-        guard king.play(cue.reach), let touch = cue.reach.touch else { return }
+        guard play(cue.reach, onKing: king), let touch = cue.reach.touch else { return }
         await BroadcastStage.pause(touch, while: { [weak self] in self?.run == run })
     }
 
@@ -239,7 +263,7 @@ final class BroadcastStage {
                 Task { @MainActor [weak self] in
                     await BroadcastStage.pause(kingAfter)
                     guard let self, self.run == run, let king = self.king, king.clip == nil else { return }
-                    king.play(BroadcastScript.opening(.king))
+                    self.play(BroadcastScript.opening(.king), onKing: king)
                 }
             }
             return
@@ -253,7 +277,7 @@ final class BroadcastStage {
             self.play(ending.knight, on: knight)
             if kingAfter > 0 { await BroadcastStage.pause(kingAfter) }
             guard self.run == run else { return }
-            king.play(ending.king)
+            self.play(ending.king, onKing: king)
         }
     }
 
@@ -266,8 +290,31 @@ final class BroadcastStage {
         if track.figure == .knight {
             play(next, on: track)
         } else {
-            track.play(next)
+            play(next, onKing: track)
         }
+    }
+
+    /// Plays one of the King's films. The dragons beat their wings over all of them but the
+    /// ones where the sky is his own (the storms, the endings): for those they stand aside,
+    /// and they come back with the film after, which starts as theirs does, on the still pose.
+    @discardableResult
+    private func play(_ clip: BroadcastClip, onKing king: Track) -> Bool {
+        guard king.play(clip) else { return false }
+        setSky(shown: !clip.ownsSky)
+        return true
+    }
+
+    private func setSky(shown: Bool) {
+        guard let sky, shown != skyShown else { return }
+        skyShown = shown
+        sky.setAside(!shown, over: 0.3)
+        if shown { skyLoops() }
+    }
+
+    /// The dragons' film from its start: now, and again each time it comes round.
+    private func skyLoops() {
+        guard skyShown, let sky, let url = Self.skyURL else { return }
+        sky.show(url, fade: BroadcastScript.fade, handover: BroadcastScript.handover)
     }
 
     /// Plays one of the challenger's films, widening his mask over the table while his arm
