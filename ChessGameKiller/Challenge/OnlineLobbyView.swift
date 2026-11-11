@@ -34,7 +34,7 @@ struct OnlineLobbyView: View {
                 }
                 clockPicker
                 waitingList
-                OnlineFairPlayCard(theme: theme)
+                OnlineFairPlayCard(theme: theme, clock: clock, days: days)
             }
             .frame(maxWidth: 560)
             .frame(maxWidth: .infinity)
@@ -70,7 +70,9 @@ struct OnlineLobbyView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Play someone online")
                 .font(theme.challengeFont(30, .bold))
-            Text("Rated games with players waiting now. Take one on, or find a game at your clock.")
+            Text(clock == nil && days == nil
+                 ? "Games just for fun with players waiting now. Take one on, or find a game."
+                 : "Rated games with players waiting now. Take one on, or find a game at your clock.")
                 .font(theme.challengeFont(15))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -461,8 +463,22 @@ struct OnlineLiveDot: View {
 /// The fair-play promise for games with players online.
 struct OnlineFairPlayCard: View {
     let theme: BoardTheme
+    /// The picked clock (nil: none) and, with none, the days per move of a daily game.
+    var clock: FriendClock? = FriendClock(initial: 300, increment: 0)
+    var days: Int?
 
-    static let text = "Online games are fair: no hints or analysis. If you leave the app, your clock keeps running. Screenshots are reported, and you can report a name or cheating from the game."
+    /// The rules, for the pick: what leaving the app does follows the clock.
+    static func text(clock: FriendClock?, days: Int?) -> String {
+        let leaving: String
+        if clock != nil {
+            leaving = "If you leave the app, your clock keeps running."
+        } else if let days {
+            leaving = "You have \(DailyDays.label(days)) for each move, so close the app between moves."
+        } else {
+            leaving = "Leave and come back whenever you like."
+        }
+        return "Online games are fair: no hints or analysis. \(leaving) Screenshots are reported, and you can report a name or cheating from the game."
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -474,7 +490,7 @@ struct OnlineFairPlayCard: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("Fair play")
                     .font(theme.challengeFont(15, .semibold))
-                Text(Self.text)
+                Text(Self.text(clock: clock, days: days))
                     .font(theme.challengeFont(13))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
