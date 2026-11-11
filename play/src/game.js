@@ -125,9 +125,12 @@ export function parseCreateInput(body, { minClockSeconds = 60 } = {}) {
   if (name !== null && typeof name !== "string") return invalid('"name" must be text.');
   const side = input.side ?? "random";
   if (!SIDES.includes(side)) return invalid('"side" must be "white", "black" or "random".');
-  const clock = parseClock(input.clock, minClockSeconds);
+  // Days per move (a daily game) instead of a clock.
+  const days = parseDays(input.days);
+  if (!days.ok) return days;
+  const clock = days.days ? { ok: true, clock: null } : parseClock(input.clock, minClockSeconds);
   if (!clock.ok) return clock;
-  return { ok: true, value: { name: cleanName(name), side, clock: clock.clock, look: cleanLook(input.look) } };
+  return { ok: true, value: { name: cleanName(name), side, clock: clock.clock, days: days.days, look: cleanLook(input.look) } };
 }
 
 /**

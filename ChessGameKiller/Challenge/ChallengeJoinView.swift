@@ -74,7 +74,7 @@ struct ChallengeJoinView: View {
                     .font(theme.challengeFont(27, .bold))
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
-                Text("\(ChallengeInviteText.clockWords(state.clock)) · You play \(mySeat.name)")
+                Text("\(ChallengeInviteText.clockWords(state.clock, days: state.days)) · You play \(mySeat.name)")
                     .font(theme.challengeFont(16, .medium))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

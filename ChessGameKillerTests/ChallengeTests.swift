@@ -780,6 +780,25 @@ final class ChallengeTests: XCTestCase {
         center.dismiss()
     }
 
+    func testADailyChallengeSendsItsDaysAndSaysThemInTheInvite() async throws {
+        let api = FakeChallengeAPI()
+        var waiting = FriendGameState.sample(status: .waiting, clock: nil)
+        waiting.days = 3
+        api.created = CreatedChallenge(code: waiting.code, url: "https://play.chess-game-killer.workers.dev/c/7KQ2XM",
+                                       appUrl: "chessgamekiller://c/7KQ2XM", seat: .white, token: "token-white", game: waiting)
+        let center = ChallengeCenter(api: api, store: ChallengeStore(), sounds: nil, defaults: defaults)
+        center.compose()
+        guard case .composer(let composer)? = center.screen else { return XCTFail("the composer should be up") }
+        await composer.create(name: "Alex", clock: nil, days: 3, side: .white)
+        XCTAssertEqual(api.creates, [FakeChallengeAPI.CreateRequest(name: "Alex", side: .white, clock: nil, days: 3)])
+        let record = try XCTUnwrap(composer.created)
+        XCTAssertEqual(record.days, 3)
+        XCTAssertEqual(ChallengeInviteContent(game: record, name: "Alex").lead,
+                       "Alex challenged you to chess on Beauty of Chess. 3 days a move, you play Black.")
+        XCTAssertEqual(ChallengeComposerView.detail(nil, days: nil), "Take all the time you like")
+        center.dismiss()
+    }
+
     func testCreatingAChallengeKeepsItAndGoesToTheBoardWhenTheFriendJoins() async throws {
         let api = FakeChallengeAPI()
         let waiting = FriendGameState.sample(status: .waiting)

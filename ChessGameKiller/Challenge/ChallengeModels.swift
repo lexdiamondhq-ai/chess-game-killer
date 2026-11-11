@@ -576,6 +576,9 @@ enum FriendResultWords {
         if let clock = state.clock {
             parts.append(clock.kind)
             parts.append(clock.label)
+        } else if let days = state.days {
+            parts.append("Daily")
+            parts.append(DailyDays.phrase(days))
         } else {
             parts.append("No clock")
         }
@@ -587,29 +590,30 @@ enum FriendResultWords {
 
 /// The words of an invite: the text message, the email and the share sheet.
 enum ChallengeInviteText {
-    /// "10 minutes each" or "No clock", capitalized to open a sentence.
-    static func clockWords(_ clock: FriendClock?) -> String {
+    /// "10 minutes each", "2 days a move" or "No clock", capitalized to open a sentence.
+    static func clockWords(_ clock: FriendClock?, days: Int? = nil) -> String {
+        if clock == nil, let days { return DailyDays.phrase(days) }
         guard let clock else { return "No clock" }
         let phrase = clock.phrase
         return phrase.prefix(1).uppercased() + phrase.dropFirst()
     }
 
     /// "Alex challenged you to chess on Beauty of Chess. 10 minutes each, you play Black. Tap to play: …"
-    static func message(from name: String, clock: FriendClock?, friendPlays side: FriendSeat, url: URL) -> String {
-        "\(lead(from: name, clock: clock, friendPlays: side)) Tap to play: \(url.absoluteString)"
+    static func message(from name: String, clock: FriendClock?, days: Int? = nil, friendPlays side: FriendSeat, url: URL) -> String {
+        "\(lead(from: name, clock: clock, days: days, friendPlays: side)) Tap to play: \(url.absoluteString)"
     }
 
     /// The message without its link, for the share sheet, which sends the link itself.
-    static func lead(from name: String, clock: FriendClock?, friendPlays side: FriendSeat) -> String {
-        "\(sender(name)) challenged you to chess on Beauty of Chess. \(clockWords(clock)), you play \(side.name)."
+    static func lead(from name: String, clock: FriendClock?, days: Int? = nil, friendPlays side: FriendSeat) -> String {
+        "\(sender(name)) challenged you to chess on Beauty of Chess. \(clockWords(clock, days: days)), you play \(side.name)."
     }
 
     static func subject(from name: String) -> String {
         "\(sender(name)) challenged you to a game of chess"
     }
 
-    static func emailBody(from name: String, clock: FriendClock?, friendPlays side: FriendSeat, url: URL, code: String) -> String {
-        message(from: name, clock: clock, friendPlays: side, url: url)
+    static func emailBody(from name: String, clock: FriendClock?, days: Int? = nil, friendPlays side: FriendSeat, url: URL, code: String) -> String {
+        message(from: name, clock: clock, days: days, friendPlays: side, url: url)
             + "\n\nOr open Beauty of Chess and enter the code \(ChallengeLink.spaced(code))."
     }
 
