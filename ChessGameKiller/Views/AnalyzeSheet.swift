@@ -259,6 +259,23 @@ private struct PhotoPillStyle: ButtonStyle {
     }
 }
 
+/// No frosted fade where the page scrolls under the photo buttons: the moves stay readable
+/// right down to the bottom.
+private struct ClearBottomEdge: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) {
+            content.scrollEdgeEffectHidden(true, for: .bottom)
+        } else {
+            content
+        }
+        #else
+        content
+        #endif
+    }
+}
+
 /// A big tappable row on the analyzer's first screen.
 private struct StartCard: View {
     let symbol: String
@@ -793,15 +810,17 @@ struct AnalysisView: View {
                     }
                     .labelStyle(.iconOnly)
                     .buttonStyle(PhotoPillStyle(accent: accent))
-                    .background(.ultraThinMaterial, in: Capsule())
+                    // Clear glass with no strip behind it, so the moves show through
+                    // (Alex, 2026-11-11: "more clear and glassy so you can see the moves").
+                    .glassPane(Capsule(), weight: .clear)
                     .overlay(Capsule().strokeBorder(accent.opacity(0.3), lineWidth: 1))
                     .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
-                .background(.ultraThinMaterial.opacity(0.9), ignoresSafeAreaEdges: .bottom)
             }
         }
+        .modifier(ClearBottomEdge())
         .navigationTitle("Analysis")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
