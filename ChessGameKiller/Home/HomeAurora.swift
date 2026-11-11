@@ -530,23 +530,65 @@ struct HomeAuroraView: View {
         // playing, show that and allow them to swipe through for other games they may have and
         // today's move").
         todayPager
-        if let finest = info.finest {
-            HomeAuroraFinestRow(finest: finest, palette: palette) { actions.replay(finest.gameID) }
+        // The things for today sit under it as four tiles, two by two (Alex, 2026-11-11: picked
+        // "Four tiles" over the long rows). With an odd number, the last one keeps the long row.
+        let items: [TodayItem] = todayItems
+        Grid(horizontalSpacing: 10, verticalSpacing: 10) {
+            ForEach(Array(stride(from: 0, to: items.count, by: 2)), id: \.self) { start in
+                if start + 1 < items.count {
+                    GridRow {
+                        todayItem(items[start], tile: true)
+                        todayItem(items[start + 1], tile: true)
+                    }
+                } else {
+                    todayItem(items[start], tile: false)
+                        .gridCellColumns(2)
+                }
+            }
         }
-        HomeAuroraRow(eyebrow: "Puzzles", title: "Sharpen your eye", detail: "Tactics at your level, one after another",
-                      accent: palette.violet, palette: palette, action: actions.puzzles) {
-            HomeAuroraJewel(glyph: Glyphs.fineEye, stone: .amethyst)
-        }
-        HomeAuroraRow(eyebrow: "Coach Leo", title: stage.plan?.title ?? "Today's lesson", detail: coachLine,
-                      accent: palette.teal, palette: palette, action: actions.stage.coach) {
-            HomeAuroraJewel(glyph: Glyphs.fineLaurel, stone: .jade)
-        }
-        // Analyze is the gold knight, its one button on Home (Alex, 2026-11-08), so it has no
-        // row here. The game of the day, which the board up top plays, opens from its own row.
-        if let masterpiece = stage.masterpiece {
-            HomeAuroraRow(eyebrow: "Game of the day", title: masterpiece.title, detail: masterpiece.players,
-                          accent: palette.gold, palette: palette, action: openMasterpiece) {
-                HomeAuroraBoard(fen: masterpiece.frames.first, flipped: masterpiece.flipped, lit: false)
+    }
+
+    /// One of today's things under Today's Move.
+    private enum TodayItem: Hashable {
+        case finest, puzzles, coach, masterpiece
+    }
+
+    /// Today's things in order: your finest move, Puzzles, Coach Leo, the game of the day.
+    private var todayItems: [TodayItem] {
+        var items: [TodayItem] = []
+        if info.finest != nil { items.append(.finest) }
+        items.append(.puzzles)
+        items.append(.coach)
+        if stage.masterpiece != nil { items.append(.masterpiece) }
+        return items
+    }
+
+    @ViewBuilder
+    private func todayItem(_ item: TodayItem, tile: Bool) -> some View {
+        switch item {
+        case .finest:
+            if let finest = info.finest {
+                HomeAuroraFinestRow(finest: finest, palette: palette, tile: tile) { actions.replay(finest.gameID) }
+            }
+        case .puzzles:
+            HomeAuroraRow(eyebrow: "Puzzles", title: "Sharpen your eye",
+                          detail: tile ? "Tactics at your level" : "Tactics at your level, one after another",
+                          accent: palette.violet, palette: palette, tile: tile, action: actions.puzzles) {
+                HomeAuroraJewel(glyph: Glyphs.fineEye, stone: .amethyst)
+            }
+        case .coach:
+            HomeAuroraRow(eyebrow: "Coach Leo", title: stage.plan?.title ?? "Today's lesson", detail: coachLine,
+                          accent: palette.teal, palette: palette, tile: tile, action: actions.stage.coach) {
+                HomeAuroraJewel(glyph: Glyphs.fineLaurel, stone: .jade)
+            }
+        case .masterpiece:
+            // Analyze is the gold knight, its one button on Home (Alex, 2026-11-08), so it has no
+            // card here. The game of the day, which the board up top plays, opens from its own.
+            if let masterpiece = stage.masterpiece {
+                HomeAuroraRow(eyebrow: "Game of the day", title: masterpiece.title, detail: masterpiece.players,
+                              accent: palette.gold, palette: palette, tile: tile, action: openMasterpiece) {
+                    HomeAuroraBoard(fen: masterpiece.frames.first, flipped: masterpiece.flipped, lit: false)
+                }
             }
         }
     }
@@ -908,52 +950,94 @@ struct HomeRivalFrame: View {
 }
 
 /// A long row for one of today's things: a thin color edge, small caps, a serif title, a line,
-/// and a picture at the right.
+/// and a picture at the right. As a tile (half the width, two by two), the picture sits on top.
 struct HomeAuroraRow<Picture: View>: View {
     let eyebrow: String
     let title: String
     let detail: String
     let accent: Color
     let palette: HomeAuroraPalette
+    var tile: Bool = false
     let action: () -> Void
     @ViewBuilder let picture: () -> Picture
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
         Button(action: action) {
-            HStack(spacing: 14) {
-                Capsule()
-                    .fill(LinearGradient(colors: [accent, accent.opacity(0.2)], startPoint: .top, endPoint: .bottom))
-                    .frame(width: 3)
-                    .padding(.vertical, 4)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(eyebrow.uppercased())
-                        .font(.system(size: 10.5, weight: .bold))
-                        .tracking(1.3)
-                        .foregroundStyle(accent)
-                    Text(title)
-                        .font(.system(size: 19, weight: .regular, design: .serif))
-                        .foregroundStyle(palette.ink)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                    Text(detail)
-                        .font(.system(size: 12.5))
-                        .foregroundStyle(palette.ink2)
-                        .lineLimit(1)
+            Group {
+                if tile {
+                    tileBody
+                } else {
+                    rowBody
                 }
-                Spacer(minLength: 0)
-                picture()
-                    .frame(width: 64, height: 64)
             }
-            .padding(.vertical, 12)
-            .padding(.leading, 14)
-            .padding(.trailing, 12)
-            .frame(maxWidth: .infinity)
             .background(shape.fill(palette.card))
             .overlay(shape.strokeBorder(palette.line, lineWidth: 1))
+            .contentShape(shape)
         }
         .buttonStyle(HomeStagePress())
         .accessibilityElement(children: .combine)
+    }
+
+    private var rowBody: some View {
+        HStack(spacing: 14) {
+            Capsule()
+                .fill(LinearGradient(colors: [accent, accent.opacity(0.2)], startPoint: .top, endPoint: .bottom))
+                .frame(width: 3)
+                .padding(.vertical, 4)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(eyebrow.uppercased())
+                    .font(.system(size: 10.5, weight: .bold))
+                    .tracking(1.3)
+                    .foregroundStyle(accent)
+                Text(title)
+                    .font(.system(size: 19, weight: .regular, design: .serif))
+                    .foregroundStyle(palette.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Text(detail)
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(palette.ink2)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+            picture()
+                .frame(width: 64, height: 64)
+        }
+        .padding(.vertical, 12)
+        .padding(.leading, 14)
+        .padding(.trailing, 12)
+        .frame(maxWidth: .infinity)
+    }
+
+    private var tileBody: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            picture()
+                .frame(width: 56, height: 56)
+                .padding(.bottom, 14)
+            Spacer(minLength: 0)
+            Text(eyebrow.uppercased())
+                .font(.system(size: 9.5, weight: .bold))
+                .tracking(1.2)
+                .foregroundStyle(accent)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Text(title)
+                .font(.system(size: 17, weight: .regular, design: .serif))
+                .foregroundStyle(palette.ink)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 4)
+            Text(detail)
+                .font(.system(size: 12))
+                .foregroundStyle(palette.ink2)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .padding(.top, 3)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 

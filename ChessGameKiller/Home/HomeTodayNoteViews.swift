@@ -99,14 +99,15 @@ struct HomeAuroraTodayCard: View {
 struct HomeAuroraFinestRow: View {
     let finest: HomeFinestMove
     let palette: HomeAuroraPalette
+    var tile: Bool = false
     let replay: () -> Void
 
     @State private var picture: Image?
 
     var body: some View {
         HomeAuroraRow(eyebrow: "Your finest move", title: finest.move, detail: who,
-                      accent: palette.gold, palette: palette, action: replay) {
-            HomeFinestMoveFrame(finest: finest, side: 64)
+                      accent: palette.gold, palette: palette, tile: tile, action: replay) {
+            HomeFinestMoveFrame(finest: finest, side: tile ? 56 : 64)
         }
         .accessibilityHint("Replays the game at this move")
         .contextMenu {
