@@ -136,7 +136,7 @@ enum HouseRule: String, CaseIterable, Identifiable {
     var text: String {
         switch self {
         case .help:
-            return "Undo, played hints, seeing ahead and talking it through are always there. A game with any of them earns your pieces half the XP."
+            return "Undo, played hints and talking it through are always there. A game with any of them earns your pieces half the XP."
         case .leaving:
             return "Starting a new game mid-game counts as a loss for your pieces. Going home only pauses it."
         case .grudges:

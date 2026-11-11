@@ -65,6 +65,27 @@ final class FriendDirectoryTests: XCTestCase {
         XCTAssertFalse(later.people[0].online)
     }
 
+    func testAddingKeepsSomeoneWithoutAGame() async {
+        let api = FakeFriendAPI()
+        api.people = [Self.jay]
+        let friends = FriendDirectory(api: api, defaults: defaults)
+        _ = await friends.claim("alex_k", name: "Alex")
+        friends.add(Self.maria)
+        friends.add(Self.maria)
+        XCTAssertEqual(friends.people.map(\.username), ["maria"])
+        // The server doesn't list her yet: she stays, ahead of the people it does.
+        await friends.refresh(name: "Alex")
+        XCTAssertEqual(friends.people.map(\.username), ["maria", "jdog"])
+        // And on the next launch.
+        let later = FriendDirectory(api: nil, defaults: defaults)
+        XCTAssertEqual(later.people.map(\.username), ["maria", "jdog"])
+        // Once a game went to her the server lists her, and its word on her is the one shown.
+        api.people = [Self.maria, Self.jay]
+        await friends.refresh(name: "Alex")
+        XCTAssertEqual(friends.people.map(\.username), ["maria", "jdog"])
+        XCTAssertTrue(friends.people[0].online)
+    }
+
     func testTheInboxNeedsAUsernameAndForgetsADismissedChallenge() async {
         let api = FakeFriendAPI()
         let note = FriendInviteNote(id: "0123456789ab", code: "7KQ2XM", clock: FriendClock(initial: 600, increment: 0),

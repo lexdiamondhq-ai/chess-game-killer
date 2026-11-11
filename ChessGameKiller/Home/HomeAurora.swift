@@ -96,6 +96,9 @@ struct HomeAuroraView: View {
     @State private var todayShown: String?
     /// How far the bottom bar has faded, 0 to 1: it goes as you scroll down, comes back up.
     @State private var barHidden: CGFloat = 0
+    /// Counts the taps on Today, each of which scrolls the page back to its top.
+    @State private var toTop = 0
+    private static let pageTop = "home.pageTop"
 
     private var palette: HomeAuroraPalette { HomeAuroraPalette(dark: tone.scheme == .dark) }
     private var stage: HomeStageInfo { info.stage }
@@ -130,24 +133,39 @@ struct HomeAuroraView: View {
                     .opacity(1 - 0.6 * Double(lift))
                 spinningBoard(height: boardHeight, lift: lift)
                     .padding(.top, 58)
-                ScrollView(.vertical) {
-                    VStack(spacing: 0) {
-                        // The board shows through here; a tap on it plays.
-                        Color.clear
-                            .frame(height: boardHeight + 58 - 40)
-                            .contentShape(Rectangle())
-                            .onTapGesture { actions.stage.play() }
-                            .onGeometryChange(for: CGFloat.self) { proxy in
-                                -proxy.frame(in: .scrollView).minY
-                            } action: { value in
-                                hideBar(from: pulled, to: value,
-                                        tuckStart: boardHeight + 18 - headerHeight - 6)
-                                pulled = value
-                            }
-                        page
+                ScrollViewReader { reader in
+                    ScrollView(.vertical) {
+                        VStack(spacing: 0) {
+                            // The board shows through here. It plays the game of the day, so a tap
+                            // on it opens that game, as its tile under For today does (Alex,
+                            // 2026-11-11, audit pick H1: it used to start the next rival's film).
+                            Color.clear
+                                .frame(height: boardHeight + 58 - 40)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    // With no game of the day the board shows the next game, and plays it.
+                                    if stage.masterpiece != nil { openMasterpiece() } else { actions.stage.play() }
+                                }
+                                .onGeometryChange(for: CGFloat.self) { proxy in
+                                    -proxy.frame(in: .scrollView).minY
+                                } action: { value in
+                                    hideBar(from: pulled, to: value,
+                                            tuckStart: boardHeight + 18 - headerHeight - 6)
+                                    pulled = value
+                                }
+                                .id(Self.pageTop)
+                            page
+                        }
+                    }
+                    .scrollIndicators(.hidden)
+                    // Today, tapped while Home is already showing, goes back to the top (Alex,
+                    // 2026-11-11, audit pick H2: the button did nothing).
+                    .onChange(of: toTop) { _, _ in
+                        withAnimation(reduceMotion ? .easeOut(duration: 0.2) : .snappy(duration: 0.45)) {
+                            reader.scrollTo(Self.pageTop, anchor: .top)
+                        }
                     }
                 }
-                .scrollIndicators(.hidden)
                 // Once the header has tucked away, a slim veil keeps the cards from running
                 // sharp under the clock and battery.
                 LinearGradient(colors: [palette.bg, palette.bg.opacity(0)], startPoint: .top, endPoint: .bottom)
@@ -172,8 +190,8 @@ struct HomeAuroraView: View {
                     .accessibilityHidden(tuck >= 1)
                 VStack(spacing: 0) {
                     Spacer()
-                    HomeAuroraTabBar(palette: palette, play: actions.stage.analyze, learn: actions.stage.learn,
-                                     rooms: actions.stage.rooms, you: actions.stage.you)
+                    HomeAuroraTabBar(palette: palette, play: actions.stage.analyze, today: { toTop += 1 },
+                                     learn: actions.stage.learn, rooms: actions.stage.rooms, you: actions.stage.you)
                         .padding(.horizontal, 16)
                         .padding(.bottom, 8)
                         .background(alignment: .bottom) {
@@ -1888,6 +1906,8 @@ struct HomeAuroraRings: View {
 struct HomeAuroraTabBar: View {
     let palette: HomeAuroraPalette
     let play: () -> Void
+    /// Home is Today, so its own button goes back to the top of the page.
+    var today: () -> Void = {}
     let learn: () -> Void
     let rooms: () -> Void
     let you: () -> Void
@@ -1895,7 +1915,7 @@ struct HomeAuroraTabBar: View {
     var body: some View {
         HStack(spacing: 12) {
             HStack(spacing: 0) {
-                tab("Today", icon: .today, on: true) {}
+                tab("Today", icon: .today, on: true, action: today)
                 tab("Learn", icon: .learn, on: false, action: learn)
                 tab("Rooms", icon: .rooms, on: false, action: rooms)
                 tab("You", icon: .you, on: false, action: you)

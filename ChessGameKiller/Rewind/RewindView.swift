@@ -544,9 +544,11 @@ struct RewindView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(ply == 0 ? "The start" : moveName(ply))
                 .font(.app(.title3, weight: .semibold))
-            Text(moments.isEmpty
-                 ? "A clean game: nothing here needs rewriting."
-                 : "Drag along the line to move through the game, or tap a dot to jump to a moment.")
+            // A game with a person is kept without grades, so it isn't called clean.
+            Text(!moments.isEmpty
+                 ? "Drag along the line to move through the game, or tap a dot to jump to a moment."
+                 : game.isPlayersOwn ? "A clean game: nothing here needs rewriting."
+                 : "Drag along the line to move through the game.")
                 .font(.app(.body))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

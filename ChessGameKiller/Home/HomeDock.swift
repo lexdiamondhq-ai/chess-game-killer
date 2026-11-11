@@ -624,6 +624,9 @@ struct HomeYouPanel: View {
     let actions: HomeActions
     let fromTop: Bool
     let close: () -> Void
+    /// Opens Play a friend, where the player's people are. Nil where friend games are off.
+    var friends: (() -> Void)? = nil
+    var friendsLine = ""
 
     @AccessibilityFocusState private var titleFocused: Bool
     @State private var drag: CGFloat = 0
@@ -650,6 +653,10 @@ struct HomeYouPanel: View {
                 .padding(.trailing, -14)
             }
             VStack(spacing: 0) {
+                if let friends {
+                    HomeLinkRow(title: "Friends", detail: friendsLine, tone: tone) { go(friends) }
+                    HomeHairline(tone: tone)
+                }
                 HomeLinkRow(title: "Your pieces", detail: piecesLine, tone: tone) { go(actions.army) }
                 HomeHairline(tone: tone)
                 HomeLinkRow(title: "Your games", detail: gamesLine, tone: tone) { go(actions.rewind) }
