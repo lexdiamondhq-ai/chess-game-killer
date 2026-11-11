@@ -353,14 +353,18 @@ struct ContentView: View {
                 HomeMusic.shared.setCovered(covers)
             }
             .sheet(isPresented: $showingNewGame, onDismiss: startIfNeeded) {
-                NewGameSheet(theme: theme, forfeits: forfeits) { setup in
+                NewGameSheet(theme: theme, forfeits: forfeits, start: { setup in
                     withAnimation(.snappy) { match.start(setup) }
                     showingNewGame = false
                     leaveHome()
-                } challenge: {
+                }, challenge: {
                     showingNewGame = false
                     challenges?.compose()
-                }
+                }, online: challenges == nil ? nil : {
+                    showingNewGame = false
+                    challenges?.playOnline()
+                }, onlineWaiting: challenges?.onlineWaiting)
+                .task { await challenges?.refreshOnlineCount() }
                 .environment(army)
                 .environment(grudges)
                 .boardSheetGrabber(boardSheet)

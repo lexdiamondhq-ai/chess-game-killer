@@ -233,6 +233,12 @@ final class HomeModelTests: XCTestCase {
         }
     }
 
+    /// Rooms on the Aurora home is two doors (Alex, 2026-11-11): New game, which also leads to a
+    /// friend and to online, and Your games. No rivals (they are on the Next game card) and no Grudge.
+    func testRoomsAreNewGameAndYourGames() {
+        XCTAssertEqual(HomeShortcutKind.rooms, [.newGame, .games])
+    }
+
     /// With no other players to reach, Online and A friend are left out and the rest keep their order.
     func testWithoutOtherPlayersRoomsKeepTheRest() {
         XCTAssertEqual(HomeShortcutKind.list(online: false), [.newGame, .rivals, .grudge, .games])

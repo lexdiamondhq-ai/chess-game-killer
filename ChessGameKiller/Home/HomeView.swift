@@ -548,11 +548,16 @@ struct HomeView: View {
         actions.start(MatchController.Setup(playerColor: side.color, level: level, timeControl: timeControl))
     }
 
-    /// Rooms: Online and A friend (when the app has them), a new game, the rivals and your games.
+    /// Rooms on the Aurora home: New game and Your games only (Alex, 2026-11-11). New game is the
+    /// one door to every game: a rival, a friend or someone online. The rivals live on the Next
+    /// game card. Elsewhere: Online and A friend (when the app has them), a new game, the rivals
+    /// and your games.
     private var shortcutList: [HomeShortcut] {
         let waiting: Int = challenges?.onlineWaiting ?? 0
-        // Your Grudge's room opens over the Aurora home only.
-        return HomeShortcutKind.list(online: challenges != nil).filter { stageOn || $0 != .grudge }.map { kind in
+        let kinds: [HomeShortcutKind] = stageOn
+            ? HomeShortcutKind.rooms
+            : HomeShortcutKind.list(online: challenges != nil).filter { $0 != .grudge }
+        return kinds.map { kind in
             HomeShortcut(kind: kind, live: kind == .online && waiting > 0) { open(kind) }
         }
     }

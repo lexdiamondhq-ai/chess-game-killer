@@ -356,6 +356,11 @@ enum HomeShortcutKind: String, CaseIterable, Identifiable {
 
     var needsOnline: Bool { self == .online || self == .friend }
 
+    /// Rooms on the Aurora home (Alex, 2026-11-11): New game and Your games only. New game is
+    /// the one door to every game: a rival, a friend or someone online. The rivals live on the
+    /// Next game card, and Your Grudge has no room.
+    static let rooms: [HomeShortcutKind] = [.newGame, .games]
+
     var title: String {
         switch self {
         case .online: return "Online"

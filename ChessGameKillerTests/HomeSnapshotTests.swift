@@ -146,8 +146,8 @@ final class HomeSnapshotTests: XCTestCase {
     }
 
     /// For today with Today's Move in the large card and your finest move as a row under it; Rooms
-    /// with Your Grudge beside the rivals, two rows of three; and Your Grudge's own room (Alex,
-    /// 2026-11-09). By day and by night.
+    /// with its two doors, New game and Your games (Alex, 2026-11-11); and Your Grudge's own room
+    /// (Alex, 2026-11-09). By day and by night.
     func testForTodayRoomsAndTheGrudgesRoom() throws {
         let defaults = UserDefaults(suiteName: "HomeGrudgeRoomTests")!
         defer { defaults.removePersistentDomain(forName: "HomeGrudgeRoomTests") }
@@ -156,7 +156,7 @@ final class HomeSnapshotTests: XCTestCase {
         grudges.markSeen()
         let game = RewindSample.game(date: .now.addingTimeInterval(-86_400))
         let finest = try XCTUnwrap(HomeFinestMove.pick(games: [game]))
-        let shortcuts: [HomeShortcut] = HomeShortcutKind.list(online: true).map { HomeShortcut(kind: $0, action: {}) }
+        let shortcuts: [HomeShortcut] = HomeShortcutKind.rooms.map { HomeShortcut(kind: $0, action: {}) }
         for dark in [false, true] {
             let palette = HomeAuroraPalette(dark: dark)
             let tone = HomeTone.of(.gilded, mode: dark ? .dark : .light)
