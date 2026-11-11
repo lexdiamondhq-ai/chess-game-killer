@@ -643,17 +643,20 @@ struct AnalysisView: View {
         model.kingInCheck.map { [SculptedCoachMark(square: $0, color: Self.checkRedHex)] } ?? []
     }
 
-    /// Why a tapped piece won't move: its king is in check (Alex picked A, 2026-11-11).
+    /// What happened, under the board: checkmate, stalemate, a draw, check, or why a tapped
+    /// piece won't move (Alex picked A, 2026-11-11, and asked for endings there too).
     @ViewBuilder
     private var checkNote: some View {
-        if model.showsCheckNote {
-            Label("Your king is in check. Move the king first.", systemImage: "exclamationmark.shield.fill")
+        if let note = model.statusNote {
+            let isEnd = model.ending != nil || model.isDeadDraw
+            Label(note, systemImage: isEnd ? "flag.checkered" : "exclamationmark.shield.fill")
                 .font(.app(.subheadline, weight: .semibold))
-                .foregroundStyle(Self.checkRed)
+                .foregroundStyle(isEnd ? accent : Self.checkRed)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
-                .background(Self.checkRed.opacity(0.14), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .background((isEnd ? accent : Self.checkRed).opacity(0.14),
+                            in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .transition(.opacity.combined(with: .move(edge: .top)))
                 .accessibilityAddTraits(.isStaticText)
         }
@@ -777,7 +780,7 @@ struct AnalysisView: View {
             }
             .padding(16)
             .animation(.snappy, value: model.lines)
-            .animation(.snappy(duration: 0.25), value: model.showsCheckNote)
+            .animation(.snappy(duration: 0.25), value: model.statusNote)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             // Lower right (Alex, 2026-11-08), docked in its own strip so the page scrolls

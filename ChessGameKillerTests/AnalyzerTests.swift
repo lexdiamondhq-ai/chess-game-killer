@@ -705,6 +705,19 @@ final class AnalysisModelTests: XCTestCase {
         XCTAssertFalse(model.showsCheckNote)
     }
 
+    /// The line under the board says what happened: checkmate, stalemate, a dead draw, check
+    /// (Alex, 2026-11-11).
+    func testTheLineUnderTheBoardSaysWhatHappened() {
+        func note(_ fen: String) -> String? {
+            AnalysisModel(draft: PositionDraft(fen: fen)!, engine: nil).statusNote
+        }
+        XCTAssertEqual(note("R5k1/5ppp/8/8/8/8/8/6K1 b - - 0 1"), "Checkmate. White wins.")
+        XCTAssertEqual(note("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1"), "Stalemate. Black has no moves, so it's a draw.")
+        XCTAssertEqual(note("8/8/4k3/8/8/3K4/8/8 w - - 0 1"), "Draw. Nobody has enough pieces left to checkmate.")
+        XCTAssertEqual(note("3rr1k1/5ppp/p7/3p1b2/2PqP3/8/P3BKPP/R5NR w - - 0 1"), "Check! White's king is under attack.")
+        XCTAssertNil(note(PositionDraft.standard.fen))
+    }
+
     /// Out of check, a piece with no moves just doesn't pick up, with no note.
     func testAStuckPieceOutOfCheckSaysNothing() {
         let model = AnalysisModel(draft: .standard, engine: nil)

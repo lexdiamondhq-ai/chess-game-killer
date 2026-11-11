@@ -297,6 +297,26 @@ final class AnalysisModel {
         return draft.pieces.first { $0.kind == .king && $0.color == color }?.square
     }
 
+    /// Neither side has enough left to checkmate: kings alone, or a king and one bishop or
+    /// knight against a bare king. The game is a draw.
+    var isDeadDraw: Bool {
+        let others = draft.pieces.filter { $0.kind != .king }
+        return others.isEmpty || (others.count == 1 && [.bishop, .knight].contains(others[0].kind))
+    }
+
+    /// What happened, for the line under the board: checkmate, stalemate, a dead draw, or check
+    /// (Alex, 2026-11-11: "It also needs to say what happened on the bottom").
+    var statusNote: String? {
+        let mover = draft.sideToMove == .white ? "White" : "Black"
+        let winner = draft.sideToMove == .white ? "Black" : "White"
+        if ending == "Checkmate" { return "Checkmate. \(winner) wins." }
+        if ending == "Stalemate" { return "Stalemate. \(mover) has no moves, so it's a draw." }
+        if isDeadDraw { return "Draw. Nobody has enough pieces left to checkmate." }
+        if showsCheckNote { return "Your king is in check. Move the king first." }
+        if kingInCheck != nil { return "Check! \(mover)'s king is under attack." }
+        return nil
+    }
+
     var canGoBack: Bool { cursor > 0 }
     /// A move ahead to step to: one already made, or the engine's best.
     var canGoForward: Bool { cursor < steps.count || (ending == nil && lines.first?.firstMove != nil) }
