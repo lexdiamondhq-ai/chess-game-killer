@@ -36,25 +36,6 @@ struct SculptedCoachArrow: Hashable {
     }
 }
 
-/// The glow under a veteran of the player's army.
-struct SculptedHalo: Equatable {
-    enum Tone: Equatable {
-        case ivory, platinum, gold
-    }
-
-    let tone: Tone
-    /// A Legend's glow breathes.
-    let breathing: Bool
-
-    var color: UIColor {
-        switch tone {
-        case .ivory: return UIColor(red: 0.96, green: 0.91, blue: 0.82, alpha: 1)
-        case .platinum: return UIColor(red: 0.8, green: 0.85, blue: 0.95, alpha: 1)
-        case .gold: return UIColor(red: 1, green: 0.82, blue: 0.48, alpha: 1)
-        }
-    }
-}
-
 /// Someone at the table: a rival's own light, from across the board. It turns with the camera
 /// like the studio's lights, so it always stands on the far side, and it tints the stone and
 /// catches the pieces' edges in the rival's color.
@@ -101,8 +82,6 @@ struct SculptedBoardState: Equatable {
     var showsCoordinates = true
     /// The newest capture, so a piece that leaves the board can tip over rather than fade.
     var lastCapture: CaptureEvent?
-    /// Veteran glows by piece id.
-    var halos: [Int: SculptedHalo] = [:]
     /// The Heirloom Set: each army piece's history on the piece itself, by piece id.
     var heirlooms: [Int: Heirloom] = [:]
     /// Set once the game is decided.
@@ -379,9 +358,6 @@ final class SculptedBoardScene {
             || old.pieces.isEmpty {
             updateMarks(new)
         }
-        if old.halos != new.halos || old.pieces != new.pieces {
-            updateHalos(new)
-        }
         if old.heirlooms != new.heirlooms || old.pieces != new.pieces {
             updateHeirlooms(new)
         }
@@ -583,7 +559,6 @@ final class SculptedBoardScene {
         var flat = false
         /// A soft shadow on the stone, darkest right under the foot.
         let contact: SCNNode
-        var halo: SCNNode?
         /// The history it shows now, and the parts of the model it changed for it.
         var heirloom: Heirloom?
         var heirloomUndo: [(node: SCNNode, geometry: SCNGeometry?)] = []
@@ -1133,7 +1108,6 @@ final class SculptedBoardScene {
         }
         node.root.runAction(.sequence([.wait(duration: start), fall, .removeFromParentNode()]), forKey: "pose")
         node.contact.runAction(.sequence([.wait(duration: start), .fadeOut(duration: tip * 0.8)]))
-        node.halo?.runAction(.fadeOut(duration: 0.15))
     }
 
     /// Fades a piece out where it stands, sinking a touch. A key of its own lets it run
@@ -1250,30 +1224,6 @@ final class SculptedBoardScene {
 
     private static func scale(_ s: Float) -> simd_float4x4 {
         simd_float4x4(diagonal: SIMD4(s, s, s, 1))
-    }
-
-    // MARK: Halos
-
-    private func updateHalos(_ new: SculptedBoardState) {
-        for (id, node) in nodes {
-            let wanted = new.halos[id]
-            node.halo?.removeFromParentNode()
-            node.halo = nil
-            guard let wanted else { continue }
-            let halo = SCNNode(geometry: Self.mark(size: 1.2, color: wanted.color, alpha: 0.75, mask: Self.haloMask))
-            halo.simdPosition = SIMD3(0, 0.0021, 0)
-            halo.simdOrientation = Self.flat
-            halo.renderingOrder = 6
-            halo.castsShadow = false
-            if wanted.breathing {
-                halo.runAction(.repeatForever(.sequence([
-                    .fadeOpacity(to: 0.4, duration: 0.8),
-                    .fadeOpacity(to: 1, duration: 0.8),
-                ])))
-            }
-            node.root.addChildNode(halo)
-            node.halo = halo
-        }
     }
 
     // MARK: Heirloom Set
@@ -1661,7 +1611,6 @@ final class SculptedBoardScene {
     /// The squares lit last time the marks were drawn, so a lit board only fades in once.
     private var shownSpotlight: String?
     private static let contactGeometry = mark(size: 1, color: .black, alpha: 0.5, mask: MarkImages.contact)
-    private static let haloMask = MarkImages.halo
 
     // MARK: Camera and light
 
@@ -2120,13 +2069,6 @@ enum MarkImages {
 
     static let glow = radial(256, stops: [(0, 1), (0.35, 0.75), (1, 0)])
     static let contact = radial(128, stops: [(0, 1), (0.42, 0.7), (0.62, 0.25), (1, 0)])
-
-    static let halo = draw(256) { context, size in
-        let r = size * 0.36
-        context.setShadow(offset: .zero, blur: size * 0.06, color: UIColor.white.cgColor)
-        context.setLineWidth(size * 0.035)
-        context.strokeEllipse(in: CGRect(x: size / 2 - r, y: size / 2 - r, width: r * 2, height: r * 2))
-    }
 
     /// A dark rectangle with soft edges, under the whole board.
     static let boardShadow = draw(256) { context, size in

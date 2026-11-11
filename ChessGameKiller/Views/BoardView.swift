@@ -20,7 +20,7 @@ struct BoardView: View {
     var frameLabel: Color?
 
     @AppStorage("haptics") private var hapticsOn = true
-    /// The player's army, so veteran pieces show their glow and scar.
+    /// The player's army, so its pieces can show their history.
     @Environment(ArmyStore.self) private var army: ArmyStore?
 
     /// The sculpted looks play on a real 3D board unless the player asked for them flat.
@@ -328,7 +328,6 @@ struct BoardView: View {
             ForEach(game.pieces) { placed in
                 let place = cell(of: placed.square)
                 PieceImage(piece: placed.piece, theme: theme, size: size, onBoard: true, heirloom: heirloom(of: placed))
-                    .modifier(VeteranAura(rank: armyRank(of: placed), piece: placed.piece, theme: theme, size: size))
                     .scaleEffect(game.selected == placed.square ? PieceImage.liftedScale : 1)
                     .position(center(of: placed.square, size: size))
                     // Nearer rows draw last, so tall 3D pieces overlap the ones behind them, and
@@ -371,11 +370,6 @@ struct BoardView: View {
     private func heirloom(of placed: PlacedPiece) -> Heirloom? {
         guard showsHeirloom, let army, let slot = army.slot(of: placed, in: match) else { return nil }
         return army.heirloom(for: slot)
-    }
-
-    private func armyRank(of placed: PlacedPiece) -> ArmyRank {
-        guard let army, let slot = army.slot(of: placed, in: match) else { return .recruit }
-        return army.record(for: slot).rank
     }
 
     // MARK: Check

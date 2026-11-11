@@ -196,7 +196,6 @@ struct SculptedBoardView: View {
             hints: match.bestHint.map { [SculptedHint(from: $0.from, to: $0.to, isBest: true)] } ?? [],
             flipped: flipped,
             lastCapture: game.captureEvents.last,
-            halos: halos,
             heirlooms: heirlooms,
             finale: finale
         )
@@ -212,20 +211,6 @@ struct SculptedBoardView: View {
             guard let slot = army.slot(of: placed, in: match) else { continue }
             let heirloom = army.heirloom(for: slot)
             if !heirloom.isEmpty { result[placed.id] = heirloom }
-        }
-        return result
-    }
-
-    /// The player's veterans glow: ivory or platinum by side, gold for a Legend, which breathes.
-    private var halos: [Int: SculptedHalo] {
-        guard let army else { return [:] }
-        var result: [Int: SculptedHalo] = [:]
-        for placed in game.pieces {
-            guard let slot = army.slot(of: placed, in: match) else { continue }
-            let rank = army.record(for: slot).rank
-            guard rank >= .veteran else { continue }
-            let tone: SculptedHalo.Tone = rank == .legend ? .gold : (placed.piece.color == .white ? .ivory : .platinum)
-            result[placed.id] = SculptedHalo(tone: tone, breathing: rank == .legend)
         }
         return result
     }
