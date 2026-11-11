@@ -382,13 +382,13 @@ struct ChallengeComposerView: View {
     private func shareDock(_ created: FriendGame) -> some View {
         let invite = ChallengeInviteContent(game: created, name: name)
         return HStack(spacing: 0) {
-            DockButton(title: "Text", symbol: "message.fill", theme: theme) {
+            SendDockButton(title: "Text", symbol: "message.fill", theme: theme) {
                 ChallengeSharing.shared.text(invite) { sent in sentInvite(sent) }
             }
-            DockButton(title: "Email", symbol: "envelope.fill", theme: theme) {
+            SendDockButton(title: "Email", symbol: "envelope.fill", theme: theme) {
                 ChallengeSharing.shared.mail(invite) { sent in sentInvite(sent) }
             }
-            DockButton(title: copied ? "Copied" : "Copy link", symbol: copied ? "checkmark" : "link",
+            SendDockButton(title: copied ? "Copied" : "Copy link", symbol: copied ? "checkmark" : "link",
                        isOn: copied, theme: theme) {
                 ChallengeSharing.copy(invite)
                 withAnimation(.snappy) { copied = true }
@@ -397,7 +397,7 @@ struct ChallengeComposerView: View {
                     withAnimation(.snappy) { copied = false }
                 }
             }
-            DockButton(title: "More", symbol: "square.and.arrow.up", theme: theme) {
+            SendDockButton(title: "More", symbol: "square.and.arrow.up", theme: theme) {
                 ChallengeSharing.shared.share(invite) { sent in sentInvite(sent) }
             }
         }
@@ -468,7 +468,7 @@ struct ChallengeComposerView: View {
 }
 
 /// One way to send the invite: a round glass button over its name.
-private struct DockButton: View {
+private struct SendDockButton: View {
     let title: String
     let symbol: String
     var isOn = false
