@@ -688,6 +688,31 @@ final class AnalysisModelTests: XCTestCase {
         XCTAssertEqual(model.movesMade.map { $0.label }, ["1. d4"])
     }
 
+    /// In check only the king (or a piece that saves it) moves: a tap on a stuck piece says why,
+    /// and the king glows (Alex, 2026-11-11, a photo with the queen on d4 checking the king on f2).
+    func testAStuckPieceInCheckSaysWhy() {
+        let draft = PositionDraft(fen: "3rr1k1/5ppp/p7/3p1b2/2PqP3/8/P3BKPP/R5NR w - - 0 1")!
+        let model = AnalysisModel(draft: draft, engine: nil)
+        XCTAssertEqual(model.kingInCheck, .f2)
+        model.tap(.e2)
+        XCTAssertNil(model.selected)
+        XCTAssertTrue(model.showsCheckNote)
+        model.tap(.f2)
+        XCTAssertEqual(model.selected, .f2)
+        XCTAssertFalse(model.showsCheckNote)
+        model.tap(.g3)
+        XCTAssertNil(model.kingInCheck)
+        XCTAssertFalse(model.showsCheckNote)
+    }
+
+    /// Out of check, a piece with no moves just doesn't pick up, with no note.
+    func testAStuckPieceOutOfCheckSaysNothing() {
+        let model = AnalysisModel(draft: .standard, engine: nil)
+        XCTAssertNil(model.kingInCheck)
+        model.tap(.d1)
+        XCTAssertFalse(model.showsCheckNote)
+    }
+
     /// A pawn the person moves to the last rank asks what it becomes, and becomes that.
     func testAPromotionAsksWhichPiece() {
         let draft = PositionDraft(fen: "8/8/8/8/8/8/4p3/K6k b - - 0 1")!

@@ -628,7 +628,35 @@ struct AnalysisView: View {
         if let selected = model.selected {
             tints[selected] = accent.opacity(0.45)
         }
+        if let king = model.kingInCheck {
+            tints[king] = Self.checkRed.opacity(0.55)
+        }
         return tints
+    }
+
+    /// The red the king in check glows, under it on the stone or on the flat square.
+    static let checkRed = Color(red: 1, green: 0.23, blue: 0.19)
+    private static let checkRedHex: UInt32 = 0xFF3B30
+
+    /// The king in check, lit red on the 3D board's stone.
+    private var checkMarks: [SculptedCoachMark] {
+        model.kingInCheck.map { [SculptedCoachMark(square: $0, color: Self.checkRedHex)] } ?? []
+    }
+
+    /// Why a tapped piece won't move: its king is in check (Alex picked A, 2026-11-11).
+    @ViewBuilder
+    private var checkNote: some View {
+        if model.showsCheckNote {
+            Label("Your king is in check. Move the king first.", systemImage: "exclamationmark.shield.fill")
+                .font(.app(.subheadline, weight: .semibold))
+                .foregroundStyle(Self.checkRed)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(Self.checkRed.opacity(0.14), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .transition(.opacity.combined(with: .move(edge: .top)))
+                .accessibilityAddTraits(.isStaticText)
+        }
     }
 
     /// What a pawn the person moved to the last rank becomes: Queen, Rook, Bishop or Knight,
@@ -663,6 +691,7 @@ struct AnalysisView: View {
                 SculptedPositionBoard(pieces: model.draft.pieces, theme: theme, flipped: flipped, hints: hints,
                                       selected: model.selected, targets: model.targets,
                                       lastMove: model.lastMove.map { LastMove(from: $0.from, to: $0.to) },
+                                      marks: checkMarks,
                                       onTap: { square in model.tap(square) },
                                       framing: tilt.framing)
                     // Standing, a little taller than the scroll view would leave it: the camera
@@ -739,6 +768,8 @@ struct AnalysisView: View {
                 header
                 board
                     .sensoryFeedback(.selection, trigger: model.selected) { _, new in hapticsOn && new != nil }
+                    .sensoryFeedback(.warning, trigger: model.showsCheckNote) { _, new in hapticsOn && new }
+                checkNote
                 stepper
                 madeMoves
                 lines
@@ -746,6 +777,7 @@ struct AnalysisView: View {
             }
             .padding(16)
             .animation(.snappy, value: model.lines)
+            .animation(.snappy(duration: 0.25), value: model.showsCheckNote)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             // Lower right (Alex, 2026-11-08), docked in its own strip so the page scrolls
