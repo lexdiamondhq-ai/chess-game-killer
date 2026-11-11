@@ -146,8 +146,14 @@ struct AnalyzeSheet: View {
                 destination(step)
             }
         }
+        // Opens the line to the photo reader while a photo is picked or taken.
+        .task { session.warmUpReader() }
+        .onChange(of: showingCamera) { _, showing in
+            if showing { session.warmUpReader() }
+        }
         .onChange(of: photoItem) { _, item in
             guard let item else { return }
+            session.warmUpReader()
             Task {
                 // Loading can mean an iCloud download, so show that something is happening.
                 isLoadingPhoto = true

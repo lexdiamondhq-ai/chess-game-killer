@@ -247,8 +247,30 @@ struct SlowFakeBoardReader: BoardReader {
     }
 }
 
+/// Counts how often the line to the reader is opened.
+final class WarmUpCountingReader: BoardReader, @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+    var warmUps: Int { lock.withLock { count } }
+
+    func read(_ image: UIImage) async throws -> BoardReading { throw BoardReaderError.failed }
+    func warmUp() { lock.withLock { count += 1 } }
+}
+
 @MainActor
 final class ScanSessionTests: XCTestCase {
+
+    /// Opening Analyze, then picking a photo, opens the line to the reader once, not each time.
+    func testWarmingUpTheReaderIsNotRepeatedRightAway() {
+        let reader = WarmUpCountingReader()
+        let session = ScanSession(reader: reader)
+        let start = Date()
+        session.warmUpReader(now: start)
+        session.warmUpReader(now: start.addingTimeInterval(5))
+        XCTAssertEqual(reader.warmUps, 1)
+        session.warmUpReader(now: start.addingTimeInterval(25))
+        XCTAssertEqual(reader.warmUps, 2)
+    }
 
     private func waitUntil(_ condition: () -> Bool) async {
         for _ in 0..<250 where !condition() {
