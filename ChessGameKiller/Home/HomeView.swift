@@ -670,6 +670,21 @@ struct HomeView: View {
         }
     }
 
+    /// Friends in the You panel opens Play a friend, where the player's people are.
+    private var openFriends: (() -> Void)? {
+        guard let challenges else { return nil }
+        return { challenges.compose() }
+    }
+
+    /// Under Friends in the You panel: the player's username and how many people they have.
+    private var friendsLine: String {
+        guard let friends = challenges?.friends else { return "" }
+        let count = friends.people.count
+        guard count > 0 else { return "Add people and challenge them" }
+        let people = count == 1 ? "1 friend" : "\(count) friends"
+        return friends.you.map { "@\($0.username) · \(people)" } ?? people
+    }
+
     private func closeYou() {
         withAnimation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.36, dampingFraction: 0.9)) {
             you = nil
@@ -684,7 +699,8 @@ struct HomeView: View {
             .onTapGesture { closeYou() }
             .transition(.opacity)
             .accessibilityHidden(true)
-        HomeYouPanel(tone: tone, piecesLine: piecesLine, gamesLine: gamesLine, actions: actions, fromTop: fromTop, close: closeYou)
+        HomeYouPanel(tone: tone, piecesLine: piecesLine, gamesLine: gamesLine, actions: actions, fromTop: fromTop, close: closeYou,
+                     friends: openFriends, friendsLine: friendsLine)
             .padding(.horizontal, 16)
             .padding(.top, fromTop ? 6 : 0)
             .padding(.bottom, fromTop ? 0 : 10)

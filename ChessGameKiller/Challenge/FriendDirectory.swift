@@ -145,7 +145,8 @@ final class LiveFriendDirectoryAPI: FriendDirectoryAPI {
 final class FriendDirectory {
     /// The player's username, once picked (remembered on this phone, checked with the server).
     private(set) var you: FriendYou?
-    /// Whoever the player has challenged or been challenged by, the latest first.
+    /// The player's people: whoever they added by hand, then whoever they have challenged or
+    /// been challenged by, the latest first.
     private(set) var people: [FriendPerson] = []
     /// Players matching what's typed in the find box.
     private(set) var results: [FriendPerson] = []
@@ -157,9 +158,14 @@ final class FriendDirectory {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var searchTask: Task<Void, Never>?
     @ObservationIgnored private var lastInboxCheck: Date?
+    /// People added by hand, kept on this phone: the server lists only those a game went to or came from.
+    @ObservationIgnored private var added: [FriendPerson] = []
 
     static let youKey = "friends.you"
     static let peopleKey = "friends.people"
+    static let addedKey = "friends.added"
+    /// The most people kept by hand.
+    static let addedLimit = 40
 
     /// `api` nil: nothing is asked of a server (tests and CI's pictures).
     init(api: FriendDirectoryAPI?, defaults: UserDefaults = .standard) {
@@ -172,6 +178,10 @@ final class FriendDirectory {
            let saved = try? JSONDecoder().decode([FriendPerson].self, from: data) {
             // Nobody counts as online until the server says so.
             people = saved.map { var person = $0; person.online = false; return person }
+        }
+        if let data = defaults.data(forKey: Self.addedKey),
+           let saved = try? JSONDecoder().decode([FriendPerson].self, from: data) {
+            added = saved
         }
     }
 
@@ -202,7 +212,23 @@ final class FriendDirectory {
             return
         }
         guard you != nil, let found = try? await api.people(player: player) else { return }
-        keep(people: found)
+        // The server's word on anyone it knows; the ones added by hand it doesn't list yet come first.
+        keep(people: added.filter { person in !found.contains { $0.username == person.username } } + found)
+    }
+
+    /// Adds someone to the player's people without sending them a game. They stay for next time.
+    func add(_ person: FriendPerson) {
+        guard person.username != you?.username else { return }
+        if !added.contains(where: { $0.username == person.username }) {
+            // Whether they're online is the server's to say, each time.
+            var kept = person
+            kept.online = false
+            added = Array(([kept] + added).prefix(Self.addedLimit))
+            if let data = try? JSONEncoder().encode(added) { defaults.set(data, forKey: Self.addedKey) }
+        }
+        if !people.contains(where: { $0.username == person.username }) {
+            keep(people: [person] + people)
+        }
     }
 
     /// Picks (or changes) the player's username. Answers why not, or nil once it's theirs.

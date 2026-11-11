@@ -291,6 +291,8 @@ struct ChallengeGameView: View {
         dock
             .opacity(game.phase == .playing ? 1 : 0)
             .allowsHitTesting(game.phase == .playing)
+            // Room for the end card's second row, so it never stands over the moves or your plate.
+            .padding(.top, canReview ? Self.reviewRow : 0)
             .overlay(alignment: .top) {
                 if game.phase == .playing, game.offersClaim {
                     claimBanner
@@ -492,25 +494,37 @@ struct ChallengeGameView: View {
         let offered = rematchOffered
         let lineWeight: Font.Weight = offered ? .semibold : .regular
         let lineColor: Color = offered ? theme.challengeAccent : .secondary
-        return HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(game.resultHeadline ?? "Game over")
-                    .font(theme.challengeFont(17, .bold))
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.8)
-                Text(endLine)
-                    .font(theme.challengeFont(13, lineWeight))
-                    .foregroundStyle(lineColor)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.85)
+        return VStack(spacing: 8) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(game.resultHeadline ?? "Game over")
+                        .font(theme.challengeFont(17, .bold))
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
+                    Text(endLine)
+                        .font(theme.challengeFont(13, lineWeight))
+                        .foregroundStyle(lineColor)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.85)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityElement(children: .combine)
+                endButton
+                    .frame(width: 148)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityElement(children: .combine)
-            endButton
-                .frame(width: 148)
+            .padding(.leading, 12)
+            // A game that was really played can be looked back on, as a rival game can (Alex,
+            // 2026-11-11, audit pick O1).
+            if canReview {
+                Button {
+                    center.review(game)
+                } label: {
+                    Label("Review game", systemImage: "backward.circle")
+                }
+                .buttonStyle(ChallengeButtonStyle(kind: .glass, theme: theme, height: Self.reviewHeight))
+            }
         }
-        .padding(.leading, 20)
-        .padding(.trailing, 8)
+        .padding(.horizontal, 8)
         .padding(.vertical, 8)
         .challengeGlass(RoundedRectangle(cornerRadius: 30, style: .continuous))
         .frame(maxWidth: 520)
@@ -518,6 +532,16 @@ struct ChallengeGameView: View {
         .padding(.bottom, 6)
         .animation(.snappy(duration: 0.25), value: game.rematchStage)
     }
+
+    /// The game was really played, with moves to look back on: not one aborted or never taken.
+    private var canReview: Bool {
+        guard game.phase == .over, let state = game.state, let result = state.result else { return false }
+        return result.reason.wasPlayed && !state.moves.isEmpty
+    }
+
+    private static let reviewHeight: CGFloat = 40
+    /// How much taller Review game makes the end card than the dock it stands in for.
+    private static let reviewRow: CGFloat = reviewHeight + 8
 
     /// The friend asked for a rematch and is waiting on you.
     private var rematchOffered: Bool { canRematch && game.rematchStage == .offered }

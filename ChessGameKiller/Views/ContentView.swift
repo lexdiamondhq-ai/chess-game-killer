@@ -14,6 +14,8 @@ struct ContentView: View {
     @State private var confirmingDraw = false
     /// The welcome's Play, waiting on the first rival's film: its Begin starts this game.
     @State private var welcomeFilm: WelcomeFilm?
+    /// The next rival's film, asked for from a won game's end panel.
+    @State private var nextRivalFilm: NextRivalFilm?
     @State private var showingAnalyze = false
     /// The analyzer, kept while the app runs: closing Analyze and opening it again finds the same board.
     @State private var analyzer = ScanSession(reader: CloudBoardReader.live, engine: StockfishEngine.shared,
@@ -313,6 +315,20 @@ struct ContentView: View {
                     lookAround()
                 })
             }
+            // "Face the Hunter" on a won game's end panel: that rival's film, then the game,
+            // on the side and clock of the game just played (Alex, 2026-11-11, audit pick R2).
+            .fullScreenCover(item: $nextRivalFilm) { film in
+                RivalsHall(start: film.id, intro: true, begin: { level in
+                    var quiet = Transaction()
+                    quiet.disablesAnimations = true
+                    withTransaction(quiet) { nextRivalFilm = nil }
+                    var setup = MatchController.Setup(playerColor: film.setup.playerColor, level: level,
+                                                      timeControl: film.setup.timeControl)
+                    setup.opponent = film.setup.opponent
+                    UserDefaults.standard.set(level.rawValue, forKey: "setup.level")
+                    withAnimation(.snappy) { match.start(setup) }
+                }, close: { nextRivalFilm = nil })
+            }
             .fullScreenCover(item: $coach.presentedLesson) { lesson in
                 LessonScreen(lesson: lesson, theme: chosenTheme).environment(training).environment(daily)
             }
@@ -384,6 +400,17 @@ struct ContentView: View {
             .environment(vault)
             .environment(puzzles)
             .environment(daily)
+            // Review game on a finished friend or online game: Rewind opens on it once that
+            // game's own screen has slid away.
+            .onChange(of: challenges?.reviewing) { _, id in
+                guard let id else { return }
+                challenges?.reviewing = nil
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(600))
+                    rewindOpening = id
+                    showingGames = true
+                }
+            }
             .onReceive(NotificationCenter.default.publisher(for: DailyLink.notification)) { _ in openDaily() }
             .onReceive(NotificationCenter.default.publisher(for: LiveGameLink.notification)) { _ in openLiveGame() }
             // The game under way on the Lock Screen and in the Dynamic Island.
@@ -933,7 +960,13 @@ struct ContentView: View {
             CoachOrb(match: match, theme: theme, isExpanded: $coachExpanded, expandedMaxHeight: coachHeight,
                      newGame: homeScreenOn ? nil : { showingNewGame = true },
                      home: homeScreenOn ? { goHome() } : nil, showGames: { showingGames = true },
-                     talk: { openTalk() }, analyze: { showingAnalyze = true })
+                     talk: { openTalk() }, analyze: { showingAnalyze = true },
+                     faceNext: { level in
+                         // The victory theme gives way to the next rival's film.
+                         SoundPlayer.shared.stopAll(fade: 0.4)
+                         RivalTheme.shared.stop(fade: 0.6)
+                         nextRivalFilm = NextRivalFilm(id: level, setup: match.setup)
+                     })
                 .padding(.horizontal, coachExpanded ? 0 : 6)
         }
         .frame(minHeight: Self.dockHeight)
@@ -1100,6 +1133,13 @@ private struct PendingTalkMove: Equatable {
 }
 
 #Preview { ContentView() }
+
+/// The rival above the one just beaten, held while its film plays, with the game just played
+/// for its side and clock.
+private struct NextRivalFilm: Identifiable {
+    let id: MatchController.Level
+    let setup: MatchController.Setup
+}
 
 /// What the welcome picked, held while the first rival's film plays.
 private struct WelcomeFilm: Identifiable {

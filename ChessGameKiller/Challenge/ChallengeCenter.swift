@@ -41,6 +41,9 @@ final class ChallengeCenter {
     /// A finished friend game, to keep with the player's games. ContentView keeps it in its vault,
     /// the only place games.json is written from.
     @ObservationIgnored var onGameFinished: (@MainActor (SavedGame) -> Void)?
+    /// A finished game the player asked to review from its end card: ContentView opens it in
+    /// Rewind once this screen has gone, and sets this back to nil.
+    var reviewing: UUID? = nil
     @ObservationIgnored private var lastRefresh: Date?
     /// Never asks the server about the listed games: CI's pictures list games the server doesn't have.
     @ObservationIgnored var holdsStill = false
@@ -164,6 +167,21 @@ final class ChallengeCenter {
             heldCode = nil
             open(code: held)
         }
+    }
+
+    /// Review game, on a finished game's end card (Alex, 2026-11-11, audit pick O1): the game
+    /// is kept with the player's games now, not at the next refresh, its screen closes, and
+    /// it opens in Rewind.
+    func review(_ game: OnlineGame) {
+        guard let state = game.state, let onGameFinished else { return }
+        let date = state.updatedAt > 0 ? Date(timeIntervalSince1970: state.updatedAt / 1000) : Date.now
+        guard let saved = game.savedGame(date: date) else { return }
+        if store.game(code: game.code)?.recorded != true {
+            onGameFinished(saved)
+            store.markRecorded(code: game.code)
+        }
+        dismiss()
+        reviewing = saved.id
     }
 
     /// Takes a finished game off the list. Games still going stay.

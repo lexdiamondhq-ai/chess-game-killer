@@ -76,16 +76,30 @@ struct ChallengeComposerView: View {
 
     private var sendToSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            ChallengeSectionTitle(title: friends.people.isEmpty ? "Send to" : "Your people")
-            if !friends.people.isEmpty {
+            ChallengeSectionTitle(title: "Your people")
+            if friends.you == nil {
+                usernameCard
+            }
+            if friends.people.isEmpty {
+                HStack(alignment: .center, spacing: 14) {
+                    AddFace(theme: theme, action: addFriend)
+                    Text("Add a friend by username and they stay here. Not in the app yet? Create the challenge and send its link or QR code.")
+                        .font(theme.challengeFont(13))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.vertical, 4)
+                .padding(.horizontal, 2)
+            } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(alignment: .top, spacing: 14) {
+                        AddFace(theme: theme, action: addFriend)
                         ForEach(friends.people) { person in
                             PersonFace(person: person, isOn: composer.recipient == person, theme: theme) {
                                 pick(composer.recipient == person ? nil : person)
                             }
                         }
-                        FindFace(theme: theme) { focus = .find }
                     }
                     .padding(.vertical, 4)
                     .padding(.horizontal, 2)
@@ -99,7 +113,9 @@ struct ChallengeComposerView: View {
                 findField
                 findResults
             }
-            youRow
+            if friends.you != nil {
+                youRow
+            }
         }
         .animation(.snappy(duration: 0.25), value: composer.recipient)
         .animation(.snappy(duration: 0.25), value: friends.results)
@@ -110,7 +126,7 @@ struct ChallengeComposerView: View {
             Text("@")
                 .font(theme.challengeFont(17, .semibold))
                 .foregroundStyle(theme.challengeAccent)
-            TextField("Find", text: $findText, prompt: Text("Find by username or name"))
+            TextField("Add a friend", text: $findText, prompt: Text("Add a friend by username or name"))
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .submitLabel(.search)
@@ -150,6 +166,8 @@ struct ChallengeComposerView: View {
                         Rectangle().fill(Color.primary.opacity(0.08)).frame(height: 0.5).padding(.leading, 62)
                     }
                     Button {
+                        // Found is kept: they join Your people whether or not a game goes out now.
+                        friends.add(person)
                         pick(person)
                     } label: {
                         PersonLine(person: person, theme: theme)
@@ -162,26 +180,63 @@ struct ChallengeComposerView: View {
         }
     }
 
-    /// The player's own username, or the way to pick one.
+    /// The player's own username, with the way to change it.
     private var youRow: some View {
         Button {
             pickingUsername = true
         } label: {
-            Group {
-                if let you = friends.you {
-                    (Text("You're ").foregroundStyle(.secondary)
-                        + Text("@\(you.username)").fontWeight(.semibold).foregroundStyle(Color.primary)
-                        + Text("  ·  Change").foregroundStyle(theme.challengeAccent))
-                } else {
-                    (Text("Pick your username").fontWeight(.semibold).foregroundStyle(theme.challengeAccent)
-                        + Text(" so friends can find you.").foregroundStyle(.secondary))
-                }
-            }
-            .font(theme.challengeFont(13))
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
+            (Text("You're ").foregroundStyle(.secondary)
+                + Text("@\(friends.you?.username ?? "")").fontWeight(.semibold).foregroundStyle(Color.primary)
+                + Text("  ·  Change").foregroundStyle(theme.challengeAccent))
+                .font(theme.challengeFont(13))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    /// Before the player has a username: a clear card to pick one, first on the screen.
+    private var usernameCard: some View {
+        Button {
+            pickingUsername = true
+        } label: {
+            HStack(spacing: 12) {
+                Text("@")
+                    .font(theme.challengeFont(19, .bold))
+                    .foregroundStyle(theme.challengeAccent)
+                    .frame(width: 38, height: 38)
+                    .background(Circle().fill(theme.challengeAccent.opacity(0.14)))
+                    .overlay(Circle().strokeBorder(theme.challengeAccent.opacity(0.35), lineWidth: 0.75))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Pick your username")
+                        .font(theme.challengeFont(16, .semibold))
+                        .foregroundStyle(Color.primary)
+                    Text("Friends find you by it and challenge you in the app.")
+                        .font(theme.challengeFont(13))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(ChallengePressStyle())
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .strokeBorder(theme.challengeAccent.opacity(0.6), lineWidth: 1))
+        .challengeGlass(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .accessibilityLabel("Pick your username. Friends find you by it and challenge you in the app.")
+    }
+
+    /// The Add tile: on to the find box, with nobody picked.
+    private func addFriend() {
+        composer.recipient = nil
+        Task { @MainActor in focus = .find }
     }
 
     /// Picks a friend (or nobody). Sending needs the player's own username first.
@@ -555,8 +610,8 @@ private struct PersonFace: View {
     }
 }
 
-/// The last face in the row: find someone else.
-private struct FindFace: View {
+/// The first face in the row: add a friend.
+private struct AddFace: View {
     let theme: BoardTheme
     let action: () -> Void
 
@@ -570,13 +625,13 @@ private struct FindFace: View {
                     .overlay(Circle().strokeBorder(theme.challengeAccent.opacity(0.7),
                                                    style: StrokeStyle(lineWidth: 1.2, dash: [4, 4])))
                     .padding(6)
-                Text("Find")
+                Text("Add")
                     .font(theme.challengeFont(12, .medium))
                     .foregroundStyle(Color.primary.opacity(0.85))
             }
         }
         .buttonStyle(ChallengePressStyle())
-        .accessibilityLabel("Find a player")
+        .accessibilityLabel("Add a friend")
     }
 }
 

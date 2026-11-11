@@ -6,8 +6,8 @@ import UIKit
 /// The rivals' hall, opened from Rivals on Home (Alex, 2026-11-07): one card for each rival,
 /// swiped through, its film's last frame above a short line on how it plays. Landing on a rival
 /// plays its film full screen; when it ends the film holds its last frame and the rival's words
-/// and Face rise at the bottom, over I to V for swiping on to the others. Face plays the
-/// rival's welcome film, then Begin starts the game. Every rival after the Cub stays locked
+/// and Face rise at the bottom, over I to V for swiping on to the others. Face starts the
+/// game. Every rival after the Cub stays locked
 /// until the rival before it is beaten; their cards still show, saying who to beat.
 struct RivalsHall: View {
     /// The rival the hall opens on; nil opens on the first one not yet beaten.
@@ -73,8 +73,13 @@ struct RivalsHall: View {
                 RivalHallFilm(film: film, ended: ended == level, done: { finishFilm(level) },
                               step: { stepFilm(by: $0) }, close: close) {
                     VStack(spacing: 0) {
+                        // Face starts the game: the film was just watched, so it doesn't play a
+                        // second time before the board (Alex, 2026-11-11, audit pick R1).
                         RivalFilmEnding(film: film, open: ladder.isOpen(level),
-                                        face: { withAnimation(.easeIn(duration: 0.3)) { showing = film } },
+                                        face: {
+                                            RivalIntros.mark(level)
+                                            begin(level)
+                                        },
                                         notToday: close)
                         .padding(.horizontal, 24)
                         .opacity(ended == level ? 1 : 0)
@@ -489,7 +494,7 @@ struct RivalFilmEnding: View {
         .disabled(!open)
         .accessibilityLabel(open ? "Face \(film.rival.name)"
                                  : "Locked. Beat \(film.previous?.name ?? "the rival before") first.")
-        .accessibilityHint(open ? "Plays \(film.rival.name)'s welcome, then starts the game" : "")
+        .accessibilityHint(open ? "Starts the game" : "")
     }
 }
 
