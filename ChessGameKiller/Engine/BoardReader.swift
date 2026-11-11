@@ -5,6 +5,12 @@ import UIKit
 /// Turns a photo or screenshot of a chess board into a position.
 protocol BoardReader: Sendable {
     func read(_ image: UIImage) async throws -> BoardReading
+    /// Opens the line to the reader ahead of a photo, so sending it doesn't wait on a fresh connection.
+    func warmUp()
+}
+
+extension BoardReader {
+    func warmUp() {}
 }
 
 /// What a reader saw. The draft is always from White's side; `whiteSide`
@@ -64,6 +70,15 @@ struct CloudBoardReader: BoardReader {
         let whiteSide: PositionDraft.WhiteSide?
         let sideToMove: String?
         let confidence: BoardReading.Confidence?
+    }
+
+    /// A tiny request to the server's front door. URLSession keeps the connection open, so the photo
+    /// that follows skips the connection and security handshake (Alex, 2026-11-11: make it quicker).
+    func warmUp() {
+        var request = URLRequest(url: endpoint)
+        request.timeoutInterval = 10
+        let session = session
+        Task.detached(priority: .utility) { _ = try? await session.data(for: request) }
     }
 
     func read(_ image: UIImage) async throws -> BoardReading {

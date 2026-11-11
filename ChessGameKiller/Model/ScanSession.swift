@@ -53,6 +53,16 @@ final class ScanSession {
         self.sounds = sounds
     }
 
+    /// When the line to the reader was last opened, so it isn't knocked on again and again.
+    private var lastWarmUp: Date?
+
+    /// Gets the reader ready while the person picks or takes a photo.
+    func warmUpReader(now: Date = .now) {
+        if let lastWarmUp, now.timeIntervalSince(lastWarmUp) < 20 { return }
+        lastWarmUp = now
+        reader.warmUp()
+    }
+
     // MARK: Starting points
 
     func setUpByHand() {
@@ -323,8 +333,8 @@ final class AnalysisModel {
         isThinking = true
         // One search that reports as it deepens: the arrows show as soon as the first depths are
         // in, a fraction of a second, and firm up as it looks further. Capped so it can't run
-        // away on a slow phone.
-        let found = await engine.analyze(fen: fen, depth: Self.fullDepth, lines: 2, maxTimeMs: 6000) { [weak self] found, depth in
+        // away on a slow phone, and so it settles quickly (Alex, 2026-11-11: was 6 s).
+        let found = await engine.analyze(fen: fen, depth: Self.fullDepth, lines: 2, maxTimeMs: Self.maxThinkMs) { [weak self] found, depth in
             Task { @MainActor in self?.progress(found, depth: depth, fen: fen, id: id) }
         }
         guard id == generation else { return }
@@ -343,6 +353,9 @@ final class AnalysisModel {
 
     /// How deep the analysis looks before it counts as done.
     static let fullDepth = 18
+
+    /// The longest one position is thought about. The best move rarely changes after this.
+    static let maxThinkMs = 3000
 
     /// The first depth worth showing: shallower, the best move still jumps about.
     static let firstDepth = 8
