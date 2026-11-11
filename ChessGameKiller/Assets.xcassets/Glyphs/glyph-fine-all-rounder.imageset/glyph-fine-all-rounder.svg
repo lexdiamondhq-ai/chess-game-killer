@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+<path fill="#000" fill-rule="evenodd" d="M10.90 12.00A1.1 1.1 0 1 1 13.10 12.00A1.1 1.1 0 1 1 10.90 12.00Z"/>
+<path fill="none" stroke="#000" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round" d="M12.00 1.40L12.92 9.78L16.24 7.76L14.22 11.08L22.60 12.00L14.22 12.92L16.24 16.24L12.92 14.22L12.00 22.60L11.08 14.22L7.76 16.24L9.78 12.92L1.40 12.00L9.78 11.08L7.76 7.76L11.08 9.78Z"/>
+<path fill="none" stroke="#000" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round" d="M5.20 12.00A6.8 6.8 0 1 1 18.80 12.00A6.8 6.8 0 1 1 5.20 12.00Z"/>
+</svg>

@@ -308,19 +308,20 @@ struct HomeAuroraView: View {
             // 2026-11-10): the card swipes through them, and Rivals is in Rooms.
             HomeAuroraSection(title: "Next game", palette: palette)
             gameRow
-            HomeAuroraSection(title: "For today", palette: palette, note: gamesNote)
-            VStack(spacing: 10) {
-                todayRows
-            }
-            .padding(.horizontal, 16)
-            // Your Chess DNA under For today, where Your Grudge was (Alex, 2026-11-09: "Chess DNA
-            // is a nice selling point. We should highlight this instead of grudge").
+            // Your Chess DNA right under Next game (Alex, 2026-11-10: "Move your chess DNA under the
+            // next game"); it came in where Your Grudge was (2026-11-09: "Chess DNA is a nice
+            // selling point").
             if let dna = info.dna {
                 HomeAuroraSection(title: "Your Chess DNA", palette: palette,
                                   note: dna.gamesRead > 0 ? ChessDNAView.basis(dna) : nil)
                 HomeAuroraDNA(dna: dna, palette: palette, action: actions.chessDNA)
                     .padding(.horizontal, 16)
             }
+            HomeAuroraSection(title: "For today", palette: palette, note: gamesNote)
+            VStack(spacing: 10) {
+                todayRows
+            }
+            .padding(.horizontal, 16)
         }
         .padding(.bottom, 130)
         .frame(maxWidth: .infinity)
@@ -510,11 +511,11 @@ struct HomeAuroraView: View {
         }
         HomeAuroraRow(eyebrow: "Puzzles", title: "Sharpen your eye", detail: "Tactics at your level, one after another",
                       accent: palette.violet, palette: palette, action: actions.puzzles) {
-            HomeAuroraEmblem(glyph: Glyphs.puzzles, fill: HomeAuroraPalette.violetTile)
+            HomeAuroraJewel(glyph: Glyphs.fineEye, stone: .amethyst)
         }
         HomeAuroraRow(eyebrow: "Coach Leo", title: stage.plan?.title ?? "Today's lesson", detail: coachLine,
                       accent: palette.teal, palette: palette, action: actions.stage.coach) {
-            HomeAuroraEmblem(glyph: Glyphs.coach, fill: HomeAuroraPalette.tealTile)
+            HomeAuroraJewel(glyph: Glyphs.fineLaurel, stone: .jade)
         }
         // Analyze is the gold knight, its one button on Home (Alex, 2026-11-08), so it has no
         // row here. The game of the day, which the board up top plays, opens from its own row.
@@ -996,15 +997,8 @@ struct HomeAuroraDNA: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(HomeAuroraPalette.goldTile)
-                .overlay {
-                    Image(systemName: dna.style?.symbol ?? "circle.hexagongrid.fill")
-                        .font(.system(size: 26, weight: .semibold))
-                        .foregroundStyle(Color.white)
-                }
+            HomeAuroraJewel(style: dna.style)
                 .frame(width: 64, height: 64)
-                .accessibilityHidden(true)
         }
         .fixedSize(horizontal: false, vertical: true)
     }
@@ -1311,6 +1305,80 @@ struct HomeAuroraEmblem: View {
                     .foregroundStyle(Color.white)
             }
             .accessibilityHidden(true)
+    }
+}
+
+/// A fine gold drawing on a deep jewel tile with a thin gold edge (Alex, 2026-11-10: "more
+/// elegant with color", picked Jewel and gold). Puzzles is amethyst, Coach Leo jade, and each
+/// Chess DNA style has its own stone.
+struct HomeAuroraJewel: View {
+    enum Stone {
+        case amethyst, jade, ruby, sapphire, emerald, amber, slate, violet
+
+        /// Top-left to bottom-right.
+        var colors: [Color] {
+            switch self {
+            case .amethyst: return [Color(hex: 0x5B3FB8), Color(hex: 0x2E1F6E)]
+            case .jade: return [Color(hex: 0x1F8A7A), Color(hex: 0x0D4A45)]
+            case .ruby: return [Color(hex: 0xB3283B), Color(hex: 0x5E0F1C)]
+            case .sapphire: return [Color(hex: 0x2B5FB8), Color(hex: 0x13306B)]
+            case .emerald: return [Color(hex: 0x2F8A57), Color(hex: 0x124A2C)]
+            case .amber: return [Color(hex: 0xB8782A), Color(hex: 0x6A3F10)]
+            case .slate: return [Color(hex: 0x4F5B6E), Color(hex: 0x232A36)]
+            case .violet: return [Color(hex: 0x8A3FA8), Color(hex: 0x45185A)]
+            }
+        }
+    }
+
+    let glyph: String
+    let stone: Stone
+
+    init(glyph: String, stone: Stone) {
+        self.glyph = glyph
+        self.stone = stone
+    }
+
+    /// The emblem for a Chess DNA style; before the style is read, the compass on amber.
+    init(style: ChessDNA.Style?) {
+        switch style {
+        case .attacker: self.init(glyph: Glyphs.fineAttacker, stone: .ruby)
+        case .tactician: self.init(glyph: Glyphs.fineTactician, stone: .sapphire)
+        case .counterpuncher: self.init(glyph: Glyphs.fineCounterpuncher, stone: .emerald)
+        case .grinder: self.init(glyph: Glyphs.fineGrinder, stone: .amber)
+        case .builder: self.init(glyph: Glyphs.fineBuilder, stone: .slate)
+        case .allRounder: self.init(glyph: Glyphs.fineAllRounder, stone: .violet)
+        case nil: self.init(glyph: Glyphs.fineAllRounder, stone: .amber)
+        }
+    }
+
+    static let gold = LinearGradient(colors: [Color(hex: 0xF7E2A8), Color(hex: 0xD9AE5C), Color(hex: 0xB07E35)],
+                                     startPoint: .topLeading, endPoint: .bottomTrailing)
+
+    var body: some View {
+        let tile = RoundedRectangle(cornerRadius: 16, style: .continuous)
+        GeometryReader { geo in
+            let side = min(geo.size.width, geo.size.height)
+            tile
+                .fill(LinearGradient(colors: stone.colors, startPoint: .topLeading, endPoint: .bottomTrailing))
+                .overlay {
+                    // A soft sheen from the top left, like light on a cut stone.
+                    tile.fill(RadialGradient(colors: [.white.opacity(0.22), .white.opacity(0)],
+                                             center: UnitPoint(x: 0.3, y: 0.2), startRadius: 0,
+                                             endRadius: side * 0.7))
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: side * 0.22, style: .continuous)
+                        .strokeBorder(Color(hex: 0xE2C27E).opacity(0.7), lineWidth: 0.7)
+                        .padding(side * 0.055)
+                }
+                .overlay {
+                    Glyph(name: glyph, size: side * 0.5625)
+                        .foregroundStyle(Self.gold)
+                }
+                .frame(width: side, height: side)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .accessibilityHidden(true)
     }
 }
 

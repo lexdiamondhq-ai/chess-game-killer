@@ -106,8 +106,8 @@ final class HomeSnapshotTests: XCTestCase {
         XCTAssertEqual(metrics.nearest(to: 0), .board)
     }
 
-    /// Your Chess DNA under For today on the Aurora home, where Your Grudge was (2026-11-09):
-    /// a few weeks in, by day and by night, and before Coach Leo has read enough games.
+    /// Your Chess DNA on the Aurora home, under Next game (2026-11-10): a few weeks in, by day and
+    /// by night, before Coach Leo has read enough games, and every style's jewel emblem.
     func testTheChessDNACardOnHome() throws {
         let sample = TrainSample(settled: true)
         let dna = ChessDNA.make(games: sample.vault.games, puzzleStats: sample.puzzles.themeStats,
@@ -124,6 +124,15 @@ final class HomeSnapshotTests: XCTestCase {
                     HomeAuroraSection(title: "Before three games", palette: palette)
                     HomeAuroraDNA(dna: fresh, palette: palette, action: {})
                         .padding(.horizontal, 16)
+                    HomeAuroraSection(title: "Every style", palette: palette)
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 14) {
+                        HomeAuroraJewel(glyph: Glyphs.fineEye, stone: .amethyst).frame(width: 64, height: 64)
+                        HomeAuroraJewel(glyph: Glyphs.fineLaurel, stone: .jade).frame(width: 64, height: 64)
+                        ForEach(ChessDNA.Style.allCases) { style in
+                            HomeAuroraJewel(style: style).frame(width: 64, height: 64)
+                        }
+                    }
+                    .padding(.horizontal, 16)
                 }
                 .padding(.top, 60)
             }
