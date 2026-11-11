@@ -582,7 +582,7 @@ struct RivalHallFilm<Ending: View>: View {
 }
 
 /// A rival's welcome: its film, full screen and with sound, opening from a point of torchlight;
-/// then its name, and Begin. A tap skips to the name; a swipe down goes back. Nothing sits over
+/// then, when it ends, its name, and Begin. A tap skips to the name; a swipe down goes back. Nothing sits over
 /// the art. The film's last frame holds behind it.
 struct RivalWelcome: View {
     let film: RivalFilm
@@ -696,14 +696,23 @@ struct RivalWelcome: View {
         self.player = player
         if !Welcome.isUnderTest { player.play() }
         withAnimation(reduceMotion ? .easeOut(duration: 0.4) : .easeOut(duration: 1.8)) { iris = 1 }
-        try? await Task.sleep(for: .seconds(film.beat + 0.8))
+        // The name and Begin rise when the film ends (Alex, 2026-11-10: "the buttons to play
+        // the rival should appear at the end of each video"); a tap still brings them sooner.
+        let length = (try? await player.currentItem?.asset.load(.duration)).flatMap { $0.isNumeric ? $0.seconds : nil }
+        let wait = Welcome.isUnderTest ? film.beat + 0.8 : (length ?? film.beat + 0.8)
+        try? await Task.sleep(for: .seconds(wait))
         guard !Task.isCancelled else { return }
         showTitle()
     }
 
     private func skip() {
         guard !titled else { return }
-        player?.seek(to: CMTime(seconds: film.beat + 0.8, preferredTimescale: 600))
+        // To the film's last frame, which holds behind the name.
+        if let item = player?.currentItem, item.duration.isNumeric {
+            player?.seek(to: item.duration)
+        } else {
+            player?.seek(to: CMTime(seconds: film.beat + 0.8, preferredTimescale: 600))
+        }
         withAnimation(.easeOut(duration: 0.3)) { iris = 1 }
         showTitle()
     }

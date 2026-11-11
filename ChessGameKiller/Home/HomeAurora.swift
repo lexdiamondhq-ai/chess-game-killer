@@ -304,9 +304,9 @@ struct HomeAuroraView: View {
                 .frame(width: 38, height: 4)
                 .padding(.top, 10)
             // The Face a rival coins are gone: the rival you're on stands big in the Next game
-            // card instead (Alex, 2026-11-08). All rivals moves to this heading's corner.
-            HomeAuroraSection(title: "Next game", palette: palette, note: "All rivals",
-                              action: { actions.rivals(nil) })
+            // card instead (Alex, 2026-11-08). No All rivals link in the corner (Alex,
+            // 2026-11-10): the card swipes through them, and Rivals is in Rooms.
+            HomeAuroraSection(title: "Next game", palette: palette)
             gameRow
             HomeAuroraSection(title: "For today", palette: palette, note: gamesNote)
             VStack(spacing: 10) {
