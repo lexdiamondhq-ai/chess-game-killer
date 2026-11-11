@@ -80,11 +80,11 @@ enum ArmySlot: String, CaseIterable, Codable, Identifiable {
 enum ArmyRank: Int, CaseIterable, Comparable, Codable {
     /// Plain.
     case recruit
-    /// Earns a name and a soft glow.
+    /// Earns a name.
     case veteran
     /// Earns a scar.
     case elite
-    /// A golden glow that breathes.
+    /// Earns a gold name.
     case legend
 
     var title: String {
@@ -109,9 +109,9 @@ enum ArmyRank: Int, CaseIterable, Comparable, Codable {
     var reward: String {
         switch self {
         case .recruit: return "Every piece starts here."
-        case .veteran: return "Earns a name and a soft glow."
+        case .veteran: return "Earns a name."
         case .elite: return "Earns a battle scar."
-        case .legend: return "Glows gold."
+        case .legend: return "Earns a gold name."
         }
     }
 
