@@ -166,10 +166,25 @@ final class HomeSnapshotTests: XCTestCase {
                     HomeAuroraTodayCard(eyebrow: "Today's Move", fen: finest.fen, flipped: false,
                                         title: "White to play and win", detail: "Keep your 5-day streak",
                                         button: "Play", symbol: "play.fill", palette: palette, open: {})
-                    HomeAuroraFinestRow(finest: finest, palette: palette, replay: {})
-                    HomeAuroraRow(eyebrow: "Puzzles", title: "Sharpen your eye", detail: "Tactics at your level, one after another",
-                                  accent: palette.violet, palette: palette, action: {}) {
-                        HomeAuroraEmblem(glyph: Glyphs.puzzles, fill: HomeAuroraPalette.violetTile)
+                    // Today's things as tiles, two by two (Alex, 2026-11-11).
+                    Grid(horizontalSpacing: 10, verticalSpacing: 10) {
+                        GridRow {
+                            HomeAuroraFinestRow(finest: finest, palette: palette, tile: true, replay: {})
+                            HomeAuroraRow(eyebrow: "Puzzles", title: "Sharpen your eye", detail: "Tactics at your level",
+                                          accent: palette.violet, palette: palette, tile: true, action: {}) {
+                                HomeAuroraJewel(glyph: Glyphs.fineEye, stone: .amethyst)
+                            }
+                        }
+                        GridRow {
+                            HomeAuroraRow(eyebrow: "Coach Leo", title: "Today's training", detail: "Done today. Another round?",
+                                          accent: palette.teal, palette: palette, tile: true, action: {}) {
+                                HomeAuroraJewel(glyph: Glyphs.fineLaurel, stone: .jade)
+                            }
+                            HomeAuroraRow(eyebrow: "Game of the day", title: "Réti – Tartakower", detail: "Réti v Tartakower · 1910",
+                                          accent: palette.gold, palette: palette, tile: true, action: {}) {
+                                HomeAuroraBoard(fen: finest.fen, flipped: false, lit: false)
+                            }
+                        }
                     }
                 }
                 .padding(.horizontal, 16)
