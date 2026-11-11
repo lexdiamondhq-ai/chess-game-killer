@@ -397,8 +397,12 @@ private struct CapturedPieces: View {
     @ViewBuilder
     private func leadLabel(_ lead: Int) -> some View {
         if lead > 0 {
+            // Always one piece: next to a long taunt there was no room, and "+3" broke into a
+            // "+" over a "3" at the card's edge (Alex, 2026-11-11). The taunt wraps instead.
             Text("+\(lead)")
                 .font(.app(.footnote, weight: .semibold, scale: scale).monospacedDigit())
+                .lineLimit(1)
+                .fixedSize()
         }
     }
 
