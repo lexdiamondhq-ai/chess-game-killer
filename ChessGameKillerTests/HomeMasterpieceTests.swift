@@ -40,4 +40,30 @@ final class HomeMasterpieceTests: XCTestCase {
         XCTAssertEqual(HomeMasterpiece.of(evening, games: games, calendar: calendar)?.game.id, first.game.id)
         XCTAssertNotEqual(HomeMasterpiece.of(tomorrow, games: games, calendar: calendar)?.game.id, first.game.id)
     }
+
+    func testTheGamePlaysAcrossTheDay() throws {
+        let games = GrandmasterContent.shared.games
+        let game = try XCTUnwrap(games.first { $0.id == "kasparov-topalov" })
+        let masterpiece = try XCTUnwrap(HomeMasterpiece(game))
+        // Every move of the game, from the opening position; the finish is its tail.
+        XCTAssertEqual(masterpiece.dayFrames.count, game.moves.count + 1)
+        XCTAssertEqual(Array(masterpiece.dayFrames.suffix(masterpiece.frames.count)), masterpiece.frames)
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        func at(_ hour: Int, _ minute: Int = 0) throws -> Int {
+            let date = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 11, day: 11,
+                                                                       hour: hour, minute: minute)))
+            return masterpiece.dayFrame(at: date, calendar: calendar)
+        }
+        let last = masterpiece.dayFrames.count - 1
+        // A full set until 7 am, the finish from 11 pm, steadily on in between.
+        XCTAssertEqual(try at(3), 0)
+        XCTAssertEqual(try at(7), 0)
+        XCTAssertEqual(try at(15), last / 2)
+        XCTAssertEqual(try at(23), last)
+        XCTAssertEqual(try at(23, 59), last)
+        XCTAssertLessThan(try at(12), try at(18))
+        XCTAssertEqual(PositionDraft(fen: masterpiece.dayFrames[0])?.pieces.count, 32)
+    }
 }

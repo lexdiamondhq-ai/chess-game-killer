@@ -87,8 +87,9 @@ struct HomeAuroraView: View {
     @State private var pulled: CGFloat = 0
     /// The header's height, so it knows when the page's top edge reaches it.
     @State private var headerHeight: CGFloat = 52
-    /// Which position of the game of the day the turning board shows: it plays itself slowly.
-    @State private var boardFrame = 0
+    /// Which position of the game of the day the turning board shows: the clock moves it on.
+    /// Nil until Home plays its first move: one move behind the clock.
+    @State private var boardFrame: Int?
     /// The rival in front on the Up next card, as you swipe through them. Nil: the one up next.
     @State private var rivalShown: MatchController.Level?
     /// The card in front under For today, as you swipe through your games and Today's Move.
@@ -199,8 +200,12 @@ struct HomeAuroraView: View {
         }
         .environment(\.colorScheme, tone.scheme)
         .onAppear { music.homeAppeared() }
-        .onDisappear { music.homeDisappeared() }
-        .task(id: reduceMotion) { await playThrough() }
+        .onDisappear {
+            music.homeDisappeared()
+            // Back on Home, the board stands one move behind the clock again and plays it.
+            boardFrame = nil
+        }
+        .task(id: "\(reduceMotion)-\(stage.masterpiece?.game.id ?? "")") { await playThrough() }
     }
 
     /// Scrolling down past where the header tucks away fades the bar over about 80 points;
@@ -214,25 +219,44 @@ struct HomeAuroraView: View {
         }
     }
 
-    /// The pieces move slowly: the game of the day's finish, a move every few seconds, a rest on
-    /// the final position, then again from the start.
+    /// The game of the day plays across the day (Alex, 2026-11-11): a full set at 7 am, the
+    /// famous finish by 11 pm. Home opens one move behind the clock and plays it, so a piece
+    /// moves (and, on a capture, tips over) as you arrive; then the board rests, taking each
+    /// new move as the clock reaches it.
     private func playThrough() async {
-        guard !reduceMotion else { return }
+        guard let masterpiece = stage.masterpiece else { return }
+        guard !reduceMotion else { boardFrame = masterpiece.dayFrame(); return }
+        var frame: Int = boardFrame ?? arrivalFrame(masterpiece)
+        boardFrame = frame
+        try? await Task.sleep(for: .seconds(1.4))
         while !Task.isCancelled {
-            let count: Int = stage.masterpiece?.frames.count ?? 0
-            guard count > 1 else { return }
-            let last: Bool = boardFrame >= count - 1
-            try? await Task.sleep(for: .seconds(last ? 6 : 3.2))
-            guard !Task.isCancelled else { return }
-            boardFrame = last ? 0 : boardFrame + 1
+            let due: Int = masterpiece.dayFrame()
+            if frame < due {
+                frame += 1
+                boardFrame = frame
+                try? await Task.sleep(for: .seconds(3.2))
+            } else if frame > due {
+                // Past midnight: the full set again.
+                frame = due
+                boardFrame = frame
+            } else {
+                try? await Task.sleep(for: .seconds(30))
+            }
         }
     }
 
-    /// What stands on the turning board: the game of the day as it plays, or your game's pieces.
+    /// What stands on the turning board: the game of the day where the clock has it, or your
+    /// game's pieces.
     private var boardPieces: [Piece] {
-        guard let frames = stage.masterpiece?.frames, !frames.isEmpty else { return info.pieces }
-        let fen: String = frames[min(boardFrame, frames.count - 1)]
-        return PositionDraft(fen: fen)?.pieces ?? info.pieces
+        guard let masterpiece = stage.masterpiece, !masterpiece.dayFrames.isEmpty else { return info.pieces }
+        let frames: [String] = masterpiece.dayFrames
+        let frame: Int = boardFrame ?? (reduceMotion ? masterpiece.dayFrame() : arrivalFrame(masterpiece))
+        return PositionDraft(fen: frames[min(frame, frames.count - 1)])?.pieces ?? info.pieces
+    }
+
+    /// Where the board stands as Home opens: one move behind the clock, so that move plays.
+    private func arrivalFrame(_ masterpiece: HomeMasterpiece) -> Int {
+        max(masterpiece.dayFrame() - 1, 0)
     }
 
     // MARK: The board
