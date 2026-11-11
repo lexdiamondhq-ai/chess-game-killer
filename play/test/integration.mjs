@@ -519,6 +519,49 @@ try {
     assert.equal((await api(base, "GET", `/api/daily/${day}`)).status, 405);
   });
 
+  await scenario("friends by username: claim, find, challenge, inbox", async () => {
+    const alex = "a1".repeat(16);
+    const maria = "b2".repeat(16);
+    const post = (part, body) => api(base, "POST", `/api/friends/${part}`, { body });
+    assert.deepEqual((await post("me", { player: alex })).json, { you: null });
+    assert.equal((await post("claim", { player: alex, username: "@Alex_K", name: "Alex" })).json.you.username, "alex_k");
+    assert.equal((await post("claim", { player: maria, username: "maria", name: "Maria Lopez" })).status, 200);
+    // Taken, and badly formed.
+    const taken = await post("claim", { player: alex, username: "Maria" });
+    assert.equal(taken.status, 409);
+    assert.equal(taken.json.error, "username_taken");
+    assert.equal((await post("claim", { player: alex, username: "a" })).status, 400);
+    // Found by username and by a word of the name, never yourself.
+    assert.deepEqual((await post("search", { player: alex, q: "@mar" })).json.players.map((p) => p.username), ["maria"]);
+    assert.deepEqual((await post("search", { player: alex, q: "lop" })).json.players.map((p) => p.username), ["maria"]);
+    assert.deepEqual((await post("search", { player: alex, q: "alex" })).json.players, []);
+    // A challenge sent by username lands in Maria's inbox, and each is now in the other's people.
+    // From an address of its own, so this game doesn't use up the other scenarios' allowance of new games.
+    const own = { "cf-connecting-ip": "203.0.113.7" };
+    const madeAnswer = await api(base, "POST", "/api/games", { body: { name: "Alex", side: "white", clock: { initial: 600, increment: 0 } }, headers: own });
+    assert.equal(madeAnswer.status, 201, madeAnswer.text);
+    const made = madeAnswer.json;
+    const sent = await post("invite", { player: alex, to: "maria", code: made.code });
+    assert.equal(sent.status, 201, sent.text);
+    assert.equal(sent.json.sent.username, "maria");
+    assert.equal((await post("invite", { player: alex, to: "nobody", code: made.code })).status, 404);
+    const inbox = (await post("inbox", { player: maria })).json.invites;
+    assert.equal(inbox.length, 1);
+    assert.equal(inbox[0].code, made.code);
+    assert.equal(inbox[0].seat, "black");
+    assert.deepEqual(inbox[0].clock, { initial: 600, increment: 0 });
+    assert.equal(inbox[0].from.username, "alex_k");
+    assert.equal(inbox[0].from.online, true);
+    assert.deepEqual((await post("people", { player: alex })).json.people.map((p) => p.username), ["maria"]);
+    assert.deepEqual((await post("people", { player: maria })).json.people.map((p) => p.username), ["alex_k"]);
+    // Dismissed, it's gone. A game that's been joined can't be sent.
+    assert.equal((await post("dismiss", { player: maria, id: inbox[0].id })).status, 200);
+    assert.deepEqual((await post("inbox", { player: maria })).json.invites, []);
+    assert.equal((await api(base, "POST", `/api/games/${made.code}/join`, { body: { name: "Maria" }, headers: own })).status, 200);
+    assert.equal((await post("invite", { player: alex, to: "maria", code: made.code })).status, 409);
+    assert.equal((await api(base, "GET", "/api/friends/me")).status, 405);
+  });
+
   await scenario("the rate limits work in local dev too", async () => {
     let limited = null;
     for (let i = 0; i < 45 && !limited; i += 1) {

@@ -5,10 +5,35 @@ import SwiftUI
 /// Applied once, at the app's root, inside the environment that holds the `ChallengeCenter`.
 struct ChallengeHost: ViewModifier {
     @Environment(ChallengeCenter.self) private var center: ChallengeCenter?
+    @Environment(\.scenePhase) private var scenePhase
+    @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .gilded
     @State private var shown = false
 
     func body(content: Content) -> some View {
         content
+            // A challenge a friend sent by username, over the app until it's opened or let go.
+            .overlay(alignment: .top) {
+                if let center, !center.isPresenting, let note = center.friends.inbox.first {
+                    FriendInviteBanner(note: note, theme: BoardTheme.named(themeID)) {
+                        center.friends.dismiss(note)
+                        center.open(code: note.code)
+                    } close: {
+                        center.friends.dismiss(note)
+                    }
+                    .padding(.top, 6)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .id(note.id)
+                }
+            }
+            .animation(.spring(duration: 0.45, bounce: 0.2), value: center?.friends.inbox.first?.id)
+            // Looks for challenges sent by username while the app is open: now, then every 30 seconds.
+            .task(id: scenePhase) {
+                guard scenePhase == .active, let center, !center.holdsStill else { return }
+                while !Task.isCancelled {
+                    await center.friends.checkInbox(force: true)
+                    try? await Task.sleep(for: .seconds(30))
+                }
+            }
             .onOpenURL { url in
                 // The Today's Move widget opens the game screen's daily puzzle, and the game on the
                 // Lock Screen opens that game; every other link is a challenge.

@@ -14,7 +14,8 @@ final class ChallengeSnapshotTests: XCTestCase {
 
     private let defaults = UserDefaults.standard
     private var saved: [String: Any?] = [:]
-    private static let keys = ["boardTheme", "sculpted3D", ChallengeName.key, "challenge.clock", "challenge.side", "online.clock"]
+    private static let keys = ["boardTheme", "sculpted3D", ChallengeName.key, "challenge.clock", "challenge.side", "online.clock",
+                               FriendDirectory.youKey, FriendDirectory.peopleKey]
 
     /// The phone's own time, for games that must look recent. Clocks and absences count from the server's `now`.
     private var realNow: Double { Date.now.timeIntervalSince1970 * 1000 }
@@ -35,6 +36,8 @@ final class ChallengeSnapshotTests: XCTestCase {
         defaults.set("Alex", forKey: ChallengeName.key)
         defaults.set(TimeControl.rapid10.rawValue, forKey: "challenge.clock")
         defaults.set(SideChoice.white.rawValue, forKey: "challenge.side")
+        defaults.removeObject(forKey: FriendDirectory.youKey)
+        defaults.removeObject(forKey: FriendDirectory.peopleKey)
     }
 
     override func tearDown() async throws {
@@ -51,6 +54,39 @@ final class ChallengeSnapshotTests: XCTestCase {
         center.compose()
         try snapshot("challenge-composer", center: center)
         center.dismiss()
+    }
+
+    /// Friends by username: the player's people along the top, one picked to send the challenge to.
+    func testComposerWithYourPeople() throws {
+        let people = [
+            FriendPerson(username: "maria", name: "Maria Lopez", online: true),
+            FriendPerson(username: "jdog", name: "Jay", online: false),
+            FriendPerson(username: "dad", name: "Dad", online: true),
+            FriendPerson(username: "sammyc", name: "Sam", online: false),
+        ]
+        defaults.set(try JSONEncoder().encode(FriendYou(username: "alex_k", name: "Alex")), forKey: FriendDirectory.youKey)
+        defaults.set(try JSONEncoder().encode(people), forKey: FriendDirectory.peopleKey)
+        let api = FakeChallengeAPI()
+        let center = makeCenter(api)
+        center.compose()
+        try snapshot("challenge-composer-people", center: center)
+        guard case .composer(let composer)? = center.screen else { return XCTFail("the composer should be up") }
+        composer.recipient = people[0]
+        try snapshot("challenge-composer-recipient", center: center)
+        center.dismiss()
+    }
+
+    /// A challenge a friend sent by username, as it floats over the app.
+    func testInviteBanner() throws {
+        let note = FriendInviteNote(id: "0123456789ab", code: "7KQ2XM", clock: FriendClock(initial: 600, increment: 0),
+                                    seat: .black, from: FriendPerson(username: "maria", name: "Maria Lopez", online: true))
+        let view = ZStack(alignment: .top) {
+            TrainingBackdrop(theme: BoardTheme.named(.gilded))
+            FriendInviteBanner(note: note, theme: BoardTheme.named(.gilded), open: {}, close: {})
+                .padding(.top, 60)
+        }
+        .screenScheme(BoardTheme.named(.gilded))
+        try snapshot("challenge-invite-banner", view: view, wait: 1)
     }
 
     func testComposerOnceTheChallengeExists() throws {

@@ -16,11 +16,15 @@ struct ChallengeComposerView: View {
     @State private var code = ""
     @State private var codeProblem: String?
     @State private var copied = false
+    @State private var findText = ""
+    @State private var pickingUsername = false
     @FocusState private var focus: Field?
 
     private enum Field {
-        case code
+        case code, find
     }
+
+    private var friends: FriendDirectory { center.friends }
 
     /// The clocks a friend game offers, as on the server.
     static let clocks: [TimeControl] = [.blitz3Plus2, .blitz5, .rapid10, .rapid15Plus10, .unlimited]
@@ -59,6 +63,136 @@ struct ChallengeComposerView: View {
         .sensoryFeedback(.success, trigger: composer.created?.code) { _, new in hapticsOn && new != nil }
         .sensoryFeedback(.selection, trigger: control) { _, _ in hapticsOn }
         .sensoryFeedback(.selection, trigger: side) { _, _ in hapticsOn }
+        .sensoryFeedback(.selection, trigger: composer.recipient) { _, _ in hapticsOn }
+        .task { await friends.refresh(name: name) }
+        .onChange(of: findText) { _, text in friends.search(text) }
+        .sheet(isPresented: $pickingUsername) {
+            UsernamePicker(name: name, theme: theme)
+                .environment(center)
+        }
+    }
+
+    // MARK: Send to a friend by username
+
+    private var sendToSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ChallengeSectionTitle(title: friends.people.isEmpty ? "Send to" : "Your people")
+            if !friends.people.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: 14) {
+                        ForEach(friends.people) { person in
+                            PersonFace(person: person, isOn: composer.recipient == person, theme: theme) {
+                                pick(composer.recipient == person ? nil : person)
+                            }
+                        }
+                        FindFace(theme: theme) { focus = .find }
+                    }
+                    .padding(.vertical, 4)
+                    .padding(.horizontal, 2)
+                }
+                .scrollClipDisabled()
+            }
+            if let recipient = composer.recipient {
+                RecipientRow(person: recipient, theme: theme) { pick(nil) }
+                    .transition(.opacity.combined(with: .scale(scale: 0.97)))
+            } else {
+                findField
+                findResults
+            }
+            youRow
+        }
+        .animation(.snappy(duration: 0.25), value: composer.recipient)
+        .animation(.snappy(duration: 0.25), value: friends.results)
+    }
+
+    private var findField: some View {
+        HStack(spacing: 10) {
+            Text("@")
+                .font(theme.challengeFont(17, .semibold))
+                .foregroundStyle(theme.challengeAccent)
+            TextField("Find", text: $findText, prompt: Text("Find by username or name"))
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+                .font(theme.challengeFont(17, .medium))
+                .focused($focus, equals: .find)
+            if friends.isSearching {
+                ProgressView().controlSize(.small)
+            } else if !findText.isEmpty {
+                Button {
+                    findText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear")
+            }
+        }
+        .padding(.horizontal, 16)
+        .frame(height: 50)
+        .challengeGlass(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    @ViewBuilder
+    private var findResults: some View {
+        let typed = findText.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "@", with: "")
+        if typed.count >= 2 {
+            VStack(spacing: 0) {
+                if friends.results.isEmpty, !friends.isSearching {
+                    Text("Nobody by that name yet. Send them a link instead.")
+                        .font(theme.challengeFont(14))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(14)
+                }
+                ForEach(Array(friends.results.enumerated()), id: \.element.id) { index, person in
+                    if index > 0 {
+                        Rectangle().fill(Color.primary.opacity(0.08)).frame(height: 0.5).padding(.leading, 62)
+                    }
+                    Button {
+                        pick(person)
+                    } label: {
+                        PersonLine(person: person, theme: theme)
+                    }
+                    .buttonStyle(ChallengePressStyle())
+                }
+            }
+            .challengeGlass(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .transition(.opacity)
+        }
+    }
+
+    /// The player's own username, or the way to pick one.
+    private var youRow: some View {
+        Button {
+            pickingUsername = true
+        } label: {
+            Group {
+                if let you = friends.you {
+                    (Text("You're ").foregroundStyle(.secondary)
+                        + Text("@\(you.username)").fontWeight(.semibold).foregroundStyle(Color.primary)
+                        + Text("  ·  Change").foregroundStyle(theme.challengeAccent))
+                } else {
+                    (Text("Pick your username").fontWeight(.semibold).foregroundStyle(theme.challengeAccent)
+                        + Text(" so friends can find you.").foregroundStyle(.secondary))
+                }
+            }
+            .font(theme.challengeFont(13))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Picks a friend (or nobody). Sending needs the player's own username first.
+    private func pick(_ person: FriendPerson?) {
+        composer.recipient = person
+        if person != nil {
+            findText = ""
+            friends.clearSearch()
+            focus = nil
+            if friends.you == nil { pickingUsername = true }
+        }
     }
 
     // MARK: Before the challenge exists
@@ -68,12 +202,14 @@ struct ChallengeComposerView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Play a friend")
                     .font(theme.challengeFont(30, .bold))
-                Text("Send a link by text or email. Your friend plays in the app, or right in the browser.")
+                Text("Pick a friend by username, or send a link. They play in the app, or right in the browser.")
                     .font(theme.challengeFont(15))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.top, 8)
+
+            sendToSection
 
             VStack(alignment: .leading, spacing: 10) {
                 ChallengeSectionTitle(title: "Your name")
@@ -172,12 +308,14 @@ struct ChallengeComposerView: View {
 
     private func createdContent(_ created: FriendGame) -> some View {
         let invite = ChallengeInviteContent(game: created, name: name)
-        return VStack(spacing: 22) {
+        return VStack(spacing: 20) {
             VStack(spacing: 8) {
                 Text("Your challenge is ready")
                     .font(theme.challengeFont(26, .bold))
                     .multilineTextAlignment(.center)
-                Text("Send the link to your friend. The game starts as soon as they open it.")
+                Text(composer.recipient == nil
+                     ? "Next to you? Let them scan. Far away? Send the link below."
+                     : "Next to you? Let them scan. Or send the link below too.")
                     .font(theme.challengeFont(15))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -185,56 +323,40 @@ struct ChallengeComposerView: View {
             }
             .padding(.top, 12)
 
-            codeCard(created, invite: invite)
-
-            HStack(spacing: 10) {
-                ShareTile(title: "Text", symbol: "message.fill", theme: theme) {
-                    ChallengeSharing.shared.text(invite) { sent in sentInvite(sent) }
+            if let delivery = composer.delivery {
+                DeliveryRow(delivery: delivery, theme: theme) {
+                    Task { await composer.deliver() }
                 }
-                ShareTile(title: "Email", symbol: "envelope.fill", theme: theme) {
-                    ChallengeSharing.shared.mail(invite) { sent in sentInvite(sent) }
-                }
-                ShareTile(title: "More", symbol: "square.and.arrow.up", theme: theme) {
-                    ChallengeSharing.shared.share(invite) { sent in sentInvite(sent) }
-                }
-                ShareTile(title: copied ? "Copied" : "Copy link", symbol: copied ? "checkmark" : "link",
-                          isOn: copied, theme: theme) {
-                    ChallengeSharing.copy(invite)
-                    withAnimation(.snappy) { copied = true }
-                    Task { @MainActor in
-                        try? await Task.sleep(for: .seconds(2))
-                        withAnimation(.snappy) { copied = false }
-                    }
-                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
-            .sensoryFeedback(.success, trigger: copied) { _, new in hapticsOn && new }
+
+            codeCard(created, invite: invite)
 
             Text("The challenge stays open for 7 days. Find it under Friend games.")
                 .font(theme.challengeFont(12))
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
         }
+        .animation(.snappy(duration: 0.3), value: composer.delivery)
     }
 
     private func codeCard(_ created: FriendGame, invite: ChallengeInviteContent) -> some View {
         VStack(spacing: 12) {
-            Text("CODE")
+            InviteQRCode(url: invite.url)
+                .frame(width: 210, height: 210)
+                .accessibilityLabel("QR code for the challenge. Your friend scans it with their camera.")
+            Text("SCAN, OR TYPE THE CODE")
                 .font(.app(.caption, weight: .semibold))
                 .tracking(1.4)
                 .foregroundStyle(.secondary)
+                .padding(.top, 4)
             Text(ChallengeLink.spaced(created.code))
-                .font(.system(size: 44, weight: .semibold, design: .monospaced))
+                .font(.system(size: 40, weight: .semibold, design: .monospaced))
                 .tracking(3)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
                 .textSelection(.enabled)
                 .accessibilityLabel("Code \(created.code.map(String.init).joined(separator: " "))")
-            Text(invite.url.absoluteString.replacingOccurrences(of: "https://", with: ""))
-                .font(theme.challengeFont(13))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .textSelection(.enabled)
             Rectangle()
                 .fill(Color.primary.opacity(0.1))
                 .frame(height: 0.5)
@@ -254,6 +376,35 @@ struct ChallengeComposerView: View {
         .padding(.horizontal, 16)
         .frame(maxWidth: .infinity)
         .challengeGlass(RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+
+    /// The ways to send the link, as round buttons in a glass dock.
+    private func shareDock(_ created: FriendGame) -> some View {
+        let invite = ChallengeInviteContent(game: created, name: name)
+        return HStack(spacing: 0) {
+            SendDockButton(title: "Text", symbol: "message.fill", theme: theme) {
+                ChallengeSharing.shared.text(invite) { sent in sentInvite(sent) }
+            }
+            SendDockButton(title: "Email", symbol: "envelope.fill", theme: theme) {
+                ChallengeSharing.shared.mail(invite) { sent in sentInvite(sent) }
+            }
+            SendDockButton(title: copied ? "Copied" : "Copy link", symbol: copied ? "checkmark" : "link",
+                       isOn: copied, theme: theme) {
+                ChallengeSharing.copy(invite)
+                withAnimation(.snappy) { copied = true }
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(2))
+                    withAnimation(.snappy) { copied = false }
+                }
+            }
+            SendDockButton(title: "More", symbol: "square.and.arrow.up", theme: theme) {
+                ChallengeSharing.shared.share(invite) { sent in sentInvite(sent) }
+            }
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 6)
+        .challengeGlass(RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .sensoryFeedback(.success, trigger: copied) { _, new in hapticsOn && new }
     }
 
     /// Sent: on to the board to wait there.
@@ -276,10 +427,15 @@ struct ChallengeComposerView: View {
             if composer.created == nil {
                 Button {
                     focus = nil
+                    if composer.recipient != nil, friends.you == nil {
+                        pickingUsername = true
+                        return
+                    }
                     Task { await composer.create(name: name, clock: FriendClock(control), side: side) }
                 } label: {
                     ZStack {
-                        Label("Create challenge", systemImage: "paperplane.fill")
+                        Label(composer.recipient.map { "Challenge \($0.name)" } ?? "Create challenge", systemImage: "paperplane.fill")
+                            .lineLimit(1)
                             .opacity(composer.isCreating ? 0 : 1)
                         if composer.isCreating {
                             ProgressView()
@@ -290,6 +446,9 @@ struct ChallengeComposerView: View {
                 .buttonStyle(ChallengeButtonStyle(kind: .primary, theme: theme))
                 .disabled(composer.isCreating)
             } else {
+                if let created = composer.created {
+                    shareDock(created)
+                }
                 Button {
                     composer.goToBoard()
                 } label: {
@@ -308,8 +467,8 @@ struct ChallengeComposerView: View {
     }
 }
 
-/// One way to send the invite: an icon over its name, in glass.
-private struct ShareTile: View {
+/// One way to send the invite: a round glass button over its name.
+private struct SendDockButton: View {
     let title: String
     let symbol: String
     var isOn = false
@@ -318,24 +477,198 @@ private struct ShareTile: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 7) {
+            VStack(spacing: 6) {
                 Image(systemName: symbol)
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.system(size: 19, weight: .semibold))
                     .foregroundStyle(theme.challengeAccent)
-                    .frame(height: 24)
                     .contentTransition(.symbolEffect(.replace))
+                    .frame(width: 50, height: 50)
+                    .background(Circle().fill(theme.challengeAccent.opacity(isOn ? 0.28 : 0.14)))
+                    .overlay(Circle().strokeBorder(theme.challengeAccent.opacity(0.35), lineWidth: 0.75))
                 Text(title)
-                    .font(theme.challengeFont(12, .semibold))
-                    .foregroundStyle(isOn ? theme.challengeAccent : Color.primary)
+                    .font(theme.challengeFont(11, .semibold))
+                    .foregroundStyle(isOn ? theme.challengeAccent : Color.primary.opacity(0.85))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
-            .frame(maxWidth: .infinity, minHeight: 78)
-            .challengeGlass(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
         }
         .buttonStyle(ChallengePressStyle())
         .accessibilityLabel(title)
+    }
+}
+
+/// A player's round face: the first letter of their name, a green ring while they're online.
+struct PersonAvatar: View {
+    let person: FriendPerson
+    var size: CGFloat = 52
+    let theme: BoardTheme
+
+    var body: some View {
+        Text(person.initial)
+            .font(.system(size: size * 0.38, weight: .bold, design: .serif))
+            .foregroundStyle(Color.black.opacity(0.82))
+            .frame(width: size, height: size)
+            .background(
+                Circle().fill(LinearGradient(colors: [Color(hex: 0xEBC57A), Color(hex: 0x8A6A33)],
+                                             startPoint: .topLeading, endPoint: .bottomTrailing))
+            )
+            .overlay {
+                if person.online {
+                    Circle()
+                        .strokeBorder(Color(hex: 0x7FCF8C), lineWidth: 2)
+                        .padding(-4)
+                }
+            }
+            .accessibilityHidden(true)
+    }
+}
+
+/// One of the player's people, in the row along the top: tap to send them the challenge.
+private struct PersonFace: View {
+    let person: FriendPerson
+    let isOn: Bool
+    let theme: BoardTheme
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 7) {
+                PersonAvatar(person: person, theme: theme)
+                    .overlay {
+                        if isOn {
+                            Circle().strokeBorder(theme.challengeAccent, lineWidth: 2.5).padding(-7)
+                        }
+                    }
+                    .padding(6)
+                Text(person.handle)
+                    .font(theme.challengeFont(12, isOn ? .semibold : .medium))
+                    .foregroundStyle(isOn ? theme.challengeAccent : Color.primary.opacity(0.85))
+                    .lineLimit(1)
+                    .frame(maxWidth: 74)
+            }
+        }
+        .buttonStyle(ChallengePressStyle())
+        .accessibilityLabel("\(person.name), \(person.handle)\(person.online ? ", online" : "")")
+        .accessibilityAddTraits(isOn ? .isSelected : [])
+    }
+}
+
+/// The last face in the row: find someone else.
+private struct FindFace: View {
+    let theme: BoardTheme
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 7) {
+                Image(systemName: "plus")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(theme.challengeAccent)
+                    .frame(width: 52, height: 52)
+                    .overlay(Circle().strokeBorder(theme.challengeAccent.opacity(0.7),
+                                                   style: StrokeStyle(lineWidth: 1.2, dash: [4, 4])))
+                    .padding(6)
+                Text("Find")
+                    .font(theme.challengeFont(12, .medium))
+                    .foregroundStyle(Color.primary.opacity(0.85))
+            }
+        }
+        .buttonStyle(ChallengePressStyle())
+        .accessibilityLabel("Find a player")
+    }
+}
+
+/// A player in the find results: face, name and username.
+private struct PersonLine: View {
+    let person: FriendPerson
+    let theme: BoardTheme
+
+    var body: some View {
+        HStack(spacing: 12) {
+            PersonAvatar(person: person, size: 38, theme: theme)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(person.name)
+                    .font(theme.challengeFont(16, .semibold))
+                    .foregroundStyle(Color.primary)
+                Text(person.online ? "\(person.handle) · online" : person.handle)
+                    .font(theme.challengeFont(13))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            Image(systemName: "plus.circle.fill")
+                .font(.system(size: 22))
+                .foregroundStyle(theme.challengeAccent)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .contentShape(Rectangle())
+    }
+}
+
+/// The friend the challenge goes to, with a way to change your mind.
+private struct RecipientRow: View {
+    let person: FriendPerson
+    let theme: BoardTheme
+    let clear: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            PersonAvatar(person: person, size: 38, theme: theme)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Sending to \(person.name)")
+                    .font(theme.challengeFont(16, .semibold))
+                Text("\(person.handle) gets it in the app\(person.online ? ", right now" : "")")
+                    .font(theme.challengeFont(13))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            Button(action: clear) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 22))
+                    .foregroundStyle(.tertiary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Don't send to \(person.name)")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .strokeBorder(theme.challengeAccent.opacity(0.6), lineWidth: 1))
+        .challengeGlass(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+}
+
+/// How sending to a friend by username went.
+private struct DeliveryRow: View {
+    let delivery: ChallengeComposer.Delivery
+    let theme: BoardTheme
+    let retry: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            switch delivery {
+            case .sending(let person):
+                ProgressView().controlSize(.small)
+                Text("Sending to \(person.name)…")
+            case .sent(let person):
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(Color(hex: 0x7FCF8C))
+                Text("Sent to \(person.name). They'll see it when they open the app.")
+            case .failed(_, let problem):
+                Image(systemName: "exclamationmark.circle.fill").foregroundStyle(ChallengeColors.urgent)
+                Text(problem)
+                Spacer(minLength: 4)
+                Button("Try again", action: retry)
+                    .font(theme.challengeFont(13, .semibold))
+                    .foregroundStyle(theme.challengeAccent)
+            }
+        }
+        .font(theme.challengeFont(14, .medium))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .challengeGlass(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
 

@@ -29,6 +29,11 @@ class_name = "GameRoom"
 name = "LOBBY"
 class_name = "Lobby"
 
+# Friends by @username: one object, named "directory" (src/directory.js).
+[[durable_objects.bindings]]
+name = "DIRECTORY"
+class_name = "Directory"
+
 # Durable Objects on the Workers Free plan must keep their data in SQLite.
 [[migrations]]
 tag = "v1"
@@ -37,6 +42,10 @@ new_sqlite_classes = ["GameRoom"]
 [[migrations]]
 tag = "v2"
 new_sqlite_classes = ["Lobby"]
+
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["Directory"]
 
 [vars]
 # How long a player in a timed game may be away before the other side may

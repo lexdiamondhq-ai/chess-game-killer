@@ -192,6 +192,36 @@ Moves and actions always go through REST, so a reply tells the client whether th
 - Close codes 4000–4999 are final: don't reconnect after one. 4001 means the seat's game is open somewhere newer;
   4002 means a player took this spectator's place.
 
+## Friends by username
+
+A player can pick a `@username` once, then find friends by username or name and send them a challenge in the app.
+Everything lives in one Durable Object, `Directory` (binding `DIRECTORY`, named `"directory"`, SQLite): the rules are
+in `src/friends.js`, the storage in `src/directory.js`.
+
+- **Player**: the app's 32-hex player key (the same one Play online and Today's Move send). The server keeps only its
+  SHA-256 and never shows it.
+- **Username**: 3–20 characters, `a–z 0–9 _ .`, starting with a letter, no `..` and no `.` at the end. Typed with or
+  without `@` and in any case; stored and shown lower case. A few names that would look like the app are reserved, and
+  the name filter applies. Each player has one; claiming again changes it.
+- **Online**: the app checked in (any call below) within the last 90 s.
+- **People**: whoever you've sent a challenge to or had one from, the latest first (at most 12).
+- **Invites**: a waiting friend game sent to a username. At most 3 waiting from one sender to one player; gone after 7
+  days, when dismissed, or when the same game is sent again. A game that's no longer `waiting` can't be sent.
+
+Every call is `POST /api/friends/{part}` with a JSON body that always has `"player"`:
+
+| Part | Body | Answer |
+|---|---|---|
+| `me` | `{ "player", "name"? }` | `200 { "you": { "username", "name" } \| null }` (also updates the name friends see) |
+| `claim` | `{ "player", "username", "name"? }` | `200 { "you" }`; `409 username_taken`; `400` with the reason |
+| `search` | `{ "player", "q" }` | `200 { "players": [Person] }`, at most 8: username starts with `q` or a word of the name does; never yourself. `q` under 2 letters answers `[]` |
+| `people` | `{ "player" }` | `200 { "people": [Person] }` |
+| `invite` | `{ "player", "to", "code" }` | `201 { "sent": Person }`; `400` without your own username; `404` no such player or game; `409 game_over` once joined; `429` too many waiting |
+| `inbox` | `{ "player" }` | `200 { "invites": [{ "id", "code", "clock", "seat", "at", "from": Person }] }`, newest first, at most 10. `seat` is the one the friend takes |
+| `dismiss` | `{ "player", "id" }` | `200 { "dismissed": true }` |
+
+`Person` is `{ "username", "name", "online" }`. All of these count against the moves-and-actions rate limit.
+
 ## Pages
 
 - `GET /c/{code}`: the invite page. Its `<head>` carries Open Graph tags naming the challenger, so Messages and

@@ -9,6 +9,7 @@
 
 import { parseCreateInput, ACTIONS } from "./game.js";
 import { parseSeekInput } from "./lobby.js";
+import { parseQuery, parseUsername } from "./friends.js";
 import { isDailyDay, parseDailyReport } from "./daily.js";
 import { renderHomePage, renderInvitePage } from "./pages.js";
 import {
@@ -65,6 +66,7 @@ async function route(request, env, url) {
     return method === "POST" ? createGame(request, env, url) : wrongMethod("POST");
   }
   if (path === "/api/lobby" || path.startsWith("/api/lobby/")) return lobbyRequest(request, env, url, path);
+  if (path.startsWith("/api/friends/")) return friendsRequest(request, env, path);
   const daily = DAILY_PATH.exec(path);
   if (daily) return dailyRequest(request, env, daily[1]);
   const game = GAME_PATH.exec(path);
@@ -290,6 +292,62 @@ async function lobbyRequest(request, env, url, path) {
     if (!isToken(token)) return unauthorized();
     const tokenHash = await hashToken(token);
     return fromRoom(seek[2] === "cancel" ? await lobby.cancel({ id: seek[1], tokenHash }) : await lobby.check({ id: seek[1], tokenHash }));
+  }
+  return errorResponse("not_found", "There's nothing at this address.");
+}
+
+// ---------------------------------------------------------------------------
+// Friends by @username (PROTOCOL.md, "Friends by username")
+
+const FRIENDS_PATH = /^\/api\/friends\/(me|claim|search|people|invite|inbox|dismiss)\/?$/;
+
+function directory(env) {
+  return env.DIRECTORY.get(env.DIRECTORY.idFromName("directory"));
+}
+
+async function friendsRequest(request, env, path) {
+  const match = FRIENDS_PATH.exec(path);
+  if (!match) return errorResponse("not_found", "There's nothing at this address.");
+  if (request.method !== "POST") return wrongMethod("POST");
+  const part = match[1];
+  if (await overLimit(env.MOVE_LIMITER, request)) return rateLimited();
+  const body = await readJson(request);
+  if (!body.ok) return badRequest(body.message);
+  const input = body.value;
+  if (!isToken(input.player)) return badRequest('"player" must be the app\'s player key.');
+  const playerHash = await hashToken(input.player);
+  const dir = directory(env);
+  if (input.name !== undefined && typeof input.name !== "string") return badRequest('"name" must be text.');
+
+  switch (part) {
+    case "me":
+      return fromRoom(await dir.me({ playerHash, name: input.name }));
+    case "claim": {
+      const username = parseUsername(input.username);
+      if (!username.ok) return badRequest(username.message);
+      return fromRoom(await dir.claim({ playerHash, username: username.value, name: input.name }));
+    }
+    case "search": {
+      const q = parseQuery(input.q);
+      if (!q) return jsonResponse({ players: [] }, 200);
+      return fromRoom(await dir.search({ playerHash, q }));
+    }
+    case "people":
+      return fromRoom(await dir.people({ playerHash }));
+    case "inbox":
+      return fromRoom(await dir.inbox({ playerHash }));
+    case "dismiss":
+      if (typeof input.id !== "string" || !/^[0-9a-f]{12}$/.test(input.id)) return badRequest('"id" must be an invite\'s id.');
+      return fromRoom(await dir.dismiss({ playerHash, id: input.id }));
+    case "invite": {
+      const to = parseUsername(input.to);
+      if (!to.ok) return badRequest("That isn't a username.");
+      const code = normalizeCode(input.code);
+      if (!code) return badRequest('"code" must be a game code.');
+      const read = await roomFor(env, code).read();
+      if (read.status !== 200) return errorResponse("not_found", "There's no game with that code.");
+      return fromRoom(await dir.invite({ playerHash, to: to.value, game: read.body.game }));
+    }
   }
   return errorResponse("not_found", "There's nothing at this address.");
 }
