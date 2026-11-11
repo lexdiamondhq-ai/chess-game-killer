@@ -733,6 +733,17 @@ extension HomeView {
             if let game = vault.game(id) { actions.openGame(game) }
         })
         return HomeAuroraView(tone: tone, info: auroraInfo, actions: auroraActions)
+            .task {
+                // Keeps whose move it is in games with people, and how many wait online, up to
+                // date while Home is showing. The earlier homes did this from their Play tile;
+                // this home has no such tile, so its "Your move" cards went stale (audit, 2026-11-11).
+                guard let challenges else { return }
+                while !Task.isCancelled {
+                    await challenges.refreshGames()
+                    await challenges.refreshOnlineCount()
+                    try? await Task.sleep(for: .seconds(ChallengeCenter.refreshInterval))
+                }
+            }
             .fullScreenCover(item: $hall) { visit in
                 RivalsHall(start: visit.start, intro: visit.intro, begin: { level in
                     // The film's last frame gives way to the game: the hall closes at once.

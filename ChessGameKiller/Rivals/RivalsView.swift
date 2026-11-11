@@ -12,6 +12,9 @@ import UIKit
 struct RivalsHall: View {
     /// The rival the hall opens on; nil opens on the first one not yet beaten.
     var start: MatchController.Level? = nil
+    /// Opened straight into one rival's welcome film, from a Play button: leaving that film
+    /// leaves the hall too, back to where Play was pressed, not to the cards behind it.
+    private let intro: Bool
     /// The game starts against this rival.
     let begin: (MatchController.Level) -> Void
     let close: () -> Void
@@ -37,6 +40,7 @@ struct RivalsHall: View {
     init(start: MatchController.Level? = nil, intro: Bool = false, ended: MatchController.Level? = nil,
          begin: @escaping (MatchController.Level) -> Void, close: @escaping () -> Void) {
         self.start = start
+        self.intro = intro && start != nil
         self.begin = begin
         self.close = close
         let ladder = RivalLadder()
@@ -86,6 +90,12 @@ struct RivalsHall: View {
             }
             if let film = showing {
                 RivalWelcome(film: film, begin: { begin(film.level) }, back: {
+                    // From a Play button, "Not today" goes back to where Play was (audit,
+                    // 2026-11-11: it used to land on the hall's cards, a screen never asked for).
+                    if intro {
+                        close()
+                        return
+                    }
                     watched = film.level
                     withAnimation(.easeOut(duration: 0.35)) { showing = nil }
                 })
@@ -99,7 +109,13 @@ struct RivalsHall: View {
             HomeMusic.shared.setCovered(true)
             if showing == nil { playFilm(selected) }
         }
-        .onDisappear { HomeMusic.shared.setCovered(false) }
+        .onDisappear {
+            // The films play with the ring switch off; everything after them is quiet on silent
+            // again. Without this the move sounds and the bells kept playing aloud on a silenced
+            // phone whenever Home music or the rival themes were off (audit, 2026-11-11).
+            try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
+            HomeMusic.shared.setCovered(false)
+        }
         .onChange(of: selected) { _, level in
             watched = nil
             playFilm(level)
