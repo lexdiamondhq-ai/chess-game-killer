@@ -217,6 +217,10 @@ private struct PremiumBenefitList: View {
                 detail: "All 15 lessons, 3,865 openings, 22 endgames, master games and Blindfold."),
         Benefit(symbol: "bubble.left.and.bubble.right", title: "Talk It Through any time",
                 detail: "Plus photo scans, as often as you like."),
+        // Premium opens every rival (RivalLadder.opensEverything); the page now says so
+        // (Alex, 2026-11-11, audit pick R4).
+        Benefit(symbol: "shield.lefthalf.filled", title: "Every rival, from day one",
+                detail: "Face any of the five without beating the ones before."),
         Benefit(symbol: "square.grid.3x3", title: "Every board look",
                 detail: "Every set of pieces and its board."),
     ]

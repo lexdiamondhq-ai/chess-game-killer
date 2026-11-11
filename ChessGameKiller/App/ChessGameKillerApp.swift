@@ -5,6 +5,8 @@ import UserNotifications
 struct ChessGameKillerApp: App {
     /// Set only when CI launches the app for screenshots; see `Showcase`.
     private let showcase: Showcase?
+    /// Keeps the app upright everywhere but the Ashen King's game (see `AppOrientation`).
+    @UIApplicationDelegateAdaptor(AppOrientation.self) private var orientation
     /// Challenge a friend: the links, the live games and the screens they open.
     @State private var challenges = Showcase.challenges() ?? ChallengeCenter.live()
 

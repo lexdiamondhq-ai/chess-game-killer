@@ -33,12 +33,17 @@ final class ChallengeCenter {
     var isPresenting: Bool { screen != nil }
 
     let store: ChallengeStore
+    /// Friends by @username: the player's username, their people, and challenges sent to them.
+    let friends: FriendDirectory
     @ObservationIgnored let api: ChallengeAPI
     @ObservationIgnored private let sounds: SoundPlaying?
     @ObservationIgnored private let defaults: UserDefaults
     /// A finished friend game, to keep with the player's games. ContentView keeps it in its vault,
     /// the only place games.json is written from.
     @ObservationIgnored var onGameFinished: (@MainActor (SavedGame) -> Void)?
+    /// A finished game the player asked to review from its end card: ContentView opens it in
+    /// Rewind once this screen has gone, and sets this back to nil.
+    var reviewing: UUID? = nil
     @ObservationIgnored private var lastRefresh: Date?
     /// Never asks the server about the listed games: CI's pictures list games the server doesn't have.
     @ObservationIgnored var holdsStill = false
@@ -48,16 +53,19 @@ final class ChallengeCenter {
     /// The list is fetched again at most this often, unless asked.
     static let refreshInterval: TimeInterval = 15
 
-    init(api: ChallengeAPI, store: ChallengeStore, sounds: SoundPlaying?, defaults: UserDefaults = .standard) {
+    init(api: ChallengeAPI, store: ChallengeStore, sounds: SoundPlaying?, defaults: UserDefaults = .standard,
+         friendsAPI: FriendDirectoryAPI? = nil) {
         self.api = api
         self.store = store
+        self.friends = FriendDirectory(api: friendsAPI, defaults: defaults)
         self.sounds = sounds
         self.defaults = defaults
     }
 
     /// The app's: the real server, the friend games saved on this phone and the bundled sounds.
     static func live() -> ChallengeCenter {
-        ChallengeCenter(api: LiveChallengeAPI(), store: .live(), sounds: SoundPlayer.shared)
+        ChallengeCenter(api: LiveChallengeAPI(), store: .live(), sounds: SoundPlayer.shared,
+                        friendsAPI: LiveFriendDirectoryAPI())
     }
 
     // MARK: The player's name
@@ -102,7 +110,7 @@ final class ChallengeCenter {
     func open(code text: String) {
         guard let code = ChallengeLink.code(fromText: text) else { return }
         if case .game(let game)? = screen, game.code == code { return }
-        // Leaving a timed game under way lets the friend claim the win after a minute, so the link waits for it to close.
+        // Leaving a timed game under way runs your clock down (or lets a friend claim the win), so the link waits for it to close.
         if case .game(let game)? = screen, game.phase == .playing, game.isTimed {
             heldCode = code
             game.notify("Finish this game first. The other challenge opens after it.", symbol: "hourglass")
@@ -161,6 +169,21 @@ final class ChallengeCenter {
         }
     }
 
+    /// Review game, on a finished game's end card (Alex, 2026-11-11, audit pick O1): the game
+    /// is kept with the player's games now, not at the next refresh, its screen closes, and
+    /// it opens in Rewind.
+    func review(_ game: OnlineGame) {
+        guard let state = game.state, let onGameFinished else { return }
+        let date = state.updatedAt > 0 ? Date(timeIntervalSince1970: state.updatedAt / 1000) : Date.now
+        guard let saved = game.savedGame(date: date) else { return }
+        if store.game(code: game.code)?.recorded != true {
+            onGameFinished(saved)
+            store.markRecorded(code: game.code)
+        }
+        dismiss()
+        reviewing = saved.id
+    }
+
     /// Takes a finished game off the list. Games still going stay.
     func remove(_ record: FriendGame) {
         guard record.isOver || store.game(code: record.code)?.isOver == true else { return }
@@ -199,6 +222,8 @@ final class ChallengeCenter {
         if holdsStill { return }
         if !force, let lastRefresh, Date.now.timeIntervalSince(lastRefresh) < Self.refreshInterval { return }
         lastRefresh = .now
+        // A daily game someone started while the app was closed joins the list first.
+        if case .online? = screen {} else { await PendingDailySeek.collect(api: api, store: store, defaults: defaults) }
         // Games still going, and finished ones not yet kept with the player's games.
         let due = store.games.filter { !$0.isOver || !$0.recorded }
         for record in due {
@@ -252,6 +277,10 @@ final class ChallengeComposer {
     private(set) var link: URL? = nil
     private(set) var isCreating = false
     private(set) var problem: String? = nil
+    /// The friend picked by username, if any: the challenge goes straight to them.
+    var recipient: FriendPerson? = nil
+    /// Where sending to `recipient` stands once the challenge exists.
+    private(set) var delivery: Delivery? = nil
     /// The new challenge, live from the start, so a friend joining is seen at once.
     private(set) var game: OnlineGame? = nil
 
@@ -261,8 +290,26 @@ final class ChallengeComposer {
         self.center = center
     }
 
+    enum Delivery: Equatable {
+        case sending(FriendPerson)
+        case sent(FriendPerson)
+        case failed(FriendPerson, String)
+    }
+
     /// The side the friend plays.
     var friendSeat: FriendSeat? { created?.seat.opposite }
+
+    /// Sends the challenge to the picked friend (again, after a failure).
+    func deliver() async {
+        guard let center, let created, let person = recipient else { return }
+        if case .sending? = delivery { return }
+        delivery = .sending(person)
+        if let problem = await center.friends.send(code: created.code, to: person) {
+            delivery = .failed(person, problem)
+        } else {
+            delivery = .sent(person)
+        }
+    }
 
     func create(name: String, clock: FriendClock?, side: SideChoice) async {
         guard !isCreating, created == nil, let center else { return }
@@ -281,6 +328,7 @@ final class ChallengeComposer {
             self.game = game
             link = reply.inviteURL
             created = record
+            if recipient != nil { await deliver() }
         } catch is CancellationError {
         } catch let error as ChallengeError {
             problem = error.message

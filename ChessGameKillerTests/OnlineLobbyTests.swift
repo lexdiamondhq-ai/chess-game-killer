@@ -67,6 +67,69 @@ final class OnlineLobbyTests: XCTestCase {
         XCTAssertNil(friend.ratings)
     }
 
+    // MARK: No clock
+
+    func testNoClockPlayersAndGamesAreReadAndUnrated() throws {
+        let list = try JSONDecoder().decode(LobbyList.self, from: Data("""
+        {"players":[{"id":"a1b2c3d4e5f6","name":"Sam","rating":1450,"clock":null,"waitingFor":1000}],"waiting":1}
+        """.utf8))
+        XCTAssertNil(list.players.first?.clock)
+        XCTAssertEqual(list.players.first?.clockLine, "No clock")
+
+        let game = try JSONDecoder().decode(FriendGameState.self, from: Data(#"{"code":"onl1ne","status":"active","online":true,"rated":false}"#.utf8))
+        XCTAssertTrue(game.online)
+        XCTAssertFalse(game.rated)
+        // An older server only said `rated`, which every online game was.
+        let older = try JSONDecoder().decode(FriendGameState.self, from: Data(#"{"code":"onl1ne","status":"active","rated":true}"#.utf8))
+        XCTAssertTrue(older.online)
+    }
+
+    func testOnlineGamesHaveNoLeaveRule() {
+        var state = rated()
+        state.status = .active
+        state.moves = ["e2e4", "e7e5"]
+        state.white.away = 1000
+        state.online = true
+        XCTAssertFalse(FriendClockMath.leaveRuleApplies(state))
+        XCTAssertNil(FriendClockMath.awayDeadline(state, seat: .white))
+        state.online = false
+        XCTAssertTrue(FriendClockMath.leaveRuleApplies(state), "friend games keep it")
+    }
+
+    func testFindingAGameWithNoClockAsksForNone() async throws {
+        let api = FakeChallengeAPI()
+        let free = LobbyPlayer(id: "111111111111", name: "Lee", rating: 1500, clock: nil)
+        let blitz = LobbyPlayer(id: "222222222222", name: "Max", rating: 1100, clock: Self.blitz)
+        api.lobbyList = LobbyList(players: [blitz, free])
+        let center = center(api)
+        center.playOnline()
+        let lobby = try lobby(of: center)
+        await lobby.tick()
+        XCTAssertEqual(lobby.sorted(for: nil).map(\.name), ["Lee", "Max"])
+        await lobby.find(clock: nil, name: "Alex")
+        XCTAssertEqual(api.seeks.count, 1)
+        XCTAssertNil(api.seeks.first?.clock)
+        XCTAssertEqual(OnlineLobby.quickPicks.first, .some(nil))
+        center.dismiss()
+    }
+
+    func testMoreTimesAreKeptAndReadBack() {
+        // Every clock under More times is a valid server clock, in the family its group names.
+        for group in OnlineLobby.moreClocks {
+            for clock in group.clocks {
+                XCTAssertEqual(clock.kind, group.name, clock.label)
+                XCTAssertTrue((60...3600).contains(clock.initial) && (0...60).contains(clock.increment))
+                XCTAssertEqual(OnlineLobby.clock(id: OnlineLobby.clockID(clock)), clock)
+            }
+        }
+        // What earlier versions kept still reads: TimeControl's raw values.
+        for control in TimeControl.allCases {
+            XCTAssertEqual(OnlineLobby.clock(id: control.rawValue), FriendClock(control))
+        }
+        XCTAssertEqual(OnlineLobby.clock(id: "junk"), FriendClock(initial: 300, increment: 0))
+        XCTAssertEqual(OnlineLobby.detail(FriendClock(initial: 1800, increment: 0)), "Classical · 30 minutes each")
+    }
+
     func testThePlayerKeyIsMadeOnceAndKept() {
         let key = OnlinePlayerKey.current(defaults)
         XCTAssertEqual(key.count, 32)
@@ -128,6 +191,47 @@ final class OnlineLobbyTests: XCTestCase {
         }
         XCTAssertEqual(api.cancels, ["a1b2c3d4e5f6"])
         XCTAssertFalse(lobby.isSearching)
+    }
+
+    func testADailySeekStaysUpWhenTheScreenClosesAndItsGameArrivesLater() async throws {
+        let api = FakeChallengeAPI()
+        let center = center(api)
+        center.playOnline()
+        let lobby = try lobby(of: center)
+        await lobby.find(clock: nil, days: 2, name: "Alex")
+        XCTAssertEqual(api.seeks.first?.days, 2)
+        XCTAssertNil(api.seeks.first?.clock)
+        XCTAssertTrue(lobby.isWaitingDaily)
+        center.dismiss()
+        try? await Task.sleep(for: .milliseconds(200))
+        XCTAssertEqual(api.cancels, [], "a daily seek is left up")
+        XCTAssertEqual(PendingDailySeek.load(defaults)?.days, 2)
+
+        // Someone takes it on while the app is closed: the games refresh picks the game up.
+        var state = FriendGameState.sample(code: "D4ILY1", clock: nil, white: "Sam", black: "Alex")
+        state.days = 2
+        state.deadline = Date.now.timeIntervalSince1970 * 1000 + 86_400_000
+        api.games[state.code] = state
+        api.checkReplies = [LobbyReply(match: LobbyMatch(code: state.code, seat: .black, token: "token-black"))]
+        await center.refreshGames(force: true)
+        let record = try XCTUnwrap(center.store.game(code: "D4ILY1"))
+        XCTAssertEqual(record.days, 2)
+        XCTAssertTrue(record.statusLine.hasPrefix("Their move · "), record.statusLine)
+        XCTAssertNil(PendingDailySeek.load(defaults))
+    }
+
+    func testDailyWords() throws {
+        XCTAssertEqual(DailyDays.label(1), "1 day")
+        XCTAssertEqual(DailyDays.phrase(3), "3 days a move")
+        XCTAssertEqual(DailyDays.left(26 * 3_600_000), "1d 2h")
+        XCTAssertEqual(DailyDays.left(5 * 3_600_000 + 12 * 60_000), "5h 12m")
+        XCTAssertEqual(DailyDays.left(-5), "0m")
+        let player = try JSONDecoder().decode(LobbyPlayer.self, from: Data("""
+        {"id":"a1b2c3d4e5f6","name":"Sam","rating":1450,"clock":null,"days":3,"waitingFor":0}
+        """.utf8))
+        XCTAssertEqual(player.clockLine, "Daily · 3 days")
+        XCTAssertTrue(player.plays(nil, days: 3))
+        XCTAssertFalse(player.plays(nil, days: nil))
     }
 
     func testCancellingJustAsSomeoneTookYouOnOpensTheGame() async throws {

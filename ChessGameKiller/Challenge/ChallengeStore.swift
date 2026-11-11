@@ -14,13 +14,18 @@ struct FriendGame: Codable, Identifiable, Equatable, Sendable {
     var isCreator: Bool
     var opponentName: String?
     var clock: FriendClock?
+    /// A daily game's days per move; nil otherwise.
+    var days: Int?
+    /// In a daily game under way, when the side to move runs out of days.
+    var deadline: Date?
     var status: FriendGameState.Status
     var turn: FriendSeat
     var result: FriendGameState.Result?
     var moveCount: Int
     /// The position now, for the home's small board; nil in a record from before it was kept.
     var fen: String?
-    /// Paired online from the lobby, rather than a friend's link.
+    /// Paired online from the lobby, rather than a friend's link. Called `rated` from when every online
+    /// game was; an online game with no clock isn't rated but is still marked here.
     var rated: Bool
     /// The opponent's rating in a rated game.
     var opponentRating: String?
@@ -64,12 +69,14 @@ struct FriendGame: Codable, Identifiable, Equatable, Sendable {
             opponentName = name
         }
         clock = state.clock
+        days = state.days
+        deadline = state.deadline.map { Date(timeIntervalSince1970: $0 / 1000) }
         status = state.status
         turn = state.turn
         result = state.result
         moveCount = state.moves.count
         fen = state.fen
-        rated = state.rated
+        rated = state.online || state.rated
         opponentRating = state.ratings?[seat.opposite].label
         updatedAt = state.updatedAt > 0 ? Date(timeIntervalSince1970: state.updatedAt / 1000) : .now
     }
@@ -87,7 +94,11 @@ struct FriendGame: Codable, Identifiable, Equatable, Sendable {
     var statusLine: String {
         switch status {
         case .waiting: return "Waiting for \(opponentName ?? "your friend") to join"
-        case .active: return isYourMove ? "Your move" : "Their move"
+        case .active:
+            let line = isYourMove ? "Your move" : "Their move"
+            // A daily game says how long the side to move has left.
+            guard let deadline else { return line }
+            return "\(line) · \(DailyDays.left(deadline.timeIntervalSinceNow * 1000)) left"
         case .over:
             guard let result else { return "Game over" }
             return FriendResultWords.short(result, me: seat)
@@ -104,7 +115,7 @@ struct FriendGame: Codable, Identifiable, Equatable, Sendable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, code, token, seat, isCreator, opponentName, clock, status, turn, result, moveCount
+        case id, code, token, seat, isCreator, opponentName, clock, days, deadline, status, turn, result, moveCount
         case fen, rated, opponentRating, createdAt, updatedAt, recorded
     }
 }
@@ -120,6 +131,8 @@ extension FriendGame {
         isCreator = try c.decodeIfPresent(Bool.self, forKey: .isCreator) ?? false
         opponentName = try c.decodeIfPresent(String.self, forKey: .opponentName)
         clock = try c.decodeIfPresent(FriendClock.self, forKey: .clock)
+        days = try c.decodeIfPresent(Int.self, forKey: .days)
+        deadline = try c.decodeIfPresent(Date.self, forKey: .deadline)
         status = (try? c.decodeIfPresent(FriendGameState.Status.self, forKey: .status)) ?? .active
         turn = (try? c.decodeIfPresent(FriendSeat.self, forKey: .turn)) ?? .white
         result = try? c.decodeIfPresent(FriendGameState.Result.self, forKey: .result)

@@ -23,6 +23,9 @@ struct CoachOrb: View {
     var talk: (() -> Void)? = nil
     /// Opens Analyze on the position. Nil leaves it out.
     var analyze: (() -> Void)? = nil
+    /// Plays the next rival's film, then starts the game against it. Offered after a win
+    /// while the rival above is still unbeaten. Nil leaves it out.
+    var faceNext: ((MatchController.Level) -> Void)? = nil
 
     @AppStorage("haptics") private var hapticsOn = true
     /// Counts the times the person opened or closed the panel, for a light tap each.
@@ -48,7 +51,8 @@ struct CoachOrb: View {
         ZStack {
             if isExpanded {
                 CoachPanel(match: match, theme: theme, coachMove: $coachMove, newGame: newGame, home: home, showGames: showGames,
-                           talk: talk, analyze: analyze, close: { collapse(felt: true) }, collapse: { collapse() })
+                           talk: talk, analyze: analyze, faceNext: faceNext,
+                           close: { collapse(felt: true) }, collapse: { collapse() })
                     .transition(.opacity.combined(with: .scale(scale: 0.97)))
             } else {
                 OrbFace(match: match, theme: theme, open: { expand() })
@@ -198,7 +202,7 @@ private struct ResultText {
             switch outcome {
             case .timeout(let loser):
                 return loser == player ? "\(rival) \(rival.agreeing("wins", "win")) on time" : "You win on time"
-            case .timeoutDraw:
+            case .timeoutDraw, .agreedDraw:
                 return "Draw"
             case .resigned(let loser):
                 return loser == player ? "You resigned" : "\(rival) \(rival.agreeing("resigns", "resign"))"
@@ -217,6 +221,8 @@ private struct ResultText {
                 return flagged == player
                     ? "Your clock ran out, but \(rival.midSentence) can't checkmate with what's left."
                     : "\(rival.possessive) clock ran out, but you can't checkmate with what's left."
+            case .agreedDraw:
+                return "You offered a draw and \(rival.midSentence) accepted."
             case .resigned(let loser):
                 return loser == player ? "\(rival) \(rival.agreeing("takes", "take")) this one." : "You win. There was no way back for \(rival.midSentence)."
             }
@@ -404,6 +410,8 @@ private struct CoachPanel: View {
     let talk: (() -> Void)?
     /// Opens Analyze. Nil leaves it out, and Flip takes its place.
     let analyze: (() -> Void)?
+    /// Plays the next rival's film, then the game. Nil leaves the offer out.
+    var faceNext: ((MatchController.Level) -> Void)? = nil
     /// Closes the panel when the person closes it themselves, with a light tap.
     let close: () -> Void
     /// Closes the panel quietly, on the way to something else.
@@ -704,6 +712,7 @@ private struct CoachPanel: View {
     private var controls: some View {
         if match.isOver {
             VStack(spacing: 8) {
+                if let next = nextRival { nextRivalOffer(next) }
                 endButtons
                 if canReview || hasHighlights {
                     HStack(spacing: 8) {
@@ -768,22 +777,63 @@ private struct CoachPanel: View {
         }
     }
 
-    private var endButtons: some View {
-        HStack(spacing: 10) {
+    /// The rival above the one just beaten, while it is still unbeaten: the climb's next step
+    /// (Alex, 2026-11-11, audit pick R2: a win opened the next rival and nothing said so).
+    /// Never after Your Grudge, a loss or a draw, or once the last rival has fallen.
+    private var nextRival: MatchController.Level? {
+        guard faceNext != nil, match.playerWon == true, !match.setup.grudge,
+              let next = MatchController.Level(rawValue: match.setup.level.rawValue + 1),
+              !RivalLadder().beaten(next.rival) else { return nil }
+        return next
+    }
+
+    /// One quiet line, and a gold button that plays the next rival's film.
+    private func nextRivalOffer(_ next: MatchController.Level) -> some View {
+        let gold = Color(hex: 0xE8C27A)
+        let rival = next.rival
+        return VStack(spacing: 8) {
+            Text("\(rival.name) will see you now.")
+                .font(.system(size: 14, weight: .regular, design: .serif))
+                .italic()
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity)
             Button {
                 collapse()
-                withAnimation(.snappy) { match.rematch() }
+                faceNext?(next)
             } label: {
-                Label("Rematch", systemImage: "play.fill")
-                    .font(.app(.headline))
-                    .frame(maxWidth: .infinity)
-                    .frame(minHeight: 50)
+                HStack(spacing: 10) {
+                    RivalCoin(rival: rival, size: 28)
+                    // "Face the Hunter", as the hall's own button writes it.
+                    Text("Face \(rival.name.lowercasedFirstWord)")
+                        .font(.app(.headline))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+                .foregroundStyle(Color(hex: 0x1B1408))
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 50)
+                .background {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(LinearGradient(colors: [Color(hex: 0xF3DDA8), gold, Color(hex: 0xC99A4B)],
+                                             startPoint: .top, endPoint: .bottom))
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.35), lineWidth: 1)
+                }
+                .shadow(color: gold.opacity(theme.glows ? 0.45 : 0.2), radius: 12, y: 3)
+                .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
-            .buttonStyle(.borderedProminent)
-            .buttonBorderShape(.roundedRectangle(radius: 16))
-            .tint(accent)
-            .foregroundStyle(theme.isDark ? Color.black : Color.white)
-            .shadow(color: theme.glows ? accent.opacity(0.5) : .clear, radius: 12)
+            .buttonStyle(.plain)
+            .accessibilityLabel("Face \(rival.name)")
+            .accessibilityHint("Plays \(rival.name.possessive) film, then starts the game")
+        }
+        .padding(.bottom, 4)
+    }
+
+    private var endButtons: some View {
+        HStack(spacing: 10) {
+            rematchButton
 
             if let newGame {
                 Button {
@@ -810,6 +860,32 @@ private struct CoachPanel: View {
                 .buttonStyle(.bordered)
                 .buttonBorderShape(.roundedRectangle(radius: 16))
             }
+        }
+    }
+
+    /// Rematch is the panel's one solid button, unless the next rival is on offer above it:
+    /// then that is the solid one, and Rematch steps back beside Home.
+    @ViewBuilder
+    private var rematchButton: some View {
+        let rematch: () -> Void = {
+            collapse()
+            withAnimation(.snappy) { match.rematch() }
+        }
+        let label = Label("Rematch", systemImage: "play.fill")
+            .font(.app(.headline))
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 50)
+        if nextRival == nil {
+            Button(action: rematch) { label }
+                .buttonStyle(.borderedProminent)
+                .buttonBorderShape(.roundedRectangle(radius: 16))
+                .tint(accent)
+                .foregroundStyle(theme.isDark ? Color.black : Color.white)
+                .shadow(color: theme.glows ? accent.opacity(0.5) : .clear, radius: 12)
+        } else {
+            Button(action: rematch) { label }
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.roundedRectangle(radius: 16))
         }
     }
 

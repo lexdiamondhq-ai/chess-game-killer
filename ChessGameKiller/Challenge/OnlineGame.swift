@@ -145,18 +145,39 @@ final class OnlineGame {
 
     var clock: FriendClock? { state?.clock ?? record.clock }
 
-    /// "vs Sam · 10+0", or "vs Sam · No clock".
-    var title: String {
-        "vs \(opponentName) · \(clock?.label ?? "No clock")"
+    /// A daily game's days per move; nil otherwise.
+    var days: Int? { state?.days ?? record.days }
+
+    /// "10+0", "2 days a move", or "No clock".
+    var paceLabel: String {
+        if let days { return DailyDays.phrase(days) }
+        return clock?.label ?? "No clock"
     }
 
-    /// Leaving counts: a timed game, under way, both sides have moved. Away past the grace period,
-    /// the other side may claim the win.
+    /// "vs Sam · 10+0", "vs Sam · 2 days a move", or "vs Sam · No clock".
+    var title: String {
+        "vs \(opponentName) · \(paceLabel)"
+    }
+
+    /// In a daily game under way, milliseconds before the side to move runs out of days; nil otherwise.
+    func daysLeft(at instant: ContinuousClock.Instant = .now) -> Double? {
+        guard phase == .playing, let deadline = state?.deadline else { return nil }
+        return max(0, deadline - serverNow(at: instant))
+    }
+
+    /// Leaving counts: a timed friend game, under way, both sides have moved. Away past the grace period,
+    /// the other side may claim the win. Online games have no leave rule.
     var leaveRuleApplies: Bool { state.map(FriendClockMath.leaveRuleApplies) ?? false }
     /// A timed game: closing it is leaving it.
     var isTimed: Bool { clock != nil }
+    /// A timed friend game: away for a while, the other side may claim the win.
+    var hasLeaveRule: Bool { isTimed && !(state?.online ?? false) }
+    /// An online game with no clock (and no days per move) is just for fun: either side may end it with no result at any time.
+    var endsAnyTime: Bool { !isTimed && days == nil && (state?.online ?? false) }
     /// Before both sides have moved, giving up aborts the game instead. A move still on its way counts.
-    var canAbort: Bool { phase == .playing && (state?.moves.count ?? 0) + (pending == nil ? 0 : 1) < 2 }
+    var canAbort: Bool {
+        phase == .playing && (endsAnyTime || (state?.moves.count ?? 0) + (pending == nil ? 0 : 1) < 2)
+    }
     var drawOfferedByMe: Bool { phase == .playing && state?.drawOffer == seat }
     var drawOfferedToMe: Bool { phase == .playing && state?.drawOffer == opponentSeat }
     var isMyTurn: Bool { phase == .playing && state?.turn == seat && pending == nil }
@@ -781,6 +802,9 @@ final class OnlineGame {
         if let clocks = state.clocks, let running = clocks.running, let since = clocks.since {
             deadlines.append(since + clocks[running])
         }
+        // A daily game: the side to move runs out of days. Waits longer than a task should are
+        // left to the next refresh (the screen reopens, the app comes back).
+        if let deadline = state.deadline, deadline - serverNow() < 6 * 3_600_000 { deadlines.append(deadline) }
         guard let first = deadlines.min() else { return }
         let now = serverNow()
         let overdue = now - first

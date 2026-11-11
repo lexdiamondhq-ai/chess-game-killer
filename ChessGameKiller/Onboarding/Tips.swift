@@ -8,6 +8,8 @@ enum AppTip: String, CaseIterable, Identifiable {
     case undoHelp
     /// On the home, once a game has been played: the gold knight in the dock has shortcuts.
     case jewelShortcuts
+    /// A few moves into a game against the Ashen King: sideways, the phone shows his hall.
+    case kingsHall
 
     var id: String { rawValue }
 
@@ -16,6 +18,7 @@ enum AppTip: String, CaseIterable, Identifiable {
         case .coachOrb: return "circle.circle"
         case .undoHelp: return "hand.raised"
         case .jewelShortcuts: return "hand.tap"
+        case .kingsHall: return "rectangle.landscape.rotate"
         }
     }
 
@@ -27,6 +30,8 @@ enum AppTip: String, CaseIterable, Identifiable {
             return "Undo counts as help: this game now earns your pieces half the XP."
         case .jewelShortcuts:
             return "Hold the gold knight for shortcuts: your rivals, Online, Analyze and more."
+        case .kingsHall:
+            return "Turn your phone sideways to face the King across his table."
         }
     }
 
@@ -67,11 +72,13 @@ enum TipBook {
     /// - Parameters:
     ///   - playerMoves: moves the player has made this game.
     ///   - justUndid: the player just took a move back in a game that earns XP.
-    static func next(playerMoves: Int, justUndid: Bool,
+    ///   - facingKing: the game is against the Ashen King, whose hall opens with the phone on its side.
+    static func next(playerMoves: Int, justUndid: Bool, facingKing: Bool = false,
                      _ defaults: UserDefaults = .standard) -> AppTip? {
         let wanted: [AppTip] = [
             justUndid ? .undoHelp : nil,
             playerMoves >= 1 ? .coachOrb : nil,
+            facingKing && playerMoves >= 2 ? .kingsHall : nil,
         ].compactMap { $0 }
         return wanted.first { canShow($0, defaults) }
     }

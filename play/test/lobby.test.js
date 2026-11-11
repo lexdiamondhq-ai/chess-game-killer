@@ -9,6 +9,7 @@ import {
   listView,
   parseSeekInput,
   SEEK_STALE_MS,
+  DAILY_SEEK_MS,
   MATCH_KEEP_MS,
   sweep,
 } from "../src/lobby.js";
@@ -19,14 +20,15 @@ const KEY = "0123456789abcdef0123456789abcdef";
 const BLITZ = { initial: 300, increment: 0 };
 const RAPID = { initial: 600, increment: 0 };
 
-function seek(lobby, id, { player = id, rating = 1200, games = 0, clock = BLITZ, at = T0, name = id } = {}) {
-  return addSeek(lobby, { id, tokenHash: `t-${id}`, playerHash: player, name, rating, games, clock, look: null }, at);
+function seek(lobby, id, { player = id, rating = 1200, games = 0, clock = BLITZ, days = null, at = T0, name = id } = {}) {
+  return addSeek(lobby, { id, tokenHash: `t-${id}`, playerHash: player, name, rating, games, clock, days, look: null }, at);
 }
 
-test("a seek needs a name, a player key and a clock", () => {
+test("a seek needs a name and a player key, and has a clock or none", () => {
   const ok = parseSeekInput({ name: "  Alex  ", clock: BLITZ, player: KEY, look: "gilded" }, { isKey: isToken });
-  assert.deepEqual(ok, { ok: true, value: { name: "Alex", clock: BLITZ, look: "gilded", player: KEY } });
-  assert.equal(parseSeekInput({ name: "A", clock: null, player: KEY }, { isKey: isToken }).ok, false);
+  assert.deepEqual(ok, { ok: true, value: { name: "Alex", clock: BLITZ, days: null, look: "gilded", player: KEY } });
+  assert.deepEqual(parseSeekInput({ name: "A", clock: null, player: KEY }, { isKey: isToken }).value.clock, null);
+  assert.equal(parseSeekInput({ name: "A", clock: { initial: 5 }, player: KEY }, { isKey: isToken }).ok, false);
   assert.equal(parseSeekInput({ name: "A", clock: BLITZ, player: "nope" }, { isKey: isToken }).ok, false);
   assert.equal(parseSeekInput({ name: 3, clock: BLITZ, player: KEY }, { isKey: isToken }).ok, false);
   // Taking a waiting player on needs no clock: theirs is used.
@@ -43,7 +45,7 @@ test("the list shows open seeks, longest waiting first, and never a hash or toke
   assert.deepEqual(list.players.map((p) => p.id), ["a", "b"]);
   assert.equal(list.waiting, 2);
   assert.deepEqual(list.players[1], {
-    id: "b", name: "b", rating: 1500, provisional: false, clock: BLITZ, look: null, waitingFor: 1000,
+    id: "b", name: "b", rating: 1500, provisional: false, clock: BLITZ, days: null, look: null, waitingFor: 1000,
   });
   assert.equal(list.players[0].provisional, true);
   assert.doesNotMatch(JSON.stringify(list), /t-a|tokenHash|playerHash/);
@@ -91,12 +93,12 @@ test("Elo: a win against an equal player gains 20 while settling, 10 after", () 
   assert.equal(upset.white.rating - 1200, 18);
 });
 
-function pairedGame() {
+function pairedGame(clock = BLITZ) {
   return createPairedGame({
     code: "ONL1NE",
     white: { name: "Alex", tokenHash: "hw" },
     black: { name: "Sam", tokenHash: "hb" },
-    clock: BLITZ,
+    clock,
     look: "gilded",
     rated: { white: { player: "pw", rating: 1200, games: 0 }, black: { player: "pb", rating: 1450, games: 20 } },
     now: T0,
@@ -147,4 +149,83 @@ test("a rematch of a rated game is rated, colors swapped, from the newest rating
   assert.deepEqual(next.rated.white, { player: "pb", rating: 1436, games: 21 });
   assert.deepEqual(next.rated.black, { player: "pw", rating: 1232, games: 1 });
   assert.equal(next.rated.reported, false);
+});
+
+// ---------------------------------------------------------------------------
+// No clock: just for fun
+
+test("players waiting with no clock pair only with each other, and only apps that ask see them", () => {
+  const lobby = emptyLobby();
+  seek(lobby, "timed", { clock: BLITZ });
+  seek(lobby, "free", { clock: null });
+  assert.equal(bestOpponent(lobby, { clock: null, playerHash: "me", rating: 1200 }, T0).id, "free");
+  assert.equal(bestOpponent(lobby, { clock: BLITZ, playerHash: "me", rating: 1200 }, T0).id, "timed");
+  assert.deepEqual(listView(lobby, T0).players.map((p) => p.id), ["timed"]);
+  const all = listView(lobby, T0, { untimed: true }).players;
+  assert.deepEqual(all.map((p) => p.id), ["timed", "free"]);
+  assert.equal(all[1].clock, null);
+});
+
+test("an online game with no clock isn't rated, and either side can end it with no result at any time", () => {
+  const game = pairedGame(null);
+  const state = view(game, T0);
+  assert.equal(state.online, true);
+  assert.equal(state.rated, false);
+  assert.equal(state.ratings, null);
+  game.moves = ["e2e4", "e7e5", "g1f3"];
+  assert.equal(act(game, "white", "abort", T0 + 1000).ok, true);
+  assert.deepEqual(game.result, { winner: null, reason: "aborted" });
+  assert.equal(needsRatingReport(game), false);
+  // A rematch stays online and unrated.
+  const next = rematchRecord(game, "R3MTCH", T0 + 2000);
+  assert.equal(view(next, T0 + 2000).online, true);
+  assert.equal(view(next, T0 + 2000).rated, false);
+});
+
+test("online games have no leave rule: leaving just spends your clock", () => {
+  const game = pairedGame();
+  game.moves = ["e2e4", "e7e5"];
+  game.timedFrom = T0;
+  act(game, "white", "away", T0 + 1000);
+  assert.equal(view(game, T0 + 2 * 60 * 1000).white.claimableAt, null);
+  assert.equal(act(game, "black", "claim_win", T0 + 2 * 60 * 1000).error, "cannot_claim");
+  // A timed online game can't be aborted once both sides have moved.
+  assert.equal(act(game, "white", "abort", T0 + 2 * 60 * 1000).error, "bad_request");
+});
+
+test("a daily seek asks for days per move instead of a clock", () => {
+  const daily = parseSeekInput({ name: "A", days: 3, clock: BLITZ, player: KEY }, { isKey: isToken });
+  assert.equal(daily.value.days, 3);
+  assert.equal(daily.value.clock, null);
+  assert.equal(parseSeekInput({ name: "A", days: 4, player: KEY }, { isKey: isToken }).ok, false);
+});
+
+test("a daily seek waits a week without checking in, listed only for apps that ask", () => {
+  const lobby = emptyLobby();
+  seek(lobby, "daily", { clock: null, days: 2 });
+  seek(lobby, "live");
+  const later = T0 + SEEK_STALE_MS + 1;
+  assert.deepEqual(listView(lobby, later, { untimed: true }).players.map((p) => p.id), []);
+  assert.deepEqual(listView(lobby, later, { daily: true }).players.map((p) => p.id), ["daily"]);
+  assert.equal(listView(lobby, later, { daily: true }).players[0].days, 2);
+  sweep(lobby, later);
+  assert.deepEqual(Object.keys(lobby.seeks), ["daily"]);
+  sweep(lobby, T0 + DAILY_SEEK_MS + 1);
+  assert.deepEqual(Object.keys(lobby.seeks), []);
+});
+
+test("daily seeks pair only at the same days, and a player keeps one of each kind", () => {
+  const lobby = emptyLobby();
+  seek(lobby, "two", { clock: null, days: 2 });
+  seek(lobby, "untimed", { clock: null });
+  seek(lobby, "mine", { player: "p", clock: null, days: 1 });
+  seek(lobby, "mine-live", { player: "p" });
+  assert.deepEqual(Object.keys(lobby.seeks).sort(), ["mine", "mine-live", "two", "untimed"]);
+  assert.equal(bestOpponent(lobby, { clock: null, days: 2, playerHash: "x", rating: 1200 }, T0).id, "two");
+  assert.equal(bestOpponent(lobby, { clock: null, playerHash: "x", rating: 1200 }, T0).id, "untimed");
+  assert.equal(bestOpponent(lobby, { clock: null, days: 3, playerHash: "x", rating: 1200 }, T0), null);
+  // A taken daily seek waits a week for its player to come back.
+  lobby.seeks.two.match = { code: "D4ILY1", seat: "white", token: KEY, at: T0 };
+  sweep(lobby, T0 + MATCH_KEEP_MS + 1);
+  assert.ok(lobby.seeks.two);
 });

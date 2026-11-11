@@ -614,7 +614,7 @@ struct HomeJewelTip: View {
     }
 }
 
-/// Your own things in one glass panel: your pieces, your games and Settings (and Pro, once there is one).
+/// Your own things in one glass panel: your pieces, your games and Settings (and Premium, once there is one).
 /// It opens from the dock's You, or by pulling the board down, and comes from where it was
 /// asked for. Everything else has its own door, so nothing here is found twice.
 struct HomeYouPanel: View {
@@ -624,6 +624,9 @@ struct HomeYouPanel: View {
     let actions: HomeActions
     let fromTop: Bool
     let close: () -> Void
+    /// Opens Play a friend, where the player's people are. Nil where friend games are off.
+    var friends: (() -> Void)? = nil
+    var friendsLine = ""
 
     @AccessibilityFocusState private var titleFocused: Bool
     @State private var drag: CGFloat = 0
@@ -650,6 +653,10 @@ struct HomeYouPanel: View {
                 .padding(.trailing, -14)
             }
             VStack(spacing: 0) {
+                if let friends {
+                    HomeLinkRow(title: "Friends", detail: friendsLine, tone: tone) { go(friends) }
+                    HomeHairline(tone: tone)
+                }
                 HomeLinkRow(title: "Your pieces", detail: piecesLine, tone: tone) { go(actions.army) }
                 HomeHairline(tone: tone)
                 HomeLinkRow(title: "Your games", detail: gamesLine, tone: tone) { go(actions.rewind) }
@@ -657,7 +664,7 @@ struct HomeYouPanel: View {
                 HomeLinkRow(title: "Settings", detail: "Board look, sound, hints", tone: tone) { go(actions.settings) }
                 if let premium = actions.premium {
                     HomeHairline(tone: tone)
-                    HomeLinkRow(title: "Beauty of Chess Pro", detail: "Everything, with no limits", tone: tone) { go(premium) }
+                    HomeLinkRow(title: "Premium", detail: "Everything, with no limits", tone: tone) { go(premium) }
                 }
             }
         }

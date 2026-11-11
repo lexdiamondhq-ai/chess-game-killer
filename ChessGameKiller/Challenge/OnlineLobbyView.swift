@@ -10,12 +10,19 @@ struct OnlineLobbyView: View {
 
     @Environment(ChallengeCenter.self) private var center
     @AppStorage(ChallengeName.key) private var name = ""
-    @AppStorage("online.clock") private var control: TimeControl = .blitz5
+    /// The picked clock, as `OnlineLobby.clockID` keeps it.
+    @AppStorage("online.clock") private var clockID = "5+0"
+    /// With ∞ picked: the days per move of a daily game, or 0 for no limit.
+    @AppStorage("online.days") private var dailyDays = 0
     @AppStorage("haptics") private var hapticsOn = true
+    /// More times is folded open. It starts open when the picked clock lives there.
+    @State private var showsMore: Bool?
 
-    private var clock: FriendClock {
-        FriendClock(control) ?? FriendClock(initial: 300, increment: 0)
-    }
+    /// The server's clock for the pick; nil for no clock.
+    private var clock: FriendClock? { OnlineLobby.clock(id: clockID) }
+    /// The days per move when ∞ is picked with a limit; nil otherwise.
+    private var days: Int? { clock == nil && DailyDays.options.contains(dailyDays) ? dailyDays : nil }
+    private var isMoreOpen: Bool { showsMore ?? !OnlineLobby.quickPicks.contains(clock) }
 
     var body: some View {
         ScrollView {
@@ -27,7 +34,7 @@ struct OnlineLobbyView: View {
                 }
                 clockPicker
                 waitingList
-                OnlineFairPlayCard(theme: theme)
+                OnlineFairPlayCard(theme: theme, clock: clock, days: days)
             }
             .frame(maxWidth: 560)
             .frame(maxWidth: .infinity)
@@ -51,7 +58,9 @@ struct OnlineLobbyView: View {
         .onAppear { lobby.start() }
         .animation(.snappy(duration: 0.3), value: lobby.players)
         .animation(.snappy(duration: 0.3), value: lobby.phase)
-        .sensoryFeedback(.selection, trigger: control) { _, _ in hapticsOn }
+        .sensoryFeedback(.selection, trigger: clockID) { _, _ in hapticsOn }
+        .sensoryFeedback(.selection, trigger: dailyDays) { _, _ in hapticsOn }
+        .animation(.snappy(duration: 0.3), value: clock == nil)
         .sensoryFeedback(.success, trigger: lobby.phase) { _, new in hapticsOn && new == .starting }
     }
 
@@ -61,7 +70,9 @@ struct OnlineLobbyView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Play someone online")
                 .font(theme.challengeFont(30, .bold))
-            Text("Rated games with players waiting now. Take one on, or find a game at your clock.")
+            Text(clock == nil && days == nil
+                 ? "Games just for fun with players waiting now. Take one on, or find a game."
+                 : "Rated games with players waiting now. Take one on, or find a game at your clock.")
                 .font(theme.challengeFont(15))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -73,23 +84,75 @@ struct OnlineLobbyView: View {
         VStack(alignment: .leading, spacing: 10) {
             ChallengeSectionTitle(title: "Clock")
             HStack(spacing: 8) {
-                ForEach(OnlineLobby.clocks) { option in
-                    ChallengeChip(title: option.name, isOn: control == option, theme: theme) {
-                        control = option
-                    }
-                    .accessibilityLabel(option.detail)
-                    .disabled(lobby.isSearching)
+                ForEach(OnlineLobby.quickPicks, id: \.self) { option in
+                    clockChip(option)
                 }
             }
-            Text(control.detail)
+            Button {
+                withAnimation(.snappy(duration: 0.3)) { showsMore = !isMoreOpen }
+            } label: {
+                HStack(spacing: 4) {
+                    Text("More times")
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 11, weight: .bold))
+                        .rotationEffect(.degrees(isMoreOpen ? 180 : 0))
+                }
+                .font(theme.challengeFont(14, .semibold))
+                .foregroundStyle(theme.challengeAccent)
+                .frame(maxWidth: .infinity, minHeight: 32)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(isMoreOpen ? "Fewer times" : "More times")
+            if clock == nil {
+                OnlineDaysStepper(days: $dailyDays, theme: theme)
+                    .disabled(lobby.isSearching)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+            if isMoreOpen {
+                moreClocks
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+            Text(OnlineLobby.detail(clock, days: days))
                 .font(theme.challengeFont(12))
                 .foregroundStyle(.secondary)
         }
     }
 
+    /// Bullet, Blitz, Rapid and Classical, each a row of chips, on a glass card.
+    private var moreClocks: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(OnlineLobby.moreClocks) { group in
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(group.name.uppercased())
+                        .font(theme.challengeFont(11.5, .semibold))
+                        .tracking(0.8)
+                        .foregroundStyle(.secondary)
+                        .accessibilityAddTraits(.isHeader)
+                    HStack(spacing: 6) {
+                        ForEach(group.clocks, id: \.self) { option in
+                            clockChip(option, size: 14)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .challengeGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+
+    private func clockChip(_ option: FriendClock?, size: CGFloat = 15) -> some View {
+        ChallengeChip(title: option?.label ?? "∞", isOn: clock == option, theme: theme,
+                      size: option == nil ? 24 : size) {
+            withAnimation(.snappy(duration: 0.3)) { clockID = OnlineLobby.clockID(option) }
+        }
+        .accessibilityLabel(OnlineLobby.detail(option))
+        .disabled(lobby.isSearching)
+    }
+
     @ViewBuilder
     private var waitingList: some View {
-        let players = lobby.sorted(for: clock)
+        let players = lobby.sorted(for: clock, days: days)
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 ChallengeSectionTitle(title: "Waiting now")
@@ -102,7 +165,7 @@ struct OnlineLobbyView: View {
             } else {
                 VStack(spacing: 0) {
                     ForEach(players) { player in
-                        OnlinePlayerRow(player: player, theme: theme, sameClock: player.clock == clock,
+                        OnlinePlayerRow(player: player, theme: theme, sameClock: player.plays(clock, days: days),
                                         isChallenging: lobby.challenging == player.id,
                                         isBusy: lobby.challenging != nil || lobby.phase == .starting) {
                             Task { await lobby.challenge(player, name: name) }
@@ -153,8 +216,15 @@ struct OnlineLobbyView: View {
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
             switch lobby.phase {
-            case .searching(let waitingClock, let since):
-                OnlineSearchingBar(clock: waitingClock, since: since, theme: theme) {
+            case .searching(let waitingClock, let waitingDays, let since):
+                if waitingDays != nil {
+                    Text("You can close this. When someone takes you on, the game shows up in your games.")
+                        .font(theme.challengeFont(12.5))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                OnlineSearchingBar(clock: waitingClock, days: waitingDays, since: since, theme: theme) {
                     Task { await lobby.cancel() }
                 }
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
@@ -168,9 +238,9 @@ struct OnlineLobbyView: View {
                 .challengeGlass(Capsule(style: .continuous))
             case .browsing:
                 Button {
-                    Task { await lobby.find(clock: clock, name: name) }
+                    Task { await lobby.find(clock: clock, days: days, name: name) }
                 } label: {
-                    Label("Find a game · \(clock.label)", systemImage: "bolt.fill")
+                    Label("Find a game · \(days.map(DailyDays.label) ?? clock?.label ?? "No clock")", systemImage: "bolt.fill")
                 }
                 .buttonStyle(ChallengeButtonStyle(kind: .primary, theme: theme))
                 .disabled(lobby.challenging != nil)
@@ -210,7 +280,7 @@ struct OnlinePlayerRow: View {
                         .font(theme.challengeFont(13, .medium).monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
-                Text("\(player.clock.kind) · \(player.clock.label) · \(Self.waited(player.waitingFor))")
+                Text("\(player.clockLine) · \(Self.waited(player.waitingFor))")
                     .font(theme.challengeFont(12.5).monospacedDigit())
                     .foregroundStyle(sameClock ? AnyShapeStyle(theme.challengeAccent) : AnyShapeStyle(HierarchicalShapeStyle.secondary))
                     .lineLimit(1)
@@ -225,7 +295,7 @@ struct OnlinePlayerRow: View {
             .buttonStyle(ChallengeButtonStyle(kind: sameClock ? .primary : .glass, theme: theme, height: 38))
             .frame(width: 86)
             .disabled(isBusy)
-            .accessibilityLabel("Play \(player.name), rated \(player.ratingLabel), \(player.clock.phrase)")
+            .accessibilityLabel("Play \(player.name), rated \(player.ratingLabel), \(player.clockPhrase)")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
@@ -242,7 +312,10 @@ struct OnlinePlayerRow: View {
 
 /// While waiting in the lobby: the clock, a count-up, and Cancel.
 struct OnlineSearchingBar: View {
-    let clock: FriendClock
+    /// Nil: no clock.
+    let clock: FriendClock?
+    /// A daily game's days per move.
+    var days: Int?
     let since: Date
     let theme: BoardTheme
     let cancel: () -> Void
@@ -252,12 +325,13 @@ struct OnlineSearchingBar: View {
             OnlineLiveDot(theme: theme, size: 10)
                 .padding(.leading, 6)
             VStack(alignment: .leading, spacing: 1) {
-                Text("Finding an opponent · \(clock.label)")
+                Text("Finding an opponent · \(days.map(DailyDays.label) ?? clock?.label ?? "No clock")")
                     .font(theme.challengeFont(15, .semibold))
                     .lineLimit(1)
                 TimelineView(.periodic(from: since, by: 1)) { context in
                     let seconds = max(0, Int(context.date.timeIntervalSince(since)))
-                    Text("You're in the lobby · \(seconds / 60):\(String(format: "%02d", seconds % 60))")
+                    Text(days == nil ? "You're in the lobby · \(seconds / 60):\(String(format: "%02d", seconds % 60))"
+                                     : "Posted for a week · \(Self.posted(seconds))")
                         .font(theme.challengeFont(12.5).monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
@@ -271,6 +345,92 @@ struct OnlineSearchingBar: View {
         .padding(.leading, 8)
         .challengeGlass(Capsule(style: .continuous))
         .accessibilityElement(children: .contain)
+    }
+}
+
+extension OnlineSearchingBar {
+    /// How long a daily seek has been up: "just now", "12 min", "3 h", "2 days".
+    static func posted(_ seconds: Int) -> String {
+        if seconds < 60 { return "just now" }
+        if seconds < 3600 { return "\(seconds / 60) min" }
+        if seconds < 86_400 { return "\(seconds / 3600) h" }
+        return DailyDays.label(seconds / 86_400)
+    }
+}
+
+/// With ∞ picked: a glass line to set the time per move, − and + either side of "2 days per move",
+/// stepping through No limit, 1, 2, 3, 5 and 7 days.
+struct OnlineDaysStepper: View {
+    @Binding var days: Int
+    let theme: BoardTheme
+
+    @Environment(\.isEnabled) private var isEnabled
+
+    /// No limit (0), then the days on offer.
+    private static let steps = [0] + DailyDays.options
+    private var index: Int { Self.steps.firstIndex(of: days) ?? 0 }
+
+    var body: some View {
+        VStack(spacing: 10) {
+            HStack {
+                stepButton("minus", to: index - 1)
+                    .accessibilityLabel("Fewer days")
+                Spacer(minLength: 8)
+                VStack(spacing: 2) {
+                    Text(days > 0 ? DailyDays.label(days) : "No limit")
+                        .font(theme.challengeFont(26, .bold).monospacedDigit())
+                        .contentTransition(.numericText(value: Double(days)))
+                    Text(days > 0 ? "per move" : "take all the time you like")
+                        .font(theme.challengeFont(12.5))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 8)
+                stepButton("plus", to: index + 1)
+                    .accessibilityLabel("More days")
+            }
+            HStack(spacing: 7) {
+                ForEach(Self.steps.indices, id: \.self) { step in
+                    Circle()
+                        .fill(step == index ? AnyShapeStyle(theme.challengeAccent) : AnyShapeStyle(Color.primary.opacity(0.18)))
+                        .frame(width: 6, height: 6)
+                }
+            }
+            .accessibilityHidden(true)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .challengeGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .opacity(isEnabled ? 1 : 0.5)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Time per move")
+        .accessibilityValue(days > 0 ? DailyDays.phrase(days) : "No limit")
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: go(to: index + 1)
+            case .decrement: go(to: index - 1)
+            @unknown default: break
+            }
+        }
+    }
+
+    private func stepButton(_ symbol: String, to target: Int) -> some View {
+        let possible = Self.steps.indices.contains(target)
+        return Button { go(to: target) } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(theme.challengeAccent)
+                .frame(width: 44, height: 44)
+                .background(Circle().fill(Color.primary.opacity(0.06)))
+                .overlay(Circle().strokeBorder(Color.primary.opacity(0.14), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .opacity(possible ? 1 : 0.35)
+        .disabled(!possible)
+    }
+
+    private func go(to target: Int) {
+        guard Self.steps.indices.contains(target) else { return }
+        withAnimation(.snappy(duration: 0.25)) { days = Self.steps[target] }
     }
 }
 
@@ -303,8 +463,22 @@ struct OnlineLiveDot: View {
 /// The fair-play promise for games with players online.
 struct OnlineFairPlayCard: View {
     let theme: BoardTheme
+    /// The picked clock (nil: none) and, with none, the days per move of a daily game.
+    var clock: FriendClock? = FriendClock(initial: 300, increment: 0)
+    var days: Int?
 
-    static let text = "Online games are rated and fair: no hints or analysis. If you leave the app for over a minute, your opponent can claim the win. Screenshots are reported, and you can report a name or cheating from the game."
+    /// The rules, for the pick: what leaving the app does follows the clock.
+    static func text(clock: FriendClock?, days: Int?) -> String {
+        let leaving: String
+        if clock != nil {
+            leaving = "If you leave the app, your clock keeps running."
+        } else if let days {
+            leaving = "You have \(DailyDays.label(days)) for each move, so close the app between moves."
+        } else {
+            leaving = "Leave and come back whenever you like."
+        }
+        return "Online games are fair: no hints or analysis. \(leaving) Screenshots are reported, and you can report a name or cheating from the game."
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -316,7 +490,7 @@ struct OnlineFairPlayCard: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("Fair play")
                     .font(theme.challengeFont(15, .semibold))
-                Text(Self.text)
+                Text(Self.text(clock: clock, days: days))
                     .font(theme.challengeFont(13))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

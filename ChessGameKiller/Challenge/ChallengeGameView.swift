@@ -255,8 +255,12 @@ struct ChallengeGameView: View {
     /// The fair-play rules, on the first screen of a game.
     private var fairPlayLine: String {
         var line = "Fair play: no hints or analysis."
-        if game.isTimed {
+        if game.hasLeaveRule {
             line += " Leave for over \(game.graceWords) and \(game.opponentName) can claim the win."
+        } else if game.isTimed {
+            line += " If you leave, your clock keeps running."
+        } else if let days = game.days {
+            line += " You have \(DailyDays.label(days)) for each move: close the app between moves."
         }
         return line + " \(game.opponentName) is told if you take a screenshot."
     }
@@ -289,6 +293,8 @@ struct ChallengeGameView: View {
         dock
             .opacity(game.phase == .playing ? 1 : 0)
             .allowsHitTesting(game.phase == .playing)
+            // Room for the end card's second row, so it never stands over the moves or your plate.
+            .padding(.top, canReview ? Self.reviewRow : 0)
             .overlay(alignment: .top) {
                 if game.phase == .playing, game.offersClaim {
                     claimBanner
@@ -326,7 +332,7 @@ struct ChallengeGameView: View {
                 }
             }
             .disabled(game.drawOfferedByMe || game.sending != nil)
-            DockButton(title: game.canAbort ? "Abort" : "Resign", symbol: "flag", theme: theme) {
+            DockButton(title: game.endsAnyTime ? "End" : game.canAbort ? "Abort" : "Resign", symbol: "flag", theme: theme) {
                 confirming = game.canAbort ? .abort : .resign
             }
             .disabled(game.sending != nil)
@@ -480,7 +486,7 @@ struct ChallengeGameView: View {
 
     /// "10+0 · You play White".
     private var lobbyDetail: String {
-        "\(game.clock?.label ?? "No clock") · You play \(game.seat.name)"
+        "\(game.paceLabel) · You play \(game.seat.name)"
     }
 
     /// The result beside Rematch, in one row about the dock's height, so it takes the dock's place
@@ -490,25 +496,37 @@ struct ChallengeGameView: View {
         let offered = rematchOffered
         let lineWeight: Font.Weight = offered ? .semibold : .regular
         let lineColor: Color = offered ? theme.challengeAccent : .secondary
-        return HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(game.resultHeadline ?? "Game over")
-                    .font(theme.challengeFont(17, .bold))
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.8)
-                Text(endLine)
-                    .font(theme.challengeFont(13, lineWeight))
-                    .foregroundStyle(lineColor)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.85)
+        return VStack(spacing: 8) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(game.resultHeadline ?? "Game over")
+                        .font(theme.challengeFont(17, .bold))
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
+                    Text(endLine)
+                        .font(theme.challengeFont(13, lineWeight))
+                        .foregroundStyle(lineColor)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.85)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityElement(children: .combine)
+                endButton
+                    .frame(width: 148)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityElement(children: .combine)
-            endButton
-                .frame(width: 148)
+            .padding(.leading, 12)
+            // A game that was really played can be looked back on, as a rival game can (Alex,
+            // 2026-11-11, audit pick O1).
+            if canReview {
+                Button {
+                    center.review(game)
+                } label: {
+                    Label("Review game", systemImage: "backward.circle")
+                }
+                .buttonStyle(ChallengeButtonStyle(kind: .glass, theme: theme, height: Self.reviewHeight))
+            }
         }
-        .padding(.leading, 20)
-        .padding(.trailing, 8)
+        .padding(.horizontal, 8)
         .padding(.vertical, 8)
         .challengeGlass(RoundedRectangle(cornerRadius: 30, style: .continuous))
         .frame(maxWidth: 520)
@@ -516,6 +534,16 @@ struct ChallengeGameView: View {
         .padding(.bottom, 6)
         .animation(.snappy(duration: 0.25), value: game.rematchStage)
     }
+
+    /// The game was really played, with moves to look back on: not one aborted or never taken.
+    private var canReview: Bool {
+        guard game.phase == .over, let state = game.state, let result = state.result else { return false }
+        return result.reason.wasPlayed && !state.moves.isEmpty
+    }
+
+    private static let reviewHeight: CGFloat = 40
+    /// How much taller Review game makes the end card than the dock it stands in for.
+    private static let reviewRow: CGFloat = reviewHeight + 8
 
     /// The friend asked for a rematch and is waiting on you.
     private var rematchOffered: Bool { canRematch && game.rematchStage == .offered }
@@ -597,7 +625,8 @@ struct ChallengeGameView: View {
     // MARK: Leaving, resigning, cancelling
 
     private func close() {
-        // Closing a timed game under way is leaving it: away long enough, the friend can claim the win.
+        // Closing a timed game under way is leaving it: the clock runs on (and in a friend game, away
+        // long enough, the friend can claim the win).
         if game.phase == .playing, game.isTimed {
             confirming = .leave
         } else {
@@ -612,7 +641,7 @@ struct ChallengeGameView: View {
     private var confirmTitle: String {
         switch confirming {
         case .resign?: return "Resign this game?"
-        case .abort?: return "Abort this game?"
+        case .abort?: return game.endsAnyTime ? "End this game?" : "Abort this game?"
         case .leave?: return "Leave the game?"
         case .cancelChallenge?: return "Cancel this challenge?"
         case .reportName?: return "Report \(game.opponentName)'s name?"
@@ -624,8 +653,14 @@ struct ChallengeGameView: View {
     private func confirmMessage(_ item: Confirmation) -> String {
         switch item {
         case .resign: return "\(game.opponentName) wins."
-        case .abort: return "Neither of you has moved yet, so nobody wins or loses."
-        case .leave: return "Your clock keeps running. Away for over \(game.graceWords), \(game.opponentName) can claim the win."
+        case .abort:
+            return game.endsAnyTime
+                ? "This game has no clock, so it ends with no result. Nobody wins or loses."
+                : "Neither of you has moved yet, so nobody wins or loses."
+        case .leave:
+            return game.hasLeaveRule
+                ? "Your clock keeps running. Away for over \(game.graceWords), \(game.opponentName) can claim the win."
+                : "Your clock keeps running while you're away."
         case .cancelChallenge: return "The link stops working, and your friend can't join."
         case .reportName: return "Their name is hidden from now on, and we'll take a look."
         case .reportCheating: return "We'll take a look at this game."
@@ -691,6 +726,8 @@ struct FriendPlate: View {
             Spacer(minLength: 8)
             if game.clock != nil, game.phase != .waiting || isMe {
                 FriendClockBox(game: game, seat: seat, theme: theme)
+            } else if game.days != nil, game.phase == .playing, game.state?.turn == seat {
+                FriendDaysBox(game: game, seat: seat, theme: theme)
             }
         }
         .padding(.horizontal, 4)
@@ -885,6 +922,37 @@ struct FriendClockBox: View {
     /// Light), or bright white on the older home.
     private var runningFace: Color { theme.screenTone?.ivory ?? Color.white.opacity(0.92) }
     private var runningInk: Color { theme.screenTone?.onIvory ?? Color.black.opacity(0.88) }
+}
+
+/// A daily game: the time the side to move has left, "1d 4h", in the same quiet box as a clock.
+struct FriendDaysBox: View {
+    let game: OnlineGame
+    let seat: FriendSeat
+    let theme: BoardTheme
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 30)) { _ in
+            let left = game.daysLeft() ?? 0
+            let urgent = left < 3_600_000
+            let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
+            HStack(spacing: 5) {
+                Image(systemName: "hourglass")
+                    .font(.system(size: 13, weight: .semibold))
+                Text(DailyDays.left(left))
+                    .font(.system(size: 17, weight: .medium).monospacedDigit())
+            }
+            .foregroundStyle(urgent ? ChallengeColors.urgent : theme.challengeAccent)
+            .lineLimit(1)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 6)
+            .background {
+                shape.fill(Color.primary.opacity(0.04))
+                    .overlay(shape.strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(seat.name) has \(DailyDays.left(left)) left to move")
+        }
+    }
 }
 
 /// A soft dot that breathes while the lobby waits.

@@ -113,12 +113,14 @@ final class MatchController {
         case timeoutDraw(flagged: Piece.Color)
         /// One side gave up: the person, or a rival with no way back.
         case resigned(loser: Piece.Color)
+        /// The person offered a draw and the rival took it.
+        case agreedDraw
 
         /// Nil for a draw.
         var winner: Piece.Color? {
             switch self {
             case .timeout(let loser), .resigned(let loser): return loser.opposite
-            case .timeoutDraw: return nil
+            case .timeoutDraw, .agreedDraw: return nil
             }
         }
     }
@@ -183,6 +185,11 @@ final class MatchController {
     @ObservationIgnored var landingDelay: @MainActor (PlayedMove) -> TimeInterval = { _ in 0 }
     /// Seconds from the mating move until the end is seen: the king has fallen, in 3D.
     @ObservationIgnored var finaleDelay: @MainActor (PlayedMove) -> TimeInterval = { _ in 0.4 }
+
+    /// Set while the rival's move is acted out before it lands: the King's hall, where his hand
+    /// reaches the piece first. Handed the move the rival chose (UCI), it returns when the
+    /// move should land on the board. Nil, as everywhere else, plays the move at once.
+    @ObservationIgnored var rivalStage: (@MainActor (String) async -> Void)?
 
     /// The rival's latest remark, shown for a few seconds in its line by the board.
     private(set) var rivalLine: RivalLine?
@@ -327,6 +334,7 @@ final class MatchController {
         firstPersonPly = game.sideToMove == setup.playerColor ? 0 : 1
         outcome = nil
         hopelessTurns = 0
+        drawDeclinedAtPly = nil
         gradeLog = [:]
         reelLog = [:]
         isFlippedByHand = false
@@ -539,6 +547,45 @@ final class MatchController {
         end(.resigned(loser: setup.playerColor))
     }
 
+    /// The ply at which the rival last turned down a draw, so it isn't asked again right away.
+    private var drawDeclinedAtPly: Int?
+    /// Plies to wait after a refused draw before offering again: three of the person's moves.
+    static let pliesBetweenDrawOffers = 6
+    /// How far ahead (in centipawns, from its own side) a rival may be and still take a draw.
+    static let drawAcceptMargin = 50
+
+    /// Whether the person can offer a draw now: a game under way, and not right after a refusal.
+    var canOfferDraw: Bool {
+        guard canResign else { return false }
+        guard let declined = drawDeclinedAtPly else { return true }
+        return game.plyCount - declined >= Self.pliesBetweenDrawOffers || game.plyCount < declined
+    }
+
+    /// The person offers a draw. The rival takes it unless it judges itself more than half a
+    /// pawn better; otherwise it says no and plays on. Returns whether the draw was agreed.
+    @discardableResult
+    func offerDraw() -> Bool {
+        guard canOfferDraw else { return false }
+        if Self.rivalTakesDraw(evaluation: evaluations[game.fen] ?? evaluation, rival: setup.playerColor.opposite) {
+            end(.agreedDraw)
+            return true
+        }
+        drawDeclinedAtPly = game.plyCount
+        rivalSays(.drawDeclined)
+        return false
+    }
+
+    /// Whether a rival playing `rival` takes a draw, given the engine's look at the position
+    /// from White's side. With no look yet, it plays on.
+    static func rivalTakesDraw(evaluation whiteView: Evaluation?, rival: Piece.Color) -> Bool {
+        guard let whiteView else { return false }
+        let rivalView = rival == .white ? whiteView : whiteView.flipped
+        switch rivalView {
+        case .centipawns(let cp): return cp <= drawAcceptMargin
+        case .mate(let n): return n <= 0
+        }
+    }
+
     /// Ends the game off the board: the engine stops, the clock stops, and the right sound plays.
     private func end(_ result: Outcome) {
         cancelWork()
@@ -558,7 +605,7 @@ final class MatchController {
             rivalSays(.rivalResigns)
         case .timeout(let loser):
             rivalSays(game.humanColors.contains(loser) ? .rivalWins : .playerWins)
-        case .timeoutDraw:
+        case .timeoutDraw, .agreedDraw:
             rivalSays(.draw)
         }
         gradeWhatsLeft()
@@ -984,6 +1031,12 @@ final class MatchController {
             try? await Task.sleep(for: minimum - elapsed)
         }
         guard gen == generation, !Task.isCancelled else { return }
+        // On a stage (the King's hall) the rival's hand goes out first, and the move lands
+        // when it reaches the piece.
+        if let chosen, let rivalStage {
+            await rivalStage(chosen)
+            guard gen == generation, !Task.isCancelled else { return }
+        }
         isComputerThinking = false
 
         // The rival plays what its search found: its level is in the search itself (see

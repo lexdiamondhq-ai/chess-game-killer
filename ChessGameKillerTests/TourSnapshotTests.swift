@@ -77,6 +77,13 @@ final class TourSnapshotTests: XCTestCase {
         window.isHidden = true
     }
 
+    /// What Play on a rival opens: its film, then the same words and Face as the hall's ending.
+    func testARivalsWelcome() throws {
+        let window = try show(RivalWelcome(film: .of(.beginner), begin: {}, back: {}), wait: 3)
+        try save(window, "tour-rival-welcome")
+        window.isHidden = true
+    }
+
     func testTheYouPanelOnTheBoardHome() throws {
         let window = try show(HomeSample.home(showsYou: true), wait: 3)
         try save(window, "tour-home-you")

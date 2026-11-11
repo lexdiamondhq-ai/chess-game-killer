@@ -53,18 +53,37 @@ struct HomeMasterpiece: Equatable {
     }
 
     init?(_ game: ClassicGame) {
-        let count: Int = min(Self.finish, game.moves.count)
-        let before = Array(game.moves.dropLast(count))
-        let finish = Array(game.moves.suffix(count))
-        guard var board = TrainingChess.board(after: before, from: Position.standard.fen) else { return nil }
-        var frames: [String] = [board.position.fen]
-        for uci in finish {
+        guard var board = TrainingChess.board(after: [], from: Position.standard.fen) else { return nil }
+        var day: [String] = [board.position.fen]
+        for uci in game.moves {
             guard TrainingChess.play(uci, on: &board) != nil else { return nil }
-            frames.append(board.position.fen)
+            day.append(board.position.fen)
         }
+        let count: Int = min(Self.finish, game.moves.count)
         self.game = game
-        self.frames = frames
-        self.moves = finish
+        self.dayFrames = day
+        self.frames = Array(day.suffix(count + 1))
+        self.moves = Array(game.moves.suffix(count))
+    }
+
+    // MARK: The game across the day
+
+    /// The whole game from the opening position, one frame after each move: the Home board plays
+    /// it across the day, a full set in the morning and the famous finish by night (Alex,
+    /// 2026-11-11: "throughout each day pieces fall").
+    let dayFrames: [String]
+
+    /// The day's game starts at 7 am and reaches its last move at 11 pm.
+    static let dayStarts: TimeInterval = 7 * 3600
+    static let dayEnds: TimeInterval = 23 * 3600
+
+    /// How far into the game the board is at `date`: 0 (the opening position) before 7 am, the
+    /// last move from 11 pm, evenly between.
+    func dayFrame(at date: Date = .now, calendar: Calendar = .current) -> Int {
+        let last: Int = dayFrames.count - 1
+        let seconds: TimeInterval = date.timeIntervalSince(calendar.startOfDay(for: date))
+        let progress: Double = (seconds - Self.dayStarts) / (Self.dayEnds - Self.dayStarts)
+        return min(max(Int((progress * Double(last)).rounded(.down)), 0), last)
     }
 
     /// "Morphy" from "Paul Morphy"; names that are more than a person's stay whole.

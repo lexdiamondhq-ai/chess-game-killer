@@ -50,6 +50,8 @@ test("a new game seats its creator and waits", () => {
     createdAt: T0,
     updatedAt: T0,
     clock: { initial: 600, increment: 0 },
+    days: null,
+    deadline: null,
     creator: "white",
     look: null,
     white: { name: "Alex", seated: true, online: true, away: null, claimableAt: null, screenshots: 0, recordings: 0 },
@@ -63,6 +65,7 @@ test("a new game seats its creator and waits", () => {
     rematch: null,
     result: null,
     leaveGraceMs: GRACE,
+    online: false,
     rated: false,
     ratings: null,
     now: T0 + 5,
@@ -846,4 +849,64 @@ test("offensive names become Player when a game is made or joined", () => {
   assert.equal(game.white.name, "Player");
   rules.join(game, { name: "F u c k", tokenHash: BLACK }, T0);
   assert.equal(game.black.name, "Player");
+});
+
+// ---------------------------------------------------------------------------
+// Daily games: days per move
+
+/** An online daily game, Alex White and Sam Black, paired at T0. */
+function dailyGame(days = 1) {
+  const seat = (player) => ({ player, rating: 1200, games: 0 });
+  return rules.createPairedGame({
+    code: "D4ILY1", white: { name: "Alex", tokenHash: WHITE }, black: { name: "Sam", tokenHash: BLACK },
+    clock: null, days, rated: { white: seat("pa"), black: seat("pb") }, now: T0,
+  });
+}
+
+test("a daily game is rated, has no clock and shows each move's deadline", () => {
+  const game = dailyGame(2);
+  const state = rules.view(game, T0);
+  assert.equal(state.clock, null);
+  assert.equal(state.clocks, null);
+  assert.equal(state.days, 2);
+  assert.equal(state.rated, true);
+  assert.equal(state.deadline, T0 + 2 * DAY);
+  const { now } = play(game, "e2e4", { step: 5 * 60 * 60 * SECOND });
+  // The days start again from each move.
+  assert.equal(rules.view(game, now).deadline, now + 2 * DAY);
+  // Not one to end any time: an abort after both sides moved is refused.
+  play(game, "e7e5", { from: now });
+  assert.equal(rules.act(game, "white", "abort", now + 2 * SECOND).ok, false);
+});
+
+test("running out of days loses, and the alarm finds it", () => {
+  const game = dailyGame(1);
+  const { now } = play(game, "e2e4 e7e5");
+  assert.equal(rules.nextDeadline(game), now + DAY);
+  assert.equal(rules.tick(game, now + DAY - 1).changed, false);
+  assert.equal(rules.tick(game, now + DAY).changed, true);
+  assert.deepEqual(game.result, { winner: "black", reason: "timeout" });
+  assert.equal(rules.needsRatingReport(game), true);
+});
+
+test("a daily game nobody starts is called off, not lost", () => {
+  const game = dailyGame(3);
+  rules.tick(game, T0 + 3 * DAY);
+  assert.deepEqual(game.result, { winner: null, reason: "aborted" });
+  assert.equal(rules.needsRatingReport(game), false);
+});
+
+test("a rematch of a daily game keeps its days", () => {
+  const game = dailyGame(5);
+  rules.act(game, "white", "resign", T0 + SECOND);
+  const next = rules.rematchRecord(game, "N3XT01", T0 + 2 * SECOND);
+  assert.equal(next.days, 5);
+  assert.equal(next.clock, null);
+});
+
+test("days per move are checked", () => {
+  assert.deepEqual(rules.parseDays(undefined), { ok: true, days: null });
+  assert.deepEqual(rules.parseDays(3), { ok: true, days: 3 });
+  assert.equal(rules.parseDays(4).ok, false);
+  assert.equal(rules.parseDays("1").ok, false);
 });

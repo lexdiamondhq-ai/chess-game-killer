@@ -21,6 +21,29 @@ enum FriendSeat: String, Codable, CaseIterable, Sendable {
 
 /// A friend game's time control: seconds each side starts with and seconds added a move.
 /// A game with no clock has none of these (nil).
+/// Daily games online: no clock, but each move must come within some days. The days on offer,
+/// and the words for them and for the time left.
+enum DailyDays {
+    /// The days per move Play online offers (the server's DAYS_PER_MOVE).
+    static let options = [1, 2, 3, 5, 7]
+
+    /// "1 day", "3 days".
+    static func label(_ days: Int) -> String { "\(days) day\(days == 1 ? "" : "s")" }
+
+    /// "2 days a move".
+    static func phrase(_ days: Int) -> String { "\(label(days)) a move" }
+
+    /// The time left to move, short: "2d 4h", "5h 12m", "9m", "0m".
+    static func left(_ milliseconds: Double) -> String {
+        let minutes = max(0, Int(milliseconds / 60_000))
+        let days = minutes / 1440
+        let hours = (minutes % 1440) / 60
+        if days > 0 { return hours > 0 ? "\(days)d \(hours)h" : "\(days)d" }
+        if hours > 0 { return "\(hours)h \(minutes % 60)m" }
+        return "\(minutes)m"
+    }
+}
+
 struct FriendClock: Codable, Hashable, Sendable {
     var initial: Int
     var increment: Int
@@ -209,6 +232,10 @@ struct FriendGameState: Codable, Equatable, Sendable {
     var createdAt: Double = 0
     var updatedAt: Double = 0
     var clock: FriendClock?
+    /// A daily game: no clock, but each move must come within this many days. Nil otherwise.
+    var days: Int?
+    /// In a daily game under way, when the side to move runs out of days (server ms).
+    var deadline: Double?
     /// The creator's seat.
     var creator: FriendSeat = .white
     var white = Player()
@@ -228,7 +255,9 @@ struct FriendGameState: Codable, Equatable, Sendable {
     var leaveGraceMs: Double = 60_000
     /// The server's time when it sent this, in milliseconds since 1970.
     var now: Double = 0
-    /// Paired online with someone from the lobby: rated, and not a friend's game.
+    /// Paired online with someone from the lobby, not a friend's game. Such games have no leave rule.
+    var online = false
+    /// An online game with a clock or days per move: it counts for the players' ratings.
     var rated = false
     /// Each side's rating in a rated game; nil otherwise.
     var ratings: Ratings?
@@ -258,8 +287,8 @@ struct FriendGameState: Codable, Equatable, Sendable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case code, status, createdAt, updatedAt, clock, creator, white, black, moves, san, fen, turn
-        case clocks, drawOffer, rematch, result, leaveGraceMs, now, rated, ratings
+        case code, status, createdAt, updatedAt, clock, days, deadline, creator, white, black, moves, san, fen, turn
+        case clocks, drawOffer, rematch, result, leaveGraceMs, now, online, rated, ratings
     }
 
     subscript(seat: FriendSeat) -> Player {
@@ -278,6 +307,8 @@ extension FriendGameState {
         createdAt = try c.decodeIfPresent(Double.self, forKey: .createdAt) ?? 0
         updatedAt = try c.decodeIfPresent(Double.self, forKey: .updatedAt) ?? 0
         clock = try c.decodeIfPresent(FriendClock.self, forKey: .clock)
+        days = try c.decodeIfPresent(Int.self, forKey: .days)
+        deadline = try c.decodeIfPresent(Double.self, forKey: .deadline)
         creator = try c.decodeIfPresent(FriendSeat.self, forKey: .creator) ?? .white
         white = try c.decodeIfPresent(Player.self, forKey: .white) ?? Player()
         black = try c.decodeIfPresent(Player.self, forKey: .black) ?? Player()
@@ -292,6 +323,8 @@ extension FriendGameState {
         leaveGraceMs = try c.decodeIfPresent(Double.self, forKey: .leaveGraceMs) ?? 60_000
         now = try c.decodeIfPresent(Double.self, forKey: .now) ?? 0
         rated = try c.decodeIfPresent(Bool.self, forKey: .rated) ?? false
+        // An older server said only `rated`, which every online game was then.
+        online = try c.decodeIfPresent(Bool.self, forKey: .online) ?? rated
         // Ratings the app can't read never hide the game itself.
         ratings = (try? c.decodeIfPresent(Ratings.self, forKey: .ratings)) ?? nil
     }
@@ -677,7 +710,7 @@ enum FriendClockMath {
     /// Leaving counts only in a timed game under way once both sides have moved. It never ends the
     /// game by itself: after the grace period the other side may claim the win, or keep waiting.
     static func leaveRuleApplies(_ state: FriendGameState) -> Bool {
-        state.clock != nil && state.status == .active && state.moves.count >= 2
+        state.clock != nil && !state.online && state.status == .active && state.moves.count >= 2
     }
 
     /// When the other side may claim the win because `seat` left, in server milliseconds; nil when it isn't

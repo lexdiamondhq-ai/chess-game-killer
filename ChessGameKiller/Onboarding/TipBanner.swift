@@ -83,7 +83,8 @@ struct GameTips: View {
 
     private func consider() {
         guard shown == nil, !blocked, !Welcome.isUnderTest, match.hasStarted, !match.isOver else { return }
-        let tip = TipBook.next(playerMoves: playerMoves, justUndid: justUndid)
+        let facingKing = match.setup.opponent == .computer && !match.setup.grudge && match.setup.level == .grandmaster
+        let tip = TipBook.next(playerMoves: playerMoves, justUndid: justUndid, facingKing: facingKing)
         justUndid = false
         guard let tip else { return }
         TipBook.markSeen(tip)

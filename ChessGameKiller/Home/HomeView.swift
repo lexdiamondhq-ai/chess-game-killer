@@ -65,11 +65,11 @@ struct HomeView: View {
     @State private var confirmingGrudge = false
     /// Settle it was pressed: the game starts as the Grudge's room closes.
     @State private var settlingGrudge = false
-    /// The rivals' hall is open, on this rival (nil: the one up next).
-    @State private var showingHall = false
-    @State private var hallStart: MatchController.Level?
-    /// The hall opens straight into the rival's welcome film.
-    @State private var hallIntro = false
+    /// The rivals' hall is open, on its rival and whether its film plays first. One value, so the
+    /// hall always opens on the rival asked for: with the rival kept apart from the open switch,
+    /// the hall could read the rival from before and open on the Cub (Alex, 2026-11-10: "When I
+    /// hit play it goes to cub rather than the rival I selected").
+    @State private var hall: HallVisit?
     @AppStorage("setup.clock") private var timeControl: TimeControl = .unlimited
     @AppStorage("haptics") private var hapticsOn = true
     /// The name friends see, from the last challenge: the home says hello with it.
@@ -563,9 +563,7 @@ struct HomeView: View {
         case .online: challenges?.playOnline()
         case .friend: challenges?.compose()
         case .newGame: secondary(upNext)
-        case .rivals:
-            hallStart = nil
-            showingHall = true
+        case .rivals: hall = HallVisit(start: nil, intro: false)
         case .grudge: showingGrudge = true
         case .games: actions.rewind()
         }
@@ -672,6 +670,21 @@ struct HomeView: View {
         }
     }
 
+    /// Friends in the You panel opens Play a friend, where the player's people are.
+    private var openFriends: (() -> Void)? {
+        guard let challenges else { return nil }
+        return { challenges.compose() }
+    }
+
+    /// Under Friends in the You panel: the player's username and how many people they have.
+    private var friendsLine: String {
+        guard let friends = challenges?.friends else { return "" }
+        let count = friends.people.count
+        guard count > 0 else { return "Add people and challenge them" }
+        let people = count == 1 ? "1 friend" : "\(count) friends"
+        return friends.you.map { "@\($0.username) · \(people)" } ?? people
+    }
+
     private func closeYou() {
         withAnimation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.36, dampingFraction: 0.9)) {
             you = nil
@@ -686,7 +699,8 @@ struct HomeView: View {
             .onTapGesture { closeYou() }
             .transition(.opacity)
             .accessibilityHidden(true)
-        HomeYouPanel(tone: tone, piecesLine: piecesLine, gamesLine: gamesLine, actions: actions, fromTop: fromTop, close: closeYou)
+        HomeYouPanel(tone: tone, piecesLine: piecesLine, gamesLine: gamesLine, actions: actions, fromTop: fromTop, close: closeYou,
+                     friends: openFriends, friendsLine: friendsLine)
             .padding(.horizontal, 16)
             .padding(.top, fromTop ? 6 : 0)
             .padding(.bottom, fromTop ? 0 : 10)
@@ -730,21 +744,30 @@ extension HomeView {
                 actions.resume()
             }
         }, playRival: { level in playOtherRival(level) }, options: { level in actions.playRival(level) }, rivals: { level in
-            hallStart = level
-            hallIntro = false
-            showingHall = true
+            hall = HallVisit(start: level, intro: false)
         }, chessDNA: actions.chessDNA, puzzles: actions.puzzles, replay: { id in
             if let game = vault.game(id) { actions.openGame(game) }
         })
         return HomeAuroraView(tone: tone, info: auroraInfo, actions: auroraActions)
-            .fullScreenCover(isPresented: $showingHall) {
-                RivalsHall(start: hallStart, intro: hallIntro, begin: { level in
+            .task {
+                // Keeps whose move it is in games with people, and how many wait online, up to
+                // date while Home is showing. The earlier homes did this from their Play tile;
+                // this home has no such tile, so its "Your move" cards went stale (audit, 2026-11-11).
+                guard let challenges else { return }
+                while !Task.isCancelled {
+                    await challenges.refreshGames()
+                    await challenges.refreshOnlineCount()
+                    try? await Task.sleep(for: .seconds(ChallengeCenter.refreshInterval))
+                }
+            }
+            .fullScreenCover(item: $hall) { visit in
+                RivalsHall(start: visit.start, intro: visit.intro, begin: { level in
                     // The film's last frame gives way to the game: the hall closes at once.
                     var quiet = Transaction()
                     quiet.disablesAnimations = true
-                    withTransaction(quiet) { showingHall = false }
+                    withTransaction(quiet) { hall = nil }
                     playRival(level)
-                }, close: { showingHall = false })
+                }, close: { hall = nil })
             }
             .sheet(isPresented: $showingGrudge, onDismiss: {
                 // The game starts once the room has gone, so nothing presents over a closing sheet.
@@ -808,10 +831,16 @@ extension HomeView {
     }
 
     private func showFilm(_ level: MatchController.Level) {
-        hallStart = level
-        hallIntro = true
-        showingHall = true
+        hall = HallVisit(start: level, intro: true)
     }
+}
+
+/// One visit to the rivals' hall: the rival it opens on (nil: the one up next) and whether that
+/// rival's welcome film plays first.
+private struct HallVisit: Identifiable {
+    let id = UUID()
+    let start: MatchController.Level?
+    let intro: Bool
 }
 
 // MARK: - The board home
@@ -1159,7 +1188,7 @@ extension HomeView {
         }
     }
 
-    /// You: the home's colors, your games, Settings and Pro.
+    /// You: the home's colors, your games, Settings and Premium.
     private var sheetYou: some View {
         VStack(alignment: .leading, spacing: Self.gap) {
             sheetCard {
@@ -1181,7 +1210,7 @@ extension HomeView {
                     .homeRise(1)
                 if let premium = actions.premium {
                     HomeHairline(tone: tone)
-                    HomeLinkRow(glyph: Glyphs.king, title: "Beauty of Chess Pro", detail: "Everything, with no limits", tone: tone, action: premium)
+                    HomeLinkRow(glyph: Glyphs.king, title: "Premium", detail: "Everything, with no limits", tone: tone, action: premium)
                         .homeRise(2)
                 }
             }

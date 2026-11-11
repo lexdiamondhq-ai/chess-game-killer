@@ -146,8 +146,14 @@ struct AnalyzeSheet: View {
                 destination(step)
             }
         }
+        // Opens the line to the photo reader while a photo is picked or taken.
+        .task { session.warmUpReader() }
+        .onChange(of: showingCamera) { _, showing in
+            if showing { session.warmUpReader() }
+        }
         .onChange(of: photoItem) { _, item in
             guard let item else { return }
+            session.warmUpReader()
             Task {
                 // Loading can mean an iCloud download, so show that something is happening.
                 isLoadingPhoto = true
@@ -564,6 +570,7 @@ struct AnalysisView: View {
     @State private var model: AnalysisModel
     @State private var flipped: Bool
     @State private var showingPhoto = false
+    @State private var showingHelp = false
     @AppStorage("haptics") private var hapticsOn = true
     @AppStorage("sculpted3D") private var sculpted3D = true
     @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.tilted
@@ -788,21 +795,20 @@ struct AnalysisView: View {
 
     // MARK: Help
 
-    /// At the foot of the page, the website's short directions for Analyze (Alex, 2026-11-09:
-    /// "so people don't get confused").
+    /// At the foot of the page, the short directions for Analyze (Alex, 2026-11-09: "so people
+    /// don't get confused"), unrolled as a scroll in the app (2026-11-11), not the website.
     private var help: some View {
-        Link(destination: AnalysisView.faq) {
+        Button { showingHelp = true } label: {
             Label("How Analyze works", systemImage: "questionmark.circle")
                 .font(.app(.footnote, weight: .semibold))
                 .foregroundStyle(.secondary)
         }
+        .buttonStyle(.plain)
         .frame(maxWidth: .infinity)
         .padding(.top, 4)
-        .accessibilityHint("Opens the questions page on the website")
+        .accessibilityHint("Shows how Analyze works")
+        .sheet(isPresented: $showingHelp) { AnalyzeHelpScroll() }
     }
-
-    /// play/public/faq, served beside the privacy and support pages.
-    static let faq = URL(string: "https://play.chess-game-killer.workers.dev/faq/")!
 
     // MARK: The photo
 

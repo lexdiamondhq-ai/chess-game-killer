@@ -101,9 +101,9 @@ export class GameRoom extends DurableObject {
   }
 
   /** Starts a game paired in the online lobby, both players seated. Returns { inUse: true } if the code already has one. */
-  async createPaired({ code, white, black, clock, look, rated }) {
+  async createPaired({ code, white, black, clock, days = null, look, rated }) {
     if (this.game) return { inUse: true };
-    this.game = rules.createPairedGame({ code, white, black, clock, look, rated, now: Date.now(), leaveGraceMs: this.config.leaveGraceMs });
+    this.game = rules.createPairedGame({ code, white, black, clock, days, look, rated, now: Date.now(), leaveGraceMs: this.config.leaveGraceMs });
     await this.#settle({ changed: true, notices: [] });
     return { game: this.#view() };
   }

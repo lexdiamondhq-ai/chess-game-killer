@@ -6,18 +6,20 @@ import UIKit
 /// The rivals' hall, opened from Rivals on Home (Alex, 2026-11-07): one card for each rival,
 /// swiped through, its film's last frame above a short line on how it plays. Landing on a rival
 /// plays its film full screen; when it ends the film holds its last frame and the rival's words
-/// and Face rise at the bottom, over I to V for swiping on to the others. Face plays the
-/// rival's welcome film, then Begin starts the game. Every rival after the Cub stays locked
+/// and Face rise at the bottom, over I to V for swiping on to the others. Face starts the
+/// game. Every rival after the Cub stays locked
 /// until the rival before it is beaten; their cards still show, saying who to beat.
 struct RivalsHall: View {
     /// The rival the hall opens on; nil opens on the first one not yet beaten.
     var start: MatchController.Level? = nil
+    /// Opened straight into one rival's welcome film, from a Play button: leaving that film
+    /// leaves the hall too, back to where Play was pressed, not to the cards behind it.
+    private let intro: Bool
     /// The game starts against this rival.
     let begin: (MatchController.Level) -> Void
     let close: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(GameVault.self) private var vault: GameVault?
     @State private var ladder: RivalLadder
     @State private var selected: MatchController.Level?
     /// The rival whose film is playing.
@@ -38,6 +40,7 @@ struct RivalsHall: View {
     init(start: MatchController.Level? = nil, intro: Bool = false, ended: MatchController.Level? = nil,
          begin: @escaping (MatchController.Level) -> Void, close: @escaping () -> Void) {
         self.start = start
+        self.intro = intro && start != nil
         self.begin = begin
         self.close = close
         let ladder = RivalLadder()
@@ -70,9 +73,13 @@ struct RivalsHall: View {
                 RivalHallFilm(film: film, ended: ended == level, done: { finishFilm(level) },
                               step: { stepFilm(by: $0) }, close: close) {
                     VStack(spacing: 0) {
+                        // Face starts the game: the film was just watched, so it doesn't play a
+                        // second time before the board (Alex, 2026-11-11, audit pick R1).
                         RivalFilmEnding(film: film, open: ladder.isOpen(level),
-                                        record: RivalRecord(vault?.games ?? [], against: film.rival),
-                                        face: { withAnimation(.easeIn(duration: 0.3)) { showing = film } },
+                                        face: {
+                                            RivalIntros.mark(level)
+                                            begin(level)
+                                        },
                                         notToday: close)
                         .padding(.horizontal, 24)
                         .opacity(ended == level ? 1 : 0)
@@ -88,6 +95,12 @@ struct RivalsHall: View {
             }
             if let film = showing {
                 RivalWelcome(film: film, begin: { begin(film.level) }, back: {
+                    // From a Play button, "Not today" goes back to where Play was (audit,
+                    // 2026-11-11: it used to land on the hall's cards, a screen never asked for).
+                    if intro {
+                        close()
+                        return
+                    }
                     watched = film.level
                     withAnimation(.easeOut(duration: 0.35)) { showing = nil }
                 })
@@ -101,7 +114,13 @@ struct RivalsHall: View {
             HomeMusic.shared.setCovered(true)
             if showing == nil { playFilm(selected) }
         }
-        .onDisappear { HomeMusic.shared.setCovered(false) }
+        .onDisappear {
+            // The films play with the ring switch off; everything after them is quiet on silent
+            // again. Without this the move sounds and the bells kept playing aloud on a silenced
+            // phone whenever Home music or the rival themes were off (audit, 2026-11-11).
+            try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
+            HomeMusic.shared.setCovered(false)
+        }
         .onChange(of: selected) { _, level in
             watched = nil
             playFilm(level)
@@ -386,40 +405,13 @@ struct RivalHallWords: View {
     }
 }
 
-/// Your games against one rival: wins, losses and draws.
-struct RivalRecord: Equatable {
-    var wins = 0
-    var losses = 0
-    var draws = 0
-
-    init(wins: Int = 0, losses: Int = 0, draws: Int = 0) {
-        self.wins = wins
-        self.losses = losses
-        self.draws = draws
-    }
-
-    /// Counted from the games played here against the rival (not ones brought in from a site).
-    init(_ games: [SavedGame], against rival: Rival) {
-        for game in games where game.level == rival.level.rawValue && game.sourceID == nil
-            && (game.opponent == rival.name || rival.pastNames.contains(game.opponent)) {
-            switch game.result {
-            case .win: wins += 1
-            case .loss: losses += 1
-            case .draw: draws += 1
-            case .unfinished: break
-            }
-        }
-    }
-}
-
 /// How a rival's film ends in the hall (Alex, 2026-11-10, from a picture): its rank between gold
-/// rules, its name, a line on how it plays, its rating and your record against it, and Face in a
-/// dark glass capsule with its coin; "Not today" leaves the hall. For a locked rival the capsule
+/// rules, its name, a line on how it plays, and Face in a dark glass capsule with its coin; "Not
+/// today" leaves the hall. No rating or record (Alex, 2026-11-10: "give more room to see the video"). For a locked rival the capsule
 /// says who to beat first.
 struct RivalFilmEnding: View {
     let film: RivalFilm
     let open: Bool
-    let record: RivalRecord
     let face: () -> Void
     let notToday: () -> Void
 
@@ -452,14 +444,6 @@ struct RivalFilmEnding: View {
                 .foregroundStyle(.white.opacity(0.72))
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 12)
-            HStack(spacing: 0) {
-                stat(film.rival.elo, "RATING")
-                Rectangle().fill(.white.opacity(0.18)).frame(width: 1, height: 40)
-                stat("\(record.wins) · \(record.losses) · \(record.draws)", "WIN · LOSS · DRAW")
-            }
-            .padding(.top, 18)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Rating \(film.rival.elo). \(record.wins) wins, \(record.losses) losses, \(record.draws) draws.")
             capsule
                 .padding(.top, 22)
             Button("Not today", action: notToday)
@@ -474,20 +458,6 @@ struct RivalFilmEnding: View {
         Rectangle()
             .fill(Self.gold.opacity(0.55))
             .frame(width: 26, height: 1)
-    }
-
-    private func stat(_ value: String, _ label: String) -> some View {
-        VStack(spacing: 6) {
-            Text(value)
-                .font(.system(size: 20, weight: .medium, design: .serif))
-                .monospacedDigit()
-                .foregroundStyle(.white.opacity(0.92))
-            Text(label)
-                .font(.system(size: 10, weight: .bold))
-                .tracking(1.8)
-                .foregroundStyle(.white.opacity(0.4))
-        }
-        .frame(maxWidth: .infinity)
     }
 
     private var capsule: some View {
@@ -524,7 +494,7 @@ struct RivalFilmEnding: View {
         .disabled(!open)
         .accessibilityLabel(open ? "Face \(film.rival.name)"
                                  : "Locked. Beat \(film.previous?.name ?? "the rival before") first.")
-        .accessibilityHint(open ? "Plays \(film.rival.name)'s welcome, then starts the game" : "")
+        .accessibilityHint(open ? "Starts the game" : "")
     }
 }
 
@@ -555,23 +525,30 @@ struct RivalHallFilm<Ending: View>: View {
         Color.clear
             .overlay(alignment: .bottom) { ending() }
             .background {
-                ZStack {
-                    Color.black
-                    if let image = film.cardImage {
-                        Image(uiImage: image).resizable().scaledToFill()
+                // Laid over the black, so the screen sets their frame and the film sits centred: a
+                // filled image beside them would widen the frame and push the film off centre.
+                Color.black
+                    .overlay {
+                        if let image = film.cardImage {
+                            Image(uiImage: image).resizable().scaledToFill()
+                        }
                     }
-                    if let player {
-                        RivalFilmLayer(player: player)
+                    .overlay {
+                        if let player {
+                            RivalFilmLayer(player: player)
+                        }
                     }
-                    LinearGradient(stops: [.init(color: .clear, location: 0.3),
-                                           .init(color: .black.opacity(0.6), location: 0.5),
-                                           .init(color: .black.opacity(0.88), location: 0.68),
-                                           .init(color: .black.opacity(0.96), location: 1)],
-                                   startPoint: .top, endPoint: .bottom)
-                        .opacity(ended ? 1 : 0)
-                }
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
+                    .overlay {
+                        LinearGradient(stops: [.init(color: .clear, location: 0.48),
+                                               .init(color: .black.opacity(0.6), location: 0.64),
+                                               .init(color: .black.opacity(0.88), location: 0.78),
+                                               .init(color: .black.opacity(0.96), location: 1)],
+                                       startPoint: .top, endPoint: .bottom)
+                            .opacity(ended ? 1 : 0)
+                    }
+                    .clipped()
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
             }
         .contentShape(Rectangle())
         .onTapGesture { if !ended { leave() } }
@@ -592,8 +569,10 @@ struct RivalHallFilm<Ending: View>: View {
         .accessibilityAction(.escape) { player?.pause(); close() }
         .task { await play() }
         .onDisappear { player?.pause() }
-        .onReceive(NotificationCenter.default.publisher(for: AVPlayerItem.didPlayToEndTimeNotification)) { note in
-            if let item = note.object as? AVPlayerItem, item === player?.currentItem { done() }
+        // The end can be posted off the main thread: brought back to it before the words rise.
+        .onReceive(NotificationCenter.default.publisher(for: AVPlayerItem.didPlayToEndTimeNotification)
+            .receive(on: DispatchQueue.main)) { note in
+            if let item = note.object as? AVPlayerItem, item === player?.currentItem, !ended { done() }
         }
     }
 
@@ -610,6 +589,11 @@ struct RivalHallFilm<Ending: View>: View {
         player.actionAtItemEnd = .pause
         self.player = player
         player.play()
+        // In case the end is never heard: the words rise once the film's length has passed.
+        guard let length = try? await player.currentItem?.asset.load(.duration), length.isNumeric else { return }
+        try? await Task.sleep(for: .seconds(length.seconds + 0.4))
+        guard !Task.isCancelled, !ended else { return }
+        done()
     }
 
     private func leave() {
@@ -619,7 +603,7 @@ struct RivalHallFilm<Ending: View>: View {
 }
 
 /// A rival's welcome: its film, full screen and with sound, opening from a point of torchlight;
-/// then its name, and Begin. A tap skips to the name; a swipe down goes back. Nothing sits over
+/// then, at the rival's moment, its name and Begin while the film plays on. A tap skips to the name; a swipe down goes back. Nothing sits over
 /// the art. The film's last frame holds behind it.
 struct RivalWelcome: View {
     let film: RivalFilm
@@ -631,19 +615,21 @@ struct RivalWelcome: View {
     @State private var iris: CGFloat = 0
     @State private var titled = false
 
-    private static let gold = Color(hex: 0xE8C27A)
-
     var body: some View {
         GeometryReader { geo in
             let reach = hypot(geo.size.width, geo.size.height)
             ZStack {
+                // In an overlay, clipped, so a filled picture can't widen the screen.
                 Color.black
-                if let player {
-                    RivalFilmLayer(player: player)
-                        .blur(radius: reduceMotion ? 0 : (1 - iris) * 14)
-                } else if let image = film.cardImage {
-                    Image(uiImage: image).resizable().scaledToFill()
-                }
+                    .overlay {
+                        if let player {
+                            RivalFilmLayer(player: player)
+                                .blur(radius: reduceMotion ? 0 : (1 - iris) * 14)
+                        } else if let image = film.cardImage {
+                            Image(uiImage: image).resizable().scaledToFill()
+                        }
+                    }
+                    .clipped()
                 // The torchlight: the dark draws back from the middle.
                 RadialGradient(colors: [.clear, .black],
                                center: UnitPoint(x: 0.5, y: 0.42),
@@ -651,9 +637,13 @@ struct RivalWelcome: View {
                                endRadius: iris * reach * 0.42 + max(1, reach * 0.28))
                     .opacity(1 - Double(iris) * 0.15)
                     .allowsHitTesting(false)
-                LinearGradient(stops: [.init(color: .clear, location: 0.5),
-                                       .init(color: .black.opacity(titled ? 0.85 : 0), location: 1)],
+                // The hall ending's shade, so the words read the same here.
+                LinearGradient(stops: [.init(color: .clear, location: 0.48),
+                                       .init(color: .black.opacity(0.6), location: 0.64),
+                                       .init(color: .black.opacity(0.88), location: 0.78),
+                                       .init(color: .black.opacity(0.96), location: 1)],
                                startPoint: .top, endPoint: .bottom)
+                    .opacity(titled ? 1 : 0)
                     .allowsHitTesting(false)
                 if titled { titleCard.transition(.opacity.combined(with: .offset(y: 18))) }
             }
@@ -662,7 +652,7 @@ struct RivalWelcome: View {
         .ignoresSafeArea()
         .contentShape(Rectangle())
         .onTapGesture { skip() }
-        // No button over the art: a swipe down goes back to the rivals, as does "Not now".
+        // No button over the art: a swipe down goes back to the rivals, as does "Not today".
         .gesture(DragGesture(minimumDistance: 24).onEnded { drag in
             let t = drag.translation
             if t.height > 90, t.height > abs(t.width) * 1.5 { leave() }
@@ -675,52 +665,25 @@ struct RivalWelcome: View {
         .onDisappear { player?.pause() }
     }
 
+    /// The same words as the hall's film ending (Alex, 2026-11-11: "I like this style better"):
+    /// rank between rules, the gold name, the rival's line, Face, and Not today.
     private var titleCard: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 0) {
             Spacer()
-            Text("RANK \(film.numeral)")
-                .font(.system(size: 11, weight: .bold))
-                .tracking(3)
-                .foregroundStyle(Self.gold)
-            Text(film.rival.name.uppercased())
-                .font(.custom(HomeCarvingFont.plain, size: 38, relativeTo: .largeTitle))
-                .tracking(2)
-                .foregroundStyle(.white)
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-                .shadow(color: .black.opacity(0.8), radius: 12)
-            Text(film.title)
-                .font(.system(size: 16, weight: .regular, design: .serif))
-                .italic()
-                .foregroundStyle(.white.opacity(0.75))
-            LinearGradient(colors: [Self.gold.opacity(0), Self.gold.opacity(0.8), Self.gold.opacity(0)],
-                           startPoint: .leading, endPoint: .trailing)
-                .frame(width: 120, height: 1)
-                .padding(.vertical, 6)
-            Button {
-                player?.pause()
-                begin()
-            } label: {
-                Text("Begin")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Color(hex: 0x1C1813))
-                    .frame(width: 220, height: 52)
-                    .background(HomeAuroraPalette.goldButton, in: Capsule())
-                    .shadow(color: Self.gold.opacity(0.4), radius: 16, y: 4)
-            }
-            .buttonStyle(HomeStagePress())
-            .accessibilityHint("Starts the game against \(film.rival.name)")
-            Button("Not now", action: leave)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.white.opacity(0.6))
-                .frame(minHeight: 44)
+            RivalFilmEnding(film: film, open: true,
+                            face: {
+                                player?.pause()
+                                begin()
+                            },
+                            notToday: leave)
         }
-        .padding(.horizontal, 28)
+        .padding(.horizontal, 24)
         .padding(.bottom, 44)
     }
 
     private func play() async {
-        guard let url = film.filmURL else {
+        // Pictured under test on the film's last frame, with the words up.
+        guard let url = film.filmURL, !Welcome.isUnderTest else {
             iris = 1
             titled = true
             return
@@ -731,8 +694,11 @@ struct RivalWelcome: View {
         let player = AVPlayer(url: url)
         player.actionAtItemEnd = .pause
         self.player = player
-        if !Welcome.isUnderTest { player.play() }
+        player.play()
         withAnimation(reduceMotion ? .easeOut(duration: 0.4) : .easeOut(duration: 1.8)) { iris = 1 }
+        // The name and Begin rise at the rival's moment, a few seconds in, and the film plays on
+        // beneath them to its end (Alex, 2026-11-11: waiting the whole film "takes too long").
+        // A tap still brings them sooner.
         try? await Task.sleep(for: .seconds(film.beat + 0.8))
         guard !Task.isCancelled else { return }
         showTitle()
@@ -740,7 +706,12 @@ struct RivalWelcome: View {
 
     private func skip() {
         guard !titled else { return }
-        player?.seek(to: CMTime(seconds: film.beat + 0.8, preferredTimescale: 600))
+        // To the film's last frame, which holds behind the name.
+        if let item = player?.currentItem, item.duration.isNumeric {
+            player?.seek(to: item.duration)
+        } else {
+            player?.seek(to: CMTime(seconds: film.beat + 0.8, preferredTimescale: 600))
+        }
         withAnimation(.easeOut(duration: 0.3)) { iris = 1 }
         showTitle()
     }

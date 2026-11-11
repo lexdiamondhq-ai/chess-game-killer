@@ -7,17 +7,13 @@ workers_dev = true
 
 [vars]
 # The Claude model that reads the board, and how hard it thinks (low to max).
-# Keep high: on an angled photo (2026-11-08 compare) low and medium misread
-# 13 squares, while high thought for about 8 s and read all 64. Clean
-# screenshots take about 2 s on any effort.
-MODEL = "claude-sonnet-5-5"
-EFFORT = "high"
-# Each player's first 100 scans a month (the app counts them) read with Opus on
-# low (Alex, 2026-11-08): it read every test board right in about 2 s, photos
-# too, at about 1.2 cents a scan.
-FAST_MODEL = "claude-opus-5-5"
-FAST_EFFORT = "low"
-FAST_SCANS = "100"
+# Opus 5.5 on low for every scan (Alex, 2026-11-11, to make Analyze quicker):
+# it reads every test board right, photos too, in about 2.5 s. Sonnet 5.5 had
+# to think on high for about 6 s to read an angled photo. About 1.2 cents a scan.
+# (The app still sends X-Scan-Count; FAST_MODEL/FAST_SCANS would bring back a
+# faster model for a player's first scans each month if MODEL changes again.)
+MODEL = "claude-opus-5-5"
+EFFORT = "low"
 # The most scans a day across everyone. The address is public, so this caps the bill.
 DAILY_LIMIT = "300"
 

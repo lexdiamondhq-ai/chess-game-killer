@@ -16,6 +16,10 @@ on:
         description: "Compare settings on the test boards instead of deploying, e.g. claude-sonnet-5-5:high claude-opus-5-5:high"
         required: false
         default: ""
+      speed:
+        description: "Time the reader instead of deploying (scanner/test/speed.mjs), e.g. claude-opus-5-5:low claude-opus-5-5:low+compact live:1"
+        required: false
+        default: ""
 
 jobs:
   test:
@@ -31,7 +35,7 @@ jobs:
 
   compare:
     needs: test
-    if: github.event_name == 'workflow_dispatch' && inputs.compare != ''
+    if: github.event_name == 'workflow_dispatch' && (inputs.compare != '' || inputs.speed != '')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -42,12 +46,15 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           CONFIGS: ${{ inputs.compare }}
+          SPEED: ${{ inputs.speed }}
         shell: bash
-        run: node scanner/test/compare.mjs $CONFIGS | tee -a "$GITHUB_STEP_SUMMARY"
+        run: |
+          if [ -n "$CONFIGS" ]; then node scanner/test/compare.mjs $CONFIGS | tee -a "$GITHUB_STEP_SUMMARY"; fi
+          if [ -n "$SPEED" ]; then node scanner/test/speed.mjs $SPEED | tee -a "$GITHUB_STEP_SUMMARY"; fi
 
   deploy:
     needs: test
-    if: github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || inputs.compare == '')
+    if: github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || (inputs.compare == '' && inputs.speed == ''))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

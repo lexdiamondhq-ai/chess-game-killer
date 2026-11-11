@@ -53,9 +53,21 @@ enum Glyphs {
     static let scan = "glyph-scan"
     /// A pawn on a calendar page: Today's Move.
     static let today = "glyph-today"
+    /// Home's fine emblems, drawn in gold on a jewel tile (HomeAuroraJewel): an eye for Puzzles,
+    /// a laurel round a pawn for Coach Leo, and one for each Chess DNA style.
+    static let fineEye = "glyph-fine-eye"
+    static let fineLaurel = "glyph-fine-laurel"
+    static let fineAttacker = "glyph-fine-attacker"
+    static let fineTactician = "glyph-fine-tactician"
+    static let fineCounterpuncher = "glyph-fine-counterpuncher"
+    static let fineGrinder = "glyph-fine-grinder"
+    static let fineBuilder = "glyph-fine-builder"
+    static let fineAllRounder = "glyph-fine-all-rounder"
 
     static let all = [home, train, play, puzzles, analyze, army, games, undo, hints, hintsOff, flip,
-                      settings, normalView, bigBoard, king, pawn, coach, challenge, online, scan, today]
+                      settings, normalView, bigBoard, king, pawn, coach, challenge, online, scan, today,
+                      fineEye, fineLaurel, fineAttacker, fineTactician, fineCounterpuncher, fineGrinder,
+                      fineBuilder, fineAllRounder]
 }
 
 /// The small dark well a row's icon sits in (New Game's match card, Challenge a friend):

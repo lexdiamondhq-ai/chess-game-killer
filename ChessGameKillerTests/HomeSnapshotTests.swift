@@ -106,8 +106,8 @@ final class HomeSnapshotTests: XCTestCase {
         XCTAssertEqual(metrics.nearest(to: 0), .board)
     }
 
-    /// Your Chess DNA under For today on the Aurora home, where Your Grudge was (2026-11-09):
-    /// a few weeks in, by day and by night, and before Coach Leo has read enough games.
+    /// Your Chess DNA on the Aurora home, under Next game (2026-11-10): a few weeks in, by day and
+    /// by night, before Coach Leo has read enough games, and every style's jewel emblem.
     func testTheChessDNACardOnHome() throws {
         let sample = TrainSample(settled: true)
         let dna = ChessDNA.make(games: sample.vault.games, puzzleStats: sample.puzzles.themeStats,
@@ -124,6 +124,15 @@ final class HomeSnapshotTests: XCTestCase {
                     HomeAuroraSection(title: "Before three games", palette: palette)
                     HomeAuroraDNA(dna: fresh, palette: palette, action: {})
                         .padding(.horizontal, 16)
+                    HomeAuroraSection(title: "Every style", palette: palette)
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 14) {
+                        HomeAuroraJewel(glyph: Glyphs.fineEye, stone: .amethyst).frame(width: 64, height: 64)
+                        HomeAuroraJewel(glyph: Glyphs.fineLaurel, stone: .jade).frame(width: 64, height: 64)
+                        ForEach(ChessDNA.Style.allCases) { style in
+                            HomeAuroraJewel(style: style).frame(width: 64, height: 64)
+                        }
+                    }
+                    .padding(.horizontal, 16)
                 }
                 .padding(.top, 60)
             }
@@ -157,10 +166,25 @@ final class HomeSnapshotTests: XCTestCase {
                     HomeAuroraTodayCard(eyebrow: "Today's Move", fen: finest.fen, flipped: false,
                                         title: "White to play and win", detail: "Keep your 5-day streak",
                                         button: "Play", symbol: "play.fill", palette: palette, open: {})
-                    HomeAuroraFinestRow(finest: finest, palette: palette, replay: {})
-                    HomeAuroraRow(eyebrow: "Puzzles", title: "Sharpen your eye", detail: "Tactics at your level, one after another",
-                                  accent: palette.violet, palette: palette, action: {}) {
-                        HomeAuroraEmblem(glyph: Glyphs.puzzles, fill: HomeAuroraPalette.violetTile)
+                    // Today's things as tiles, two by two (Alex, 2026-11-11).
+                    Grid(horizontalSpacing: 10, verticalSpacing: 10) {
+                        GridRow {
+                            HomeAuroraFinestRow(finest: finest, palette: palette, tile: true, replay: {})
+                            HomeAuroraRow(eyebrow: "Puzzles", title: "Sharpen your eye", detail: "Tactics at your level",
+                                          accent: palette.violet, palette: palette, tile: true, action: {}) {
+                                HomeAuroraJewel(glyph: Glyphs.fineEye, stone: .amethyst)
+                            }
+                        }
+                        GridRow {
+                            HomeAuroraRow(eyebrow: "Coach Leo", title: "Today's training", detail: "Done today. Another round?",
+                                          accent: palette.teal, palette: palette, tile: true, action: {}) {
+                                HomeAuroraJewel(glyph: Glyphs.fineLaurel, stone: .jade)
+                            }
+                            HomeAuroraRow(eyebrow: "Game of the day", title: "Réti – Tartakower", detail: "Réti v Tartakower · 1910",
+                                          accent: palette.gold, palette: palette, tile: true, action: {}) {
+                                HomeAuroraBoard(fen: finest.fen, flipped: false, lit: false)
+                            }
+                        }
                     }
                 }
                 .padding(.horizontal, 16)

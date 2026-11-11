@@ -11,8 +11,11 @@ struct ContentView: View {
     @State private var showingNewGame = true
     @State private var showingSettings = false
     @State private var confirmingResign = false
+    @State private var confirmingDraw = false
     /// The welcome's Play, waiting on the first rival's film: its Begin starts this game.
     @State private var welcomeFilm: WelcomeFilm?
+    /// The next rival's film, asked for from a won game's end panel.
+    @State private var nextRivalFilm: NextRivalFilm?
     @State private var showingAnalyze = false
     /// The analyzer, kept while the app runs: closing Analyze and opening it again finds the same board.
     @State private var analyzer = ScanSession(reader: CloudBoardReader.live, engine: StockfishEngine.shared,
@@ -102,12 +105,17 @@ struct ContentView: View {
     private var coachIsWide: Bool { coachExpanded }
     /// The board is out of sight: the app is in the background, or another screen covers the game.
     /// The clock and the rival wait while it is.
-    private var boardHidden: Bool {
-        scenePhase != .active || showingHome || showingTraining || showingArmy || showingPuzzles || showingGames || showingDaily
+    private var boardHidden: Bool { scenePhase != .active || boardCovered }
+    /// Another screen is over the game, or in its place.
+    private var boardCovered: Bool {
+        showingHome || showingTraining || showingArmy || showingPuzzles || showingGames || showingDaily
             || showingNewGame || showingSettings || showingAnalyze
             || coach.presentedLesson != nil || coach.presentedSession != nil
             || challenges?.isPresenting == true || talk != nil || showingWelcome
     }
+    /// The Ashen King's game is on screen with nothing over it: turned sideways, the phone
+    /// shows his hall (`BroadcastView`). Every other screen stays upright.
+    private var hallOpen: Bool { stormy && match.hasStarted && !boardCovered }
     /// Starting a game now would cost the one in progress: the rival it is against, so the
     /// screens that start games can ask first.
     private var forfeits: String? {
@@ -307,6 +315,20 @@ struct ContentView: View {
                     lookAround()
                 })
             }
+            // "Face the Hunter" on a won game's end panel: that rival's film, then the game,
+            // on the side and clock of the game just played (Alex, 2026-11-11, audit pick R2).
+            .fullScreenCover(item: $nextRivalFilm) { film in
+                RivalsHall(start: film.id, intro: true, begin: { level in
+                    var quiet = Transaction()
+                    quiet.disablesAnimations = true
+                    withTransaction(quiet) { nextRivalFilm = nil }
+                    var setup = MatchController.Setup(playerColor: film.setup.playerColor, level: level,
+                                                      timeControl: film.setup.timeControl)
+                    setup.opponent = film.setup.opponent
+                    UserDefaults.standard.set(level.rawValue, forKey: "setup.level")
+                    withAnimation(.snappy) { match.start(setup) }
+                }, close: { nextRivalFilm = nil })
+            }
             .fullScreenCover(item: $coach.presentedLesson) { lesson in
                 LessonScreen(lesson: lesson, theme: chosenTheme).environment(training).environment(daily)
             }
@@ -378,6 +400,17 @@ struct ContentView: View {
             .environment(vault)
             .environment(puzzles)
             .environment(daily)
+            // Review game on a finished friend or online game: Rewind opens on it once that
+            // game's own screen has slid away.
+            .onChange(of: challenges?.reviewing) { _, id in
+                guard let id else { return }
+                challenges?.reviewing = nil
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(600))
+                    rewindOpening = id
+                    showingGames = true
+                }
+            }
             .onReceive(NotificationCenter.default.publisher(for: DailyLink.notification)) { _ in openDaily() }
             .onReceive(NotificationCenter.default.publisher(for: LiveGameLink.notification)) { _ in openLiveGame() }
             // The game under way on the Lock Screen and in the Dynamic Island.
@@ -402,6 +435,9 @@ struct ContentView: View {
             }
             .onChange(of: boardHidden) { _, hidden in
                 if hidden { match.suspend() } else { match.resume() }
+            }
+            .onChange(of: hallOpen, initial: true) { _, open in
+                AppOrientation.allowLandscape(open)
             }
             .onChange(of: scenePhase) { _, phase in
                 // A new day may have started while away; the reminders and the widget follow.
@@ -612,55 +648,66 @@ struct ContentView: View {
     /// The board, the players and the dock inside the navigation bar, sized to the screen.
     private var gameScreen: some View {
         GeometryReader { screen in
-            NavigationStack {
-                GeometryReader { geo in
-                    boardLayout(in: geo.size)
-                }
-                // The army's news floats just above the dock, clear of both players' lines.
-                .overlay(alignment: .bottom) {
-                    if let news = armyNews {
-                        ArmyNewsBanner(news: news, color: match.setup.playerColor, theme: theme) {
-                            armyNews = nil
-                            showingArmy = true
-                        }
-                        .padding(.horizontal, Self.inset)
-                        .padding(.bottom, 8)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+            if hallOpen, screen.size.width > screen.size.height {
+                // The phone is on its side against the Ashen King: his hall.
+                BroadcastView(match: match, theme: theme)
+                    .transition(.opacity)
+            } else {
+                uprightGame(screen)
+            }
+        }
+    }
+
+    /// The game as always: the board, the players and the dock inside the navigation bar.
+    private func uprightGame(_ screen: GeometryProxy) -> some View {
+        NavigationStack {
+            GeometryReader { geo in
+                boardLayout(in: geo.size)
+            }
+            // The army's news floats just above the dock, clear of both players' lines.
+            .overlay(alignment: .bottom) {
+                if let news = armyNews {
+                    ArmyNewsBanner(news: news, color: match.setup.playerColor, theme: theme) {
+                        armyNews = nil
+                        showingArmy = true
                     }
+                    .padding(.horizontal, Self.inset)
+                    .padding(.bottom, 8)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
-                // A one-line tip the first time a hidden gesture or a rule would help.
-                .overlay(alignment: .bottom) {
-                    GameTips(match: match, theme: theme, blocked: tipsBlocked)
+            }
+            // A one-line tip the first time a hidden gesture or a rule would help.
+            .overlay(alignment: .bottom) {
+                GameTips(match: match, theme: theme, blocked: tipsBlocked)
+                    .frame(maxWidth: Self.dockMaxWidth)
+                    .padding(.horizontal, Self.inset)
+                    .padding(.bottom, 8)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                // A finished game gives the result a little more room: the board has had its say.
+                let coachHeight = screen.size.height * (match.isOver ? Self.resultShare : Self.coachShare)
+                if boardSheet {
+                    gameSheet(coachHeight: coachHeight, bottom: screen.safeAreaInsets.bottom)
+                } else {
+                    dock(coachHeight: coachHeight)
                         .frame(maxWidth: Self.dockMaxWidth)
                         .padding(.horizontal, Self.inset)
-                        .padding(.bottom, 8)
+                        .padding(.top, 8)
+                        // Above the home indicator; on a phone without one, a little off the edge.
+                        .padding(.bottom, screen.safeAreaInsets.bottom > 0 ? 0 : 8)
                 }
-                .safeAreaInset(edge: .bottom, spacing: 0) {
-                    // A finished game gives the result a little more room: the board has had its say.
-                    let coachHeight = screen.size.height * (match.isOver ? Self.resultShare : Self.coachShare)
-                    if boardSheet {
-                        gameSheet(coachHeight: coachHeight, bottom: screen.safeAreaInsets.bottom)
-                    } else {
-                        dock(coachHeight: coachHeight)
-                            .frame(maxWidth: Self.dockMaxWidth)
-                            .padding(.horizontal, Self.inset)
-                            .padding(.top, 8)
-                            // Above the home indicator; on a phone without one, a little off the edge.
-                            .padding(.bottom, screen.safeAreaInsets.bottom > 0 ? 0 : 8)
-                    }
-                }
-                .background {
-                    SheetBackdrop(theme: theme)
-                        .overlay {
-                            // The Ashen King plays in his storm (Alex, 2026-11-08).
-                            if stormy { DragonStorm().transition(.opacity) }
-                        }
-                        .animation(.easeInOut(duration: 1.2), value: stormy)
-                }
-                .navigationTitle("Beauty of Chess")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar { toolbarContent }
             }
+            .background {
+                SheetBackdrop(theme: theme)
+                    .overlay {
+                        // The Ashen King plays in his storm (Alex, 2026-11-08).
+                        if stormy { DragonStorm().transition(.opacity) }
+                    }
+                    .animation(.easeInOut(duration: 1.2), value: stormy)
+            }
+            .navigationTitle("Beauty of Chess")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { toolbarContent }
         }
     }
 
@@ -810,8 +857,15 @@ struct ContentView: View {
                 }
             }
             // Resign is also here, not only in the dock's pull-up (Alex, 2026-11-09: "How to resign").
+            // Offer a draw sits just above it (Alex, 2026-11-10, option B).
             if match.canResign {
                 Section {
+                    Button {
+                        confirmingDraw = true
+                    } label: {
+                        Label("Offer a draw", systemImage: "equal.circle")
+                    }
+                    .disabled(!match.canOfferDraw)
                     Button(role: .destructive) {
                         confirmingResign = true
                     } label: {
@@ -827,6 +881,14 @@ struct ContentView: View {
                 withAnimation(.snappy) { match.resign() }
             }
             Button("Keep playing", role: .cancel) {}
+        }
+        .confirmationDialog("Offer \(match.opponentName) a draw?", isPresented: $confirmingDraw, titleVisibility: .visible) {
+            Button("Offer a draw") {
+                withAnimation(.snappy) { _ = match.offerDraw() }
+            }
+            Button("Keep playing", role: .cancel) {}
+        } message: {
+            Text("If it's accepted, the game ends level.")
         }
     }
 
@@ -898,7 +960,13 @@ struct ContentView: View {
             CoachOrb(match: match, theme: theme, isExpanded: $coachExpanded, expandedMaxHeight: coachHeight,
                      newGame: homeScreenOn ? nil : { showingNewGame = true },
                      home: homeScreenOn ? { goHome() } : nil, showGames: { showingGames = true },
-                     talk: { openTalk() }, analyze: { showingAnalyze = true })
+                     talk: { openTalk() }, analyze: { showingAnalyze = true },
+                     faceNext: { level in
+                         // The victory theme gives way to the next rival's film.
+                         SoundPlayer.shared.stopAll(fade: 0.4)
+                         RivalTheme.shared.stop(fade: 0.6)
+                         nextRivalFilm = NextRivalFilm(id: level, setup: match.setup)
+                     })
                 .padding(.horizontal, coachExpanded ? 0 : 6)
         }
         .frame(minHeight: Self.dockHeight)
@@ -1065,6 +1133,13 @@ private struct PendingTalkMove: Equatable {
 }
 
 #Preview { ContentView() }
+
+/// The rival above the one just beaten, held while its film plays, with the game just played
+/// for its side and clock.
+private struct NextRivalFilm: Identifiable {
+    let id: MatchController.Level
+    let setup: MatchController.Setup
+}
 
 /// What the welcome picked, held while the first rival's film plays.
 private struct WelcomeFilm: Identifiable {

@@ -87,14 +87,18 @@ struct HomeAuroraView: View {
     @State private var pulled: CGFloat = 0
     /// The header's height, so it knows when the page's top edge reaches it.
     @State private var headerHeight: CGFloat = 52
-    /// Which position of the game of the day the turning board shows: it plays itself slowly.
-    @State private var boardFrame = 0
+    /// Which position of the game of the day the turning board shows: the clock moves it on.
+    /// Nil until Home plays its first move: one move behind the clock.
+    @State private var boardFrame: Int?
     /// The rival in front on the Up next card, as you swipe through them. Nil: the one up next.
     @State private var rivalShown: MatchController.Level?
     /// The card in front under For today, as you swipe through your games and Today's Move.
     @State private var todayShown: String?
     /// How far the bottom bar has faded, 0 to 1: it goes as you scroll down, comes back up.
     @State private var barHidden: CGFloat = 0
+    /// Counts the taps on Today, each of which scrolls the page back to its top.
+    @State private var toTop = 0
+    private static let pageTop = "home.pageTop"
 
     private var palette: HomeAuroraPalette { HomeAuroraPalette(dark: tone.scheme == .dark) }
     private var stage: HomeStageInfo { info.stage }
@@ -129,24 +133,39 @@ struct HomeAuroraView: View {
                     .opacity(1 - 0.6 * Double(lift))
                 spinningBoard(height: boardHeight, lift: lift)
                     .padding(.top, 58)
-                ScrollView(.vertical) {
-                    VStack(spacing: 0) {
-                        // The board shows through here; a tap on it plays.
-                        Color.clear
-                            .frame(height: boardHeight + 58 - 40)
-                            .contentShape(Rectangle())
-                            .onTapGesture { actions.stage.play() }
-                            .onGeometryChange(for: CGFloat.self) { proxy in
-                                -proxy.frame(in: .scrollView).minY
-                            } action: { value in
-                                hideBar(from: pulled, to: value,
-                                        tuckStart: boardHeight + 18 - headerHeight - 6)
-                                pulled = value
-                            }
-                        page
+                ScrollViewReader { reader in
+                    ScrollView(.vertical) {
+                        VStack(spacing: 0) {
+                            // The board shows through here. It plays the game of the day, so a tap
+                            // on it opens that game, as its tile under For today does (Alex,
+                            // 2026-11-11, audit pick H1: it used to start the next rival's film).
+                            Color.clear
+                                .frame(height: boardHeight + 58 - 40)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    // With no game of the day the board shows the next game, and plays it.
+                                    if stage.masterpiece != nil { openMasterpiece() } else { actions.stage.play() }
+                                }
+                                .onGeometryChange(for: CGFloat.self) { proxy in
+                                    -proxy.frame(in: .scrollView).minY
+                                } action: { value in
+                                    hideBar(from: pulled, to: value,
+                                            tuckStart: boardHeight + 18 - headerHeight - 6)
+                                    pulled = value
+                                }
+                                .id(Self.pageTop)
+                            page
+                        }
+                    }
+                    .scrollIndicators(.hidden)
+                    // Today, tapped while Home is already showing, goes back to the top (Alex,
+                    // 2026-11-11, audit pick H2: the button did nothing).
+                    .onChange(of: toTop) { _, _ in
+                        withAnimation(reduceMotion ? .easeOut(duration: 0.2) : .snappy(duration: 0.45)) {
+                            reader.scrollTo(Self.pageTop, anchor: .top)
+                        }
                     }
                 }
-                .scrollIndicators(.hidden)
                 // Once the header has tucked away, a slim veil keeps the cards from running
                 // sharp under the clock and battery.
                 LinearGradient(colors: [palette.bg, palette.bg.opacity(0)], startPoint: .top, endPoint: .bottom)
@@ -171,8 +190,8 @@ struct HomeAuroraView: View {
                     .accessibilityHidden(tuck >= 1)
                 VStack(spacing: 0) {
                     Spacer()
-                    HomeAuroraTabBar(palette: palette, play: actions.stage.analyze, learn: actions.stage.learn,
-                                     rooms: actions.stage.rooms, you: actions.stage.you)
+                    HomeAuroraTabBar(palette: palette, play: actions.stage.analyze, today: { toTop += 1 },
+                                     learn: actions.stage.learn, rooms: actions.stage.rooms, you: actions.stage.you)
                         .padding(.horizontal, 16)
                         .padding(.bottom, 8)
                         .background(alignment: .bottom) {
@@ -199,8 +218,12 @@ struct HomeAuroraView: View {
         }
         .environment(\.colorScheme, tone.scheme)
         .onAppear { music.homeAppeared() }
-        .onDisappear { music.homeDisappeared() }
-        .task(id: reduceMotion) { await playThrough() }
+        .onDisappear {
+            music.homeDisappeared()
+            // Back on Home, the board stands one move behind the clock again and plays it.
+            boardFrame = nil
+        }
+        .task(id: "\(reduceMotion)-\(stage.masterpiece?.game.id ?? "")") { await playThrough() }
     }
 
     /// Scrolling down past where the header tucks away fades the bar over about 80 points;
@@ -214,25 +237,44 @@ struct HomeAuroraView: View {
         }
     }
 
-    /// The pieces move slowly: the game of the day's finish, a move every few seconds, a rest on
-    /// the final position, then again from the start.
+    /// The game of the day plays across the day (Alex, 2026-11-11): a full set at 7 am, the
+    /// famous finish by 11 pm. Home opens one move behind the clock and plays it, so a piece
+    /// moves (and, on a capture, tips over) as you arrive; then the board rests, taking each
+    /// new move as the clock reaches it.
     private func playThrough() async {
-        guard !reduceMotion else { return }
+        guard let masterpiece = stage.masterpiece else { return }
+        guard !reduceMotion else { boardFrame = masterpiece.dayFrame(); return }
+        var frame: Int = boardFrame ?? arrivalFrame(masterpiece)
+        boardFrame = frame
+        try? await Task.sleep(for: .seconds(1.4))
         while !Task.isCancelled {
-            let count: Int = stage.masterpiece?.frames.count ?? 0
-            guard count > 1 else { return }
-            let last: Bool = boardFrame >= count - 1
-            try? await Task.sleep(for: .seconds(last ? 6 : 3.2))
-            guard !Task.isCancelled else { return }
-            boardFrame = last ? 0 : boardFrame + 1
+            let due: Int = masterpiece.dayFrame()
+            if frame < due {
+                frame += 1
+                boardFrame = frame
+                try? await Task.sleep(for: .seconds(3.2))
+            } else if frame > due {
+                // Past midnight: the full set again.
+                frame = due
+                boardFrame = frame
+            } else {
+                try? await Task.sleep(for: .seconds(30))
+            }
         }
     }
 
-    /// What stands on the turning board: the game of the day as it plays, or your game's pieces.
+    /// What stands on the turning board: the game of the day where the clock has it, or your
+    /// game's pieces.
     private var boardPieces: [Piece] {
-        guard let frames = stage.masterpiece?.frames, !frames.isEmpty else { return info.pieces }
-        let fen: String = frames[min(boardFrame, frames.count - 1)]
-        return PositionDraft(fen: fen)?.pieces ?? info.pieces
+        guard let masterpiece = stage.masterpiece, !masterpiece.dayFrames.isEmpty else { return info.pieces }
+        let frames: [String] = masterpiece.dayFrames
+        let frame: Int = boardFrame ?? (reduceMotion ? masterpiece.dayFrame() : arrivalFrame(masterpiece))
+        return PositionDraft(fen: frames[min(frame, frames.count - 1)])?.pieces ?? info.pieces
+    }
+
+    /// Where the board stands as Home opens: one move behind the clock, so that move plays.
+    private func arrivalFrame(_ masterpiece: HomeMasterpiece) -> Int {
+        max(masterpiece.dayFrame() - 1, 0)
     }
 
     // MARK: The board
@@ -304,23 +346,24 @@ struct HomeAuroraView: View {
                 .frame(width: 38, height: 4)
                 .padding(.top, 10)
             // The Face a rival coins are gone: the rival you're on stands big in the Next game
-            // card instead (Alex, 2026-11-08). All rivals moves to this heading's corner.
-            HomeAuroraSection(title: "Next game", palette: palette, note: "All rivals",
-                              action: { actions.rivals(nil) })
+            // card instead (Alex, 2026-11-08). No All rivals link in the corner (Alex,
+            // 2026-11-10): the card swipes through them, and Rivals is in Rooms.
+            HomeAuroraSection(title: "Next game", palette: palette)
             gameRow
-            HomeAuroraSection(title: "For today", palette: palette, note: gamesNote)
-            VStack(spacing: 10) {
-                todayRows
-            }
-            .padding(.horizontal, 16)
-            // Your Chess DNA under For today, where Your Grudge was (Alex, 2026-11-09: "Chess DNA
-            // is a nice selling point. We should highlight this instead of grudge").
+            // Your Chess DNA right under Next game (Alex, 2026-11-10: "Move your chess DNA under the
+            // next game"); it came in where Your Grudge was (2026-11-09: "Chess DNA is a nice
+            // selling point").
             if let dna = info.dna {
                 HomeAuroraSection(title: "Your Chess DNA", palette: palette,
                                   note: dna.gamesRead > 0 ? ChessDNAView.basis(dna) : nil)
                 HomeAuroraDNA(dna: dna, palette: palette, action: actions.chessDNA)
                     .padding(.horizontal, 16)
             }
+            HomeAuroraSection(title: "For today", palette: palette, note: gamesNote)
+            VStack(spacing: 10) {
+                todayRows
+            }
+            .padding(.horizontal, 16)
         }
         .padding(.bottom, 130)
         .frame(maxWidth: .infinity)
@@ -505,23 +548,65 @@ struct HomeAuroraView: View {
         // playing, show that and allow them to swipe through for other games they may have and
         // today's move").
         todayPager
-        if let finest = info.finest {
-            HomeAuroraFinestRow(finest: finest, palette: palette) { actions.replay(finest.gameID) }
+        // The things for today sit under it as four tiles, two by two (Alex, 2026-11-11: picked
+        // "Four tiles" over the long rows). With an odd number, the last one keeps the long row.
+        let items: [TodayItem] = todayItems
+        Grid(horizontalSpacing: 10, verticalSpacing: 10) {
+            ForEach(Array(stride(from: 0, to: items.count, by: 2)), id: \.self) { start in
+                if start + 1 < items.count {
+                    GridRow {
+                        todayItem(items[start], tile: true)
+                        todayItem(items[start + 1], tile: true)
+                    }
+                } else {
+                    todayItem(items[start], tile: false)
+                        .gridCellColumns(2)
+                }
+            }
         }
-        HomeAuroraRow(eyebrow: "Puzzles", title: "Sharpen your eye", detail: "Tactics at your level, one after another",
-                      accent: palette.violet, palette: palette, action: actions.puzzles) {
-            HomeAuroraEmblem(glyph: Glyphs.puzzles, fill: HomeAuroraPalette.violetTile)
-        }
-        HomeAuroraRow(eyebrow: "Coach Leo", title: stage.plan?.title ?? "Today's lesson", detail: coachLine,
-                      accent: palette.teal, palette: palette, action: actions.stage.coach) {
-            HomeAuroraEmblem(glyph: Glyphs.coach, fill: HomeAuroraPalette.tealTile)
-        }
-        // Analyze is the gold knight, its one button on Home (Alex, 2026-11-08), so it has no
-        // row here. The game of the day, which the board up top plays, opens from its own row.
-        if let masterpiece = stage.masterpiece {
-            HomeAuroraRow(eyebrow: "Game of the day", title: masterpiece.title, detail: masterpiece.players,
-                          accent: palette.gold, palette: palette, action: openMasterpiece) {
-                HomeAuroraBoard(fen: masterpiece.frames.first, flipped: masterpiece.flipped, lit: false)
+    }
+
+    /// One of today's things under Today's Move.
+    private enum TodayItem: Hashable {
+        case finest, puzzles, coach, masterpiece
+    }
+
+    /// Today's things in order: your finest move, Puzzles, Coach Leo, the game of the day.
+    private var todayItems: [TodayItem] {
+        var items: [TodayItem] = []
+        if info.finest != nil { items.append(.finest) }
+        items.append(.puzzles)
+        items.append(.coach)
+        if stage.masterpiece != nil { items.append(.masterpiece) }
+        return items
+    }
+
+    @ViewBuilder
+    private func todayItem(_ item: TodayItem, tile: Bool) -> some View {
+        switch item {
+        case .finest:
+            if let finest = info.finest {
+                HomeAuroraFinestRow(finest: finest, palette: palette, tile: tile) { actions.replay(finest.gameID) }
+            }
+        case .puzzles:
+            HomeAuroraRow(eyebrow: "Puzzles", title: "Sharpen your eye",
+                          detail: tile ? "Tactics at your level" : "Tactics at your level, one after another",
+                          accent: palette.violet, palette: palette, tile: tile, action: actions.puzzles) {
+                HomeAuroraJewel(glyph: Glyphs.fineEye, stone: .amethyst)
+            }
+        case .coach:
+            HomeAuroraRow(eyebrow: "Coach Leo", title: stage.plan?.title ?? "Today's lesson", detail: coachLine,
+                          accent: palette.teal, palette: palette, tile: tile, action: actions.stage.coach) {
+                HomeAuroraJewel(glyph: Glyphs.fineLaurel, stone: .jade)
+            }
+        case .masterpiece:
+            // Analyze is the gold knight, its one button on Home (Alex, 2026-11-08), so it has no
+            // card here. The game of the day, which the board up top plays, opens from its own.
+            if let masterpiece = stage.masterpiece {
+                HomeAuroraRow(eyebrow: "Game of the day", title: masterpiece.title, detail: masterpiece.players,
+                              accent: palette.gold, palette: palette, tile: tile, action: openMasterpiece) {
+                    HomeAuroraBoard(fen: masterpiece.frames.first, flipped: masterpiece.flipped, lit: false)
+                }
             }
         }
     }
@@ -883,52 +968,94 @@ struct HomeRivalFrame: View {
 }
 
 /// A long row for one of today's things: a thin color edge, small caps, a serif title, a line,
-/// and a picture at the right.
+/// and a picture at the right. As a tile (half the width, two by two), the picture sits on top.
 struct HomeAuroraRow<Picture: View>: View {
     let eyebrow: String
     let title: String
     let detail: String
     let accent: Color
     let palette: HomeAuroraPalette
+    var tile: Bool = false
     let action: () -> Void
     @ViewBuilder let picture: () -> Picture
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
         Button(action: action) {
-            HStack(spacing: 14) {
-                Capsule()
-                    .fill(LinearGradient(colors: [accent, accent.opacity(0.2)], startPoint: .top, endPoint: .bottom))
-                    .frame(width: 3)
-                    .padding(.vertical, 4)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(eyebrow.uppercased())
-                        .font(.system(size: 10.5, weight: .bold))
-                        .tracking(1.3)
-                        .foregroundStyle(accent)
-                    Text(title)
-                        .font(.system(size: 19, weight: .regular, design: .serif))
-                        .foregroundStyle(palette.ink)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                    Text(detail)
-                        .font(.system(size: 12.5))
-                        .foregroundStyle(palette.ink2)
-                        .lineLimit(1)
+            Group {
+                if tile {
+                    tileBody
+                } else {
+                    rowBody
                 }
-                Spacer(minLength: 0)
-                picture()
-                    .frame(width: 64, height: 64)
             }
-            .padding(.vertical, 12)
-            .padding(.leading, 14)
-            .padding(.trailing, 12)
-            .frame(maxWidth: .infinity)
             .background(shape.fill(palette.card))
             .overlay(shape.strokeBorder(palette.line, lineWidth: 1))
+            .contentShape(shape)
         }
         .buttonStyle(HomeStagePress())
         .accessibilityElement(children: .combine)
+    }
+
+    private var rowBody: some View {
+        HStack(spacing: 14) {
+            Capsule()
+                .fill(LinearGradient(colors: [accent, accent.opacity(0.2)], startPoint: .top, endPoint: .bottom))
+                .frame(width: 3)
+                .padding(.vertical, 4)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(eyebrow.uppercased())
+                    .font(.system(size: 10.5, weight: .bold))
+                    .tracking(1.3)
+                    .foregroundStyle(accent)
+                Text(title)
+                    .font(.system(size: 19, weight: .regular, design: .serif))
+                    .foregroundStyle(palette.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Text(detail)
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(palette.ink2)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+            picture()
+                .frame(width: 64, height: 64)
+        }
+        .padding(.vertical, 12)
+        .padding(.leading, 14)
+        .padding(.trailing, 12)
+        .frame(maxWidth: .infinity)
+    }
+
+    private var tileBody: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            picture()
+                .frame(width: 56, height: 56)
+                .padding(.bottom, 14)
+            Spacer(minLength: 0)
+            Text(eyebrow.uppercased())
+                .font(.system(size: 9.5, weight: .bold))
+                .tracking(1.2)
+                .foregroundStyle(accent)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Text(title)
+                .font(.system(size: 17, weight: .regular, design: .serif))
+                .foregroundStyle(palette.ink)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 4)
+            Text(detail)
+                .font(.system(size: 12))
+                .foregroundStyle(palette.ink2)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .padding(.top, 3)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 
@@ -996,15 +1123,8 @@ struct HomeAuroraDNA: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(HomeAuroraPalette.goldTile)
-                .overlay {
-                    Image(systemName: dna.style?.symbol ?? "circle.hexagongrid.fill")
-                        .font(.system(size: 26, weight: .semibold))
-                        .foregroundStyle(Color.white)
-                }
+            HomeAuroraJewel(style: dna.style)
                 .frame(width: 64, height: 64)
-                .accessibilityHidden(true)
         }
         .fixedSize(horizontal: false, vertical: true)
     }
@@ -1230,6 +1350,10 @@ struct HomeGrudgeRoom: View {
 /// letters as they would in a real inscription (Alex: "the lines would be inside the letters").
 /// An inner shadow under each top edge, a faint shadowed wall above and a lit lower lip give
 /// the cut its depth; "of" is gold leaf laid in the same cut.
+/// On dark marble a darkened groove went black on black and the name vanished (Alex,
+/// 2026-11-10, "Can't see the beauty of chess"), so there the cut is filled with pale
+/// limestone instead (option B): the fill screens onto the slab, lightening it, and the veins
+/// still run through the letters, brighter than the stone around them. "of" stays gold.
 /// Cinzel Decorative's lowercase h carries a swash crossbar that read as broken, so the H is
 /// plain Cinzel's.
 struct HomeAuroraCarving: View {
@@ -1246,9 +1370,11 @@ struct HomeAuroraCarving: View {
     private var font: Font { .custom(Self.fontName, size: Self.size, relativeTo: .largeTitle) }
     private var plain: Font { .custom(Self.plainFontName, size: Self.size, relativeTo: .largeTitle) }
 
-    /// How much each groove darkens the marble: a warm grey, and gold for "of".
-    private var stone: Color { palette.dark ? Color(hex: 0x8C8781) : Color(hex: 0xDCD2C2) }
-    private var gold: Color { palette.dark ? Color(hex: 0xE0B064) : Color(hex: 0xD9A24A) }
+    /// The floor of each groove: on light marble a warm grey that darkens the stone (multiply),
+    /// on dark marble pale limestone that lightens it (screen). Gold for "of".
+    private var stone: Color { palette.dark ? Color(hex: 0xC9C0B2) : Color(hex: 0xDCD2C2) }
+    private var gold: Color { palette.dark ? Color(hex: 0xD9A856) : Color(hex: 0xD9A24A) }
+    private var floorBlend: BlendMode { palette.dark ? .screen : .multiply }
 
     private func words(_ body: AnyShapeStyle, of: AnyShapeStyle) -> Text {
         Text("Beauty ").font(font).foregroundStyle(body)
@@ -1270,7 +1396,7 @@ struct HomeAuroraCarving: View {
     var body: some View {
         ZStack {
             // The lit lower lip of each cut.
-            words(Color.white.opacity(palette.dark ? 0.1 : 0.9))
+            words(Color.white.opacity(palette.dark ? 0.16 : 0.9))
                 .offset(y: 1.2)
                 .opacity(reveal)
             // The shadowed upper wall, just above.
@@ -1278,10 +1404,10 @@ struct HomeAuroraCarving: View {
                 .offset(y: -0.7)
                 .opacity(reveal)
                 .blendMode(.multiply)
-            // The floor of the cut: it darkens the marble, veins and all.
+            // The floor of the cut: it tints the marble, veins and all.
             words(cut(stone), of: cut(gold))
                 .opacity(reveal)
-                .blendMode(.multiply)
+                .blendMode(floorBlend)
         }
         .tracking(1.5)
         .lineLimit(1)
@@ -1305,6 +1431,80 @@ struct HomeAuroraEmblem: View {
                     .foregroundStyle(Color.white)
             }
             .accessibilityHidden(true)
+    }
+}
+
+/// A fine gold drawing on a deep jewel tile with a thin gold edge (Alex, 2026-11-10: "more
+/// elegant with color", picked Jewel and gold). Puzzles is amethyst, Coach Leo jade, and each
+/// Chess DNA style has its own stone.
+struct HomeAuroraJewel: View {
+    enum Stone {
+        case amethyst, jade, ruby, sapphire, emerald, amber, slate, violet
+
+        /// Top-left to bottom-right.
+        var colors: [Color] {
+            switch self {
+            case .amethyst: return [Color(hex: 0x5B3FB8), Color(hex: 0x2E1F6E)]
+            case .jade: return [Color(hex: 0x1F8A7A), Color(hex: 0x0D4A45)]
+            case .ruby: return [Color(hex: 0xB3283B), Color(hex: 0x5E0F1C)]
+            case .sapphire: return [Color(hex: 0x2B5FB8), Color(hex: 0x13306B)]
+            case .emerald: return [Color(hex: 0x2F8A57), Color(hex: 0x124A2C)]
+            case .amber: return [Color(hex: 0xB8782A), Color(hex: 0x6A3F10)]
+            case .slate: return [Color(hex: 0x4F5B6E), Color(hex: 0x232A36)]
+            case .violet: return [Color(hex: 0x8A3FA8), Color(hex: 0x45185A)]
+            }
+        }
+    }
+
+    let glyph: String
+    let stone: Stone
+
+    init(glyph: String, stone: Stone) {
+        self.glyph = glyph
+        self.stone = stone
+    }
+
+    /// The emblem for a Chess DNA style; before the style is read, the compass on amber.
+    init(style: ChessDNA.Style?) {
+        switch style {
+        case .attacker: self.init(glyph: Glyphs.fineAttacker, stone: .ruby)
+        case .tactician: self.init(glyph: Glyphs.fineTactician, stone: .sapphire)
+        case .counterpuncher: self.init(glyph: Glyphs.fineCounterpuncher, stone: .emerald)
+        case .grinder: self.init(glyph: Glyphs.fineGrinder, stone: .amber)
+        case .builder: self.init(glyph: Glyphs.fineBuilder, stone: .slate)
+        case .allRounder: self.init(glyph: Glyphs.fineAllRounder, stone: .violet)
+        case nil: self.init(glyph: Glyphs.fineAllRounder, stone: .amber)
+        }
+    }
+
+    static let gold = LinearGradient(colors: [Color(hex: 0xF7E2A8), Color(hex: 0xD9AE5C), Color(hex: 0xB07E35)],
+                                     startPoint: .topLeading, endPoint: .bottomTrailing)
+
+    var body: some View {
+        let tile = RoundedRectangle(cornerRadius: 16, style: .continuous)
+        GeometryReader { geo in
+            let side = min(geo.size.width, geo.size.height)
+            tile
+                .fill(LinearGradient(colors: stone.colors, startPoint: .topLeading, endPoint: .bottomTrailing))
+                .overlay {
+                    // A soft sheen from the top left, like light on a cut stone.
+                    tile.fill(RadialGradient(colors: [.white.opacity(0.22), .white.opacity(0)],
+                                             center: UnitPoint(x: 0.3, y: 0.2), startRadius: 0,
+                                             endRadius: side * 0.7))
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: side * 0.22, style: .continuous)
+                        .strokeBorder(Color(hex: 0xE2C27E).opacity(0.7), lineWidth: 0.7)
+                        .padding(side * 0.055)
+                }
+                .overlay {
+                    Glyph(name: glyph, size: side * 0.5625)
+                        .foregroundStyle(Self.gold)
+                }
+                .frame(width: side, height: side)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .accessibilityHidden(true)
     }
 }
 
@@ -1706,6 +1906,8 @@ struct HomeAuroraRings: View {
 struct HomeAuroraTabBar: View {
     let palette: HomeAuroraPalette
     let play: () -> Void
+    /// Home is Today, so its own button goes back to the top of the page.
+    var today: () -> Void = {}
     let learn: () -> Void
     let rooms: () -> Void
     let you: () -> Void
@@ -1713,7 +1915,7 @@ struct HomeAuroraTabBar: View {
     var body: some View {
         HStack(spacing: 12) {
             HStack(spacing: 0) {
-                tab("Today", icon: .today, on: true) {}
+                tab("Today", icon: .today, on: true, action: today)
                 tab("Learn", icon: .learn, on: false, action: learn)
                 tab("Rooms", icon: .rooms, on: false, action: rooms)
                 tab("You", icon: .you, on: false, action: you)
