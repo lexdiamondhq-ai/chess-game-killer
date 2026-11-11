@@ -33,6 +33,8 @@ final class ChallengeCenter {
     var isPresenting: Bool { screen != nil }
 
     let store: ChallengeStore
+    /// Friends by @username: the player's username, their people, and challenges sent to them.
+    let friends: FriendDirectory
     @ObservationIgnored let api: ChallengeAPI
     @ObservationIgnored private let sounds: SoundPlaying?
     @ObservationIgnored private let defaults: UserDefaults
@@ -48,16 +50,19 @@ final class ChallengeCenter {
     /// The list is fetched again at most this often, unless asked.
     static let refreshInterval: TimeInterval = 15
 
-    init(api: ChallengeAPI, store: ChallengeStore, sounds: SoundPlaying?, defaults: UserDefaults = .standard) {
+    init(api: ChallengeAPI, store: ChallengeStore, sounds: SoundPlaying?, defaults: UserDefaults = .standard,
+         friendsAPI: FriendDirectoryAPI? = nil) {
         self.api = api
         self.store = store
+        self.friends = FriendDirectory(api: friendsAPI, defaults: defaults)
         self.sounds = sounds
         self.defaults = defaults
     }
 
     /// The app's: the real server, the friend games saved on this phone and the bundled sounds.
     static func live() -> ChallengeCenter {
-        ChallengeCenter(api: LiveChallengeAPI(), store: .live(), sounds: SoundPlayer.shared)
+        ChallengeCenter(api: LiveChallengeAPI(), store: .live(), sounds: SoundPlayer.shared,
+                        friendsAPI: LiveFriendDirectoryAPI())
     }
 
     // MARK: The player's name
@@ -252,6 +257,10 @@ final class ChallengeComposer {
     private(set) var link: URL? = nil
     private(set) var isCreating = false
     private(set) var problem: String? = nil
+    /// The friend picked by username, if any: the challenge goes straight to them.
+    var recipient: FriendPerson? = nil
+    /// Where sending to `recipient` stands once the challenge exists.
+    private(set) var delivery: Delivery? = nil
     /// The new challenge, live from the start, so a friend joining is seen at once.
     private(set) var game: OnlineGame? = nil
 
@@ -261,8 +270,26 @@ final class ChallengeComposer {
         self.center = center
     }
 
+    enum Delivery: Equatable {
+        case sending(FriendPerson)
+        case sent(FriendPerson)
+        case failed(FriendPerson, String)
+    }
+
     /// The side the friend plays.
     var friendSeat: FriendSeat? { created?.seat.opposite }
+
+    /// Sends the challenge to the picked friend (again, after a failure).
+    func deliver() async {
+        guard let center, let created, let person = recipient else { return }
+        if case .sending? = delivery { return }
+        delivery = .sending(person)
+        if let problem = await center.friends.send(code: created.code, to: person) {
+            delivery = .failed(person, problem)
+        } else {
+            delivery = .sent(person)
+        }
+    }
 
     func create(name: String, clock: FriendClock?, side: SideChoice) async {
         guard !isCreating, created == nil, let center else { return }
@@ -281,6 +308,7 @@ final class ChallengeComposer {
             self.game = game
             link = reply.inviteURL
             created = record
+            if recipient != nil { await deliver() }
         } catch is CancellationError {
         } catch let error as ChallengeError {
             problem = error.message

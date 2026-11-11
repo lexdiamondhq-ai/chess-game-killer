@@ -7,11 +7,14 @@
 // - game.js: the rules, with no Cloudflare in them (most tests are of this).
 // - lobbyroom.js: Lobby, the one Durable Object where players wait to be paired
 //   online; lobby.js holds its rules and the ratings' math.
+// - directory.js: Directory, the one Durable Object that keeps players' @usernames
+//   and the challenges sent to them; friends.js holds its rules.
 
 import { handleRequest } from "./router.js";
 
 export { GameRoom } from "./room.js";
 export { Lobby } from "./lobbyroom.js";
+export { Directory } from "./directory.js";
 
 export default {
   fetch: handleRequest,
