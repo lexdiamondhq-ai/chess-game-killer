@@ -594,19 +594,21 @@ struct RivalWelcome: View {
     @State private var iris: CGFloat = 0
     @State private var titled = false
 
-    private static let gold = Color(hex: 0xE8C27A)
-
     var body: some View {
         GeometryReader { geo in
             let reach = hypot(geo.size.width, geo.size.height)
             ZStack {
+                // In an overlay, clipped, so a filled picture can't widen the screen.
                 Color.black
-                if let player {
-                    RivalFilmLayer(player: player)
-                        .blur(radius: reduceMotion ? 0 : (1 - iris) * 14)
-                } else if let image = film.cardImage {
-                    Image(uiImage: image).resizable().scaledToFill()
-                }
+                    .overlay {
+                        if let player {
+                            RivalFilmLayer(player: player)
+                                .blur(radius: reduceMotion ? 0 : (1 - iris) * 14)
+                        } else if let image = film.cardImage {
+                            Image(uiImage: image).resizable().scaledToFill()
+                        }
+                    }
+                    .clipped()
                 // The torchlight: the dark draws back from the middle.
                 RadialGradient(colors: [.clear, .black],
                                center: UnitPoint(x: 0.5, y: 0.42),
@@ -614,9 +616,13 @@ struct RivalWelcome: View {
                                endRadius: iris * reach * 0.42 + max(1, reach * 0.28))
                     .opacity(1 - Double(iris) * 0.15)
                     .allowsHitTesting(false)
-                LinearGradient(stops: [.init(color: .clear, location: 0.5),
-                                       .init(color: .black.opacity(titled ? 0.85 : 0), location: 1)],
+                // The hall ending's shade, so the words read the same here.
+                LinearGradient(stops: [.init(color: .clear, location: 0.48),
+                                       .init(color: .black.opacity(0.6), location: 0.64),
+                                       .init(color: .black.opacity(0.88), location: 0.78),
+                                       .init(color: .black.opacity(0.96), location: 1)],
                                startPoint: .top, endPoint: .bottom)
+                    .opacity(titled ? 1 : 0)
                     .allowsHitTesting(false)
                 if titled { titleCard.transition(.opacity.combined(with: .offset(y: 18))) }
             }
@@ -625,7 +631,7 @@ struct RivalWelcome: View {
         .ignoresSafeArea()
         .contentShape(Rectangle())
         .onTapGesture { skip() }
-        // No button over the art: a swipe down goes back to the rivals, as does "Not now".
+        // No button over the art: a swipe down goes back to the rivals, as does "Not today".
         .gesture(DragGesture(minimumDistance: 24).onEnded { drag in
             let t = drag.translation
             if t.height > 90, t.height > abs(t.width) * 1.5 { leave() }
@@ -638,52 +644,25 @@ struct RivalWelcome: View {
         .onDisappear { player?.pause() }
     }
 
+    /// The same words as the hall's film ending (Alex, 2026-11-11: "I like this style better"):
+    /// rank between rules, the gold name, the rival's line, Face, and Not today.
     private var titleCard: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 0) {
             Spacer()
-            Text("RANK \(film.numeral)")
-                .font(.system(size: 11, weight: .bold))
-                .tracking(3)
-                .foregroundStyle(Self.gold)
-            Text(film.rival.name.uppercased())
-                .font(.custom(HomeCarvingFont.plain, size: 38, relativeTo: .largeTitle))
-                .tracking(2)
-                .foregroundStyle(.white)
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-                .shadow(color: .black.opacity(0.8), radius: 12)
-            Text(film.title)
-                .font(.system(size: 16, weight: .regular, design: .serif))
-                .italic()
-                .foregroundStyle(.white.opacity(0.75))
-            LinearGradient(colors: [Self.gold.opacity(0), Self.gold.opacity(0.8), Self.gold.opacity(0)],
-                           startPoint: .leading, endPoint: .trailing)
-                .frame(width: 120, height: 1)
-                .padding(.vertical, 6)
-            Button {
-                player?.pause()
-                begin()
-            } label: {
-                Text("Begin")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Color(hex: 0x1C1813))
-                    .frame(width: 220, height: 52)
-                    .background(HomeAuroraPalette.goldButton, in: Capsule())
-                    .shadow(color: Self.gold.opacity(0.4), radius: 16, y: 4)
-            }
-            .buttonStyle(HomeStagePress())
-            .accessibilityHint("Starts the game against \(film.rival.name)")
-            Button("Not now", action: leave)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.white.opacity(0.6))
-                .frame(minHeight: 44)
+            RivalFilmEnding(film: film, open: true,
+                            face: {
+                                player?.pause()
+                                begin()
+                            },
+                            notToday: leave)
         }
-        .padding(.horizontal, 28)
+        .padding(.horizontal, 24)
         .padding(.bottom, 44)
     }
 
     private func play() async {
-        guard let url = film.filmURL else {
+        // Pictured under test on the film's last frame, with the words up.
+        guard let url = film.filmURL, !Welcome.isUnderTest else {
             iris = 1
             titled = true
             return
@@ -694,7 +673,7 @@ struct RivalWelcome: View {
         let player = AVPlayer(url: url)
         player.actionAtItemEnd = .pause
         self.player = player
-        if !Welcome.isUnderTest { player.play() }
+        player.play()
         withAnimation(reduceMotion ? .easeOut(duration: 0.4) : .easeOut(duration: 1.8)) { iris = 1 }
         // The name and Begin rise at the rival's moment, a few seconds in, and the film plays on
         // beneath them to its end (Alex, 2026-11-11: waiting the whole film "takes too long").
