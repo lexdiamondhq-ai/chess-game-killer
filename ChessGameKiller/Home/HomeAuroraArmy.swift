@@ -19,26 +19,33 @@ struct HomeAuroraArmy: View {
 
     static let nameFont = "Cinzel-Bold"
 
-    @ViewBuilder
     var body: some View {
         let champion: ArmySlot? = army.champion
         let quest: ArmyQuest? = ArmyQuest.of(army, next: nextRival)
         // Not one big button: the quest's own button sits inside it, and a button inside a
         // button's label is not reliable. A tap anywhere else opens the army.
-        let card = content(champion: champion, quest: quest)
-            .onTapGesture(perform: open)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Your army")
-            .accessibilityValue(spoken(champion: champion, quest: quest))
-            .accessibilityHint("Opens your army")
-            .accessibilityAddTraits(.isButton)
-            .accessibilityAction(perform: open)
-        if let quest {
-            let words: String = quest.button(army)
-            card.accessibilityAction(named: Text(words)) { play(quest.rival) }
-        } else {
-            card
+        return spoken(content(champion: champion, quest: quest), champion: champion, quest: quest)
+    }
+
+    /// VoiceOver hears the card as one button that opens the army, with the quest as an action.
+    private func spoken(_ card: some View, champion: ArmySlot?, quest: ArmyQuest?) -> some View {
+        let value: String = spoken(champion: champion, quest: quest)
+        let questWords: String = quest.map { $0.button(army) } ?? "Open your army"
+        let questRival: MatchController.Level? = quest?.rival
+        let tapped: () -> Void = open
+        let played: (MatchController.Level) -> Void = play
+        let questAction: () -> Void = {
+            if let questRival { played(questRival) } else { tapped() }
         }
+        return card
+            .onTapGesture(perform: tapped)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text("Your army"))
+            .accessibilityValue(Text(value))
+            .accessibilityHint(Text("Opens your army"))
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction(.default, tapped)
+            .accessibilityAction(named: Text(questWords), questAction)
     }
 
     private func content(champion: ArmySlot?, quest: ArmyQuest?) -> some View {
