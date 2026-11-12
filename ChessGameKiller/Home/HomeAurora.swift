@@ -366,11 +366,7 @@ struct HomeAuroraView: View {
             }
             // Your army under your Chess DNA (Alex, 2026-11-12: make the Army stand out on Home,
             // "A and C together"): the champion big, and today's job for the army.
-            HomeAuroraSection(title: "Your army", palette: palette, note: armyNote)
-            HomeAuroraArmy(army: army, color: info.stage.upNext.playerColor, pieceTheme: info.stage.pieceTheme,
-                           nextRival: info.stage.upNext.level, palette: palette,
-                           open: actions.army, play: actions.armyQuest)
-                .padding(.horizontal, 16)
+            armySection
             HomeAuroraSection(title: "For today", palette: palette, note: gamesNote)
             VStack(spacing: 10) {
                 todayRows
@@ -388,6 +384,18 @@ struct HomeAuroraView: View {
                 }
                 .shadow(color: .black.opacity(palette.dark ? 0.5 : 0.1), radius: 30, y: -10)
                 .ignoresSafeArea(edges: .bottom)
+        }
+    }
+
+    /// Your army: the champion big and the army's job for today.
+    private var armySection: some View {
+        let upNext: HomeUpNext = info.stage.upNext
+        let card = HomeAuroraArmy(army: army, color: upNext.playerColor, pieceTheme: info.stage.pieceTheme,
+                                  nextRival: upNext.level, palette: palette,
+                                  open: actions.army, play: actions.armyQuest)
+        return VStack(spacing: 0) {
+            HomeAuroraSection(title: "Your army", palette: palette, note: armyNote)
+            card.padding(.horizontal, 16)
         }
     }
 

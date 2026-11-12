@@ -19,13 +19,31 @@ struct HomeAuroraArmy: View {
 
     static let nameFont = "Cinzel-Bold"
 
+    @ViewBuilder
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
         let champion: ArmySlot? = army.champion
         let quest: ArmyQuest? = ArmyQuest.of(army, next: nextRival)
         // Not one big button: the quest's own button sits inside it, and a button inside a
         // button's label is not reliable. A tap anywhere else opens the army.
-        VStack(alignment: .leading, spacing: 14) {
+        let card = content(champion: champion, quest: quest)
+            .onTapGesture(perform: open)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Your army")
+            .accessibilityValue(spoken(champion: champion, quest: quest))
+            .accessibilityHint("Opens your army")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction(perform: open)
+        if let quest {
+            let words: String = quest.button(army)
+            card.accessibilityAction(named: Text(words)) { play(quest.rival) }
+        } else {
+            card
+        }
+    }
+
+    private func content(champion: ArmySlot?, quest: ArmyQuest?) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+        return VStack(alignment: .leading, spacing: 14) {
             if let champion {
                 hero(champion)
             } else {
@@ -44,66 +62,70 @@ struct HomeAuroraArmy: View {
         .background(shape.fill(palette.card))
         .overlay(shape.strokeBorder(palette.line, lineWidth: 1))
         .contentShape(shape)
-        .onTapGesture(perform: open)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Your army")
-        .accessibilityValue(spoken(champion: champion, quest: quest))
-        .accessibilityHint("Opens your army")
-        .accessibilityAddTraits(.isButton)
-        .accessibilityAction(perform: open)
-        .accessibilityActions {
-            if let quest {
-                Button(quest.button(army)) { play(quest.rival) }
-            }
-        }
     }
 
     // MARK: The champion
 
     private func hero(_ slot: ArmySlot) -> some View {
-        let record = army.record(for: slot)
-        let piece = Piece(slot.kind, color: color, square: slot.square(for: color))
-        let legend: Bool = record.rank == .legend
-        return HStack(alignment: .center, spacing: 14) {
-            ZStack(alignment: .bottom) {
-                // The stone base it stands on.
-                Ellipse()
-                    .fill(LinearGradient(colors: [Color(hex: 0x6A5D51), Color(hex: 0x2E2621)],
-                                         startPoint: .top, endPoint: .bottom))
-                    .overlay(Ellipse().strokeBorder(Color.white.opacity(0.12), lineWidth: 0.75))
-                    .frame(width: 78, height: 16)
-                    .shadow(color: palette.shadow, radius: 5, y: 4)
-                PieceImage(piece: piece, theme: pieceTheme, size: 72, heirloom: army.heirloom(for: slot))
-                    .modifier(VeteranAura(rank: record.rank, piece: piece, theme: pieceTheme, size: 72, onBoard: false))
-                    .frame(width: 72, height: 72)
-                    .padding(.bottom, 7)
-            }
-            .frame(width: 84, height: 88)
-            VStack(alignment: .leading, spacing: 5) {
-                Text("YOUR CHAMPION")
-                    .font(.system(size: 10.5, weight: .bold))
-                    .tracking(1.3)
-                    .foregroundStyle(palette.gold)
-                Text(record.name ?? slot.title)
-                    .font(.custom(Self.nameFont, size: record.name == nil ? 18 : 24))
-                    .foregroundStyle(legend ? palette.gold : palette.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                Text(record.name == nil ? record.rank.title.uppercased()
-                                        : "\(record.rank.title.uppercased()) · \(slot.title.uppercased())")
-                    .font(.system(size: 10.5, weight: .semibold))
-                    .tracking(0.6)
-                    .foregroundStyle(palette.ink2)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                rankBar(slot, record: record)
-                Text(army.deeds(of: slot).joined(separator: " · "))
-                    .font(.system(size: 12.5))
-                    .foregroundStyle(palette.ink)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+        HStack(alignment: .center, spacing: 14) {
+            plinth(slot)
+            heroWords(slot)
             Spacer(minLength: 0)
+        }
+    }
+
+    /// The champion big, on the stone base it stands on.
+    private func plinth(_ slot: ArmySlot) -> some View {
+        let rank: ArmyRank = army.record(for: slot).rank
+        let piece = Piece(slot.kind, color: color, square: slot.square(for: color))
+        let stone = LinearGradient(colors: [Color(hex: 0x6A5D51), Color(hex: 0x2E2621)],
+                                   startPoint: .top, endPoint: .bottom)
+        let base = Ellipse()
+            .fill(stone)
+            .overlay(Ellipse().strokeBorder(Color.white.opacity(0.12), lineWidth: 0.75))
+            .frame(width: 78, height: 16)
+            .shadow(color: palette.shadow, radius: 5, y: 4)
+        let figure = PieceImage(piece: piece, theme: pieceTheme, size: 72, heirloom: army.heirloom(for: slot))
+            .modifier(VeteranAura(rank: rank, piece: piece, theme: pieceTheme, size: 72, onBoard: false))
+            .frame(width: 72, height: 72)
+            .padding(.bottom, 7)
+        return ZStack(alignment: .bottom) {
+            base
+            figure
+        }
+        .frame(width: 84, height: 88)
+    }
+
+    /// Its name carved in Cinzel (gold for a Legend), its rank and place, the next rank and its deeds.
+    private func heroWords(_ slot: ArmySlot) -> some View {
+        let record: PieceRecord = army.record(for: slot)
+        let named: Bool = record.name != nil
+        let nameColor: Color = record.rank == .legend ? palette.gold : palette.ink
+        let rankWords: String = named ? "\(record.rank.title.uppercased()) · \(slot.title.uppercased())"
+                                      : record.rank.title.uppercased()
+        let deeds: String = army.deeds(of: slot).joined(separator: " · ")
+        return VStack(alignment: .leading, spacing: 5) {
+            Text("YOUR CHAMPION")
+                .font(.system(size: 10.5, weight: .bold))
+                .tracking(1.3)
+                .foregroundStyle(palette.gold)
+            Text(record.name ?? slot.title)
+                .font(.custom(Self.nameFont, size: named ? 24 : 18))
+                .foregroundStyle(nameColor)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            Text(rankWords)
+                .font(.system(size: 10.5, weight: .semibold))
+                .tracking(0.6)
+                .foregroundStyle(palette.ink2)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            rankBar(slot, record: record)
+            Text(deeds)
+                .font(.system(size: 12.5))
+                .foregroundStyle(palette.ink)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -137,9 +159,11 @@ struct HomeAuroraArmy: View {
     // MARK: The quest
 
     private func questRow(_ quest: ArmyQuest) -> some View {
-        HStack(alignment: .center, spacing: 12) {
+        let edge = LinearGradient(colors: [palette.gold, palette.gold.opacity(0.2)], startPoint: .top, endPoint: .bottom)
+        let wash: Color = palette.gold.opacity(palette.dark ? 0.07 : 0.08)
+        return HStack(alignment: .center, spacing: 12) {
             Capsule()
-                .fill(LinearGradient(colors: [palette.gold, palette.gold.opacity(0.2)], startPoint: .top, endPoint: .bottom))
+                .fill(edge)
                 .frame(width: 3)
                 .padding(.vertical, 2)
             Text(quest.line(army))
@@ -147,30 +171,37 @@ struct HomeAuroraArmy: View {
                 .foregroundStyle(palette.ink)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Button {
-                play(quest.rival)
-            } label: {
-                HStack(spacing: 6) {
-                    Text(quest.button(army))
-                        .font(.system(size: 13, weight: .bold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 11, weight: .bold))
-                }
-                .foregroundStyle(Color(hex: 0x2A1E0F))
-                .padding(.horizontal, 12)
-                .frame(height: 32)
-                .background(Capsule().fill(HomeAuroraPalette.goldButton))
-                .contentShape(Capsule().inset(by: -6))
-            }
-            .buttonStyle(HomeStagePress())
-            .fixedSize()
+            questButton(quest)
         }
         .fixedSize(horizontal: false, vertical: true)
         .padding(.vertical, 10)
         .padding(.horizontal, 12)
-        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(palette.gold.opacity(palette.dark ? 0.07 : 0.08)))
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(wash))
+    }
+
+    /// The gold button that plays the quest's rival.
+    private func questButton(_ quest: ArmyQuest) -> some View {
+        let words: String = quest.button(army)
+        let rival: MatchController.Level = quest.rival
+        return Button {
+            play(rival)
+        } label: {
+            HStack(spacing: 6) {
+                Text(words)
+                    .font(.system(size: 13, weight: .bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 11, weight: .bold))
+            }
+            .foregroundStyle(Color(hex: 0x2A1E0F))
+            .padding(.horizontal, 12)
+            .frame(height: 32)
+            .background(Capsule().fill(HomeAuroraPalette.goldButton))
+            .contentShape(Capsule().inset(by: -6))
+        }
+        .buttonStyle(HomeStagePress())
+        .fixedSize()
     }
 
     // MARK: The rest of the army
@@ -208,13 +239,16 @@ struct HomeAuroraArmy: View {
                 .frame(width: size, height: size)
         } else {
             let piece = Piece(slot.kind, color: color, square: slot.square(for: color))
+            let legend: Bool = rank == .legend
+            let lineWidth: CGFloat = size * (legend ? 0.55 : 0.32)
+            let lineColor: Color = palette.gold.opacity(legend ? 1 : 0.7)
             PieceImage(piece: piece, theme: pieceTheme, size: size)
                 .frame(width: size, height: size)
                 .overlay(alignment: .bottom) {
                     if rank >= .veteran {
                         Capsule()
-                            .fill(palette.gold.opacity(rank == .legend ? 1 : 0.7))
-                            .frame(width: size * (rank == .legend ? 0.55 : 0.32), height: 1.5)
+                            .fill(lineColor)
+                            .frame(width: lineWidth, height: 1.5)
                             .offset(y: 3)
                     }
                 }
