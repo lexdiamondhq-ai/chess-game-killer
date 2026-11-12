@@ -253,6 +253,21 @@ final class SculptedBoardTests: XCTestCase {
         XCTAssertFalse(scene.litFromAbove)
     }
 
+    /// A floating board (the King's hall) has no frame and throws no shadow behind itself;
+    /// every other board keeps both.
+    func testAFloatingBoardHasNothingAroundItsSquares() {
+        let scene = SculptedBoardScene()
+        let framed = SculptedBoardState(pieces: Self.startPieces)
+        var floating = framed
+        floating.floating = true
+        scene.apply(framed, animated: false)
+        XCTAssertTrue(scene.showsSurround)
+        scene.apply(floating, animated: false)
+        XCTAssertFalse(scene.showsSurround)
+        scene.apply(framed, animated: false)
+        XCTAssertTrue(scene.showsSurround)
+    }
+
     func testTheFlatBoardFillsItsViewAndStaysInside() {
         let framing = SculptedCamera.Framing.seated
         for flipped in [false, true] {
