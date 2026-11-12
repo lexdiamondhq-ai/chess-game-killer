@@ -24,11 +24,11 @@ struct HomeAuroraArmy: View {
         let quest: ArmyQuest? = ArmyQuest.of(army, next: nextRival)
         // Not one big button: the quest's own button sits inside it, and a button inside a
         // button's label is not reliable. A tap anywhere else opens the army.
-        return spoken(content(champion: champion, quest: quest), champion: champion, quest: quest)
+        return asOneButton(content(champion: champion, quest: quest), champion: champion, quest: quest)
     }
 
     /// VoiceOver hears the card as one button that opens the army, with the quest as an action.
-    private func spoken(_ card: some View, champion: ArmySlot?, quest: ArmyQuest?) -> some View {
+    private func asOneButton(_ card: some View, champion: ArmySlot?, quest: ArmyQuest?) -> some View {
         let value: String = spoken(champion: champion, quest: quest)
         let questWords: String = quest.map { $0.button(army) } ?? "Open your army"
         let questRival: MatchController.Level? = quest?.rival
