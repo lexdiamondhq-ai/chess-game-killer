@@ -36,6 +36,10 @@ struct HomeAuroraActions {
     var puzzles: () -> Void = {}
     /// Opens one of your finished games in Rewind.
     var replay: (UUID) -> Void = { _ in }
+    /// Opens your army.
+    var army: () -> Void = {}
+    /// Plays the rival the army's quest names (to free a piece, or to help one rank up).
+    var armyQuest: (MatchController.Level) -> Void = { _ in }
 }
 
 /// Aurora's colors, night and day.
@@ -80,6 +84,7 @@ struct HomeAuroraView: View {
     let actions: HomeAuroraActions
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(ArmyStore.self) private var army
     @AppStorage("haptics") private var hapticsOn = true
     @State private var music = HomeMusic.shared
     @State private var boardStage = SculptedStage()
@@ -359,6 +364,9 @@ struct HomeAuroraView: View {
                 HomeAuroraDNA(dna: dna, palette: palette, action: actions.chessDNA)
                     .padding(.horizontal, 16)
             }
+            // Your army under your Chess DNA (Alex, 2026-11-12: make the Army stand out on Home,
+            // "A and C together"): the champion big, and today's job for the army.
+            armySection
             HomeAuroraSection(title: "For today", palette: palette, note: gamesNote)
             VStack(spacing: 10) {
                 todayRows
@@ -377,6 +385,25 @@ struct HomeAuroraView: View {
                 .shadow(color: .black.opacity(palette.dark ? 0.5 : 0.1), radius: 30, y: -10)
                 .ignoresSafeArea(edges: .bottom)
         }
+    }
+
+    /// Your army: the champion big and the army's job for today.
+    private var armySection: some View {
+        let upNext: HomeUpNext = info.stage.upNext
+        let card = HomeAuroraArmy(army: army, color: upNext.playerColor, pieceTheme: info.stage.pieceTheme,
+                                  nextRival: upNext.level, palette: palette,
+                                  open: actions.army, play: actions.armyQuest)
+        return VStack(spacing: 0) {
+            HomeAuroraSection(title: "Your army", palette: palette, note: armyNote)
+            card.padding(.horizontal, 16)
+        }
+    }
+
+    /// How long the army has been together, once it has played.
+    private var armyNote: String? {
+        let games: Int = army.gamesPlayed
+        guard games > 0 else { return nil }
+        return games == 1 ? "1 game together" : "\(games) games together"
     }
 
     private var gamesNote: String? {

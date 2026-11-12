@@ -747,7 +747,7 @@ extension HomeView {
             hall = HallVisit(start: level, intro: false)
         }, chessDNA: actions.chessDNA, puzzles: actions.puzzles, replay: { id in
             if let game = vault.game(id) { actions.openGame(game) }
-        })
+        }, army: actions.army, armyQuest: { level in playOtherRival(level) })
         return HomeAuroraView(tone: tone, info: auroraInfo, actions: auroraActions)
             .task {
                 // Keeps whose move it is in games with people, and how many wait online, up to
