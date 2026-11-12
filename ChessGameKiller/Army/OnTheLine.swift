@@ -7,7 +7,7 @@ import Foundation
 /// A rival holds one prisoner at most, so while it holds one nothing can be staked
 /// against it: the next game there is the rescue. The king is never staked, nor a
 /// piece another rival is holding. Hints on the board rule a stake out (New Game asks
-/// for Grades or Just play).
+/// for hints off).
 extension ArmyStore {
     /// The rival holding this piece, if one is.
     func captor(of slot: ArmySlot) -> MatchController.Level? {
