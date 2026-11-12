@@ -1,12 +1,13 @@
 import ChessKit
 import SwiftUI
 
-/// Your army on the Aurora home (Alex's pick, 2026-11-12: "A and C together"). The champion, your
-/// most experienced piece, stands big on a stone base with its name carved in Cinzel (gold once
-/// it is a Legend), its rank, how close the next rank is and what it has done. Under it, the
-/// army's job for today: free a piece a rival holds, or help one piece to its next rank, with a
-/// button that plays that rival. The other pieces line up small at the foot. Nothing glows
-/// (Alex, 2026-11-11). A tap anywhere else opens the army.
+/// Your army at the foot of the Aurora home, as a wide banner (Alex's picks, 2026-11-12: "A and C
+/// together", then "move the Army to the bottom and change the format to more of a rectangle").
+/// The champion, your most experienced piece, stands on a stone base beside its name carved in
+/// Cinzel (gold once it is a Legend), its rank and a fine gold line to the next rank. Along the
+/// bottom, the army's job for today: free a piece a rival holds, or help one piece to its next
+/// rank, with a button that plays that rival. Nothing glows (Alex, 2026-11-11). A tap anywhere
+/// else opens the army, where all sixteen pieces are.
 struct HomeAuroraArmy: View {
     let army: ArmyStore
     let color: Piece.Color
@@ -50,23 +51,25 @@ struct HomeAuroraArmy: View {
 
     private func content(champion: ArmySlot?, quest: ArmyQuest?) -> some View {
         let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
-        return VStack(alignment: .leading, spacing: 14) {
+        return VStack(alignment: .leading, spacing: 0) {
             if let champion {
                 hero(champion)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
             } else {
                 Text("Sixteen pieces, each remembers its games. Play a rival and they start earning names.")
                     .font(.system(size: 13))
                     .foregroundStyle(palette.ink2)
                     .fixedSize(horizontal: false, vertical: true)
+                    .padding(14)
             }
             if let quest {
-                questRow(quest)
+                questStrip(quest)
             }
-            formation(champion: champion)
         }
-        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(shape.fill(palette.card))
+        .clipShape(shape)
         .overlay(shape.strokeBorder(palette.line, lineWidth: 1))
         .contentShape(shape)
     }
@@ -90,100 +93,90 @@ struct HomeAuroraArmy: View {
         let base = Ellipse()
             .fill(stone)
             .overlay(Ellipse().strokeBorder(Color.white.opacity(0.12), lineWidth: 0.75))
-            .frame(width: 78, height: 16)
+            .frame(width: 70, height: 14)
             .shadow(color: palette.shadow, radius: 5, y: 4)
-        let figure = PieceImage(piece: piece, theme: pieceTheme, size: 72, heirloom: army.heirloom(for: slot))
-            .modifier(VeteranAura(rank: rank, piece: piece, theme: pieceTheme, size: 72, onBoard: false))
-            .frame(width: 72, height: 72)
-            .padding(.bottom, 7)
+        let figure = PieceImage(piece: piece, theme: pieceTheme, size: 64, heirloom: army.heirloom(for: slot))
+            .modifier(VeteranAura(rank: rank, piece: piece, theme: pieceTheme, size: 64, onBoard: false))
+            .frame(width: 64, height: 64)
+            .padding(.bottom, 6)
         return ZStack(alignment: .bottom) {
             base
             figure
         }
-        .frame(width: 84, height: 88)
+        .frame(width: 74, height: 78)
     }
 
-    /// Its name carved in Cinzel (gold for a Legend), its rank and place, the next rank and its deeds.
+    /// Its name carved in Cinzel (gold for a Legend), its rank, place and the XP to its next
+    /// rank on one line, and a fine gold line filled as far as it has come.
     private func heroWords(_ slot: ArmySlot) -> some View {
         let record: PieceRecord = army.record(for: slot)
         let named: Bool = record.name != nil
         let nameColor: Color = record.rank == .legend ? palette.gold : palette.ink
-        let rankWords: String = named ? "\(record.rank.title.uppercased()) · \(slot.title.uppercased())"
-                                      : record.rank.title.uppercased()
-        let deeds: String = army.deeds(of: slot).joined(separator: " · ")
-        return VStack(alignment: .leading, spacing: 5) {
+        var parts: [String] = [record.rank.title]
+        if named { parts.append(slot.title) }
+        if let next = record.rank.next {
+            parts.append("\(next.threshold - record.xp) XP to \(next.title)")
+        } else {
+            parts.append("\(record.xp) XP")
+        }
+        let rankWords: String = parts.joined(separator: " · ").uppercased()
+        return VStack(alignment: .leading, spacing: 4) {
             Text("YOUR CHAMPION")
                 .font(.system(size: 10.5, weight: .bold))
                 .tracking(1.3)
                 .foregroundStyle(palette.gold)
             Text(record.name ?? slot.title)
-                .font(.custom(Self.nameFont, size: named ? 24 : 18))
+                .font(.custom(Self.nameFont, size: named ? 23 : 18))
                 .foregroundStyle(nameColor)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
             Text(rankWords)
-                .font(.system(size: 10.5, weight: .semibold))
-                .tracking(0.6)
+                .font(.system(size: 10, weight: .semibold))
+                .tracking(0.5)
                 .foregroundStyle(palette.ink2)
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
-            rankBar(slot, record: record)
-            Text(deeds)
-                .font(.system(size: 12.5))
-                .foregroundStyle(palette.ink)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
+                .minimumScaleFactor(0.7)
+            rankBar(army.rankProgress(of: slot))
+                .padding(.top, 4)
         }
     }
 
-    /// A fine gold line filled as far as the piece has come toward its next rank.
-    private func rankBar(_ slot: ArmySlot, record: PieceRecord) -> some View {
-        let progress: Double = army.rankProgress(of: slot)
-        let words: String
-        if let next = record.rank.next {
-            words = "\(next.threshold - record.xp) XP to \(next.title)"
-        } else {
-            words = "\(record.xp) XP"
-        }
-        return VStack(alignment: .leading, spacing: 4) {
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(palette.line)
-                    Capsule()
-                        .fill(LinearGradient(colors: [palette.gold.opacity(0.45), palette.gold],
-                                             startPoint: .leading, endPoint: .trailing))
-                        .frame(width: max(3, geo.size.width * progress))
-                }
+    private func rankBar(_ progress: Double) -> some View {
+        let fill = LinearGradient(colors: [palette.gold.opacity(0.45), palette.gold],
+                                  startPoint: .leading, endPoint: .trailing)
+        return GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(palette.line)
+                Capsule()
+                    .fill(fill)
+                    .frame(width: max(3, geo.size.width * progress))
             }
-            .frame(height: 3)
-            Text(words)
-                .font(.system(size: 11).monospacedDigit())
-                .foregroundStyle(palette.ink2)
         }
-        .padding(.vertical, 2)
+        .frame(height: 3)
     }
 
     // MARK: The quest
 
-    private func questRow(_ quest: ArmyQuest) -> some View {
-        let edge = LinearGradient(colors: [palette.gold, palette.gold.opacity(0.2)], startPoint: .top, endPoint: .bottom)
-        let wash: Color = palette.gold.opacity(palette.dark ? 0.07 : 0.08)
+    /// The strip along the banner's foot: the quest in words, and its gold button.
+    private func questStrip(_ quest: ArmyQuest) -> some View {
+        let wash: Color = palette.gold.opacity(palette.dark ? 0.06 : 0.07)
         return HStack(alignment: .center, spacing: 12) {
-            Capsule()
-                .fill(edge)
-                .frame(width: 3)
-                .padding(.vertical, 2)
             Text(quest.line(army))
-                .font(.system(size: 13.5))
+                .font(.system(size: 12.5))
                 .foregroundStyle(palette.ink)
+                .lineLimit(3)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
             questButton(quest)
         }
-        .fixedSize(horizontal: false, vertical: true)
-        .padding(.vertical, 10)
-        .padding(.horizontal, 12)
-        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(wash))
+        .padding(.leading, 14)
+        .padding(.trailing, 12)
+        .padding(.vertical, 9)
+        .frame(minHeight: 48)
+        .background(wash)
+        .overlay(alignment: .top) {
+            Rectangle().fill(palette.line).frame(height: 1)
+        }
     }
 
     /// The gold button that plays the quest's rival.
@@ -210,59 +203,6 @@ struct HomeAuroraArmy: View {
         .buttonStyle(HomeStagePress())
         .fixedSize()
     }
-
-    // MARK: The rest of the army
-
-    /// Pawns in front, the pieces behind them, as they start. The champion's own place stands
-    /// faint (it is up above), a piece a rival holds is an empty dashed ring, and a fine gold
-    /// line sits under each Veteran and up, longer under a Legend.
-    private func formation(champion: ArmySlot?) -> some View {
-        let pawns: [ArmySlot] = ArmySlot.allCases.filter(\.isPawn)
-        let pieces: [ArmySlot] = ArmySlot.allCases.filter { !$0.isPawn }
-        return VStack(spacing: 4) {
-            row(pawns, size: 20, champion: champion)
-            row(pieces, size: 25, champion: champion)
-        }
-        .frame(maxWidth: .infinity)
-        .environment(\.layoutDirection, .leftToRight)
-    }
-
-    private func row(_ slots: [ArmySlot], size: CGFloat, champion: ArmySlot?) -> some View {
-        HStack(spacing: 0) {
-            ForEach(slots) { slot in
-                soldier(slot, size: size, champion: slot == champion)
-                    .frame(maxWidth: .infinity)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func soldier(_ slot: ArmySlot, size: CGFloat, champion: Bool) -> some View {
-        let rank: ArmyRank = army.record(for: slot).rank
-        if army.captor(of: slot) != nil {
-            Circle()
-                .strokeBorder(palette.gold.opacity(0.7), style: StrokeStyle(lineWidth: 1, dash: [2.5, 2.5]))
-                .frame(width: size * 0.7, height: size * 0.7)
-                .frame(width: size, height: size)
-        } else {
-            let piece = Piece(slot.kind, color: color, square: slot.square(for: color))
-            let legend: Bool = rank == .legend
-            let lineWidth: CGFloat = size * (legend ? 0.55 : 0.32)
-            let lineColor: Color = palette.gold.opacity(legend ? 1 : 0.7)
-            PieceImage(piece: piece, theme: pieceTheme, size: size)
-                .frame(width: size, height: size)
-                .overlay(alignment: .bottom) {
-                    if rank >= .veteran {
-                        Capsule()
-                            .fill(lineColor)
-                            .frame(width: lineWidth, height: 1.5)
-                            .offset(y: 3)
-                    }
-                }
-                .opacity(champion ? 0.28 : 1)
-        }
-    }
-
     // MARK: VoiceOver
 
     private func spoken(champion: ArmySlot?, quest: ArmyQuest?) -> String {
