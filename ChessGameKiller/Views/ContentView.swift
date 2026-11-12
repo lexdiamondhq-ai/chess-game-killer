@@ -23,6 +23,8 @@ struct ContentView: View {
     @State private var coachExpanded = false
     @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .gilded
     @AppStorage("showBestMoves") private var showBestMoves = false
+    /// Hints switched off in the New Game box: the Hints button stays off the dock too.
+    @AppStorage("hintsHidden") private var hintsHidden = false
     @AppStorage("showSecondBest") private var showSecondBest = true
     @AppStorage("coachVerdicts") private var showVerdicts = true
     @AppStorage("haptics") private var hapticsOn = true
@@ -222,7 +224,11 @@ struct ContentView: View {
                 SoundPlayer.shared.playWelcome()
                 await StockfishEngine.shared.warmUp()
             }
-            .onChange(of: showBestMoves) { _, _ in syncCoachSettings() }
+            .onChange(of: showBestMoves) { _, on in
+                // Hints turned back on anywhere (Settings) bring the button back for good.
+                if on { hintsHidden = false }
+                syncCoachSettings()
+            }
             .onChange(of: showSecondBest) { _, _ in syncCoachSettings() }
             .onChange(of: showVerdicts) { _, _ in syncCoachSettings() }
             .onChange(of: showingNewGame) { _, showing in
@@ -941,9 +947,12 @@ struct ContentView: View {
                         withAnimation(.snappy(duration: 0.22)) { match.undo() }
                     }
                     .disabled(!match.canUndo)
-                    DockButton(title: "Hints", symbol: showBestMoves ? Glyphs.hints : Glyphs.hintsOff,
-                               isOn: showBestMoves, theme: theme) {
-                        showBestMoves.toggle()
+                    // Off in the New Game box means off: no button to peek with (Alex, 2026-11-12).
+                    if !hintsHidden {
+                        DockButton(title: "Hints", symbol: showBestMoves ? Glyphs.hints : Glyphs.hintsOff,
+                                   isOn: showBestMoves, theme: theme) {
+                            showBestMoves.toggle()
+                        }
                     }
                     DockButton(title: "Flip", symbol: Glyphs.flip, theme: theme) {
                         withAnimation(.snappy) { match.flipBoard() }

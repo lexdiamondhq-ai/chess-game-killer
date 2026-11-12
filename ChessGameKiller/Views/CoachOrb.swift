@@ -418,6 +418,8 @@ private struct CoachPanel: View {
     let collapse: () -> Void
 
     @AppStorage("showBestMoves") private var showBestMoves = false
+    /// Hints switched off in the New Game box: no Hints button and no picks to open.
+    @AppStorage("hintsHidden") private var hintsHidden = false
     @Environment(GameCoach.self) private var gameCoach: GameCoach?
     @Environment(TrainingStore.self) private var training: TrainingStore?
     @Environment(ArmyStore.self) private var army: ArmyStore?
@@ -618,7 +620,9 @@ private struct CoachPanel: View {
                     }
                     .padding(.top, 12)
                 }
-                bestMoves.padding(.top, 12)
+                if !hintsHidden {
+                    bestMoves.padding(.top, 12)
+                }
             }
         }
     }
@@ -734,8 +738,10 @@ private struct CoachPanel: View {
                 withAnimation(.snappy(duration: 0.22)) { match.undo() }
             }
             .disabled(!match.canUndo)
-            ActionButton(title: "Hints", symbol: showBestMoves ? Glyphs.hints : Glyphs.hintsOff, isOn: showBestMoves, theme: theme) {
-                showBestMoves.toggle()
+            if !hintsHidden {
+                ActionButton(title: "Hints", symbol: showBestMoves ? Glyphs.hints : Glyphs.hintsOff, isOn: showBestMoves, theme: theme) {
+                    showBestMoves.toggle()
+                }
             }
             if gameCoach != nil {
                 ThinkActionButton(match: match, theme: theme)
