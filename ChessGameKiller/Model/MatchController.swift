@@ -1149,7 +1149,8 @@ final class MatchController {
         } else if move.isCastle {
             sounds.play(.castle, after: landing)
         } else {
-            sounds.play(.move, after: landing)
+            // A timed game is heard with its clock: the piece lands, then the clock is pressed.
+            sounds.play(clock == nil ? .move : .clockMove, after: landing)
         }
         if game.isGameOver {
             playEndSound(winner: game.winner, after: game.isCheckmate ? finaleDelay(move) : landing + 0.35)
