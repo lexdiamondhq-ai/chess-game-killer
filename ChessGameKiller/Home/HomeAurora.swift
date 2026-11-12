@@ -653,7 +653,8 @@ struct HomeAuroraView: View {
             today
         } else {
             let ids: [String] = games.map(\.id) + ["today"]
-            let shown: String = todayShown ?? ids[0]
+            // A game that left the list while its card was showing lights no dash: the first card does.
+            let shown: String = todayShown.flatMap { ids.contains($0) ? $0 : nil } ?? ids[0]
             VStack(spacing: 12) {
                 ScrollView(.horizontal) {
                     HStack(alignment: .top, spacing: 16) {
@@ -1939,6 +1940,8 @@ struct HomeAuroraTabBar: View {
     let learn: () -> Void
     let rooms: () -> Void
     let you: () -> Void
+    /// A finger is on the gold knight: it gives a little, like every other button here.
+    @State private var knightPressed = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -1982,8 +1985,15 @@ struct HomeAuroraTabBar: View {
                     .overlay(Circle().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
                     .shadow(color: .black.opacity(palette.dark ? 0.5 : 0.18), radius: 14, y: 8)
                     .contentShape(Circle())
+                    // The app's main button answered a touch with nothing until the finger
+                    // lifted (audit, 2026-11-12): it now sinks a touch while pressed.
+                    .scaleEffect(knightPressed ? 0.94 : 1)
+                    .brightness(knightPressed ? -0.04 : 0)
+                    .animation(.spring(response: 0.25, dampingFraction: 0.7), value: knightPressed)
                     .onTapGesture(perform: play)
-                    .onLongPressGesture(minimumDuration: 0.35, perform: rooms)
+                    .onLongPressGesture(minimumDuration: 0.35, perform: rooms) { pressing in
+                        knightPressed = pressing
+                    }
                     .accessibilityElement()
                     .accessibilityLabel("Analyze")
                     .accessibilityAddTraits(.isButton)
