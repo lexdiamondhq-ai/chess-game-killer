@@ -51,6 +51,8 @@ struct PremiumOfferView: View {
         .screenScheme(theme)
         .tint(accent)
         .task {
+            // A problem from the last visit (a purchase that didn't go through) isn't news now.
+            premium.problem = nil
             premium.start()
             if premium.products.isEmpty { await premium.loadProducts() }
             trial = await premium.hasTrial(.yearly)
@@ -97,7 +99,7 @@ struct PremiumOfferView: View {
     private var plans: some View {
         VStack(spacing: 10) {
             PremiumPlanCard(plan: .yearly, price: premium.price(.yearly), selected: plan == .yearly,
-                            note: "Just $5 a month. Save 50%", accent: accent) { plan = .yearly }
+                            note: premium.yearlyNote, accent: accent) { plan = .yearly }
             PremiumPlanCard(plan: .monthly, price: premium.price(.monthly), selected: plan == .monthly,
                             note: nil, accent: accent) { plan = .monthly }
         }
