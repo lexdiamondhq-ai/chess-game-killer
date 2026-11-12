@@ -71,12 +71,7 @@ struct ChallengeHost: ViewModifier {
         }
         guard !shown else { return }
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(60))
-            var waited = 0
-            while ChallengePresenter.isTransitioning, waited < 30 {
-                try? await Task.sleep(for: .milliseconds(50))
-                waited += 1
-            }
+            await ScreenCovers.settled()
             if center?.isPresenting == true { shown = true }
         }
     }

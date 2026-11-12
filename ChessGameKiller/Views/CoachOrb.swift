@@ -926,8 +926,11 @@ private struct CoachPanel: View {
                     withAnimation(.snappy) { match.rematch() }
                 })
                 .environment(vault)
+                .keepsPhoneUpright("review")
             }
         }
+        // A link from outside brings its own screen forward: this one steps aside for it.
+        .onReceive(NotificationCenter.default.publisher(for: ScreenCovers.closeAll)) { _ in rewind = nil }
     }
 
     /// Leo's 30-second story of the game, to watch and share.
@@ -947,7 +950,9 @@ private struct CoachPanel: View {
         .tint(.primary)
         .fullScreenCover(item: $reel) { reel in
             HighlightReelView(reel: reel, theme: theme)
+                .keepsPhoneUpright("highlights")
         }
+        .onReceive(NotificationCenter.default.publisher(for: ScreenCovers.closeAll)) { _ in reel = nil }
     }
 }
 
