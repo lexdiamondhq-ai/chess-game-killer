@@ -239,6 +239,9 @@ final class AnalysisModel {
     /// The piece picked up, and where it can go.
     private(set) var selected: Square?
     private(set) var targets: Set<Square> = []
+    /// The person tapped one of their pieces that can't move because their king is in check:
+    /// the board says so under it (Alex, 2026-11-11: "You can't move any other pieces").
+    private(set) var showsCheckNote = false
     /// The squares of the last move, for a tint.
     private(set) var lastMove: (from: Square, to: Square)?
     /// A pawn moved to the last rank by the person, waiting for them to choose its piece.
@@ -285,6 +288,33 @@ final class AnalysisModel {
     var evaluationForWhite: Evaluation? {
         guard let first = lines.first else { return nil }
         return draft.sideToMove == .white ? first.evaluation : first.evaluation.flipped
+    }
+
+    /// The king of the side to move, while it is in check, for a red glow under it.
+    var kingInCheck: Square? {
+        let color = draft.sideToMove
+        guard draft.isInCheck(color) else { return nil }
+        return draft.pieces.first { $0.kind == .king && $0.color == color }?.square
+    }
+
+    /// Neither side has enough left to checkmate: kings alone, or a king and one bishop or
+    /// knight against a bare king. The game is a draw.
+    var isDeadDraw: Bool {
+        let others = draft.pieces.filter { $0.kind != .king }
+        return others.isEmpty || (others.count == 1 && [.bishop, .knight].contains(others[0].kind))
+    }
+
+    /// What happened, for the line under the board: checkmate, stalemate, a dead draw, or check
+    /// (Alex, 2026-11-11: "It also needs to say what happened on the bottom").
+    var statusNote: String? {
+        let mover = draft.sideToMove == .white ? "White" : "Black"
+        let winner = draft.sideToMove == .white ? "Black" : "White"
+        if ending == "Checkmate" { return "Checkmate. \(winner) wins." }
+        if ending == "Stalemate" { return "Stalemate. \(mover) has no moves, so it's a draw." }
+        if isDeadDraw { return "Draw. Nobody has enough pieces left to checkmate." }
+        if showsCheckNote { return "Your king is in check. Move the king first." }
+        if kingInCheck != nil { return "Check! \(mover)'s king is under attack." }
+        return nil
     }
 
     var canGoBack: Bool { cursor > 0 }
@@ -414,6 +444,7 @@ final class AnalysisModel {
     func tap(_ square: Square) {
         stopLine()
         promoting = nil
+        showsCheckNote = false
         if let from = selected, targets.contains(square) {
             if draft[from]?.kind == .pawn, square.rankIndex == 0 || square.rankIndex == 7 {
                 // The person chooses what the pawn becomes; the picker shows over the board.
@@ -435,6 +466,8 @@ final class AnalysisModel {
         let moves = Set(board.legalMoves(forPieceAt: square))
         selected = moves.isEmpty ? nil : square
         targets = moves
+        // A piece stuck because the king is in check: say why, instead of doing nothing.
+        showsCheckNote = moves.isEmpty && kingInCheck != nil
     }
 
     /// Finishes the person's promotion with the piece they chose.
@@ -557,6 +590,7 @@ final class AnalysisModel {
         promoting = nil
         selected = nil
         targets = []
+        showsCheckNote = false
         reanalyze()
     }
 
