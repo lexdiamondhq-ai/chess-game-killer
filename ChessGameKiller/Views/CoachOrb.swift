@@ -757,7 +757,7 @@ private struct CoachPanel: View {
                     withAnimation(.snappy(duration: 0.45)) { match.flipBoard() }
                 }
             }
-            if match.canResign {
+            if match.isUnderway {
                 // While a game is on, Resign takes the place of Games (also in the dock).
                 ActionButton(title: "Resign", symbol: "flag.fill", theme: theme) {
                     confirmingResign = true

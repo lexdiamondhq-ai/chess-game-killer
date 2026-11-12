@@ -129,7 +129,7 @@ struct ContentView: View {
     }
     /// While a game is under way, looking at the engine's lines for it is help, like Undo.
     private var analyzeGame: (() -> Void)? {
-        guard match.canResign else { return nil }
+        guard match.isUnderway else { return nil }
         return { [match] in match.markAssisted() }
     }
 
@@ -249,8 +249,8 @@ struct ContentView: View {
                 recordArmy()
                 recordGame()
                 recordGrudge()
-                // A game played to its end makes the day.
-                daily.record(.game)
+                // A game played to its end makes the day; resigning before a move doesn't.
+                if match.game.plyCount > 0 { daily.record(.game) }
                 // Let the last move land and the king fall, then open the summary.
                 let number = match.gameNumber
                 Task { @MainActor in
@@ -844,6 +844,23 @@ struct ContentView: View {
     /// Everything that leaves the board for a moment, one tap away.
     private var moreMenu: some View {
         Menu {
+            // Resign comes first and is there from the start of the game, so it is never hunted
+            // for (Alex, 2026-11-12). Offer a draw sits just below it (Alex, 2026-11-10, option B).
+            if match.canResign {
+                Section {
+                    Button(role: .destructive) {
+                        confirmingResign = true
+                    } label: {
+                        Label("Resign", systemImage: "flag.fill")
+                    }
+                    Button {
+                        confirmingDraw = true
+                    } label: {
+                        Label("Offer a draw", systemImage: "equal.circle")
+                    }
+                    .disabled(!match.canOfferDraw)
+                }
+            }
             // Flip is in the dock, so it isn't repeated here (Alex, 2026-11-08).
             Section {
                 Button {
@@ -860,23 +877,6 @@ struct ContentView: View {
                     showingSettings = true
                 } label: {
                     Label("Settings", image: Glyphs.settings)
-                }
-            }
-            // Resign is also here, not only in the dock's pull-up (Alex, 2026-11-09: "How to resign").
-            // Offer a draw sits just above it (Alex, 2026-11-10, option B).
-            if match.canResign {
-                Section {
-                    Button {
-                        confirmingDraw = true
-                    } label: {
-                        Label("Offer a draw", systemImage: "equal.circle")
-                    }
-                    .disabled(!match.canOfferDraw)
-                    Button(role: .destructive) {
-                        confirmingResign = true
-                    } label: {
-                        Label("Resign", systemImage: "flag.fill")
-                    }
                 }
             }
         } label: {

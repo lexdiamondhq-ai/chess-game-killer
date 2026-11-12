@@ -23,7 +23,7 @@ extension MatchController {
     }
 
     /// Talking it through would count as help: the game is under way and has had none yet.
-    var talkCountsAsHelp: Bool { canResign && !wasAssisted }
+    var talkCountsAsHelp: Bool { isUnderway && !wasAssisted }
 }
 
 /// The way into Talk it through from the open coach: Leo's microphone, and what it does.

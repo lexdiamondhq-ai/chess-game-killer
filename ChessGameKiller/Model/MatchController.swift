@@ -532,12 +532,16 @@ final class MatchController {
         isFlippedByHand.toggle()
     }
 
-    /// Whether the person can resign now: a game under way that isn't over.
-    var canResign: Bool { hasStarted && !isOver && game.plyCount > 0 }
+    /// Whether the person can resign now: any game that isn't over, even before the first move,
+    /// so Resign is always where they look for it (Alex, 2026-11-12).
+    var canResign: Bool { hasStarted && !isOver }
+
+    /// A game under way with at least one move on the board.
+    var isUnderway: Bool { canResign && game.plyCount > 0 }
 
     /// The person looked at the engine's lines for the game in progress: like Undo, that is help.
     func markAssisted() {
-        guard canResign else { return }
+        guard isUnderway else { return }
         wasAssisted = true
     }
 
@@ -556,7 +560,7 @@ final class MatchController {
 
     /// Whether the person can offer a draw now: a game under way, and not right after a refusal.
     var canOfferDraw: Bool {
-        guard canResign else { return false }
+        guard isUnderway else { return false }
         guard let declined = drawDeclinedAtPly else { return true }
         return game.plyCount - declined >= Self.pliesBetweenDrawOffers || game.plyCount < declined
     }
