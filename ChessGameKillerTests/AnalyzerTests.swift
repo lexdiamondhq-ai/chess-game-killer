@@ -205,6 +205,18 @@ final class BoardReaderTests: XCTestCase {
         XCTAssertFalse(BoardReaderError.failed.errorDescription?.contains("connection") == true)
     }
 
+    func testTheServersRefusalsSayWhatIsTrue() {
+        // Too fast: a minute's wait helps.
+        XCTAssertEqual(CloudBoardReader.refusal(status: 429, body: json(#"{"error": "rate_limited"}"#)), .busy)
+        XCTAssertEqual(CloudBoardReader.refusal(status: 429, body: Data()), .busy)
+        // The day's ceiling: waiting a minute doesn't, and the note mustn't say it does.
+        XCTAssertEqual(CloudBoardReader.refusal(status: 429, body: json(#"{"error": "daily_limit"}"#)), .full)
+        XCTAssertTrue(BoardReaderError.full.errorDescription?.contains("tomorrow") == true)
+        XCTAssertEqual(CloudBoardReader.refusal(status: 503, body: json(#"{"error": "not_configured"}"#)), .notSetUp)
+        XCTAssertEqual(CloudBoardReader.refusal(status: 502, body: json(#"{"error": "upstream", "status": 529}"#)), .failed)
+        XCTAssertEqual(CloudBoardReader.refusal(status: 500, body: Data("oops".utf8)), .failed)
+    }
+
     func testNoBoardInThePicture() {
         XCTAssertThrowsError(try CloudBoardReader.reading(from: json(#"{"found": false}"#))) { error in
             XCTAssertEqual(error as? BoardReaderError, .noBoard)
@@ -247,6 +259,12 @@ struct SlowFakeBoardReader: BoardReader {
     }
 }
 
+/// Counts the scans a test's reads were charged.
+@MainActor
+final class ScanTally {
+    var scans = 0
+}
+
 /// Counts how often the line to the reader is opened.
 final class WarmUpCountingReader: BoardReader, @unchecked Sendable {
     private let lock = NSLock()
@@ -277,6 +295,30 @@ final class ScanSessionTests: XCTestCase {
             try? await Task.sleep(for: .milliseconds(20))
         }
         XCTAssertTrue(condition())
+    }
+
+    /// A scan is counted when the reader answers, so one lost on the way costs nothing.
+    func testAScanCountsOnlyOnceTheReaderAnswered() async {
+        let draft = PositionDraft(fen: "6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1")!
+        let counted = ScanTally()
+        let read = ScanSession(reader: FakeBoardReader(result: .success(
+            BoardReading(draft: draft, whiteSide: .bottom, sureOfTurn: true, confidence: .high)
+        )))
+        read.read(UIImage()) { counted.scans += 1 }
+        await waitUntil { !read.isReading }
+        XCTAssertEqual(counted.scans, 1, "A position read is a scan")
+
+        let empty = ScanSession(reader: FakeBoardReader(result: .failure(.noBoard)))
+        empty.read(UIImage()) { counted.scans += 1 }
+        await waitUntil { !empty.isReading }
+        XCTAssertEqual(counted.scans, 2, "The reader looked and found no board: still a scan")
+
+        for lost in [BoardReaderError.offline, .busy, .full, .failed] {
+            let session = ScanSession(reader: FakeBoardReader(result: .failure(lost)))
+            session.read(UIImage()) { counted.scans += 1 }
+            await waitUntil { !session.isReading }
+        }
+        XCTAssertEqual(counted.scans, 2, "A scan that never got an answer isn't counted")
     }
 
     /// A photo goes from being read straight to its analysis, with no stop in the editor

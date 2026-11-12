@@ -460,9 +460,14 @@ struct ContentView: View {
                 timeSounds(threeD: threeD)
             }
             .onChange(of: challenges?.isPresenting == true) { _, presenting in
-                // Challenge a friend takes the New Game sheet's place; with no game under way, the sheet comes back after.
+                // Challenge a friend takes the place of whatever was up (the New Game sheet that opened
+                // it, or any screen a friend's link arrived over); with no game under way, the sheet comes back after.
                 if presenting {
-                    showingNewGame = false
+                    closeCovers()
+                    showingDaily = false
+                } else if DailyLink.pending {
+                    // Today's Move was asked for during a friend game: it opens now that the game has closed.
+                    openDaily()
                 } else if !match.hasStarted, !showingHome {
                     showingNewGame = true
                 }
@@ -551,41 +556,52 @@ struct ContentView: View {
         DailyActivityKeeper.shared.follow(daily: daily)
     }
 
-    /// The game on the Lock Screen was tapped: the game comes forward, over the home and any
-    /// screen opened over it. (After a cold start there is no game, and the home stays.)
-    private func openLiveGame() {
-        guard !showingWelcome, match.hasStarted else { return }
+    /// Closes every screen opened over the home or the game, here and in the views that own
+    /// their own (the rivals' hall, Review game, Highlights), so a link's screen can come forward.
+    private func closeCovers() {
         showingTraining = false
         showingPuzzles = false
         showingGames = false
         showingArmy = false
-        showingDaily = false
         showingNewGame = false
         showingSettings = false
         showingAnalyze = false
+        coach.presentedLesson = nil
+        coach.presentedSession = nil
+        talk = nil
+        nextRivalFilm = nil
+        ScreenCovers.close()
+    }
+
+    /// The game on the Lock Screen was tapped: the game comes forward, over the home and any
+    /// screen opened over it. (After a cold start there is no game, and the home stays.)
+    private func openLiveGame() {
+        // The first rival's film is still part of the welcome.
+        guard !showingWelcome, welcomeFilm == nil, match.hasStarted else { return }
+        closeCovers()
+        showingDaily = false
         leaveHome()
     }
 
     /// Opens Today's Move over whatever is showing (from Home, the widget or a reminder).
     private func openDaily() {
         DailyLink.pending = false
-        guard !showingWelcome else { return }
-        let covered = showingTraining || showingPuzzles || showingGames || showingArmy || showingNewGame
-            || showingSettings || showingAnalyze
-        showingTraining = false
-        showingPuzzles = false
-        showingGames = false
-        showingArmy = false
-        showingNewGame = false
-        showingSettings = false
-        showingAnalyze = false
+        guard !showingWelcome, welcomeFilm == nil else { return }
+        // A game with a friend keeps the screen (leaving a timed one costs clock): Today's Move
+        // opens when it closes.
+        if challenges?.isPresenting == true {
+            DailyLink.pending = true
+            return
+        }
+        let covered = ScreenCovers.anyUp
+        closeCovers()
         if !covered {
             showingDaily = true
             return
         }
         // Once the screen that was up has slid away.
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(600))
+            await ScreenCovers.settled()
             showingDaily = true
         }
     }

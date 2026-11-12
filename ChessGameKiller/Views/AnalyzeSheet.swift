@@ -72,11 +72,13 @@ struct AnalyzeSheet: View {
 
     /// Reads a picture, if a scan is left; otherwise the offer.
     private func scan(_ image: UIImage) {
-        guard Premium.shared.use(.scan) else {
+        guard Premium.shared.canUse(.scan) else {
             offer = .scan
             return
         }
-        session.read(image)
+        // Counted when the reader answers, not when the picture is sent: a scan lost to a bad
+        // connection isn't taken from the week's few.
+        session.read(image) { _ = Premium.shared.use(.scan) }
     }
 
     var body: some View {

@@ -80,7 +80,11 @@ final class ScanSession {
 
     /// Shows the picture while it's read, then its analysis. A read that fails, or finds pieces
     /// that can't be analyzed yet, opens the editor instead, with the photo there to copy from.
-    func read(_ image: UIImage) {
+    ///
+    /// `answered` runs once the reader has looked at the picture (a position, or no board in it):
+    /// that is when a scan is counted. A read lost to the connection or a busy server never
+    /// reaches it, so it doesn't cost one of a free player's few scans (audit, 2026-11-12).
+    func read(_ image: UIImage, answered: (@MainActor () -> Void)? = nil) {
         reset()
         photo = image
         draft = .empty
@@ -91,8 +95,10 @@ final class ScanSession {
         readTask = Task { [weak self, reader] in
             do {
                 let reading = try await reader.read(image)
+                answered?()
                 self?.finishReading(reading, id: id)
             } catch {
+                if (error as? BoardReaderError) == .noBoard { answered?() }
                 self?.failReading(error, id: id)
             }
         }
@@ -312,7 +318,8 @@ final class AnalysisModel {
         if ending == "Checkmate" { return "Checkmate. \(winner) wins." }
         if ending == "Stalemate" { return "Stalemate. \(mover) has no moves, so it's a draw." }
         if isDeadDraw { return "Draw. Nobody has enough pieces left to checkmate." }
-        if showsCheckNote { return "Your king is in check. Move the king first." }
+        // The piece tapped has no way to end the check; another piece (or the king) may.
+        if showsCheckNote { return "Your king is in check. This piece can't save it." }
         if kingInCheck != nil { return "Check! \(mover)'s king is under attack." }
         return nil
     }

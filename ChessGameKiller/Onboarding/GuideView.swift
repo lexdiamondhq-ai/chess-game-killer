@@ -13,7 +13,7 @@ struct GuideView: View {
     /// The hidden gestures, by what they do. (Gesture, then what it's called in the app.)
     static let gestures: [(symbol: String, title: String, text: String)] = [
         ("circle.circle", "Tap the orb for the coach",
-         "The round button in the middle of the dock opens the coach: grades, the best moves, undo and new game."),
+         "The round button in the middle of the dock opens the coach: grades, the best moves, undo and Analyze. After a game it shows how you played and what comes next."),
         ("hand.tap", "Hold the gold knight for Rooms",
          "On the home screen, a tap on the gold knight opens Analyze. Hold it to open Rooms: online, a friend, your rivals and your games. The Rooms button beside it does the same."),
         ("rectangle.landscape.rotate", "Turn sideways against the Ashen King",

@@ -75,6 +75,35 @@ test("too many scans are turned away", async () => {
   assert.equal((await worker.fetch(post(), limited)).status, 429);
 });
 
+test("a limiter hiccup doesn't stop a scan, and a surprise still answers in JSON", async () => {
+  claudeAnswers({ found: false });
+  const hiccup = {
+    ...env,
+    SCAN_LIMITER: {
+      limit: async () => {
+        throw new Error("limiter down");
+      },
+    },
+  };
+  assert.equal((await worker.fetch(post(), hiccup)).status, 200);
+
+  // The budget counter can't be reached: a JSON 500, never an unhandled crash.
+  const broken = {
+    ...env,
+    BUDGET: {
+      idFromName: () => "global",
+      get: () => ({
+        fetch: async () => {
+          throw new Error("counter down");
+        },
+      }),
+    },
+  };
+  const response = await worker.fetch(post(), broken);
+  assert.equal(response.status, 500);
+  assert.deepEqual(await response.json(), { error: "internal" });
+});
+
 test("a missing key or a failing API is reported, not crashed on", async () => {
   assert.equal((await worker.fetch(post(), { MODEL: "x" })).status, 503);
   assert.equal((await worker.fetch(post(), { ANTHROPIC_API_KEY: "  \n" })).status, 503);
