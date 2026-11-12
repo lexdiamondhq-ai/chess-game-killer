@@ -227,6 +227,10 @@ struct ArmyView: View {
                 VStack(spacing: 18) {
                     header
                         .homeRise(0)
+                    if let quest = ArmyQuest.of(store, next: .club) {
+                        questCard(quest)
+                            .homeRise(0)
+                    }
                     formation
                         .homeRise(1)
                     if !decorated.isEmpty {
@@ -289,6 +293,26 @@ struct ArmyView: View {
                 .multilineTextAlignment(.center)
         }
         .padding(.top, 4)
+    }
+
+    /// The army's job today, in words. Home's slim Your army strip shows only its button (Alex's
+    /// pick B, 2026-11-12), so the sentence lives here. The line never names the rival up next,
+    /// so any rival will do for the lookup.
+    private func questCard(_ quest: ArmyQuest) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("TODAY'S QUEST")
+                .font(.system(size: 10.5, weight: .bold))
+                .tracking(1.3)
+                .foregroundStyle(theme.trainingAccent)
+            Text(quest.line(store))
+                .font(.app(.subheadline))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 12)
+        .padding(.horizontal, 14)
+        .trainingCard(theme)
+        .accessibilityElement(children: .combine)
     }
 
     /// The army lined up as it starts: pawns in front, the back rank behind.

@@ -364,14 +364,15 @@ struct HomeAuroraView: View {
                 HomeAuroraDNA(dna: dna, palette: palette, action: actions.chessDNA)
                     .padding(.horizontal, 16)
             }
-            // Your army under your Chess DNA (Alex, 2026-11-12: make the Army stand out on Home,
-            // "A and C together"): the champion big, and today's job for the army.
-            armySection
             HomeAuroraSection(title: "For today", palette: palette, note: gamesNote)
             VStack(spacing: 10) {
                 todayRows
             }
             .padding(.horizontal, 16)
+            // Your army at the foot of the page, as a wide banner (Alex, 2026-11-12: "move the
+            // Army to the bottom and change the format to more of a rectangle"): the champion
+            // and today's job for the army.
+            armySection
         }
         .padding(.bottom, 130)
         .frame(maxWidth: .infinity)
