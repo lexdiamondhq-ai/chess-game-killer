@@ -88,6 +88,9 @@ struct SculptedBoardState: Equatable {
     var finale: SculptedFinale?
     /// Seen from the player's chair, or from above with each piece inside its square (Flat).
     var framing: SculptedCamera.Framing = .standing
+    /// The board hangs in the open with nothing under or around it (the King's hall): no glass
+    /// frame, no line around the squares, and no shadow on whatever is behind the view.
+    var floating = false
     /// The pieces come without lasting ids (an earlier position of the game, a preview):
     /// the scene matches them to the pieces on the board so each one moves rather than fades.
     var matchesPieces = false
@@ -144,6 +147,10 @@ final class SculptedBoardScene {
     private let piecesNode = SCNNode()
     private let marksNode = SCNNode()
     private let labelsNode = SCNNode()
+    /// All there is around the squares: the glass frame, the fine line inside it, and the
+    /// board's shadows on whatever is behind the view. A floating board has none of it.
+    private let surroundNode = SCNNode()
+    var showsSurround: Bool { !surroundNode.isHidden }
     /// Dust puffs and other passing effects.
     private let effectsNode = SCNNode()
     private var keyLight: SCNLight?
@@ -191,6 +198,7 @@ final class SculptedBoardScene {
         scene.lightingEnvironment.contents = assets.environment(look)
         scene.lightingEnvironment.intensity = look.environment
 
+        scene.rootNode.addChildNode(surroundNode)
         buildCamera()
         buildLights()
         buildBoard()
@@ -339,6 +347,7 @@ final class SculptedBoardScene {
             endFinale(animated: animate && old.flipped == new.flipped)
         }
         labelsNode.isHidden = !new.showsCoordinates
+        surroundNode.isHidden = new.floating
         if old.framing != new.framing {
             reframe(new.framing, animated: animate && old.flipped == new.flipped)
         }
@@ -1762,14 +1771,14 @@ final class SculptedBoardScene {
         floor.simdOrientation = Self.flat
         floor.simdPosition = SIMD3(0, -0.14, 0)
         floor.castsShadow = false
-        scene.rootNode.addChildNode(floor)
+        surroundNode.addChildNode(floor)
 
         let ground = SCNNode(geometry: Self.mark(size: 10.2, color: .black, alpha: 0.55, mask: MarkImages.boardShadow))
         ground.simdOrientation = Self.flat
         ground.simdPosition = SIMD3(0, -0.139, 0)
         ground.castsShadow = false
         ground.renderingOrder = -5
-        scene.rootNode.addChildNode(ground)
+        surroundNode.addChildNode(ground)
     }
 
     // MARK: The board
@@ -1797,7 +1806,7 @@ final class SculptedBoardScene {
             box.materials = [frame]
             let node = SCNNode(geometry: box)
             node.simdPosition = SIMD3(rail.x, 0.005 - height / 2, rail.z)
-            board.addChildNode(node)
+            surroundNode.addChildNode(node)
         }
 
         // A fine metal line around the squares: its own copy, as the flat view makes it glow.
@@ -1818,7 +1827,7 @@ final class SculptedBoardScene {
             let node = SCNNode(geometry: box)
             node.simdPosition = SIMD3(strip.x, 0.0062, strip.z)
             node.castsShadow = false
-            board.addChildNode(node)
+            surroundNode.addChildNode(node)
         }
         scene.rootNode.addChildNode(board)
     }

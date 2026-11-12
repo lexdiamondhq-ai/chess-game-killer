@@ -4,7 +4,11 @@ import Foundation
 /// Every sound the game can make. File names match ChessGameKiller/Sounds/*.mp3,
 /// which are generated with ElevenLabs by scripts/make_sounds.py.
 enum GameSound: String, CaseIterable {
+    /// A piece set down. It has several takes (move.mp3, move-2.mp3, ...), one picked at random
+    /// each time, so a game never repeats the same knock.
     case move
+    /// A timed game's move: the piece set down, then the chess clock pressed.
+    case clockMove = "move-clock"
     /// Training's soft click: a piece picked up, a square found. In a game, picking up a
     /// piece is felt (a haptic), not heard.
     case select
@@ -28,7 +32,7 @@ enum GameSound: String, CaseIterable {
     /// little above the knocks, so the end of a game is never a jolt, and the welcome softest.
     var volume: Float {
         switch self {
-        case .move: return 0.75
+        case .move, .clockMove: return 0.75
         case .select: return 0.3
         case .capture: return 0.9
         case .check: return 1.0
@@ -45,7 +49,7 @@ enum GameSound: String, CaseIterable {
     var isLong: Bool {
         switch self {
         case .win, .gameOver, .defeat, .victory, .welcome: return true
-        case .move, .select, .capture, .check, .castle: return false
+        case .move, .clockMove, .select, .capture, .check, .castle: return false
         }
     }
 }
@@ -79,10 +83,13 @@ final class SoundPlayer: SoundPlaying {
         set { UserDefaults.standard.set(newValue, forKey: "soundEffects") }
     }
 
-    /// Two players for each knock, used in turn, so a piece landing never cuts off the
-    /// one before it; one for each longer cue.
-    private var players: [GameSound: [AVAudioPlayer]] = [:]
+    /// Each sound's takes (a knock may have several: move.mp3, move-2.mp3, ...), and for each
+    /// take two players for a knock, used in turn, so a piece landing never cuts off the one
+    /// before it; one for each longer cue.
+    private var players: [GameSound: [[AVAudioPlayer]]] = [:]
     private var nextPlayer: [GameSound: Int] = [:]
+    /// The take each knock played last, so the next one is a different take.
+    private var lastTake: [GameSound: Int] = [:]
     /// Longer cues fading out, to be stopped once they are silent.
     private var fading: Set<GameSound> = []
 
@@ -90,13 +97,17 @@ final class SoundPlayer: SoundPlaying {
         // Ambient: respects the silent switch and mixes with the player's music.
         try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
         for sound in GameSound.allCases {
-            guard let url = Bundle.main.url(forResource: sound.rawValue, withExtension: "mp3") else { continue }
-            let pool = (0..<(sound.isLong ? 1 : 2)).compactMap { _ in try? AVAudioPlayer(contentsOf: url) }
-            for player in pool {
-                player.volume = sound.volume
-                player.prepareToPlay()
+            let names = [sound.rawValue] + (sound.isLong ? [] : (2...6).map { "\(sound.rawValue)-\($0)" })
+            let takes: [[AVAudioPlayer]] = names.compactMap { name in
+                guard let url = Bundle.main.url(forResource: name, withExtension: "mp3") else { return nil }
+                let pool = (0..<(sound.isLong ? 1 : 2)).compactMap { _ in try? AVAudioPlayer(contentsOf: url) }
+                for player in pool {
+                    player.volume = sound.volume
+                    player.prepareToPlay()
+                }
+                return pool.isEmpty ? nil : pool
             }
-            if !pool.isEmpty { players[sound] = pool }
+            if !takes.isEmpty { players[sound] = takes }
         }
     }
 
@@ -118,7 +129,11 @@ final class SoundPlayer: SoundPlaying {
         if sound == .victory, players[.victory] == nil {
             return play(.win, after: delay)
         }
-        guard isEnabled, let pool = players[sound], !pool.isEmpty else { return }
+        guard isEnabled, let takes = players[sound], !takes.isEmpty else { return }
+        var take = Int.random(in: 0..<takes.count)
+        if takes.count > 1, take == lastTake[sound] { take = (take + 1) % takes.count }
+        lastTake[sound] = take
+        let pool = takes[take]
         let index = (nextPlayer[sound] ?? 0) % pool.count
         nextPlayer[sound] = index + 1
         let player = pool[index]
@@ -137,7 +152,7 @@ final class SoundPlayer: SoundPlaying {
     func stopAll(fade: TimeInterval) {
         var faded: Set<GameSound> = []
         for sound in GameSound.allCases where sound.isLong {
-            for player in players[sound] ?? [] where player.isPlaying {
+            for player in (players[sound] ?? []).joined() where player.isPlaying {
                 player.setVolume(0, fadeDuration: fade)
                 faded.insert(sound)
             }
@@ -149,7 +164,7 @@ final class SoundPlayer: SoundPlaying {
             guard let self else { return }
             // A cue played again meanwhile has left `fading` and keeps playing.
             for sound in faded where self.fading.contains(sound) {
-                for player in self.players[sound] ?? [] {
+                for player in (self.players[sound] ?? []).joined() {
                     player.stop()
                     player.currentTime = 0
                     player.volume = sound.volume

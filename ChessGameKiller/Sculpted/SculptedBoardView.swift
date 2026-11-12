@@ -59,6 +59,8 @@ struct SculptedBoardView: View {
     var endBrowsing: (() -> Void)?
     /// Seen from the player's chair, or from above with the flat pieces (Flat).
     var framing: SculptedCamera.Framing = .standing
+    /// Nothing around the squares: no frame, and no shadow behind the board (the King's hall).
+    var floating = false
 
     /// Width over height: the board seen at an angle is wider than it is tall.
     static let aspect: CGFloat = SculptedCamera.Framing.standing.aspect
@@ -184,6 +186,7 @@ struct SculptedBoardView: View {
             var state = SculptedBoardState(pieces: browsing.pieces.map { PlacedPiece(id: 0, piece: $0) },
                                            flipped: flipped, matchesPieces: true)
             state.framing = framing
+            state.floating = floating
             return state
         }
         var state = SculptedBoardState(
@@ -200,6 +203,7 @@ struct SculptedBoardView: View {
             finale: finale
         )
         state.framing = framing
+        state.floating = floating
         return state
     }
 

@@ -23,6 +23,8 @@ struct ContentView: View {
     @State private var coachExpanded = false
     @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .gilded
     @AppStorage("showBestMoves") private var showBestMoves = false
+    /// Hints switched off in the New Game box: the Hints button stays off the dock too.
+    @AppStorage("hintsHidden") private var hintsHidden = false
     @AppStorage("showSecondBest") private var showSecondBest = true
     @AppStorage("coachVerdicts") private var showVerdicts = true
     @AppStorage("haptics") private var hapticsOn = true
@@ -127,7 +129,7 @@ struct ContentView: View {
     }
     /// While a game is under way, looking at the engine's lines for it is help, like Undo.
     private var analyzeGame: (() -> Void)? {
-        guard match.canResign else { return nil }
+        guard match.isUnderway else { return nil }
         return { [match] in match.markAssisted() }
     }
 
@@ -222,7 +224,11 @@ struct ContentView: View {
                 SoundPlayer.shared.playWelcome()
                 await StockfishEngine.shared.warmUp()
             }
-            .onChange(of: showBestMoves) { _, _ in syncCoachSettings() }
+            .onChange(of: showBestMoves) { _, on in
+                // Hints turned back on anywhere (Settings) bring the button back for good.
+                if on { hintsHidden = false }
+                syncCoachSettings()
+            }
             .onChange(of: showSecondBest) { _, _ in syncCoachSettings() }
             .onChange(of: showVerdicts) { _, _ in syncCoachSettings() }
             .onChange(of: showingNewGame) { _, showing in
@@ -243,8 +249,8 @@ struct ContentView: View {
                 recordArmy()
                 recordGame()
                 recordGrudge()
-                // A game played to its end makes the day.
-                daily.record(.game)
+                // A game played to its end makes the day; resigning before a move doesn't.
+                if match.game.plyCount > 0 { daily.record(.game) }
                 // Let the last move land and the king fall, then open the summary.
                 let number = match.gameNumber
                 Task { @MainActor in
@@ -454,9 +460,14 @@ struct ContentView: View {
                 timeSounds(threeD: threeD)
             }
             .onChange(of: challenges?.isPresenting == true) { _, presenting in
-                // Challenge a friend takes the New Game sheet's place; with no game under way, the sheet comes back after.
+                // Challenge a friend takes the place of whatever was up (the New Game sheet that opened
+                // it, or any screen a friend's link arrived over); with no game under way, the sheet comes back after.
                 if presenting {
-                    showingNewGame = false
+                    closeCovers()
+                    showingDaily = false
+                } else if DailyLink.pending {
+                    // Today's Move was asked for during a friend game: it opens now that the game has closed.
+                    openDaily()
                 } else if !match.hasStarted, !showingHome {
                     showingNewGame = true
                 }
@@ -545,41 +556,52 @@ struct ContentView: View {
         DailyActivityKeeper.shared.follow(daily: daily)
     }
 
-    /// The game on the Lock Screen was tapped: the game comes forward, over the home and any
-    /// screen opened over it. (After a cold start there is no game, and the home stays.)
-    private func openLiveGame() {
-        guard !showingWelcome, match.hasStarted else { return }
+    /// Closes every screen opened over the home or the game, here and in the views that own
+    /// their own (the rivals' hall, Review game, Highlights), so a link's screen can come forward.
+    private func closeCovers() {
         showingTraining = false
         showingPuzzles = false
         showingGames = false
         showingArmy = false
-        showingDaily = false
         showingNewGame = false
         showingSettings = false
         showingAnalyze = false
+        coach.presentedLesson = nil
+        coach.presentedSession = nil
+        talk = nil
+        nextRivalFilm = nil
+        ScreenCovers.close()
+    }
+
+    /// The game on the Lock Screen was tapped: the game comes forward, over the home and any
+    /// screen opened over it. (After a cold start there is no game, and the home stays.)
+    private func openLiveGame() {
+        // The first rival's film is still part of the welcome.
+        guard !showingWelcome, welcomeFilm == nil, match.hasStarted else { return }
+        closeCovers()
+        showingDaily = false
         leaveHome()
     }
 
     /// Opens Today's Move over whatever is showing (from Home, the widget or a reminder).
     private func openDaily() {
         DailyLink.pending = false
-        guard !showingWelcome else { return }
-        let covered = showingTraining || showingPuzzles || showingGames || showingArmy || showingNewGame
-            || showingSettings || showingAnalyze
-        showingTraining = false
-        showingPuzzles = false
-        showingGames = false
-        showingArmy = false
-        showingNewGame = false
-        showingSettings = false
-        showingAnalyze = false
+        guard !showingWelcome, welcomeFilm == nil else { return }
+        // A game with a friend keeps the screen (leaving a timed one costs clock): Today's Move
+        // opens when it closes.
+        if challenges?.isPresenting == true {
+            DailyLink.pending = true
+            return
+        }
+        let covered = ScreenCovers.anyUp
+        closeCovers()
         if !covered {
             showingDaily = true
             return
         }
         // Once the screen that was up has slid away.
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(600))
+            await ScreenCovers.settled()
             showingDaily = true
         }
     }
@@ -838,39 +860,43 @@ struct ContentView: View {
     /// Everything that leaves the board for a moment, one tap away.
     private var moreMenu: some View {
         Menu {
-            // Flip is in the dock, so it isn't repeated here (Alex, 2026-11-08).
-            Section {
-                Button {
-                    showingGames = true
-                } label: {
-                    Label("Your games", image: Glyphs.games)
-                }
-                Button {
-                    showingArmy = true
-                } label: {
-                    Label("Your pieces", image: Glyphs.army)
-                }
-                Button {
-                    showingSettings = true
-                } label: {
-                    Label("Settings", image: Glyphs.settings)
-                }
-            }
-            // Resign is also here, not only in the dock's pull-up (Alex, 2026-11-09: "How to resign").
-            // Offer a draw sits just above it (Alex, 2026-11-10, option B).
+            // Resign comes first and is there from the start of the game, so it is never hunted
+            // for (Alex, 2026-11-12). Offer a draw sits just below it (Alex, 2026-11-10, option B).
             if match.canResign {
                 Section {
+                    Button(role: .destructive) {
+                        confirmingResign = true
+                    } label: {
+                        Label("Resign", systemImage: "flag.fill")
+                    }
                     Button {
                         confirmingDraw = true
                     } label: {
                         Label("Offer a draw", systemImage: "equal.circle")
                     }
                     .disabled(!match.canOfferDraw)
-                    Button(role: .destructive) {
-                        confirmingResign = true
+                }
+            }
+            // Flip is in the dock, so it isn't repeated here (Alex, 2026-11-08).
+            // Your games and Your pieces live on Home (the You tab, Rooms and the army tile), so
+            // the menu keeps them only when Home is off (Alex, 2026-11-12).
+            Section {
+                if !homeScreenOn {
+                    Button {
+                        showingGames = true
                     } label: {
-                        Label("Resign", systemImage: "flag.fill")
+                        Label("Your games", image: Glyphs.games)
                     }
+                    Button {
+                        showingArmy = true
+                    } label: {
+                        Label("Your pieces", image: Glyphs.army)
+                    }
+                }
+                Button {
+                    showingSettings = true
+                } label: {
+                    Label("Settings", image: Glyphs.settings)
                 }
             }
         } label: {
@@ -941,9 +967,12 @@ struct ContentView: View {
                         withAnimation(.snappy(duration: 0.22)) { match.undo() }
                     }
                     .disabled(!match.canUndo)
-                    DockButton(title: "Hints", symbol: showBestMoves ? Glyphs.hints : Glyphs.hintsOff,
-                               isOn: showBestMoves, theme: theme) {
-                        showBestMoves.toggle()
+                    // Off in the New Game box means off: no button to peek with (Alex, 2026-11-12).
+                    if !hintsHidden {
+                        DockButton(title: "Hints", symbol: showBestMoves ? Glyphs.hints : Glyphs.hintsOff,
+                                   isOn: showBestMoves, theme: theme) {
+                            showBestMoves.toggle()
+                        }
                     }
                     DockButton(title: "Flip", symbol: Glyphs.flip, theme: theme) {
                         withAnimation(.snappy) { match.flipBoard() }

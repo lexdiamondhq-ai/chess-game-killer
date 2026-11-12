@@ -90,7 +90,8 @@ function duration(seconds) {
   if (seconds < 60) return plural(seconds, 'second');
   return `${plural(Math.floor(seconds / 60), 'minute')} ${plural(seconds % 60, 'second')}`;
 }
-function clockWords(clock) {
+function clockWords(clock, days) {
+  if (!clock && days) return `${plural(days, 'day')} a move`;
   if (!clock) return 'No clock, play at your own pace';
   if (!clock.increment) return `${duration(clock.initial)} each`;
   return `${duration(clock.initial)} + ${plural(clock.increment, 'second')} a move`;
@@ -886,7 +887,7 @@ function buildInvite() {
   return h('section', { class: 'view view-invite' },
     previewBoard(mySide),
     h('h1', {}, `${creator} challenged you to chess`),
-    h('div', { class: 'chips' }, chip(icon('clock'), clockWords(g.clock)), sideChip(mySide)),
+    h('div', { class: 'chips' }, chip(icon('clock'), clockWords(g.clock, g.days)), sideChip(mySide)),
     form,
     h('p', { class: 'fine fair' }, fairWords()),
   );
@@ -954,7 +955,7 @@ function buildWait() {
         h('span', { class: 'link-code', 'aria-label': `Code ${g.code.split('').join(' ')}` }, g.code)),
       copyBtn),
     actions,
-    h('div', { class: 'chips' }, chip(icon('clock'), clockWords(g.clock)), sideChip(S.seat)),
+    h('div', { class: 'chips' }, chip(icon('clock'), clockWords(g.clock, g.days)), sideChip(S.seat)),
     cancelArea,
   );
 }

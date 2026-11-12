@@ -36,6 +36,10 @@ struct HomeAuroraActions {
     var puzzles: () -> Void = {}
     /// Opens one of your finished games in Rewind.
     var replay: (UUID) -> Void = { _ in }
+    /// Opens your army.
+    var army: () -> Void = {}
+    /// Plays the rival the army's quest names (to free a piece, or to help one rank up).
+    var armyQuest: (MatchController.Level) -> Void = { _ in }
 }
 
 /// Aurora's colors, night and day.
@@ -80,6 +84,7 @@ struct HomeAuroraView: View {
     let actions: HomeAuroraActions
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(ArmyStore.self) private var army
     @AppStorage("haptics") private var hapticsOn = true
     @State private var music = HomeMusic.shared
     @State private var boardStage = SculptedStage()
@@ -364,6 +369,10 @@ struct HomeAuroraView: View {
                 todayRows
             }
             .padding(.horizontal, 16)
+            // Your army at the foot of the page, as a wide banner (Alex, 2026-11-12: "move the
+            // Army to the bottom and change the format to more of a rectangle"): the champion
+            // and today's job for the army.
+            armySection
         }
         .padding(.bottom, 130)
         .frame(maxWidth: .infinity)
@@ -377,6 +386,25 @@ struct HomeAuroraView: View {
                 .shadow(color: .black.opacity(palette.dark ? 0.5 : 0.1), radius: 30, y: -10)
                 .ignoresSafeArea(edges: .bottom)
         }
+    }
+
+    /// Your army: the champion big and the army's job for today.
+    private var armySection: some View {
+        let upNext: HomeUpNext = info.stage.upNext
+        let card = HomeAuroraArmy(army: army, color: upNext.playerColor, pieceTheme: info.stage.pieceTheme,
+                                  nextRival: upNext.level, palette: palette,
+                                  open: actions.army, play: actions.armyQuest)
+        return VStack(spacing: 0) {
+            HomeAuroraSection(title: "Your army", palette: palette, note: armyNote)
+            card.padding(.horizontal, 16)
+        }
+    }
+
+    /// How long the army has been together, once it has played.
+    private var armyNote: String? {
+        let games: Int = army.gamesPlayed
+        guard games > 0 else { return nil }
+        return games == 1 ? "1 game together" : "\(games) games together"
     }
 
     private var gamesNote: String? {
@@ -625,7 +653,8 @@ struct HomeAuroraView: View {
             today
         } else {
             let ids: [String] = games.map(\.id) + ["today"]
-            let shown: String = todayShown ?? ids[0]
+            // A game that left the list while its card was showing lights no dash: the first card does.
+            let shown: String = todayShown.flatMap { ids.contains($0) ? $0 : nil } ?? ids[0]
             VStack(spacing: 12) {
                 ScrollView(.horizontal) {
                     HStack(alignment: .top, spacing: 16) {
@@ -1911,6 +1940,8 @@ struct HomeAuroraTabBar: View {
     let learn: () -> Void
     let rooms: () -> Void
     let you: () -> Void
+    /// A finger is on the gold knight: it gives a little, like every other button here.
+    @State private var knightPressed = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -1954,8 +1985,15 @@ struct HomeAuroraTabBar: View {
                     .overlay(Circle().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
                     .shadow(color: .black.opacity(palette.dark ? 0.5 : 0.18), radius: 14, y: 8)
                     .contentShape(Circle())
+                    // The app's main button answered a touch with nothing until the finger
+                    // lifted (audit, 2026-11-12): it now sinks a touch while pressed.
+                    .scaleEffect(knightPressed ? 0.94 : 1)
+                    .brightness(knightPressed ? -0.04 : 0)
+                    .animation(.spring(response: 0.25, dampingFraction: 0.7), value: knightPressed)
                     .onTapGesture(perform: play)
-                    .onLongPressGesture(minimumDuration: 0.35, perform: rooms)
+                    .onLongPressGesture(minimumDuration: 0.35, perform: rooms) { pressing in
+                        knightPressed = pressing
+                    }
                     .accessibilityElement()
                     .accessibilityLabel("Analyze")
                     .accessibilityAddTraits(.isButton)

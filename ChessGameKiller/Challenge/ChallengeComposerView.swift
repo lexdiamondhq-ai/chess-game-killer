@@ -9,7 +9,10 @@ struct ChallengeComposerView: View {
 
     @Environment(ChallengeCenter.self) private var center
     @AppStorage(ChallengeName.key) private var name = ""
-    @AppStorage("challenge.clock") private var control: TimeControl = .rapid10
+    /// The picked clock, as `OnlineLobby.clockID` keeps it (earlier versions kept TimeControl's raw values, which read the same).
+    @AppStorage("challenge.clock") private var clockID = TimeControl.rapid10.rawValue
+    /// With ∞ picked: the days per move of a daily game, or 0 for no limit.
+    @AppStorage("challenge.days") private var dailyDays = 0
     @AppStorage("challenge.side") private var side: SideChoice = .white
     @AppStorage("haptics") private var hapticsOn = true
     @State private var joining = false
@@ -26,8 +29,15 @@ struct ChallengeComposerView: View {
 
     private var friends: FriendDirectory { center.friends }
 
-    /// The clocks a friend game offers, as on the server.
-    static let clocks: [TimeControl] = [.blitz3Plus2, .blitz5, .rapid10, .rapid15Plus10, .unlimited]
+    private var clock: FriendClock? { OnlineLobby.clock(id: clockID) }
+    private var days: Int? { clock == nil && DailyDays.options.contains(dailyDays) ? dailyDays : nil }
+
+    /// The line under the clock picks. Friend games are never rated.
+    static func detail(_ clock: FriendClock?, days: Int?) -> String {
+        if let clock { return clock.timeControl?.detail ?? "\(clock.kind) · \(clock.phrase)" }
+        if let days { return "\(DailyDays.phrase(days)) · play over days, close the app between moves" }
+        return "Take all the time you like"
+    }
 
     var body: some View {
         ScrollView {
@@ -61,7 +71,8 @@ struct ChallengeComposerView: View {
             bottomBar
         }
         .sensoryFeedback(.success, trigger: composer.created?.code) { _, new in hapticsOn && new != nil }
-        .sensoryFeedback(.selection, trigger: control) { _, _ in hapticsOn }
+        .sensoryFeedback(.selection, trigger: clockID) { _, _ in hapticsOn }
+        .sensoryFeedback(.selection, trigger: dailyDays) { _, _ in hapticsOn }
         .sensoryFeedback(.selection, trigger: side) { _, _ in hapticsOn }
         .sensoryFeedback(.selection, trigger: composer.recipient) { _, _ in hapticsOn }
         .task { await friends.refresh(name: name) }
@@ -274,22 +285,8 @@ struct ChallengeComposerView: View {
                     .foregroundStyle(.tertiary)
             }
 
-            VStack(alignment: .leading, spacing: 10) {
-                ChallengeSectionTitle(title: "Clock")
-                HStack(spacing: 8) {
-                    ForEach(Self.clocks) { clock in
-                        ChallengeChip(title: clock.name, isOn: control == clock, theme: theme) {
-                            control = clock
-                        }
-                        .accessibilityLabel(clock == .unlimited ? "No clock" : clock.detail)
-                    }
-                }
-                Text(control.detail)
-                    .font(theme.challengeFont(12))
-                    .foregroundStyle(.secondary)
-                    .contentTransition(.opacity)
-                    .animation(.snappy(duration: 0.2), value: control)
-            }
+            ChallengeClockPicker(clockID: $clockID, dailyDays: $dailyDays, theme: theme,
+                                 detail: { Self.detail($0, days: $1) })
 
             VStack(alignment: .leading, spacing: 10) {
                 ChallengeSectionTitle(title: "You play")
@@ -417,7 +414,8 @@ struct ChallengeComposerView: View {
                 .frame(height: 0.5)
                 .padding(.vertical, 2)
             HStack(spacing: 18) {
-                Label(created.clock?.label ?? "No clock", systemImage: "stopwatch")
+                Label(created.days.map(DailyDays.phrase) ?? created.clock?.label ?? "No clock",
+                      systemImage: created.days == nil ? "stopwatch" : "hourglass")
                 HStack(spacing: 6) {
                     PieceImage(piece: Piece(.king, color: created.seat.color, square: .e1), theme: theme, size: 18)
                         .frame(width: 18, height: 18)
@@ -486,7 +484,7 @@ struct ChallengeComposerView: View {
                         pickingUsername = true
                         return
                     }
-                    Task { await composer.create(name: name, clock: FriendClock(control), side: side) }
+                    Task { await composer.create(name: name, clock: clock, days: days, side: side) }
                 } label: {
                     ZStack {
                         Label(composer.recipient.map { "Challenge \($0.name)" } ?? "Create challenge", systemImage: "paperplane.fill")

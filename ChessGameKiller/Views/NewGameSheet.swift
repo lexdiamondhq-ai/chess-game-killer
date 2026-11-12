@@ -16,55 +16,16 @@ enum SideChoice: String, CaseIterable, Identifiable {
     }
 }
 
-/// How much the coach says during a game. Two switches, shown as one choice, in two words:
-/// "grades" say how good your move was, "hints" say where to move.
-enum CoachMode: CaseIterable, Identifiable {
-    case full, verdicts, hints, silent
-
-    var id: Self { self }
-
-    var name: String {
-        switch self {
-        case .full: return "Grades + hints"
-        case .verdicts: return "Grades"
-        case .hints: return "Hints"
-        case .silent: return "Just play"
-        }
-    }
-
-    /// One line about the mode.
-    var detail: String {
-        switch self {
-        case .full: return "Rates each move and spotlights your best move"
-        case .verdicts: return "Rates each move, no hints. A fair test."
-        case .hints: return "Spotlights your best move, no grades"
-        case .silent: return "Just chess. The coach keeps quiet."
-        }
-    }
-
-    var showsHints: Bool { self == .full || self == .hints }
-    var showsVerdicts: Bool { self == .full || self == .verdicts }
-
-    init(hints: Bool, verdicts: Bool) {
-        switch (hints, verdicts) {
-        case (true, true): self = .full
-        case (true, false): self = .hints
-        case (false, true): self = .verdicts
-        case (false, false): self = .silent
-        }
-    }
-}
-
-/// Picks the rival, the side, the clock and the coach, then starts the game.
+/// Picks the rival, the side, the clock and hints, then starts the game.
 ///
-/// Side, clock and coach live in one card of three rows. A row shows its
+/// Side, clock and hints live in one card. A row shows its
 /// current choice; tapping it unfolds the options in place, and picking one
 /// folds it back up. Nothing is kept until the game starts: Cancel, or closing
 /// the sheet, leaves every choice as it was.
 struct NewGameSheet: View {
     /// The rows of the match card.
     private enum MatchRow {
-        case side, clock, coach, stake
+        case side, clock, stake
     }
 
     let theme: BoardTheme
@@ -80,7 +41,9 @@ struct NewGameSheet: View {
     @AppStorage("setup.grudge") private var grudgeOn = false
     @AppStorage("setup.clock") private var timeControl: TimeControl = .unlimited
     @AppStorage("showBestMoves") private var showBestMoves = false
-    @AppStorage("coachVerdicts") private var showVerdicts = true
+    /// Hints switched off here: the game screen leaves out the Hints button too, so there is
+    /// nothing to peek at (Alex, 2026-11-12). Turning hints back on anywhere clears it.
+    @AppStorage("hintsHidden") private var hintsHidden = false
 
     @AppStorage("haptics") private var hapticsOn = true
 
@@ -88,7 +51,7 @@ struct NewGameSheet: View {
     @State private var draftSide: SideChoice
     @State private var draftLevel: MatchController.Level
     @State private var draftClock: TimeControl
-    @State private var draftCoach: CoachMode
+    @State private var draftHints: Bool
     /// The piece the player means to put on the line. Never remembered: every stake is chosen afresh.
     @State private var draftStake: ArmySlot?
     /// The army, for On the line. Absent in tests that draw the sheet without one.
@@ -117,10 +80,7 @@ struct NewGameSheet: View {
         _draftSide = State(initialValue: defaults.string(forKey: "setup.side").flatMap { SideChoice(rawValue: $0) } ?? .white)
         _draftLevel = State(initialValue: level)
         _draftClock = State(initialValue: defaults.string(forKey: "setup.clock").flatMap { TimeControl(rawValue: $0) } ?? .unlimited)
-        _draftCoach = State(initialValue: CoachMode(
-            hints: defaults.object(forKey: "showBestMoves") as? Bool ?? false,
-            verdicts: defaults.object(forKey: "coachVerdicts") as? Bool ?? true
-        ))
+        _draftHints = State(initialValue: defaults.object(forKey: "showBestMoves") as? Bool ?? false)
         _scrolledLevel = State(initialValue: level)
     }
 
@@ -144,8 +104,8 @@ struct NewGameSheet: View {
         side = draftSide
         level = draftLevel
         timeControl = draftClock
-        showBestMoves = draftCoach.showsHints
-        showVerdicts = draftCoach.showsVerdicts
+        showBestMoves = draftHints
+        hintsHidden = !draftHints
         grudgeOn = false
         start(MatchController.Setup(playerColor: draftSide.color, level: draftLevel, timeControl: draftClock,
                                     stake: stake))
@@ -267,19 +227,7 @@ struct NewGameSheet: View {
             }
             rowDivider
 
-            MatchRowButton(label: "Coach", value: draftCoach.name, detail: nil, isOpen: openRow == .coach,
-                           theme: theme, icon: { Glyph(name: Glyphs.coach, size: 22) }) {
-                toggle(.coach)
-            }
-            if openRow == .coach {
-                optionList {
-                    ForEach(CoachMode.allCases) { mode in
-                        OptionRow(title: mode.name, detail: mode.detail, isOn: draftCoach == mode, theme: theme) {
-                            choose { draftCoach = mode }
-                        }
-                    }
-                }
-            }
+            HintsRow(isOn: $draftHints, theme: theme)
 
             if army != nil {
                 rowDivider
@@ -357,7 +305,7 @@ struct NewGameSheet: View {
 
     /// The stake that will count: the one picked, if it is still allowed with these choices.
     private var stake: ArmySlot? {
-        guard let army, let draftStake, !draftCoach.showsHints,
+        guard let army, let draftStake, !draftHints,
               army.canStake(draftStake, against: draftLevel) else { return nil }
         return draftStake
     }
@@ -405,8 +353,8 @@ struct NewGameSheet: View {
         if army.stakeable.isEmpty {
             return "Pieces earn a name at Veteran (25 XP). Named pieces can go on the line."
         }
-        if draftCoach.showsHints {
-            return "Turn hints off in Coach to put a piece on the line."
+        if draftHints {
+            return "Turn hints off to put a piece on the line."
         }
         return nil
     }
@@ -766,6 +714,48 @@ private struct MatchRowButton<Icon: View>: View {
         .accessibilityLabel("\(label): \(value)")
         .accessibilityHint(isOpen ? "Closes the choices" : "Shows the choices")
         .accessibilityAddTraits(isOpen ? .isSelected : [])
+    }
+}
+
+/// Hints on or off, as a switch right on the row: no unfolding, one tap.
+private struct HintsRow: View {
+    @Binding var isOn: Bool
+    let theme: BoardTheme
+    @AppStorage("haptics") private var hapticsOn = true
+
+    private var accent: Color { theme.trainingAccent }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            GlyphTile(theme: theme) { Glyph(name: isOn ? Glyphs.hints : Glyphs.hintsOff, size: 22) }
+            VStack(alignment: .leading, spacing: 2) {
+                Text("HINTS")
+                    .font(.app(.caption2, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .tracking(1)
+                Text(isOn ? "\(Coach.current.name) shows your best move" : "Off. Just you and the rival.")
+                    .font(.app(.callout, weight: .bold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .contentTransition(.opacity)
+            }
+            Spacer(minLength: 0)
+            Toggle("Hints", isOn: $isOn.animation(.snappy))
+                .labelsHidden()
+                .tint(accent)
+        }
+        .padding(.leading, 12)
+        .padding(.trailing, 14)
+        .frame(minHeight: 60)
+        .contentShape(Rectangle())
+        .onTapGesture { withAnimation(.snappy) { isOn.toggle() } }
+        .sensoryFeedback(.selection, trigger: isOn) { _, _ in hapticsOn }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Hints")
+        .accessibilityValue(isOn ? "On" : "Off")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { isOn.toggle() }
     }
 }
 

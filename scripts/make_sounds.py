@@ -36,13 +36,18 @@ SOUNDS = {
     "castle": ("Two weighted wooden chess pieces with felt bases set down on a hardwood board one "
                "right after the other: two soft knocks a fraction of a second apart. Close-up, "
                "dry room, no music", 0.7),
-    # Deeper, more vibrant (Alex, 2026-11-10): move, capture and castle in the app are these
-    # takes made two semitones lower with more warmth and sparkle and a small wooden room:
-    #   asetrate=44100*0.891,aresample=44100,atempo=1.122,bass=g=5:f=140,
-    #   equalizer=f=2800:t=q:w=1:g=2.5,aecho=0.8:0.5:28|46:0.18|0.10
-    # brought back to the old files' loudness, then tidied. check.mp3 is the take above with
-    # bass=g=3:f=140, equalizer=f=2800:t=q:w=1:g=1.5 and the same small room. A fresh take of
-    # any of them needs that chain again.
+    # Realistic sets (Alex, 2026-11-12): the files in the app are not made from the prompts
+    # above. Each was a "real foley recording" take, trimmed to its first sound and set to
+    # the old files' loudness:
+    #   move.mp3     a heavy ebony and boxwood piece, leather base, on polished rosewood
+    #   move-2.mp3   a weighted plastic club piece on a roll-up vinyl mat
+    #   move-3.mp3   the club piece slid a few centimetres, then set down
+    #   move-clock.mp3  a wooden blitz move, then a mechanical chess clock pressed (timed games)
+    #   capture.mp3  a triple-weighted boxwood Staunton piece on maple and walnut, the taken
+    #                piece tipping over
+    # The move takes are played at random. castle.mp3 is still the deeper take of 2026-11-10
+    # (two semitones lower, bass=g=5:f=140, equalizer=f=2800:t=q:w=1:g=2.5, a small aecho
+    # room), and check.mp3 is the two bronze bells above with that same warmth.
     # The endings: warm and acoustic like the pieces, never arcade synths.
     "win": ("A short, elegant success chime: three warm rising notes on a soft celesta and a "
             "felt piano, a gentle shimmer at the end. Clean, luxurious, understated, no synths, "

@@ -222,6 +222,24 @@ final class BroadcastTests: XCTestCase {
         XCTAssertEqual(match.game.plyCount, 0, "The old game's move never lands in the new one")
     }
 
+    // MARK: Turning the phone
+
+    func testAScreenOverTheGameKeepsThePhoneUpright() {
+        // Review game, opened on a finished game against the Ashen King: turning the phone
+        // swapped the game for the hall beneath and closed the review with it.
+        AppOrientation.allowLandscape(true)
+        XCTAssertTrue(AppOrientation.allowsLandscape)
+        AppOrientation.cover("review", up: true)
+        XCTAssertFalse(AppOrientation.allowsLandscape, "The phone stays upright while Review game is up")
+        AppOrientation.cover("review", up: true)
+        AppOrientation.cover("review", up: false)
+        XCTAssertTrue(AppOrientation.allowsLandscape, "Closed, the hall is a turn away again")
+        AppOrientation.cover("think", up: true)
+        AppOrientation.allowLandscape(false)
+        AppOrientation.cover("think", up: false)
+        XCTAssertFalse(AppOrientation.allowsLandscape, "Away from the Ashen King nothing turns")
+    }
+
     // MARK: The picture
 
     /// The hall on a sideways iPhone, Tilted and Flat, over the still plate (the films don't

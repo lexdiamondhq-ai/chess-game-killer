@@ -205,6 +205,18 @@ final class BoardReaderTests: XCTestCase {
         XCTAssertFalse(BoardReaderError.failed.errorDescription?.contains("connection") == true)
     }
 
+    func testTheServersRefusalsSayWhatIsTrue() {
+        // Too fast: a minute's wait helps.
+        XCTAssertEqual(CloudBoardReader.refusal(status: 429, body: json(#"{"error": "rate_limited"}"#)), .busy)
+        XCTAssertEqual(CloudBoardReader.refusal(status: 429, body: Data()), .busy)
+        // The day's ceiling: waiting a minute doesn't, and the note mustn't say it does.
+        XCTAssertEqual(CloudBoardReader.refusal(status: 429, body: json(#"{"error": "daily_limit"}"#)), .full)
+        XCTAssertTrue(BoardReaderError.full.errorDescription?.contains("tomorrow") == true)
+        XCTAssertEqual(CloudBoardReader.refusal(status: 503, body: json(#"{"error": "not_configured"}"#)), .notSetUp)
+        XCTAssertEqual(CloudBoardReader.refusal(status: 502, body: json(#"{"error": "upstream", "status": 529}"#)), .failed)
+        XCTAssertEqual(CloudBoardReader.refusal(status: 500, body: Data("oops".utf8)), .failed)
+    }
+
     func testNoBoardInThePicture() {
         XCTAssertThrowsError(try CloudBoardReader.reading(from: json(#"{"found": false}"#))) { error in
             XCTAssertEqual(error as? BoardReaderError, .noBoard)
@@ -247,6 +259,12 @@ struct SlowFakeBoardReader: BoardReader {
     }
 }
 
+/// Counts the scans a test's reads were charged.
+@MainActor
+final class ScanTally {
+    var scans = 0
+}
+
 /// Counts how often the line to the reader is opened.
 final class WarmUpCountingReader: BoardReader, @unchecked Sendable {
     private let lock = NSLock()
@@ -277,6 +295,30 @@ final class ScanSessionTests: XCTestCase {
             try? await Task.sleep(for: .milliseconds(20))
         }
         XCTAssertTrue(condition())
+    }
+
+    /// A scan is counted when the reader answers, so one lost on the way costs nothing.
+    func testAScanCountsOnlyOnceTheReaderAnswered() async {
+        let draft = PositionDraft(fen: "6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1")!
+        let counted = ScanTally()
+        let read = ScanSession(reader: FakeBoardReader(result: .success(
+            BoardReading(draft: draft, whiteSide: .bottom, sureOfTurn: true, confidence: .high)
+        )))
+        read.read(UIImage()) { counted.scans += 1 }
+        await waitUntil { !read.isReading }
+        XCTAssertEqual(counted.scans, 1, "A position read is a scan")
+
+        let empty = ScanSession(reader: FakeBoardReader(result: .failure(.noBoard)))
+        empty.read(UIImage()) { counted.scans += 1 }
+        await waitUntil { !empty.isReading }
+        XCTAssertEqual(counted.scans, 2, "The reader looked and found no board: still a scan")
+
+        for lost in [BoardReaderError.offline, .busy, .full, .failed] {
+            let session = ScanSession(reader: FakeBoardReader(result: .failure(lost)))
+            session.read(UIImage()) { counted.scans += 1 }
+            await waitUntil { !session.isReading }
+        }
+        XCTAssertEqual(counted.scans, 2, "A scan that never got an answer isn't counted")
     }
 
     /// A photo goes from being read straight to its analysis, with no stop in the editor
@@ -686,6 +728,44 @@ final class AnalysisModelTests: XCTestCase {
         XCTAssertTrue(model.canGoForward)
         model.forward()
         XCTAssertEqual(model.movesMade.map { $0.label }, ["1. d4"])
+    }
+
+    /// In check only the king (or a piece that saves it) moves: a tap on a stuck piece says why,
+    /// and the king glows (Alex, 2026-11-11, a photo with the queen on d4 checking the king on f2).
+    func testAStuckPieceInCheckSaysWhy() {
+        let draft = PositionDraft(fen: "3rr1k1/5ppp/p7/3p1b2/2PqP3/8/P3BKPP/R5NR w - - 0 1")!
+        let model = AnalysisModel(draft: draft, engine: nil)
+        XCTAssertEqual(model.kingInCheck, .f2)
+        model.tap(.e2)
+        XCTAssertNil(model.selected)
+        XCTAssertTrue(model.showsCheckNote)
+        model.tap(.f2)
+        XCTAssertEqual(model.selected, .f2)
+        XCTAssertFalse(model.showsCheckNote)
+        model.tap(.g3)
+        XCTAssertNil(model.kingInCheck)
+        XCTAssertFalse(model.showsCheckNote)
+    }
+
+    /// The line under the board says what happened: checkmate, stalemate, a dead draw, check
+    /// (Alex, 2026-11-11).
+    func testTheLineUnderTheBoardSaysWhatHappened() {
+        func note(_ fen: String) -> String? {
+            AnalysisModel(draft: PositionDraft(fen: fen)!, engine: nil).statusNote
+        }
+        XCTAssertEqual(note("R5k1/5ppp/8/8/8/8/8/6K1 b - - 0 1"), "Checkmate. White wins.")
+        XCTAssertEqual(note("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1"), "Stalemate. Black has no moves, so it's a draw.")
+        XCTAssertEqual(note("8/8/4k3/8/8/3K4/8/8 w - - 0 1"), "Draw. Nobody has enough pieces left to checkmate.")
+        XCTAssertEqual(note("3rr1k1/5ppp/p7/3p1b2/2PqP3/8/P3BKPP/R5NR w - - 0 1"), "Check! White's king is under attack.")
+        XCTAssertNil(note(PositionDraft.standard.fen))
+    }
+
+    /// Out of check, a piece with no moves just doesn't pick up, with no note.
+    func testAStuckPieceOutOfCheckSaysNothing() {
+        let model = AnalysisModel(draft: .standard, engine: nil)
+        XCTAssertNil(model.kingInCheck)
+        model.tap(.d1)
+        XCTAssertFalse(model.showsCheckNote)
     }
 
     /// A pawn the person moves to the last rank asks what it becomes, and becomes that.

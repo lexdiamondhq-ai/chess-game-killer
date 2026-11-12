@@ -44,9 +44,9 @@ extension ArmyRank {
 
 // MARK: How a veteran piece looks
 
-/// Draws a piece's rank around it: a soft glow for a Veteran, a battle scar
-/// for Elite, and a breathing golden glow for a Legend. On the board the glow
-/// stays still and there is no scar, so nothing moves on or marks a piece you play with.
+/// Draws a piece's rank on it. Nothing glows (Alex picked no glow anywhere): an Elite or
+/// Legend piece wears a battle scar off the board, and a Legend's gold shows in its name.
+/// On the board a piece stays plain, so nothing marks a piece you play with.
 struct VeteranAura: ViewModifier {
     let rank: ArmyRank
     let piece: Piece
@@ -54,21 +54,8 @@ struct VeteranAura: ViewModifier {
     let size: CGFloat
     var onBoard = true
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     func body(content: Content) -> some View {
         content
-            .background {
-                if rank >= .veteran {
-                    if rank == .legend, !onBoard, !reduceMotion {
-                        halo.phaseAnimator([0.5, 1.0]) { view, phase in
-                            view.opacity(phase).scaleEffect(0.92 + 0.08 * phase)
-                        } animation: { _ in .easeInOut(duration: 1.6) }
-                    } else {
-                        halo
-                    }
-                }
-            }
             .overlay {
                 if rank >= .elite, !onBoard {
                     ScarMark(size: size, raised: false)
@@ -76,27 +63,6 @@ struct VeteranAura: ViewModifier {
                         .allowsHitTesting(false)
                 }
             }
-    }
-
-    private var color: Color { rank.color(for: piece, theme: theme) }
-
-    /// A pool of light under a standing 3D piece, a round glow behind a flat one.
-    @ViewBuilder
-    private var halo: some View {
-        let strength = rank == .legend ? 0.85 : rank == .elite ? 0.6 : 0.45
-        if onBoard && theme.spritePieces {
-            Ellipse()
-                .fill(RadialGradient(colors: [color.opacity(strength), color.opacity(0)],
-                                     center: .center, startRadius: 0, endRadius: size * 0.5))
-                .frame(width: size * 1.0, height: size * 0.42)
-                .offset(y: size * 0.2)
-                .blur(radius: size * 0.04)
-        } else {
-            Circle()
-                .fill(RadialGradient(colors: [color.opacity(strength), color.opacity(0)],
-                                     center: .center, startRadius: 0, endRadius: size * 0.55))
-                .frame(width: size * 1.1, height: size * 1.1)
-        }
     }
 }
 
@@ -261,6 +227,10 @@ struct ArmyView: View {
                 VStack(spacing: 18) {
                     header
                         .homeRise(0)
+                    if let quest = ArmyQuest.of(store, next: .club) {
+                        questCard(quest)
+                            .homeRise(0)
+                    }
                     formation
                         .homeRise(1)
                     if !decorated.isEmpty {
@@ -317,12 +287,32 @@ struct ArmyView: View {
         VStack(spacing: 6) {
             Text("Every piece remembers.")
                 .font(.app(.title3, weight: .bold))
-            Text("Win with them and they earn a name, then a battle scar, then a golden glow.")
+            Text("Win with them and they earn a name, then a battle scar, then a gold name.")
                 .font(.app(.subheadline))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
         .padding(.top, 4)
+    }
+
+    /// The army's job today, in words. Home's slim Your army strip shows only its button (Alex's
+    /// pick B, 2026-11-12), so the sentence lives here. The line never names the rival up next,
+    /// so any rival will do for the lookup.
+    private func questCard(_ quest: ArmyQuest) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("TODAY'S QUEST")
+                .font(.system(size: 10.5, weight: .bold))
+                .tracking(1.3)
+                .foregroundStyle(theme.trainingAccent)
+            Text(quest.line(store))
+                .font(.app(.subheadline))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 12)
+        .padding(.horizontal, 14)
+        .trainingCard(theme)
+        .accessibilityElement(children: .combine)
     }
 
     /// The army lined up as it starts: pawns in front, the back rank behind.

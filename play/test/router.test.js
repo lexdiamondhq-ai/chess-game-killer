@@ -131,6 +131,7 @@ test("making a game returns its links and a token; the room gets only the token'
     name: "Alex",
     side: "black",
     clock: { initial: 180, increment: 2 },
+    days: null,
     look: null,
     tokenHash: createHash("sha256").update(token).digest("hex"),
   });

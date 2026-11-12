@@ -96,10 +96,10 @@ test("the creator's board look is kept, shown and carried into a rematch", () =>
 
 test("the request to make a game is checked", () => {
   const ok = (body, options) => rules.parseCreateInput(body, options);
-  assert.deepEqual(ok({}), { ok: true, value: { name: "Player", side: "random", clock: null, look: null } });
+  assert.deepEqual(ok({}), { ok: true, value: { name: "Player", side: "random", clock: null, days: null, look: null } });
   assert.deepEqual(ok({ name: "  Alex ", side: "black", clock: { initial: 180, increment: 2 } }), {
     ok: true,
-    value: { name: "Alex", side: "black", clock: { initial: 180, increment: 2 }, look: null },
+    value: { name: "Alex", side: "black", clock: { initial: 180, increment: 2 }, days: null, look: null },
   });
   // The creator's board look rides along; anything odd is dropped, never refused.
   assert.equal(ok({ look: "classic" }).value.look, "classic");
@@ -909,4 +909,22 @@ test("days per move are checked", () => {
   assert.deepEqual(rules.parseDays(3), { ok: true, days: 3 });
   assert.equal(rules.parseDays(4).ok, false);
   assert.equal(rules.parseDays("1").ok, false);
+});
+
+test("a friend game can have days per move: unrated, and out of days loses", () => {
+  const input = rules.parseCreateInput({ name: "Alex", side: "white", clock: { initial: 600, increment: 0 }, days: 2 });
+  assert.equal(input.value.days, 2);
+  assert.equal(input.value.clock, null);
+  assert.equal(rules.parseCreateInput({ name: "A", days: 4 }).ok, false);
+  assert.equal(rules.parseCreateInput({ name: "A", clock: null }).value.days, null);
+  const game = rules.createGame({ code: "FR1END", name: "Alex", side: "white", days: 2, tokenHash: WHITE, now: T0 });
+  assert.equal(rules.view(game, T0).deadline, null, "no deadline before the friend joins");
+  rules.join(game, { name: "Sam", tokenHash: BLACK }, T0 + SECOND);
+  const state = rules.view(game, T0 + SECOND);
+  assert.equal(state.days, 2);
+  assert.equal(state.rated, false);
+  assert.equal(state.deadline, T0 + SECOND + 2 * DAY);
+  const { now } = play(game, "e2e4 e7e5", { from: T0 + SECOND });
+  rules.tick(game, now + 2 * DAY);
+  assert.deepEqual(game.result, { winner: "black", reason: "timeout" });
 });

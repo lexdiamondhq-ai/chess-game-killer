@@ -620,7 +620,8 @@ final class MatchControllerTests: XCTestCase {
         let sounds = SilentSounds()
         let match = MatchController(engine: FakeEngine(), sounds: sounds)
         match.start(.init(opponent: .computer, playerColor: .white, level: .club))
-        XCTAssertFalse(match.canResign, "nothing to resign before the first move")
+        XCTAssertTrue(match.canResign, "Resign is there from the start")
+        XCTAssertFalse(match.canOfferDraw, "no draw before the first move")
         tapMove(match, "e2e4")
         await waitUntil("the computer answers") { match.game.plyCount == 2 }
         match.resign()
@@ -628,6 +629,15 @@ final class MatchControllerTests: XCTestCase {
         XCTAssertEqual(match.winner, .black)
         XCTAssertTrue(match.isOver)
         XCTAssertEqual(sounds.played.last, .defeat)
+        XCTAssertFalse(match.canResign)
+    }
+
+    func testThePersonCanResignBeforeTheFirstMove() {
+        let match = MatchController(engine: FakeEngine(), sounds: SilentSounds())
+        XCTAssertFalse(match.canResign, "no game, nothing to resign")
+        match.start(.init(opponent: .computer, playerColor: .white, level: .club))
+        match.resign()
+        XCTAssertEqual(match.outcome, .resigned(loser: .white))
         XCTAssertFalse(match.canResign)
     }
 
