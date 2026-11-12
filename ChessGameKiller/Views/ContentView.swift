@@ -862,16 +862,20 @@ struct ContentView: View {
                 }
             }
             // Flip is in the dock, so it isn't repeated here (Alex, 2026-11-08).
+            // Your games and Your pieces live on Home (the You tab, Rooms and the army tile), so
+            // the menu keeps them only when Home is off (Alex, 2026-11-12).
             Section {
-                Button {
-                    showingGames = true
-                } label: {
-                    Label("Your games", image: Glyphs.games)
-                }
-                Button {
-                    showingArmy = true
-                } label: {
-                    Label("Your pieces", image: Glyphs.army)
+                if !homeScreenOn {
+                    Button {
+                        showingGames = true
+                    } label: {
+                        Label("Your games", image: Glyphs.games)
+                    }
+                    Button {
+                        showingArmy = true
+                    } label: {
+                        Label("Your pieces", image: Glyphs.army)
+                    }
                 }
                 Button {
                     showingSettings = true
