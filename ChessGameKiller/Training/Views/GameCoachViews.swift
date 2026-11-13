@@ -159,6 +159,7 @@ struct ThinkActionButton: View {
         .accessibilityHint("Walks through the three questions to ask before you move.")
         .sheet(isPresented: $showing) {
             ThinkWithMeSheet(fen: match.game.fen, lastMove: match.game.lastMove, theme: theme)
+                .keepsPhoneUpright("think")
         }
     }
 }

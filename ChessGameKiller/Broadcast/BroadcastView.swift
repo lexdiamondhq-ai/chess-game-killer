@@ -39,7 +39,8 @@ struct BroadcastLayout: Equatable {
 }
 
 /// The King's hall: the game against the Ashen King with the phone on its side. His films and
-/// your challenger's play behind the real board, which is played on as always; the clocks sit
+/// your challenger's play behind the real board, which is played on as always and floats in the
+/// sky with no frame around it; the clocks sit
 /// under it and Tilted / Flat by your challenger. Turning the phone upright brings back the
 /// game screen with everything else.
 struct BroadcastView: View {
@@ -63,7 +64,8 @@ struct BroadcastView: View {
                 Color.black
                 scene(layout.sceneFrame)
                 foot(height: geo.size.height)
-                BoardView(match: match, theme: theme, framing: tilt.framing)
+                // No frame and no shadow: the board hangs in the storm.
+                BoardView(match: match, theme: theme, framing: tilt.framing, floating: true)
                     .frame(width: board.width, height: board.height)
                     .offset(x: board.minX, y: board.minY)
                 underBoard

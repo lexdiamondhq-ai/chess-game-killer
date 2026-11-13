@@ -59,42 +59,63 @@ If there is no chess board in the picture, set found to false.`;
 
 export default {
   async fetch(request, env) {
-    const url = new URL(request.url);
-    if (url.pathname === "/" && request.method === "GET") {
-      return json({ ok: true });
-    }
-    if (url.pathname !== "/read") return json({ error: "not_found" }, 404);
-    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
-
-    if (env.SCAN_LIMITER) {
-      const key = request.headers.get("cf-connecting-ip") || "unknown";
-      const { success } = await env.SCAN_LIMITER.limit({ key });
-      if (!success) return json({ error: "rate_limited" }, 429);
-    }
-
-    const type = (request.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
-    if (!IMAGE_TYPES.has(type)) return json({ error: "unsupported_type" }, 415);
-
-    const declared = Number(request.headers.get("content-length") || 0);
-    if (declared > MAX_BYTES) return json({ error: "too_large" }, 413);
-    const bytes = new Uint8Array(await request.arrayBuffer());
-    if (bytes.length === 0) return json({ error: "empty" }, 400);
-    if (bytes.length > MAX_BYTES) return json({ error: "too_large" }, 413);
-
-    if (!apiKey(env)) return json({ error: "not_configured" }, 503);
-
-    // The whole app shares a daily allowance, so the bill has a ceiling even if
-    // someone scripts requests against this public address from many addresses.
-    if (!(await withinDailyBudget(env))) return json({ error: "daily_limit" }, 429);
-
     try {
-      return json(await readBoard(bytes, type, env, settingsFor(request, env)));
+      return await handle(request, env);
     } catch (error) {
-      console.error("reading failed:", error && error.message);
-      return json({ error: "upstream", status: (error && error.status) || null }, 502);
+      // Anything unforeseen (a body cut off mid-upload, the budget counter unreachable) still
+      // answers in JSON, so the app shows its own "try again" instead of a bare failure.
+      console.error("scanner failed:", error && error.message);
+      return json({ error: "internal" }, 500);
     }
   },
 };
+
+async function handle(request, env) {
+  const url = new URL(request.url);
+  if (url.pathname === "/" && request.method === "GET") {
+    return json({ ok: true });
+  }
+  if (url.pathname !== "/read") return json({ error: "not_found" }, 404);
+  if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
+
+  if (await overLimit(env.SCAN_LIMITER, request)) return json({ error: "rate_limited" }, 429);
+
+  const type = (request.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+  if (!IMAGE_TYPES.has(type)) return json({ error: "unsupported_type" }, 415);
+
+  const declared = Number(request.headers.get("content-length") || 0);
+  if (declared > MAX_BYTES) return json({ error: "too_large" }, 413);
+  const bytes = new Uint8Array(await request.arrayBuffer());
+  if (bytes.length === 0) return json({ error: "empty" }, 400);
+  if (bytes.length > MAX_BYTES) return json({ error: "too_large" }, 413);
+
+  if (!apiKey(env)) return json({ error: "not_configured" }, 503);
+
+  // The whole app shares a daily allowance, so the bill has a ceiling even if
+  // someone scripts requests against this public address from many addresses.
+  if (!(await withinDailyBudget(env))) return json({ error: "daily_limit" }, 429);
+
+  try {
+    return json(await readBoard(bytes, type, env, settingsFor(request, env)));
+  } catch (error) {
+    console.error("reading failed:", error && error.message);
+    return json({ error: "upstream", status: (error && error.status) || null }, 502);
+  }
+}
+
+/** True when this address has sent too many pictures in the last minute. */
+async function overLimit(limiter, request) {
+  if (!limiter) return false;
+  const key = request.headers.get("cf-connecting-ip") || "unknown";
+  try {
+    const { success } = await limiter.limit({ key });
+    return !success;
+  } catch (error) {
+    // A limiter hiccup shouldn't stop people scanning; the daily allowance still holds.
+    console.error("limiter failed:", error && error.message);
+    return false;
+  }
+}
 
 /** Asks Claude to read the board and returns the cleaned-up answer. */
 export async function readBoard(bytes, type, env, settings = { model: env.MODEL, effort: env.EFFORT }) {

@@ -14,6 +14,8 @@ struct BoardView: View {
     var endBrowsing: (() -> Void)?
     /// How the 3D board is seen: Flat looks from above, each piece inside its square.
     var framing: SculptedCamera.Framing = .standing
+    /// The 3D board with nothing around its squares, so it hangs in whatever is behind it.
+    var floating = false
     /// The ink for the letters and numbers in the flat board's frame, where the page behind the
     /// board can be light (a friend game in Light). Nil keeps the look's pale ink, as in a game
     /// against the computer, whose screen is always dark.
@@ -36,7 +38,7 @@ struct BoardView: View {
     var body: some View {
         Group {
             if Self.playsIn3D(theme, setting: sculpted3D) {
-                SculptedBoardView(match: match, theme: theme, browsing: browsing, endBrowsing: endBrowsing, framing: framing)
+                SculptedBoardView(match: match, theme: theme, browsing: browsing, endBrowsing: endBrowsing, framing: framing, floating: floating)
             } else {
                 flatBoard
             }

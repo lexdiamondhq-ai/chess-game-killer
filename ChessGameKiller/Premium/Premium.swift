@@ -203,6 +203,15 @@ final class Premium {
         products[plan]?.displayPrice ?? plan.fallbackPrice
     }
 
+    /// The line under the yearly plan: what it comes to a month and what it saves, in the
+    /// App Store's own prices once they have loaded.
+    var yearlyNote: String {
+        guard let yearly = products[.yearly], let monthly = products[.monthly] else {
+            return PremiumPlan.fallbackYearlyNote
+        }
+        return PremiumPlan.yearlyNote(yearly: yearly.price, monthly: monthly.price, style: yearly.priceFormatStyle)
+    }
+
     /// Whether the plan starts with a free trial this player can still take.
     func hasTrial(_ plan: PremiumPlan) async -> Bool {
         guard let subscription = products[plan]?.subscription, subscription.introductoryOffer != nil else {

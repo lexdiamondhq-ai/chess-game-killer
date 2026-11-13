@@ -165,4 +165,18 @@ enum PremiumPlan: String, CaseIterable, Identifiable {
         case .monthly: return "a month"
         }
     }
+
+    /// The line under the yearly plan before the App Store's prices arrive, for the planned prices.
+    static let fallbackYearlyNote = "Just $5 a month. Save 50%"
+
+    /// The line under the yearly plan, worked out from the App Store's own prices, so it is
+    /// true in every country's money: what a year comes to a month, and what that saves
+    /// against paying monthly. Only the monthly price when a year saves nothing worth saying.
+    static func yearlyNote(yearly: Decimal, monthly: Decimal, style: Decimal.FormatStyle.Currency) -> String {
+        let aMonth = (yearly / 12).formatted(style.precision(.fractionLength(0...2)))
+        guard monthly > 0 else { return "Just \(aMonth) a month" }
+        let share = NSDecimalNumber(decimal: yearly / (monthly * 12)).doubleValue
+        let saved = Int(((1 - share) * 100).rounded())
+        return saved >= 5 ? "Just \(aMonth) a month. Save \(saved)%" : "Just \(aMonth) a month"
+    }
 }

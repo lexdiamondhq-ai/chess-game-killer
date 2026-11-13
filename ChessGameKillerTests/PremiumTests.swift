@@ -52,6 +52,18 @@ final class PremiumTests: XCTestCase {
         }
     }
 
+    func testTheYearlyLineIsWorkedOutFromTheStoresPrices() {
+        let dollars = Decimal.FormatStyle.Currency(code: "USD", locale: Locale(identifier: "en_US"))
+        XCTAssertEqual(PremiumPlan.yearlyNote(yearly: Decimal(string: "59.99")!, monthly: Decimal(string: "9.99")!, style: dollars),
+                       PremiumPlan.fallbackYearlyNote, "The planned prices read as they always have")
+        // Another country's prices: its own money, and its own saving.
+        let pounds = Decimal.FormatStyle.Currency(code: "GBP", locale: Locale(identifier: "en_GB"))
+        XCTAssertEqual(PremiumPlan.yearlyNote(yearly: Decimal(string: "49.99")!, monthly: Decimal(string: "8.99")!, style: pounds),
+                       "Just £4.17 a month. Save 54%")
+        // A year that saves nothing says only what it comes to.
+        XCTAssertEqual(PremiumPlan.yearlyNote(yearly: 120, monthly: 10, style: dollars), "Just $10 a month")
+    }
+
     // MARK: Counting
 
     func testADayAllowanceRunsOutAndComesBackTomorrow() {

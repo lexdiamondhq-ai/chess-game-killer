@@ -2,8 +2,8 @@ import ChessKit
 import SwiftUI
 
 /// Your army on Today (it used to have a tab of its own): all sixteen pieces lined up as
-/// they start, pawns in front, each lit by how far it has come (a soft glow for a Veteran, a
-/// gold one for a Legend), with the army's hero named above them. A tap opens the army.
+/// they start, pawns in front, each marked by how far it has come (a gold line under a Veteran,
+/// a longer brighter one under a Legend; nothing glows), with the army's hero named above them. A tap opens the army.
 struct HomeArmyTile: View {
     let army: ArmyStore
     /// The side the player last took: the army wears its color.
@@ -79,22 +79,21 @@ struct HomeArmyTile: View {
 
     private func soldier(_ slot: ArmySlot, size: CGFloat) -> some View {
         let rank: ArmyRank = army.record(for: slot).rank
-        let glow: Double
+        let strength: Double
         switch rank {
-        case .recruit: glow = 0
-        case .veteran: glow = 0.35
-        case .elite: glow = 0.6
-        case .legend: glow = 0.95
+        case .recruit: strength = 0
+        case .veteran: strength = 0.35
+        case .elite: strength = 0.6
+        case .legend: strength = 0.95
         }
         let piece = Piece(slot.kind, color: color, square: slot.square(for: color))
         // Fitted into its frame rather than standing on a square, so the two rows don't overlap.
         return PieceImage(piece: piece, theme: pieceTheme, size: size)
             .frame(width: size, height: size)
-            .shadow(color: tone.metal.opacity(glow), radius: rank == .recruit ? 0 : size * 0.22)
             .overlay(alignment: .bottom) {
                 if rank >= .veteran {
                     Capsule()
-                        .fill(tone.metal.opacity(0.4 + glow * 0.6))
+                        .fill(tone.metal.opacity(0.4 + strength * 0.6))
                         .frame(width: size * (rank == .legend ? 0.5 : 0.3), height: 2)
                         .offset(y: 3)
                 }

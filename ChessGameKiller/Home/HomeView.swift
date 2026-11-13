@@ -743,7 +743,7 @@ extension HomeView {
             hall = HallVisit(start: level, intro: false)
         }, chessDNA: actions.chessDNA, puzzles: actions.puzzles, replay: { id in
             if let game = vault.game(id) { actions.openGame(game) }
-        })
+        }, army: actions.army, armyQuest: { level in playOtherRival(level) })
         return HomeAuroraView(tone: tone, info: auroraInfo, actions: auroraActions)
             .task {
                 // Keeps whose move it is in games with people, and how many wait online, up to
@@ -756,6 +756,9 @@ extension HomeView {
                     try? await Task.sleep(for: .seconds(ChallengeCenter.refreshInterval))
                 }
             }
+            // A link from outside (a friend's challenge, Today's Move) brings its own screen
+            // forward: the hall steps aside for it.
+            .onReceive(NotificationCenter.default.publisher(for: ScreenCovers.closeAll)) { _ in hall = nil }
             .fullScreenCover(item: $hall) { visit in
                 RivalsHall(start: visit.start, intro: visit.intro, begin: { level in
                     // The film's last frame gives way to the game: the hall closes at once.

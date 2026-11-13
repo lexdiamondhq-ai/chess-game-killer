@@ -23,6 +23,9 @@ struct ExecutivePlate: View {
     /// tarnished silver for the rest (Alex, 2026-11-08; `RivalLetters`).
     private var speaksInBlood: Bool { isComputer && !inDock }
     private var voice: RivalLetters.Voice { .init(match.setup.level) }
+    /// The rival's card shows its film and weather behind it on the dark looks; the light looks
+    /// keep plain glass, where the rival's dark letters read.
+    private var showsWeather: Bool { speaksInBlood && theme.isDark }
     /// The line under the rival's name (its taunt, remarks and captures) is half again as large
     /// as the rest (Alex, 2026-11-08).
     private var lineScale: CGFloat { isComputer && !inDock ? 1.5 : 1 }
@@ -115,6 +118,13 @@ struct ExecutivePlate: View {
         .padding(.leading, 12)
         .padding(.trailing, 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background {
+            // The rival's film and its weather behind its words, on the dark looks (Alex, 2026-11-11).
+            if showsWeather {
+                RivalCardBackdrop(rival: match.setup.rival)
+                    .clipShape(shape)
+            }
+        }
         .glassPane(shape)
         .overlay {
             // Whose move it is: a fine edge of the look's gold, as the Home lights the next rung.
@@ -301,7 +311,11 @@ struct ExecutivePlate: View {
 
     @ViewBuilder
     private var avatar: some View {
-        if isComputer {
+        if speaksInBlood {
+            LivingRivalCoin(rival: match.setup.rival, size: 40,
+                            captures: match.game.captured(by: color).reduce(0) { $0 + $1.count },
+                            losing: match.game.materialLead(for: color) <= -3)
+        } else if isComputer {
             RivalPortrait(rival: match.setup.rival, size: 40, glows: theme.glows)
         } else {
             let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
