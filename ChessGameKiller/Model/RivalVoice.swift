@@ -41,7 +41,7 @@ struct RivalLine: Equatable, Identifiable {
 
 /// What each crowd says, as one voice for thousands of players: "we". The 1000s are cheerful
 /// and surprised, the Masters barely speak. Dry, never chirpy, and short enough to fit the line
-/// under its name (48 characters at most). The Grudge has its own voice: `GrudgeVoice`.
+/// under its name (48 characters at most).
 enum RivalVoice {
     /// A line for `moment`, or nil if this crowd keeps quiet. `pick` in 0..<1 chooses among them.
     static func line(for moment: RivalMoment, level: MatchController.Level, pick: Double) -> String? {
@@ -128,70 +128,5 @@ enum RivalVoice {
         case (.drawDeclined, .expert): return ["Declined."]
         case (.drawDeclined, .grandmaster): return ["A draw? Never."]
         }
-    }
-}
-
-/// What your Grudge says. It only ever states true things from your games against it: the
-/// score, its streaks, the piece it took last time. Dry, short, never an insult, and short
-/// enough for the line under its name (48 characters at most).
-enum GrudgeVoice {
-    static func line(for moment: RivalMoment, record: GrudgeRecord?, now: Date = .now, pick: Double) -> String? {
-        RivalVoice.choose(lines(for: moment, record: record, now: now), pick: pick)
-    }
-
-    static func lines(for moment: RivalMoment, record: GrudgeRecord?, now: Date = .now) -> [String] {
-        let mood = record?.mood ?? .even
-        let its = record?.itsWins ?? 0
-        let quiet = mood == .rattled
-        switch moment {
-        case .greeting:
-            if let memory = record?.lastLoss, mood != .respect, let line = recall(memory, now: now) {
-                return [line]
-            }
-            switch mood {
-            case .smug: return ["You again. \(its) to me so far.", "Sit down. I remember you."]
-            case .rattled: return ["Two in a row. Not three."]
-            case .furious: return ["You ended my streak. Sit down."]
-            case .respect: return ["Fine. Let's see if it holds."]
-            case .even: return ["We're level. Not for long.", "I remember you."]
-            }
-        case .tookPiece(let kind):
-            return quiet ? ["Mine."] : ["Your \(kind.word). Like last time.", "I'll remember that \(kind.word)."]
-        case .lostPiece:
-            return quiet ? ["…"] : ["Keep it. For now.", "That changes nothing."]
-        case .givesCheck:
-            return quiet ? ["Check."] : ["Check. Remember this?", "Check."]
-        case .inCheck:
-            return quiet ? [] : ["Hm.", "You've been practising."]
-        case .playerBlunder:
-            return ["There it is.", "Same as last time."]
-        case .playerGreatMove:
-            return quiet ? ["…"] : ["Lucky.", "Who taught you that?"]
-        case .rivalResigns:
-            return ["This one. Not the next."]
-        case .playerResigned:
-            return ["Wise. That's \(its + 1)."]
-        case .rivalWins:
-            return ["Again.", "That's \(its + 1)."]
-        case .playerWins:
-            return quiet ? ["…"] : ["Lucky.", "Enjoy it. It's going on the list."]
-        case .draw:
-            return ["A draw. We'll finish this."]
-        case .drawDeclined:
-            return quiet ? ["No."] : ["No. Play it out.", "A draw? Not with you."]
-        }
-    }
-
-    /// "Tuesday. Move 12. Remember?", or for an older game "Your knight. Move 12. Remember?"
-    static func recall(_ memory: GrudgeRecord.Moment, now: Date) -> String? {
-        let days = Calendar.current.dateComponents([.day], from: memory.date, to: now).day ?? 99
-        if days >= 1 && days < 7 {
-            let formatter = DateFormatter()
-            formatter.locale = Locale(identifier: "en_US_POSIX")
-            formatter.dateFormat = "EEEE"
-            return "\(formatter.string(from: memory.date)). Move \(memory.move). Remember?"
-        }
-        if days < 1 { return "Move \(memory.move). Your \(memory.piece). Remember?" }
-        return "Your \(memory.piece) on \(memory.square). Remember?"
     }
 }

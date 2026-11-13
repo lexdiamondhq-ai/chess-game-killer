@@ -785,9 +785,9 @@ private struct CoachPanel: View {
 
     /// The rival above the one just beaten, while it is still unbeaten: the climb's next step
     /// (Alex, 2026-11-11, audit pick R2: a win opened the next rival and nothing said so).
-    /// Never after Your Grudge, a loss or a draw, or once the last rival has fallen.
+    /// Never after a loss or a draw, or once the last rival has fallen.
     private var nextRival: MatchController.Level? {
-        guard faceNext != nil, match.playerWon == true, !match.setup.grudge,
+        guard faceNext != nil, match.playerWon == true,
               let next = MatchController.Level(rawValue: match.setup.level.rawValue + 1),
               !RivalLadder().beaten(next.rival) else { return nil }
         return next

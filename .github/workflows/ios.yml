@@ -184,7 +184,6 @@ jobs:
           shoot faberge -showcaseLook faberge
           shoot neon -showcaseLook neon
           shoot classic -showcaseLook classic
-          shoot grudge -showcaseLook gilded -showcaseRival grudge -showcaseClock 3+2
           shoot coach -showcaseLook gilded -showcase3D NO -showcaseCoach open
           # The Board view setting: flat from above, each piece seated in its own square.
           shoot flat-3d -showcaseLook gilded -showcase3D YES -boardTilt flat
@@ -213,8 +212,6 @@ jobs:
           home daily-move -showcaseDaily YES -welcomeSeen YES -tipsOff YES
           # The gold knight in the dock, held: the rivals and shortcuts over the veiled home.
           home home-shortcuts -showcaseShortcuts YES -welcomeSeen YES -tipsOff YES
-          # Someone at the Table with a game under way against your Grudge: red light, leaning in on your move.
-          home home-grudge -showcase game -showcaseHome YES -showcaseRival grudge -welcomeSeen YES -tipsOff YES
           # The home at rest with games going against the computer and with people: Your move under the board.
           home home-current-rest -showcase game -showcaseHome YES -showcaseGames YES -welcomeSeen YES -tipsOff YES
           # The game in the Dynamic Island: a timed game under way, then another app in front of it.
@@ -271,7 +268,7 @@ jobs:
         # The screens being worked on, once more at the very end and small, so a short tail of the log holds them.
         run: |
           [ -d snapshots ] || exit 0
-          for f in snapshots/device-home.png snapshots/device-home-middle.png snapshots/device-home-dark.png snapshots/device-gilded-3d.png snapshots/device-coach.png snapshots/device-home-grudge.png snapshots/tour-rewind.png snapshots/tour-deep-review-waiting.png snapshots/tour-deep-review.png snapshots/broadcast-tilted.png snapshots/broadcast-flat.png; do
+          for f in snapshots/device-home.png snapshots/device-home-middle.png snapshots/device-home-dark.png snapshots/device-gilded-3d.png snapshots/device-coach.png snapshots/tour-rewind.png snapshots/tour-deep-review-waiting.png snapshots/tour-deep-review.png snapshots/broadcast-tilted.png snapshots/broadcast-flat.png; do
             [ -e "$f" ] || continue
             sips -s format jpeg -s formatOptions 70 -Z 1700 "$f" --out /tmp/tiny.jpg >/dev/null
             echo "BEGIN-SCREEN $(basename "$f")"
