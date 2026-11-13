@@ -156,7 +156,6 @@ struct AnalyzeSheet: View {
         .onChange(of: photoItem) { _, item in
             guard let item else { return }
             session.warmUpReader()
-            session.photoPicked()
             Task {
                 // Loading can mean an iCloud download, so show that something is happening.
                 isLoadingPhoto = true
@@ -187,7 +186,12 @@ extension AnalyzeSheet {
     fileprivate func destination(_ step: ScanSession.Step) -> some View {
         switch step {
         case .reading:
-            PhotoReadingView(session: session, theme: theme)
+            // The analysis board straight away, while the photo is read (Alex, 2026-11-13,
+            // "Board right away"): its pieces and arrows come in when the reading lands.
+            AnalysisView(draft: .empty, theme: theme, engine: nil, rival: rival, clock: clock,
+                         readingPhoto: true,
+                         onStopReading: { withAnimation(.snappy) { session.stopReading() } },
+                         onLeaveReading: { session.leaveReading() }) { _ in }
         case .editor:
             BoardEditorView(session: session, theme: theme)
         case .analysis:
@@ -195,7 +199,6 @@ extension AnalyzeSheet {
             AnalysisView(draft: session.analyzed, theme: theme, engine: engine, model: session.analysis,
                          rival: rival, clock: clock, forfeits: forfeits,
                          photo: session.photo, photoDoubts: session.photoDoubts,
-                         stopwatch: session.stopwatch,
                          onEditPieces: { session.editPieces($0) },
                          onSwitchTurn: { session.switchTurn(of: $0) },
                          photoButtons: photoButtons) { draft in
@@ -344,32 +347,6 @@ struct Panel: View {
                         .shadow(color: highlight.opacity(theme.glows ? 0.45 : 0), radius: 10)
                 }
             }
-    }
-}
-
-// MARK: - Reading
-
-/// While the reader checks every square: the Gilded knight drawn in light on a glass card,
-/// "Processing" below (KnightLoadingView, Alex 2026-11-10). Its analysis follows by itself;
-/// Stop goes to the editor to set the pieces by hand.
-struct PhotoReadingView: View {
-    let session: ScanSession
-    let theme: BoardTheme
-
-    var body: some View {
-        KnightLoadingView()
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.hidden, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Stop") { withAnimation(.snappy) { session.stopReading() } }
-                        .accessibilityLabel("Stop reading the photo")
-                        .accessibilityHint("Then set up the pieces by hand")
-                }
-            }
-            // Backing out while it's read drops the read, so its analysis can't open later.
-            .onDisappear { session.leaveReading() }
     }
 }
 
@@ -597,14 +574,19 @@ struct AnalysisView: View {
     /// The photo the position was read from, and what the reader wasn't sure of.
     var photo: UIImage?
     var photoDoubts: String?
-    /// Where the photo's time went, shown small under it (Alex, 2026-11-13: "Stopwatch first").
-    var stopwatch: PhotoStopwatch?
     /// Opens the editor on the board's pieces, to fix one the reader got wrong. Offered with the photo.
     var onEditPieces: ((PositionDraft) -> Void)?
     /// Gives the board's position to the other side to move, for a fresh analysis.
     var onSwitchTurn: ((PositionDraft) -> Void)?
     /// Take a photo and Upload a photo, for a new board, when the analyzer offers them.
     var photoButtons: AnalysisPhotoButtons?
+    /// The photo is still being read: an empty board, "Reading your board…" and Stop, with no
+    /// engine yet (Alex, 2026-11-13: the board right away instead of a waiting screen).
+    var readingPhoto = false
+    /// Stop gives up on the read, for setting the pieces up by hand.
+    var onStopReading: (() -> Void)?
+    /// Backing out while it's read drops the read, so its analysis can't open later.
+    var onLeaveReading: (() -> Void)?
     let onPlay: (PositionDraft) -> Void
 
     @State private var model: AnalysisModel
@@ -619,10 +601,10 @@ struct AnalysisView: View {
     init(draft: PositionDraft, theme: BoardTheme, engine: ChessEngine?, model: AnalysisModel? = nil,
          rival: String = "the computer",
          clock: TimeControl = .unlimited, forfeits: String? = nil,
-         photo: UIImage? = nil, photoDoubts: String? = nil, stopwatch: PhotoStopwatch? = nil,
-         onEditPieces: ((PositionDraft) -> Void)? = nil,
+         photo: UIImage? = nil, photoDoubts: String? = nil, onEditPieces: ((PositionDraft) -> Void)? = nil,
          onSwitchTurn: ((PositionDraft) -> Void)? = nil,
          photoButtons: AnalysisPhotoButtons? = nil,
+         readingPhoto: Bool = false, onStopReading: (() -> Void)? = nil, onLeaveReading: (() -> Void)? = nil,
          onPlay: @escaping (PositionDraft) -> Void) {
         self.theme = theme
         self.rival = rival
@@ -630,10 +612,12 @@ struct AnalysisView: View {
         self.forfeits = forfeits
         self.photo = photo
         self.photoDoubts = photoDoubts
-        self.stopwatch = stopwatch
         self.onEditPieces = onEditPieces
         self.onSwitchTurn = onSwitchTurn
         self.photoButtons = photoButtons
+        self.readingPhoto = readingPhoto
+        self.onStopReading = onStopReading
+        self.onLeaveReading = onLeaveReading
         self.onPlay = onPlay
         let sounds: SoundPlaying? = engine == nil ? nil : SoundPlayer.shared
         _model = State(initialValue: model ?? AnalysisModel(draft: draft, engine: engine, sounds: sounds))
@@ -747,7 +731,7 @@ struct AnalysisView: View {
                     // Edge to edge, as the game's board runs: out past the screen's own padding.
                     .padding(.horizontal, -16)
                 HStack {
-                    turn
+                    if !readingPhoto { turn }
                     Spacer(minLength: 0)
                     BoardViewSwitch(theme: theme)
                 }
@@ -809,15 +793,21 @@ struct AnalysisView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 14) {
-                photoRow
-                header
-                board
-                    .sensoryFeedback(.selection, trigger: model.selected) { _, new in hapticsOn && new != nil }
-                    .sensoryFeedback(.warning, trigger: model.showsCheckNote) { _, new in hapticsOn && new }
-                checkNote
-                madeMoves
-                lines
-                help
+                if readingPhoto {
+                    board
+                        .allowsHitTesting(false)
+                    readingPill
+                } else {
+                    photoRow
+                    header
+                    board
+                        .sensoryFeedback(.selection, trigger: model.selected) { _, new in hapticsOn && new != nil }
+                        .sensoryFeedback(.warning, trigger: model.showsCheckNote) { _, new in hapticsOn && new }
+                    checkNote
+                    madeMoves
+                    lines
+                    help
+                }
             }
             .padding(16)
             .animation(.snappy, value: model.lines)
@@ -827,6 +817,7 @@ struct AnalysisView: View {
             // One bar at the bottom (Alex, 2026-11-13, option A): the step buttons and the
             // camera and photo share a solid strip that stays put, so the page scrolls cleanly
             // above it and nothing floats over Play the line.
+            if !readingPhoto {
             HStack(spacing: 8) {
                 stepper
                 if let photoButtons {
@@ -843,22 +834,32 @@ struct AnalysisView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
             .modifier(SolidBottomBar())
+            }
         }
         .modifier(HardBottomEdge())
         .navigationTitle("Analysis")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button { flipped.toggle() } label: {
-                    Label {
-                        Text("Flip board")
-                    } icon: {
-                        Glyph(name: Glyphs.flip, size: 24)
+            if readingPhoto, let onStopReading {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Stop", action: onStopReading)
+                        .accessibilityLabel("Stop reading the photo")
+                        .accessibilityHint("Then set up the pieces by hand")
+                }
+            } else {
+                ToolbarItem(placement: .primaryAction) {
+                    Button { flipped.toggle() } label: {
+                        Label {
+                            Text("Flip board")
+                        } icon: {
+                            Glyph(name: Glyphs.flip, size: 24)
+                        }
                     }
                 }
             }
         }
-        .task { await model.run() }
+        .task { if !readingPhoto { await model.run() } }
+        .onDisappear { if readingPhoto { onLeaveReading?() } }
         .onDisappear { model.stopLine() }
         .sheet(isPresented: $showingPhoto) {
             if let photo {
@@ -890,13 +891,28 @@ struct AnalysisView: View {
 
     // MARK: The photo
 
+    /// Under the empty board while the photo is read: the knight tracing itself, and what's
+    /// happening. The pieces take its place in about three seconds.
+    private var readingPill: some View {
+        HStack(spacing: 10) {
+            KnightTraceMark()
+                .frame(width: 20, height: 25)
+            Text("Reading your board…")
+                .font(.app(.subheadline, weight: .semibold))
+        }
+        .padding(.horizontal, 18)
+        .frame(minHeight: 44)
+        .glassPane(Capsule())
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Reading your board")
+    }
+
     /// The photo the position was read from, with the way to fix its pieces.
     @ViewBuilder
     private var photoRow: some View {
         if let photo, let onEditPieces {
-            PhotoSourceRow(photo: photo, doubts: photoDoubts,
-                           stopwatch: stopwatch?.line(arrows: model.arrowsAfter, done: model.doneAfter),
-                           theme: theme) {
+            PhotoSourceRow(photo: photo, doubts: photoDoubts, theme: theme) {
                 showingPhoto = true
             } onEdit: {
                 model.stopLine()
@@ -1102,8 +1118,6 @@ struct AnalysisView: View {
 private struct PhotoSourceRow: View {
     let photo: UIImage
     let doubts: String?
-    /// Where the photo's time went, in small print.
-    var stopwatch: String? = nil
     let theme: BoardTheme
     let onShowPhoto: () -> Void
     let onEdit: () -> Void
@@ -1127,14 +1141,6 @@ private struct PhotoSourceRow: View {
                         .font(.app(.footnote))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                }
-                if let stopwatch {
-                    Label(stopwatch, systemImage: "stopwatch")
-                        .font(.app(.caption2))
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityLabel("Stopwatch: \(stopwatch)")
                 }
             }
             Spacer(minLength: 0)

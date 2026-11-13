@@ -275,21 +275,6 @@ final class WarmUpCountingReader: BoardReader, @unchecked Sendable {
     func warmUp() { lock.withLock { count += 1 } }
 }
 
-/// The stopwatch under a photo's analysis (Alex, 2026-11-13: "Stopwatch first").
-final class PhotoStopwatchTests: XCTestCase {
-    func testEveryStepIsNamedWithItsSeconds() {
-        let watch = PhotoStopwatch(load: 0.34, read: 3.1,
-                                   parts: ReadTiming(prepare: 0.12, roundTrip: 2.98, server: 2.4))
-        XCTAssertEqual(watch.line(arrows: 0.52, done: 2.96),
-                       "Photo 0.3 s · Shrink 0.1 s · Trip 0.6 s · Read 2.4 s · Arrows 0.5 s · Done 3.0 s · Total 6.4 s")
-    }
-
-    func testStepsStillGoingShowDots() {
-        let watch = PhotoStopwatch(load: nil, read: 2.0, parts: ReadTiming(prepare: 0.1, roundTrip: 1.8, server: nil))
-        XCTAssertEqual(watch.line(arrows: nil, done: nil), "Shrink 0.1 s · Send + read 1.8 s · Arrows … · Done …")
-    }
-}
-
 @MainActor
 final class ScanSessionTests: XCTestCase {
 

@@ -362,3 +362,28 @@ struct BoardKnightRimSegment: Shape {
 #Preview("Dark") {
     KnightLoadingView().preferredColorScheme(.dark)
 }
+
+/// The same knight and spark at pill size, beside "Reading your board…" while a photo is read
+/// over its analysis board (Alex, 2026-11-13, "Board right away"): the outline with a small
+/// spark running round it, and no big glow.
+struct KnightTraceMark: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        TimelineView(.animation(paused: reduceMotion)) { context in
+            let phase = reduceMotion ? 0 : (context.date.timeIntervalSinceReferenceDate / 3.2)
+                .truncatingRemainder(dividingBy: 1)
+            ZStack {
+                BoardKnightArt()
+                    .stroke(Color.primary.opacity(0.75),
+                            style: StrokeStyle(lineWidth: 1.2, lineCap: .round, lineJoin: .round))
+                if !reduceMotion {
+                    BoardKnightRimSegment(start: phase, length: 0.16)
+                        .stroke(Color.primary, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                        .shadow(color: .white.opacity(0.7), radius: 2)
+                }
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
