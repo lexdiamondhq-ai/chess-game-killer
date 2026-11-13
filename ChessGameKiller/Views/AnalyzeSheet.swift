@@ -255,25 +255,42 @@ private struct PhotoPillStyle: ButtonStyle {
         configuration.label
             .font(.app(.title3, weight: .semibold))
             .foregroundStyle(accent)
-            .frame(width: 58, height: 46)
+            .frame(width: 44, height: 44)
             .contentShape(Rectangle())
             .opacity(configuration.isPressed ? 0.55 : 1)
     }
 }
 
-/// No frosted fade where the page scrolls under the photo buttons: the moves stay readable
-/// right down to the bottom.
-private struct ClearBottomEdge: ViewModifier {
+/// A firm edge where the page meets the bottom bar, so moves never show through the buttons
+/// (Alex, 2026-11-13: the photo buttons sat on top of Play the line).
+private struct HardBottomEdge: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
         #if compiler(>=6.2)
         if #available(iOS 26.0, *) {
-            content.scrollEdgeEffectHidden(true, for: .bottom)
+            content.scrollEdgeEffectStyle(.hard, for: .bottom)
         } else {
             content
         }
         #else
         content
+        #endif
+    }
+}
+
+/// Before iOS 26 the bottom bar takes the bar material, so the page doesn't show through it.
+/// On iOS 26 the scroll view's hard edge does that job.
+private struct SolidBottomBar: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) {
+            content
+        } else {
+            content.background(.bar)
+        }
+        #else
+        content.background(.bar)
         #endif
     }
 }
@@ -792,7 +809,6 @@ struct AnalysisView: View {
                     .sensoryFeedback(.selection, trigger: model.selected) { _, new in hapticsOn && new != nil }
                     .sensoryFeedback(.warning, trigger: model.showsCheckNote) { _, new in hapticsOn && new }
                 checkNote
-                stepper
                 madeMoves
                 lines
                 help
@@ -802,27 +818,27 @@ struct AnalysisView: View {
             .animation(.snappy(duration: 0.25), value: model.statusNote)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            // Lower right (Alex, 2026-11-08), docked in its own strip so the page scrolls
-            // above it and it never covers a score.
-            if let photoButtons {
-                HStack {
-                    Spacer()
+            // One bar at the bottom (Alex, 2026-11-13, option A): the step buttons and the
+            // camera and photo share a solid strip that stays put, so the page scrolls cleanly
+            // above it and nothing floats over Play the line.
+            HStack(spacing: 8) {
+                stepper
+                if let photoButtons {
+                    Divider().frame(height: 28)
                     HStack(spacing: 0) {
                         photoButtons
                     }
                     .labelStyle(.iconOnly)
                     .buttonStyle(PhotoPillStyle(accent: accent))
-                    // Clear glass with no strip behind it, so the moves show through
-                    // (Alex, 2026-11-11: "more clear and glassy so you can see the moves").
                     .glassPane(Capsule(), weight: .clear)
                     .overlay(Capsule().strokeBorder(accent.opacity(0.3), lineWidth: 1))
-                    .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .modifier(SolidBottomBar())
         }
-        .modifier(ClearBottomEdge())
+        .modifier(HardBottomEdge())
         .navigationTitle("Analysis")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -922,20 +938,20 @@ struct AnalysisView: View {
 
     /// Back to the start, a move back, play the best line, a move ahead.
     private var stepper: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             stepButton("backward.end.fill", label: "Back to the start", enabled: model.canGoBack) { model.rewind() }
             stepButton("chevron.backward", label: "Move back", enabled: model.canGoBack) { model.back() }
             Button {
                 if model.isPlayingLine { model.stopLine() } else { model.playLine() }
             } label: {
-                Label(model.isPlayingLine ? "Pause" : "Play the line",
-                      systemImage: model.isPlayingLine ? "pause.fill" : "play.fill")
-                    .font(.app(.subheadline, weight: .semibold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .contentTransition(.symbolEffect(.replace))
+                // In the bottom bar beside the photo buttons, a narrow phone shows just "Play".
+                ViewThatFits(in: .horizontal) {
+                    playLabel(model.isPlayingLine ? "Pause" : "Play the line")
+                    playLabel(model.isPlayingLine ? "Pause" : "Play")
+                }
+                .frame(maxWidth: .infinity, minHeight: 44)
             }
+            .accessibilityLabel(model.isPlayingLine ? "Pause" : "Play the line")
             .buttonStyle(.bordered)
             .disabled(!model.isPlayingLine && !model.canPlayLine)
             .accessibilityHint("Plays the engine's best line out on the board, a move at a time")
@@ -943,11 +959,19 @@ struct AnalysisView: View {
         }
     }
 
+    private func playLabel(_ title: String) -> some View {
+        Label(title, systemImage: model.isPlayingLine ? "pause.fill" : "play.fill")
+            .font(.app(.subheadline, weight: .semibold))
+            .lineLimit(1)
+            .fixedSize()
+            .contentTransition(.symbolEffect(.replace))
+    }
+
     private func stepButton(_ symbol: String, label: String, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.app(.body, weight: .semibold))
-                .frame(width: 48, height: 44)
+                .frame(width: 26, height: 44)
         }
         .buttonStyle(.bordered)
         .disabled(!enabled)
