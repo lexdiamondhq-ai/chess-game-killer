@@ -280,20 +280,25 @@ private struct HardBottomEdge: ViewModifier {
     }
 }
 
-/// Before iOS 26 the bottom bar takes the bar material, so the page doesn't show through it.
-/// On iOS 26 the scroll view's hard edge does that job.
+/// The bottom bar is a solid strip, set into the page with a hairline on top, so the board and
+/// the Tilted switch never show through the step buttons. On iOS 26 the scroll edge alone left
+/// it see-through (Alex, 2026-11-13: "I thought it was set into the page and not floating").
 private struct SolidBottomBar: ViewModifier {
-    @ViewBuilder
+    let theme: BoardTheme
+
     func body(content: Content) -> some View {
-        #if compiler(>=6.2)
-        if #available(iOS 26.0, *) {
-            content
-        } else {
-            content.background(.bar)
-        }
-        #else
-        content.background(.bar)
-        #endif
+        content
+            .background {
+                // The sheet's own backdrop, so the strip reads as part of the page.
+                TrainingBackdrop(theme: theme)
+                    .ignoresSafeArea(edges: .bottom)
+                    .clipped()
+            }
+            .overlay(alignment: .top) {
+                Rectangle()
+                    .fill(Color.primary.opacity(0.08))
+                    .frame(height: 1)
+            }
     }
 }
 
@@ -842,7 +847,7 @@ struct AnalysisView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
-            .modifier(SolidBottomBar())
+            .modifier(SolidBottomBar(theme: theme))
         }
         .modifier(HardBottomEdge())
         .navigationTitle("Analysis")
