@@ -169,3 +169,26 @@ struct HomeAuroraArmy: View {
         return parts.joined(separator: ". ")
     }
 }
+
+/// The carved line that closes the Aurora home, under Your army: "Every piece remembers" in
+/// small gold Cinzel between two fine gold rules (Alex's pick, 2026-11-12).
+struct HomeAuroraSignOff: View {
+    let palette: HomeAuroraPalette
+
+    var body: some View {
+        let rule = Rectangle()
+            .fill(palette.gold.opacity(0.35))
+            .frame(width: 22, height: 1)
+        return HStack(spacing: 10) {
+            rule
+            Text("EVERY PIECE REMEMBERS")
+                .font(.custom(HomeAuroraArmy.nameFont, size: 11))
+                .tracking(1.6)
+                .foregroundStyle(palette.gold.opacity(0.85))
+                .lineLimit(1)
+            rule
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityHidden(true)
+    }
+}

@@ -373,8 +373,13 @@ struct HomeAuroraView: View {
             // Army to the bottom and change the format to more of a rectangle"): the champion
             // and today's job for the army.
             armySection
+            // A carved line to close the page, and only as much room under it as the bottom bar
+            // needs when it comes back (Alex, 2026-11-12: "Too much bottom space here"; picked
+            // C, tighter with a carved sign-off).
+            HomeAuroraSignOff(palette: palette)
+                .padding(.top, 22)
         }
-        .padding(.bottom, 130)
+        .padding(.bottom, 84)
         .frame(maxWidth: .infinity)
         .background {
             shape.fill(palette.sheet)

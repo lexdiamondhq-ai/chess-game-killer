@@ -103,6 +103,8 @@ final class ArmyQuestTests: XCTestCase {
                 let page = VStack(spacing: 0) {
                     HomeAuroraSection(title: "Your army", palette: palette, note: "37 games together")
                     card.padding(.horizontal, 16)
+                    HomeAuroraSignOff(palette: palette)
+                        .padding(.top, 22)
                     Spacer()
                 }
                 .padding(.top, 80)
