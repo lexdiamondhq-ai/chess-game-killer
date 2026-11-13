@@ -100,7 +100,11 @@ struct HomeAuroraQuickBar: View {
     private var detail: String {
         switch mode {
         case .yourMove(let game, let more): return Self.detail(game, more: more)
-        case .quickPlay(let rival, let detail, let resume): return resume ? detail : "vs \(rival) · \(detail)"
+        case .quickPlay(let rival, let detail, let resume):
+            // The rival's name fills the line, so Quick play keeps only the clock beside it:
+            // "vs The Berserker · No clock" (the side was cut short on a phone).
+            let clock: String = detail.components(separatedBy: " · ").first ?? detail
+            return resume ? detail : "vs \(rival) · \(clock)"
         }
     }
 
