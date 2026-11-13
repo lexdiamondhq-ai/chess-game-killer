@@ -37,6 +37,13 @@ final class ScanSession {
     private(set) var readingFailed = false
     /// Shown with the photo's analysis when the reader wasn't sure of something: what to check.
     private(set) var photoDoubts: String?
+    /// How long the last photo took to load and read, for the stopwatch under it (Alex, 2026-11-13).
+    private(set) var stopwatch: PhotoStopwatch?
+    /// When the person picked the photo now loading, so its loading time can be told.
+    private var photoPickedAt: ContinuousClock.Instant?
+    /// When the photo went to the reader.
+    private var readStartedAt: ContinuousClock.Instant?
+    private let clock = ContinuousClock()
     /// The part of `photoDoubts` about the pieces, which still stands once the turn is settled.
     private var piecesDoubt: String?
 
@@ -57,6 +64,11 @@ final class ScanSession {
     private var lastWarmUp: Date?
 
     /// Gets the reader ready while the person picks or takes a photo.
+    /// A photo was picked from the library and is loading: the stopwatch starts here.
+    func photoPicked() {
+        photoPickedAt = clock.now
+    }
+
     func warmUpReader(now: Date = .now) {
         if let lastWarmUp, now.timeIntervalSince(lastWarmUp) < 20 { return }
         lastWarmUp = now
@@ -85,7 +97,11 @@ final class ScanSession {
     /// that is when a scan is counted. A read lost to the connection or a busy server never
     /// reaches it, so it doesn't cost one of a free player's few scans (audit, 2026-11-12).
     func read(_ image: UIImage, answered: (@MainActor () -> Void)? = nil) {
+        let picked = photoPickedAt
         reset()
+        let now = clock.now
+        readStartedAt = now
+        stopwatch = PhotoStopwatch(load: picked.map { (now - $0).inSeconds })
         photo = image
         draft = .empty
         isReading = true
@@ -181,6 +197,10 @@ final class ScanSession {
     private func finishReading(_ reading: BoardReading, id: Int) {
         guard isReading, id == readID else { return }
         isReading = false
+        if let readStartedAt {
+            stopwatch?.read = (clock.now - readStartedAt).inSeconds
+            stopwatch?.parts = reading.timing
+        }
         draft = reading.draft
         readingFailed = false
         let hardToRead = reading.confidence == .low ? "The picture was hard to read, so check the pieces." : nil
@@ -211,11 +231,50 @@ final class ScanSession {
         readTask?.cancel()
         readTask = nil
         photo = nil
+        stopwatch = nil
+        photoPickedAt = nil
+        readStartedAt = nil
         isReading = false
         readingNote = nil
         readingFailed = false
         photoDoubts = nil
         piecesDoubt = nil
+    }
+}
+
+/// Where a photo's time went, in seconds: loading it, reading it (with the reader's own split),
+/// and then, from the analysis, the first arrows and the engine settling.
+struct PhotoStopwatch: Equatable {
+    /// Loading the picked photo from the library (nil for the camera).
+    var load: Double?
+    /// From sending the photo to having the position, all in.
+    var read: Double?
+    /// The reader's split of `read`: shrinking, the trip, the reading itself.
+    var parts: ReadTiming?
+
+    /// The line under the photo, e.g. "Photo 0.3 s · Shrink 0.1 s · Trip 0.6 s · Read 2.4 s · Arrows 0.5 s · Done 3.1 s".
+    func line(arrows: Double?, done: Double?) -> String {
+        func s(_ value: Double) -> String { String(format: "%.1f s", value) }
+        var items: [String] = []
+        if let load { items.append("Photo \(s(load))") }
+        if let parts {
+            items.append("Shrink \(s(parts.prepare))")
+            if let network = parts.network, let server = parts.server {
+                items.append("Trip \(s(network))")
+                items.append("Read \(s(server))")
+            } else {
+                items.append("Send + read \(s(parts.roundTrip))")
+            }
+        } else if let read {
+            items.append("Read \(s(read))")
+        }
+        items.append(arrows.map { "Arrows \(s($0))" } ?? "Arrows …")
+        items.append(done.map { "Done \(s($0))" } ?? "Done …")
+        if let done {
+            let total = (load ?? 0) + (read ?? 0) + done
+            items.append("Total \(s(total))")
+        }
+        return items.joined(separator: " · ")
     }
 }
 
@@ -256,6 +315,11 @@ final class AnalysisModel {
     private(set) var hints: [MoveHint] = []
     private(set) var depth = 0
     private(set) var isThinking = false
+    /// Seconds from this analysis opening to its first arrows, and to the engine settling, on the
+    /// starting position, for the photo stopwatch.
+    private(set) var arrowsAfter: Double?
+    private(set) var doneAfter: Double?
+    private let opened = ContinuousClock.now
     private(set) var failed = false
     /// The best line is playing itself out on the board.
     private(set) var isPlayingLine = false
@@ -386,6 +450,9 @@ final class AnalysisModel {
         }
         isThinking = false
         failed = lines.isEmpty
+        if doneAfter == nil, fen == start.fen {
+            doneAfter = (ContinuousClock.now - opened).inSeconds
+        }
     }
 
     /// How deep the analysis looks before it counts as done.
@@ -408,6 +475,9 @@ final class AnalysisModel {
     }
 
     private func show(_ found: [EngineLine], depth: Int, fen: String) {
+        if arrowsAfter == nil, fen == start.fen, !found.isEmpty {
+            arrowsAfter = (ContinuousClock.now - opened).inSeconds
+        }
         lines = found
         self.depth = depth
         hints = found.prefix(2).enumerated().compactMap { index, line in

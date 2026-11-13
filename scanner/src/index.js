@@ -96,7 +96,11 @@ async function handle(request, env) {
   if (!(await withinDailyBudget(env))) return json({ error: "daily_limit" }, 429);
 
   try {
-    return json(await readBoard(bytes, type, env, settingsFor(request, env)));
+    const started = Date.now();
+    const response = json(await readBoard(bytes, type, env, settingsFor(request, env)));
+    // How long the reading itself took, so the app's stopwatch can tell it from the trip there and back.
+    response.headers.set("x-read-ms", String(Date.now() - started));
+    return response;
   } catch (error) {
     console.error("reading failed:", error && error.message);
     return json({ error: "upstream", status: (error && error.status) || null }, 502);

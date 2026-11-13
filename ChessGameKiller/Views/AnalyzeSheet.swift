@@ -156,6 +156,7 @@ struct AnalyzeSheet: View {
         .onChange(of: photoItem) { _, item in
             guard let item else { return }
             session.warmUpReader()
+            session.photoPicked()
             Task {
                 // Loading can mean an iCloud download, so show that something is happening.
                 isLoadingPhoto = true
@@ -194,6 +195,7 @@ extension AnalyzeSheet {
             AnalysisView(draft: session.analyzed, theme: theme, engine: engine, model: session.analysis,
                          rival: rival, clock: clock, forfeits: forfeits,
                          photo: session.photo, photoDoubts: session.photoDoubts,
+                         stopwatch: session.stopwatch,
                          onEditPieces: { session.editPieces($0) },
                          onSwitchTurn: { session.switchTurn(of: $0) },
                          photoButtons: photoButtons) { draft in
@@ -595,6 +597,8 @@ struct AnalysisView: View {
     /// The photo the position was read from, and what the reader wasn't sure of.
     var photo: UIImage?
     var photoDoubts: String?
+    /// Where the photo's time went, shown small under it (Alex, 2026-11-13: "Stopwatch first").
+    var stopwatch: PhotoStopwatch?
     /// Opens the editor on the board's pieces, to fix one the reader got wrong. Offered with the photo.
     var onEditPieces: ((PositionDraft) -> Void)?
     /// Gives the board's position to the other side to move, for a fresh analysis.
@@ -615,7 +619,8 @@ struct AnalysisView: View {
     init(draft: PositionDraft, theme: BoardTheme, engine: ChessEngine?, model: AnalysisModel? = nil,
          rival: String = "the computer",
          clock: TimeControl = .unlimited, forfeits: String? = nil,
-         photo: UIImage? = nil, photoDoubts: String? = nil, onEditPieces: ((PositionDraft) -> Void)? = nil,
+         photo: UIImage? = nil, photoDoubts: String? = nil, stopwatch: PhotoStopwatch? = nil,
+         onEditPieces: ((PositionDraft) -> Void)? = nil,
          onSwitchTurn: ((PositionDraft) -> Void)? = nil,
          photoButtons: AnalysisPhotoButtons? = nil,
          onPlay: @escaping (PositionDraft) -> Void) {
@@ -625,6 +630,7 @@ struct AnalysisView: View {
         self.forfeits = forfeits
         self.photo = photo
         self.photoDoubts = photoDoubts
+        self.stopwatch = stopwatch
         self.onEditPieces = onEditPieces
         self.onSwitchTurn = onSwitchTurn
         self.photoButtons = photoButtons
@@ -888,7 +894,9 @@ struct AnalysisView: View {
     @ViewBuilder
     private var photoRow: some View {
         if let photo, let onEditPieces {
-            PhotoSourceRow(photo: photo, doubts: photoDoubts, theme: theme) {
+            PhotoSourceRow(photo: photo, doubts: photoDoubts,
+                           stopwatch: stopwatch?.line(arrows: model.arrowsAfter, done: model.doneAfter),
+                           theme: theme) {
                 showingPhoto = true
             } onEdit: {
                 model.stopLine()
@@ -1094,6 +1102,8 @@ struct AnalysisView: View {
 private struct PhotoSourceRow: View {
     let photo: UIImage
     let doubts: String?
+    /// Where the photo's time went, in small print.
+    var stopwatch: String? = nil
     let theme: BoardTheme
     let onShowPhoto: () -> Void
     let onEdit: () -> Void
@@ -1117,6 +1127,14 @@ private struct PhotoSourceRow: View {
                         .font(.app(.footnote))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+                }
+                if let stopwatch {
+                    Label(stopwatch, systemImage: "stopwatch")
+                        .font(.app(.caption2))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityLabel("Stopwatch: \(stopwatch)")
                 }
             }
             Spacer(minLength: 0)
