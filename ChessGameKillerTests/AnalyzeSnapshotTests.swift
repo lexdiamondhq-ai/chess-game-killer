@@ -62,7 +62,8 @@ final class AnalyzeSnapshotTests: XCTestCase {
         ))
         session.read(photo)
         let reading = try show(NavigationStack {
-            PhotoReadingView(session: session, theme: theme)
+            AnalysisView(draft: .empty, theme: theme, engine: nil, readingPhoto: true,
+                         onStopReading: {}, onLeaveReading: {}) { _ in }
         }
         .background { TrainingBackdrop(theme: theme) }
         .screenScheme(theme))
