@@ -326,6 +326,58 @@ final class HomeSnapshotTests: XCTestCase {
         XCTAssertNotNil(yours.fen)
     }
 
+    /// The gold bar above Next game (Alex, 2026-11-13, picked A): a game against a person that
+    /// waits on you comes first; the game against the computer never counts; with nobody
+    /// waiting it is Quick play against the rival up next. Pictured by day and by night.
+    func testTheQuickBarShowsYourMoveOrQuickPlay() throws {
+        let now = Date().timeIntervalSince1970 * 1000
+        let start = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+        let computerTurn = HomeUpNext(kind: .resume, level: .club, playerColor: .white, randomSide: false,
+                                      timeControl: .unlimited, yourTime: nil, theirTime: nil, yourMove: true,
+                                      moveNumber: 1, plies: 0)
+        let alone = HomeCurrentGame.list(computerTurn, fen: start, friends: [])
+        guard case .quickPlay(_, _, let resume) = HomeAuroraQuickBar.mode(games: alone, upNext: computerTurn) else {
+            return XCTFail("The game against the computer is not a person waiting on you")
+        }
+        XCTAssertTrue(resume, "Quick play picks up the game against the rival already under way")
+
+        let theirs = FriendGame.sample(.sample(code: "AAAAAA", moves: ["e2e4"], now: now), seat: .white)
+        let yours = FriendGame.sample(.sample(code: "CCCCCC", moves: ["e2e4"], now: now), seat: .black)
+        let alsoYours = FriendGame.sample(.sample(code: "EEEEEE", moves: ["e2e4"], now: now), seat: .black)
+        let all = HomeCurrentGame.list(computerTurn, fen: start, friends: [theirs, yours, alsoYours])
+        let mode = HomeAuroraQuickBar.mode(games: all, upNext: computerTurn)
+        guard case .yourMove(let game, let more) = mode else { return XCTFail("A friend waits on your move") }
+        XCTAssertEqual(game.id, "CCCCCC")
+        XCTAssertEqual(more, 1)
+        XCTAssertEqual(HomeAuroraQuickBar.detail(game, more: more), "Friend · 10+0 · +1 more")
+
+        let fresh = HomeUpNext(kind: .ready, level: .club, playerColor: .white, randomSide: false,
+                               timeControl: .unlimited, yourTime: nil, theirTime: nil, yourMove: true,
+                               moveNumber: 1, plies: 0)
+        let quick = HomeAuroraQuickBar.mode(games: [], upNext: fresh)
+        XCTAssertEqual(quick, .quickPlay(rival: fresh.rival.name, detail: "No clock · You're White", resume: false))
+
+        for dark in [false, true] {
+            let palette = HomeAuroraPalette(dark: dark)
+            let page = VStack(spacing: 18) {
+                HomeAuroraQuickBar(mode: mode, palette: palette, action: {})
+                HomeAuroraQuickBar(mode: .yourMove(game, more: 0), palette: palette, action: {})
+                HomeAuroraQuickBar(mode: quick, palette: palette, action: {})
+                HomeAuroraQuickBar(mode: .quickPlay(rival: fresh.rival.name, detail: "No clock · You're White",
+                                                    resume: true), palette: palette, action: {})
+            }
+            .padding(16)
+            .padding(.top, 60)
+            .frame(maxHeight: .infinity, alignment: .top)
+            .background(palette.sheet.ignoresSafeArea())
+            .background(palette.bg.ignoresSafeArea())
+            .environment(\.colorScheme, dark ? .dark : .light)
+            let window = try show(page, wait: 2)
+            try save(window, "zz-home-quick-bar-\(dark ? "dark" : "light")")
+            window.isHidden = true
+        }
+    }
+
     /// The game against the computer is listed with the rest, so Your move shows even when it is
     /// the only game going; among games that wait on the same side, it comes first.
     func testCurrentGamesListTheGameAgainstTheComputer() {

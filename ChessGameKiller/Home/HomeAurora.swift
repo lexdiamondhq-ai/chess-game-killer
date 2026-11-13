@@ -40,6 +40,8 @@ struct HomeAuroraActions {
     var army: () -> Void = {}
     /// Plays the rival the army's quest names (to free a piece, or to help one rank up).
     var armyQuest: (MatchController.Level) -> Void = { _ in }
+    /// Quick play: starts the rival up next at once, with no film (or picks up that game).
+    var quickPlay: () -> Void = {}
 }
 
 /// Aurora's colors, night and day.
@@ -350,6 +352,11 @@ struct HomeAuroraView: View {
                 .fill(palette.ink3)
                 .frame(width: 38, height: 4)
                 .padding(.top, 10)
+            // Your move or Quick play, first thing on the page (Alex, 2026-11-13: picked A, one
+            // gold bar above Next game).
+            quickBar
+                .padding(.horizontal, 16)
+                .padding(.top, 14)
             // The Face a rival coins are gone: the rival you're on stands big in the Next game
             // card instead (Alex, 2026-11-08). No All rivals link in the corner (Alex,
             // 2026-11-10): the card swipes through them, and Rivals is in Rooms.
@@ -389,6 +396,18 @@ struct HomeAuroraView: View {
                 }
                 .shadow(color: .black.opacity(palette.dark ? 0.5 : 0.1), radius: 30, y: -10)
                 .ignoresSafeArea(edges: .bottom)
+        }
+    }
+
+    /// A game against a person waiting on your move opens from here; otherwise it is Quick play.
+    private var quickBar: some View {
+        let mode = HomeAuroraQuickBar.mode(games: info.games, upNext: info.stage.upNext)
+        return HomeAuroraQuickBar(mode: mode, palette: palette) {
+            if case .yourMove(let game, _) = mode {
+                actions.open(game)
+            } else {
+                actions.quickPlay()
+            }
         }
     }
 
