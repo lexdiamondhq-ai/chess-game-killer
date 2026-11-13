@@ -38,6 +38,8 @@ test("reads a board through Claude", async () => {
   );
   const response = await worker.fetch(post(), env);
   assert.equal(response.status, 200);
+  // The app's stopwatch tells the reading from the trip with this.
+  assert.match(response.headers.get("x-read-ms"), /^\d+$/);
   assert.deepEqual(await response.json(), {
     found: true,
     rows: ROWS,
