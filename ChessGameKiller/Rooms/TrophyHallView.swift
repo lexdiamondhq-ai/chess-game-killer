@@ -46,7 +46,8 @@ struct TrophyHallRecords: Equatable {
                 return (a.accuracy ?? 0) > (b.accuracy ?? 0)
             }
             .prefix(3)
-            .map { Win(id: $0.id, opponent: $0.opponent, date: $0.date, accuracy: $0.accuracy, moves: $0.moveCount) }
+            // The rival's name as it is today: a win saved as "The 1600s" hangs here as the Berserker's.
+            .map { Win(id: $0.id, opponent: $0.opponentShown, date: $0.date, accuracy: $0.accuracy, moves: $0.moveCount) }
     }
 }
 

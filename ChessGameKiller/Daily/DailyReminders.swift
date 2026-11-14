@@ -98,7 +98,7 @@ enum DailyReminders {
         let puzzle = facts.puzzleHeadline.map { "Today's Move: \($0)" } ?? "A new puzzle is waiting."
         options.append(("Today's Move is ready", daysAway == 0 ? puzzle : "A new puzzle every day. It takes a minute."))
         options.append(("A minute for chess?", "Today's Move is the same for everyone. See how you do."))
-        options.append(("The crowd is warming up", "Thousands of real players, from the 1000s to the Masters, are ready when you are."))
+        options.append(("The crowd is warming up", "Thousands of real players, from the Cub to the Ashen King, are ready when you are."))
         return options[min(index, options.count - 1)]
     }
 

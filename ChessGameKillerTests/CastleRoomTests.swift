@@ -117,4 +117,22 @@ final class CastleRoomTests: XCTestCase {
         XCTAssertEqual(records.bestWins.first?.opponent, "The Berserker")
         XCTAssertEqual(records.rivals.filter { $0.beaten }.count, 1)
     }
+
+    /// A win saved under a rival's old name hangs in the hall under today's name.
+    func testABestWinWearsTheRivalsNameToday() {
+        let old = SavedGame(id: UUID(), date: .now, opponent: "The 1600s", level: MatchController.Level.club.rawValue,
+                            playerIsWhite: true, result: .win, accuracy: 88, positions: [], moves: [], moments: [])
+        let records = TrophyHallRecords(games: [old], ladder: RivalLadder(beatenNames: ["the 1600s"]))
+        XCTAssertEqual(records.bestWins.first?.opponent, "The Berserker")
+    }
+
+    /// An escape is kept under the day the cell was entered, not the day it was left.
+    func testAnEscapeBelongsToTheDayItWasEntered() throws {
+        let store = defaults()
+        let entered = Date.now.addingTimeInterval(-86_400)
+        let cell = try XCTUnwrap(DungeonCells.today(entered))
+        DungeonCells.markEscaped(cell, on: entered, defaults: store)
+        XCTAssertEqual(DungeonCells.escapes(store)[DungeonCells.dayKey(entered)], cell.id)
+        XCTAssertFalse(DungeonCells.escapedToday(defaults: store))
+    }
 }

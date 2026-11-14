@@ -7,18 +7,24 @@ import SwiftUI
 struct EndgameView: View {
     let theme: BoardTheme
     private let firstStudy: EndgameStudy
+    /// Opened for this one study only (the Dungeon's cell): its end offers Done, back to where
+    /// it was opened, and never the next study of the course.
+    private let alone: Bool
     @State private var runner: EndgameRunner?
+    @State private var offer: PremiumFeature?
     @Environment(\.dismiss) private var dismiss
 
-    init(study: EndgameStudy, theme: BoardTheme) {
+    init(study: EndgameStudy, theme: BoardTheme, alone: Bool = false) {
         firstStudy = study
         self.theme = theme
+        self.alone = alone
     }
 
     /// For tests and previews: a runner set up by hand.
     init(runner: EndgameRunner, theme: BoardTheme) {
         firstStudy = runner.study
         self.theme = theme
+        alone = false
         _runner = State(initialValue: runner)
     }
 
@@ -56,6 +62,7 @@ struct EndgameView: View {
             made.start()
         }
         .onDisappear { runner?.cancel() }
+        .premiumOffer($offer)
     }
 
     /// The board gets what the header, goal line, Leo's card (up to five lines on a small
@@ -153,9 +160,12 @@ struct EndgameView: View {
 
     @ViewBuilder
     private func nextButton(after current: EndgameStudy, prominent: Bool) -> some View {
-        if let next = EndgameProgress.shared.next(after: current), next.id != current.id {
+        if !alone, let next = EndgameProgress.shared.next(after: current), next.id != current.id {
             Button {
-                open(next)
+                // The next study counts like one opened from the list: free players get one
+                // endgame a day. This button used to skip the count, so one free endgame led on
+                // to all of them (inspection, 2026-11-14).
+                if Premium.shared.use(.endgameDrill, key: next.id) { open(next) } else { offer = .endgameDrill }
             } label: {
                 Label("Next study", systemImage: "arrow.right")
             }

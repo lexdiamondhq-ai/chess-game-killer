@@ -223,8 +223,10 @@ private struct PremiumBenefitList: View {
         // (Alex, 2026-11-11, audit pick R4).
         Benefit(symbol: "shield.lefthalf.filled", title: "Every rival, from day one",
                 detail: "Face any of the five without beating the ones before."),
+        // Every set of pieces is free for everyone; the boards are what Premium opens
+        // (four free, ten in all), so the line promises only that (inspection, 2026-11-14).
         Benefit(symbol: "square.grid.3x3", title: "Every board look",
-                detail: "Every set of pieces and its board."),
+                detail: "All \(BoardTheme.all.count - BoardTheme.rivals.count) boards to play on."),
     ]
 
     var body: some View {
@@ -345,6 +347,13 @@ private struct PremiumOwnedCard: View {
     }
 }
 
+extension Premium {
+    /// Under Premium in Home's You panel: what it is, or that it is on.
+    var youLine: String {
+        isPremium ? "It's on. Everything is open" : "Everything, with no limits"
+    }
+}
+
 // MARK: - Showing the offer
 
 extension View {
@@ -434,9 +443,10 @@ struct PremiumSettingsCard: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
+                // Once Premium is on the row opens nothing, so it points nowhere.
+                Image(systemName: active ? "checkmark.seal.fill" : "chevron.right")
                     .font(.app(.footnote, weight: .semibold))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(active ? AnyShapeStyle(accent) : AnyShapeStyle(HierarchicalShapeStyle.tertiary))
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)

@@ -213,7 +213,7 @@ struct ArmyView: View {
     private static let xpRules = [
         "1 per game, 3 per win, 2 more if the piece is still standing.",
         "2 per pawn's worth taken, 10 per promotion, 20 per checkmate.",
-        "Stronger rivals are worth more, up to 3× against the Masters.",
+        "Stronger rivals are worth more, up to 3× against the Ashen King.",
         "Games with Undo or a played hint earn half.",
         "Leaving a game unfinished counts as a loss.",
         "Piece of the Match earns 5 more; revenge on a rival that keeps taking a piece earns 15.",

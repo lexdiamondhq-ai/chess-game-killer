@@ -10,6 +10,8 @@ struct ContentView: View {
     @State private var match = MatchController.live()
     @State private var showingNewGame = true
     @State private var showingSettings = false
+    /// The Premium page, opened from Home's You panel.
+    @State private var showingPremium = false
     @State private var confirmingResign = false
     @State private var confirmingDraw = false
     /// The welcome's Play, waiting on the first rival's film: its Begin starts this game.
@@ -370,6 +372,9 @@ struct ContentView: View {
                 SettingsSheet()
                     .boardSheetGrabber(boardSheet)
             }
+            .sheet(isPresented: $showingPremium) {
+                PremiumOfferView(feature: nil)
+            }
             .sheet(isPresented: $showingAnalyze) {
                 AnalyzeSheet(
                     theme: theme,
@@ -520,7 +525,10 @@ struct ContentView: View {
                 showingGames = true
             },
             army: { showingArmy = true },
-            settings: { showingSettings = true }
+            settings: { showingSettings = true },
+            // The You panel's Premium row was built but never switched on, so a free player
+            // could only find Premium in Settings or by running out of something (inspection, 2026-11-14).
+            premium: { showingPremium = true }
         )
     }
 
@@ -559,6 +567,7 @@ struct ContentView: View {
         showingArmy = false
         showingNewGame = false
         showingSettings = false
+        showingPremium = false
         showingAnalyze = false
         coach.presentedLesson = nil
         coach.presentedSession = nil

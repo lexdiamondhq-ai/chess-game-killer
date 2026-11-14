@@ -1181,7 +1181,7 @@ extension HomeView {
                     .homeRise(1)
                 if let premium = actions.premium {
                     HomeHairline(tone: tone)
-                    HomeLinkRow(glyph: Glyphs.king, title: "Premium", detail: "Everything, with no limits", tone: tone, action: premium)
+                    HomeLinkRow(glyph: Glyphs.king, title: "Premium", detail: Premium.shared.youLine, tone: tone, action: premium)
                         .homeRise(2)
                 }
             }
