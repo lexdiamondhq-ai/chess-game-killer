@@ -45,6 +45,10 @@ SOUNDS = {
     #   move-clock.mp3  a wooden blitz move, then a mechanical chess clock pressed (timed games)
     #   capture.mp3  a triple-weighted boxwood Staunton piece on maple and walnut, the taken
     #                piece tipping over
+    # Each other piece set (Alex, 2026-11-14) has its own move.<set>.mp3, move.<set>-2.mp3
+    # (slid), capture.<set>.mp3 and castle.<set>.mp3, made the same way with the set's
+    # material in the prompt: mother-of-pearl on black stone, jade on onyx, cut crystal on
+    # glass, gold on silver, glazed porcelain on ceramic. Stone uses the files above.
     # The move takes are played at random. castle.mp3 is still the deeper take of 2026-11-10
     # (two semitones lower, bass=g=5:f=140, equalizer=f=2800:t=q:w=1:g=2.5, a small aecho
     # room), and check.mp3 is the two bronze bells above with that same warmth.
