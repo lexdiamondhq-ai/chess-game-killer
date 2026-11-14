@@ -20,25 +20,10 @@ struct BoardReading: Equatable {
     var whiteSide: PositionDraft.WhiteSide
     var sureOfTurn: Bool
     var confidence: Confidence
-    /// How long each part of the read took, for the stopwatch (nil from readers that don't time).
-    var timing: ReadTiming? = nil
 
     enum Confidence: String, Decodable {
         case high, medium, low
     }
-}
-
-/// Where a read's time went, in seconds (Alex, 2026-11-13: "Stopwatch first").
-struct ReadTiming: Equatable {
-    /// Shrinking the photo on the phone.
-    var prepare: Double
-    /// Sending it and getting the answer back, the reading included.
-    var roundTrip: Double
-    /// The reading on the server, when it says.
-    var server: Double?
-
-    /// The trip there and back without the reading.
-    var network: Double? { server.map { max(0, roundTrip - $0) } }
 }
 
 enum BoardReaderError: LocalizedError, Equatable {
@@ -100,10 +85,7 @@ struct CloudBoardReader: BoardReader {
     }
 
     func read(_ image: UIImage) async throws -> BoardReading {
-        let clock = ContinuousClock()
-        let prepareStart = clock.now
         guard let jpeg = image.preparedForReading() else { throw BoardReaderError.failed }
-        let prepare = (clock.now - prepareStart).inSeconds
 
         var request = URLRequest(url: endpoint.appendingPathComponent("read"))
         request.httpMethod = "POST"
@@ -112,21 +94,15 @@ struct CloudBoardReader: BoardReader {
         request.timeoutInterval = 120
 
         let result: (Data, URLResponse)
-        let sendStart = clock.now
         do {
             result = try await session.upload(for: request, from: jpeg)
         } catch {
             throw Self.readerError(for: error)
         }
-        let roundTrip = (clock.now - sendStart).inSeconds
         let (data, response) = result
-        let http = response as? HTTPURLResponse
-        let status = http?.statusCode ?? 0
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard status == 200 else { throw Self.refusal(status: status, body: data) }
-        var reading = try Self.reading(from: data)
-        let serverMs = http?.value(forHTTPHeaderField: "X-Read-Ms").flatMap(Double.init)
-        reading.timing = ReadTiming(prepare: prepare, roundTrip: roundTrip, server: serverMs.map { $0 / 1000 })
-        return reading
+        return try Self.reading(from: data)
     }
 
     /// What to tell the player when the server turned the picture away. "Wait a minute" is
@@ -213,12 +189,5 @@ extension UIImage {
             draw(in: CGRect(origin: .zero, size: target))
         }
         return resized.jpegData(compressionQuality: 0.85)
-    }
-}
-
-extension Duration {
-    /// The duration in seconds, as a decimal.
-    var inSeconds: Double {
-        Double(components.seconds) + Double(components.attoseconds) / 1e18
     }
 }
