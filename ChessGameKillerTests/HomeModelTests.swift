@@ -234,6 +234,17 @@ final class HomeModelTests: XCTestCase {
     }
 
     /// Rooms on the Aurora home (Alex, 2026-11-14): New game, which also leads to a friend and to
+    /// Holding the gold knight (Alex, 2026-11-14): four doors on gilded branches, A friend only
+    /// when other players can be reached, every door up and to the left of the knight.
+    func testKnightMenuDoors() {
+        XCTAssertEqual(HomeKnightDoor.list(online: true), [.quickPlay, .todaysMove, .puzzles, .friend])
+        XCTAssertEqual(HomeKnightDoor.list(online: false), [.quickPlay, .todaysMove, .puzzles])
+        for door in HomeKnightDoor.allCases {
+            XCTAssertLessThan(door.spot.width, 0, "\(door.title) grows toward the middle")
+            XCTAssertLessThan(door.spot.height, 0, "\(door.title) grows up from the bar")
+        }
+    }
+
     /// online, and the castle's three rooms. Your games left Rooms; it is in the You panel.
     func testRoomsAreNewGameAndTheCastleRooms() {
         XCTAssertEqual(HomeShortcutKind.rooms, [.newGame, .trophies, .famous, .dungeon])
