@@ -19,6 +19,8 @@ struct SettingsSheet: View {
     @AppStorage(PieceSet.storageKey) private var pieceSet = PieceSet.stone
     @AppStorage(Heirloom.settingKey) private var heirloomOn = true
     @AppStorage(BoardTheme.coordinatesKey) private var coordinatesOn = true
+    /// Online, friend and daily games: a move waits for the clock press. Read by OnlineGame.
+    @AppStorage(OnlineGame.pressClockKey) private var pressClockOn = true
     @AppStorage(HomeToneMode.key) private var homeTone = HomeToneMode.defaultMode
     /// Shared with the lessons' speaker button and the highlight reel.
     @AppStorage("coachVoiceMuted") private var voiceMuted = false
@@ -101,6 +103,9 @@ struct SettingsSheet: View {
                             rule
                             ToggleRow(title: "Piece history", subtitle: "Your pieces wear what they've been through: gold seams, a promoted pawn's collar, notches, patina.",
                                       symbol: "seal", isOn: $heirloomOn, theme: theme)
+                            rule
+                            ToggleRow(title: "Press your clock", subtitle: "In online, friend and daily games your move waits until you press your clock, like a real chess clock. Tap the board to take it back. Off plays it the moment you tap.",
+                                      symbol: "clock.badge.checkmark", isOn: $pressClockOn, theme: theme)
                             // The switches for the earlier homes are gone (Alex, 2026-11-08): the
                             // app has one home. HomeLayouts.settle() puts anyone who turned them off back.
                         }

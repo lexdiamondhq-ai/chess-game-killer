@@ -701,9 +701,14 @@ struct FriendPlate: View {
     let seat: FriendSeat
     let theme: BoardTheme
 
+    @AppStorage("haptics") private var hapticsOn = true
+
     private var isMe: Bool { seat == game.seat }
     private var color: Piece.Color { seat.color }
     private var accent: Color { theme.challengeAccent }
+    /// The player's move waits on the board: their line turns gold and pressing it plays the move,
+    /// as you press a real chess clock.
+    private var waitsForPress: Bool { isMe && game.phase == .playing && game.held != nil }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -731,9 +736,34 @@ struct FriendPlate: View {
             }
         }
         .padding(.horizontal, 4)
+        .environment(\.colorScheme, waitsForPress ? .light : colorScheme)
+        .background {
+            if waitsForPress {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(accent.gradient)
+                    .shadow(color: accent.opacity(0.35), radius: 10)
+                    .padding(.horizontal, -6)
+                    .padding(.vertical, -2)
+                    .transition(.opacity.combined(with: .scale(scale: 0.97)))
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { press() }
         .animation(.snappy(duration: 0.3), value: isActive)
         .animation(.snappy(duration: 0.3), value: inCheck)
+        .animation(.snappy(duration: 0.25), value: waitsForPress)
         .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(waitsForPress ? .isButton : [])
+        .accessibilityAction { press() }
+    }
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    /// Plays the waiting move. Away from a waiting move the line is only a line.
+    private func press() {
+        guard waitsForPress else { return }
+        if hapticsOn { UIImpactFeedbackGenerator(style: .rigid).impactOccurred() }
+        withAnimation(.snappy(duration: 0.22)) { game.pressClock() }
     }
 
     @ViewBuilder
@@ -823,6 +853,7 @@ struct FriendPlate: View {
             if result.winner == seat { return "Winner" }
             return result.winner == nil ? "Draw" : "Lost"
         }
+        if waitsForPress, let held = game.held { return "Press your clock to play \(held.san)" }
         if inCheck { return isMe ? "Your king is in check" : "King in check" }
         if isActive { return isMe ? "Your move" : "To move" }
         if !isMe, game.phase == .playing, !game.isOnline(seat) { return "Offline" }

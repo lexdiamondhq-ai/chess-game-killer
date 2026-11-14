@@ -13,10 +13,13 @@ final class ChallengeTests: XCTestCase {
     override func setUp() async throws {
         defaults = UserDefaults(suiteName: Self.suite)
         defaults.removePersistentDomain(forName: Self.suite)
+        // Moves go the moment they're made, unless a test turns Press your clock on.
+        UserDefaults.standard.set(false, forKey: OnlineGame.pressClockKey)
     }
 
     override func tearDown() async throws {
         defaults.removePersistentDomain(forName: Self.suite)
+        UserDefaults.standard.removeObject(forKey: OnlineGame.pressClockKey)
     }
 
     private func waitUntil(_ what: String, timeout: Duration = .seconds(5), _ condition: () -> Bool) async {
@@ -468,6 +471,90 @@ final class ChallengeTests: XCTestCase {
         XCTAssertEqual(api.moves.last?.ply, 2)
         await waitUntil("the server takes it") { game.state?.moves.count == 3 }
         XCTAssertEqual(game.boardMoves, ["e2e4", "e7e5", "g1f3"])
+    }
+
+    func testPressYourClockIsOnUnlessTurnedOff() {
+        UserDefaults.standard.removeObject(forKey: OnlineGame.pressClockKey)
+        XCTAssertTrue(OnlineGame.pressesClock)
+        UserDefaults.standard.set(false, forKey: OnlineGame.pressClockKey)
+        XCTAssertFalse(OnlineGame.pressesClock)
+    }
+
+    func testAMoveWaitsUntilTheClockIsPressed() async {
+        UserDefaults.standard.set(true, forKey: OnlineGame.pressClockKey)
+        let api = FakeChallengeAPI()
+        let start = FriendGameState.sample(moves: ["e2e4", "e7e5"])
+        api.games[start.code] = start
+        let game = OnlineGame(record: .sample(start, seat: .white), api: api, sounds: nil, initial: start)
+
+        game.match.tap(.g1)
+        game.match.tap(.f3)
+        await waitUntil("the move waits") { game.held != nil }
+        XCTAssertEqual(game.held?.uci, "g1f3")
+        XCTAssertEqual(game.match.heldSquare, .f3)
+        XCTAssertEqual(game.match.game.piece(at: .f3)?.kind, .knight, "it stands on the board")
+        XCTAssertEqual(game.ribbon.last, "Nf3")
+        try? await Task.sleep(for: .milliseconds(150))
+        XCTAssertTrue(api.moves.isEmpty, "nothing goes until the clock is pressed")
+        XCTAssertTrue(game.isClockRunning(for: .white), "the player's clock runs on while it waits")
+
+        game.pressClock()
+        XCTAssertNil(game.held)
+        XCTAssertNil(game.match.heldSquare)
+        await waitUntil("the move is sent") { api.moves.count == 1 }
+        XCTAssertEqual(api.moves.first?.uci, "g1f3")
+        XCTAssertEqual(api.moves.first?.ply, 2)
+        await waitUntil("the server takes it") { game.state?.moves.count == 3 }
+        XCTAssertEqual(game.boardMoves, ["e2e4", "e7e5", "g1f3"])
+    }
+
+    func testATapOnTheBoardTakesTheWaitingMoveBackAndPicksUpThePiece() async {
+        UserDefaults.standard.set(true, forKey: OnlineGame.pressClockKey)
+        let api = FakeChallengeAPI()
+        let start = FriendGameState.sample(moves: ["e2e4", "e7e5"])
+        api.games[start.code] = start
+        let game = OnlineGame(record: .sample(start, seat: .white), api: api, sounds: nil, initial: start)
+
+        game.match.tap(.g1)
+        game.match.tap(.f3)
+        await waitUntil("the move waits") { game.held != nil }
+
+        game.match.tap(.b1)
+        XCTAssertNil(game.held)
+        XCTAssertNil(game.match.heldSquare)
+        XCTAssertEqual(game.boardMoves, ["e2e4", "e7e5"])
+        XCTAssertEqual(game.match.game.piece(at: .g1)?.kind, .knight, "the knight is back home")
+        XCTAssertNil(game.match.game.piece(at: .f3))
+        XCTAssertEqual(game.match.game.selected, .b1, "the same tap picks up the other knight")
+        XCTAssertTrue(game.isMyTurn)
+
+        game.match.tap(.c3)
+        await waitUntil("the new move waits") { game.held?.uci == "b1c3" }
+        game.pressClock()
+        await waitUntil("only the new move is sent") { api.moves.count == 1 }
+        XCTAssertEqual(api.moves.first?.uci, "b1c3")
+    }
+
+    func testAWaitingMoveGoesWhenTheGameEndsWithoutIt() async {
+        UserDefaults.standard.set(true, forKey: OnlineGame.pressClockKey)
+        let api = FakeChallengeAPI()
+        let state = FriendGameState.sample(moves: ["e2e4", "e7e5"])
+        api.games[state.code] = state
+        let game = OnlineGame(record: .sample(state, seat: .white), api: api, sounds: nil, initial: state)
+        game.match.tap(.g1)
+        game.match.tap(.f3)
+        await waitUntil("the move waits") { game.held != nil }
+
+        var over = state
+        over.status = .over
+        over.result = FriendGameState.Result(winner: .black, reason: .resign)
+        over.now += 4_000
+        over.setMoves(over.moves)
+        game.apply(over)
+        XCTAssertNil(game.held)
+        XCTAssertNil(game.match.heldSquare)
+        XCTAssertEqual(game.boardMoves, ["e2e4", "e7e5"])
+        XCTAssertTrue(api.moves.isEmpty)
     }
 
     func testAPromotionIsSentWithThePiecePicked() async {

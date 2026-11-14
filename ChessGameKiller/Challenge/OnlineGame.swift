@@ -79,6 +79,15 @@ final class OnlineGame {
     /// What the player has reported about the friend in this game.
     private(set) var reported: Set<ChallengeAction> = []
     private(set) var pending: PendingMove? = nil
+    /// The player's move on the board, waiting for them to press their clock (Press your clock).
+    /// Nothing is sent until they do: their clock runs on, as on a real one.
+    private(set) var held: PendingMove? = nil
+
+    /// The Settings switch for Press your clock: on unless the player turned it off.
+    static let pressClockKey = "pressClockToPlay"
+    static var pressesClock: Bool {
+        UserDefaults.standard.object(forKey: pressClockKey) as? Bool ?? true
+    }
 
     /// The record changed: a new state, or a rematch with its own code.
     @ObservationIgnored var onChange: (@MainActor (FriendGame) -> Void)?
@@ -189,7 +198,7 @@ final class OnlineGame {
 
     /// The moves so far in standard notation, the player's pending one last.
     var ribbon: [String] {
-        (state?.san ?? []) + (pending.map { [$0.san] } ?? [])
+        (state?.san ?? []) + ((pending ?? held).map { [$0.san] } ?? [])
     }
 
     var rematchStage: RematchStage {
@@ -588,16 +597,57 @@ final class OnlineGame {
     /// The player moved on the board: the move goes to the server with its place in the game.
     private func noticeOwnMove() {
         let game = match.game
-        guard phase == .playing, pending == nil, game.pendingPromotion == nil,
+        guard phase == .playing, pending == nil, held == nil, game.pendingPromotion == nil,
               boardBase + game.moves.count == boardMoves.count + 1,
               let played = game.lastPlayed, played.color == seat.color else { return }
         let move = PendingMove(uci: played.uci, san: played.san, ply: boardMoves.count, at: serverNow())
         boardMoves.append(played.uci)
+        // A move that ends the game on the board (mate, stalemate) goes at once: nothing to weigh.
+        if Self.pressesClock, !game.isGameOver {
+            hold(move, on: Square(String(played.uci.dropFirst(2).prefix(2))))
+        } else {
+            dispatch(move)
+        }
+    }
+
+    private func dispatch(_ move: PendingMove) {
         pending = move
         moveTask?.cancel()
         moveTask = Task { [weak self] in
             await self?.send(move)
         }
+    }
+
+    // MARK: Press your clock
+
+    /// The move stands on the board, lifted, until the player presses their clock.
+    private func hold(_ move: PendingMove, on square: Square) {
+        held = move
+        match.heldSquare = square
+        match.takeBackHeld = { [weak self] in self?.takeBackHeld() }
+    }
+
+    /// The player pressed their clock: the waiting move is played, timed from now.
+    func pressClock() {
+        guard let move = held, phase == .playing else { return }
+        releaseHeld()
+        dispatch(PendingMove(uci: move.uci, san: move.san, ply: move.ply, at: serverNow()))
+    }
+
+    /// The player tapped the board instead: the waiting move goes back, as if never made.
+    func takeBackHeld() {
+        guard let move = held else { return }
+        releaseHeld()
+        guard boardMoves.count == move.ply + 1, boardMoves.last == move.uci,
+              match.game.lastPlayed?.uci == move.uci else { return }
+        match.game.undo()
+        boardMoves.removeLast()
+    }
+
+    private func releaseHeld() {
+        held = nil
+        match.heldSquare = nil
+        match.takeBackHeld = nil
     }
 
     /// Sends a move, trying again while the connection is down. A refusal puts the board back as the server has it.
@@ -635,6 +685,16 @@ final class OnlineGame {
     /// Brings the board to the server's moves, keeping the player's pending move while it is still on its way.
     private func syncBoard(with state: FriendGameState, quietly: Bool) {
         var target = state.moves
+        if let held {
+            let waiting = state.status == .active && state.turn == seat && state.moves.count == held.ply
+                && boardMoves.count == held.ply + 1 && boardMoves.starts(with: state.moves)
+            if waiting {
+                target.append(held.uci)
+            } else {
+                // The game moved on without it (it ended, or the board was set again): it goes.
+                releaseHeld()
+            }
+        }
         if let pending {
             let waiting = state.status != .over && state.moves.count == pending.ply
                 && boardMoves.count == pending.ply + 1 && boardMoves.starts(with: state.moves)
@@ -649,8 +709,12 @@ final class OnlineGame {
         }
         reconcile(to: target, quietly: quietly)
         // ChessKit can call a draw (a repetition, say) the server doesn't. The server decides: play on.
-        if self.pending == nil, state.status == .active, match.game.isGameOver {
+        if self.pending == nil, held == nil, state.status == .active, match.game.isGameOver {
             rebuild(to: target, quietly: true)
+        }
+        // However the board was brought up to date, a waiting move no longer on it goes too.
+        if let held, !(boardMoves.count == held.ply + 1 && boardMoves.last == held.uci) {
+            releaseHeld()
         }
     }
 
@@ -772,6 +836,7 @@ final class OnlineGame {
         moveTask?.cancel()
         moveTask = nil
         pending = nil
+        releaseHeld()
         deadlineTask?.cancel()
         var fresh = FriendGame(code: next, token: token, seat: newSeat, state: game)
         if fresh.opponentName == nil { fresh.opponentName = record.opponentName }

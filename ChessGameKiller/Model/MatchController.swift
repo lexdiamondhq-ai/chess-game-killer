@@ -7,6 +7,12 @@ import Observation
 @MainActor
 @Observable
 final class MatchController {
+    /// Where a move of the person's waits for their OK (Press your clock, in online games): it
+    /// stands on the board, lifted, until they press their clock or tap the board to take it back.
+    var heldSquare: Square?
+    /// Takes the waiting move back. Set by the online game while a move waits.
+    @ObservationIgnored var takeBackHeld: (() -> Void)?
+
     /// Who the person plays. Every game here is against a computer rival.
     enum Opponent: String {
         case computer
@@ -389,6 +395,13 @@ final class MatchController {
 
     func tap(_ square: Square) {
         guard outcome == nil else { return }
+        // A move waiting for the clock press: a tap on the board takes it back, and the same tap
+        // goes on to pick up a piece, so trying another move is one tap, not two.
+        if heldSquare != nil, let takeBack = takeBackHeld {
+            takeBack()
+            game.tap(square)
+            return
+        }
         let movesBefore = game.moveCount
         game.tap(square)
         if game.moveCount != movesBefore {
