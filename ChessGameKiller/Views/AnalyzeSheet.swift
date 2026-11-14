@@ -252,7 +252,7 @@ struct AnalysisPhotoButtons: View {
     }
 }
 
-/// One half of the analysis's photo pill, lower right.
+/// The camera or photo button at the right of the slim bottom strip: a plain gold icon.
 private struct PhotoPillStyle: ButtonStyle {
     let accent: Color
 
@@ -263,6 +263,37 @@ private struct PhotoPillStyle: ButtonStyle {
             .frame(width: 44, height: 44)
             .contentShape(Rectangle())
             .opacity(configuration.isPressed ? 0.55 : 1)
+    }
+}
+
+/// A step button in the slim bottom strip: a plain gold icon, faded when there's nowhere to go.
+private struct PlainStepStyle: ButtonStyle {
+    let accent: Color
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(accent)
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
+            .opacity(isEnabled ? (configuration.isPressed ? 0.55 : 1) : 0.3)
+    }
+}
+
+/// Play the line in the slim bottom strip: the one filled gold pill, so it reads as the main button.
+private struct GoldPlayStyle: ButtonStyle {
+    let accent: Color
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(Color.black.opacity(0.85))
+            .padding(.horizontal, 16)
+            .frame(height: 38)
+            .background(accent, in: Capsule())
+            .contentShape(Capsule())
+            .opacity(isEnabled ? (configuration.isPressed ? 0.7 : 1) : 0.4)
+            .frame(maxWidth: .infinity)
     }
 }
 
@@ -294,8 +325,8 @@ private struct SolidBottomBar: ViewModifier {
             .background {
                 // The sheet's own backdrop, so the strip reads as part of the page.
                 TrainingBackdrop(theme: theme)
-                    .ignoresSafeArea(edges: .bottom)
                     .clipped()
+                    .ignoresSafeArea(edges: .bottom)
             }
             .overlay(alignment: .top) {
                 Rectangle()
@@ -819,11 +850,11 @@ struct AnalysisView: View {
             .animation(.snappy(duration: 0.25), value: model.statusNote)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            // One bar at the bottom (Alex, 2026-11-13, option A): the step buttons and the
-            // camera and photo share a solid strip that stays put, so the page scrolls cleanly
-            // above it and nothing floats over Play the line.
+            // A slim strip at the bottom (Alex, 2026-11-13, "Lets do A"): plain gold icons with
+            // no bubbles, one gold Play the line pill in the middle, and the strip runs to the
+            // very bottom edge so the page never peeks out under it.
             if !readingPhoto {
-            HStack(spacing: 8) {
+            HStack(spacing: 4) {
                 stepper
                 if let photoButtons {
                     Divider().frame(height: 28)
@@ -832,12 +863,10 @@ struct AnalysisView: View {
                     }
                     .labelStyle(.iconOnly)
                     .buttonStyle(PhotoPillStyle(accent: accent))
-                    .glassPane(Capsule(), weight: .clear)
-                    .overlay(Capsule().strokeBorder(accent.opacity(0.3), lineWidth: 1))
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 8)
+            .padding(.vertical, 6)
             .modifier(SolidBottomBar(theme: theme))
             }
         }
@@ -967,7 +996,7 @@ struct AnalysisView: View {
 
     /// Back to the start, a move back, play the best line, a move ahead.
     private var stepper: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 0) {
             stepButton("backward.end.fill", label: "Back to the start", enabled: model.canGoBack) { model.rewind() }
             stepButton("chevron.backward", label: "Move back", enabled: model.canGoBack) { model.back() }
             Button {
@@ -978,10 +1007,10 @@ struct AnalysisView: View {
                     playLabel(model.isPlayingLine ? "Pause" : "Play the line")
                     playLabel(model.isPlayingLine ? "Pause" : "Play")
                 }
-                .frame(maxWidth: .infinity, minHeight: 44)
             }
             .accessibilityLabel(model.isPlayingLine ? "Pause" : "Play the line")
-            .buttonStyle(.bordered)
+            .buttonStyle(GoldPlayStyle(accent: accent))
+            .layoutPriority(1)
             .disabled(!model.isPlayingLine && !model.canPlayLine)
             .accessibilityHint("Plays the engine's best line out on the board, a move at a time")
             stepButton("chevron.forward", label: "Move ahead", enabled: model.canGoForward) { model.forward() }
@@ -1000,9 +1029,8 @@ struct AnalysisView: View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.app(.body, weight: .semibold))
-                .frame(width: 26, height: 44)
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(PlainStepStyle(accent: accent))
         .disabled(!enabled)
         .accessibilityLabel(label)
     }
