@@ -191,7 +191,7 @@ struct SculptedBoardView: View {
         }
         var state = SculptedBoardState(
             pieces: game.pieces,
-            // A move waiting for the clock press stays lifted on its new square, gold beneath it.
+            // A move waiting for its ✓ stays lifted on its new square, gold beneath it.
             selected: game.selected ?? match.heldSquare,
             targets: game.targets,
             lastMove: game.lastMove,

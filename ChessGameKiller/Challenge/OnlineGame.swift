@@ -79,14 +79,14 @@ final class OnlineGame {
     /// What the player has reported about the friend in this game.
     private(set) var reported: Set<ChallengeAction> = []
     private(set) var pending: PendingMove? = nil
-    /// The player's move on the board, waiting for them to press their clock (Press your clock).
-    /// Nothing is sent until they do: their clock runs on, as on a real one.
+    /// The player's move on the board, waiting for their ✓ on the gold Play bar (Confirm moves).
+    /// Nothing is sent until they confirm: their clock runs on meanwhile.
     private(set) var held: PendingMove? = nil
 
-    /// The Settings switch for Press your clock: on unless the player turned it off.
-    static let pressClockKey = "pressClockToPlay"
-    static var pressesClock: Bool {
-        UserDefaults.standard.object(forKey: pressClockKey) as? Bool ?? true
+    /// The Settings switch for Confirm moves: on unless the player turned it off.
+    static let confirmMovesKey = "confirmMoves"
+    static var confirmsMoves: Bool {
+        UserDefaults.standard.object(forKey: confirmMovesKey) as? Bool ?? true
     }
 
     /// The record changed: a new state, or a rematch with its own code.
@@ -603,7 +603,7 @@ final class OnlineGame {
         let move = PendingMove(uci: played.uci, san: played.san, ply: boardMoves.count, at: serverNow())
         boardMoves.append(played.uci)
         // A move that ends the game on the board (mate, stalemate) goes at once: nothing to weigh.
-        if Self.pressesClock, !game.isGameOver {
+        if Self.confirmsMoves, !game.isGameOver {
             hold(move, on: Square(String(played.uci.dropFirst(2).prefix(2))))
         } else {
             dispatch(move)
@@ -618,23 +618,23 @@ final class OnlineGame {
         }
     }
 
-    // MARK: Press your clock
+    // MARK: Confirm moves
 
-    /// The move stands on the board, lifted, until the player presses their clock.
+    /// The move stands on the board, faint, until the player taps ✓ on the gold Play bar.
     private func hold(_ move: PendingMove, on square: Square) {
         held = move
         match.heldSquare = square
         match.takeBackHeld = { [weak self] in self?.takeBackHeld() }
     }
 
-    /// The player pressed their clock: the waiting move is played, timed from now.
-    func pressClock() {
+    /// The player tapped ✓: the waiting move is played, timed from now.
+    func playHeld() {
         guard let move = held, phase == .playing else { return }
         releaseHeld()
         dispatch(PendingMove(uci: move.uci, san: move.san, ply: move.ply, at: serverNow()))
     }
 
-    /// The player tapped the board instead: the waiting move goes back, as if never made.
+    /// The player tapped ✕ or the board instead: the waiting move goes back, as if never made.
     func takeBackHeld() {
         guard let move = held else { return }
         releaseHeld()

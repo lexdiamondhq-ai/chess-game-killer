@@ -331,7 +331,7 @@ struct BoardView: View {
                 let place = cell(of: placed.square)
                 PieceImage(piece: placed.piece, theme: theme, size: size, onBoard: true, heirloom: heirloom(of: placed))
                     .scaleEffect(game.selected == placed.square || match.heldSquare == placed.square ? PieceImage.liftedScale : 1)
-                    // A move waiting for the clock press stands there faintly, not yet played.
+                    // A move waiting for its ✓ stands there faintly, not yet played.
                     .opacity(match.heldSquare == placed.square ? 0.6 : 1)
                     .position(center(of: placed.square, size: size))
                     // Nearer rows draw last, so tall 3D pieces overlap the ones behind them, and
