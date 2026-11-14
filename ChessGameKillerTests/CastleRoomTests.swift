@@ -3,6 +3,7 @@ import XCTest
 @testable import ChessGameKiller
 
 /// The castle's rooms behind Rooms (Alex, 2026-11-14): Trophy Hall, Famous Games, the Dungeon.
+@MainActor
 final class CastleRoomTests: XCTestCase {
     private func defaults() -> UserDefaults {
         let name = "castle-\(UUID().uuidString)"

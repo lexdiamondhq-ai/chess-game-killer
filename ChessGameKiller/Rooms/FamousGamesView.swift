@@ -152,6 +152,7 @@ struct FamousGamesView: View {
 
 /// Plays a famous game by itself, a move every little while, with Leo's story under the board.
 /// Pause, step back and forward, or start again.
+@MainActor
 @Observable
 final class FamousGamePlayer {
     let game: ClassicGame
