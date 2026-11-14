@@ -63,6 +63,8 @@ struct HomeView: View {
     /// the hall could read the rival from before and open on the Cub (Alex, 2026-11-10: "When I
     /// hit play it goes to cub rather than the rival I selected").
     @State private var hall: HallVisit?
+    /// The castle room open from Rooms: Trophy Hall, Famous Games or the Dungeon.
+    @State private var castleRoom: CastleRoom?
     @AppStorage("setup.clock") private var timeControl: TimeControl = .unlimited
     @AppStorage("haptics") private var hapticsOn = true
     /// The name friends see, from the last challenge: the home says hello with it.
@@ -540,9 +542,8 @@ struct HomeView: View {
         actions.start(MatchController.Setup(playerColor: side.color, level: level, timeControl: timeControl))
     }
 
-    /// Rooms on the Aurora home: New game and Your games only (Alex, 2026-11-11). New game is the
-    /// one door to every game: a rival, a friend or someone online. The rivals live on the Next
-    /// game card. Elsewhere: Online and A friend (when the app has them), a new game, the rivals
+    /// Rooms on the Aurora home: New game, the one door to every game, and the castle's rooms
+    /// (Alex, 2026-11-14). The rivals live on the Next game card. Elsewhere: Online and A friend (when the app has them), a new game, the rivals
     /// and your games.
     private var shortcutList: [HomeShortcut] {
         let waiting: Int = challenges?.onlineWaiting ?? 0
@@ -562,6 +563,7 @@ struct HomeView: View {
         case .newGame: secondary(upNext)
         case .rivals: hall = HallVisit(start: nil, intro: false)
         case .games: actions.rewind()
+        case .trophies, .famous, .dungeon: castleRoom = kind.castleRoom
         }
     }
 
@@ -758,7 +760,15 @@ extension HomeView {
             }
             // A link from outside (a friend's challenge, Today's Move) brings its own screen
             // forward: the hall steps aside for it.
-            .onReceive(NotificationCenter.default.publisher(for: ScreenCovers.closeAll)) { _ in hall = nil }
+            .onReceive(NotificationCenter.default.publisher(for: ScreenCovers.closeAll)) { _ in
+                hall = nil
+                castleRoom = nil
+            }
+            .fullScreenCover(item: $castleRoom) { room in
+                CastleRoomScreen(room: room, theme: pieceTheme)
+                    .environment(vault)
+                    .environment(puzzles)
+            }
             .fullScreenCover(item: $hall) { visit in
                 RivalsHall(start: visit.start, intro: visit.intro, begin: { level in
                     // The film's last frame gives way to the game: the hall closes at once.
