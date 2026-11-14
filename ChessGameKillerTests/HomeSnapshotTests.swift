@@ -146,7 +146,7 @@ final class HomeSnapshotTests: XCTestCase {
     }
 
     /// For today with Today's Move in the large card and your finest move as a row under it; Rooms
-    /// with its two doors, New game and Your games (Alex, 2026-11-11). By day and by night.
+    /// with New game and the castle's three rooms (Alex, 2026-11-14). By day and by night.
     func testForTodayAndRooms() throws {
         let game = RewindSample.game(date: .now.addingTimeInterval(-86_400))
         let finest = try XCTUnwrap(HomeFinestMove.pick(games: [game]))
@@ -579,6 +579,23 @@ final class HomeSnapshotTests: XCTestCase {
     }
 
     // MARK: Drawing
+
+    /// The castle's three rooms behind Rooms (Alex, 2026-11-14), each past its film: the Trophy
+    /// Hall, Famous Games and the Dungeon; and a famous game being played out.
+    func testTheCastleRooms() throws {
+        let seen = UserDefaults.standard.stringArray(forKey: CastleRoom.seenKey)
+        UserDefaults.standard.set(CastleRoom.allCases.map(\.rawValue), forKey: CastleRoom.seenKey)
+        defer { UserDefaults.standard.set(seen, forKey: CastleRoom.seenKey) }
+        for room in CastleRoom.allCases {
+            let window = try show(CastleRoomScreen(room: room, theme: .named(.gilded)), wait: 2)
+            try save(window, "zz-rooms-\(room.slug)")
+            window.isHidden = true
+        }
+        let game = try XCTUnwrap(GrandmasterContent.shared.games.first { $0.id == "opera" })
+        let window = try show(FamousGameTheater(game: game, theme: .named(.gilded)), wait: 5)
+        try save(window, "zz-rooms-famous-game-playing")
+        window.isHidden = true
+    }
 
     private func show(_ view: some View, wait: TimeInterval = 3) throws -> UIWindow {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
