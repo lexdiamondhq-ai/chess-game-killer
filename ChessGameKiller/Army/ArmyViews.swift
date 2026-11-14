@@ -199,6 +199,11 @@ struct ArmyView: View {
     let theme: BoardTheme
     /// The side the player usually takes, so the pieces look like theirs.
     let color: Piece.Color
+    /// The rival up next, for a quest that only needs a win.
+    var nextRival: MatchController.Level = .club
+    /// Plays the quest's rival, when the army was opened from Home. Nil (opened over a game):
+    /// the quest's words show with no button.
+    var play: ((MatchController.Level) -> Void)?
     @Environment(ArmyStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     @State private var selected: ArmySlot?
@@ -227,7 +232,7 @@ struct ArmyView: View {
                 VStack(spacing: 18) {
                     header
                         .homeRise(0)
-                    if let quest = ArmyQuest.of(store, next: .club) {
+                    if let quest = ArmyQuest.of(store, next: nextRival) {
                         questCard(quest)
                             .homeRise(0)
                     }
@@ -249,7 +254,7 @@ struct ArmyView: View {
                 .padding(.vertical, 12)
             }
             .background { TrainingBackdrop(theme: theme) }
-            .navigationTitle("Your pieces")
+            .navigationTitle("Your army")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -274,7 +279,7 @@ struct ArmyView: View {
                 Text("Names, scars and records will be erased. Training isn't affected.")
             }
             .sheet(item: $selected) { slot in
-                PieceDetailView(slot: slot, color: color, theme: theme)
+                PieceDetailView(slot: slot, color: color, theme: theme, play: play)
                     .environment(store)
                     .presentationDetents([.medium, .large])
             }
@@ -296,23 +301,37 @@ struct ArmyView: View {
     }
 
     /// The army's job today, in words. Home's slim Your army strip shows only its button (Alex's
-    /// pick B, 2026-11-12), so the sentence lives here. The line never names the rival up next,
-    /// so any rival will do for the lookup.
+    /// pick B, 2026-11-12), so the sentence lives here, and under it the same button, so the
+    /// quest can be played from where it is read (inspection, 2026-11-14).
     private func questCard(_ quest: ArmyQuest) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("TODAY'S QUEST")
-                .font(.system(size: 10.5, weight: .bold))
-                .tracking(1.3)
-                .foregroundStyle(theme.trainingAccent)
-            Text(quest.line(store))
-                .font(.app(.subheadline))
-                .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("TODAY'S QUEST")
+                    .font(.system(size: 10.5, weight: .bold))
+                    .tracking(1.3)
+                    .foregroundStyle(theme.trainingAccent)
+                Text(quest.line(store))
+                    .font(.app(.subheadline))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+            if let play {
+                let rival: MatchController.Level = quest.rival
+                Button {
+                    play(rival)
+                } label: {
+                    Label(quest.button(store), systemImage: "arrow.right")
+                        .labelStyle(.titleAndIcon)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(TrainingButtonStyle(theme: theme))
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 12)
         .padding(.horizontal, 14)
         .trainingCard(theme)
-        .accessibilityElement(children: .combine)
     }
 
     /// The army lined up as it starts: pawns in front, the back rank behind.
@@ -479,6 +498,8 @@ struct PieceDetailView: View {
     let slot: ArmySlot
     let color: Piece.Color
     let theme: BoardTheme
+    /// Plays the rival holding this piece, when the army was opened from Home.
+    var play: ((MatchController.Level) -> Void)?
     @Environment(ArmyStore.self) private var store
     @State private var renaming = false
     @State private var draftName = ""
@@ -586,6 +607,16 @@ struct PieceDetailView: View {
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                }
+                if let play {
+                    Button {
+                        play(captor)
+                    } label: {
+                        Label("Win it back", systemImage: "arrow.right")
+                            .labelStyle(.titleAndIcon)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(TrainingButtonStyle(theme: theme))
                 }
             }
             if !record.trophies.isEmpty {

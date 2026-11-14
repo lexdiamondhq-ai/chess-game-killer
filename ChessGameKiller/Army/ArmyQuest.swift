@@ -68,6 +68,13 @@ struct ArmyQuest: Equatable {
     }
 }
 
+/// The army screen's own quest button: the army closes and Home plays the quest's rival, just as
+/// the button on Home's Your army strip does (the rival's film first).
+enum ArmyQuestLink {
+    /// Posted with the rival's level (its raw value) as the object.
+    static let play = Notification.Name("ChessGameKiller.playArmyQuest")
+}
+
 extension ArmyStore {
     /// The piece that stands big on the Home card: the most experienced one no rival is
     /// holding. Nil before any game.

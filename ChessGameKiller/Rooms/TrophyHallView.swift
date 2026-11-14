@@ -57,6 +57,8 @@ struct TrophyHallView: View {
     let theme: BoardTheme
     @Environment(GameVault.self) private var vault: GameVault?
     @Environment(PuzzleStore.self) private var puzzles: PuzzleStore?
+    /// The best win being watched again.
+    @State private var watching: SavedGame?
 
     private var records: TrophyHallRecords {
         TrophyHallRecords(games: vault?.games ?? [], ladder: RivalLadder())
@@ -82,6 +84,14 @@ struct TrophyHallView: View {
             .padding(.bottom, 32)
         }
         .scrollIndicators(.hidden)
+        // A best win opens as any game in Your games does (inspection, 2026-11-14: the hall
+        // showed the wins but none could be opened).
+        .fullScreenCover(item: $watching) { game in
+            if let vault {
+                RewindView(game: game, theme: theme)
+                    .environment(vault)
+            }
+        }
     }
 
     // MARK: The rivals' shelf
@@ -149,7 +159,13 @@ struct TrophyHallView: View {
             CastleCard(padding: 0) {
                 VStack(spacing: 0) {
                     ForEach(Array(records.bestWins.enumerated()), id: \.element.id) { index, win in
-                        winRow(win, place: index)
+                        Button {
+                            watching = vault?.game(win.id)
+                        } label: {
+                            winRow(win, place: index)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint("Watch the game again")
                         if index < records.bestWins.count - 1 {
                             Rectangle().fill(CastleStyle.edge).frame(height: 0.5).padding(.leading, 60)
                         }
@@ -181,9 +197,14 @@ struct TrophyHallView: View {
                     .foregroundStyle(CastleStyle.gold)
                     .accessibilityLabel("\(accuracy) percent accuracy")
             }
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(CastleStyle.ink2.opacity(0.7))
+                .accessibilityHidden(true)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
+        .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
     }
 

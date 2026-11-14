@@ -7,6 +7,8 @@ import SwiftUI
 struct ChessDNACard: View {
     let dna: ChessDNA
     let theme: BoardTheme
+    /// Whether the card leads on to the whole Chess DNA (Premium's). Off, it is the card alone.
+    var opens = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -36,15 +38,17 @@ struct ChessDNACard: View {
                     }
                 }
             }
-            HStack {
-                Text("See your Chess DNA")
-                    .font(.app(.subheadline, weight: .semibold))
-                    .foregroundStyle(theme.trainingAccent)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.app(.caption, weight: .bold))
-                    .foregroundStyle(.tertiary)
-                    .accessibilityHidden(true)
+            if opens {
+                HStack {
+                    Text("See your Chess DNA")
+                        .font(.app(.subheadline, weight: .semibold))
+                        .foregroundStyle(theme.trainingAccent)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.app(.caption, weight: .bold))
+                        .foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
+                }
             }
         }
         .padding(18)

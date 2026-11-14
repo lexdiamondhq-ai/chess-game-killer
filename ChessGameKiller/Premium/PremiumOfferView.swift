@@ -1,3 +1,4 @@
+import StoreKit
 import SwiftUI
 
 /// The one Premium screen: what it adds, the two plans with the yearly one picked, and a clear
@@ -422,11 +423,17 @@ struct PremiumSettingsCard: View {
     let theme: BoardTheme
     let open: () -> Void
     private var premium: Premium { .shared }
+    /// Apple's own page for the subscription, for a player who has Premium.
+    @State private var managing = false
 
     var body: some View {
         let accent: Color = theme.accent ?? PremiumStyle.gold
         let active: Bool = premium.isPremium
-        Button(action: open) {
+        Button {
+            // With Premium on there is nothing to sell: the row opens Apple's page to change or
+            // cancel the plan (inspection, 2026-11-14: there was no way to it from the app).
+            if active { managing = true } else { open() }
+        } label: {
             HStack(spacing: 12) {
                 Image(systemName: "crown.fill")
                     .font(.system(size: 15, weight: .semibold))
@@ -437,16 +444,15 @@ struct PremiumSettingsCard: View {
                     Text(active ? "Premium is on" : "Premium")
                         .font(.app(.body, weight: .semibold))
                         .foregroundStyle(Color.primary)
-                    Text(active ? "Thank you. Everything is open." : "A coach that learns you, full Rewind, unlimited puzzles and every look.")
+                    Text(active ? "Everything is open. Tap to manage your plan." : "A coach that learns you, full Rewind, unlimited puzzles and every look.")
                         .font(.app(.footnote))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
-                // Once Premium is on the row opens nothing, so it points nowhere.
-                Image(systemName: active ? "checkmark.seal.fill" : "chevron.right")
+                Image(systemName: "chevron.right")
                     .font(.app(.footnote, weight: .semibold))
-                    .foregroundStyle(active ? AnyShapeStyle(accent) : AnyShapeStyle(HierarchicalShapeStyle.tertiary))
+                    .foregroundStyle(.tertiary)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
@@ -454,6 +460,6 @@ struct PremiumSettingsCard: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .disabled(active)
+        .manageSubscriptionsSheet(isPresented: $managing)
     }
 }

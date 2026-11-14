@@ -46,7 +46,7 @@ struct HomeDock: View {
             Door(title: "Train", glyph: Glyphs.coach, hint: "Lessons with \(Coach.current.title) and the Grandmaster Room", action: actions.train),
             Door(title: "Puzzles", glyph: Glyphs.puzzles, hint: "Rated puzzles and Puzzle Rush", action: actions.puzzles),
             Door(title: "Analyze", glyph: Glyphs.analyze, hint: "Find the best move in any position", action: actions.analyze),
-            Door(title: "You", glyph: Glyphs.king, hint: "Your pieces, your games and Settings", action: openYou),
+            Door(title: "You", glyph: Glyphs.king, hint: "Your army, your games and Settings", action: openYou),
         ]
     }
 
@@ -681,7 +681,7 @@ struct HomeYouPanel: View {
                     HomeLinkRow(title: "Friends", detail: friendsLine, tone: tone) { go(friends) }
                     HomeHairline(tone: tone)
                 }
-                HomeLinkRow(title: "Your pieces", detail: piecesLine, tone: tone) { go(actions.army) }
+                HomeLinkRow(title: "Your army", detail: piecesLine, tone: tone) { go(actions.army) }
                 HomeHairline(tone: tone)
                 HomeLinkRow(title: "Your games", detail: gamesLine, tone: tone) { go(actions.rewind) }
                 HomeHairline(tone: tone)
