@@ -275,6 +275,8 @@ struct FamousGameTheater: View {
             .frame(width: geo.size.width)
         }
         .background { TrainingBackdrop(theme: theme) }
+        // Its own scheme, so the title reads on the board's backdrop (it opens from a dark room).
+        .screenScheme(theme)
         .onAppear { player.play() }
         .onDisappear { player.cancel() }
     }

@@ -99,6 +99,7 @@ struct DungeonView: View {
         .scrollIndicators(.hidden)
         .fullScreenCover(item: $playing, onDismiss: noteEscape) { study in
             EndgameView(study: study, theme: theme)
+                .screenScheme(theme)
                 .environment(EndgameProgress.shared)
         }
     }
