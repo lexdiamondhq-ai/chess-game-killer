@@ -65,7 +65,7 @@ struct GameReel: Equatable, Identifiable {
     let moveCount: Int
     let highlights: [Highlight]
     let finalFEN: String
-    /// The Piece of the Match line, shown at the end.
+    /// The Piece of the Match line. Not shown on the card: it lives on Home, in Your army.
     var hero: String? = nil
 
     // MARK: Leo's lines (kept short so they can be recorded ahead of time)

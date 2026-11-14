@@ -10,6 +10,9 @@ struct ReelFrame: View {
     let time: Double
     /// Where the wordmark sits from the top. On the phone it clears the island and the buttons.
     var wordmarkTop: CGFloat = 34
+    /// False on the phone, where the wordmark sits in the top bar instead. Its place is
+    /// kept, so the picture lands where it does in the video.
+    var showsWordmark = true
 
     private var accent: Color { theme.trainingAccent }
     /// Rounded type on Neon, plain SF Pro on every other look, as in the game.
@@ -23,6 +26,7 @@ struct ReelFrame: View {
                     .font(.app(size: 13, weight: .heavy))
                     .tracking(3)
                     .foregroundStyle(accent)
+                    .opacity(showsWordmark ? 1 : 0)
                     .padding(.top, wordmarkTop)
                 Spacer(minLength: 0)
                 content
@@ -129,17 +133,7 @@ struct ReelFrame: View {
             Text(reel.endLine)
                 .font(.app(size: 20, weight: .semibold))
                 .multilineTextAlignment(.center)
-            if let hero = reel.hero {
-                VStack(spacing: 4) {
-                    Text("PIECE OF THE MATCH")
-                        .font(.app(size: 12, weight: .heavy))
-                        .tracking(1.5)
-                        .foregroundStyle(ArmyRank.gold)
-                    Text(hero)
-                        .font(.app(size: 17, weight: .semibold))
-                        .multilineTextAlignment(.center)
-                }
-            }
+            // The card ends on Leo's line. The Piece of the Match lives on Home, in Your army.
             Text("Coached by \(Coach.current.name) · Beauty of Chess")
                 .font(.app(size: 14, weight: .medium))
                 .foregroundStyle(.secondary)
@@ -225,15 +219,17 @@ struct HighlightReelView: View {
             GeometryReader { geo in
                 TimelineView(.animation) { context in
                     let t = min(reel.length, context.date.timeIntervalSince(started))
-                    // The picture runs edge to edge; the wordmark waits below the island and the buttons.
-                    ReelFrame(reel: reel, theme: theme, time: t, wordmarkTop: geo.safeAreaInsets.top + 62)
+                    // The picture runs edge to edge; the wordmark is in the bar, its place kept below it.
+                    ReelFrame(reel: reel, theme: theme, time: t, wordmarkTop: geo.safeAreaInsets.top + 30,
+                              showsWordmark: false)
                         .onChange(of: cueIndex(at: t)) { _, index in speak(index) }
                 }
                 .ignoresSafeArea()
             }
-            HStack(spacing: 4) {
+            // One slim line: Close, the name, then Play again and Share as plain gold icons.
+            HStack(spacing: 0) {
                 Button { stopVoice(); dismiss() } label: {
-                    roundIcon("xmark")
+                    plainIcon("xmark", color: .primary)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Close")
@@ -242,13 +238,25 @@ struct HighlightReelView: View {
                     started = Date()
                     spoken = -1
                 } label: {
-                    roundIcon("arrow.counterclockwise")
+                    plainIcon("arrow.counterclockwise", color: theme.trainingAccent)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Play again")
                 shareButton
             }
-            .padding(.horizontal, 12)
+            // The name sits in the true middle of the screen, whatever is on either side.
+            .overlay {
+                Text("BEAUTY OF CHESS")
+                    .font(.app(size: 13, weight: .heavy))
+                    .tracking(3)
+                    .foregroundStyle(theme.trainingAccent)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .padding(.horizontal, 96)
+                    .accessibilityAddTraits(.isHeader)
+                    .allowsHitTesting(false)
+            }
+            .padding(.horizontal, 8)
             .padding(.top, 4)
         }
         .onAppear {
@@ -268,47 +276,53 @@ struct HighlightReelView: View {
         }
     }
 
-    /// A 36 pt glass circle with a full 44 pt place to tap.
-    private func roundIcon(_ symbol: String) -> some View {
+    /// A plain icon, no bubble, with a full 44 pt place to tap.
+    private func plainIcon(_ symbol: String, color: Color) -> some View {
         Image(systemName: symbol)
-            .font(.system(size: 15, weight: .bold))
-            .frame(width: 36, height: 36)
-            .glassPane(Circle())
+            .font(.system(size: 18, weight: .semibold))
+            .foregroundStyle(color)
             .frame(width: 44, height: 44)
             .contentShape(Rectangle())
     }
 
-    @ViewBuilder
+    /// One tap: makes the video the first time, then opens the share sheet.
     private var shareButton: some View {
-        if let exported {
-            ShareLink(item: exported, preview: SharePreview("My chess highlights")) {
-                Label("Share", systemImage: "square.and.arrow.up")
-                    .font(.system(size: 15, weight: .bold))
-                    .padding(.horizontal, 14)
-                    .frame(height: 36)
-                    .background(theme.trainingAccent, in: Capsule())
-                    .foregroundStyle(theme.screenIsDark ? Color.black : Color.white)
-                    .frame(height: 44)
-                    .contentShape(Rectangle())
-            }
-        } else {
-            Button {
-                Task { await export() }
-            } label: {
-                HStack(spacing: 6) {
-                    if exporting { ProgressView().controlSize(.small) }
-                    Text(exporting ? "Making video…" : "Make video")
+        Button {
+            if let exported {
+                present(exported)
+            } else {
+                Task {
+                    await export()
+                    if let exported { present(exported) }
                 }
-                .font(.system(size: 15, weight: .bold))
-                .padding(.horizontal, 14)
-                .frame(height: 36)
-                .glassPane(Capsule())
-                .frame(height: 44)
-                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .disabled(exporting)
+        } label: {
+            ZStack {
+                if exporting {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(theme.trainingAccent)
+                        .frame(width: 44, height: 44)
+                } else {
+                    plainIcon("square.and.arrow.up", color: theme.trainingAccent)
+                }
+            }
         }
+        .buttonStyle(.plain)
+        .disabled(exporting)
+        .accessibilityLabel(exporting ? "Making video" : "Share video")
+    }
+
+    private func present(_ url: URL) {
+        guard let top = ChallengePresenter.top() else { return }
+        let sheet = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        if let popover = sheet.popoverPresentationController {
+            popover.sourceView = top.view
+            popover.sourceRect = CGRect(x: top.view.bounds.maxX - 40, y: top.view.safeAreaInsets.top + 26,
+                                        width: 1, height: 1)
+            popover.permittedArrowDirections = [.up]
+        }
+        top.present(sheet, animated: true)
     }
 
     private func cueIndex(at time: Double) -> Int {
