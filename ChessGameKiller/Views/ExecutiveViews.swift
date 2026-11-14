@@ -19,9 +19,9 @@ struct ExecutivePlate: View {
     @ScaledMetric(relativeTo: .footnote) private var scaledStatusHeight: CGFloat = 16
     /// The status row's height. It stops growing where the line's type does.
     private var statusHeight: CGFloat { min(scaledStatusHeight, 21) * lineScale }
-    /// A rival (not Your Grudge) speaks in its own letters: blood red for the Ashen King,
+    /// A rival speaks in its own letters: blood red for the Ashen King,
     /// tarnished silver for the rest (Alex, 2026-11-08; `RivalLetters`).
-    private var speaksInBlood: Bool { isComputer && !inDock && !match.setup.grudge }
+    private var speaksInBlood: Bool { isComputer && !inDock }
     private var voice: RivalLetters.Voice { .init(match.setup.level) }
     /// The rival's card shows its film and weather behind it on the dark looks; the light looks
     /// keep plain glass, where the rival's dark letters read.
@@ -92,11 +92,18 @@ struct ExecutivePlate: View {
                 avatar
                     .frame(width: 40, height: 40)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(name)
-                        .font(.app(.headline))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
+                    HStack(spacing: 8) {
+                        Text(name)
+                            .font(.app(.headline))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                        // A rival's taken pieces sit by its name, where there is room for all of
+                        // them; beside the taunt they shrank to a bare "+1" (Alex, 2026-11-11).
+                        if speaksInBlood {
+                            CapturedPieces(match: match, by: color, showsLead: false)
+                        }
+                    }
                     statusRow
                         // The row keeps its height when it has nothing to say, so the name never jumps.
                         // The rival's may grow to a second line, so its whole taunt shows (the card
@@ -173,7 +180,9 @@ struct ExecutivePlate: View {
                 statusWords
             }
             .layoutPriority(1)
-            CapturedPieces(match: match, by: color, scale: lineScale)
+            if !speaksInBlood {
+                CapturedPieces(match: match, by: color, scale: lineScale)
+            }
         }
         .animation(.easeInOut(duration: 0.2), value: selectedArmyPiece?.name)
     }
@@ -311,7 +320,7 @@ struct ExecutivePlate: View {
 
     @ViewBuilder
     private var avatar: some View {
-        if speaksInBlood, match.setup.rival.coinName != nil {
+        if speaksInBlood {
             LivingRivalCoin(rival: match.setup.rival, size: 40,
                             captures: match.game.captured(by: color).reduce(0) { $0 + $1.count },
                             losing: match.game.materialLead(for: color) <= -3)
@@ -339,7 +348,7 @@ struct ExecutivePlate: View {
     /// The status is the rival's taunt, waiting for your move.
     private var isTaunt: Bool { speaksInBlood && !match.isOver && !isActive }
 
-    /// The rival's taunt while it waits (`RivalTaunt`; the Grudge keeps its level), "Thinking…"
+    /// The rival's taunt while it waits (`RivalTaunt`), "Thinking…"
     /// on its turn; "Your move" on yours, and nothing while you wait (your captures say enough).
     /// The result once the game is over.
     private var status: String {
@@ -349,11 +358,7 @@ struct ExecutivePlate: View {
         }
         if isComputer {
             if isActive { return match.engineFailed ? "Coach offline" : "Thinking…" }
-            let rival = match.setup.rival
-            if rival.isGrudge {
-                return "\(rival.level.name) · \(rival.elo.replacingOccurrences(of: "~", with: ""))"
-            }
-            return RivalTaunt.line(for: rival.level, game: match.gameID, ply: match.game.plyCount)
+            return RivalTaunt.line(for: match.setup.level, game: match.gameID, ply: match.game.plyCount)
         }
         return isActive ? "Your move" : ""
     }
@@ -368,6 +373,8 @@ private struct CapturedPieces: View {
     let by: Piece.Color
     /// Larger on the rival's line.
     var scale: CGFloat = 1
+    /// The "+3" after the pieces. A rival's card shows only the pieces (Alex, 2026-11-11).
+    var showsLead = true
 
     @ScaledMetric(relativeTo: .footnote) private var baseSize: CGFloat = 14
     private var size: CGFloat { baseSize * scale }
@@ -410,7 +417,7 @@ private struct CapturedPieces: View {
 
     @ViewBuilder
     private func leadLabel(_ lead: Int) -> some View {
-        if lead > 0 {
+        if showsLead, lead > 0 {
             // Always one piece: next to a long taunt there was no room, and "+3" broke into a
             // "+" over a "3" at the card's edge (Alex, 2026-11-11). The taunt wraps instead.
             Text("+\(lead)")

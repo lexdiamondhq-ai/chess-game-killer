@@ -186,7 +186,12 @@ extension AnalyzeSheet {
     fileprivate func destination(_ step: ScanSession.Step) -> some View {
         switch step {
         case .reading:
-            PhotoReadingView(session: session, theme: theme)
+            // The analysis board straight away, while the photo is read (Alex, 2026-11-13,
+            // "Board right away"): its pieces and arrows come in when the reading lands.
+            AnalysisView(draft: .empty, theme: theme, engine: nil, rival: rival, clock: clock,
+                         readingPhoto: true,
+                         onStopReading: { withAnimation(.snappy) { session.stopReading() } },
+                         onLeaveReading: { session.leaveReading() }) { _ in }
         case .editor:
             BoardEditorView(session: session, theme: theme)
         case .analysis:
@@ -247,7 +252,7 @@ struct AnalysisPhotoButtons: View {
     }
 }
 
-/// One half of the analysis's photo pill, lower right.
+/// The camera or photo button at the right of the slim bottom strip: a plain gold icon.
 private struct PhotoPillStyle: ButtonStyle {
     let accent: Color
 
@@ -255,26 +260,79 @@ private struct PhotoPillStyle: ButtonStyle {
         configuration.label
             .font(.app(.title3, weight: .semibold))
             .foregroundStyle(accent)
-            .frame(width: 58, height: 46)
+            .frame(width: 44, height: 44)
             .contentShape(Rectangle())
             .opacity(configuration.isPressed ? 0.55 : 1)
     }
 }
 
-/// No frosted fade where the page scrolls under the photo buttons: the moves stay readable
-/// right down to the bottom.
-private struct ClearBottomEdge: ViewModifier {
+/// A step button in the slim bottom strip: a plain gold icon, faded when there's nowhere to go.
+private struct PlainStepStyle: ButtonStyle {
+    let accent: Color
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(accent)
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
+            .opacity(isEnabled ? (configuration.isPressed ? 0.55 : 1) : 0.3)
+    }
+}
+
+/// Play the line in the slim bottom strip: the one filled gold pill, so it reads as the main button.
+private struct GoldPlayStyle: ButtonStyle {
+    let accent: Color
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(Color.black.opacity(0.85))
+            .padding(.horizontal, 16)
+            .frame(height: 38)
+            .background(accent, in: Capsule())
+            .contentShape(Capsule())
+            .opacity(isEnabled ? (configuration.isPressed ? 0.7 : 1) : 0.4)
+            .frame(maxWidth: .infinity)
+    }
+}
+
+/// A firm edge where the page meets the bottom bar, so moves never show through the buttons
+/// (Alex, 2026-11-13: the photo buttons sat on top of Play the line).
+private struct HardBottomEdge: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
         #if compiler(>=6.2)
         if #available(iOS 26.0, *) {
-            content.scrollEdgeEffectHidden(true, for: .bottom)
+            content.scrollEdgeEffectStyle(.hard, for: .bottom)
         } else {
             content
         }
         #else
         content
         #endif
+    }
+}
+
+/// The bottom bar is a solid strip, set into the page with a hairline on top, so the board and
+/// the Tilted switch never show through the step buttons. On iOS 26 the scroll edge alone left
+/// it see-through (Alex, 2026-11-13: "I thought it was set into the page and not floating").
+private struct SolidBottomBar: ViewModifier {
+    let theme: BoardTheme
+
+    func body(content: Content) -> some View {
+        content
+            .background {
+                // The sheet's own backdrop, so the strip reads as part of the page.
+                TrainingBackdrop(theme: theme)
+                    .clipped()
+                    .ignoresSafeArea(edges: .bottom)
+            }
+            .overlay(alignment: .top) {
+                Rectangle()
+                    .fill(Color.primary.opacity(0.08))
+                    .frame(height: 1)
+            }
     }
 }
 
@@ -325,32 +383,6 @@ struct Panel: View {
                         .shadow(color: highlight.opacity(theme.glows ? 0.45 : 0), radius: 10)
                 }
             }
-    }
-}
-
-// MARK: - Reading
-
-/// While the reader checks every square: the Gilded knight drawn in light on a glass card,
-/// "Processing" below (KnightLoadingView, Alex 2026-11-10). Its analysis follows by itself;
-/// Stop goes to the editor to set the pieces by hand.
-struct PhotoReadingView: View {
-    let session: ScanSession
-    let theme: BoardTheme
-
-    var body: some View {
-        KnightLoadingView()
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.hidden, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Stop") { withAnimation(.snappy) { session.stopReading() } }
-                        .accessibilityLabel("Stop reading the photo")
-                        .accessibilityHint("Then set up the pieces by hand")
-                }
-            }
-            // Backing out while it's read drops the read, so its analysis can't open later.
-            .onDisappear { session.leaveReading() }
     }
 }
 
@@ -584,6 +616,13 @@ struct AnalysisView: View {
     var onSwitchTurn: ((PositionDraft) -> Void)?
     /// Take a photo and Upload a photo, for a new board, when the analyzer offers them.
     var photoButtons: AnalysisPhotoButtons?
+    /// The photo is still being read: an empty board, "Reading your board…" and Stop, with no
+    /// engine yet (Alex, 2026-11-13: the board right away instead of a waiting screen).
+    var readingPhoto = false
+    /// Stop gives up on the read, for setting the pieces up by hand.
+    var onStopReading: (() -> Void)?
+    /// Backing out while it's read drops the read, so its analysis can't open later.
+    var onLeaveReading: (() -> Void)?
     let onPlay: (PositionDraft) -> Void
 
     @State private var model: AnalysisModel
@@ -601,6 +640,7 @@ struct AnalysisView: View {
          photo: UIImage? = nil, photoDoubts: String? = nil, onEditPieces: ((PositionDraft) -> Void)? = nil,
          onSwitchTurn: ((PositionDraft) -> Void)? = nil,
          photoButtons: AnalysisPhotoButtons? = nil,
+         readingPhoto: Bool = false, onStopReading: (() -> Void)? = nil, onLeaveReading: (() -> Void)? = nil,
          onPlay: @escaping (PositionDraft) -> Void) {
         self.theme = theme
         self.rival = rival
@@ -611,6 +651,9 @@ struct AnalysisView: View {
         self.onEditPieces = onEditPieces
         self.onSwitchTurn = onSwitchTurn
         self.photoButtons = photoButtons
+        self.readingPhoto = readingPhoto
+        self.onStopReading = onStopReading
+        self.onLeaveReading = onLeaveReading
         self.onPlay = onPlay
         let sounds: SoundPlaying? = engine == nil ? nil : SoundPlayer.shared
         _model = State(initialValue: model ?? AnalysisModel(draft: draft, engine: engine, sounds: sounds))
@@ -724,7 +767,7 @@ struct AnalysisView: View {
                     // Edge to edge, as the game's board runs: out past the screen's own padding.
                     .padding(.horizontal, -16)
                 HStack {
-                    turn
+                    if !readingPhoto { turn }
                     Spacer(minLength: 0)
                     BoardViewSwitch(theme: theme)
                 }
@@ -786,57 +829,71 @@ struct AnalysisView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 14) {
-                photoRow
-                header
-                board
-                    .sensoryFeedback(.selection, trigger: model.selected) { _, new in hapticsOn && new != nil }
-                    .sensoryFeedback(.warning, trigger: model.showsCheckNote) { _, new in hapticsOn && new }
-                checkNote
-                stepper
-                madeMoves
-                lines
-                help
+                if readingPhoto {
+                    board
+                        .allowsHitTesting(false)
+                    readingPill
+                } else {
+                    photoRow
+                    header
+                    board
+                        .sensoryFeedback(.selection, trigger: model.selected) { _, new in hapticsOn && new != nil }
+                        .sensoryFeedback(.warning, trigger: model.showsCheckNote) { _, new in hapticsOn && new }
+                    checkNote
+                    madeMoves
+                    lines
+                    help
+                }
             }
             .padding(16)
             .animation(.snappy, value: model.lines)
             .animation(.snappy(duration: 0.25), value: model.statusNote)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            // Lower right (Alex, 2026-11-08), docked in its own strip so the page scrolls
-            // above it and it never covers a score.
-            if let photoButtons {
-                HStack {
-                    Spacer()
+            // A slim strip at the bottom (Alex, 2026-11-13, "Lets do A"): plain gold icons with
+            // no bubbles, one gold Play the line pill in the middle, and the strip runs to the
+            // very bottom edge so the page never peeks out under it.
+            if !readingPhoto {
+            HStack(spacing: 4) {
+                stepper
+                if let photoButtons {
+                    Divider().frame(height: 28)
                     HStack(spacing: 0) {
                         photoButtons
                     }
                     .labelStyle(.iconOnly)
                     .buttonStyle(PhotoPillStyle(accent: accent))
-                    // Clear glass with no strip behind it, so the moves show through
-                    // (Alex, 2026-11-11: "more clear and glassy so you can see the moves").
-                    .glassPane(Capsule(), weight: .clear)
-                    .overlay(Capsule().strokeBorder(accent.opacity(0.3), lineWidth: 1))
-                    .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+            .modifier(SolidBottomBar(theme: theme))
             }
         }
-        .modifier(ClearBottomEdge())
+        .modifier(HardBottomEdge())
         .navigationTitle("Analysis")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button { flipped.toggle() } label: {
-                    Label {
-                        Text("Flip board")
-                    } icon: {
-                        Glyph(name: Glyphs.flip, size: 24)
+            if readingPhoto, let onStopReading {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Stop", action: onStopReading)
+                        .accessibilityLabel("Stop reading the photo")
+                        .accessibilityHint("Then set up the pieces by hand")
+                }
+            } else {
+                ToolbarItem(placement: .primaryAction) {
+                    Button { flipped.toggle() } label: {
+                        Label {
+                            Text("Flip board")
+                        } icon: {
+                            Glyph(name: Glyphs.flip, size: 24)
+                        }
                     }
                 }
             }
         }
-        .task { await model.run() }
+        .task { if !readingPhoto { await model.run() } }
+        .onDisappear { if readingPhoto { onLeaveReading?() } }
         .onDisappear { model.stopLine() }
         .sheet(isPresented: $showingPhoto) {
             if let photo {
@@ -867,6 +924,23 @@ struct AnalysisView: View {
     }
 
     // MARK: The photo
+
+    /// Under the empty board while the photo is read: the knight tracing itself, and what's
+    /// happening. The pieces take its place in about three seconds.
+    private var readingPill: some View {
+        HStack(spacing: 10) {
+            KnightTraceMark()
+                .frame(width: 20, height: 25)
+            Text("Reading your board…")
+                .font(.app(.subheadline, weight: .semibold))
+        }
+        .padding(.horizontal, 18)
+        .frame(minHeight: 44)
+        .glassPane(Capsule())
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Reading your board")
+    }
 
     /// The photo the position was read from, with the way to fix its pieces.
     @ViewBuilder
@@ -922,34 +996,41 @@ struct AnalysisView: View {
 
     /// Back to the start, a move back, play the best line, a move ahead.
     private var stepper: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 0) {
             stepButton("backward.end.fill", label: "Back to the start", enabled: model.canGoBack) { model.rewind() }
             stepButton("chevron.backward", label: "Move back", enabled: model.canGoBack) { model.back() }
             Button {
                 if model.isPlayingLine { model.stopLine() } else { model.playLine() }
             } label: {
-                Label(model.isPlayingLine ? "Pause" : "Play the line",
-                      systemImage: model.isPlayingLine ? "pause.fill" : "play.fill")
-                    .font(.app(.subheadline, weight: .semibold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .contentTransition(.symbolEffect(.replace))
+                // In the bottom bar beside the photo buttons, a narrow phone shows just "Play".
+                ViewThatFits(in: .horizontal) {
+                    playLabel(model.isPlayingLine ? "Pause" : "Play the line")
+                    playLabel(model.isPlayingLine ? "Pause" : "Play")
+                }
             }
-            .buttonStyle(.bordered)
+            .accessibilityLabel(model.isPlayingLine ? "Pause" : "Play the line")
+            .buttonStyle(GoldPlayStyle(accent: accent))
+            .layoutPriority(1)
             .disabled(!model.isPlayingLine && !model.canPlayLine)
             .accessibilityHint("Plays the engine's best line out on the board, a move at a time")
             stepButton("chevron.forward", label: "Move ahead", enabled: model.canGoForward) { model.forward() }
         }
     }
 
+    private func playLabel(_ title: String) -> some View {
+        Label(title, systemImage: model.isPlayingLine ? "pause.fill" : "play.fill")
+            .font(.app(.subheadline, weight: .semibold))
+            .lineLimit(1)
+            .fixedSize()
+            .contentTransition(.symbolEffect(.replace))
+    }
+
     private func stepButton(_ symbol: String, label: String, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.app(.body, weight: .semibold))
-                .frame(width: 48, height: 44)
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(PlainStepStyle(accent: accent))
         .disabled(!enabled)
         .accessibilityLabel(label)
     }

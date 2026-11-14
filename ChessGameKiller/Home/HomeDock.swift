@@ -46,7 +46,7 @@ struct HomeDock: View {
             Door(title: "Train", glyph: Glyphs.coach, hint: "Lessons with \(Coach.current.title) and the Grandmaster Room", action: actions.train),
             Door(title: "Puzzles", glyph: Glyphs.puzzles, hint: "Rated puzzles and Puzzle Rush", action: actions.puzzles),
             Door(title: "Analyze", glyph: Glyphs.analyze, hint: "Find the best move in any position", action: actions.analyze),
-            Door(title: "You", glyph: Glyphs.king, hint: "Your pieces, your games and Settings", action: openYou),
+            Door(title: "You", glyph: Glyphs.king, hint: "Your army, your games and Settings", action: openYou),
         ]
     }
 
@@ -342,19 +342,38 @@ struct HomeJewelGold: View {
 /// page doesn't already hold (Alex, 2026-11-08: "Lets go with all"). A person online, a friend,
 /// a new game on your own side and clock, and your games. Today's Move, Puzzles, Analyze and
 /// the coach live on Today, so they are not repeated here. The rivals' hall joins them, the
-/// fifth room, as the review proposed once the hall landed. Your Grudge has its room beside the
-/// rivals since its Home card gave way to Chess DNA (Alex, 2026-11-09: "place in rooms").
+/// fifth room, as the review proposed once the hall landed. Your Grudge is gone from the app
+/// (Alex, 2026-11-11). The castle's rooms (Trophy Hall, Famous Games, the Dungeon) join New game
+/// on the Aurora home (Alex, 2026-11-14).
 enum HomeShortcutKind: String, CaseIterable, Identifiable {
-    case online, friend, newGame, rivals, grudge, games
+    case online, friend, newGame, rivals, games, trophies, famous, dungeon
 
     var id: String { rawValue }
 
+    /// The older homes' shortcuts, before the castle's rooms.
+    static let classic: [HomeShortcutKind] = [.online, .friend, .newGame, .rivals, .games]
+
     /// What Rooms offers: Online and A friend only when the app can reach other players.
     static func list(online: Bool) -> [HomeShortcutKind] {
-        online ? allCases : allCases.filter { !$0.needsOnline }
+        online ? classic : classic.filter { !$0.needsOnline }
     }
 
     var needsOnline: Bool { self == .online || self == .friend }
+
+    /// Rooms on the Aurora home: New game, the one door to every game (a rival, a friend or
+    /// someone online), and the castle's three rooms (Alex, 2026-11-14). Your games left Rooms
+    /// then; it lives in the You panel, and games under way show on Home.
+    static let rooms: [HomeShortcutKind] = [.newGame, .trophies, .famous, .dungeon]
+
+    /// The castle room behind a shortcut, if it is one.
+    var castleRoom: CastleRoom? {
+        switch self {
+        case .trophies: return .trophies
+        case .famous: return .famous
+        case .dungeon: return .dungeon
+        default: return nil
+        }
+    }
 
     var title: String {
         switch self {
@@ -362,8 +381,10 @@ enum HomeShortcutKind: String, CaseIterable, Identifiable {
         case .friend: return "A friend"
         case .newGame: return "New game"
         case .rivals: return "Rivals"
-        case .grudge: return "Your Grudge"
         case .games: return "Your games"
+        case .trophies: return "Trophy Hall"
+        case .famous: return "Famous Games"
+        case .dungeon: return "Dungeon"
         }
     }
 
@@ -374,9 +395,10 @@ enum HomeShortcutKind: String, CaseIterable, Identifiable {
         case .newGame: return Glyphs.play
         // The shield the hall's own door wore on Home.
         case .rivals: return "shield.lefthalf.filled"
-        // The Grudge burns red behind its king.
-        case .grudge: return "flame.fill"
         case .games: return Glyphs.games
+        case .trophies: return "trophy"
+        case .famous: return "book"
+        case .dungeon: return "lock"
         }
     }
 
@@ -386,8 +408,10 @@ enum HomeShortcutKind: String, CaseIterable, Identifiable {
         case .friend: return "Send a friend a game by link"
         case .newGame: return "Pick your side, clock and rival"
         case .rivals: return "The five rivals, and the one to beat next"
-        case .grudge: return "The rival that remembers every game"
         case .games: return "Look back at the games you've played"
+        case .trophies: return "Every rival you beat, your best wins and records"
+        case .famous: return "Watch the great games while Leo tells the story"
+        case .dungeon: return "Save a losing game to escape. A new cell each day"
         }
     }
 }
@@ -657,14 +681,14 @@ struct HomeYouPanel: View {
                     HomeLinkRow(title: "Friends", detail: friendsLine, tone: tone) { go(friends) }
                     HomeHairline(tone: tone)
                 }
-                HomeLinkRow(title: "Your pieces", detail: piecesLine, tone: tone) { go(actions.army) }
+                HomeLinkRow(title: "Your army", detail: piecesLine, tone: tone) { go(actions.army) }
                 HomeHairline(tone: tone)
                 HomeLinkRow(title: "Your games", detail: gamesLine, tone: tone) { go(actions.rewind) }
                 HomeHairline(tone: tone)
                 HomeLinkRow(title: "Settings", detail: "Board look, sound, hints", tone: tone) { go(actions.settings) }
                 if let premium = actions.premium {
                     HomeHairline(tone: tone)
-                    HomeLinkRow(title: "Premium", detail: "Everything, with no limits", tone: tone) { go(premium) }
+                    HomeLinkRow(title: "Premium", detail: Premium.shared.youLine, tone: tone) { go(premium) }
                 }
             }
         }

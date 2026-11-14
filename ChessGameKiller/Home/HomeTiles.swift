@@ -810,29 +810,8 @@ struct HomeRivalPortrait: View {
     let size: CGFloat
 
     var body: some View {
-        if rival.coinName != nil {
-            // The coins are already struck in the home's own bronze, silver and gold.
-            RivalCoin(rival: rival, size: size)
-        } else {
-            printed
-        }
-    }
-
-    private var printed: some View {
-        Image(rival.portraitName)
-            .resizable()
-            .scaledToFill()
-            .frame(width: size, height: size)
-            // A little closer in, so the rival's shape fills the small circle.
-            .scaleEffect(1.2)
-            .grayscale(1)
-            // In Light and Middle the ivory is the room's dark ink, which would black the
-            // portrait out: the ring takes the room's own light instead.
-            .colorMultiply(tone.scheme == .dark ? tone.ivory : tone.canvas)
-            .contrast(1.3)
-            .clipShape(Circle())
-            .overlay { Circle().strokeBorder(tone.ink.opacity(0.18), lineWidth: 0.5) }
-            .accessibilityHidden(true)
+        // The coins are already struck in the home's own bronze, silver and gold.
+        RivalCoin(rival: rival, size: size)
     }
 }
 

@@ -40,6 +40,8 @@ struct HomeAuroraActions {
     var army: () -> Void = {}
     /// Plays the rival the army's quest names (to free a piece, or to help one rank up).
     var armyQuest: (MatchController.Level) -> Void = { _ in }
+    /// Quick play: starts the rival up next at once, with no film (or picks up that game).
+    var quickPlay: () -> Void = {}
 }
 
 /// Aurora's colors, night and day.
@@ -350,14 +352,18 @@ struct HomeAuroraView: View {
                 .fill(palette.ink3)
                 .frame(width: 38, height: 4)
                 .padding(.top, 10)
+            // Your move or Quick play, first thing on the page (Alex, 2026-11-13: picked A, one
+            // gold bar above Next game).
+            quickBar
+                .padding(.horizontal, 16)
+                .padding(.top, 14)
             // The Face a rival coins are gone: the rival you're on stands big in the Next game
             // card instead (Alex, 2026-11-08). No All rivals link in the corner (Alex,
             // 2026-11-10): the card swipes through them, and Rivals is in Rooms.
             HomeAuroraSection(title: "Next game", palette: palette)
             gameRow
             // Your Chess DNA right under Next game (Alex, 2026-11-10: "Move your chess DNA under the
-            // next game"); it came in where Your Grudge was (2026-11-09: "Chess DNA is a nice
-            // selling point").
+            // next game"; 2026-11-09: "Chess DNA is a nice selling point").
             if let dna = info.dna {
                 HomeAuroraSection(title: "Your Chess DNA", palette: palette,
                                   note: dna.gamesRead > 0 ? ChessDNAView.basis(dna) : nil)
@@ -373,8 +379,13 @@ struct HomeAuroraView: View {
             // Army to the bottom and change the format to more of a rectangle"): the champion
             // and today's job for the army.
             armySection
+            // A carved line to close the page, and only as much room under it as the bottom bar
+            // needs when it comes back (Alex, 2026-11-12: "Too much bottom space here"; picked
+            // C, tighter with a carved sign-off).
+            HomeAuroraSignOff(palette: palette)
+                .padding(.top, 22)
         }
-        .padding(.bottom, 130)
+        .padding(.bottom, 84)
         .frame(maxWidth: .infinity)
         .background {
             shape.fill(palette.sheet)
@@ -385,6 +396,18 @@ struct HomeAuroraView: View {
                 }
                 .shadow(color: .black.opacity(palette.dark ? 0.5 : 0.1), radius: 30, y: -10)
                 .ignoresSafeArea(edges: .bottom)
+        }
+    }
+
+    /// A game against a person waiting on your move opens from here; otherwise it is Quick play.
+    private var quickBar: some View {
+        let mode = HomeAuroraQuickBar.mode(games: info.games, upNext: info.stage.upNext)
+        return HomeAuroraQuickBar(mode: mode, palette: palette) {
+            if case .yourMove(let game, _) = mode {
+                actions.open(game)
+            } else {
+                actions.quickPlay()
+            }
         }
     }
 
@@ -417,7 +440,7 @@ struct HomeAuroraView: View {
     @ViewBuilder
     private var gameRow: some View {
         let all: [HomeAuroraGameCard] = cards
-        if all.count == 1, let only = all.first, let upNext = only.upNext, !upNext.isGrudge, !upNext.inProgress {
+        if all.count == 1, let only = all.first, let upNext = only.upNext, !upNext.inProgress {
             // The next game: swipe sideways through every rival (Alex, 2026-11-08: "I should
             // be able to swipe thru the cards").
             rivalPager(only, upNext: upNext)
@@ -518,7 +541,7 @@ struct HomeAuroraView: View {
         if let upNext = card.upNext {
             HomeAuroraNextRival(card: card, rival: upNext.rival, palette: palette,
                                 play: { open(card) }, change: actions.stage.change,
-                                meet: { actions.rivals(upNext.isGrudge ? nil : upNext.level) })
+                                meet: { actions.rivals(upNext.level) })
         } else {
             HomeAuroraGameTile(card: card, palette: palette) { open(card) }
         }
@@ -939,7 +962,7 @@ struct HomeAuroraNextRival: View {
 }
 
 /// A rival's own picture, the still from its welcome film, cut square on its face and set in
-/// the same gold frame as your finest move. Your Grudge, who has no film, shows its portrait.
+/// the same gold frame as your finest move.
 struct HomeRivalFrame: View {
     let rival: Rival
     let side: CGFloat
@@ -949,7 +972,6 @@ struct HomeRivalFrame: View {
 
     @MainActor
     private var still: UIImage? {
-        guard !rival.isGrudge else { return nil }
         if let cached = Self.stills[rival.slug] { return cached }
         let image = RivalFilm.of(rival.level).cardImage
         Self.stills[rival.slug] = image
@@ -1231,145 +1253,6 @@ struct HomeAuroraDNA: View {
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(tint.opacity(palette.dark ? 0.12 : 0.07)))
-    }
-}
-
-/// Your Grudge on Home, dressed like the rows for today (Alex, 2026-11-07: "match the other
-/// areas"): a white card with a thin red edge, small caps, a serif line, and the onyx king at the
-/// right. A tap opens it into the summons, with Settle it to start the game; another tap on the
-/// summons closes it. Before the Grudge exists, the card says what wakes it.
-struct HomeAuroraGrudge: View {
-    let record: GrudgeRecord?
-    let isOpen: Bool
-    let palette: HomeAuroraPalette
-    var born = false
-    var lastSeen: (you: Int, it: Int)? = nil
-    let select: () -> Void
-    let settle: () -> Void
-
-    private var red: Color { palette.dark ? Color(hex: 0xF0606C) : Color(hex: 0xC8283A) }
-
-    var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
-        Group {
-            if let record, isOpen {
-                VStack(spacing: 16) {
-                    GrudgeStage(record: record, born: born, lastSeen: lastSeen)
-                    Button(action: settle) {
-                        Label("Settle it", systemImage: "play.fill")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(red)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 48)
-                            .background(Capsule().fill(red.opacity(0.08)))
-                            .overlay(Capsule().strokeBorder(red.opacity(0.55), lineWidth: 1))
-                    }
-                    .buttonStyle(HomeStagePress())
-                }
-                .padding(16)
-                .contentShape(shape)
-                .onTapGesture(perform: select)
-                .transition(.opacity)
-            } else {
-                Button(action: select) { row }
-                    .buttonStyle(HomeStagePress())
-                    .disabled(record == nil)
-                    .accessibilityElement(children: .combine)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .background(shape.fill(palette.card))
-        .overlay(shape.strokeBorder(isOpen ? red.opacity(0.35) : palette.line, lineWidth: 1))
-        .animation(.spring(response: 0.5, dampingFraction: 0.86), value: isOpen)
-    }
-
-    private var row: some View {
-        HStack(spacing: 14) {
-            Capsule()
-                .fill(LinearGradient(colors: [red, red.opacity(0.2)], startPoint: .top, endPoint: .bottom))
-                .frame(width: 3)
-                .padding(.vertical, 4)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(record.map { "\($0.mood.title) · \($0.score)" }?.uppercased() ?? "Not yet")
-                    .font(.system(size: 10.5, weight: .bold).monospacedDigit())
-                    .tracking(1.3)
-                    .foregroundStyle(record == nil ? palette.ink3 : red)
-                Text(record == nil ? "Someone is watching" : "Settle the score")
-                    .font(.system(size: 19, weight: .regular, design: .serif))
-                    .foregroundStyle(palette.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                Text(record.map { "Remembers every game. About \($0.rating.formatted()) now." }
-                     ?? "Lose to a rival once and it takes it personally.")
-                    .font(.system(size: 12.5))
-                    .foregroundStyle(palette.ink2)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 0)
-            GrudgeKing(scars: record?.scars ?? 0, size: 64, light: record == nil ? 0.1 : 0.55)
-                .opacity(record == nil ? 0.45 : 1)
-                .frame(width: 64, height: 64)
-        }
-        .padding(.vertical, 12)
-        .padding(.leading, 14)
-        .padding(.trailing, 12)
-        .contentShape(Rectangle())
-    }
-}
-
-/// Your Grudge's room, from Rooms (Alex, 2026-11-09: "place in rooms"): a sheet the height of
-/// what it holds, the summons with Settle it once the Grudge is born, and before then the card
-/// that says what wakes it. Meeting it here counts as seeing it, so the summons plays what
-/// changed since last time, or its birth the first time.
-struct HomeGrudgeRoom: View {
-    let grudges: GrudgeStore
-    let palette: HomeAuroraPalette
-    let settle: () -> Void
-
-    /// The score when you last saw your Grudge ("7-11"), so what changed since plays out.
-    @AppStorage("grudge.lastSeen") private var lastSeen = ""
-    @State private var since: (you: Int, it: Int)?
-    @State private var born = false
-    @State private var met = false
-    @State private var height: CGFloat = 420
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Your Grudge")
-                .font(.system(size: 20, weight: .medium, design: .serif))
-                .foregroundStyle(palette.ink)
-                .padding(.horizontal, 4)
-                .accessibilityAddTraits(.isHeader)
-            if met {
-                HomeAuroraGrudge(record: grudges.record, isOpen: grudges.record != nil, palette: palette,
-                                 born: born, lastSeen: since, select: {}, settle: settle)
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 26)
-        .padding(.bottom, 12)
-        .frame(maxWidth: .infinity, alignment: .top)
-        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
-        .presentationDetents([.height(height)])
-        .presentationDragIndicator(.visible)
-        .presentationBackground(palette.sheet)
-        .presentationCornerRadius(34)
-        .environment(\.colorScheme, palette.dark ? .dark : .light)
-        .onAppear(perform: meet)
-    }
-
-    /// Reads when you last met it, then marks it seen from here.
-    private func meet() {
-        guard !met else { return }
-        if let record = grudges.record {
-            let parts = lastSeen.split(separator: "-").compactMap { Int($0) }
-            since = parts.count == 2 ? (you: parts[0], it: parts[1]) : nil
-            born = grudges.unseen
-            lastSeen = "\(record.yourWins)-\(record.itsWins)"
-            grudges.markSeen()
-        }
-        met = true
     }
 }
 

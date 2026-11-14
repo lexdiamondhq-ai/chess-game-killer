@@ -10,6 +10,8 @@ struct ContentView: View {
     @State private var match = MatchController.live()
     @State private var showingNewGame = true
     @State private var showingSettings = false
+    /// The Premium page, opened from Home's You panel.
+    @State private var showingPremium = false
     @State private var confirmingResign = false
     @State private var confirmingDraw = false
     /// The welcome's Play, waiting on the first rival's film: its Begin starts this game.
@@ -39,7 +41,6 @@ struct ContentView: View {
     @State private var puzzles = PuzzleStore.live()
     @State private var showingPuzzles = false
     @State private var army = ArmyStore.live()
-    @State private var grudges = GrudgeStore()
     @State private var showingArmy = false
     @State private var armyNews: ArmyNews?
     @State private var vault = GameVault.live()
@@ -164,7 +165,7 @@ struct ContentView: View {
     /// The rival's line above the board is a line taller, so its taunt can run to two
     /// (Alex, 2026-11-08: the whole taunt, never cut off).
     private var topPlateHeight: CGFloat {
-        let rivalOnTop = match.setup.opponent == .computer && !match.setup.grudge
+        let rivalOnTop = match.setup.opponent == .computer
             && !match.game.humanColors.contains(bottomColor.opposite)
         return plateHeight + (rivalOnTop ? min(scaledTauntRoom, 32) : 0)
     }
@@ -202,16 +203,10 @@ struct ContentView: View {
                     daily.record(.game)
                 }
                 hookUpDaily()
-                match.grudgeRecord = { [grudges] in grudges.record }
-                match.onAbandon = { [army, grudges, weak match] ledger, setup, assisted in
+                match.onAbandon = { [army] ledger, setup, assisted in
                     // Walking away from a game counts as a loss.
                     army.record(ledger, playerColor: setup.playerColor, won: false,
                                 stakes: GameStakes(level: setup.level, assisted: assisted, staked: setup.stake))
-                    // Your Grudge counts it too. Walking out on a crowd never wakes one.
-                    if setup.grudge, let game = match?.game {
-                        grudges.recordGame(.itWon, moves: game.moves, playerColor: setup.playerColor,
-                                           positions: game.positionFENs)
-                    }
                 }
                 // Every grade reaches the coach, shown or not, so real mistakes are saved to practice.
                 match.onReview = { [weak match, coach, training] review, latest in
@@ -248,7 +243,6 @@ struct ContentView: View {
                 RivalTheme.shared.stop(fade: 2)
                 recordArmy()
                 recordGame()
-                recordGrudge()
                 // A game played to its end makes the day; resigning before a move doesn't.
                 if match.game.plyCount > 0 { daily.record(.game) }
                 // Let the last move land and the king fall, then open the summary.
@@ -300,7 +294,11 @@ struct ContentView: View {
                     .homeZoom(.games, in: homeZoom, when: zoomsFromSheet)
             }
             .fullScreenCover(isPresented: $showingArmy) {
-                ArmyView(theme: chosenTheme, color: match.setup.playerColor).environment(army)
+                // Opened from Home, the quest and a held piece each carry a button that plays the
+                // rival; over a game they stay words only.
+                ArmyView(theme: chosenTheme, color: match.setup.playerColor, nextRival: armyQuestRival,
+                         play: showingHome && stageHome ? { level in playArmyQuest(level) } : nil)
+                    .environment(army)
                     .homeZoom(.army, in: homeZoom, when: zoomsFromSheet)
             }
             // The welcome's Play shows the first rival's film, as Home's Play does, and its Begin
@@ -359,21 +357,27 @@ struct ContentView: View {
                 HomeMusic.shared.setCovered(covers)
             }
             .sheet(isPresented: $showingNewGame, onDismiss: startIfNeeded) {
-                NewGameSheet(theme: theme, forfeits: forfeits) { setup in
+                NewGameSheet(theme: theme, forfeits: forfeits, start: { setup in
                     withAnimation(.snappy) { match.start(setup) }
                     showingNewGame = false
                     leaveHome()
-                } challenge: {
+                }, challenge: {
                     showingNewGame = false
                     challenges?.compose()
-                }
+                }, online: challenges == nil ? nil : {
+                    showingNewGame = false
+                    challenges?.playOnline()
+                }, onlineWaiting: challenges?.onlineWaiting)
+                .task { await challenges?.refreshOnlineCount() }
                 .environment(army)
-                .environment(grudges)
                 .boardSheetGrabber(boardSheet)
             }
             .sheet(isPresented: $showingSettings, onDismiss: refreshDaily) {
                 SettingsSheet()
                     .boardSheetGrabber(boardSheet)
+            }
+            .sheet(isPresented: $showingPremium) {
+                PremiumOfferView(feature: nil)
             }
             .sheet(isPresented: $showingAnalyze) {
                 AnalyzeSheet(
@@ -402,7 +406,6 @@ struct ContentView: View {
             .environment(training)
             .environment(coach)
             .environment(army)
-            .environment(grudges)
             .environment(vault)
             .environment(puzzles)
             .environment(daily)
@@ -426,7 +429,7 @@ struct ContentView: View {
                 if match.isOver { recordGame() }
             }
             .onChange(of: match.gameNumber) { _, _ in
-                // Every rival game plays its rival's theme, rematches too; Your Grudge is quiet.
+                // Every rival game plays its rival's theme, rematches too.
                 RivalTheme.shared.gameStarted(match.setup)
                 coach.gameStarted()
                 announceGrudge()
@@ -526,7 +529,10 @@ struct ContentView: View {
                 showingGames = true
             },
             army: { showingArmy = true },
-            settings: { showingSettings = true }
+            settings: { showingSettings = true },
+            // The You panel's Premium row was built but never switched on, so a free player
+            // could only find Premium in Settings or by running out of something (inspection, 2026-11-14).
+            premium: { showingPremium = true }
         )
     }
 
@@ -565,6 +571,7 @@ struct ContentView: View {
         showingArmy = false
         showingNewGame = false
         showingSettings = false
+        showingPremium = false
         showingAnalyze = false
         coach.presentedLesson = nil
         coach.presentedSession = nil
@@ -603,6 +610,27 @@ struct ContentView: View {
         Task { @MainActor in
             await ScreenCovers.settled()
             showingDaily = true
+        }
+    }
+
+    /// The rival up next, as Home works it out: the one played last while it is open, else the
+    /// first one on the ladder not yet beaten.
+    private var armyQuestRival: MatchController.Level {
+        let ladder = RivalLadder()
+        if let raw = UserDefaults.standard.object(forKey: "setup.level") as? Int,
+           let stored = MatchController.Level(rawValue: raw), ladder.isOpen(stored) {
+            return stored
+        }
+        return ladder.current
+    }
+
+    /// The army screen's quest button: the army closes, and once it has slid away Home plays
+    /// that rival as its own quest button does.
+    private func playArmyQuest(_ level: MatchController.Level) {
+        showingArmy = false
+        Task { @MainActor in
+            await ScreenCovers.settled()
+            NotificationCenter.default.post(name: ArmyQuestLink.play, object: level.rawValue)
         }
     }
 
@@ -738,7 +766,7 @@ struct ContentView: View {
     /// phone. While the coach is open the two players fold into one line.
     /// Against the Ashen King, rain and lightning fill the backdrop behind the board.
     private var stormy: Bool {
-        !match.setup.grudge && match.setup.level == .grandmaster
+        match.setup.level == .grandmaster
     }
 
     /// The side whose line is under the board: yours, unless the board is flipped.
@@ -890,7 +918,7 @@ struct ContentView: View {
                     Button {
                         showingArmy = true
                     } label: {
-                        Label("Your pieces", image: Glyphs.army)
+                        Label("Your army", image: Glyphs.army)
                     }
                 }
                 Button {
@@ -1071,27 +1099,6 @@ struct ContentView: View {
             try? await Task.sleep(for: .seconds(6))
             if armyNews == news {
                 withAnimation(.easeOut(duration: 0.3)) { armyNews = nil }
-            }
-        }
-    }
-
-    /// Tells your Grudge how the game went. A loss to a crowd wakes the Grudge the first time.
-    private func recordGrudge() {
-        guard match.setup.opponent == .computer else { return }
-        let you = match.setup.playerColor
-        let result: GrudgeResult = match.winner.map { $0 == you ? .youWon : .itWon } ?? .draw
-        let game = match.game
-        if match.setup.grudge {
-            grudges.recordGame(result, moves: game.moves, playerColor: you, positions: game.positionFENs)
-        } else if result == .itWon,
-                  grudges.crowdWon(level: match.setup.level, moves: game.moves, playerColor: you,
-                                   positions: game.positionFENs) {
-            // After the crowd's own last word.
-            let number = match.gameNumber
-            Task { @MainActor in
-                try? await Task.sleep(for: .seconds(1.6))
-                guard match.gameNumber == number else { return }
-                match.say("Someone took that personally.")
             }
         }
     }

@@ -58,18 +58,13 @@ struct HomeView: View {
     @AppStorage("setup.side") private var side: SideChoice = .white
     /// Nil until a rival has been picked: a first game is against Spark.
     @AppStorage("setup.level") private var storedLevel: Int?
-    @Environment(GrudgeStore.self) private var grudges: GrudgeStore?
-    /// Your Grudge's room is open, from Rooms (Alex, 2026-11-09: "place in rooms").
-    @State private var showingGrudge = false
-    /// Your Grudge picked while a game is under way: asks before that game is lost.
-    @State private var confirmingGrudge = false
-    /// Settle it was pressed: the game starts as the Grudge's room closes.
-    @State private var settlingGrudge = false
     /// The rivals' hall is open, on its rival and whether its film plays first. One value, so the
     /// hall always opens on the rival asked for: with the rival kept apart from the open switch,
     /// the hall could read the rival from before and open on the Cub (Alex, 2026-11-10: "When I
     /// hit play it goes to cub rather than the rival I selected").
     @State private var hall: HallVisit?
+    /// The castle room open from Rooms: Trophy Hall, Famous Games or the Dungeon.
+    @State private var castleRoom: CastleRoom?
     @AppStorage("setup.clock") private var timeControl: TimeControl = .unlimited
     @AppStorage("haptics") private var hapticsOn = true
     /// The name friends see, from the last challenge: the home says hello with it.
@@ -159,8 +154,7 @@ struct HomeView: View {
     /// The pieces on the small boards match the board in the window.
     private var pieceTheme: BoardTheme { theme.sculptedLook == nil ? .named(.gilded) : theme }
 
-    /// The next game is always against a rival: Your Grudge has its own room now, so its last
-    /// game never takes over the Next game card (Alex, 2026-11-09: "replace that card with the
+    /// The next game is always against a rival (Alex, 2026-11-09: "replace that card with the
     /// next Rival opponent").
     private var upNext: HomeUpNext {
         HomeUpNext.make(match: match, side: side, level: nextLevel,
@@ -503,7 +497,7 @@ struct HomeView: View {
             return
         }
         // Remember the rival, so the next visit offers the same one.
-        if !upNext.isGrudge { storedLevel = upNext.level.rawValue }
+        storedLevel = upNext.level.rawValue
         actions.start(upNext.setup(side: side))
     }
 
@@ -548,11 +542,15 @@ struct HomeView: View {
         actions.start(MatchController.Setup(playerColor: side.color, level: level, timeControl: timeControl))
     }
 
-    /// Rooms: Online and A friend (when the app has them), a new game, the rivals and your games.
+    /// Rooms on the Aurora home: New game, the one door to every game, and the castle's rooms
+    /// (Alex, 2026-11-14). The rivals live on the Next game card. Elsewhere: Online and A friend (when the app has them), a new game, the rivals
+    /// and your games.
     private var shortcutList: [HomeShortcut] {
         let waiting: Int = challenges?.onlineWaiting ?? 0
-        // Your Grudge's room opens over the Aurora home only.
-        return HomeShortcutKind.list(online: challenges != nil).filter { stageOn || $0 != .grudge }.map { kind in
+        let kinds: [HomeShortcutKind] = stageOn
+            ? HomeShortcutKind.rooms
+            : HomeShortcutKind.list(online: challenges != nil)
+        return kinds.map { kind in
             HomeShortcut(kind: kind, live: kind == .online && waiting > 0) { open(kind) }
         }
     }
@@ -564,8 +562,8 @@ struct HomeView: View {
         case .friend: challenges?.compose()
         case .newGame: secondary(upNext)
         case .rivals: hall = HallVisit(start: nil, intro: false)
-        case .grudge: showingGrudge = true
         case .games: actions.rewind()
+        case .trophies, .famous, .dungeon: castleRoom = kind.castleRoom
         }
     }
 
@@ -747,7 +745,7 @@ extension HomeView {
             hall = HallVisit(start: level, intro: false)
         }, chessDNA: actions.chessDNA, puzzles: actions.puzzles, replay: { id in
             if let game = vault.game(id) { actions.openGame(game) }
-        }, army: actions.army, armyQuest: { level in playOtherRival(level) })
+        }, army: actions.army, armyQuest: { level in playOtherRival(level) }, quickPlay: { primary(upNext) })
         return HomeAuroraView(tone: tone, info: auroraInfo, actions: auroraActions)
             .task {
                 // Keeps whose move it is in games with people, and how many wait online, up to
@@ -762,7 +760,20 @@ extension HomeView {
             }
             // A link from outside (a friend's challenge, Today's Move) brings its own screen
             // forward: the hall steps aside for it.
-            .onReceive(NotificationCenter.default.publisher(for: ScreenCovers.closeAll)) { _ in hall = nil }
+            .onReceive(NotificationCenter.default.publisher(for: ScreenCovers.closeAll)) { _ in
+                hall = nil
+                castleRoom = nil
+            }
+            // The army screen's quest button: the same game Home's Your army strip starts.
+            .onReceive(NotificationCenter.default.publisher(for: ArmyQuestLink.play)) { note in
+                guard let raw = note.object as? Int, let level = MatchController.Level(rawValue: raw) else { return }
+                playOtherRival(level)
+            }
+            .fullScreenCover(item: $castleRoom) { room in
+                CastleRoomScreen(room: room, theme: pieceTheme)
+                    .environment(vault)
+                    .environment(puzzles)
+            }
             .fullScreenCover(item: $hall) { visit in
                 RivalsHall(start: visit.start, intro: visit.intro, begin: { level in
                     // The film's last frame gives way to the game: the hall closes at once.
@@ -772,51 +783,13 @@ extension HomeView {
                     playRival(level)
                 }, close: { hall = nil })
             }
-            .sheet(isPresented: $showingGrudge, onDismiss: {
-                // The game starts once the room has gone, so nothing presents over a closing sheet.
-                guard settlingGrudge else { return }
-                settlingGrudge = false
-                playGrudge()
-            }) {
-                if let grudges {
-                    HomeGrudgeRoom(grudges: grudges, palette: HomeAuroraPalette(dark: tone.scheme == .dark)) {
-                        settlingGrudge = true
-                        showingGrudge = false
-                    }
-                }
-            }
-            .confirmationDialog("Leave your game against \(match.opponentName)?",
-                                isPresented: $confirmingGrudge, titleVisibility: .visible) {
-                Button("Resign and play Your Grudge", role: .destructive) { startGrudge() }
-                Button("Keep playing", role: .cancel) {}
-            } message: {
-                Text("It counts as a loss for your army.")
-            }
-    }
-
-    /// Settle it, in Your Grudge's room: the game starts at once on the side and clock picked
-    /// last time. A game under way that would count as a loss is asked about first.
-    private func playGrudge() {
-        if match.newGameForfeits {
-            confirmingGrudge = true
-        } else {
-            startGrudge()
-        }
-    }
-
-    private func startGrudge() {
-        guard let record = grudges?.record else { return }
-        var setup = MatchController.Setup(playerColor: side.color, level: record.level, timeControl: timeControl)
-        setup.grudge = true
-        setup.grudgeSkill = record.skill
-        actions.start(setup)
     }
 
     /// Play on the next game. Every time you face a rival, its welcome film plays first and its
     /// Begin starts the game (Alex, 2026-11-09: "when I hit play on this rival, I should see the
     /// intro video"). A swipe down on the film goes back.
     private func playNext(_ upNext: HomeUpNext) {
-        guard !upNext.inProgress, !upNext.isGrudge else {
+        guard !upNext.inProgress else {
             primary(upNext)
             return
         }
@@ -1213,7 +1186,7 @@ extension HomeView {
                     .homeRise(1)
                 if let premium = actions.premium {
                     HomeHairline(tone: tone)
-                    HomeLinkRow(glyph: Glyphs.king, title: "Premium", detail: "Everything, with no limits", tone: tone, action: premium)
+                    HomeLinkRow(glyph: Glyphs.king, title: "Premium", detail: Premium.shared.youLine, tone: tone, action: premium)
                         .homeRise(2)
                 }
             }

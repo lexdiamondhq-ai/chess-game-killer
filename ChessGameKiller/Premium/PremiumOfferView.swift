@@ -1,3 +1,4 @@
+import StoreKit
 import SwiftUI
 
 /// The one Premium screen: what it adds, the two plans with the yearly one picked, and a clear
@@ -223,8 +224,10 @@ private struct PremiumBenefitList: View {
         // (Alex, 2026-11-11, audit pick R4).
         Benefit(symbol: "shield.lefthalf.filled", title: "Every rival, from day one",
                 detail: "Face any of the five without beating the ones before."),
+        // Every set of pieces is free for everyone; the boards are what Premium opens
+        // (four free, ten in all), so the line promises only that (inspection, 2026-11-14).
         Benefit(symbol: "square.grid.3x3", title: "Every board look",
-                detail: "Every set of pieces and its board."),
+                detail: "All \(BoardTheme.all.count - BoardTheme.rivals.count) boards to play on."),
     ]
 
     var body: some View {
@@ -345,6 +348,13 @@ private struct PremiumOwnedCard: View {
     }
 }
 
+extension Premium {
+    /// Under Premium in Home's You panel: what it is, or that it is on.
+    var youLine: String {
+        isPremium ? "It's on. Everything is open" : "Everything, with no limits"
+    }
+}
+
 // MARK: - Showing the offer
 
 extension View {
@@ -413,11 +423,17 @@ struct PremiumSettingsCard: View {
     let theme: BoardTheme
     let open: () -> Void
     private var premium: Premium { .shared }
+    /// Apple's own page for the subscription, for a player who has Premium.
+    @State private var managing = false
 
     var body: some View {
         let accent: Color = theme.accent ?? PremiumStyle.gold
         let active: Bool = premium.isPremium
-        Button(action: open) {
+        Button {
+            // With Premium on there is nothing to sell: the row opens Apple's page to change or
+            // cancel the plan (inspection, 2026-11-14: there was no way to it from the app).
+            if active { managing = true } else { open() }
+        } label: {
             HStack(spacing: 12) {
                 Image(systemName: "crown.fill")
                     .font(.system(size: 15, weight: .semibold))
@@ -428,7 +444,7 @@ struct PremiumSettingsCard: View {
                     Text(active ? "Premium is on" : "Premium")
                         .font(.app(.body, weight: .semibold))
                         .foregroundStyle(Color.primary)
-                    Text(active ? "Thank you. Everything is open." : "A coach that learns you, full Rewind, unlimited puzzles and every look.")
+                    Text(active ? "Everything is open. Tap to manage your plan." : "A coach that learns you, full Rewind, unlimited puzzles and every look.")
                         .font(.app(.footnote))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -444,6 +460,6 @@ struct PremiumSettingsCard: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .disabled(active)
+        .manageSubscriptionsSheet(isPresented: $managing)
     }
 }

@@ -347,7 +347,7 @@ final class ChallengeSnapshotTests: XCTestCase {
         let view = Color.black
             .ignoresSafeArea()
             .sheet(isPresented: .constant(true)) {
-                NewGameSheet(theme: theme, start: { _ in }, challenge: {})
+                NewGameSheet(theme: theme, start: { _ in }, challenge: {}, online: {}, onlineWaiting: 3)
             }
         try snapshot("challenge-entry", view: view, wait: 2)
     }

@@ -55,6 +55,12 @@ final class OnTheLineSnapshotTests: XCTestCase {
         XCTAssertEqual(army.captor(of: held), .club)
         try snapshot("on-the-line-rescue", view: sheet(army, stakesOpen: true, stake: nil))
         try snapshot("on-the-line-army", view: ArmyView(theme: .named(.gilded), color: .white).environment(army))
+        // Opened from Home: the quest and the held piece each carry the button that plays the rival.
+        try snapshot("on-the-line-army-quest",
+                     view: ArmyView(theme: .named(.gilded), color: .white, play: { _ in }).environment(army))
+        try snapshot("on-the-line-held-piece",
+                     view: PieceDetailView(slot: held, color: .white, theme: .named(.gilded), play: { _ in })
+                         .environment(army))
     }
 
     private func sheet(_ army: ArmyStore, stakesOpen: Bool, stake: ArmySlot?) -> some View {

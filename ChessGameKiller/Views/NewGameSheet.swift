@@ -34,11 +34,13 @@ struct NewGameSheet: View {
     let start: (MatchController.Setup) -> Void
     /// Opens Challenge a friend instead. Nil hides the row.
     var challenge: (() -> Void)? = nil
+    /// Opens Play online instead. Nil hides that row.
+    var online: (() -> Void)? = nil
+    /// Players waiting online now, for the Play online row.
+    var onlineWaiting: Int? = nil
 
     @AppStorage("setup.side") private var side: SideChoice = .white
     @AppStorage("setup.level") private var level: MatchController.Level = .club
-    /// Your Grudge is played from Home now; a game picked here is against a rival.
-    @AppStorage("setup.grudge") private var grudgeOn = false
     @AppStorage("setup.clock") private var timeControl: TimeControl = .unlimited
     @AppStorage("showBestMoves") private var showBestMoves = false
     /// Hints switched off here: the game screen leaves out the Hints button too, so there is
@@ -66,13 +68,16 @@ struct NewGameSheet: View {
     /// `stakesOpen` and `stake` are for pictures: On the line unfolded, with a piece already picked.
     init(theme: BoardTheme, forfeits: String? = nil, defaults: UserDefaults = .standard,
          stakesOpen: Bool = false, stake: ArmySlot? = nil,
-         start: @escaping (MatchController.Setup) -> Void, challenge: (() -> Void)? = nil) {
+         start: @escaping (MatchController.Setup) -> Void, challenge: (() -> Void)? = nil,
+         online: (() -> Void)? = nil, onlineWaiting: Int? = nil) {
         _openRow = State(initialValue: stakesOpen ? .stake : nil)
         _draftStake = State(initialValue: stake)
         self.theme = theme
         self.forfeits = forfeits
         self.start = start
         self.challenge = challenge
+        self.online = online
+        self.onlineWaiting = onlineWaiting
         let ladder = RivalLadder(defaults: defaults)
         self.ladder = ladder
         let saved = (defaults.object(forKey: "setup.level") as? Int).flatMap { MatchController.Level(rawValue: $0) }
@@ -106,7 +111,6 @@ struct NewGameSheet: View {
         timeControl = draftClock
         showBestMoves = draftHints
         hintsHidden = !draftHints
-        grudgeOn = false
         start(MatchController.Setup(playerColor: draftSide.color, level: draftLevel, timeControl: draftClock,
                                     stake: stake))
     }
@@ -123,7 +127,7 @@ struct NewGameSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     if let challenge {
-                        ChallengeEntryRow(theme: theme, action: challenge)
+                        ChallengeEntryRow(theme: theme, action: challenge, online: online, waiting: onlineWaiting)
                     }
 
                     section("Rivals") {

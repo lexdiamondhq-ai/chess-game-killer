@@ -156,7 +156,7 @@ struct RivalLadder {
 /// The rival's theme under the game: it starts whenever a game against a rival begins (its
 /// film first or not, a rematch too) and when you come back to one under way, loops quietly,
 /// and fades when the game ends or you go home (Alex, 2026-11-08: the music must play when you
-/// return to the rivals). Your Grudge stays quiet. Ambient, so it mixes with other audio and
+/// return to the rivals). Ambient, so it mixes with other audio and
 /// stays quiet on silent. Settings > Sound & feel turns it off.
 @MainActor
 @Observable
@@ -181,9 +181,9 @@ final class RivalTheme {
         if !on { stop() }
     }
 
-    /// Whether a game has a rival's theme: every game against the computer but Your Grudge.
+    /// Whether a game has a rival's theme: every game against the computer.
     static func hasTheme(_ setup: MatchController.Setup) -> Bool {
-        setup.opponent == .computer && !setup.grudge
+        setup.opponent == .computer
     }
 
     /// A new game started: a rival game plays its rival's theme, any other game is quiet.

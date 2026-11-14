@@ -1,6 +1,7 @@
 import ChessKit
 import Foundation
 import Observation
+import SwiftUI
 import UIKit
 
 /// One trip through the analyzer: a picture (maybe), the position being
@@ -196,7 +197,13 @@ final class ScanSession {
         let doubts = [hardToRead, turn].compactMap { $0 }
         photoDoubts = doubts.isEmpty ? nil : doubts.joined(separator: " ")
         startAnalysis(of: reading.draft)
-        if path.last == .reading { path = [.analysis] }
+        if path.last == .reading {
+            // The reading screen is already the analysis board, so it turns into the real one
+            // in place, with no slide: the pieces and arrows just arrive.
+            var still = Transaction()
+            still.disablesAnimations = true
+            withTransaction(still) { path = [.analysis] }
+        }
     }
 
     private func failReading(_ error: Error, id: Int) {

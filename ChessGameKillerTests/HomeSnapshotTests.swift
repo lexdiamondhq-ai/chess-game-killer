@@ -146,17 +146,11 @@ final class HomeSnapshotTests: XCTestCase {
     }
 
     /// For today with Today's Move in the large card and your finest move as a row under it; Rooms
-    /// with Your Grudge beside the rivals, two rows of three; and Your Grudge's own room (Alex,
-    /// 2026-11-09). By day and by night.
-    func testForTodayRoomsAndTheGrudgesRoom() throws {
-        let defaults = UserDefaults(suiteName: "HomeGrudgeRoomTests")!
-        defer { defaults.removePersistentDomain(forName: "HomeGrudgeRoomTests") }
-        let grudges = GrudgeStore(defaults: defaults)
-        grudges.crowdWon(level: .club, moves: ["e4", "e5"], playerColor: .white, positions: [])
-        grudges.markSeen()
+    /// with New game and the castle's three rooms (Alex, 2026-11-14). By day and by night.
+    func testForTodayAndRooms() throws {
         let game = RewindSample.game(date: .now.addingTimeInterval(-86_400))
         let finest = try XCTUnwrap(HomeFinestMove.pick(games: [game]))
-        let shortcuts: [HomeShortcut] = HomeShortcutKind.list(online: true).map { HomeShortcut(kind: $0, action: {}) }
+        let shortcuts: [HomeShortcut] = HomeShortcutKind.rooms.map { HomeShortcut(kind: $0, action: {}) }
         for dark in [false, true] {
             let palette = HomeAuroraPalette(dark: dark)
             let tone = HomeTone.of(.gilded, mode: dark ? .dark : .light)
@@ -200,17 +194,8 @@ final class HomeSnapshotTests: XCTestCase {
             .background(palette.bg.ignoresSafeArea())
             .environment(\.colorScheme, dark ? .dark : .light)
             let window = try show(page, wait: 2)
-            try save(window, "zz-home-rooms-grudge-\(dark ? "dark" : "light")")
+            try save(window, "zz-home-rooms-\(dark ? "dark" : "light")")
             window.isHidden = true
-
-            let room = palette.bg.ignoresSafeArea().sheet(isPresented: .constant(true)) {
-                HomeGrudgeRoom(grudges: grudges, palette: palette, settle: {})
-            }
-            .environment(\.colorScheme, dark ? .dark : .light)
-            let roomWindow = try show(room, wait: 5)
-            try save(roomWindow, "zz-home-grudge-room-\(dark ? "dark" : "light")")
-            roomWindow.rootViewController?.presentedViewController?.dismiss(animated: false)
-            roomWindow.isHidden = true
         }
     }
 
@@ -339,6 +324,58 @@ final class HomeSnapshotTests: XCTestCase {
         XCTAssertEqual(HomeCurrentGame.note([list[1]]), "Waiting on them")
         XCTAssertNil(HomeCurrentGame.note([]))
         XCTAssertNotNil(yours.fen)
+    }
+
+    /// The gold bar above Next game (Alex, 2026-11-13, picked A): a game against a person that
+    /// waits on you comes first; the game against the computer never counts; with nobody
+    /// waiting it is Quick play against the rival up next. Pictured by day and by night.
+    func testTheQuickBarShowsYourMoveOrQuickPlay() throws {
+        let now = Date().timeIntervalSince1970 * 1000
+        let start = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+        let computerTurn = HomeUpNext(kind: .resume, level: .club, playerColor: .white, randomSide: false,
+                                      timeControl: .unlimited, yourTime: nil, theirTime: nil, yourMove: true,
+                                      moveNumber: 1, plies: 0)
+        let alone = HomeCurrentGame.list(computerTurn, fen: start, friends: [])
+        guard case .quickPlay(_, _, let resume) = HomeAuroraQuickBar.mode(games: alone, upNext: computerTurn) else {
+            return XCTFail("The game against the computer is not a person waiting on you")
+        }
+        XCTAssertTrue(resume, "Quick play picks up the game against the rival already under way")
+
+        let theirs = FriendGame.sample(.sample(code: "AAAAAA", moves: ["e2e4"], now: now), seat: .white)
+        let yours = FriendGame.sample(.sample(code: "CCCCCC", moves: ["e2e4"], now: now), seat: .black)
+        let alsoYours = FriendGame.sample(.sample(code: "EEEEEE", moves: ["e2e4"], now: now), seat: .black)
+        let all = HomeCurrentGame.list(computerTurn, fen: start, friends: [theirs, yours, alsoYours])
+        let mode = HomeAuroraQuickBar.mode(games: all, upNext: computerTurn)
+        guard case .yourMove(let game, let more) = mode else { return XCTFail("A friend waits on your move") }
+        XCTAssertEqual(game.id, "CCCCCC")
+        XCTAssertEqual(more, 1)
+        XCTAssertEqual(HomeAuroraQuickBar.detail(game, more: more), "Friend · 10+0 · +1 more")
+
+        let fresh = HomeUpNext(kind: .ready, level: .club, playerColor: .white, randomSide: false,
+                               timeControl: .unlimited, yourTime: nil, theirTime: nil, yourMove: true,
+                               moveNumber: 1, plies: 0)
+        let quick = HomeAuroraQuickBar.mode(games: [], upNext: fresh)
+        XCTAssertEqual(quick, .quickPlay(rival: fresh.rival.name, detail: "No clock · You're White", resume: false))
+
+        for dark in [false, true] {
+            let palette = HomeAuroraPalette(dark: dark)
+            let page = VStack(spacing: 18) {
+                HomeAuroraQuickBar(mode: mode, palette: palette, action: {})
+                HomeAuroraQuickBar(mode: .yourMove(game, more: 0), palette: palette, action: {})
+                HomeAuroraQuickBar(mode: quick, palette: palette, action: {})
+                HomeAuroraQuickBar(mode: .quickPlay(rival: fresh.rival.name, detail: "No clock · You're White",
+                                                    resume: true), palette: palette, action: {})
+            }
+            .padding(16)
+            .padding(.top, 60)
+            .frame(maxHeight: .infinity, alignment: .top)
+            .background(palette.sheet.ignoresSafeArea())
+            .background(palette.bg.ignoresSafeArea())
+            .environment(\.colorScheme, dark ? .dark : .light)
+            let window = try show(page, wait: 2)
+            try save(window, "zz-home-quick-bar-\(dark ? "dark" : "light")")
+            window.isHidden = true
+        }
     }
 
     /// The game against the computer is listed with the rest, so Your move shows even when it is
@@ -543,6 +580,23 @@ final class HomeSnapshotTests: XCTestCase {
 
     // MARK: Drawing
 
+    /// The castle's three rooms behind Rooms (Alex, 2026-11-14), each past its film: the Trophy
+    /// Hall, Famous Games and the Dungeon; and a famous game being played out.
+    func testTheCastleRooms() throws {
+        let seen = UserDefaults.standard.stringArray(forKey: CastleRoom.seenKey)
+        UserDefaults.standard.set(CastleRoom.allCases.map(\.rawValue), forKey: CastleRoom.seenKey)
+        defer { UserDefaults.standard.set(seen, forKey: CastleRoom.seenKey) }
+        for room in CastleRoom.allCases {
+            let window = try show(CastleRoomScreen(room: room, theme: .named(.gilded)), wait: 2)
+            try save(window, "zz-rooms-\(room.slug)")
+            window.isHidden = true
+        }
+        let game = try XCTUnwrap(GrandmasterContent.shared.games.first { $0.id == "opera" })
+        let window = try show(FamousGameTheater(game: game, theme: .named(.gilded)), wait: 5)
+        try save(window, "zz-rooms-famous-game-playing")
+        window.isHidden = true
+    }
+
     private func show(_ view: some View, wait: TimeInterval = 3) throws -> UIWindow {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let window = UIWindow(windowScene: scene)
@@ -610,7 +664,7 @@ enum HomeSample {
             daily.puzzlesSolved = 2
         }
         daily.seeded = true
-        return HomeView(match: game, theme: .named(theme), actions: HomeActions(), showsYou: showsYou,
+        return HomeView(match: game, theme: .named(theme), actions: HomeActions(premium: {}), showsYou: showsYou,
                         showsShortcuts: showsShortcuts, sheet: sheet, tab: tab)
             .environment(DailyStore(state: daily))
             .environment(vault)
