@@ -362,3 +362,116 @@ private struct CoinTurn: ViewModifier, Animatable {
     .padding()
     .background(Color.black)
 }
+
+/// The fight on the rival's card (Alex picked "the card feels the fight", 2026-11-14). Even: the
+/// card as it is. The rival ahead: a fire glow spreads from its coin and the edge warms. You
+/// ahead: the glass frosts from the far corner and a hairline crack runs down it. Near its end:
+/// the card goes dark. Each fades in over the one before.
+struct RivalMoodLayer: View {
+    let mood: RivalMood
+    let theme: BoardTheme
+
+    var body: some View {
+        GeometryReader { geo in
+            let size = geo.size
+            ZStack {
+                if mood == .ahead {
+                    RadialGradient(colors: [Color(red: 0.84, green: 0.36, blue: 0.12).opacity(0.5),
+                                            Color(red: 0.59, green: 0.16, blue: 0.04).opacity(0.18),
+                                            .clear],
+                                   center: UnitPoint(x: 0.08, y: 0.5), startRadius: 0, endRadius: size.width * 0.62)
+                        .transition(.opacity)
+                }
+                if mood == .behind || mood == .doomed {
+                    RadialGradient(colors: [Color(red: 0.6, green: 0.78, blue: 1).opacity(theme.isDark ? 0.26 : 0.32), .clear],
+                                   center: .topTrailing, startRadius: 0, endRadius: size.width * 0.7)
+                        .transition(.opacity)
+                    crack(in: size)
+                        .transition(.opacity)
+                }
+                if mood == .doomed {
+                    Color.black.opacity(theme.isDark ? 0.42 : 0.18)
+                        .transition(.opacity)
+                }
+            }
+            .frame(width: size.width, height: size.height)
+        }
+        .overlay {
+            // The edge: warm when it is winning, icy when it is losing.
+            switch mood {
+            case .ahead:
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(Color(red: 0.91, green: 0.5, blue: 0.24).opacity(0.7), lineWidth: 1)
+                    .transition(.opacity)
+            case .behind, .doomed:
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(Color(red: 0.67, green: 0.82, blue: 1).opacity(0.5), lineWidth: 1)
+                    .transition(.opacity)
+            case .even:
+                EmptyView()
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    /// A hairline crack down the glass near its right edge, with a short branch.
+    private func crack(in size: CGSize) -> some View {
+        let w = size.width, h = size.height
+        let path = Path { p in
+            p.move(to: CGPoint(x: w * 0.77, y: 0))
+            p.addLine(to: CGPoint(x: w * 0.75, y: h * 0.21))
+            p.addLine(to: CGPoint(x: w * 0.795, y: h * 0.36))
+            p.addLine(to: CGPoint(x: w * 0.76, y: h * 0.58))
+            p.addLine(to: CGPoint(x: w * 0.815, y: h * 0.77))
+            p.addLine(to: CGPoint(x: w * 0.785, y: h))
+            p.move(to: CGPoint(x: w * 0.795, y: h * 0.36))
+            p.addLine(to: CGPoint(x: w * 0.87, y: h * 0.43))
+            p.addLine(to: CGPoint(x: w * 0.95, y: h * 0.38))
+        }
+        let ink = theme.isDark ? Color(red: 0.86, green: 0.92, blue: 1).opacity(0.55) : Color.black.opacity(0.35)
+        return path.stroke(ink, style: StrokeStyle(lineWidth: 0.9, lineJoin: .miter))
+    }
+}
+
+/// The rival's words with the fight in them: half a size larger when it is ahead and bragging,
+/// a little smaller and shivering now and then when it is behind. Reduce Motion keeps them still.
+private struct RivalMoodLetters: ViewModifier {
+    let mood: RivalMood
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var scale: CGFloat {
+        switch mood {
+        case .ahead: return 1.06
+        case .behind, .doomed: return 0.94
+        case .even: return 1
+        }
+    }
+
+    func body(content: Content) -> some View {
+        let scaled = content.scaleEffect(scale, anchor: .leading)
+        if mood == .behind, !reduceMotion {
+            scaled.keyframeAnimator(initialValue: 0.0, repeating: true) { view, shake in
+                view.offset(x: shake).rotationEffect(.degrees(shake * 0.35), anchor: .leading)
+            } keyframes: { _ in
+                KeyframeTrack {
+                    LinearKeyframe(0, duration: 2.6)
+                    LinearKeyframe(1.1, duration: 0.05)
+                    LinearKeyframe(-1.1, duration: 0.07)
+                    LinearKeyframe(0.8, duration: 0.06)
+                    LinearKeyframe(-0.5, duration: 0.06)
+                    LinearKeyframe(0, duration: 0.06)
+                }
+            }
+        } else {
+            scaled
+        }
+    }
+}
+
+extension View {
+    /// The rival's words, bragging or rattled as the fight goes.
+    func rivalMood(_ mood: RivalMood) -> some View {
+        modifier(RivalMoodLetters(mood: mood))
+    }
+}
