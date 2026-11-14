@@ -163,7 +163,7 @@ final class SessionRunner {
     private func finish(completed: Bool = true) {
         guard stage != .summary else { return }
         if completed {
-            reward.add(store.finishSession(accuracy: accuracy))
+            reward.add(store.finishSession(accuracy: accuracy, title: plan.headline ?? plan.focus?.title ?? plan.lesson?.title))
         }
         endedEarly = !completed
         drill = nil

@@ -46,11 +46,14 @@ struct TrainingHubView: View {
                             showingLevelCheck = true
                         }
                         .homeRise(1)
-                        doors
+                        // What's been learned, what's next, and what Premium opens (Alex, 2026-11-14).
+                        VineCard(vine: vine, theme: theme)
                             .homeRise(2)
+                        doors
+                            .homeRise(3)
                         RankStrip(theme: theme)
                             .padding(.top, 2)
-                            .homeRise(3)
+                            .homeRise(4)
                     }
                     .padding(.horizontal, 16)
                     .padding(.bottom, 28)
@@ -66,6 +69,9 @@ struct TrainingHubView: View {
             .toolbar { toolbar }
             .navigationDestination(for: TrainDoor.self) { door in
                 destination(door)
+            }
+            .navigationDestination(for: VineRoute.self) { _ in
+                LearningVinePage(vine: vine, theme: theme, rankTitle: store.rank?.title)
             }
         }
         .tint(theme.trainingAccent)
@@ -110,6 +116,13 @@ struct TrainingHubView: View {
     }
 
     // MARK: Today
+
+    /// The vine on Learn: each day trained, what's next, and the buds after it.
+    private var vine: LearningVine {
+        LearningVine.make(progress: store.progress, library: store.library, endgames: endgames,
+                          today: today, trainedToday: store.trainedToday,
+                          lessonsOpen: Premium.shared.opens(.lessons))
+    }
 
     private var offersLevelCheck: Bool {
         store.offersLevelCheck && today?.headline == nil

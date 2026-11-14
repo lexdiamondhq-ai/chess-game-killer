@@ -18,11 +18,13 @@ struct TrainingProgress: Codable, Equatable {
     var lastAccuracy: Double?
     /// The rating from the level check, when the learner took it.
     var placement: Int?
+    /// A short diary of each day of training, keyed "yyyy-MM-dd": the leaves on Learn's vine.
+    var days: [String: DayNote] = [:]
 
     init() {}
 
     private enum CodingKeys: String, CodingKey {
-        case skills, items, lessonsDone, mistakes, xp, streak, sessionsDone, lastAccuracy, placement
+        case skills, items, lessonsDone, mistakes, xp, streak, sessionsDone, lastAccuracy, placement, days
     }
 
     init(from decoder: Decoder) throws {
@@ -36,6 +38,27 @@ struct TrainingProgress: Codable, Equatable {
         sessionsDone = try c.decodeIfPresent(Int.self, forKey: .sessionsDone) ?? 0
         lastAccuracy = try c.decodeIfPresent(Double.self, forKey: .lastAccuracy)
         placement = try c.decodeIfPresent(Int.self, forKey: .placement)
+        days = try c.decodeIfPresent([String: DayNote].self, forKey: .days) ?? [:]
+    }
+}
+
+/// One day of training, as the vine on Learn remembers it: the XP earned and what was done.
+struct DayNote: Codable, Equatable {
+    var xp = 0
+    /// What the day held, in the order it happened, like "Forks" or "Fixed a mistake from your games".
+    var highlights: [String] = []
+
+    init(xp: Int = 0, highlights: [String] = []) {
+        self.xp = xp
+        self.highlights = highlights
+    }
+
+    private enum CodingKeys: String, CodingKey { case xp, highlights }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        xp = try c.decodeIfPresent(Int.self, forKey: .xp) ?? 0
+        highlights = try c.decodeIfPresent([String].self, forKey: .highlights) ?? []
     }
 }
 
