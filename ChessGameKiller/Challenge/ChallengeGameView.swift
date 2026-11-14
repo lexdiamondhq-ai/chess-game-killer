@@ -99,6 +99,17 @@ struct ChallengeGameView: View {
                 .frame(width: width, height: width / aspect)
             FriendPlate(game: game, seat: topSeat.opposite, theme: theme)
                 .frame(height: Self.plateHeight)
+                // Confirm moves: while a move waits, the gold Play bar stands in the plate's place.
+                .opacity(game.held == nil ? 1 : 0)
+                .accessibilityHidden(game.held != nil)
+                .overlay {
+                    if let held = game.held, game.phase == .playing {
+                        PlayMoveBar(san: held.san, theme: theme,
+                                    play: { game.playHeld() }, takeBack: { game.takeBackHeld() })
+                            .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                    }
+                }
+                .animation(.snappy(duration: 0.25), value: game.held)
             HStack(spacing: 10) {
                 MoveRibbon(moves: game.ribbon, theme: theme)
                 BoardViewSwitch(theme: theme)
@@ -689,6 +700,69 @@ struct ChallengeGameView: View {
             Button("Report cheating", role: .destructive) { Task { await game.reportOpponent(.reportCheating) } }
             Button("Cancel", role: .cancel) {}
         }
+    }
+}
+
+// MARK: - Confirm moves
+
+/// The gold bar under the board while the player's move waits: ✕ takes it back, ✓ (or the
+/// words) plays it. The board itself takes a move back too, with a tap anywhere on it.
+struct PlayMoveBar: View {
+    let san: String
+    let theme: BoardTheme
+    let play: () -> Void
+    let takeBack: () -> Void
+
+    @AppStorage("haptics") private var hapticsOn = true
+
+    private static let ink = Color(red: 0.10, green: 0.08, blue: 0.04)
+
+    var body: some View {
+        HStack(spacing: 0) {
+            round("xmark", label: "Take back", action: cancel)
+            Button(action: confirm) {
+                Text("Play \(san)")
+                    .font(theme.challengeFont(17, .semibold))
+                    .foregroundStyle(Self.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Play \(san)")
+            round("checkmark", label: "Play \(san)", action: confirm)
+        }
+        .padding(.horizontal, 6)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background {
+            Capsule(style: .continuous)
+                .fill(theme.challengeAccent.gradient)
+                .shadow(color: theme.challengeAccent.opacity(0.35), radius: 10, y: 2)
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func round(_ symbol: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(Self.ink)
+                .frame(width: 38, height: 38)
+                .background(Circle().fill(Self.ink.opacity(0.12)))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+    }
+
+    private func cancel() {
+        if hapticsOn { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
+        withAnimation(.snappy(duration: 0.22)) { takeBack() }
+    }
+
+    private func confirm() {
+        if hapticsOn { UIImpactFeedbackGenerator(style: .rigid).impactOccurred() }
+        withAnimation(.snappy(duration: 0.22)) { play() }
     }
 }
 
