@@ -342,7 +342,7 @@ struct VineStem: View {
             Text(node.detail)
                 .font(.app(.caption, weight: .medium))
                 .foregroundStyle(node.kind == .bloom || node.kind == .premiumBud ? AnyShapeStyle(VineGold.text(theme)) : AnyShapeStyle(.secondary))
-                .lineLimit(1)
+                .lineLimit(2)
         }
         .multilineTextAlignment(right ? .leading : .trailing)
         .frame(width: room, alignment: right ? .leading : .trailing)
