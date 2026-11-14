@@ -30,7 +30,7 @@ final class Premium {
 
     @ObservationIgnored let ledger: AllowanceLedger
     /// Everything open and uncounted: the tests, and screenshots that show a screen in full.
-    @ObservationIgnored let unlimited: Bool
+    @ObservationIgnored private(set) var unlimited: Bool
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var updates: Task<Void, Never>?
     @ObservationIgnored private var started = false
@@ -48,6 +48,14 @@ final class Premium {
         let underTest = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
         let forced = defaults.string(forKey: "premium").map { ["yes", "true", "1"].contains($0.lowercased()) }
         return Premium(defaults: defaults, isPremium: forced, unlimited: underTest)
+    }
+
+    /// For the tests' pictures only: stands as a free player (false) or a Premium one (true),
+    /// so both sides of the app can be drawn; nil goes back to everything open, as tests run.
+    /// Nothing is saved, and the app itself never calls it.
+    func pose(premium: Bool?) {
+        unlimited = premium == nil
+        isPremium = premium ?? false
     }
 
     // MARK: Allowances

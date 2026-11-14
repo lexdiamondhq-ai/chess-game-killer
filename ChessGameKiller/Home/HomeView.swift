@@ -764,6 +764,11 @@ extension HomeView {
                 hall = nil
                 castleRoom = nil
             }
+            // The army screen's quest button: the same game Home's Your army strip starts.
+            .onReceive(NotificationCenter.default.publisher(for: ArmyQuestLink.play)) { note in
+                guard let raw = note.object as? Int, let level = MatchController.Level(rawValue: raw) else { return }
+                playOtherRival(level)
+            }
             .fullScreenCover(item: $castleRoom) { room in
                 CastleRoomScreen(room: room, theme: pieceTheme)
                     .environment(vault)
@@ -1181,7 +1186,7 @@ extension HomeView {
                     .homeRise(1)
                 if let premium = actions.premium {
                     HomeHairline(tone: tone)
-                    HomeLinkRow(glyph: Glyphs.king, title: "Premium", detail: "Everything, with no limits", tone: tone, action: premium)
+                    HomeLinkRow(glyph: Glyphs.king, title: "Premium", detail: Premium.shared.youLine, tone: tone, action: premium)
                         .homeRise(2)
                 }
             }

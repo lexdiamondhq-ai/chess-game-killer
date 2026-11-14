@@ -71,6 +71,10 @@ enum DungeonCells {
 struct DungeonView: View {
     let theme: BoardTheme
     @State private var playing: EndgameStudy?
+    /// The cell that was entered, kept until it is left: at midnight "today's cell" becomes
+    /// another one, and an escape belongs to the cell that was played.
+    @State private var entered: EndgameStudy?
+    @State private var enteredOn: Date?
     /// Bumped when a cell is left, so the escape shows at once.
     @State private var refresh = 0
     /// How many times the cell had been held before this visit.
@@ -98,7 +102,9 @@ struct DungeonView: View {
         }
         .scrollIndicators(.hidden)
         .fullScreenCover(item: $playing, onDismiss: noteEscape) { study in
-            EndgameView(study: study, theme: theme)
+            // Alone: holding the cell ends on Done, back here where the lock opens, not on the
+            // next study of Learn's endgame course.
+            EndgameView(study: study, theme: theme, alone: true)
                 .screenScheme(theme)
                 .environment(EndgameProgress.shared)
         }
@@ -134,6 +140,8 @@ struct DungeonView: View {
                 }
                 Button {
                     heldBefore = EndgameProgress.shared.records[cell.id]?.completions ?? 0
+                    entered = cell
+                    enteredOn = .now
                     playing = cell
                 } label: {
                     Text(escaped ? "Play it again" : "Enter the cell")
@@ -175,10 +183,13 @@ struct DungeonView: View {
 
     /// Back from the cell: held today, it's an escape.
     private func noteEscape() {
-        guard let cell = DungeonCells.today(),
-              let record = EndgameProgress.shared.records[cell.id],
+        guard let cell = entered ?? DungeonCells.today() else { return }
+        let day: Date = enteredOn ?? .now
+        entered = nil
+        enteredOn = nil
+        guard let record = EndgameProgress.shared.records[cell.id],
               record.completions > heldBefore else { return }
-        DungeonCells.markEscaped(cell)
+        DungeonCells.markEscaped(cell, on: day)
         refresh += 1
     }
 }

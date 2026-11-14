@@ -664,7 +664,7 @@ enum HomeSample {
             daily.puzzlesSolved = 2
         }
         daily.seeded = true
-        return HomeView(match: game, theme: .named(theme), actions: HomeActions(), showsYou: showsYou,
+        return HomeView(match: game, theme: .named(theme), actions: HomeActions(premium: {}), showsYou: showsYou,
                         showsShortcuts: showsShortcuts, sheet: sheet, tab: tab)
             .environment(DailyStore(state: daily))
             .environment(vault)

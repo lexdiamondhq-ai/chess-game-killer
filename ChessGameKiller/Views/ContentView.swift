@@ -10,6 +10,8 @@ struct ContentView: View {
     @State private var match = MatchController.live()
     @State private var showingNewGame = true
     @State private var showingSettings = false
+    /// The Premium page, opened from Home's You panel.
+    @State private var showingPremium = false
     @State private var confirmingResign = false
     @State private var confirmingDraw = false
     /// The welcome's Play, waiting on the first rival's film: its Begin starts this game.
@@ -292,7 +294,11 @@ struct ContentView: View {
                     .homeZoom(.games, in: homeZoom, when: zoomsFromSheet)
             }
             .fullScreenCover(isPresented: $showingArmy) {
-                ArmyView(theme: chosenTheme, color: match.setup.playerColor).environment(army)
+                // Opened from Home, the quest and a held piece each carry a button that plays the
+                // rival; over a game they stay words only.
+                ArmyView(theme: chosenTheme, color: match.setup.playerColor, nextRival: armyQuestRival,
+                         play: showingHome && stageHome ? { level in playArmyQuest(level) } : nil)
+                    .environment(army)
                     .homeZoom(.army, in: homeZoom, when: zoomsFromSheet)
             }
             // The welcome's Play shows the first rival's film, as Home's Play does, and its Begin
@@ -369,6 +375,9 @@ struct ContentView: View {
             .sheet(isPresented: $showingSettings, onDismiss: refreshDaily) {
                 SettingsSheet()
                     .boardSheetGrabber(boardSheet)
+            }
+            .sheet(isPresented: $showingPremium) {
+                PremiumOfferView(feature: nil)
             }
             .sheet(isPresented: $showingAnalyze) {
                 AnalyzeSheet(
@@ -520,7 +529,10 @@ struct ContentView: View {
                 showingGames = true
             },
             army: { showingArmy = true },
-            settings: { showingSettings = true }
+            settings: { showingSettings = true },
+            // The You panel's Premium row was built but never switched on, so a free player
+            // could only find Premium in Settings or by running out of something (inspection, 2026-11-14).
+            premium: { showingPremium = true }
         )
     }
 
@@ -559,6 +571,7 @@ struct ContentView: View {
         showingArmy = false
         showingNewGame = false
         showingSettings = false
+        showingPremium = false
         showingAnalyze = false
         coach.presentedLesson = nil
         coach.presentedSession = nil
@@ -597,6 +610,27 @@ struct ContentView: View {
         Task { @MainActor in
             await ScreenCovers.settled()
             showingDaily = true
+        }
+    }
+
+    /// The rival up next, as Home works it out: the one played last while it is open, else the
+    /// first one on the ladder not yet beaten.
+    private var armyQuestRival: MatchController.Level {
+        let ladder = RivalLadder()
+        if let raw = UserDefaults.standard.object(forKey: "setup.level") as? Int,
+           let stored = MatchController.Level(rawValue: raw), ladder.isOpen(stored) {
+            return stored
+        }
+        return ladder.current
+    }
+
+    /// The army screen's quest button: the army closes, and once it has slid away Home plays
+    /// that rival as its own quest button does.
+    private func playArmyQuest(_ level: MatchController.Level) {
+        showingArmy = false
+        Task { @MainActor in
+            await ScreenCovers.settled()
+            NotificationCenter.default.post(name: ArmyQuestLink.play, object: level.rawValue)
         }
     }
 
@@ -884,7 +918,7 @@ struct ContentView: View {
                     Button {
                         showingArmy = true
                     } label: {
-                        Label("Your pieces", image: Glyphs.army)
+                        Label("Your army", image: Glyphs.army)
                     }
                 }
                 Button {

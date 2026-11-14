@@ -175,6 +175,27 @@ final class PremiumTests: XCTestCase {
         XCTAssertTrue(Premium.shared.unlimited)
     }
 
+    /// The pictures of both sides stand as a free player or a Premium one, and nothing is saved.
+    func testAPoseStandsAsEitherPlayer() {
+        let premium = Premium(defaults: defaults, isPremium: false, unlimited: true)
+        premium.pose(premium: false)
+        XCTAssertFalse(premium.opens(.lessons))
+        XCTAssertEqual(premium.youLine, "Everything, with no limits")
+        premium.pose(premium: true)
+        XCTAssertTrue(premium.opens(.lessons))
+        XCTAssertEqual(premium.youLine, "It's on. Everything is open")
+        XCTAssertNil(defaults.object(forKey: Premium.activeKey))
+        premium.pose(premium: nil)
+        XCTAssertTrue(premium.unlimited)
+        XCTAssertFalse(premium.isPremium)
+    }
+
+    /// Every set of pieces is free, so the Premium page promises the boards only.
+    func testThePremiumPageCountsTheBoards() {
+        XCTAssertEqual(BoardTheme.all.count - BoardTheme.rivals.count, 10)
+        XCTAssertEqual(BoardTheme.freeLooks.count, 4)
+    }
+
     func testPremiumIsRememberedForTheNextLaunch() {
         defaults.set(true, forKey: Premium.activeKey)
         XCTAssertTrue(Premium(defaults: defaults).isPremium)

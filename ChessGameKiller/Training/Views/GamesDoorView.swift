@@ -20,14 +20,20 @@ struct GamesDoorView: View {
     var body: some View {
         TrainScreen(theme: theme, title: "Chess DNA",
                     intro: "\(Coach.current.title) reads every move of your recent games and finds where the points go.") {
-            // The full Chess DNA is Premium's; the top weakness below stays free.
-            if let dna, dna.gamesRead > 0, Premium.shared.opens(.coachProfile) {
-                NavigationLink {
-                    ChessDNAView(dna: dna, theme: theme)
-                } label: {
-                    ChessDNACard(dna: dna, theme: theme)
+            // The full Chess DNA is Premium's; the top weakness below stays free. So does the
+            // card itself, the one Home shows every player: Home's card opens this page, and a
+            // free player used to find their style gone here (inspection, 2026-11-14).
+            if let dna, dna.gamesRead > 0 {
+                if Premium.shared.opens(.coachProfile) {
+                    NavigationLink {
+                        ChessDNAView(dna: dna, theme: theme)
+                    } label: {
+                        ChessDNACard(dna: dna, theme: theme)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    ChessDNACard(dna: dna, theme: theme, opens: false)
                 }
-                .buttonStyle(.plain)
             }
             if let report {
                 if report.hasEnough {
