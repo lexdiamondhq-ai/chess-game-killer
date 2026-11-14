@@ -227,6 +227,7 @@ final class TrainingStore {
         if outcome == .firstTry, updated.box >= 3 {
             updated.fixed = true
             bonus = Trainer.mistakeFixedXP
+            note("Fixed a mistake from your games", at: date)
         }
         progress.mistakes[index] = updated
         return earn(outcome.xp + bonus, at: date)
@@ -243,15 +244,17 @@ final class TrainingStore {
     func completeLesson(_ id: String, at date: Date = .now) -> TrainingReward {
         let firstTime = progress.lessonsDone[id] == nil
         progress.lessonsDone[id] = date
+        if firstTime, let title = library?.lesson(id)?.title { note(title, at: date) }
         let reward = earn(firstTime ? Trainer.lessonXP : 10, at: date)
         onFinished?()
         return reward
     }
 
     @discardableResult
-    func finishSession(accuracy: Double, at date: Date = .now) -> TrainingReward {
+    func finishSession(accuracy: Double, title: String? = nil, at date: Date = .now) -> TrainingReward {
         progress.sessionsDone += 1
         progress.lastAccuracy = accuracy
+        if let title, !title.isEmpty { note(title, at: date) }
         let reward = earn(Trainer.sessionXP, at: date)
         onFinished?()
         return reward
@@ -327,9 +330,35 @@ final class TrainingStore {
 
     // MARK: Private
 
+    /// Writes something done into that day's line of the diary (once a day for the same thing).
+    func note(_ highlight: String, at date: Date = .now) {
+        let key = Trainer.dayString(date, calendar: calendar)
+        var day = progress.days[key] ?? DayNote()
+        guard !day.highlights.contains(highlight) else { return }
+        day.highlights.append(highlight)
+        progress.days[key] = day
+        trimDiary()
+        save()
+    }
+
+    /// The diary keeps the last 180 days of training.
+    private func trimDiary() {
+        guard progress.days.count > Self.diaryDays else { return }
+        for key in progress.days.keys.sorted().dropLast(Self.diaryDays) {
+            progress.days[key] = nil
+        }
+    }
+
+    static let diaryDays = 180
+
     private func earn(_ xp: Int, at date: Date, countsTowardStreak: Bool = true) -> TrainingReward {
         let rankBefore = rank
         progress.xp += xp
+        if xp > 0 {
+            let key = Trainer.dayString(date, calendar: calendar)
+            progress.days[key, default: DayNote()].xp += xp
+            trimDiary()
+        }
         var reward = TrainingReward(xp: xp)
         if countsTowardStreak {
             let result = Trainer.streak(progress.streak, trainingOn: date, calendar: calendar)
