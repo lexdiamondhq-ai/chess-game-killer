@@ -88,6 +88,13 @@ final class SoundPlayer: SoundPlaying {
     /// before it; one for each longer cue.
     private var players: [GameSound: [[AVAudioPlayer]]] = [:]
     private var nextPlayer: [GameSound: Int] = [:]
+    /// A piece set's own takes of a knock, by "<sound>.<set>" (move.crystal.mp3,
+    /// move.crystal-2.mp3, ...): each set in Settings > Pieces sounds like what it is made of
+    /// (Alex, 2026-11-14). Stone, the default, has none and plays the sounds above.
+    private var setTakes: [String: [[AVAudioPlayer]]] = [:]
+    /// The knocks a piece set can have its own takes of. Check's bells and a timed game's clock
+    /// are the same in every set.
+    private static let setSounds: [GameSound] = [.move, .capture, .castle]
     /// The take each knock played last, so the next one is a different take.
     private var lastTake: [GameSound: Int] = [:]
     /// Longer cues fading out, to be stopped once they are silent.
@@ -97,18 +104,37 @@ final class SoundPlayer: SoundPlaying {
         // Ambient: respects the silent switch and mixes with the player's music.
         try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
         for sound in GameSound.allCases {
-            let names = [sound.rawValue] + (sound.isLong ? [] : (2...6).map { "\(sound.rawValue)-\($0)" })
-            let takes: [[AVAudioPlayer]] = names.compactMap { name in
-                guard let url = Bundle.main.url(forResource: name, withExtension: "mp3") else { return nil }
-                let pool = (0..<(sound.isLong ? 1 : 2)).compactMap { _ in try? AVAudioPlayer(contentsOf: url) }
-                for player in pool {
-                    player.volume = sound.volume
-                    player.prepareToPlay()
-                }
-                return pool.isEmpty ? nil : pool
-            }
-            if !takes.isEmpty { players[sound] = takes }
+            if let takes = Self.load(sound, named: sound.rawValue) { players[sound] = takes }
         }
+        for sound in Self.setSounds {
+            for set in PieceSet.allCases where set != .stone {
+                let name = "\(sound.rawValue).\(set.rawValue)"
+                if let takes = Self.load(sound, named: name) { setTakes[name] = takes }
+            }
+        }
+    }
+
+    /// The takes of `sound` in the bundle as `name`.mp3, then `name`-2.mp3 to `name`-6.mp3 for
+    /// a knock: two players each for a knock, one for a longer cue.
+    private static func load(_ sound: GameSound, named base: String) -> [[AVAudioPlayer]]? {
+        let names = [base] + (sound.isLong ? [] : (2...6).map { "\(base)-\($0)" })
+        let takes: [[AVAudioPlayer]] = names.compactMap { name in
+            guard let url = Bundle.main.url(forResource: name, withExtension: "mp3") else { return nil }
+            let pool = (0..<(sound.isLong ? 1 : 2)).compactMap { _ in try? AVAudioPlayer(contentsOf: url) }
+            for player in pool {
+                player.volume = sound.volume
+                player.prepareToPlay()
+            }
+            return pool.isEmpty ? nil : pool
+        }
+        return takes.isEmpty ? nil : takes
+    }
+
+    /// The takes to play for `sound`: the chosen piece set's own, else the shared ones.
+    private func takes(of sound: GameSound) -> [[AVAudioPlayer]]? {
+        let set = PieceSet.current
+        if set != .stone, let own = setTakes["\(sound.rawValue).\(set.rawValue)"] { return own }
+        return players[sound]
     }
 
     /// The welcome chime, once per launch.
@@ -129,7 +155,7 @@ final class SoundPlayer: SoundPlaying {
         if sound == .victory, players[.victory] == nil {
             return play(.win, after: delay)
         }
-        guard isEnabled, let takes = players[sound], !takes.isEmpty else { return }
+        guard isEnabled, let takes = takes(of: sound), !takes.isEmpty else { return }
         var take = Int.random(in: 0..<takes.count)
         if takes.count > 1, take == lastTake[sound] { take = (take + 1) % takes.count }
         lastTake[sound] = take
