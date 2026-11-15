@@ -244,6 +244,27 @@ final class HomeModelTests: XCTestCase {
         }
     }
 
+    /// Each vine leaves the knight's orb from its own spot (Alex, 2026-11-15: they looked stuck
+    /// together), thick at the root and thin at the tip.
+    func testKnightVinesStartApart() {
+        let knight = CGPoint(x: 354, y: 799)
+        let vines = HomeKnightDoor.allCases.enumerated().map { index, door in
+            LivingVine(index: index, knight: knight,
+                       to: CGPoint(x: knight.x + door.spot.width, y: knight.y + door.spot.height), scale: 1)
+        }
+        let starts = vines.map { $0.points[0] }
+        for i in starts.indices {
+            XCTAssertEqual(hypot(starts[i].x - knight.x, starts[i].y - knight.y), 30.4, accuracy: 1, "on the orb's rim")
+            for j in starts.indices where j > i {
+                XCTAssertGreaterThan(hypot(starts[i].x - starts[j].x, starts[i].y - starts[j].y), 12,
+                                     "vines \(i) and \(j) leave the orb apart")
+            }
+        }
+        let stem = vines[0].stem(progress: 1).boundingRect
+        XCTAssertFalse(stem.isEmpty)
+        XCTAssertTrue(vines[0].stem(progress: 0).isEmpty, "nothing shows before it grows")
+    }
+
     /// Rooms on the Aurora home (Alex, 2026-11-14): New game, which also leads to a friend and to
     /// online, and the castle's three rooms. Your games left Rooms; it is in the You panel.
     func testRoomsAreNewGameAndTheCastleRooms() {
