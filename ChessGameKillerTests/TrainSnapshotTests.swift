@@ -43,6 +43,24 @@ final class TrainSnapshotTests: XCTestCase {
         }
     }
 
+    /// The vine page, as a free player and with Premium on, and for a brand-new player.
+    func testTheVinePage() throws {
+        let sample = TrainSample(settled: true)
+        defer { Premium.shared.pose(premium: nil) }
+        for premium in [false, true] {
+            Premium.shared.pose(premium: premium)
+            let window = try show(sample.vine(theme: theme), wait: 3)
+            try save(window, "train-vine-1-\(premium ? "premium" : "free")")
+            scroll(window, to: 2_000)
+            try save(window, "train-vine-2-\(premium ? "premium" : "free")-foot")
+            window.isHidden = true
+        }
+        let fresh = TrainSample(settled: false)
+        let window = try show(fresh.vine(theme: theme), wait: 3)
+        try save(window, "train-vine-3-new")
+        window.isHidden = true
+    }
+
     func testTheGamesDoorBeforeAnyGames() throws {
         let sample = TrainSample(settled: false)
         let window = try show(sample.door(.games, theme: theme), wait: 2)
@@ -254,6 +272,12 @@ struct TrainSample {
                     title: "Missed a fork", created: .now.addingTimeInterval(-Double(index + 1) * day),
                     due: .now.addingTimeInterval(-day)))
             }
+            // A diary of the last days, for the vine on Learn.
+            for (daysAgo, xp, highlights) in [(1, 60, ["Their threats"]), (2, 35, [String]()), (4, 80, ["Forks", "Fixed a mistake from your games"]),
+                                              (5, 40, ["Pins"]), (8, 25, [String]())] {
+                let key = Trainer.dayString(.now.addingTimeInterval(-Double(daysAgo) * day), calendar: .current)
+                progress.days[key] = DayNote(xp: xp, highlights: highlights)
+            }
             puzzleProgress.rating = 1_412
             puzzleProgress.highestRating = 1_455
             puzzleProgress.played = 240
@@ -297,6 +321,20 @@ struct TrainSample {
             .environment(training)
             .environment(puzzles)
             .environment(vault)
+    }
+
+    /// The vine page, as it opens from its card on Learn.
+    func vine(theme: BoardTheme) -> some View {
+        let vine = LearningVine.make(progress: training.progress, library: training.library, endgames: endgames,
+                                     today: training.dailyPlan(), trainedToday: training.trainedToday,
+                                     lessonsOpen: Premium.shared.opens(.lessons))
+        return NavigationStack {
+            LearningVinePage(vine: vine, theme: theme, rankTitle: training.rank?.title)
+        }
+        .tint(theme.trainingAccent)
+        .screenScheme(theme)
+        .environment(training)
+        .environment(endgames)
     }
 
     /// One door's screen, as it opens from the Train page.

@@ -26,6 +26,12 @@ struct ExecutivePlate: View {
     /// The rival's card shows its film and weather behind it on the dark looks; the light looks
     /// keep plain glass, where the rival's dark letters read.
     private var showsWeather: Bool { speaksInBlood && theme.isDark }
+    /// How the fight is going for the rival: its card and its words follow it (Alex, 2026-11-14).
+    private var mood: RivalMood {
+        guard speaksInBlood, !match.isOver else { return .even }
+        let chances = match.evaluation.map { color == .white ? $0.winningChances : -$0.winningChances }
+        return RivalMood(lead: match.game.materialLead(for: color), chances: chances)
+    }
     /// The line under the rival's name (its taunt, remarks and captures) is half again as large
     /// as the rest (Alex, 2026-11-08).
     private var lineScale: CGFloat { isComputer && !inDock ? 1.5 : 1 }
@@ -127,10 +133,17 @@ struct ExecutivePlate: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background {
             // The rival's film and its weather behind its words, on the dark looks (Alex, 2026-11-11).
-            if showsWeather {
-                RivalCardBackdrop(rival: match.setup.rival)
-                    .clipShape(shape)
+            ZStack {
+                if showsWeather {
+                    RivalCardBackdrop(rival: match.setup.rival)
+                }
+                // The fight on the glass, under the words: fire when the rival is ahead, frost
+                // and a crack when you are, dark near its end (Alex, 2026-11-14).
+                if speaksInBlood {
+                    RivalMoodLayer(mood: mood, theme: theme)
+                }
             }
+            .clipShape(shape)
         }
         .glassPane(shape)
         .overlay {
@@ -165,6 +178,7 @@ struct ExecutivePlate: View {
         .dynamicTypeSize(...DynamicTypeSize.xxLarge)
         .animation(.snappy(duration: 0.3), value: isActive)
         .animation(.snappy(duration: 0.3), value: inCheck)
+        .animation(.easeInOut(duration: 0.9), value: mood)
     }
 
     /// The CHECK tag, the turn dot and the status (or the selected army piece's name and rank),
@@ -251,6 +265,7 @@ struct ExecutivePlate: View {
             } else if !status.isEmpty, isTaunt {
                 Text(status)
                     .rivalLetters(voice, theme: theme)
+                    .rivalMood(mood)
                     .transition(.opacity)
             } else if !status.isEmpty {
                 Text(status)
@@ -358,7 +373,7 @@ struct ExecutivePlate: View {
         }
         if isComputer {
             if isActive { return match.engineFailed ? "Coach offline" : "Thinking…" }
-            return RivalTaunt.line(for: match.setup.level, game: match.gameID, ply: match.game.plyCount)
+            return RivalTaunt.line(for: match.setup.level, game: match.gameID, ply: match.game.plyCount, mood: mood)
         }
         return isActive ? "Your move" : ""
     }

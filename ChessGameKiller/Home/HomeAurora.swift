@@ -42,6 +42,8 @@ struct HomeAuroraActions {
     var armyQuest: (MatchController.Level) -> Void = { _ in }
     /// Quick play: starts the rival up next at once, with no film (or picks up that game).
     var quickPlay: () -> Void = {}
+    /// Sends a friend a game by link; nil when the app can't reach other players.
+    var friend: (() -> Void)? = nil
 }
 
 /// Aurora's colors, night and day.
@@ -105,6 +107,9 @@ struct HomeAuroraView: View {
     @State private var barHidden: CGFloat = 0
     /// Counts the taps on Today, each of which scrolls the page back to its top.
     @State private var toTop = 0
+    /// The gold knight's ironwork menu is out, and where the knight sits for its branches.
+    @State private var knightMenuOpen = false
+    @State private var knightCenter: CGPoint?
     private static let pageTop = "home.pageTop"
 
     private var palette: HomeAuroraPalette { HomeAuroraPalette(dark: tone.scheme == .dark) }
@@ -198,7 +203,9 @@ struct HomeAuroraView: View {
                 VStack(spacing: 0) {
                     Spacer()
                     HomeAuroraTabBar(palette: palette, play: actions.stage.analyze, today: { toTop += 1 },
-                                     learn: actions.stage.learn, rooms: actions.stage.rooms, you: actions.stage.you)
+                                     learn: actions.stage.learn, rooms: actions.stage.rooms, you: actions.stage.you,
+                                     hold: openKnightMenu,
+                                     knightAt: { knightCenter = $0 })
                         .padding(.horizontal, 16)
                         .padding(.bottom, 8)
                         .background(alignment: .bottom) {
@@ -221,7 +228,15 @@ struct HomeAuroraView: View {
                         .allowsHitTesting(barHidden < 0.5)
                         .accessibilityHidden(barHidden >= 1)
                 }
+                // Holding the gold knight grows gilded branches out to four doors (Alex, 2026-11-14).
+                if knightMenuOpen, let knightCenter {
+                    HomeKnightBranchMenu(knight: knightCenter, doors: HomeKnightDoor.list(online: actions.friend != nil),
+                                         pick: pickKnightDoor, close: closeKnightMenu)
+                        .transition(.opacity)
+                        .zIndex(5)
+                }
             }
+            .coordinateSpace(.named(HomeAuroraTabBar.space))
         }
         .environment(\.colorScheme, tone.scheme)
         .onAppear { music.homeAppeared() }
@@ -716,6 +731,24 @@ struct HomeAuroraView: View {
     }
 
     /// The game of the day, in Analyze from its first position, ready to play through.
+    private func openKnightMenu() {
+        withAnimation(.easeOut(duration: 0.18)) { knightMenuOpen = true }
+    }
+
+    private func closeKnightMenu() {
+        withAnimation(.easeOut(duration: 0.2)) { knightMenuOpen = false }
+    }
+
+    private func pickKnightDoor(_ door: HomeKnightDoor) {
+        knightMenuOpen = false
+        switch door {
+        case .quickPlay: actions.quickPlay()
+        case .todaysMove: actions.stage.dailyMove()
+        case .puzzles: actions.puzzles()
+        case .friend: actions.friend?()
+        }
+    }
+
     private func openMasterpiece() {
         if let fen = stage.masterpiece?.frames.first { actions.stage.analyzePosition(fen) }
     }
@@ -1823,6 +1856,11 @@ struct HomeAuroraTabBar: View {
     let learn: () -> Void
     let rooms: () -> Void
     let you: () -> Void
+    /// A press and hold on the gold knight: its ironwork menu (Alex, 2026-11-14).
+    var hold: () -> Void = {}
+    /// Where the gold knight's center sits, in Home's own space, for the menu's branches.
+    var knightAt: (CGPoint) -> Void = { _ in }
+    static let space = "home.aurora"
     /// A finger is on the gold knight: it gives a little, like every other button here.
     @State private var knightPressed = false
 
@@ -1843,7 +1881,7 @@ struct HomeAuroraTabBar: View {
                     .overlay(Capsule().strokeBorder(palette.gold.opacity(0.35), lineWidth: 0.75))
                     .shadow(color: .black.opacity(palette.dark ? 0.5 : 0.14), radius: 20, y: 10)
             }
-            // A tap opens Analyze; a press and hold brings up the Rooms panel (Alex, 2026-11-07).
+            // A tap opens Analyze; a press and hold grows the ironwork menu (Alex, 2026-11-14).
             knight
         }
     }
@@ -1874,13 +1912,17 @@ struct HomeAuroraTabBar: View {
                     .brightness(knightPressed ? -0.04 : 0)
                     .animation(.spring(response: 0.25, dampingFraction: 0.7), value: knightPressed)
                     .onTapGesture(perform: play)
-                    .onLongPressGesture(minimumDuration: 0.35, perform: rooms) { pressing in
+                    .onLongPressGesture(minimumDuration: 0.35, perform: hold) { pressing in
                         knightPressed = pressing
                     }
+                    .onGeometryChange(for: CGPoint.self) { proxy in
+                        let frame = proxy.frame(in: .named(Self.space))
+                        return CGPoint(x: frame.midX, y: frame.midY)
+                    } action: { knightAt($0) }
                     .accessibilityElement()
                     .accessibilityLabel("Analyze")
                     .accessibilityAddTraits(.isButton)
-                    .accessibilityAction(named: "Rooms", rooms)
+                    .accessibilityAction(named: "More", hold)
     }
 
     private func tab(_ title: String, icon: HomeTabIcon.Kind, on: Bool, action: @escaping () -> Void) -> some View {
