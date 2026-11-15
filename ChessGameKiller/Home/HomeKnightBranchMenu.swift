@@ -166,8 +166,10 @@ struct LivingVine: Equatable {
 
     init(index: Int, knight: CGPoint, to door: CGPoint, scale: CGFloat, orbRadius: CGFloat = 32) {
         self.scale = scale
-        let angle = Self.startAngles[min(max(index, 0), Self.startAngles.count - 1)] * .pi / 180
-        let start = CGPoint(x: knight.x + cos(angle) * orbRadius * 0.95, y: knight.y + sin(angle) * orbRadius * 0.95)
+        let degrees: Double = Self.startAngles[min(max(index, 0), Self.startAngles.count - 1)]
+        let angle = CGFloat(degrees * Double.pi / 180)
+        let rim: CGFloat = orbRadius * 0.95
+        let start = CGPoint(x: knight.x + cos(angle) * rim, y: knight.y + sin(angle) * rim)
         let toDoor = atan2(door.y - start.y, door.x - start.x)
         // It stops just inside the door's coin, which sits on top of it.
         let end = CGPoint(x: door.x - cos(toDoor) * 22 * scale, y: door.y - sin(toDoor) * 22 * scale)
@@ -176,16 +178,24 @@ struct LivingVine: Equatable {
         let nx = -dy / length, ny = dx / length
         let c1 = CGPoint(x: start.x + cos(angle) * length * 0.35, y: start.y + sin(angle) * length * 0.35)
         let c2 = CGPoint(x: start.x + dx * 0.7, y: start.y + dy * 0.7)
-        let wave = 5.3 * scale
-        let phase = Double(index) * 1.3
-        points = (0...Self.samples).map { k in
-            let u = CGFloat(k) / CGFloat(Self.samples), v = 1 - u
-            let a = v * v * v, b = 3 * v * v * u, c = 3 * v * u * u, d = u * u * u
-            let x = a * start.x + b * c1.x + c * c2.x + d * end.x
-            let y = a * start.y + b * c1.y + c * c2.y + d * end.y
-            let w = wave * CGFloat(sin(Double(u) * .pi * 2.4 + phase) * sin(Double(u) * .pi))
-            return CGPoint(x: x + nx * w, y: y + ny * w)
+        let wave: CGFloat = 5.3 * scale
+        let phase: Double = Double(index) * 1.3
+        var sampled: [CGPoint] = []
+        for k in 0...Self.samples {
+            let u: CGFloat = CGFloat(k) / CGFloat(Self.samples)
+            let v: CGFloat = 1 - u
+            let a: CGFloat = v * v * v
+            let b: CGFloat = 3 * v * v * u
+            let c: CGFloat = 3 * v * u * u
+            let d: CGFloat = u * u * u
+            let x: CGFloat = a * start.x + b * c1.x + c * c2.x + d * end.x
+            let y: CGFloat = a * start.y + b * c1.y + c * c2.y + d * end.y
+            let ud = Double(u)
+            let sway: Double = sin(ud * Double.pi * 2.4 + phase) * sin(ud * Double.pi)
+            let w: CGFloat = wave * CGFloat(sway)
+            sampled.append(CGPoint(x: x + nx * w, y: y + ny * w))
         }
+        points = sampled
     }
 
     func tangent(_ k: Int) -> CGVector {
@@ -219,7 +229,8 @@ struct LivingVine: Equatable {
         let w0 = 6.3 * scale, w1 = 1.3 * scale
         for k in 0...last {
             let t = tangent(k), u = CGFloat(k) / CGFloat(Self.samples)
-            let half = (w0 + (w1 - w0) * pow(u, 0.8)) / 2
+            let taper: CGFloat = pow(u, 0.8)
+            let half: CGFloat = (w0 + (w1 - w0) * taper) / 2
             let p = points[k]
             left.append(CGPoint(x: p.x - t.dy * half, y: p.y + t.dx * half))
             right.append(CGPoint(x: p.x + t.dy * half, y: p.y - t.dx * half))
@@ -234,7 +245,9 @@ struct LivingVine: Equatable {
         let p = points[k], t = tangent(k)
         let nx = -t.dy * side, ny = t.dx * side
         let end = CGPoint(x: p.x + nx * 3.3 * scale, y: p.y + ny * 3.3 * scale)
-        return (end, atan2(ny * 0.8 + t.dy * 0.6, nx * 0.8 + t.dx * 0.6))
+        let ay: CGFloat = ny * 0.8 + t.dy * 0.6
+        let ax: CGFloat = nx * 0.8 + t.dx * 0.6
+        return (end, atan2(ay, ax))
     }
 
     /// The leaves' blades, pointed at the tip.
@@ -282,7 +295,9 @@ struct LivingVine: Equatable {
             guard grow > 0 else { continue }
             let p = points[tendril.k], t = tangent(tendril.k), r = tendril.radius, side = tendril.side
             let nx = -t.dy * side, ny = t.dx * side
-            let center = CGPoint(x: p.x + nx * r * 1.6 + t.dx * r * 0.6, y: p.y + ny * r * 1.6 + t.dy * r * 0.6)
+            let cx: CGFloat = p.x + nx * r * 1.6 + t.dx * r * 0.6
+            let cy: CGFloat = p.y + ny * r * 1.6 + t.dy * r * 0.6
+            let center = CGPoint(x: cx, y: cy)
             let a0 = atan2(p.y - center.y, p.x - center.x)
             let reach = hypot(p.x - center.x, p.y - center.y)
             path.move(to: p)
@@ -290,7 +305,7 @@ struct LivingVine: Equatable {
             guard steps > 0 else { continue }
             for i in 1...steps {
                 let f = CGFloat(i) / 50
-                let a = a0 + side * f * .pi * 3.2
+                let a: CGFloat = a0 + side * f * CGFloat.pi * 3.2
                 let rr = reach * (1 - f * 0.85)
                 path.addLine(to: CGPoint(x: center.x + cos(a) * rr, y: center.y + sin(a) * rr))
             }
