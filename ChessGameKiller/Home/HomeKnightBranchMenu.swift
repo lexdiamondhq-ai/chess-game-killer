@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// What a press and hold on the gold Analyze knight offers (Alex, 2026-11-14): four round gold
-/// doors that grow out toward the middle of the screen on gilded ironwork branches, like a castle
-/// gate's scrollwork, each tied back to the knight. Rooms has its own tab, so it is not repeated.
+/// doors that grow out toward the middle of the screen on living gold vines, each leaving the
+/// knight's orb from its own spot (Alex, 2026-11-15). Rooms has its own tab, so it is not repeated.
 enum HomeKnightDoor: String, CaseIterable, Identifiable {
     case quickPlay, todaysMove, puzzles, friend
 
@@ -62,28 +62,14 @@ struct HomeKnightBranchMenu: View {
                     .frame(width: 280, height: 280)
                     .position(knight)
                     .allowsHitTesting(false)
-                // The knight stays lit above the dimmed room; a tap on it folds the branches away.
-                knightCoin
-                    .position(knight)
-                    .onTapGesture(perform: close)
                 ForEach(Array(doors.enumerated()), id: \.element) { index, door in
                     let end = CGPoint(x: knight.x + door.spot.width * scale, y: knight.y + door.spot.height * scale)
                     let delay = reduceMotion ? 0 : Double(index) * 0.07
-                    GildedBranch(from: knight, to: end, scale: scale)
-                        .trim(from: 0, to: grown ? 1 : 0)
-                        .stroke(Color(hex: 0x2A1C08).opacity(0.7), style: StrokeStyle(lineWidth: 4.5 * scale, lineCap: .round))
-                        .overlay {
-                            GildedBranch(from: knight, to: end, scale: scale)
-                                .trim(from: 0, to: grown ? 1 : 0)
-                                .stroke(Self.gold, style: StrokeStyle(lineWidth: 2.4 * scale, lineCap: .round))
-                        }
-                        .animation(reduceMotion ? .easeOut(duration: 0.15) : .easeOut(duration: 0.42).delay(delay), value: grown)
-                        .allowsHitTesting(false)
-                    GildedCurls(from: knight, to: end, scale: scale)
-                        .opacity(grown ? 1 : 0)
-                        .scaleEffect(grown ? 1 : 0.6, anchor: UnitPoint(x: knight.x / max(geo.size.width, 1),
-                                                                         y: knight.y / max(geo.size.height, 1)))
-                        .animation(reduceMotion ? .easeOut(duration: 0.15) : .easeOut(duration: 0.3).delay(delay + 0.22), value: grown)
+                    // Each vine leaves the orb from its own spot and grows out to its door
+                    // (Alex, 2026-11-15: "coming out of the orb separately ... like actual vines").
+                    LivingVineView(vine: LivingVine(index: index, knight: knight, to: end, scale: scale),
+                                   progress: grown ? 1 : 0)
+                        .animation(reduceMotion ? .easeOut(duration: 0.15) : .easeOut(duration: 0.5).delay(delay), value: grown)
                         .allowsHitTesting(false)
                     doorButton(door)
                         .scaleEffect(grown ? 1 : 0.2, anchor: .center)
@@ -91,6 +77,11 @@ struct HomeKnightBranchMenu: View {
                         .animation(reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.36, dampingFraction: 0.7).delay(delay + 0.3), value: grown)
                         .position(end)
                 }
+                // The knight stays lit above the dimmed room, over the vines' roots; a tap on it
+                // folds them away.
+                knightCoin
+                    .position(knight)
+                    .onTapGesture(perform: close)
             }
         }
         .onAppear {
@@ -159,108 +150,191 @@ struct HomeKnightBranchMenu: View {
         case .friend: Glyph(name: Glyphs.challenge, size: 26)
         }
     }
-
-    static let gold = LinearGradient(colors: [Color(hex: 0xF6DC93), Color(hex: 0xC99436), Color(hex: 0xF0CF7A)],
-                                     startPoint: .topLeading, endPoint: .bottomTrailing)
 }
 
-/// One gilded branch's spine: it leaves the knight's shoulder, sweeps out, and bends back in
-/// to its door.
-struct GildedBranch: Shape {
-    let from: CGPoint
-    let to: CGPoint
-    var scale: CGFloat = 1
+/// One living vine: it leaves the orb's rim at its own angle, heading outward, then bends to its
+/// door. Thick at the root and thin at the tip, gently wavy, with leaves on short stalks and two
+/// coiled tendrils (Alex picked "Living vines", 2026-11-15).
+struct LivingVine: Equatable {
+    /// Where on the orb's rim each vine starts, in degrees (0 is right, 90 is down): spread from
+    /// due left round to straight up, so no two leave from the same place.
+    static let startAngles: [Double] = [172, 207, 240, 272]
+    static let samples = 120
 
-    func path(in rect: CGRect) -> Path {
-        let c = Self.controls(from: from, to: to, scale: scale)
-        var p = Path()
-        p.move(to: c[0])
-        p.addCurve(to: c[3], control1: c[1], control2: c[2])
-        return p
-    }
+    let points: [CGPoint]
+    let scale: CGFloat
 
-    /// The curve's four points, shared with its curls and leaves.
-    static func controls(from: CGPoint, to: CGPoint, scale: CGFloat) -> [CGPoint] {
-        let start = CGPoint(x: from.x - 13 * scale, y: from.y - 23 * scale)
-        let dx = to.x - start.x, dy = to.y - start.y
+    init(index: Int, knight: CGPoint, to door: CGPoint, scale: CGFloat, orbRadius: CGFloat = 32) {
+        self.scale = scale
+        let angle = Self.startAngles[min(max(index, 0), Self.startAngles.count - 1)] * .pi / 180
+        let start = CGPoint(x: knight.x + cos(angle) * orbRadius * 0.95, y: knight.y + sin(angle) * orbRadius * 0.95)
+        let toDoor = atan2(door.y - start.y, door.x - start.x)
+        // It stops just inside the door's coin, which sits on top of it.
+        let end = CGPoint(x: door.x - cos(toDoor) * 22 * scale, y: door.y - sin(toDoor) * 22 * scale)
+        let dx = end.x - start.x, dy = end.y - start.y
         let length = max(hypot(dx, dy), 1)
         let nx = -dy / length, ny = dx / length
-        let bend = length * 0.22
-        return [start,
-                CGPoint(x: start.x + dx * 0.25 + nx * bend, y: start.y + dy * 0.25 + ny * bend),
-                CGPoint(x: start.x + dx * 0.75 - nx * bend * 0.6, y: start.y + dy * 0.75 - ny * bend * 0.6),
-                to]
-    }
-
-    static func point(_ c: [CGPoint], _ t: CGFloat) -> CGPoint {
-        let u = 1 - t
-        let a = u * u * u, b = 3 * u * u * t, d = 3 * u * t * t, e = t * t * t
-        return CGPoint(x: a * c[0].x + b * c[1].x + d * c[2].x + e * c[3].x,
-                       y: a * c[0].y + b * c[1].y + d * c[2].y + e * c[3].y)
-    }
-
-    static func tangent(_ c: [CGPoint], _ t: CGFloat) -> CGVector {
-        let a = point(c, max(0, t - 0.005)), b = point(c, min(1, t + 0.005))
-        let length = max(hypot(b.x - a.x, b.y - a.y), 0.0001)
-        return CGVector(dx: (b.x - a.x) / length, dy: (b.y - a.y) / length)
-    }
-}
-
-/// The scrollwork on a branch: four small curling tendrils, side to side, each with a leaf.
-struct GildedCurls: View {
-    let from: CGPoint
-    let to: CGPoint
-    var scale: CGFloat = 1
-
-    var body: some View {
-        Canvas { gc, _ in
-            let c = GildedBranch.controls(from: from, to: to, scale: scale)
-            let gold = GraphicsContext.Shading.linearGradient(
-                Gradient(colors: [Color(hex: 0xF6DC93), Color(hex: 0xC99436), Color(hex: 0xF0CF7A)]),
-                startPoint: c[0], endPoint: c[3])
-            for (k, u) in [0.22, 0.42, 0.62, 0.8].enumerated() {
-                let side: CGFloat = k % 2 == 0 ? -1 : 1
-                let p = GildedBranch.point(c, u)
-                let d = GildedBranch.tangent(c, u)
-                let tendril = curl(at: p, along: d, side: side, length: 23 * scale)
-                gc.stroke(tendril, with: .color(Color(hex: 0x2A1C08).opacity(0.6)),
-                          style: StrokeStyle(lineWidth: 2.4 * scale, lineCap: .round))
-                gc.stroke(tendril, with: gold, style: StrokeStyle(lineWidth: 1.2 * scale, lineCap: .round))
-                gc.fill(leaf(at: p, along: d, side: -side, size: 11 * scale), with: .color(Color(hex: 0xC99A3E)))
-            }
+        let c1 = CGPoint(x: start.x + cos(angle) * length * 0.35, y: start.y + sin(angle) * length * 0.35)
+        let c2 = CGPoint(x: start.x + dx * 0.7, y: start.y + dy * 0.7)
+        let wave = 5.3 * scale
+        let phase = Double(index) * 1.3
+        points = (0...Self.samples).map { k in
+            let u = CGFloat(k) / CGFloat(Self.samples), v = 1 - u
+            let a = v * v * v, b = 3 * v * v * u, c = 3 * v * u * u, d = u * u * u
+            let x = a * start.x + b * c1.x + c * c2.x + d * end.x
+            let y = a * start.y + b * c1.y + c * c2.y + d * end.y
+            let w = wave * CGFloat(sin(Double(u) * .pi * 2.4 + phase) * sin(Double(u) * .pi))
+            return CGPoint(x: x + nx * w, y: y + ny * w)
         }
     }
 
-    /// A tendril that leaves the branch to one side and rolls up into a small spiral.
-    private func curl(at p: CGPoint, along d: CGVector, side: CGFloat, length: CGFloat) -> Path {
-        let nx = -d.dy * side, ny = d.dx * side
-        let base = atan2(ny, nx)
+    func tangent(_ k: Int) -> CGVector {
+        let a = points[max(0, k - 1)], b = points[min(points.count - 1, k + 1)]
+        let length = max(hypot(b.x - a.x, b.y - a.y), 0.0001)
+        return CGVector(dx: (b.x - a.x) / length, dy: (b.y - a.y) / length)
+    }
+
+    /// Leaves: where along the vine (a sample), which side, and how long.
+    var leaves: [(k: Int, side: CGFloat, size: CGFloat)] {
+        [(k: 22, side: -1, size: 12.7 * scale), (k: 46, side: 1, size: 12.7 * scale),
+         (k: 70, side: -1, size: 10 * scale), (k: 94, side: 1, size: 10 * scale)]
+    }
+
+    /// Tendrils: where they leave the vine, which way they coil, and how big.
+    var tendrils: [(k: Int, side: CGFloat, radius: CGFloat)] {
+        [(k: 34, side: 1, radius: 3 * scale), (k: 82, side: -1, radius: 2.3 * scale)]
+    }
+
+    /// How grown a leaf or tendril at sample `k` is, when the vine has grown to `progress`.
+    func bloom(_ k: Int, progress: CGFloat) -> CGFloat {
+        let u = CGFloat(k) / CGFloat(Self.samples)
+        return min(max((progress - u) * 6, 0), 1)
+    }
+
+    /// The tapered stem, as far as it has grown.
+    func stem(progress: CGFloat) -> Path {
+        let last = Int((CGFloat(Self.samples) * min(max(progress, 0), 1)).rounded(.down))
+        guard last >= 1 else { return Path() }
+        var left: [CGPoint] = [], right: [CGPoint] = []
+        let w0 = 6.3 * scale, w1 = 1.3 * scale
+        for k in 0...last {
+            let t = tangent(k), u = CGFloat(k) / CGFloat(Self.samples)
+            let half = (w0 + (w1 - w0) * pow(u, 0.8)) / 2
+            let p = points[k]
+            left.append(CGPoint(x: p.x - t.dy * half, y: p.y + t.dx * half))
+            right.append(CGPoint(x: p.x + t.dy * half, y: p.y - t.dx * half))
+        }
         var path = Path()
-        for i in 0...30 {
-            let t = CGFloat(i) / 30
-            let reach = sin(min(t * 2, 1) * .pi / 2)
-            var x = p.x + nx * length * 0.5 * reach + d.dx * length * 0.4 * t
-            var y = p.y + ny * length * 0.5 * reach + d.dy * length * 0.4 * t
-            if t > 0.5 {
-                let a = t * .pi * 1.6
-                let r = length * (1 - t * 0.7) * 0.35 * (t - 0.5) * 2
-                x += cos(a * side + base) * r
-                y += sin(a * side + base) * r
-            }
-            if i == 0 { path.move(to: CGPoint(x: x, y: y)) } else { path.addLine(to: CGPoint(x: x, y: y)) }
+        path.addLines(left + right.reversed())
+        path.closeSubpath()
+        return path
+    }
+
+    private func leafBase(_ k: Int, side: CGFloat) -> (stalkEnd: CGPoint, angle: CGFloat) {
+        let p = points[k], t = tangent(k)
+        let nx = -t.dy * side, ny = t.dx * side
+        let end = CGPoint(x: p.x + nx * 3.3 * scale, y: p.y + ny * 3.3 * scale)
+        return (end, atan2(ny * 0.8 + t.dy * 0.6, nx * 0.8 + t.dx * 0.6))
+    }
+
+    /// The leaves' blades, pointed at the tip.
+    func leafBlades(progress: CGFloat) -> Path {
+        var path = Path()
+        for leaf in leaves {
+            let grow = bloom(leaf.k, progress: progress)
+            guard grow > 0 else { continue }
+            let s = leaf.size * grow
+            let (base, angle) = leafBase(leaf.k, side: leaf.side)
+            var blade = Path()
+            blade.move(to: .zero)
+            blade.addCurve(to: CGPoint(x: s, y: 0), control1: CGPoint(x: s * 0.25, y: -s * 0.45), control2: CGPoint(x: s * 0.75, y: -s * 0.42))
+            blade.addCurve(to: .zero, control1: CGPoint(x: s * 0.75, y: s * 0.38), control2: CGPoint(x: s * 0.25, y: s * 0.42))
+            blade.closeSubpath()
+            path.addPath(blade, transform: CGAffineTransform(translationX: base.x, y: base.y).rotated(by: angle))
         }
         return path
     }
 
-    /// A small almond leaf on the branch, leaning forward.
-    private func leaf(at p: CGPoint, along d: CGVector, side: CGFloat, size: CGFloat) -> Path {
-        let nx = -d.dy * side, ny = d.dx * side
-        let angle = atan2(ny + d.dy * 0.6, nx + d.dx * 0.6)
-        var leaf = Path()
-        leaf.move(to: .zero)
-        leaf.addQuadCurve(to: CGPoint(x: size, y: 0), control: CGPoint(x: size * 0.5, y: -size * 0.35))
-        leaf.addQuadCurve(to: .zero, control: CGPoint(x: size * 0.5, y: size * 0.35))
-        leaf.closeSubpath()
-        return leaf.applying(CGAffineTransform(rotationAngle: angle).concatenating(CGAffineTransform(translationX: p.x, y: p.y)))
+    /// The leaves' stalks, midribs and two side veins.
+    func leafVeins(progress: CGFloat) -> Path {
+        var path = Path()
+        for leaf in leaves {
+            let grow = bloom(leaf.k, progress: progress)
+            guard grow > 0 else { continue }
+            let s = leaf.size * grow
+            let (base, angle) = leafBase(leaf.k, side: leaf.side)
+            path.move(to: points[leaf.k])
+            path.addLine(to: base)
+            var veins = Path()
+            veins.move(to: CGPoint(x: s * 0.05, y: 0)); veins.addLine(to: CGPoint(x: s * 0.9, y: 0))
+            veins.move(to: CGPoint(x: s * 0.4, y: 0)); veins.addLine(to: CGPoint(x: s * 0.58, y: -s * 0.2))
+            veins.move(to: CGPoint(x: s * 0.55, y: 0)); veins.addLine(to: CGPoint(x: s * 0.72, y: s * 0.17))
+            path.addPath(veins, transform: CGAffineTransform(translationX: base.x, y: base.y).rotated(by: angle))
+        }
+        return path
+    }
+
+    /// The tendrils, each a coil that winds in on itself.
+    func tendrilCoils(progress: CGFloat) -> Path {
+        var path = Path()
+        for tendril in tendrils {
+            let grow = bloom(tendril.k, progress: progress)
+            guard grow > 0 else { continue }
+            let p = points[tendril.k], t = tangent(tendril.k), r = tendril.radius, side = tendril.side
+            let nx = -t.dy * side, ny = t.dx * side
+            let center = CGPoint(x: p.x + nx * r * 1.6 + t.dx * r * 0.6, y: p.y + ny * r * 1.6 + t.dy * r * 0.6)
+            let a0 = atan2(p.y - center.y, p.x - center.x)
+            let reach = hypot(p.x - center.x, p.y - center.y)
+            path.move(to: p)
+            let steps = Int(50 * grow)
+            guard steps > 0 else { continue }
+            for i in 1...steps {
+                let f = CGFloat(i) / 50
+                let a = a0 + side * f * .pi * 3.2
+                let rr = reach * (1 - f * 0.85)
+                path.addLine(to: CGPoint(x: center.x + cos(a) * rr, y: center.y + sin(a) * rr))
+            }
+        }
+        return path
+    }
+}
+
+/// Draws one vine grown to `progress`, so it can grow out of the orb in an animation.
+struct LivingVineView: View, Animatable {
+    let vine: LivingVine
+    var progress: CGFloat
+
+    var animatableData: CGFloat {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    private static let ink = Color(hex: 0x2A1C08)
+
+    var body: some View {
+        let s = vine.scale
+        Canvas { gc, _ in
+            let stem = vine.stem(progress: progress)
+            let tendrils = vine.tendrilCoils(progress: progress)
+            let veins = vine.leafVeins(progress: progress)
+            let blades = vine.leafBlades(progress: progress)
+            let round = StrokeStyle(lineWidth: 1, lineCap: .round, lineJoin: .round)
+            gc.stroke(tendrils, with: .color(Self.ink.opacity(0.55)), style: round.with(width: 1.7 * s))
+            gc.stroke(tendrils, with: .color(Color(hex: 0xE2B963)), style: round.with(width: 0.8 * s))
+            gc.stroke(stem, with: .color(Self.ink), style: round.with(width: 1.4 * s))
+            gc.fill(stem, with: .linearGradient(Gradient(colors: [Color(hex: 0xF6DC93), Color(hex: 0xC99436), Color(hex: 0xF0CF7A)]),
+                                                 startPoint: vine.points.first ?? .zero, endPoint: vine.points.last ?? .zero))
+            gc.stroke(blades, with: .color(Self.ink), style: round.with(width: 1.1 * s))
+            gc.fill(blades, with: .color(Color(hex: 0xE2B963)))
+            gc.stroke(veins, with: .color(Color(hex: 0x6B4A18)), style: round.with(width: 0.6 * s))
+        }
+    }
+}
+
+private extension StrokeStyle {
+    func with(width: CGFloat) -> StrokeStyle {
+        var copy = self
+        copy.lineWidth = width
+        return copy
     }
 }
