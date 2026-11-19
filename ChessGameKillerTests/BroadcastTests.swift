@@ -228,7 +228,7 @@ final class BroadcastTests: XCTestCase {
                 let board = layout.boardFrame(aspect: aspect)
                 XCTAssertEqual(board.midX, size.width / 2, accuracy: 0.5)
                 XCTAssertLessThanOrEqual(board.width, 490 * layout.scale + 0.5, "Clear of the Cub's fox hood")
-                XCTAssertLessThanOrEqual(board.maxY, layout.y(460) + 0.5)
+                XCTAssertLessThanOrEqual(board.maxY, layout.y(aspect < 1.1 ? 520 : 440) + 0.5, "Above the pieces on the stump")
                 XCTAssertGreaterThan(board.width / 9, 18, "Squares a finger can find")
             }
         }

@@ -79,8 +79,10 @@ enum BroadcastHall: String, CaseIterable {
         switch self {
         case .ashenKing: return flat ? (575, 560) : (545, 640)
         // Between the knight's beard and the Cub's fox hood, which sit higher and closer than
-        // the King's head; the lantern and the birds stay outside it.
-        case .cub: return flat ? (460, 470) : (440, 490)
+        // the King's head; the lantern and the birds stay outside it. Below the heads there is
+        // only mist down to the stump, so a flat board may reach lower: on the smallest phones
+        // that keeps its squares big enough for a finger.
+        case .cub: return flat ? (520, 470) : (440, 490)
         }
     }
 
