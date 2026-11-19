@@ -9,22 +9,38 @@ import Foundation
 /// still pose, so any one can follow any other. This file is the script: which film each
 /// figure plays for each moment of the game, and when. It knows nothing of video.
 ///
+/// The same script plays the Cub's forest (`BroadcastHall`): there the rival's seat is the
+/// Cub's, and the storm that answers a capture is his upset face.
+///
 /// The films live in Broadcast/Films as `broadcast-<figure>-<name>.mp4`.
 struct BroadcastClip: Hashable {
     enum Figure: String {
+        /// The rival's seat: the Ashen King, or the Cub in his forest.
         case king
         /// The player's challenger. Only the Wolf Knight has been filmed so far.
         case knight
     }
 
+    var hall: BroadcastHall = .ashenKing
     let figure: Figure
     let name: String
 
-    static func king(_ name: String) -> BroadcastClip { BroadcastClip(figure: .king, name: name) }
-    static func knight(_ name: String) -> BroadcastClip { BroadcastClip(figure: .knight, name: name) }
+    static func king(_ name: String, in hall: BroadcastHall = .ashenKing) -> BroadcastClip {
+        BroadcastClip(hall: hall, figure: .king, name: name)
+    }
+    static func knight(_ name: String, in hall: BroadcastHall = .ashenKing) -> BroadcastClip {
+        BroadcastClip(hall: hall, figure: .knight, name: name)
+    }
 
     /// The film's name in the bundle, without ".mp4".
-    var resource: String { "broadcast-\(figure.rawValue)-\(name)" }
+    var resource: String { "broadcast-\(hall.stem(figure))-\(name)" }
+
+    /// Its length in frames, at 24 a second: five seconds, but for the forest's ten-second breath.
+    var frames: Int { hall == .cub && name == "think" ? 240 : 120 }
+
+    /// Seconds in when the next film is started: eight frames before the end (see
+    /// `BroadcastScript.handover`).
+    var handover: Double { Double(frames - 8) / 24 }
 
     /// An ending: it plays once and holds.
     var holds: Bool { name == "win" || name == "lose" }
@@ -32,15 +48,22 @@ struct BroadcastClip: Hashable {
     /// A hand goes out to the board.
     var isReach: Bool { touch != nil }
 
-    /// Seconds in when the hand sets the piece down, for the films that move one.
+    /// Seconds in when the hand sets the piece down, for the films that move one (measured on
+    /// each film).
     var touch: Double? {
-        switch (figure, base) {
-        case (.king, "near"): return 2.4
-        case (.king, "far"): return 2.7
-        case (.king, "strike"): return 2.8
-        case (.knight, "near"): return 2.6
-        case (.knight, "far"): return 2.8
-        case (.knight, "strike"): return 2.7
+        switch (hall, figure, base) {
+        case (.ashenKing, .king, "near"): return 2.4
+        case (.ashenKing, .king, "far"): return 2.7
+        case (.ashenKing, .king, "strike"): return 2.8
+        case (.ashenKing, .knight, "near"): return 2.6
+        case (.ashenKing, .knight, "far"): return 2.8
+        case (.ashenKing, .knight, "strike"): return 2.7
+        case (.cub, .king, "near"): return 2.4
+        case (.cub, .king, "far"): return 2.6
+        case (.cub, .king, "strike"): return 2.6
+        case (.cub, .knight, "near"): return 2.5
+        // His hard move is his long reach for now (three takes of his own failed).
+        case (.cub, .knight, "far"), (.cub, .knight, "strike"): return 2.4
         default: return nil
         }
     }
@@ -53,7 +76,8 @@ struct BroadcastClip: Hashable {
     /// side, and for his fall at the end a wider one. The King's hand never comes that far
     /// (measured on every film), so the two never meet.
     var strip: Strip? {
-        guard figure == .knight else { return nil }
+        // The forest's mask already takes in his side of the table.
+        guard hall == .ashenKing, figure == .knight else { return nil }
         switch base {
         case "near": return Strip(wide: false, from: 0.7, to: 3.8)
         case "far": return Strip(wide: false, from: 0.7, to: 4.15)
@@ -68,7 +92,7 @@ struct BroadcastClip: Hashable {
     /// (the dragons breathe fire in them) and the two endings. The dragons' own film, which
     /// beats their wings over every other film of his, stands aside for these.
     var ownsSky: Bool {
-        figure == .king && (base == "loss" || holds)
+        hall == .ashenKing && figure == .king && (base == "loss" || holds)
     }
 
     struct Strip: Equatable {
@@ -109,6 +133,7 @@ struct BroadcastCue: Equatable {
     var then: BroadcastClip?
     /// The King's storm, and how long after the reach it starts.
     var storm: BroadcastClip?
+    var stormAfter: Double = BroadcastScript.stormDelay
     /// Seconds from now until the King is free to make his own move.
     var kingWaits: Double = 0
 }
@@ -137,30 +162,32 @@ struct BroadcastScript {
     /// The challenger's flinch when the King takes one of the player's pieces.
     static let wince = BroadcastClip.knight("wince")
 
-    // The idle films, in a set order: never the same one twice running. The challenger has
-    // the most to do (Alex, 2026-11-10: "the challenger needs to have more movements"): he
-    // rubs his brow, folds his arms, looks up at the storm, clasps his fists, with the quiet
-    // thinking film as a breath between.
-    private static let kingIdles = ["lean", "nod", "lean", "lean", "nod"]
-    private static let knightIdles = ["brow", "think", "arms", "nod", "upward", "lean", "fists", "think"]
+    /// The Cub's upset face when he loses a piece takes about this long to settle.
+    static let upsetSettles: Double = 3.0
+
+    let hall: BroadcastHall
     private var kingTurn = 0
     private var knightTurn = 0
 
-    /// The next film for a figure with nothing else to do.
+    init(hall: BroadcastHall = .ashenKing) {
+        self.hall = hall
+    }
+
+    /// The next film for a figure with nothing else to do (`BroadcastHall.idles`).
     mutating func idle(_ figure: BroadcastClip.Figure) -> BroadcastClip {
         switch figure {
         case .king:
             defer { kingTurn += 1 }
-            return .king(Self.kingIdles[kingTurn % Self.kingIdles.count])
+            return .king(hall.idles.king[kingTurn % hall.idles.king.count], in: hall)
         case .knight:
             defer { knightTurn += 1 }
-            return .knight(Self.knightIdles[knightTurn % Self.knightIdles.count])
+            return .knight(hall.idles.knight[knightTurn % hall.idles.knight.count], in: hall)
         }
     }
 
     /// The film a figure opens on: the challenger thinking, the King leaning in.
-    static func opening(_ figure: BroadcastClip.Figure) -> BroadcastClip {
-        figure == .king ? .king("lean") : .knight("think")
+    static func opening(_ figure: BroadcastClip.Figure, in hall: BroadcastHall = .ashenKing) -> BroadcastClip {
+        figure == .king ? .king("lean", in: hall) : .knight("think", in: hall)
     }
 
     /// A move that lands past the middle of the board, seen from the side that made it, is a
@@ -173,12 +200,20 @@ struct BroadcastScript {
     /// The player's move has landed on the board: the challenger makes it at the table. A
     /// capture is a hard move, and the storm answers once the piece is down, unless the move
     /// ended the game.
-    static func playerMoved(uci: String, color: Piece.Color, captured: Piece.Kind?, endsGame: Bool) -> BroadcastCue {
+    /// In the forest the Cub's face answers instead: he is upset as the piece goes down.
+    static func playerMoved(uci: String, color: Piece.Color, captured: Piece.Kind?, endsGame: Bool,
+                            in hall: BroadcastHall = .ashenKing) -> BroadcastCue {
         guard let captured else {
-            let reach = BroadcastClip.knight(isFar(uci: uci, by: color) ? "far" : "near")
+            let reach = BroadcastClip.knight(isFar(uci: uci, by: color) ? "far" : "near", in: hall)
             return BroadcastCue(reach: reach, kingWaits: reach.touch ?? 0)
         }
-        guard !endsGame else { return BroadcastCue(reach: .knight("strike")) }
+        guard !endsGame else { return BroadcastCue(reach: .knight("strike", in: hall)) }
+        if hall == .cub {
+            let strike = BroadcastClip.knight("strike", in: hall)
+            let touch = strike.touch ?? 0
+            return BroadcastCue(reach: strike, then: .knight("pleased", in: hall), storm: .king("upset", in: hall),
+                                stormAfter: touch, kingWaits: touch + upsetSettles)
+        }
         let loss = BroadcastLoss(captured)
         return BroadcastCue(reach: loss.strike, then: loss.after, storm: loss.storm,
                             kingWaits: stormDelay + stormSettles)
@@ -186,15 +221,19 @@ struct BroadcastScript {
 
     /// The King has chosen his move: the film his hand makes it with. After a capture he
     /// allows himself a moment's satisfaction.
-    static func kingMoves(uci: String, color: Piece.Color, captures: Bool) -> BroadcastCue {
-        if captures { return BroadcastCue(reach: .king("strike"), then: .king("pleased")) }
-        return BroadcastCue(reach: .king(isFar(uci: uci, by: color) ? "far" : "near"))
+    static func kingMoves(uci: String, color: Piece.Color, captures: Bool,
+                          in hall: BroadcastHall = .ashenKing) -> BroadcastCue {
+        if captures { return BroadcastCue(reach: .king("strike", in: hall), then: .king("pleased", in: hall)) }
+        return BroadcastCue(reach: .king(isFar(uci: uci, by: color) ? "far" : "near", in: hall))
     }
 
-    /// The last films: the winner's and the loser's. Nil for a draw, where both sit on.
-    static func ending(playerWon: Bool?) -> (king: BroadcastClip, knight: BroadcastClip)? {
+    /// The last films: the winner's and the loser's. Nil for a draw, where both sit on. In the
+    /// forest the Cub's ending holds both players, and the knight's film stands aside (nil).
+    static func ending(playerWon: Bool?, in hall: BroadcastHall = .ashenKing) -> (king: BroadcastClip, knight: BroadcastClip?)? {
         guard let playerWon else { return nil }
-        return playerWon ? (.king("lose"), .knight("win")) : (.king("win"), .knight("lose"))
+        let king = BroadcastClip.king(playerWon ? "lose" : "win", in: hall)
+        guard !hall.rivalEndingsShowBoth else { return (king, nil) }
+        return (king, .knight(playerWon ? "win" : "lose", in: hall))
     }
 
     /// Whether a move the rival is about to make takes something: a piece on the square it
@@ -208,12 +247,24 @@ struct BroadcastScript {
         return uci.first != uci.dropFirst(2).first
     }
 
-    /// Every film the scene can ask for, so a test can check each is in the bundle.
-    static var allClips: [BroadcastClip] {
-        let king = ["lean", "nod", "near", "far", "strike", "pleased", "win", "lose"].map(BroadcastClip.king)
-        let knight = ["think", "nod", "lean", "brow", "fists", "upward", "arms", "wince",
-                      "near", "far", "strike", "pleased", "win", "lose"].map(BroadcastClip.knight)
-        let storms = BroadcastLoss.allCases.flatMap { [$0.storm, $0.strike, $0.after] }
-        return king + knight + storms
+    /// Every film the King's hall can ask for, so a test can check each is in the bundle.
+    static var allClips: [BroadcastClip] { clips(in: .ashenKing) }
+
+    /// Every film a scene can ask for.
+    static func clips(in hall: BroadcastHall) -> [BroadcastClip] {
+        switch hall {
+        case .ashenKing:
+            let king = ["lean", "nod", "near", "far", "strike", "pleased", "win", "lose"].map { BroadcastClip.king($0) }
+            let knight = ["think", "nod", "lean", "brow", "fists", "upward", "arms", "wince",
+                          "near", "far", "strike", "pleased", "win", "lose"].map { BroadcastClip.knight($0) }
+            let storms = BroadcastLoss.allCases.flatMap { [$0.storm, $0.strike, $0.after] }
+            return king + knight + storms
+        case .cub:
+            let cub = ["think", "lean", "nod", "near", "far", "strike", "pleased", "upset", "win", "lose"]
+                .map { BroadcastClip.king($0, in: .cub) }
+            let knight = ["think", "nod", "lean", "near", "far", "strike", "pleased", "wince"]
+                .map { BroadcastClip.knight($0, in: .cub) }
+            return cub + knight
+        }
     }
 }
