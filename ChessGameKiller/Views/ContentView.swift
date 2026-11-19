@@ -116,9 +116,9 @@ struct ContentView: View {
             || coach.presentedLesson != nil || coach.presentedSession != nil
             || challenges?.isPresenting == true || talk != nil || showingWelcome
     }
-    /// The Ashen King's game is on screen with nothing over it: turned sideways, the phone
-    /// shows his hall (`BroadcastView`). Every other screen stays upright.
-    private var hallOpen: Bool { stormy && match.hasStarted && !boardCovered }
+    /// The Ashen King's game, or the Cub's, is on screen with nothing over it: turned sideways,
+    /// the phone shows his hall or the forest (`BroadcastView`). Every other screen stays upright.
+    private var hallOpen: Bool { BroadcastHall(match.setup.level) != nil && match.hasStarted && !boardCovered }
     /// Starting a game now would cost the one in progress: the rival it is against, so the
     /// screens that start games can ask first.
     private var forfeits: String? {
@@ -699,7 +699,7 @@ struct ContentView: View {
     private var gameScreen: some View {
         GeometryReader { screen in
             if hallOpen, screen.size.width > screen.size.height {
-                // The phone is on its side against the Ashen King: his hall.
+                // The phone is on its side against the Ashen King or the Cub: his scene.
                 BroadcastView(match: match, theme: theme)
                     .transition(.opacity)
             } else {

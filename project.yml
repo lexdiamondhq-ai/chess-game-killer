@@ -79,7 +79,7 @@ targets:
         INFOPLIST_KEY_NSMicrophoneUsageDescription: Leo listens while you hold the button to talk through your move.
         INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: Your words become text so Leo can check your plan.
         # Every screen is laid out for portrait and stays upright (AppOrientation), but one: the
-        # game against the Ashen King, which turned sideways becomes his hall (Broadcast).
+        # game against the Ashen King or the Cub, which turned sideways becomes his scene (Broadcast).
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         # iPhone only for 1.0: nothing has been laid out or tested for iPad yet, and an app that is
         # offered to iPad owners has to work there. Set back to "1,2" once it is designed for it.

@@ -23,6 +23,17 @@ final class BroadcastTests: XCTestCase {
         }
     }
 
+    func testEveryFilmTheCubsForestAsksForIsInTheApp() {
+        for clip in BroadcastScript.clips(in: .cub) {
+            XCTAssertNotNil(Bundle.main.url(forResource: clip.resource, withExtension: "mp4"), "\(clip.resource).mp4 is missing")
+            XCTAssertTrue(clip.resource.hasPrefix("broadcast-cub-"), clip.resource)
+        }
+        XCTAssertNotNil(BroadcastStage.still(for: .cub), "The forest's still is missing")
+        for mask in BroadcastHall.cub.masks {
+            XCTAssertNotNil(Bundle.main.path(forResource: mask, ofType: "png"), "\(mask).png is missing")
+        }
+    }
+
     // MARK: The script
 
     func testAQuietMoveIsANearOrAFarReach() {
@@ -152,6 +163,77 @@ final class BroadcastTests: XCTestCase {
         XCTAssertFalse(BroadcastScript.captures(uci: "g1f3", in: game))
     }
 
+    // MARK: The Cub's forest
+
+    func testOnlyTheCubAndTheAshenKingHaveAScene() {
+        XCTAssertEqual(BroadcastHall(.grandmaster), .ashenKing)
+        XCTAssertEqual(BroadcastHall(.beginner), .cub)
+        for level in MatchController.Level.allCases where level != .grandmaster && level != .beginner {
+            XCTAssertNil(BroadcastHall(level), "\(level)")
+        }
+    }
+
+    func testTheCubIsUpsetWhenHeLosesAPiece() {
+        let cue = BroadcastScript.playerMoved(uci: "e4d5", color: .white, captured: .queen, endsGame: false, in: .cub)
+        XCTAssertEqual(cue.reach, .knight("strike", in: .cub))
+        XCTAssertEqual(cue.then, .knight("pleased", in: .cub))
+        XCTAssertEqual(cue.storm, .king("upset", in: .cub), "No storm in the forest: the Cub's face answers")
+        let touch = try? XCTUnwrap(cue.reach.touch)
+        XCTAssertEqual(cue.stormAfter, touch ?? -1, accuracy: 0.001, "He is upset as the piece goes down")
+        XCTAssertEqual(cue.kingWaits, (touch ?? 0) + BroadcastScript.upsetSettles, accuracy: 0.001)
+        let quiet = BroadcastScript.playerMoved(uci: "e2e4", color: .white, captured: nil, endsGame: false, in: .cub)
+        XCTAssertEqual(quiet.reach, .knight("near", in: .cub))
+        XCTAssertNil(quiet.storm)
+        XCTAssertEqual(BroadcastScript.kingMoves(uci: "d8d5", color: .black, captures: true, in: .cub).then, .king("pleased", in: .cub))
+    }
+
+    func testEveryForestReachSaysWhenTheHandSetsThePieceDown() {
+        for clip in BroadcastScript.clips(in: .cub) where ["near", "far", "strike"].contains(clip.name) {
+            XCTAssertTrue((2.0...3.0).contains(clip.touch ?? 0), clip.resource)
+            XCTAssertNil(clip.strip, "The forest's mask already holds his side of the table")
+        }
+        XCTAssertFalse(BroadcastClip.king("win", in: .cub).ownsSky, "No dragons in the forest")
+    }
+
+    func testTheCubsEndingHoldsBothPlayers() {
+        let won = BroadcastScript.ending(playerWon: true, in: .cub)
+        XCTAssertEqual(won?.king, .king("lose", in: .cub))
+        XCTAssertNil(won?.knight, "The knight's film stands aside")
+        XCTAssertEqual(BroadcastScript.ending(playerWon: false, in: .cub)?.king, .king("win", in: .cub))
+        XCTAssertNil(BroadcastScript.ending(playerWon: nil, in: .cub))
+        XCTAssertEqual(BroadcastHall.cub.result(playerWon: true), "The Cub is beaten")
+    }
+
+    func testTheForestsIdlesNeverRepeatAndItsBreathIsTenSeconds() {
+        var script = BroadcastScript(hall: .cub)
+        var last: [BroadcastClip.Figure: BroadcastClip] = [:]
+        for _ in 0..<12 {
+            for figure in [BroadcastClip.Figure.king, .knight] {
+                let clip = script.idle(figure)
+                XCTAssertEqual(clip.hall, .cub)
+                XCTAssertNotEqual(clip, last[figure])
+                XCTAssertFalse(clip.isReach || clip.holds)
+                last[figure] = clip
+            }
+        }
+        XCTAssertEqual(BroadcastClip.king("think", in: .cub).handover, 232.0 / 24.0, accuracy: 0.001)
+        XCTAssertEqual(BroadcastClip.king("lean", in: .cub).handover, BroadcastScript.handover, accuracy: 0.001)
+        XCTAssertEqual(BroadcastClip.king("think").handover, BroadcastScript.handover, accuracy: 0.001)
+    }
+
+    func testTheForestsBoardStaysBetweenTheHeads() {
+        for size in [CGSize(width: 874, height: 402), CGSize(width: 956, height: 440), CGSize(width: 667, height: 375)] {
+            let layout = BroadcastLayout(size: size, hall: .cub)
+            for aspect in [CGFloat(1.01), 1.3] {
+                let board = layout.boardFrame(aspect: aspect)
+                XCTAssertEqual(board.midX, size.width / 2, accuracy: 0.5)
+                XCTAssertLessThanOrEqual(board.width, 490 * layout.scale + 0.5, "Clear of the Cub's fox hood")
+                XCTAssertLessThanOrEqual(board.maxY, layout.y(460) + 0.5)
+                XCTAssertGreaterThan(board.width / 9, 18, "Squares a finger can find")
+            }
+        }
+    }
+
     // MARK: The layout
 
     func testThePictureFillsASidewaysPhoneAndKeepsItsSides() {
@@ -262,6 +344,10 @@ final class BroadcastTests: XCTestCase {
             match.start(MatchController.Setup(level: .grandmaster, timeControl: .blitz5))
             for move in Showcase.moves.prefix(10) { _ = match.game.playEngineMove(move) }
             try picture(BroadcastView(match: match, theme: .named(.gilded)), "broadcast-\(tilt.rawValue)")
+            let cub = MatchController(engine: nil, sounds: nil)
+            cub.start(MatchController.Setup(level: .beginner, timeControl: .blitz5))
+            for move in Showcase.moves.prefix(10) { _ = cub.game.playEngineMove(move) }
+            try picture(BroadcastView(match: cub, theme: .named(.gilded)), "broadcast-cub-\(tilt.rawValue)")
         }
     }
 
