@@ -25,6 +25,8 @@ final class HomeTodayNotesTests: XCTestCase {
         XCTAssertEqual(finest?.move, "4. Ng5!")
         XCTAssertEqual(finest?.detail, "Against Pulse, Thursday. Stockfish's top choice.")
         XCTAssertEqual(finest?.flipped, false)
+        // The replay opens just before 4. Ng5 (White's seventh half-move), so the move plays out.
+        XCTAssertEqual(finest?.startPly, 6)
         XCTAssertEqual(finest?.squares?.from.file, 5)
         XCTAssertEqual(finest?.squares?.from.rank, 2)
         XCTAssertEqual(finest?.squares?.to.file, 6)

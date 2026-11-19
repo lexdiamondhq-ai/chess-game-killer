@@ -491,7 +491,7 @@ struct PremiumGate: View {
             }
             .foregroundStyle(VineGold.text(theme))
             if isOn {
-                Text("Every bud on your vine is open: every lesson, every drill, Chess DNA and deep reviews.")
+                Text("Every bud on your vine is open: every lesson, every drill, your full Chess DNA and deep reviews.")
                     .font(.app(.subheadline))
                     .foregroundStyle(.secondary)
             } else {
@@ -540,5 +540,5 @@ struct PremiumGate: View {
         return lines
     }
 
-    static let premiumLines = ["Every lesson, every drill", "Chess DNA and deep reviews", "Puzzle review and cycles", "Nothing held back"]
+    static let premiumLines = ["Every lesson, every drill", "Your full Chess DNA and deep reviews", "Puzzle review and cycles", "Nothing held back"]
 }

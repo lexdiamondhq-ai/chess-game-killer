@@ -14,6 +14,8 @@ struct HomeFinestMove: Equatable {
     let detail: String
     /// The player had Black: the board turns round.
     let flipped: Bool
+    /// Where the replay opens: the position just before the move, so it plays out on screen.
+    var startPly: Int? = nil
 
     /// The best of the week, or nil when no game in it had a move to be proud of.
     static func pick(games: [SavedGame], now: Date = .now, calendar: Calendar = .current) -> HomeFinestMove? {
@@ -37,7 +39,7 @@ struct HomeFinestMove: Equatable {
         let move: String = mate || moment.san.hasSuffix("!") ? moment.numbered : moment.numbered + "!"
         return HomeFinestMove(gameID: best.game.id, fen: moment.fenBefore, uci: moment.uci, move: move,
                               detail: detail(game: best.game, moment: moment, now: now, calendar: calendar),
-                              flipped: !best.game.playerIsWhite)
+                              flipped: !best.game.playerIsWhite, startPly: max(0, moment.ply - 1))
     }
 
     /// How much each of the player's moves gained since their move before, by ply.

@@ -47,6 +47,8 @@ struct ContentView: View {
     @State private var showingGames = false
     /// A game picked on the home screen, opened straight away in Rewind.
     @State private var rewindOpening: UUID?
+    /// Where that game opens, as when Home's finest move replays at the move. Nil: the first moment.
+    @State private var rewindOpeningPly: Int?
     /// The home screen covers the game until a game is started or resumed.
     @State private var showingHome: Bool
     /// Where the home's tiles and the screens they open meet, so a screen grows out of its tile.
@@ -286,10 +288,10 @@ struct ContentView: View {
                     .homeZoom(.puzzles, in: homeZoom, when: zoomsFromSheet)
             }
             .onChange(of: showingGames) { _, showing in
-                if !showing { rewindOpening = nil }
+                if !showing { rewindOpening = nil; rewindOpeningPly = nil }
             }
             .fullScreenCover(isPresented: $showingGames) {
-                RewindGamesView(theme: chosenTheme, opening: rewindOpening, forfeits: forfeits) { game in playAgain(game) }
+                RewindGamesView(theme: chosenTheme, opening: rewindOpening, openingPly: rewindOpeningPly, forfeits: forfeits) { game in playAgain(game) }
                     .environment(vault).environment(training)
                     .homeZoom(.games, in: homeZoom, when: zoomsFromSheet)
             }
@@ -524,8 +526,9 @@ struct ContentView: View {
             puzzles: { showingPuzzles = true },
             dailyMove: { openDaily() },
             rewind: { showingGames = true },
-            openGame: { game in
+            openGame: { game, ply in
                 rewindOpening = game.id
+                rewindOpeningPly = ply
                 showingGames = true
             },
             army: { showingArmy = true },

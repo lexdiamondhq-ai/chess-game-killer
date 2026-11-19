@@ -613,7 +613,7 @@ extension ChessDNA {
     static func learned(before: ChessDNA, after: ChessDNA, game: SavedGame,
                         index: OpeningIndex = .shared) -> String? {
         if let style = after.style, before.style == nil {
-            return "I've seen enough to read your style: you play like \(article(style.title)) \(style.title). Your Chess DNA is in Train."
+            return "I've seen enough to read your style: you play like \(article(style.title)) \(style.title). Your Chess DNA is in Learn."
         }
         if let style = after.style, let old = before.style, style != old {
             return "Your style is shifting: from \(old.title) to \(style.title)."
