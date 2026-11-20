@@ -768,7 +768,9 @@ private struct CoachPanel: View {
                     }
                     Button("Keep playing", role: .cancel) {}
                 }
-            } else {
+            } else if match.isOver {
+                // Before the first move the slot stays empty: Your games lives on Home now
+                // (Alex's pick 10A, screen review 2026-11-19).
                 ActionButton(title: "Games", symbol: Glyphs.games, theme: theme) {
                     collapse()
                     showGames()
