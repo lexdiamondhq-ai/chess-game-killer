@@ -91,7 +91,8 @@ final class LiveChallengeAPI: ChallengeAPI {
 
     func create(name: String, side: SideChoice, clock: FriendClock?, days: Int?) async throws -> CreatedChallenge {
         try await send("POST", "api/games", body: CreateBody(name: name, side: side.rawValue, clock: days == nil ? clock : nil,
-                                                             days: days, look: Self.currentLook()))
+                                                             days: days, look: Self.currentLook(),
+                                                             player: OnlinePlayerKey.current()))
     }
 
     func game(_ code: String) async throws -> FriendGameState {
@@ -100,7 +101,8 @@ final class LiveChallengeAPI: ChallengeAPI {
     }
 
     func join(_ code: String, name: String, token: String?) async throws -> SeatTicket {
-        try await send("POST", "api/games/\(code)/join", body: NameBody(name: name), token: token)
+        // The private player key lets the game send this phone alerts (PhoneAlerts); the server keeps only its hash.
+        try await send("POST", "api/games/\(code)/join", body: NameBody(name: name, player: OnlinePlayerKey.current()), token: token)
     }
 
     func move(_ code: String, uci: String, ply: Int, token: String) async throws -> FriendGameState {
@@ -178,9 +180,10 @@ final class LiveChallengeAPI: ChallengeAPI {
         let clock: FriendClock?
         let days: Int?
         let look: String
+        let player: String
 
         enum CodingKeys: String, CodingKey {
-            case name, side, clock, days, look
+            case name, side, clock, days, look, player
         }
 
         // No clock is sent as an explicit null, as the protocol spells it.
@@ -191,6 +194,7 @@ final class LiveChallengeAPI: ChallengeAPI {
             try container.encode(clock, forKey: .clock)
             try container.encodeIfPresent(days, forKey: .days)
             try container.encode(look, forKey: .look)
+            try container.encode(player, forKey: .player)
         }
     }
 
@@ -228,6 +232,7 @@ final class LiveChallengeAPI: ChallengeAPI {
 
     private struct NameBody: Encodable {
         let name: String
+        let player: String
     }
 
     private struct MoveBody: Encodable {

@@ -110,9 +110,9 @@ instead of the Authorization header, so a browser can report `away` with `naviga
 
 | Method & path | Body | Reply |
 | --- | --- | --- |
-| `POST /api/games` | `{ "name", "side": "white"\|"black"\|"random", "clock": {…}\|null, "days"?, "look"? }` | `201 { "code", "url", "appUrl", "seat", "token", "game" }` |
+| `POST /api/games` | `{ "name", "side": "white"\|"black"\|"random", "clock": {…}\|null, "days"?, "look"?, "player"? }` | `201 { "code", "url", "appUrl", "seat", "token", "game" }` |
 | `GET /api/games/{code}` | – | `200 { "game" }` |
-| `POST /api/games/{code}/join` | `{ "name" }` | `200 { "seat", "token", "game" }` |
+| `POST /api/games/{code}/join` | `{ "name", "player"? }` | `200 { "seat", "token", "game" }` |
 | `POST /api/games/{code}/move` | `{ "uci", "ply" }` + Bearer | `200 { "game" }` |
 | `POST /api/games/{code}/action` | `{ "type" }` + Bearer | `200 { "game" }` |
 
@@ -229,8 +229,24 @@ Every call is `POST /api/friends/{part}` with a JSON body that always has `"play
 | `invite` | `{ "player", "to", "code" }` | `201 { "sent": Person }`; `400` without your own username; `404` no such player or game; `409 game_over` once joined; `429` too many waiting |
 | `inbox` | `{ "player" }` | `200 { "invites": [{ "id", "code", "clock", "seat", "at", "from": Person }] }`, newest first, at most 10. `seat` is the one the friend takes |
 | `dismiss` | `{ "player", "id" }` | `200 { "dismissed": true }` |
+| `phone` | `{ "player", "phone": token\|null, "sandbox"? }` | `200 { "phone": true\|false }`: keeps the phone's Apple push token for alerts, or with `null` forgets it. `sandbox` is true for a build from Xcode. No username needed |
 
 `Person` is `{ "username", "name", "online" }`. All of these count against the moves-and-actions rate limit.
+
+## Phone alerts
+
+A player's phone gets four alerts (`src/push.js` has the words), each carrying `{ "kind", "code" }` beside `aps`
+so a tap opens that game:
+
+- `challenge`: a friend sent you a game by your @username.
+- `accepted`: your friend sat down in the game you made.
+- `move`: it's your move. Only when you aren't looking at the game (no open WebSocket, or away).
+- `last_call`: a daily game's move is due in 6 hours, once per move.
+
+A game only knows whom to alert when the app sends its private `player` key (only its hash is kept) when it
+creates or joins the game; a joining app with a token sends it again so older games learn it. Paired online
+games get it from the lobby. Sending needs the worker secrets `APNS_KEY` (the .p8 file's text), `APNS_KEY_ID`
+and `APNS_TEAM_ID`; without them nothing is sent.
 
 ## Pages
 

@@ -177,8 +177,9 @@ export class Lobby extends DurableObject {
         const room = this.env.GAMES.get(this.env.GAMES.idFromName(code));
         const made = await room.createPaired({
           code,
-          white: { name: white.name, tokenHash: white.tokenHash },
-          black: { name: black.name, tokenHash: black.tokenHash },
+          // Each player key (by its hash) goes along too, so the game can send phone alerts.
+          white: { name: white.name, tokenHash: white.tokenHash, player: white.player },
+          black: { name: black.name, tokenHash: black.tokenHash, player: black.player },
           clock: seek.clock,
           days: seek.days ?? null,
           look: seek.look,

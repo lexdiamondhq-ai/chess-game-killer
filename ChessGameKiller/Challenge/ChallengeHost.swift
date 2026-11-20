@@ -34,6 +34,16 @@ struct ChallengeHost: ViewModifier {
                     try? await Task.sleep(for: .seconds(30))
                 }
             }
+            // A tapped phone alert opens its game (PhoneAlerts), even when it launched the app.
+            .onReceive(NotificationCenter.default.publisher(for: PhoneAlertLink.notification)) { _ in
+                if let code = PhoneAlertLink.take() { center?.open(code: code) }
+            }
+            .task {
+                if let code = PhoneAlertLink.take() { center?.open(code: code) }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: PhoneAlertLink.inboxNotification)) { _ in
+                Task { await center?.friends.checkInbox(force: true) }
+            }
             .onOpenURL { url in
                 // The Today's Move widget opens the game screen's daily puzzle, and the game on the
                 // Lock Screen opens that game; every other link is a challenge.
