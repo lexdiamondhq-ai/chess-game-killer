@@ -104,9 +104,18 @@ struct ChallengeGameView: View {
                 .accessibilityHidden(game.held != nil)
                 .overlay {
                     if let held = game.held, game.phase == .playing {
-                        PlayMoveBar(san: held.san, theme: theme,
-                                    play: { game.playHeld() }, takeBack: { game.takeBackHeld() })
-                            .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                        // Your clock still runs while the move waits, so it stays in sight beside
+                        // the bar (Alex's pick 7A, screen review 2026-11-19).
+                        HStack(spacing: 10) {
+                            PlayMoveBar(san: held.san, theme: theme,
+                                        play: { game.playHeld() }, takeBack: { game.takeBackHeld() })
+                            if game.clock != nil {
+                                FriendClockBox(game: game, seat: game.seat, theme: theme)
+                                    .fixedSize()
+                            }
+                        }
+                        .padding(.horizontal, 4)
+                        .transition(.opacity.combined(with: .scale(scale: 0.96)))
                     }
                 }
                 .animation(.snappy(duration: 0.25), value: game.held)
