@@ -50,3 +50,8 @@ ID is looked up from the token. It runs on the Workers Free plan: the Durable Ob
 
 Settings (`[vars]` in `wrangler.toml`): `LEAVE_GRACE_MS` (60000, how long someone may be away before their friend can claim the win) and `MIN_CLOCK_SECONDS` (60). Setting
 `APPLE_TEAM_ID` serves `/.well-known/apple-app-site-association`, so iOS can open invite links in the app.
+
+Phone alerts (PROTOCOL.md, "Phone alerts") need three more repository secrets, which the deploy copies into the
+worker's secrets: `APNS_KEY` (the whole text of the .p8 key file from Apple Developer > Keys, with Apple Push
+Notifications service turned on), `APNS_KEY_ID` (its 10-character Key ID) and `APNS_TEAM_ID` (the team's ID).
+Until they're set, everything works and no alerts are sent.

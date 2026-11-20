@@ -19,17 +19,22 @@ struct BoardViewSwitch: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            segment(.tilted, symbol: "perspective")
-            segment(.flat, symbol: "square.grid.2x2")
+        // On a look with no 3D board (Classic, Neon, a rival's board) neither side is on, and a tap
+        // quietly swapped the player's look for Gilded, so the switch stays away there, as it
+        // always has in Analyze (Alex's pick 6A, screen review 2026-11-19). Settings changes looks.
+        if current != nil {
+            HStack(spacing: 0) {
+                segment(.tilted, symbol: "perspective")
+                segment(.flat, symbol: "square.grid.2x2")
+            }
+            .padding(3)
+            .frame(maxHeight: 32)
+            .glassPane(Capsule())
+            .fixedSize(horizontal: true, vertical: false)
+            .dynamicTypeSize(...DynamicTypeSize.xLarge)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Board view")
         }
-        .padding(3)
-        .frame(maxHeight: 32)
-        .glassPane(Capsule())
-        .fixedSize(horizontal: true, vertical: false)
-        .dynamicTypeSize(...DynamicTypeSize.xLarge)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Board view")
     }
 
     private func segment(_ choice: BoardTilt, symbol: String) -> some View {

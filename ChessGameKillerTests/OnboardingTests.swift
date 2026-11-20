@@ -89,6 +89,8 @@ final class OnboardingTests: XCTestCase {
         XCTAssertEqual(TipBook.next(playerMoves: 2, justUndid: false, facingKing: true, defaults), .kingsHall)
         TipBook.markSeen(.kingsHall, defaults)
         XCTAssertNil(TipBook.next(playerMoves: 3, justUndid: false, facingKing: true, defaults))
+        // The Cub's forest turns sideways too, with its own tip.
+        XCTAssertEqual(TipBook.next(playerMoves: 2, justUndid: false, facingCub: true, defaults), .cubForest)
     }
 
     func testPicturesShowNoTipsUnlessAsked() {

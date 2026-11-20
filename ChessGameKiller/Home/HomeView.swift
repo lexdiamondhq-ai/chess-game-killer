@@ -23,7 +23,7 @@ struct HomeActions {
     /// Opens Today's Move, the puzzle of the day.
     var dailyMove: () -> Void = {}
     var rewind: () -> Void = {}
-    var openGame: (SavedGame) -> Void = { _ in }
+    var openGame: (SavedGame, Int?) -> Void = { _, _ in }
     var army: () -> Void = {}
     var settings: () -> Void = {}
     /// The premium screen. Its rows show only once this is set.
@@ -212,8 +212,8 @@ struct HomeView: View {
                         .padding(.top, 6)
                 }
 
-                if jewelTip, !stageOn, !shortcutsOpen, you == nil {
-                    jewelNote(in: geo.size)
+                if jewelTip, !shortcutsOpen, you == nil {
+                    if stageOn { auroraJewelNote } else { jewelNote(in: geo.size) }
                 }
 
                 if shortcutsOpen {
@@ -626,6 +626,20 @@ struct HomeView: View {
         .zIndex(1)
     }
 
+    /// The same note on the Aurora home, just above its bar and the gold knight in it. It was
+    /// marked seen here but never drawn (Alex's pick 13A, screen review 2026-11-19).
+    private var auroraJewelNote: some View {
+        HomeJewelTip(tone: tone) {
+            withAnimation(.easeOut(duration: 0.25)) { jewelTip = false }
+        }
+        .padding(.horizontal, 24)
+        .frame(maxWidth: 440)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .padding(.bottom, 96)
+        .transition(.offset(y: 10).combined(with: .opacity))
+        .zIndex(1)
+    }
+
     /// CI's pictures open the shortcuts with `-showcaseShortcuts YES`. Otherwise, once a game
     /// has been played, a note says once that the jewel holds them.
     private func introduceJewel() async {
@@ -743,8 +757,8 @@ extension HomeView {
             }
         }, playRival: { level in playOtherRival(level) }, options: { level in actions.playRival(level) }, rivals: { level in
             hall = HallVisit(start: level, intro: false)
-        }, chessDNA: actions.chessDNA, puzzles: actions.puzzles, replay: { id in
-            if let game = vault.game(id) { actions.openGame(game) }
+        }, chessDNA: actions.chessDNA, puzzles: actions.puzzles, replay: { id, ply in
+            if let game = vault.game(id) { actions.openGame(game, ply) }
         }, army: actions.army, armyQuest: { level in playOtherRival(level) }, quickPlay: { primary(upNext) },
            friend: challenges.map { center in { center.compose() } })
         return HomeAuroraView(tone: tone, info: auroraInfo, actions: auroraActions)

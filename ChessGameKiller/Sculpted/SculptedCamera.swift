@@ -117,7 +117,10 @@ struct SculptedCamera: Equatable {
     static var keyPoints: [SIMD3<Float>] { keyPoints(tallest: tallest) }
 
     static func keyPoints(tallest: Float) -> [SIMD3<Float>] {
-        let w = fitHalfWidth
+        keyPoints(tallest: tallest, halfWidth: fitHalfWidth)
+    }
+
+    static func keyPoints(tallest: Float, halfWidth w: Float) -> [SIMD3<Float>] {
         var points: [SIMD3<Float>] = []
         for x in [-w, w] {
             for z in [-w, w] {
@@ -143,7 +146,10 @@ struct SculptedCamera: Equatable {
         var elevation: Float {
             switch self {
             case .standing: return SculptedCamera.lowestTilt * .pi / 180
-            case .seated: return 80 * .pi / 180
+            // A hair off straight down (straight down has no "up" for the camera to keep), so
+            // every rank is as wide as the next and the board fills the view edge to edge, like
+            // other apps' flat boards (Alex, 2026-11-20).
+            case .seated: return 89.9 * .pi / 180
             }
         }
 
@@ -170,8 +176,29 @@ struct SculptedCamera: Equatable {
         var aspect: CGFloat {
             switch self {
             case .standing: return CGFloat(SculptedCamera.snugAspect(tilt: SculptedCamera.lowestTilt))
-            case .seated: return 1.01
+            case .seated: return 1
             }
+        }
+
+        /// How far out the picture must reach: standing, the squares with their metal line and a
+        /// sliver of frame; flat, the squares alone, so nothing of the frame shows round them.
+        var fitHalfWidth: Float {
+            switch self {
+            case .standing: return SculptedCamera.fitHalfWidth
+            case .seated: return 4
+            }
+        }
+
+        /// Room left at the view's edges, across and up and down.
+        var margin: SIMD2<Float> {
+            switch self {
+            case .standing: return SculptedCamera.margin
+            case .seated: return SIMD2(0.001, 0.001)
+            }
+        }
+
+        var keyPoints: [SIMD3<Float>] {
+            SculptedCamera.keyPoints(tallest: tallest, halfWidth: fitHalfWidth)
         }
     }
 
@@ -207,7 +234,7 @@ struct SculptedCamera: Equatable {
         return camera
     }
 
-    private static let margin = SIMD2<Float>(0.004, 0.035)
+    fileprivate static let margin = SIMD2<Float>(0.004, 0.035)
 
     /// The chair's height above the board, standing, in degrees: from the classic view across
     /// the table to a higher one that opens up the far ranks on a tall phone.
@@ -263,15 +290,16 @@ struct SculptedCamera: Equatable {
     }
 
     private func fits() -> Bool {
-        Self.keyPoints(tallest: framing.tallest).allSatisfy { point in
+        let margin = framing.margin
+        return framing.keyPoints.allSatisfy { point in
             let n = normalized(point)
-            return abs(n.x) <= 1 - Self.margin.x && abs(n.y) <= 1 - Self.margin.y
+            return abs(n.x) <= 1 - margin.x && abs(n.y) <= 1 - margin.y
         }
     }
 
     /// How far the picture's middle sits above the view's middle, from -1 to 1.
     private func verticalOffset() -> Float {
-        let ys = Self.keyPoints(tallest: framing.tallest).map { normalized($0).y }
+        let ys = framing.keyPoints.map { normalized($0).y }
         return (ys.max()! + ys.min()!) / 2
     }
 }

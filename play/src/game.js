@@ -146,15 +146,18 @@ function randomSide() {
   return crypto.getRandomValues(new Uint8Array(1))[0] & 1 ? "black" : "white";
 }
 
-function newSeat(name, tokenHash) {
-  return { name: cleanName(name), tokenHash, away: null, screenshots: 0, recordings: 0 };
+/** A seat. `player` is the hash of the app's player key, kept only to send that seat phone alerts (push.js); never shown. */
+function newSeat(name, tokenHash, player = null) {
+  const seat = { name: cleanName(name), tokenHash, away: null, screenshots: 0, recordings: 0 };
+  if (player) seat.player = player;
+  return seat;
 }
 
 /**
  * A new game with its creator seated. A "random" side is settled here, once,
  * so the creator knows their color from the start. pickSide is for tests.
  */
-export function createGame({ code, name, side = "random", clock = null, days = null, look = null, tokenHash, now, leaveGraceMs = DEFAULT_LEAVE_GRACE_MS, pickSide = randomSide }) {
+export function createGame({ code, name, side = "random", clock = null, days = null, look = null, tokenHash, playerHash = null, now, leaveGraceMs = DEFAULT_LEAVE_GRACE_MS, pickSide = randomSide }) {
   const seat = side === "white" || side === "black" ? side : pickSide();
   const game = {
     v: 1,
@@ -186,7 +189,7 @@ export function createGame({ code, name, side = "random", clock = null, days = n
     timedFrom: null, // when the clocks started (both sides had moved)
     endedAt: null,
   };
-  game[seat] = newSeat(name, tokenHash);
+  game[seat] = newSeat(name, tokenHash, playerHash);
   return game;
 }
 
@@ -198,8 +201,8 @@ export function createGame({ code, name, side = "random", clock = null, days = n
  * Online games have no leave rule. White counts as the creator.
  */
 export function createPairedGame({ code, white, black, clock, days = null, look = null, rated, now, leaveGraceMs = DEFAULT_LEAVE_GRACE_MS }) {
-  const game = createGame({ code, name: white.name, side: "white", clock, days, look, tokenHash: white.tokenHash, now, leaveGraceMs });
-  game.black = newSeat(black.name, black.tokenHash);
+  const game = createGame({ code, name: white.name, side: "white", clock, days, look, tokenHash: white.tokenHash, playerHash: white.player ?? null, now, leaveGraceMs });
+  game.black = newSeat(black.name, black.tokenHash, black.player ?? null);
   game.joinedAt = now;
   game.lastMoveAt = now;
   game.online = true;
@@ -254,10 +257,11 @@ export function rematchRecord(game, code, now, leaveGraceMs = game.leaveGraceMs)
     days: game.days ?? null,
     look: game.look,
     tokenHash: game.black.tokenHash,
+    playerHash: game.black.player ?? null,
     now,
     leaveGraceMs,
   });
-  next.black = newSeat(game.white.name, game.white.tokenHash);
+  next.black = newSeat(game.white.name, game.white.tokenHash, game.white.player ?? null);
   next.creator = other(game.creator);
   next.joinedAt = now;
   next.lastMoveAt = now;
@@ -467,12 +471,12 @@ export function hasMatingMaterial(fen, seat) {
 // Joining
 
 /** Seats a second player. The caller makes their token; only its hash is kept. */
-export function join(game, { name, tokenHash }, now) {
+export function join(game, { name, tokenHash, playerHash = null }, now) {
   const out = begin(game, now);
   if (game.result) return fail(out, "game_over", GAME_OVER);
   const seat = !game.white ? "white" : !game.black ? "black" : null;
   if (!seat) return fail(out, "seat_taken", "Both seats are taken. You can still watch.");
-  game[seat] = newSeat(name, tokenHash);
+  game[seat] = newSeat(name, tokenHash, playerHash);
   game.joinedAt = now;
   game.lastMoveAt = now;
   touch(game, out, now);
@@ -822,4 +826,44 @@ function ratingView(rated, seat) {
     after: after ? after.rating : null,
     change: after ? after.rating - before.rating : null,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Phone alerts (push.js sends them; these say who gets one and when)
+
+/** Notes the player key (by its hash) for a seat that has none yet: a game made before alerts, or from an older app. */
+export function setSeatPlayer(game, seat, playerHash, now) {
+  const out = blank();
+  const player = game[seat];
+  if (!player || !playerHash || player.player === playerHash) return out;
+  player.player = playerHash;
+  touch(game, out, now);
+  return out;
+}
+
+/** The hash of the player key for a seat, or null. */
+export function seatPlayer(game, seat) {
+  return (game[seat] && game[seat].player) || null;
+}
+
+/**
+ * In a daily game, when the side to move gets its last call (6 hours before
+ * the move is due), or null: none once it was sent for this move, or when the
+ * move came in so late there was no time for one.
+ */
+export function lastCallAt(game, leadMs) {
+  const deadline = moveDeadline(game);
+  if (deadline === null || game.moves.length < 2) return null;
+  if (game.lastCallFor === deadline) return null;
+  const at = deadline - leadMs;
+  const from = game.lastMoveAt ?? game.joinedAt ?? game.createdAt;
+  return at > from ? at : null;
+}
+
+/** Marks the last call as sent for the move now due. */
+export function markLastCall(game, now) {
+  const out = blank();
+  game.lastCallFor = moveDeadline(game);
+  touch(game, out, now);
+  return out;
 }

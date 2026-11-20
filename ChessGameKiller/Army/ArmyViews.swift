@@ -637,7 +637,7 @@ struct PieceDetailView: View {
                 }
             }
             if record.escapes > 0 {
-                Text("Escaped \(ArmyNews.times(record.escapes)).")
+                Text("Won back \(ArmyNews.times(record.escapes)).")
                     .font(.app(.caption, weight: .semibold))
                     .foregroundStyle(.secondary)
             }

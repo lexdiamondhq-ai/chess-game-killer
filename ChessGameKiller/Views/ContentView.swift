@@ -47,6 +47,8 @@ struct ContentView: View {
     @State private var showingGames = false
     /// A game picked on the home screen, opened straight away in Rewind.
     @State private var rewindOpening: UUID?
+    /// Where that game opens, as when Home's finest move replays at the move. Nil: the first moment.
+    @State private var rewindOpeningPly: Int?
     /// The home screen covers the game until a game is started or resumed.
     @State private var showingHome: Bool
     /// Where the home's tiles and the screens they open meet, so a screen grows out of its tile.
@@ -116,9 +118,9 @@ struct ContentView: View {
             || coach.presentedLesson != nil || coach.presentedSession != nil
             || challenges?.isPresenting == true || talk != nil || showingWelcome
     }
-    /// The Ashen King's game is on screen with nothing over it: turned sideways, the phone
-    /// shows his hall (`BroadcastView`). Every other screen stays upright.
-    private var hallOpen: Bool { stormy && match.hasStarted && !boardCovered }
+    /// The Ashen King's game, or the Cub's, is on screen with nothing over it: turned sideways,
+    /// the phone shows his hall or the forest (`BroadcastView`). Every other screen stays upright.
+    private var hallOpen: Bool { BroadcastHall(match.setup.level) != nil && match.hasStarted && !boardCovered }
     /// Starting a game now would cost the one in progress: the rival it is against, so the
     /// screens that start games can ask first.
     private var forfeits: String? {
@@ -286,10 +288,10 @@ struct ContentView: View {
                     .homeZoom(.puzzles, in: homeZoom, when: zoomsFromSheet)
             }
             .onChange(of: showingGames) { _, showing in
-                if !showing { rewindOpening = nil }
+                if !showing { rewindOpening = nil; rewindOpeningPly = nil }
             }
             .fullScreenCover(isPresented: $showingGames) {
-                RewindGamesView(theme: chosenTheme, opening: rewindOpening, forfeits: forfeits) { game in playAgain(game) }
+                RewindGamesView(theme: chosenTheme, opening: rewindOpening, openingPly: rewindOpeningPly, forfeits: forfeits) { game in playAgain(game) }
                     .environment(vault).environment(training)
                     .homeZoom(.games, in: homeZoom, when: zoomsFromSheet)
             }
@@ -524,8 +526,9 @@ struct ContentView: View {
             puzzles: { showingPuzzles = true },
             dailyMove: { openDaily() },
             rewind: { showingGames = true },
-            openGame: { game in
+            openGame: { game, ply in
                 rewindOpening = game.id
+                rewindOpeningPly = ply
                 showingGames = true
             },
             army: { showingArmy = true },
@@ -699,7 +702,7 @@ struct ContentView: View {
     private var gameScreen: some View {
         GeometryReader { screen in
             if hallOpen, screen.size.width > screen.size.height {
-                // The phone is on its side against the Ashen King: his hall.
+                // The phone is on its side against the Ashen King or the Cub: his scene.
                 BroadcastView(match: match, theme: theme)
                     .transition(.opacity)
             } else {
@@ -1017,7 +1020,12 @@ struct ContentView: View {
             CoachOrb(match: match, theme: theme, isExpanded: $coachExpanded, expandedMaxHeight: coachHeight,
                      newGame: homeScreenOn ? nil : { showingNewGame = true },
                      home: homeScreenOn ? { goHome() } : nil, showGames: { showingGames = true },
-                     talk: { openTalk() }, analyze: { showingAnalyze = true },
+                     talk: { openTalk() }, analyze: {
+                         // From a game, Analyze opens on its first page with "This game" on top,
+                         // not on an old photo's analysis; Home's Analyze still remembers (#119).
+                         analyzer.path = []
+                         showingAnalyze = true
+                     },
                      faceNext: { level in
                          // The victory theme gives way to the next rival's film.
                          SoundPlayer.shared.stopAll(fade: 0.4)

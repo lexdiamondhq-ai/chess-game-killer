@@ -48,7 +48,7 @@ struct CandidateMovesView: View {
     // MARK: Header
 
     private var header: some View {
-        RoomHeader(title: "Think in candidates", subtitle: subtitle) {
+        RoomHeader(title: "Candidate moves", subtitle: subtitle) {
             session?.cancel()
             dismiss()
         }

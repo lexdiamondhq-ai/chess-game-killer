@@ -10,6 +10,8 @@ struct BroadcastLayout: Equatable {
     static let topShare: CGFloat = 0.15
 
     let size: CGSize
+    /// Whose scene: where the board may float differs.
+    var hall: BroadcastHall = .ashenKing
 
     /// Points for each of the film's pixels.
     var scale: CGFloat { max(size.width / Self.scene.width, size.height / Self.scene.height) }
@@ -28,17 +30,18 @@ struct BroadcastLayout: Equatable {
     /// The board floats in the sky between the two heads, above the far ruins: as large as
     /// that gap allows. A flat board is narrower, so it may come a little lower.
     func boardFrame(aspect: CGFloat) -> CGRect {
-        let flat = aspect < 1.1
+        let limits = hall.boardLimits(flat: aspect < 1.1)
         let top = max(8, y(24))
-        let floor = y(flat ? 575 : 545)
-        let widest = (flat ? 560 : 640) * scale
+        let floor = y(limits.floor)
+        let widest = limits.widest * scale
         let width = max(0, min((floor - top) * aspect, widest))
         let height = width / max(aspect, 0.01)
         return CGRect(x: (size.width - width) / 2, y: top, width: width, height: height)
     }
 }
 
-/// The King's hall: the game against the Ashen King with the phone on its side. His films and
+/// The King's hall: the game against the Ashen King with the phone on its side (and, the same
+/// way, the Cub's forest: `BroadcastHall`). His films and
 /// your challenger's play behind the real board, which is played on as always and floats in the
 /// sky with no frame around it; the clocks sit
 /// under it and Tilted / Flat by your challenger. Turning the phone upright brings back the
@@ -48,6 +51,7 @@ struct BroadcastView: View {
     let theme: BoardTheme
 
     @State private var stage = BroadcastStage()
+    private var hall: BroadcastHall { BroadcastHall(match.setup.level) ?? .ashenKing }
     @AppStorage("sculpted3D") private var sculpted3D = true
     @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.tilted
     @Environment(\.scenePhase) private var scenePhase
@@ -58,7 +62,7 @@ struct BroadcastView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let layout = BroadcastLayout(size: geo.size)
+            let layout = BroadcastLayout(size: geo.size, hall: hall)
             let board = layout.boardFrame(aspect: BoardView.aspect(theme, setting: sculpted3D, framing: tilt.framing))
             ZStack(alignment: .topLeading) {
                 Color.black
@@ -100,7 +104,7 @@ struct BroadcastView: View {
     /// the challenger's film, cut to his shape.
     private func scene(_ frame: CGRect) -> some View {
         ZStack {
-            if let plate = BroadcastStage.plate {
+            if let plate = BroadcastStage.still(for: hall) {
                 Image(uiImage: plate)
                     .resizable()
             }
@@ -175,8 +179,7 @@ struct BroadcastView: View {
     }
 
     private var resultTitle: String {
-        guard let winner = match.winner else { return "Drawn" }
-        return match.game.humanColors.contains(winner) ? "The King has fallen" : "The King stands"
+        hall.result(playerWon: match.winner.map { match.game.humanColors.contains($0) })
     }
 
     /// Lower left, by your challenger: Tilted / Flat and his name. Lower right: the King's.

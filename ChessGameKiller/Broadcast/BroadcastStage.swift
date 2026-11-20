@@ -8,6 +8,7 @@ import UIKit
 /// and follows the game. Your move sends the challenger's hand out; the King's move waits for
 /// his own hand to reach the piece before it lands on the board; a capture of his brings the
 /// storm; the end of the game plays the two endings. The script says which film; this plays it.
+/// The Cub's forest runs the same way with his own films (`BroadcastHall`).
 @MainActor
 @Observable
 final class BroadcastStage {
@@ -39,7 +40,7 @@ final class BroadcastStage {
             guard let url = Bundle.main.url(forResource: clip.resource, withExtension: "mp4") else { return false }
             self.clip = clip
             startedAt = CACurrentMediaTime()
-            view.show(url, fade: BroadcastScript.fade, handover: clip.holds ? nil : BroadcastScript.handover)
+            view.show(url, fade: BroadcastScript.fade, handover: clip.holds ? nil : clip.handover)
             return true
         }
     }
@@ -52,6 +53,8 @@ final class BroadcastStage {
     /// runs, and if its film or mask is missing: the dragons then hold still, as painted.
     private(set) var sky: BroadcastFilmView?
 
+    /// Whose scene this is, from the game's rival.
+    @ObservationIgnored private(set) var hall: BroadcastHall = .ashenKing
     @ObservationIgnored private var script = BroadcastScript()
     @ObservationIgnored private weak var match: MatchController?
     /// Bumps whenever the scene starts, stops or a new game begins, so timers from before stop.
@@ -64,16 +67,22 @@ final class BroadcastStage {
     /// The dragons' film is on show: not during a storm or an ending, where the sky is the King's.
     @ObservationIgnored private var skyShown = false
 
-    /// The still both figures start from, shown until the films are playing.
-    static let plate: UIImage? = image("broadcast-plate", "jpg")
+    /// The King's hall's still, shown until the films are playing.
+    static var plate: UIImage? { still(for: .ashenKing) }
+
+    /// The still both figures start from in a scene, read once.
+    static func still(for hall: BroadcastHall) -> UIImage? { stills[hall] }
+
+    private static let stills: [BroadcastHall: UIImage] = Dictionary(uniqueKeysWithValues:
+        BroadcastHall.allCases.compactMap { hall in image(hall.plate, "jpg").map { (hall, $0) } })
 
     private static func image(_ name: String, _ type: String) -> UIImage? {
         Bundle.main.path(forResource: name, ofType: type).flatMap(UIImage.init(contentsOfFile:))
     }
 
-    /// The challenger's shape, the strip of table on his side, and the wider strip.
-    private static func masks() -> [UIImage] {
-        ["broadcast-knight-mask", "broadcast-knight-strip", "broadcast-knight-strip-wide"].compactMap { image($0, "png") }
+    /// The challenger's shape, and the strips of table that can be added to it.
+    private static func masks(_ hall: BroadcastHall) -> [UIImage] {
+        hall.masks.compactMap { image($0, "png") }
     }
 
     private static let skyURL = Bundle.main.url(forResource: BroadcastScript.skyFilm, withExtension: "mp4")
@@ -82,10 +91,12 @@ final class BroadcastStage {
 
     /// The scene came on screen for this game.
     func begin(_ match: MatchController) {
-        guard king == nil, !Welcome.isUnderTest else { return }
-        let masks = Self.masks()
+        guard king == nil, !Welcome.isUnderTest, let hall = BroadcastHall(match.setup.level) else { return }
+        let masks = Self.masks(hall)
         // Without his mask the challenger's film would cover the King: better the King alone.
-        guard masks.count == 3 else { return }
+        guard masks.count == hall.masks.count else { return }
+        self.hall = hall
+        script = BroadcastScript(hall: hall)
         self.match = match
         run += 1
         ended = false
@@ -102,7 +113,7 @@ final class BroadcastStage {
         }
         self.king = king
         self.knight = knight
-        if let mask = Self.image("broadcast-sky-mask", "png"), Self.skyURL != nil {
+        if hall.hasSky, let mask = Self.image("broadcast-sky-mask", "png"), Self.skyURL != nil {
             let sky = BroadcastFilmView(masks: [mask])
             sky.onEnd = { [weak self] in self?.skyLoops() }
             self.sky = sky
@@ -118,13 +129,13 @@ final class BroadcastStage {
             playEnding(after: 0, kingAfter: Self.kingFollows)
             return
         }
-        knight.play(BroadcastScript.opening(.knight))
+        knight.play(BroadcastScript.opening(.knight, in: hall))
         let run = self.run
         Task { @MainActor [weak self] in
             await BroadcastStage.pause(BroadcastStage.kingFollows)
             // Unless his hand is already out: a move he had chosen as the phone turned.
             guard let self, self.run == run, let king = self.king, king.clip == nil else { return }
-            self.play(BroadcastScript.opening(.king), onKing: king)
+            self.play(BroadcastScript.opening(.king, in: self.hall), onKing: king)
         }
     }
 
@@ -186,8 +197,10 @@ final class BroadcastStage {
         knight?.view.clearStrips()
         king?.upNext = nil
         knight?.upNext = nil
-        if let king { play(BroadcastScript.opening(.king), onKing: king) }
-        knight?.play(BroadcastScript.opening(.knight))
+        // Back from an ending that the rival's film played alone.
+        knight?.view.setAside(false, over: 0)
+        if let king { play(BroadcastScript.opening(.king, in: hall), onKing: king) }
+        knight?.play(BroadcastScript.opening(.knight, in: hall))
     }
 
     private func moveLanded(_ played: PlayedMove, in match: MatchController) {
@@ -195,17 +208,18 @@ final class BroadcastStage {
         if match.game.humanColors.contains(played.color) {
             let taken = played.isCapture ? match.game.captureEvents.last?.piece.kind : nil
             let cue = BroadcastScript.playerMoved(uci: played.uci, color: played.color, captured: taken,
-                                                  endsGame: match.isOver)
+                                                  endsGame: match.isOver, in: hall)
             perform(cue)
         } else if played.isCapture {
             // His hand is already on the piece (`kingActs`); what follows is his satisfaction.
-            king?.upNext = .king("pleased")
+            king?.upNext = .king("pleased", in: hall)
             // The challenger feels it, unless that move ended the game: then the endings follow.
             guard !match.isOver, let knight else { return }
+            let wince = BroadcastClip.knight("wince", in: hall)
             if knight.busyFor > 0 {
-                knight.upNext = BroadcastScript.wince
+                knight.upNext = wince
             } else {
-                play(BroadcastScript.wince, on: knight)
+                play(wince, on: knight)
             }
         }
     }
@@ -220,7 +234,7 @@ final class BroadcastStage {
         guard let storm = cue.storm else { return }
         let run = self.run
         Task { @MainActor [weak self] in
-            await BroadcastStage.pause(BroadcastScript.stormDelay)
+            await BroadcastStage.pause(cue.stormAfter)
             guard let self, self.run == run, !self.ended, let king = self.king else { return }
             king.upNext = nil
             self.play(storm, onKing: king)
@@ -237,7 +251,7 @@ final class BroadcastStage {
         guard self.run == run, !Task.isCancelled, !ended, let king else { return }
         let color = match.game.sideToMove
         let cue = BroadcastScript.kingMoves(uci: uci, color: color,
-                                            captures: BroadcastScript.captures(uci: uci, in: match.game))
+                                            captures: BroadcastScript.captures(uci: uci, in: match.game), in: hall)
         king.upNext = nil
         guard play(cue.reach, onKing: king), let touch = cue.reach.touch else { return }
         await BroadcastStage.pause(touch, while: { [weak self] in self?.run == run })
@@ -254,16 +268,16 @@ final class BroadcastStage {
         ended = true
         guard let match else { return }
         let playerWon = match.winner.map { match.game.humanColors.contains($0) }
-        guard let ending = BroadcastScript.ending(playerWon: playerWon) else {
+        guard let ending = BroadcastScript.ending(playerWon: playerWon, in: hall) else {
             // A draw: both sit on.
             ended = false
             if king?.clip == nil, let knight {
-                knight.play(BroadcastScript.opening(.knight))
+                knight.play(BroadcastScript.opening(.knight, in: hall))
                 let run = self.run
                 Task { @MainActor [weak self] in
                     await BroadcastStage.pause(kingAfter)
                     guard let self, self.run == run, let king = self.king, king.clip == nil else { return }
-                    self.play(BroadcastScript.opening(.king), onKing: king)
+                    self.play(BroadcastScript.opening(.king, in: self.hall), onKing: king)
                 }
             }
             return
@@ -274,7 +288,14 @@ final class BroadcastStage {
         Task { @MainActor [weak self] in
             if delay > 0 { await BroadcastStage.pause(delay) }
             guard let self, self.run == run, let king = self.king, let knight = self.knight else { return }
-            self.play(ending.knight, on: knight)
+            guard let knightEnding = ending.knight else {
+                // The rival's ending holds both of them: it starts on the still pose, the same
+                // picture the knight's film rests on, and his film fades away over it.
+                self.play(ending.king, onKing: king)
+                knight.view.setAside(true, over: 0.5)
+                return
+            }
+            self.play(knightEnding, on: knight)
             if kingAfter > 0 { await BroadcastStage.pause(kingAfter) }
             guard self.run == run else { return }
             self.play(ending.king, onKing: king)

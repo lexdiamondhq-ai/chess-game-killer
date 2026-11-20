@@ -11,6 +11,7 @@ import { parseCreateInput, ACTIONS } from "./game.js";
 import { parseSeekInput } from "./lobby.js";
 import { parseQuery, parseUsername } from "./friends.js";
 import { isDailyDay, parseDailyReport } from "./daily.js";
+import { parsePhoneToken } from "./push.js";
 import { renderHomePage, renderInvitePage } from "./pages.js";
 import {
   errorResponse,
@@ -140,6 +141,15 @@ function rateLimited() {
   });
 }
 
+/**
+ * The hash of the app's player key, when a create or join sends one ("player"):
+ * the game keeps it so it can send that seat phone alerts. Optional; a
+ * browser player sends none.
+ */
+async function alertHash(body) {
+  return isToken(body.player) ? hashToken(body.player) : null;
+}
+
 /** POST /api/games: a new game with its creator seated. */
 async function createGame(request, env, url) {
   if (await overLimit(env.CREATE_LIMITER, request)) return rateLimited();
@@ -150,11 +160,12 @@ async function createGame(request, env, url) {
 
   const token = newToken();
   const tokenHash = await hashToken(token);
+  const playerHash = await alertHash(body.value);
   // A code that already has a game is drawn again. With 887 million codes
   // this almost never happens, but it must never mix two games.
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const code = newCode();
-    const made = await roomFor(env, code).create({ code, ...input.value, tokenHash });
+    const made = await roomFor(env, code).create({ code, ...input.value, tokenHash, playerHash });
     if (made.inUse) continue;
     return jsonResponse(
       { code, url: `${url.origin}/c/${code}`, appUrl: `${APP_LINK}${code}`, seat: made.seat, token, game: made.game },
@@ -196,7 +207,7 @@ async function gameRequest(request, env, url, rawCode, part) {
     if (token !== null && !isToken(token)) return unauthorized();
     const name = body.value.name ?? null;
     if (name !== null && typeof name !== "string") return badRequest('"name" must be text.');
-    return fromRoom(await room.join({ token, name }));
+    return fromRoom(await room.join({ token, name, playerHash: await alertHash(body.value) }));
   }
 
   if (!isToken(token)) return unauthorized();
@@ -300,7 +311,7 @@ async function lobbyRequest(request, env, url, path) {
 // ---------------------------------------------------------------------------
 // Friends by @username (PROTOCOL.md, "Friends by username")
 
-const FRIENDS_PATH = /^\/api\/friends\/(me|claim|search|people|invite|inbox|dismiss)\/?$/;
+const FRIENDS_PATH = /^\/api\/friends\/(me|claim|search|people|invite|inbox|dismiss|phone)\/?$/;
 
 function directory(env) {
   return env.DIRECTORY.get(env.DIRECTORY.idFromName("directory"));
@@ -340,6 +351,13 @@ async function friendsRequest(request, env, path) {
     case "dismiss":
       if (typeof input.id !== "string" || !/^[0-9a-f]{12}$/.test(input.id)) return badRequest('"id" must be an invite\'s id.');
       return fromRoom(await dir.dismiss({ playerHash, id: input.id }));
+    case "phone": {
+      // { player, phone: Apple's device token or null to stop alerts, sandbox: a build from Xcode }
+      if (input.phone === null) return fromRoom(await dir.phone({ playerHash, token: null }));
+      const token = parsePhoneToken(input.phone);
+      if (!token) return badRequest('"phone" must be the phone\'s push token, or null.');
+      return fromRoom(await dir.phone({ playerHash, token, sandbox: input.sandbox === true }));
+    }
     case "invite": {
       const to = parseUsername(input.to);
       if (!to.ok) return badRequest("That isn't a username.");

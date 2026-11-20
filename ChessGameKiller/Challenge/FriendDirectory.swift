@@ -295,6 +295,8 @@ final class FriendDirectory {
         lastInboxCheck = Date()
         guard let found = try? await api.inbox(player: player) else { return }
         inbox = found
+        // A challenge came in: the first one is when the iPhone asks to allow alerts.
+        if !found.isEmpty { PhoneAlerts.askIfNeeded() }
     }
 
     /// The player opened or turned down a challenge: it stops showing.

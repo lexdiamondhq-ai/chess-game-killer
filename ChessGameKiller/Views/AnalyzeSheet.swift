@@ -91,6 +91,20 @@ struct AnalyzeSheet: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.bottom, 8)
 
+                    // Opened from a game, the game comes first (Alex's pick 8A, screen review 2026-11-19).
+                    if let gameFEN {
+                        Button {
+                            onAnalyzeGame?()
+                            session.analyze(fen: gameFEN)
+                        } label: {
+                            StartCard(symbol: Glyphs.analyze, title: "This game",
+                                      detail: onAnalyzeGame == nil
+                                          ? "The position in your game right now"
+                                          : "Your game as it stands. Counts as help, like Undo.",
+                                      theme: theme)
+                        }
+                        .buttonStyle(.plain)
+                    }
                     if hasCamera {
                         Button {
                             if canScan { showingCamera = true } else { offer = .scan }
@@ -116,23 +130,10 @@ struct AnalyzeSheet: View {
                         .buttonStyle(.plain)
                     }
                     Button { session.setUpByHand() } label: {
-                        StartCard(symbol: "square.grid.3x3.fill", title: "Set up a board",
+                        StartCard(symbol: "square.grid.3x3.fill", title: "Set up position",
                                   detail: "Start from the opening position and change it", theme: theme)
                     }
                     .buttonStyle(.plain)
-                    if let gameFEN {
-                        Button {
-                            onAnalyzeGame?()
-                            session.analyze(fen: gameFEN)
-                        } label: {
-                            StartCard(symbol: Glyphs.analyze, title: "This game",
-                                      detail: onAnalyzeGame == nil
-                                          ? "The position in your game right now"
-                                          : "Your game as it stands. Counts as help, like Undo.",
-                                      theme: theme)
-                        }
-                        .buttonStyle(.plain)
-                    }
                 }
                 .padding(20)
             }
@@ -240,13 +241,13 @@ struct AnalysisPhotoButtons: View {
         }
         if canScan {
             PhotosPicker(selection: $item, matching: .images) {
-                Label("Upload a photo", systemImage: "photo.on.rectangle")
+                Label("Choose a photo", systemImage: "photo.on.rectangle")
             }
             .disabled(isLoading)
             .accessibilityHint("A picture or a screenshot of a board, to analyze it")
         } else {
             Button(action: onNoScans) {
-                Label("Upload a photo", systemImage: "photo.on.rectangle")
+                Label("Choose a photo", systemImage: "photo.on.rectangle")
             }
         }
     }
@@ -1178,7 +1179,7 @@ private struct PhotoSourceRow: View {
             }
             Spacer(minLength: 0)
             Button(action: onEdit) {
-                Label("Edit pieces", systemImage: "square.and.pencil")
+                Label("Edit position", systemImage: "square.and.pencil")
                     .font(.app(.subheadline, weight: .semibold))
                     .lineLimit(1)
             }

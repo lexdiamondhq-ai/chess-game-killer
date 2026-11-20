@@ -7,6 +7,8 @@ struct RewindGamesView: View {
     let theme: BoardTheme
     /// The game picked on the home screen, if this list was opened for it.
     let opening: UUID?
+    /// Where that game opens (Home's finest move opens at the move). Nil: its first moment.
+    let openingPly: Int?
     /// The rival of a game in progress that a rematch would cost, so the person is asked first.
     let forfeits: String?
     var onPlayAgain: ((SavedGame) -> Void)?
@@ -16,9 +18,11 @@ struct RewindGamesView: View {
     @State private var path: [UUID]
 
     /// `opening` is a game to show straight away, as when one is picked on the home screen.
-    init(theme: BoardTheme, opening: UUID? = nil, forfeits: String? = nil, onPlayAgain: ((SavedGame) -> Void)? = nil) {
+    init(theme: BoardTheme, opening: UUID? = nil, openingPly: Int? = nil, forfeits: String? = nil,
+         onPlayAgain: ((SavedGame) -> Void)? = nil) {
         self.theme = theme
         self.opening = opening
+        self.openingPly = openingPly
         self.forfeits = forfeits
         self.onPlayAgain = onPlayAgain
         _path = State(initialValue: opening.map { [$0] } ?? [])
@@ -66,7 +70,7 @@ struct RewindGamesView: View {
             .navigationDestination(for: UUID.self) { id in
                 if let game = vault.game(id) {
                     // A game opened from the home screen goes straight back there.
-                    RewindView(game: game, theme: theme, forfeits: forfeits,
+                    RewindView(game: game, theme: theme, startAt: id == opening ? openingPly : nil, forfeits: forfeits,
                                leave: id == opening ? { dismiss() } : nil) { game in
                         dismiss()
                         onPlayAgain?(game)
@@ -225,7 +229,8 @@ private struct GameCard: View {
         let left = game.leftToRewrite
         if game.toRewrite.isEmpty {
             if let mate = game.playerMoments.last(where: { $0.moveGrade == .checkmate }) { return "Checkmate · \(mate.numbered)" }
-            return "A clean game"
+            // A game with a person is kept without grades, so it isn't called clean.
+            return game.isPlayersOwn ? "A clean game" : "Ready to replay"
         }
         if left == 0 { return "All rewritten" }
         return left == 1 ? "1 moment to rewrite" : "\(left) moments to rewrite"

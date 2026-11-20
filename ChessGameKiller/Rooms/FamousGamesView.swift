@@ -92,7 +92,7 @@ struct FamousGamesView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 14) {
-                Text("Pick a game and watch it play out while Leo tells the story.")
+                Text("Pick a game and watch it play out while \(Coach.current.name) tells the story.")
                     .font(.app(.subheadline, weight: .medium))
                     .foregroundStyle(CastleStyle.ink2)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -267,7 +267,7 @@ struct FamousGameTheater: View {
                     .padding(.horizontal, 16)
                 controls
                     .padding(.horizontal, 16)
-                Text("Move \((player.index + 1) / 2) of \((game.moves.count + 1) / 2)")
+                Text(player.index == 0 ? "Start" : "Move \((player.index + 1) / 2) of \((game.moves.count + 1) / 2)")
                     .font(.app(.caption).monospacedDigit())
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 0)

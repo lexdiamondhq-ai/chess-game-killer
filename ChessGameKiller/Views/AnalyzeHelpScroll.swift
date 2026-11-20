@@ -18,11 +18,11 @@ struct AnalyzeHelpScroll: View {
         Entry(question: "Analyze a position",
               answer: "Tap the knight on Home, then take a photo of a real board, choose a screenshot, or set up a board by hand. Stockfish 17 finds the best moves right on your phone."),
         Entry(question: "Analyzing from a photo",
-              answer: "Shoot the board from above, with all 64 squares in the picture and good light. Screenshots from other chess apps work too.\n\nReading takes up to a minute. Tap **Stop** to set the pieces up yourself instead. Your photo sits at the top of the analysis, so you can compare it with the board."),
+              answer: "Shoot the board from above, with all 64 squares in the picture and good light. Screenshots from other chess apps work too.\n\nReading takes a few seconds. Tap **Stop** to set the pieces up yourself instead. Your photo sits at the top of the analysis, so you can compare it with the board."),
         Entry(question: "A piece is wrong or missing",
-              answer: "Tap **Edit pieces** beside your photo. Pick a piece from the row under the board and tap a square to place it. The eraser takes a piece off. Tap **Analyze** when it looks right."),
+              answer: "Tap **Edit position** beside your photo. Pick a piece from the row under the board and tap a square to place it. The eraser takes a piece off. Tap **Analyze** when it looks right."),
         Entry(question: "Rotate or Flip board?",
-              answer: "**Rotate** (in Edit pieces) turns the position itself around. Use it when a photo was taken from the other side and the pieces came out upside down.\n\n**Flip board** only turns your view, so you can look from Black's side."),
+              answer: "**Rotate** (in Edit position) turns the position itself around. Use it when a photo was taken from the other side and the pieces came out upside down.\n\n**Flip board** only turns your view, so you can look from Black's side."),
         Entry(question: "It's the wrong side to move",
               answer: "Tap **White to move** (or Black) under the board to give the move to the other side. The analysis starts over."),
         Entry(question: "Which line is better?",
@@ -37,7 +37,7 @@ struct AnalyzeHelpScroll: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 VStack(spacing: 6) {
-                    Text("How Analyze Works")
+                    Text("How Analyze works")
                         .font(.custom(HomeAuroraCarving.plainFontName, size: 24, relativeTo: .title2))
                         .tracking(1.2)
                         .foregroundStyle(Parchment.title)

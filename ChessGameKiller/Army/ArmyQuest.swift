@@ -63,7 +63,7 @@ struct ArmyQuest: Equatable {
         case .rescue:
             return "Win to free \(army.record(for: slot).name ?? "it")"
         case .rankUp(_, _, let rival):
-            return "Play \(rival.rival.shortName)"
+            return "Play \(rival.rival.name.lowercasedFirstWord)"
         }
     }
 }

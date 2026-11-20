@@ -149,7 +149,7 @@ struct OnlineLobbyView: View {
             switch lobby.phase {
             case .searching(let waitingClock, let waitingDays, let since):
                 if waitingDays != nil {
-                    Text("You can close this. When someone takes you on, the game shows up in your games.")
+                    Text("You can close this. When someone takes you on, the game shows up on Home.")
                         .font(theme.challengeFont(12.5))
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)

@@ -2,10 +2,10 @@ import SwiftUI
 import UIKit
 
 /// The app is laid out for an upright phone. One screen turns: the game against the Ashen
-/// King, which on its side becomes his hall (`BroadcastView`). The app's Info.plist lists the
+/// King or the Cub, which on its side becomes his scene (`BroadcastView`). The app's Info.plist lists the
 /// sideways orientations so that screen can have them; this keeps every other screen upright.
 final class AppOrientation: NSObject, UIApplicationDelegate {
-    /// The phone may turn sideways right now: the Ashen King's game is on screen with nothing over it.
+    /// The phone may turn sideways right now: the Ashen King's or the Cub's game is on screen with nothing over it.
     @MainActor private(set) static var allowsLandscape = false
     /// What the game screen last asked for.
     @MainActor private static var gameAllows = false

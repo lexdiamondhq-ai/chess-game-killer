@@ -104,9 +104,18 @@ struct ChallengeGameView: View {
                 .accessibilityHidden(game.held != nil)
                 .overlay {
                     if let held = game.held, game.phase == .playing {
-                        PlayMoveBar(san: held.san, theme: theme,
-                                    play: { game.playHeld() }, takeBack: { game.takeBackHeld() })
-                            .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                        // Your clock still runs while the move waits, so it stays in sight beside
+                        // the bar (Alex's pick 7A, screen review 2026-11-19).
+                        HStack(spacing: 10) {
+                            PlayMoveBar(san: held.san, theme: theme,
+                                        play: { game.playHeld() }, takeBack: { game.takeBackHeld() })
+                            if game.clock != nil {
+                                FriendClockBox(game: game, seat: game.seat, theme: theme)
+                                    .fixedSize()
+                            }
+                        }
+                        .padding(.horizontal, 4)
+                        .transition(.opacity.combined(with: .scale(scale: 0.96)))
                     }
                 }
                 .animation(.snappy(duration: 0.25), value: game.held)
@@ -155,44 +164,45 @@ struct ChallengeGameView: View {
 
     private var topBar: some View {
         ChallengeTopBar(title: game.title, detail: connectionDetail, theme: theme, close: close) {
-            Menu {
-                Button {
-                    UIPasteboard.general.string = ChallengeLink.inviteURL(for: game.code).absoluteString
-                } label: {
-                    Label("Copy link", systemImage: "link")
-                }
-                Button {
-                    ChallengeSharing.shared.share(invite) { _ in }
-                } label: {
-                    Label("Share link", systemImage: "square.and.arrow.up")
-                }
-                Button {
-                    withAnimation(.snappy) { game.match.flipBoard() }
-                } label: {
-                    Label("Flip board", systemImage: "arrow.up.arrow.down")
-                }
-                if game.canReport {
-                    Section("Report \(game.opponentName)") {
+            // The invite links only while the friend hasn't come, and no Flip: it is in the dock,
+            // as in a rival game (Alex's pick 11A, screen review 2026-11-19).
+            if game.phase == .waiting || game.canReport {
+                Menu {
+                    if game.phase == .waiting {
                         Button {
-                            confirming = .reportName
+                            UIPasteboard.general.string = ChallengeLink.inviteURL(for: game.code).absoluteString
                         } label: {
-                            Label(game.reported.contains(.reportName) ? "Name reported" : "Offensive name",
-                                  systemImage: "person.crop.circle.badge.exclamationmark")
+                            Label("Copy link", systemImage: "link")
                         }
-                        .disabled(game.reported.contains(.reportName))
                         Button {
-                            confirming = .reportCheating
+                            ChallengeSharing.shared.share(invite) { _ in }
                         } label: {
-                            Label(game.reported.contains(.reportCheating) ? "Cheating reported" : "Cheating",
-                                  systemImage: "exclamationmark.shield")
+                            Label("Share link", systemImage: "square.and.arrow.up")
                         }
-                        .disabled(game.reported.contains(.reportCheating))
                     }
+                    if game.canReport {
+                        Section("Report \(game.opponentName)") {
+                            Button {
+                                confirming = .reportName
+                            } label: {
+                                Label(game.reported.contains(.reportName) ? "Name reported" : "Offensive name",
+                                      systemImage: "person.crop.circle.badge.exclamationmark")
+                            }
+                            .disabled(game.reported.contains(.reportName))
+                            Button {
+                                confirming = .reportCheating
+                            } label: {
+                                Label(game.reported.contains(.reportCheating) ? "Cheating reported" : "Cheating",
+                                      systemImage: "exclamationmark.shield")
+                            }
+                            .disabled(game.reported.contains(.reportCheating))
+                        }
+                    }
+                } label: {
+                    ChallengeBarIcon(symbol: "ellipsis")
                 }
-            } label: {
-                ChallengeBarIcon(symbol: "ellipsis")
+                .accessibilityLabel("More")
             }
-            .accessibilityLabel("More")
         }
         .padding(.horizontal, 12)
         .padding(.top, 4)
@@ -362,8 +372,8 @@ struct ChallengeGameView: View {
 
     private var drawTitle: String {
         if game.drawOfferedByMe { return "Draw offered" }
-        if game.drawOfferedToMe { return "Accept draw" }
-        return "Offer draw"
+        if game.drawOfferedToMe { return "Accept the draw" }
+        return "Offer a draw"
     }
 
     private var drawBanner: some View {
@@ -431,7 +441,7 @@ struct ChallengeGameView: View {
         VStack(spacing: 14) {
             HStack(spacing: 10) {
                 WaitingDot(color: theme.challengeAccent)
-                Text("Waiting for your friend to open the link")
+                Text("Waiting for your friend to join")
                     .font(theme.challengeFont(15, .semibold))
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
