@@ -378,6 +378,36 @@ final class HomeSnapshotTests: XCTestCase {
         }
     }
 
+    /// Play a friend, the slim row under the gold bar (Alex, 2026-11-20, picked A): your people's
+    /// faces on the left send them a game at once; the line names them. Pictured on Home with
+    /// three friends (by day and by night) and with nobody yet.
+    func testThePlayAFriendRowSitsUnderTheGoldBar() throws {
+        let sam = FriendPerson(username: "sam", name: "Sam Ortiz", online: true)
+        let mia = FriendPerson(username: "mia", name: "Mia", online: false)
+        let jo = FriendPerson(username: "jo", name: "Jo", online: false)
+        let max = FriendPerson(username: "max", name: "Max", online: false)
+        XCTAssertEqual(HomeAuroraFriendRow.detail([]), "Send a game to anyone you know")
+        XCTAssertEqual(HomeAuroraFriendRow.detail([sam]), "Sam or anyone")
+        XCTAssertEqual(HomeAuroraFriendRow.detail([sam, mia, jo, max]), "Sam, Mia, Jo or anyone")
+
+        let suite = "home.friend-row"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defaults.removePersistentDomain(forName: suite)
+        defaults.set(try JSONEncoder().encode([sam, mia, jo]), forKey: FriendDirectory.peopleKey)
+        let center = ChallengeCenter(api: FakeChallengeAPI(), store: ChallengeStore(), sounds: nil, defaults: defaults)
+        XCTAssertEqual(center.friends.people.map(\.username), ["sam", "mia", "jo"])
+        for (look, name) in [(BoardTheme.ID.gilded, "zz-home-friend-row"), (.midnight, "zz-home-friend-row-night")] {
+            let window = try show(HomeSample.home(theme: look).environment(center))
+            try save(window, name)
+            window.isHidden = true
+        }
+        let none = ChallengeCenter(api: FakeChallengeAPI(), store: ChallengeStore(), sounds: nil)
+        let empty = try show(HomeSample.home().environment(none))
+        try save(empty, "zz-home-friend-row-nobody")
+        empty.isHidden = true
+        defaults.removePersistentDomain(forName: suite)
+    }
+
     /// The game against the computer is listed with the rest, so Your move shows even when it is
     /// the only game going; among games that wait on the same side, it comes first.
     func testCurrentGamesListTheGameAgainstTheComputer() {
