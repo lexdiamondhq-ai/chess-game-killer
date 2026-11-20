@@ -224,7 +224,7 @@ struct DailyMoveView: View {
                 Text(daily.streak == 1 ? "1-day streak" : "\(daily.streak)-day streak")
                     .font(.app(.headline).monospacedDigit())
                 Spacer()
-                Text(counts ? "Day done" : "Next Move tomorrow")
+                Text(counts ? "Done for today" : "Next Move tomorrow")
                     .font(.app(.caption, weight: .semibold))
                     .foregroundStyle(theme.trainingAccent)
             }

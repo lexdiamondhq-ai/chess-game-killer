@@ -59,7 +59,7 @@ struct ChallengeComposerView: View {
         }
         .scrollDismissesKeyboard(.interactively)
         .safeAreaInset(edge: .top, spacing: 0) {
-            ChallengeTopBar(title: composer.created == nil ? "Challenge a friend" : "Send the link", theme: theme,
+            ChallengeTopBar(title: composer.created == nil ? "Play a friend" : "Send the link", theme: theme,
                             close: { center.dismiss() }) {
                 Color.clear
             }

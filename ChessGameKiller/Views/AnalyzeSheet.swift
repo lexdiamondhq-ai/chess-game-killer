@@ -130,7 +130,7 @@ struct AnalyzeSheet: View {
                         .buttonStyle(.plain)
                     }
                     Button { session.setUpByHand() } label: {
-                        StartCard(symbol: "square.grid.3x3.fill", title: "Set up a board",
+                        StartCard(symbol: "square.grid.3x3.fill", title: "Set up position",
                                   detail: "Start from the opening position and change it", theme: theme)
                     }
                     .buttonStyle(.plain)
@@ -241,13 +241,13 @@ struct AnalysisPhotoButtons: View {
         }
         if canScan {
             PhotosPicker(selection: $item, matching: .images) {
-                Label("Upload a photo", systemImage: "photo.on.rectangle")
+                Label("Choose a photo", systemImage: "photo.on.rectangle")
             }
             .disabled(isLoading)
             .accessibilityHint("A picture or a screenshot of a board, to analyze it")
         } else {
             Button(action: onNoScans) {
-                Label("Upload a photo", systemImage: "photo.on.rectangle")
+                Label("Choose a photo", systemImage: "photo.on.rectangle")
             }
         }
     }
@@ -1179,7 +1179,7 @@ private struct PhotoSourceRow: View {
             }
             Spacer(minLength: 0)
             Button(action: onEdit) {
-                Label("Edit pieces", systemImage: "square.and.pencil")
+                Label("Edit position", systemImage: "square.and.pencil")
                     .font(.app(.subheadline, weight: .semibold))
                     .lineLimit(1)
             }

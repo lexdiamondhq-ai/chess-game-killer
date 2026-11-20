@@ -196,7 +196,7 @@ struct PuzzlesView: View {
                     .font(.app(.subheadline, weight: .semibold))
                 Spacer()
                 if store.progress.streak > 1 {
-                    Label("\(store.progress.streak)", systemImage: "flame.fill")
+                    Label("\(store.progress.streak) in a row", systemImage: "flame.fill")
                         .font(.app(.caption, weight: .bold).monospacedDigit())
                         .foregroundStyle(TrainingColor.orange.color(on: theme))
                 }

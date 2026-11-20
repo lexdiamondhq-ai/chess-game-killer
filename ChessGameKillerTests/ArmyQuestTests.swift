@@ -75,7 +75,7 @@ final class ArmyQuestTests: XCTestCase {
         XCTAssertEqual(quest.slot, .ePawn)
         XCTAssertEqual(quest.kind, .rankUp(next: .veteran, xpLeft: 4, rival: .club))
         XCTAssertEqual(quest.line(army), "Your e-pawn is 4 XP from Veteran. Win with it standing.")
-        XCTAssertEqual(quest.button(army), "Play \(MatchController.Level.club.rival.shortName)")
+        XCTAssertEqual(quest.button(army), "Play \(MatchController.Level.club.rival.name.lowercasedFirstWord)")
     }
 
     func testANamedPieceIsCalledByItsName() throws {

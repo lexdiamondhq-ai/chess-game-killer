@@ -372,7 +372,7 @@ struct ExecutivePlate: View {
             return match.winner == nil ? "Draw" : "Lost"
         }
         if isComputer {
-            if isActive { return match.engineFailed ? "Coach offline" : "Thinking…" }
+            if isActive { return match.engineFailed ? "\(Coach.current.name) is offline" : "Thinking…" }
             return RivalTaunt.line(for: match.setup.level, game: match.gameID, ply: match.game.plyCount, mood: mood)
         }
         return isActive ? "Your move" : ""

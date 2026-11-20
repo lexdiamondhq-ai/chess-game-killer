@@ -109,7 +109,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable, Codable {
         case .fullRewind: return "Today's free full Rewind is used. The line and key moments stay free for every game."
         case .openingDrill: return "That's today's free opening drill. Premium drills all 3,865 openings."
         case .endgameDrill: return "That's today's free endgame. Premium opens all 22."
-        case .calculationDrill: return "That's today's free calculation drill. Premium has no limit."
+        case .calculationDrill: return "That's today's free See ahead. Premium has no limit."
         case .lessons: return "The first 5 lessons are free. Premium opens all 15, and every new pack."
         case .puzzleCycles: return "Cycles, the Woodpecker method, comes with Premium."
         case .puzzleReview: return "Your review queue of missed puzzles comes with Premium."

@@ -372,8 +372,8 @@ struct ChallengeGameView: View {
 
     private var drawTitle: String {
         if game.drawOfferedByMe { return "Draw offered" }
-        if game.drawOfferedToMe { return "Accept draw" }
-        return "Offer draw"
+        if game.drawOfferedToMe { return "Accept the draw" }
+        return "Offer a draw"
     }
 
     private var drawBanner: some View {
@@ -441,7 +441,7 @@ struct ChallengeGameView: View {
         VStack(spacing: 14) {
             HStack(spacing: 10) {
                 WaitingDot(color: theme.challengeAccent)
-                Text("Waiting for your friend to open the link")
+                Text("Waiting for your friend to join")
                     .font(theme.challengeFont(15, .semibold))
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)

@@ -303,7 +303,7 @@ struct CoachReportCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline) {
-                Text("WHAT LEO SEES")
+                Text("WHAT \(Coach.current.name.uppercased()) SEES")
                     .font(.app(.caption, weight: .bold))
                     .tracking(1)
                     .foregroundStyle(theme.trainingAccent)
