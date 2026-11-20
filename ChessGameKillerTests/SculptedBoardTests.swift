@@ -272,12 +272,31 @@ final class SculptedBoardTests: XCTestCase {
         let framing = SculptedCamera.Framing.seated
         for flipped in [false, true] {
             let camera = SculptedCamera.fitted(aspect: Float(framing.aspect), flipped: flipped, framing: framing)
-            let points = SculptedCamera.keyPoints(tallest: framing.tallest)
+            let points = framing.keyPoints
                 .map { flipped ? SIMD3($0.x * -1, $0.y, $0.z * -1) : $0 }
                 .map(camera.normalized)
             XCTAssertTrue(points.allSatisfy { abs($0.x) <= 1 && abs($0.y) <= 1 })
             XCTAssertGreaterThan(points.map { abs($0.x) }.max() ?? 0, 0.95, "edge to edge")
             XCTAssertGreaterThan(points.map { abs($0.y) }.max() ?? 0, 0.9, "top to bottom, nothing wasted")
+        }
+    }
+
+    /// Flat, the squares themselves run edge to edge like other apps' flat boards (Alex,
+    /// 2026-11-20): seen from straight above, the far rank is as wide as the near one and the
+    /// corner squares touch the view's four sides, with no frame round them.
+    func testTheFlatSquaresRunEdgeToEdgeFromStraightAbove() {
+        let framing = SculptedCamera.Framing.seated
+        let size = CGSize(width: 402, height: 402 / framing.aspect)
+        for flipped in [false, true] {
+            let camera = SculptedCamera.fitted(aspect: Float(size.width / size.height), flipped: flipped, framing: framing)
+            let far = camera.frame(of: flipped ? .h1 : .a8, in: size)
+            let near = camera.frame(of: flipped ? .h8 : .a1, in: size)
+            XCTAssertEqual(far.width, near.width, accuracy: 0.2, "every rank as wide as the next")
+            XCTAssertLessThan(near.minX, 1, "the corner square reaches the left side")
+            XCTAssertLessThan(far.minY, 1, "the far rank reaches the top")
+            XCTAssertGreaterThan(near.maxY, size.height - 1, "the near rank reaches the bottom")
+            let right = camera.frame(of: flipped ? .a8 : .h1, in: size)
+            XCTAssertGreaterThan(right.maxX, size.width - 1, "the corner square reaches the right side")
         }
     }
 
