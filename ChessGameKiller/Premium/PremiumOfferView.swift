@@ -11,6 +11,8 @@ struct PremiumOfferView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var plan: PremiumPlan = .yearly
     @State private var trial = true
+    /// Apple's page for the plan, for a subscriber who came here from You.
+    @State private var managing = false
     private var premium: Premium { .shared }
 
     private var theme: BoardTheme { .named(themeID) }
@@ -29,6 +31,11 @@ struct PremiumOfferView: View {
                         // and never ask them to buy it again.
                         PremiumOwnedCard(text: feature.map(premium.limitLine), accent: accent)
                         doneButton
+                        // The same Apple page as Settings' Premium card (Alex's pick 14A, 2026-11-19).
+                        Button("Manage plan") { managing = true }
+                            .font(.app(.subheadline, weight: .semibold))
+                            .foregroundStyle(accent)
+                            .manageSubscriptionsSheet(isPresented: $managing)
                     } else {
                         if let feature {
                             PremiumReasonCard(text: feature.limitLine, accent: accent)
@@ -217,7 +224,7 @@ private struct PremiumBenefitList: View {
         Benefit(symbol: "puzzlepiece.extension", title: "Unlimited puzzles",
                 detail: "115,000 rated puzzles, Puzzle Rush, Cycles and your review queue."),
         Benefit(symbol: "graduationcap", title: "Every lesson and drill",
-                detail: "All 15 lessons, 3,865 openings, 22 endgames, master games and Blindfold."),
+                detail: "All 15 lessons, 3,865 openings, 22 endgames, master games and unlimited See ahead."),
         Benefit(symbol: "bubble.left.and.bubble.right", title: "Talk It Through any time",
                 detail: "Plus photo scans, as often as you like."),
         // Premium opens every rival (RivalLadder.opensEverything); the page now says so

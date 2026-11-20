@@ -35,7 +35,7 @@ struct HomeAuroraActions {
     /// Opens Puzzles.
     var puzzles: () -> Void = {}
     /// Opens one of your finished games in Rewind.
-    var replay: (UUID) -> Void = { _ in }
+    var replay: (UUID, Int?) -> Void = { _, _ in }
     /// Opens your army.
     var army: () -> Void = {}
     /// Plays the rival the army's quest names (to free a piece, or to help one rank up).
@@ -652,7 +652,7 @@ struct HomeAuroraView: View {
         switch item {
         case .finest:
             if let finest = info.finest {
-                HomeAuroraFinestRow(finest: finest, palette: palette, tile: tile) { actions.replay(finest.gameID) }
+                HomeAuroraFinestRow(finest: finest, palette: palette, tile: tile) { actions.replay(finest.gameID, finest.startPly) }
             }
         case .puzzles:
             HomeAuroraRow(eyebrow: "Puzzles", title: "Sharpen your eye",
@@ -661,7 +661,7 @@ struct HomeAuroraView: View {
                 HomeAuroraJewel(glyph: Glyphs.fineEye, stone: .amethyst)
             }
         case .coach:
-            HomeAuroraRow(eyebrow: "Coach Leo", title: stage.plan?.title ?? "Today's lesson", detail: coachLine,
+            HomeAuroraRow(eyebrow: Coach.current.title, title: stage.plan?.title ?? "Today's lesson", detail: coachLine,
                           accent: palette.teal, palette: palette, tile: tile, action: actions.stage.coach) {
                 HomeAuroraJewel(glyph: Glyphs.fineLaurel, stone: .jade)
             }
@@ -769,7 +769,7 @@ struct HomeAuroraView: View {
     private var coachLine: String {
         if stage.trainedToday { return "Done today. Another round?" }
         guard let plan = stage.plan else { return "Pick up where you stopped" }
-        return "\(plan.minutes) min with Leo"
+        return "\(plan.minutes) min with \(Coach.current.name)"
     }
 
     private func open(_ card: HomeAuroraGameCard) {

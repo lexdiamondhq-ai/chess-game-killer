@@ -161,13 +161,13 @@ struct NewGameSheet: View {
                 .animation(.snappy, value: draftLevel)
                 .confirmationDialog("Leave your game against \(forfeits ?? "your rival")?",
                                     isPresented: $confirmingForfeit, titleVisibility: .visible) {
-                    Button("Resign and play \(draftRival.name)", role: .destructive) { play() }
+                    Button("Resign and play \(draftRival.name.lowercasedFirstWord)", role: .destructive) { play() }
                     Button("Keep playing", role: .cancel) {}
                 } message: {
                     Text("It counts as a loss for your army.")
                 }
             }
-            .navigationTitle("New Game")
+            .navigationTitle("New game")
             .navigationBarTitleDisplayMode(.inline)
             .sheetTitleBar()
             .toolbar {
@@ -329,7 +329,7 @@ struct NewGameSheet: View {
         if let lockedBy { return "Beat \(lockedBy.name.lowercasedFirstWord) first" }
         if let army, let stake { return "Play for \(army.displayName(of: stake))" }
         if let army, let prisoner { return "Rescue \(army.displayName(of: prisoner))" }
-        return "Play \(draftRival.name)"
+        return "Play \(draftRival.name.lowercasedFirstWord)"
     }
 
     private var stakeValue: String {
@@ -737,7 +737,7 @@ private struct HintsRow: View {
                     .font(.app(.caption2, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .tracking(1)
-                Text(isOn ? "\(Coach.current.name) shows your best move" : "Off. Just you and the rival.")
+                Text(isOn ? "\(Coach.current.name) shows your best move" : "Off. No hints or picks from \(Coach.current.name).")
                     .font(.app(.callout, weight: .bold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)

@@ -384,7 +384,7 @@ enum HomeShortcutKind: String, CaseIterable, Identifiable {
         case .games: return "Your games"
         case .trophies: return "Trophy Hall"
         case .famous: return "Famous Games"
-        case .dungeon: return "Dungeon"
+        case .dungeon: return "The Dungeon"
         }
     }
 
@@ -410,7 +410,7 @@ enum HomeShortcutKind: String, CaseIterable, Identifiable {
         case .rivals: return "The five rivals, and the one to beat next"
         case .games: return "Look back at the games you've played"
         case .trophies: return "Every rival you beat, your best wins and records"
-        case .famous: return "Watch the great games while Leo tells the story"
+        case .famous: return "Watch the great games while \(Coach.current.name) tells the story"
         case .dungeon: return "Save a losing game to escape. A new cell each day"
         }
     }

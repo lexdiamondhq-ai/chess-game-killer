@@ -148,6 +148,12 @@ struct ThinkActionButton: View {
                     .overlay(Circle().strokeBorder(Color.primary.opacity(0.11), lineWidth: 1))
                 Text("Think")
                     .font(.app(.caption2, weight: .semibold))
+                // Beside Talk it through, which counts as help: this one never does
+                // (Alex's pick 12A, screen review 2026-11-19).
+                Text("Free")
+                    .font(.app(.caption2))
+                    .foregroundStyle(.secondary)
+                    .padding(.top, -4)
             }
             .foregroundStyle(Color.primary.opacity(0.85))
             .frame(maxWidth: .infinity)
@@ -156,7 +162,7 @@ struct ThinkActionButton: View {
         .buttonStyle(.plain)
         .disabled(!canThink)
         .accessibilityLabel("Think with me")
-        .accessibilityHint("Walks through the three questions to ask before you move.")
+        .accessibilityHint("Walks through the three questions to ask before you move. Free: it doesn't count as help.")
         .sheet(isPresented: $showing) {
             ThinkWithMeSheet(fen: match.game.fen, lastMove: match.game.lastMove, theme: theme)
                 .keepsPhoneUpright("think")
