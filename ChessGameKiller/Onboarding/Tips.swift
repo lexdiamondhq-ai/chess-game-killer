@@ -10,6 +10,9 @@ enum AppTip: String, CaseIterable, Identifiable {
     case jewelShortcuts
     /// A few moves into a game against the Ashen King: sideways, the phone shows his hall.
     case kingsHall
+    /// The same a few moves into a game against the Cub, whose forest opens sideways too
+    /// (Alex's pick 9A, screen review 2026-11-19).
+    case cubForest
 
     var id: String { rawValue }
 
@@ -18,7 +21,7 @@ enum AppTip: String, CaseIterable, Identifiable {
         case .coachOrb: return "circle.circle"
         case .undoHelp: return "hand.raised"
         case .jewelShortcuts: return "hand.tap"
-        case .kingsHall: return "rectangle.landscape.rotate"
+        case .kingsHall, .cubForest: return "rectangle.landscape.rotate"
         }
     }
 
@@ -32,6 +35,8 @@ enum AppTip: String, CaseIterable, Identifiable {
             return "Hold the gold knight for shortcuts: your rivals, Online, Analyze and more."
         case .kingsHall:
             return "Turn your phone sideways to face the King across his table."
+        case .cubForest:
+            return "Turn your phone sideways to face the Cub in his forest."
         }
     }
 
@@ -73,12 +78,14 @@ enum TipBook {
     ///   - playerMoves: moves the player has made this game.
     ///   - justUndid: the player just took a move back in a game that earns XP.
     ///   - facingKing: the game is against the Ashen King, whose hall opens with the phone on its side.
-    static func next(playerMoves: Int, justUndid: Bool, facingKing: Bool = false,
+    ///   - facingCub: the game is against the Cub, whose forest opens the same way.
+    static func next(playerMoves: Int, justUndid: Bool, facingKing: Bool = false, facingCub: Bool = false,
                      _ defaults: UserDefaults = .standard) -> AppTip? {
         let wanted: [AppTip] = [
             justUndid ? .undoHelp : nil,
             playerMoves >= 1 ? .coachOrb : nil,
             facingKing && playerMoves >= 2 ? .kingsHall : nil,
+            facingCub && playerMoves >= 2 ? .cubForest : nil,
         ].compactMap { $0 }
         return wanted.first { canShow($0, defaults) }
     }
