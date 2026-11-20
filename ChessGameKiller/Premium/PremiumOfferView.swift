@@ -224,7 +224,7 @@ private struct PremiumBenefitList: View {
         Benefit(symbol: "puzzlepiece.extension", title: "Unlimited puzzles",
                 detail: "115,000 rated puzzles, Puzzle Rush, Cycles and your review queue."),
         Benefit(symbol: "graduationcap", title: "Every lesson and drill",
-                detail: "All 15 lessons, 3,865 openings, 22 endgames, master games and Blindfold."),
+                detail: "All 15 lessons, 3,865 openings, 22 endgames, master games and unlimited See ahead."),
         Benefit(symbol: "bubble.left.and.bubble.right", title: "Talk It Through any time",
                 detail: "Plus photo scans, as often as you like."),
         // Premium opens every rival (RivalLadder.opensEverything); the page now says so
