@@ -105,6 +105,26 @@ jobs:
           accountId: ${{ env.CF_ACCOUNT_ID }}
           workingDirectory: play
           wranglerVersion: "4"
+      - name: Hand the phone-alert key to the worker
+        # Optional: APNS_KEY (the .p8 file's text), APNS_KEY_ID and APNS_TEAM_ID. Without them no alerts are sent.
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ env.CF_ACCOUNT_ID }}
+          APNS_KEY: ${{ secrets.APNS_KEY }}
+          APNS_KEY_ID: ${{ secrets.APNS_KEY_ID }}
+          APNS_TEAM_ID: ${{ secrets.APNS_TEAM_ID }}
+        shell: bash
+        working-directory: play
+        run: |
+          if [ -z "$APNS_KEY" ] || [ -z "$APNS_KEY_ID" ] || [ -z "$APNS_TEAM_ID" ]; then
+            echo "::notice::Phone alerts are off: set the APNS_KEY, APNS_KEY_ID and APNS_TEAM_ID secrets to turn them on."
+            exit 0
+          fi
+          jq -n --arg key "$APNS_KEY" --arg id "$APNS_KEY_ID" --arg team "$APNS_TEAM_ID" \
+            '{APNS_KEY: $key, APNS_KEY_ID: $id, APNS_TEAM_ID: $team}' > /tmp/apns.json
+          npx --yes wrangler@4 secret bulk /tmp/apns.json
+          rm -f /tmp/apns.json
       - name: Play a game on the live server
         if: steps.secrets.outputs.ready == 'true'
         env:

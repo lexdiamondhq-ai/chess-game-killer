@@ -557,9 +557,13 @@ try {
     // Dismissed, it's gone. A game that's been joined can't be sent.
     assert.equal((await post("dismiss", { player: maria, id: inbox[0].id })).status, 200);
     assert.deepEqual((await post("inbox", { player: maria })).json.invites, []);
-    assert.equal((await api(base, "POST", `/api/games/${made.code}/join`, { body: { name: "Maria" }, headers: own })).status, 200);
+    assert.equal((await api(base, "POST", `/api/games/${made.code}/join`, { body: { name: "Maria", player: maria }, headers: own })).status, 200);
     assert.equal((await post("invite", { player: alex, to: "maria", code: made.code })).status, 409);
     assert.equal((await api(base, "GET", "/api/friends/me")).status, 405);
+    // A phone for alerts: kept, replaced, and forgotten. (No Apple key in local dev, so nothing is sent.)
+    assert.deepEqual((await post("phone", { player: maria, phone: "cd".repeat(32), sandbox: true })).json, { phone: true });
+    assert.equal((await post("phone", { player: maria, phone: "not a token" })).status, 400);
+    assert.deepEqual((await post("phone", { player: maria, phone: null })).json, { phone: false });
   });
 
   await scenario("the rate limits work in local dev too", async () => {

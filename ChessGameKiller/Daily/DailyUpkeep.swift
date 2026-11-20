@@ -67,7 +67,7 @@ enum DailyLink {
     }
 }
 
-/// Opens Today's Move when a reminder is tapped, and lets a reminder show while the app is open.
+/// Opens Today's Move when a reminder is tapped, and a friend's game when its phone alert is.
 final class DailyNotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
     static let shared = DailyNotificationDelegate()
 
@@ -75,13 +75,20 @@ final class DailyNotificationDelegate: NSObject, UNUserNotificationCenterDelegat
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
         if response.notification.request.identifier.hasPrefix(DailyReminders.idPrefix) {
             Task { @MainActor in DailyLink.open() }
+        } else if let code = PhoneAlertLink.code(in: response.notification.request.content.userInfo) {
+            // A phone alert about a friend's game (PhoneAlerts): open that game.
+            Task { @MainActor in PhoneAlertLink.open(code) }
         }
         completionHandler()
     }
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
                                 withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        // The player is in the app already: no banner over the game.
+        // The player is in the app already: no banner over the game. A challenge shows as the
+        // app's own banner instead, looked for right away.
+        if PhoneAlertLink.code(in: notification.request.content.userInfo) != nil {
+            Task { @MainActor in NotificationCenter.default.post(name: PhoneAlertLink.inboxNotification, object: nil) }
+        }
         completionHandler([])
     }
 }

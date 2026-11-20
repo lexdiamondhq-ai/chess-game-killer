@@ -321,6 +321,8 @@ final class ChallengeComposer {
             let reply = try await center.api.create(name: ChallengeName.clean(name), side: side, clock: clock, days: clock == nil ? days : nil)
             let record = FriendGame(code: reply.code, token: reply.token, seat: reply.seat, state: reply.game)
             center.store.add(record)
+            // Sent or accepted a challenge: the iPhone asks once to allow alerts for it.
+            PhoneAlerts.askIfNeeded()
             // Closed while the challenge was being made: it waits in Friend games, with nothing left running.
             guard case .composer(let shown)? = center.screen, shown === self else { return }
             let game = center.makeGame(record, initial: reply.game)
@@ -400,6 +402,8 @@ final class ChallengeInvite {
             let ticket = try await center.api.join(code, name: ChallengeName.clean(name), token: nil)
             let record = FriendGame(code: code, token: ticket.token, seat: ticket.seat, state: ticket.game)
             center.store.add(record)
+            // Sent or accepted a challenge: the iPhone asks once to allow alerts for it.
+            PhoneAlerts.askIfNeeded()
             center.play(record, initial: ticket.game)
         } catch is CancellationError {
         } catch let error as ChallengeError {

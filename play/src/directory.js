@@ -4,11 +4,15 @@
 // ("Friends by username").
 //
 // Calls come from the router and get back { status, body }:
-//   me, claim, search, people, invite, inbox, dismiss
+//   me, claim, search, people, invite, inbox, dismiss, phone
+// and from game rooms: notify (a phone alert to one player).
 // Players are known only by the SHA-256 of their app's player key.
+// Each player's phone (its Apple push token) is kept here too, for alerts
+// (push.js); a player needs no username to have one.
 
 import { DurableObject } from "cloudflare:workers";
 import * as friends from "./friends.js";
+import * as push from "./push.js";
 import { ERROR_STATUS, cleanName, errorBody, newToken } from "./util.js";
 
 function reply(status, body) {
@@ -49,6 +53,13 @@ export class Directory extends DurableObject {
         created INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS invites_to ON invites (to_hash, created);
+      CREATE TABLE IF NOT EXISTS phones (
+        hash TEXT PRIMARY KEY,
+        token TEXT NOT NULL,
+        sandbox INTEGER NOT NULL,
+        updated INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS phones_token ON phones (token);
     `);
   }
 
@@ -160,6 +171,9 @@ export class Directory extends DurableObject {
       );
     }
     this.#seen(playerHash, now);
+    // A phone alert, so the friend hears of it even with the app closed.
+    const alert = push.challengeAlert({ from: friends.displayName(me.name, me.username), clock: game.clock ?? null, days: game.days ?? null });
+    this.#alert(them.hash, alert, { kind: "challenge", code: game.code });
     return reply(201, { sent: friends.personView(them, now) });
   }
 
@@ -189,6 +203,46 @@ export class Directory extends DurableObject {
   async dismiss({ playerHash, id }) {
     this.sql.exec("DELETE FROM invites WHERE id = ? AND to_hash = ?", id, playerHash);
     return reply(200, { dismissed: true });
+  }
+
+  /** Keeps (or with no token, forgets) the phone that gets this player's alerts. */
+  async phone({ playerHash, token, sandbox }) {
+    if (!token) {
+      this.sql.exec("DELETE FROM phones WHERE hash = ?", playerHash);
+      return reply(200, { phone: false });
+    }
+    // One phone, one player: a phone that changed hands stops getting the old player's alerts.
+    this.sql.exec("DELETE FROM phones WHERE token = ? AND hash != ?", token, playerHash);
+    this.sql.exec(
+      `INSERT INTO phones (hash, token, sandbox, updated) VALUES (?, ?, ?, ?)
+       ON CONFLICT (hash) DO UPDATE SET token = excluded.token, sandbox = excluded.sandbox, updated = excluded.updated`,
+      playerHash, token, sandbox ? 1 : 0, Date.now(),
+    );
+    return reply(200, { phone: true });
+  }
+
+  /** A phone alert to one player, from a game room. { alert: { title, body }, kind, code }. */
+  async notify({ playerHash, alert, kind, code = null }) {
+    await this.#alert(playerHash, alert, { kind, code });
+    return { ok: true };
+  }
+
+  /** Sends an alert to a player's phone, if they have one. Never throws. */
+  #alert(playerHash, alert, { kind, code = null }) {
+    const row = this.sql.exec("SELECT * FROM phones WHERE hash = ?", playerHash).toArray()[0];
+    if (!row || !push.canSend(this.env)) return Promise.resolve();
+    const payload = push.apnsPayload(alert, { kind, code });
+    // One alert of each kind per game: a newer one replaces the older on the lock screen.
+    const collapseId = code ? `${kind}-${code}` : null;
+    return push
+      .sendAlert(this.env, { token: row.token, sandbox: row.sandbox === 1, payload, collapseId })
+      .then((result) => {
+        if (result.gone) this.sql.exec("DELETE FROM phones WHERE hash = ? AND token = ?", playerHash, row.token);
+        else if (result.sent && result.sandbox !== (row.sandbox === 1)) {
+          this.sql.exec("UPDATE phones SET sandbox = ? WHERE hash = ?", result.sandbox ? 1 : 0, playerHash);
+        }
+      })
+      .catch((error) => console.error("push failed:", error && error.message));
   }
 
   #sweep(now) {

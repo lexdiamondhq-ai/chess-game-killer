@@ -14,8 +14,11 @@
 //   may put the object to sleep and still keep the sockets open, and the
 //   text "ping" is answered with "pong" without waking it.
 // - One alarm wakes the object for the next thing that can happen on its own:
-//   a flag falling, the game expiring,
-//   or a finished game being deleted.
+//   a flag falling, the game expiring, a daily game's last call (a phone
+//   alert 6 hours before a move is due), or a finished game being deleted.
+// - Phone alerts (push.js) go to a seat whose player isn't looking at the
+//   game: "accepted" when a friend sits down, "your move", and the last call.
+//   The Directory object keeps the phones and sends them.
 //
 // About waiting: while this code awaits storage, Cloudflare delivers no other
 // event to the object, but while it awaits another object (making a rematch)
@@ -24,6 +27,7 @@
 
 import { DurableObject } from "cloudflare:workers";
 import * as rules from "./game.js";
+import * as push from "./push.js";
 import { ERROR_STATUS, errorBody, hashToken, isToken, newCode, newToken, readConfig } from "./util.js";
 
 /** At most 8 WebSockets per game, and at most 3 for one seat (the oldest is closed when a 4th opens). */
@@ -92,10 +96,10 @@ export class GameRoom extends DurableObject {
   // Calls from the router
 
   /** Starts a new game under this code. Returns { inUse: true } if the code already has one. */
-  async create({ code, name, side, clock, days = null, look, tokenHash }) {
+  async create({ code, name, side, clock, days = null, look, tokenHash, playerHash = null }) {
     if (this.game) return { inUse: true };
     const now = Date.now();
-    this.game = rules.createGame({ code, name, side, clock, days, look, tokenHash, now, leaveGraceMs: this.config.leaveGraceMs });
+    this.game = rules.createGame({ code, name, side, clock, days, look, tokenHash, playerHash, now, leaveGraceMs: this.config.leaveGraceMs });
     await this.#settle({ changed: true, notices: [] });
     return { seat: this.game.creator, game: this.#view() };
   }
@@ -123,7 +127,7 @@ export class GameRoom extends DurableObject {
   }
 
   /** Takes the open seat, or with a valid token for this game just returns that seat. */
-  async join({ token = null, name = null } = {}) {
+  async join({ token = null, name = null, playerHash = null } = {}) {
     // Hash before looking at the game, so nothing can change it in between.
     const tokenHash = token ? await hashToken(token) : null;
     const fresh = token ? null : newToken();
@@ -133,12 +137,17 @@ export class GameRoom extends DurableObject {
     if (tokenHash) {
       const seat = rules.seatForToken(this.game, tokenHash);
       if (!seat) return refuse("unauthorized", BAD_TOKEN);
-      await this.#settle(rules.tick(this.game, now));
+      const out = rules.tick(this.game, now);
+      if (rules.setSeatPlayer(this.game, seat, playerHash, now).changed) out.changed = true;
+      await this.#settle(out);
       return reply(200, { seat, token, game: this.#view() });
     }
-    const out = rules.join(this.game, { name, tokenHash: freshHash }, now);
+    const out = rules.join(this.game, { name, tokenHash: freshHash, playerHash }, now);
     await this.#settle(out);
     if (!out.ok) return refuse(out.error, out.message, this.#view());
+    // The friend who made the game hears they've sat down.
+    const host = rules.other(out.seat);
+    if (this.game[host]) this.#alert(host, push.acceptedAlert({ name: this.game[out.seat].name, seat: host }), "accepted");
     return reply(200, { seat: out.seat, token: fresh, game: this.#view() });
   }
 
@@ -149,6 +158,10 @@ export class GameRoom extends DurableObject {
     const out = rules.move(this.game, seat, { uci, ply }, Date.now());
     await this.#settle(out);
     if (!out.ok) return refuse(out.error, out.message, this.#view());
+    if (!this.game.result) {
+      const next = rules.turnOf(this.game);
+      this.#alert(next, push.yourMoveAlert({ name: this.game[seat].name, san: this.game.san.at(-1) }), "move");
+    }
     return reply(200, { game: this.#view() });
   }
 
@@ -320,11 +333,20 @@ export class GameRoom extends DurableObject {
       return;
     }
     await this.#settle(rules.tick(this.game, now));
+    // A daily game's last call.
+    const call = this.game ? rules.lastCallAt(this.game, push.LAST_CALL_MS) : null;
+    if (call !== null && call <= now) {
+      const seat = rules.turnOf(this.game);
+      await this.#settle(rules.markLastCall(this.game, now));
+      this.#alert(seat, push.lastCallAlert({ name: this.game[rules.other(seat)].name }), "last_call");
+    }
   }
 
   /** Sets the alarm for the game's next deadline (no alarm if there is none). */
   async #syncAlarm() {
-    const at = this.game ? rules.nextDeadline(this.game, this.config.keepFinishedMs) : null;
+    const deadline = this.game ? rules.nextDeadline(this.game, this.config.keepFinishedMs) : null;
+    const call = this.game ? rules.lastCallAt(this.game, push.LAST_CALL_MS) : null;
+    const at = call !== null && (deadline === null || call < deadline) ? call : deadline;
     if (at === this.alarmAt) return;
     // Noted before waiting, so a save that overlaps this one compares
     // against the alarm being set. Storage applies the two in order.
@@ -387,6 +409,22 @@ export class GameRoom extends DurableObject {
     } catch (error) {
       console.error("reporting a rated result failed:", error && error.message);
     }
+  }
+
+  /**
+   * A phone alert to a seat's player, if they gave the game their player key
+   * and aren't looking at the game right now. Sent in the background: the
+   * request that caused it doesn't wait.
+   */
+  #alert(seat, alert, kind) {
+    const player = this.game && this.game[seat];
+    const playerHash = this.game ? rules.seatPlayer(this.game, seat) : null;
+    if (!player || !playerHash || !this.env.DIRECTORY) return;
+    if (this.#openSockets(seat).length > 0 && player.away === null) return;
+    const directory = this.env.DIRECTORY.get(this.env.DIRECTORY.idFromName("directory"));
+    directory
+      .notify({ playerHash, alert, kind, code: this.game.code })
+      .catch((error) => console.error("phone alert failed:", error && error.message));
   }
 
   /** The GameState as players see it right now. */

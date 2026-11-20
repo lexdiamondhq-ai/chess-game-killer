@@ -28,6 +28,9 @@ targets:
       path: Support/ChessGameKiller.entitlements
       properties:
         com.apple.security.application-groups: [group.com.chessgamekiller.app]
+        # Phone alerts for friend games (ChessGameKiller/Challenge/PhoneAlerts.swift). Xcode switches it to
+        # "production" when it exports the build for the App Store.
+        aps-environment: development
     # Challenge links (chessgamekiller://c/CODE) open the app. Xcode merges this file with the generated keys.
     info:
       path: Support/ChessGameKiller-Info.plist

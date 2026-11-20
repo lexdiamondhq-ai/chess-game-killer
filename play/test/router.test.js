@@ -134,6 +134,7 @@ test("making a game returns its links and a token; the room gets only the token'
     days: null,
     look: null,
     tokenHash: createHash("sha256").update(token).digest("hex"),
+    playerHash: null,
   });
   assert.equal(made.headers.get("cache-control"), "no-store");
 });
@@ -254,9 +255,10 @@ test("only the listed actions reach a game", async () => {
 test("joining, with or without a token", async () => {
   const { env, called } = fakeEnv();
   assert.equal((await send(env, "POST", "/api/games/7KQ2XM/join")).status, 200);
-  assert.deepEqual(called("join")[0][2], { token: null, name: null });
-  await send(env, "POST", "/api/games/7KQ2XM/join", { body: { name: "Sam" }, headers: bearer });
-  assert.deepEqual(called("join")[1][2], { token: TOKEN, name: "Sam" });
+  assert.deepEqual(called("join")[0][2], { token: null, name: null, playerHash: null });
+  await send(env, "POST", "/api/games/7KQ2XM/join", { body: { name: "Sam", player: TOKEN }, headers: bearer });
+  // The player key is kept only as its hash, for phone alerts.
+  assert.deepEqual(called("join")[1][2], { token: TOKEN, name: "Sam", playerHash: createHash("sha256").update(TOKEN).digest("hex") });
   assert.equal((await send(env, "POST", "/api/games/7KQ2XM/join", { body: {}, headers: { authorization: "Basic x" } })).status, 401);
   assert.equal((await send(env, "POST", "/api/games/7KQ2XM/join", { body: { name: ["Sam"] } })).status, 400);
   assert.equal(called("join").length, 2);

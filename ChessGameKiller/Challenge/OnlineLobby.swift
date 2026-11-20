@@ -478,6 +478,8 @@ final class OnlineLobby {
         }
         let record = FriendGame(code: match.code, token: match.token, seat: match.seat, state: state)
         center.store.add(record)
+        // A daily game online can wait days for a move: the iPhone asks once to allow alerts for it.
+        if record.days != nil { PhoneAlerts.askIfNeeded() }
         center.play(record, initial: state)
     }
 }
