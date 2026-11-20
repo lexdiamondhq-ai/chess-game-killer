@@ -32,7 +32,7 @@ enum AppTip: String, CaseIterable, Identifiable {
         case .undoHelp:
             return "Undo counts as help: this game now earns your pieces half the XP."
         case .jewelShortcuts:
-            return "Hold the gold knight for shortcuts: your rivals, Online, Analyze and more."
+            return "Tap the knight to analyze. Hold it for Quick play, Today's Move and more."
         case .kingsHall:
             return "Turn your phone sideways to face the King across his table."
         case .cubForest:

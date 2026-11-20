@@ -212,8 +212,8 @@ struct HomeView: View {
                         .padding(.top, 6)
                 }
 
-                if jewelTip, !stageOn, !shortcutsOpen, you == nil {
-                    jewelNote(in: geo.size)
+                if jewelTip, !shortcutsOpen, you == nil {
+                    if stageOn { auroraJewelNote } else { jewelNote(in: geo.size) }
                 }
 
                 if shortcutsOpen {
@@ -622,6 +622,20 @@ struct HomeView: View {
         .frame(maxWidth: 440)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         .padding(.bottom, lift)
+        .transition(.offset(y: 10).combined(with: .opacity))
+        .zIndex(1)
+    }
+
+    /// The same note on the Aurora home, just above its bar and the gold knight in it. It was
+    /// marked seen here but never drawn (Alex's pick 13A, screen review 2026-11-19).
+    private var auroraJewelNote: some View {
+        HomeJewelTip(tone: tone) {
+            withAnimation(.easeOut(duration: 0.25)) { jewelTip = false }
+        }
+        .padding(.horizontal, 24)
+        .frame(maxWidth: 440)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .padding(.bottom, 96)
         .transition(.offset(y: 10).combined(with: .opacity))
         .zIndex(1)
     }
