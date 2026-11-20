@@ -91,6 +91,20 @@ struct AnalyzeSheet: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.bottom, 8)
 
+                    // Opened from a game, the game comes first (Alex's pick 8A, screen review 2026-11-19).
+                    if let gameFEN {
+                        Button {
+                            onAnalyzeGame?()
+                            session.analyze(fen: gameFEN)
+                        } label: {
+                            StartCard(symbol: Glyphs.analyze, title: "This game",
+                                      detail: onAnalyzeGame == nil
+                                          ? "The position in your game right now"
+                                          : "Your game as it stands. Counts as help, like Undo.",
+                                      theme: theme)
+                        }
+                        .buttonStyle(.plain)
+                    }
                     if hasCamera {
                         Button {
                             if canScan { showingCamera = true } else { offer = .scan }
@@ -120,19 +134,6 @@ struct AnalyzeSheet: View {
                                   detail: "Start from the opening position and change it", theme: theme)
                     }
                     .buttonStyle(.plain)
-                    if let gameFEN {
-                        Button {
-                            onAnalyzeGame?()
-                            session.analyze(fen: gameFEN)
-                        } label: {
-                            StartCard(symbol: Glyphs.analyze, title: "This game",
-                                      detail: onAnalyzeGame == nil
-                                          ? "The position in your game right now"
-                                          : "Your game as it stands. Counts as help, like Undo.",
-                                      theme: theme)
-                        }
-                        .buttonStyle(.plain)
-                    }
                 }
                 .padding(20)
             }

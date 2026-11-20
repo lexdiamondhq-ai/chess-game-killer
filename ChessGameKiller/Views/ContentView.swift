@@ -1020,7 +1020,12 @@ struct ContentView: View {
             CoachOrb(match: match, theme: theme, isExpanded: $coachExpanded, expandedMaxHeight: coachHeight,
                      newGame: homeScreenOn ? nil : { showingNewGame = true },
                      home: homeScreenOn ? { goHome() } : nil, showGames: { showingGames = true },
-                     talk: { openTalk() }, analyze: { showingAnalyze = true },
+                     talk: { openTalk() }, analyze: {
+                         // From a game, Analyze opens on its first page with "This game" on top,
+                         // not on an old photo's analysis; Home's Analyze still remembers (#119).
+                         analyzer.path = []
+                         showingAnalyze = true
+                     },
                      faceNext: { level in
                          // The victory theme gives way to the next rival's film.
                          SoundPlayer.shared.stopAll(fade: 0.4)
