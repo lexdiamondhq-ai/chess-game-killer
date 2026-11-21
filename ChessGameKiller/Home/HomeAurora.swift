@@ -18,6 +18,8 @@ struct HomeAuroraInfo {
     var finest: HomeFinestMove? = nil
     /// Your Chess DNA, once it has been read from your games.
     var dna: ChessDNA? = nil
+    /// The people you play by @username, newest first: their faces sit on the Play a friend row.
+    var people: [FriendPerson] = []
 }
 
 struct HomeAuroraActions {
@@ -44,6 +46,8 @@ struct HomeAuroraActions {
     var quickPlay: () -> Void = {}
     /// Sends a friend a game by link; nil when the app can't reach other players.
     var friend: (() -> Void)? = nil
+    /// Sends this friend a game at once, with the clock and side you used last.
+    var challengeFriend: (FriendPerson) -> Void = { _ in }
 }
 
 /// Aurora's colors, night and day.
@@ -372,6 +376,15 @@ struct HomeAuroraView: View {
             quickBar
                 .padding(.horizontal, 16)
                 .padding(.top, 14)
+            // Play a friend, always in sight under the gold bar (Alex, 2026-11-20: "How do I
+            // start a game? I thought it was on the homepage"; picked A, a slim row with your
+            // friends' faces, a tap on a face sending them a game at once).
+            if let friend = actions.friend {
+                HomeAuroraFriendRow(people: info.people, palette: palette, open: friend,
+                                    challenge: actions.challengeFriend)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+            }
             // The Face a rival coins are gone: the rival you're on stands big in the Next game
             // card instead (Alex, 2026-11-08). No All rivals link in the corner (Alex,
             // 2026-11-10): the card swipes through them, and Rivals is in Rooms.

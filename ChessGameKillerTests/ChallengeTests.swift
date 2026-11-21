@@ -851,6 +851,27 @@ final class ChallengeTests: XCTestCase {
         XCTAssertTrue(api.lives.allSatisfy { $0.isStopped })
     }
 
+    /// A face on Home's Play a friend row: the composer opens on that friend and the challenge
+    /// goes out at once, with the clock and side picked last time.
+    func testAFaceOnHomeSendsTheGameStraightAway() async throws {
+        let api = FakeChallengeAPI()
+        defaults.set("3+2", forKey: "challenge.clock")
+        defaults.set(SideChoice.black.rawValue, forKey: "challenge.side")
+        let pick = ChallengeCenter.lastPick(defaults)
+        XCTAssertEqual(pick.clock, FriendClock(initial: 180, increment: 2))
+        XCTAssertNil(pick.days)
+        XCTAssertEqual(pick.side, .black)
+        let center = ChallengeCenter(api: api, store: ChallengeStore(), sounds: nil, defaults: defaults)
+        let sam = FriendPerson(username: "sam", name: "Sam", online: false)
+
+        // Without a username of your own the composer waits, with Sam picked.
+        center.challenge(sam)
+        guard case .composer(let waiting)? = center.screen else { return XCTFail("the composer should be up") }
+        XCTAssertEqual(waiting.recipient, sam)
+        XCTAssertNil(waiting.created)
+        center.dismiss()
+    }
+
     func testATakenCancelledOrMissingChallengeSaysSo() async {
         let api = FakeChallengeAPI()
         let waiting = FriendGameState.sample(status: .waiting)

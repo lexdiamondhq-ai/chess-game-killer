@@ -89,6 +89,30 @@ final class ChallengeCenter {
         screen = .composer(ChallengeComposer(center: self))
     }
 
+    /// Sends one of the player's people a game straight away (a face on Home's Play a friend
+    /// row): the composer opens on them and makes the challenge with the clock, days and side
+    /// picked last time, so it lands on "Sent". Without a username of the player's own yet, the
+    /// composer waits with the friend picked, and its button asks for one first.
+    func challenge(_ person: FriendPerson) {
+        let composer = ChallengeComposer(center: self)
+        composer.recipient = person
+        leaveScreen(keeping: nil)
+        screen = .composer(composer)
+        guard let you = friends.you else { return }
+        let pick = Self.lastPick(defaults)
+        let name: String = playerName.isEmpty ? you.name : playerName
+        Task { await composer.create(name: name, clock: pick.clock, days: pick.days, side: pick.side) }
+    }
+
+    /// The clock, days per move and side last picked in the composer (its own defaults when none).
+    static func lastPick(_ defaults: UserDefaults) -> (clock: FriendClock?, days: Int?, side: SideChoice) {
+        let clock = OnlineLobby.clock(id: defaults.string(forKey: "challenge.clock") ?? TimeControl.rapid10.rawValue)
+        let saved = defaults.integer(forKey: "challenge.days")
+        let days: Int? = clock == nil && DailyDays.options.contains(saved) ? saved : nil
+        let side = SideChoice(rawValue: defaults.string(forKey: "challenge.side") ?? "") ?? .white
+        return (clock, days, side)
+    }
+
     /// Opens Play online: players waiting now, and finding a game with one.
     func playOnline() {
         if case .online? = screen { return }

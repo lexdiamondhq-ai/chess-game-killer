@@ -748,7 +748,8 @@ extension HomeView {
             you: { openYou(.bottom) },
             rooms: openShortcuts)
         let auroraInfo = HomeAuroraInfo(stage: info, games: currentGameList(upNext), look: look,
-                                        pieces: match.game.pieces.map(\.piece), finest: finestMove, dna: dna)
+                                        pieces: match.game.pieces.map(\.piece), finest: finestMove, dna: dna,
+                                        people: challenges?.friends.people ?? [])
         let auroraActions = HomeAuroraActions(stage: stageActions, open: { game in
             if let friend = game.friendGame {
                 challenges?.play(friend)
@@ -760,7 +761,8 @@ extension HomeView {
         }, chessDNA: actions.chessDNA, puzzles: actions.puzzles, replay: { id, ply in
             if let game = vault.game(id) { actions.openGame(game, ply) }
         }, army: actions.army, armyQuest: { level in playOtherRival(level) }, quickPlay: { primary(upNext) },
-           friend: challenges.map { center in { center.compose() } })
+           friend: challenges.map { center in { center.compose() } },
+           challengeFriend: { person in challenges?.challenge(person) })
         return HomeAuroraView(tone: tone, info: auroraInfo, actions: auroraActions)
             .task {
                 // Keeps whose move it is in games with people, and how many wait online, up to
