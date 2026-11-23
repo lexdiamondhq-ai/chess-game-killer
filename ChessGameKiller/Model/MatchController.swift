@@ -1129,8 +1129,12 @@ final class MatchController {
     private func playSound(for move: PlayedMove) {
         guard let sounds else { return }
         let landing = landingDelay(move)
+        // The rival's moves are a quiet, soft knock: no clank, no clock (Alex, 2026-11-23).
+        let byRival = !game.humanColors.contains(move.color)
         if move.givesCheck, !game.isGameOver {
             sounds.play(.check, after: landing)
+        } else if byRival {
+            sounds.play(move.isCapture ? .rivalCapture : .rivalMove, after: landing)
         } else if move.isCapture {
             sounds.play(.capture, after: landing)
         } else if move.isCastle {
