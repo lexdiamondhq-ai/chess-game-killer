@@ -219,7 +219,8 @@ final class MatchControllerTests: XCTestCase {
         await waitUntil("the computer replies") { match.game.plyCount == 2 }
         XCTAssertTrue(match.game.isHumanTurn)
         XCTAssertFalse(match.isComputerThinking)
-        XCTAssertEqual(sounds.played.filter { $0 == .move }.count, 2)
+        XCTAssertEqual(sounds.played.filter { $0 == .move }.count, 1, "the person's move knocks")
+        XCTAssertEqual(sounds.played.filter { $0 == .rivalMove }.count, 1, "the computer's move is the soft knock")
         await waitUntil("hints appear for the player") { match.hints.count == 2 }
     }
 

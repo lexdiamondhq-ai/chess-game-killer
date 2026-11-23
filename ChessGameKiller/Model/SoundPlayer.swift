@@ -9,6 +9,13 @@ enum GameSound: String, CaseIterable {
     case move
     /// A timed game's move: the piece set down, then the chess clock pressed.
     case clockMove = "move-clock"
+    /// A rival's move: a clean, soft wooden "tock" like other chess apps use, the same in every
+    /// piece set and with no clock press, so the computer's moves never clank (Alex, 2026-11-23).
+    /// It has takes like a move (move-soft.mp3, move-soft-2.mp3, ...). The tocks are made in
+    /// code (a few fading wood tones under 3 kHz), not recorded.
+    case rivalMove = "move-soft"
+    /// A rival's capture, as quiet and soft as its move.
+    case rivalCapture = "capture-soft"
     /// Training's soft click: a piece picked up, a square found. In a game, picking up a
     /// piece is felt (a haptic), not heard.
     case select
@@ -33,6 +40,7 @@ enum GameSound: String, CaseIterable {
     var volume: Float {
         switch self {
         case .move, .clockMove: return 0.75
+        case .rivalMove, .rivalCapture: return 0.6
         case .select: return 0.3
         case .capture: return 0.9
         case .check: return 1.0
@@ -49,7 +57,7 @@ enum GameSound: String, CaseIterable {
     var isLong: Bool {
         switch self {
         case .win, .gameOver, .defeat, .victory, .welcome: return true
-        case .move, .clockMove, .select, .capture, .check, .castle: return false
+        case .move, .clockMove, .rivalMove, .rivalCapture, .select, .capture, .check, .castle: return false
         }
     }
 }
