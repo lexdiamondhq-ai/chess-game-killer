@@ -129,8 +129,11 @@ struct HomeAuroraArmy: View {
                 .font(.system(size: 10, weight: .semibold))
                 .tracking(0.5)
                 .foregroundStyle(palette.ink2)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                // Two lines in Rooms' narrower card before it would cut off (a long quest
+                // button, "Play the Berserker", leaves little room).
+                .lineLimit(2)
+                .minimumScaleFactor(0.85)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

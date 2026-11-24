@@ -587,7 +587,7 @@ struct HomeShortcutsPanel: View {
             }
             .font(.system(size: 11, weight: .semibold))
             .tracking(1)
-            .foregroundStyle(card.palette.gold)
+            .foregroundStyle(tone.ink2)
             .lineLimit(1)
             .minimumScaleFactor(0.8)
             .padding(.horizontal, 6)
