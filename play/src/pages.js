@@ -47,12 +47,6 @@ function nameOf(game, side) {
   return (game && game[side] && game[side].name) || (side === 'white' ? 'White' : 'Black');
 }
 
-/** Who sent the invite, as the friend reads it: "A friend" when they left their name blank. */
-function inviterOf(game) {
-  const name = game && game[game.creator] && game[game.creator].name;
-  return name && name !== 'Player' ? name : 'A friend';
-}
-
 function resultWords(game) {
   const r = game.result;
   if (!r) return 'Game over';
@@ -152,10 +146,11 @@ ${CREDITS}
 </html>`;
   }
 
+  const creator = nameOf(game, game.creator);
   let ogTitle;
   let description;
   if (game.status === 'waiting') {
-    ogTitle = `${inviterOf(game)} challenged you to chess`;
+    ogTitle = `${creator} challenged you to chess`;
     description = `${clockWords(game.clock)} · Play in your browser or in the ${SITE} app`;
   } else if (game.status === 'active') {
     ogTitle = `${nameOf(game, 'white')} vs ${nameOf(game, 'black')}, live`;
