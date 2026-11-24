@@ -4,8 +4,8 @@ import UIKit
 import XCTest
 @testable import ChessGameKiller
 
-/// Your army on the Aurora home: the champion and the army's quest (Alex, 2026-11-12: "A and C
-/// together"). The card's pictures are saved to SNAPSHOT_DIR as army-home-*.png.
+/// Your army (in Rooms since 2026-11-24): the champion and the army's quest (Alex, 2026-11-12: "A and C
+/// together"). The card's pictures are saved to SNAPSHOT_DIR as army-rooms-*.png (the card in Rooms since 2026-11-24).
 @MainActor
 final class ArmyQuestTests: XCTestCase {
 
@@ -89,25 +89,29 @@ final class ArmyQuestTests: XCTestCase {
 
     // MARK: Pictures
 
-    func testTheArmyCardOnHome() throws {
+    func testTheArmyCardInRooms() throws {
         let shots: [(String, ArmyStore)] = [
-            ("army-home-1-quest", Self.army()),
-            ("army-home-2-rescue", Self.army(holding: .queensBishop)),
-            ("army-home-3-fresh", ArmyStore()),
+            ("army-rooms-1-quest", Self.army()),
+            ("army-rooms-2-rescue", Self.army(holding: .queensBishop)),
+            ("army-rooms-3-fresh", ArmyStore()),
         ]
         for dark in [false, true] {
             let palette = HomeAuroraPalette(dark: dark)
+            let tone = HomeTone.of(.gilded, mode: dark ? .dark : .light)
             for (name, army) in shots {
                 let card = HomeAuroraArmy(army: army, color: .white, pieceTheme: .named(.gilded), nextRival: .club,
                                           palette: palette, open: {}, play: { _ in })
+                let doors: [HomeShortcut] = HomeShortcutKind.rooms.map { HomeShortcut(kind: $0, action: {}) }
                 let page = VStack(spacing: 0) {
-                    HomeAuroraSection(title: "Your army", palette: palette, note: "37 games together")
-                    card.padding(.horizontal, 16)
-                    HomeAuroraSignOff(palette: palette)
-                        .padding(.top, 22)
                     Spacer()
+                    HomeAuroraSignOff(palette: palette)
+                    Spacer()
+                    HomeShortcutsPanel(tone: tone, next: .club, underWay: false, shortcuts: doors,
+                                       playRival: { _ in }, close: {}, asRooms: true,
+                                       army: card, armyNote: HomeAuroraArmy.note(army))
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 96)
                 }
-                .padding(.top, 80)
                 .background(palette.sheet.ignoresSafeArea())
                 .background(palette.bg.ignoresSafeArea())
                 try snapshot("\(name)-\(dark ? "dark" : "light")", view: page)

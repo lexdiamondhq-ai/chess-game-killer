@@ -92,7 +92,6 @@ struct HomeAuroraView: View {
     let actions: HomeAuroraActions
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(ArmyStore.self) private var army
     @AppStorage("haptics") private var hapticsOn = true
     @State private var music = HomeMusic.shared
     @State private var boardStage = SculptedStage()
@@ -403,13 +402,9 @@ struct HomeAuroraView: View {
                 todayRows
             }
             .padding(.horizontal, 16)
-            // Your army at the foot of the page, as a wide banner (Alex, 2026-11-12: "move the
-            // Army to the bottom and change the format to more of a rectangle"): the champion
-            // and today's job for the army.
-            armySection
-            // A carved line to close the page, and only as much room under it as the bottom bar
-            // needs when it comes back (Alex, 2026-11-12: "Too much bottom space here"; picked
-            // C, tighter with a carved sign-off).
+            // Your army moved to Rooms (Alex, 2026-11-24). A carved line still closes the page,
+            // and only as much room under it as the bottom bar needs when it comes back (Alex,
+            // 2026-11-12: "Too much bottom space here"; picked C, tighter with a carved sign-off).
             HomeAuroraSignOff(palette: palette)
                 .padding(.top, 22)
         }
@@ -437,25 +432,6 @@ struct HomeAuroraView: View {
                 actions.quickPlay()
             }
         }
-    }
-
-    /// Your army: the champion big and the army's job for today.
-    private var armySection: some View {
-        let upNext: HomeUpNext = info.stage.upNext
-        let card = HomeAuroraArmy(army: army, color: upNext.playerColor, pieceTheme: info.stage.pieceTheme,
-                                  nextRival: upNext.level, palette: palette,
-                                  open: actions.army, play: actions.armyQuest)
-        return VStack(spacing: 0) {
-            HomeAuroraSection(title: "Your army", palette: palette, note: armyNote)
-            card.padding(.horizontal, 16)
-        }
-    }
-
-    /// How long the army has been together, once it has played.
-    private var armyNote: String? {
-        let games: Int = army.gamesPlayed
-        guard games > 0 else { return nil }
-        return games == 1 ? "1 game together" : "\(games) games together"
     }
 
     private var gamesNote: String? {
