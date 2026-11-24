@@ -1,7 +1,7 @@
 import ChessKit
 import SwiftUI
 
-/// Your army at the foot of the Aurora home, as one slim strip (Alex's picks, 2026-11-12: "A and
+/// Your army in Rooms (moved off the Aurora home, Alex 2026-11-24), as one slim strip (Alex's picks, 2026-11-12: "A and
 /// C together", then "move the Army to the bottom ... more of a rectangle", then B, the slim
 /// strip). The champion, your most experienced piece, stands small on its stone base beside its
 /// name carved in Cinzel (gold once it is a Legend) and its rank; at the end, the gold button for
@@ -19,6 +19,13 @@ struct HomeAuroraArmy: View {
     let play: (MatchController.Level) -> Void
 
     static let nameFont = "Cinzel-Bold"
+
+    /// How long the army has been together, once it has played.
+    static func note(_ army: ArmyStore) -> String? {
+        let games: Int = army.gamesPlayed
+        guard games > 0 else { return nil }
+        return games == 1 ? "1 game together" : "\(games) games together"
+    }
 
     var body: some View {
         let champion: ArmySlot? = army.champion
@@ -122,8 +129,11 @@ struct HomeAuroraArmy: View {
                 .font(.system(size: 10, weight: .semibold))
                 .tracking(0.5)
                 .foregroundStyle(palette.ink2)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                // Two lines in Rooms' narrower card before it would cut off (a long quest
+                // button, "Play the Berserker", leaves little room).
+                .lineLimit(2)
+                .minimumScaleFactor(0.85)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -170,7 +180,7 @@ struct HomeAuroraArmy: View {
     }
 }
 
-/// The carved line that closes the Aurora home, under Your army: "Every piece remembers" in
+/// The carved line that closes the Aurora home: "Every piece remembers" in
 /// small gold Cinzel between two fine gold rules (Alex's pick, 2026-11-12).
 struct HomeAuroraSignOff: View {
     let palette: HomeAuroraPalette

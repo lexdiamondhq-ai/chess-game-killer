@@ -455,6 +455,12 @@ struct HomeShortcutsPanel: View {
     /// Rooms on the Aurora home: no rivals here (they have their own row on the page, Alex
     /// 2026-11-07), and a grabber in place of the jewel's cross; a drag down closes it.
     var asRooms = false
+    /// Your army under the rooms' doors (Alex, 2026-11-24: "Remove your army from the homepage
+    /// and place it in the room section"; picked A, the same card under the four doors). Its
+    /// open and play close the panel first.
+    var army: HomeAuroraArmy? = nil
+    /// How long the army has been together, beside its title.
+    var armyNote: String? = nil
 
     @AccessibilityFocusState private var titleFocused: Bool
     @State private var drag: CGFloat = 0
@@ -496,6 +502,9 @@ struct HomeShortcutsPanel: View {
                 ForEach(shortcuts) { shortcut in
                     shortcutButton(shortcut)
                 }
+            }
+            if asRooms, let army {
+                armyRow(army)
             }
         }
         .padding(.horizontal, 10)
@@ -562,6 +571,29 @@ struct HomeShortcutsPanel: View {
         .accessibilityLabel(underWay ? "New game against \(rival.name)" : "Play \(rival.name)")
         .accessibilityValue(rival.spokenElo)
         .accessibilityHint(isNext ? "Up next" : "")
+    }
+
+    /// Your army's title in small gold capitals, the games together at the right, and the
+    /// champion's card under it.
+    private func armyRow(_ card: HomeAuroraArmy) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("YOUR ARMY")
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 8)
+                if let armyNote {
+                    Text(armyNote.uppercased())
+                }
+            }
+            .font(.system(size: 11, weight: .semibold))
+            .tracking(1)
+            .foregroundStyle(tone.ink2)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .padding(.horizontal, 6)
+            card
+        }
+        .padding(.top, 6)
     }
 
     private func shortcutButton(_ shortcut: HomeShortcut) -> some View {

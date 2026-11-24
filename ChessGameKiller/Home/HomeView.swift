@@ -591,7 +591,8 @@ struct HomeView: View {
             .transition(.opacity)
             .accessibilityHidden(true)
         HomeShortcutsPanel(tone: tone, next: upNext.level, underWay: upNext.inProgress, shortcuts: shortcutList,
-                           playRival: { level in playRival(level) }, close: closeShortcuts, asRooms: stageOn)
+                           playRival: { level in playRival(level) }, close: closeShortcuts, asRooms: stageOn,
+                           army: stageOn ? roomsArmy : nil, armyNote: HomeAuroraArmy.note(army))
             .padding(.horizontal, 16)
             .frame(maxWidth: 520)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
@@ -609,6 +610,15 @@ struct HomeView: View {
                 .transition(.opacity)
                 .zIndex(3)
         }
+    }
+
+    /// Your army's card in Rooms: a tap opens the army, the gold button plays its quest, each
+    /// after the panel closes.
+    private var roomsArmy: HomeAuroraArmy {
+        HomeAuroraArmy(army: army, color: upNext.playerColor, pieceTheme: pieceTheme, nextRival: upNext.level,
+                       palette: HomeAuroraPalette(dark: tone.scheme == .dark),
+                       open: { closeShortcuts(); actions.army() },
+                       play: { level in closeShortcuts(); playOtherRival(level) })
     }
 
     /// The jewel's note, just above it.
