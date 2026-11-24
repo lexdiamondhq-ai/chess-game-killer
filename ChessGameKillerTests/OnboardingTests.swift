@@ -28,6 +28,13 @@ final class OnboardingTests: XCTestCase {
         XCTAssertTrue(Welcome.shouldShow(defaults))
     }
 
+    func testTheIntroFilmShipsAndNeverPlaysInTests() {
+        XCTAssertNotNil(IntroFilm.url, "intro-film.mp4 is in the app")
+        XCTAssertFalse(IntroFilm.shouldShow(defaults))
+        IntroFilm.markSeen(defaults)
+        XCTAssertTrue(defaults.bool(forKey: IntroFilm.key))
+    }
+
     func testCIGamePicturesNeverShowTheWelcome() {
         defaults.set("game", forKey: "showcase")
         XCTAssertFalse(Welcome.shouldShow(defaults))

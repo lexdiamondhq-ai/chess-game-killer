@@ -7,6 +7,7 @@ struct GuideView: View {
     /// Closes Settings and opens the welcome again.
     let replayWelcome: () -> Void
     @State private var tipsReset = false
+    @State private var watchingIntro = false
 
     private var accent: Color { theme.trainingAccent }
 
@@ -48,12 +49,23 @@ struct GuideView: View {
                     Label("Replay the welcome", systemImage: "sparkles")
                         .font(.app(.body, weight: .semibold))
                 }
+                if IntroFilm.url != nil {
+                    Button {
+                        watchingIntro = true
+                    } label: {
+                        Label("Watch the intro", systemImage: "film")
+                            .font(.app(.body, weight: .semibold))
+                    }
+                }
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
         }
         .tint(accent)
         .background { TrainingBackdrop(theme: theme).ignoresSafeArea() }
+        .fullScreenCover(isPresented: $watchingIntro) {
+            IntroFilmView { watchingIntro = false }
+        }
         .navigationTitle("How it works")
         .navigationBarTitleDisplayMode(.inline)
     }
