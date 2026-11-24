@@ -1747,7 +1747,15 @@ final class SculptedBoardScene {
         let keyNode = SCNNode()
         keyNode.light = key
         keyLight = key
-        keyNode.simdPosition = Self.keyPosition
+        // Sketch only (not for main): which shadow look to show. A: the light sits higher, so
+        // shadows are short. B: today's long shadows, fading out just past the board.
+        // C: the light comes from the player's left, so shadows fall sideways, not away.
+        let shadowLook = UserDefaults.standard.string(forKey: "sketch.shadowLook") ?? ""
+        switch shadowLook {
+        case "A": keyNode.simdPosition = SIMD3(-4, 14, 4)
+        case "C": keyNode.simdPosition = SIMD3(-9, 8, 1)
+        default: keyNode.simdPosition = Self.keyPosition
+        }
         keyNode.simdLook(at: .zero, up: SculptedCamera.up, localFront: SCNNode.simdLocalFront)
         rig.addChildNode(keyNode)
 
@@ -1771,6 +1779,15 @@ final class SculptedBoardScene {
         floor.simdOrientation = Self.flat
         floor.simdPosition = SIMD3(0, -0.14, 0)
         floor.castsShadow = false
+        if shadowLook == "B" {
+            // Full strength at the frame's outer edge, gone before the top of the view.
+            catcher.shaderModifiers = [.fragment: """
+            float4 world = scn_frame.inverseViewTransform * float4(_surface.position, 1.0);
+            float2 p = abs(world.xz);
+            float d = pow(pow(p.x, 6.0) + pow(p.y, 6.0), 1.0 / 6.0);
+            _output.color *= smoothstep(4.85, 4.4, d);
+            """]
+        }
         surroundNode.addChildNode(floor)
 
         let ground = SCNNode(geometry: Self.mark(size: 10.2, color: .black, alpha: 0.55, mask: MarkImages.boardShadow))
