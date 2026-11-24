@@ -1904,8 +1904,8 @@ struct HomeAuroraTabBar: View {
         .accessibilityHint("Scan a board from a photo, or set one up")
     }
 
-    /// The gold knight carries its name like the tabs do: Play, opening the vine menu.
-    private var knight: some View {
+    /// The gold coin itself: the Gilded knight over the word Play.
+    private var knightFace: some View {
                 VStack(spacing: 1) {
                     // The Gilded knight, a touch larger so its mane stripes read (Alex, 2026-11-10).
                     AnalyzeKnightGlyph()
@@ -1923,6 +1923,11 @@ struct HomeAuroraTabBar: View {
                     }
                     .overlay(Circle().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
                     .shadow(color: .black.opacity(palette.dark ? 0.5 : 0.18), radius: 14, y: 8)
+    }
+
+    /// The gold knight carries its name like the tabs do: Play, opening the vine menu.
+    private var knight: some View {
+                knightFace
                     .contentShape(Circle())
                     // The app's main button answered a touch with nothing until the finger
                     // lifted (audit, 2026-11-12): it now sinks a touch while pressed.
@@ -1942,7 +1947,7 @@ struct HomeAuroraTabBar: View {
                     .accessibilityLabel("Play")
                     .accessibilityHint("Quick play, Today's Move, Puzzles and A friend")
                     .accessibilityAddTraits(.isButton)
-                    .accessibilityAction(play)
+                    .accessibilityAction(.default) { play() }
     }
 
     private func tab(_ title: String, icon: HomeTabIcon.Kind, on: Bool, action: @escaping () -> Void) -> some View {
