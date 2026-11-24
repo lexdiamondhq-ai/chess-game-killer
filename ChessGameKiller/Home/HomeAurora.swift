@@ -205,9 +205,9 @@ struct HomeAuroraView: View {
                     .accessibilityHidden(tuck >= 1)
                 VStack(spacing: 0) {
                     Spacer()
-                    HomeAuroraTabBar(palette: palette, play: actions.stage.analyze, today: { toTop += 1 },
+                    HomeAuroraTabBar(palette: palette, analyze: actions.stage.analyze, today: { toTop += 1 },
                                      learn: actions.stage.learn, rooms: actions.stage.rooms, you: actions.stage.you,
-                                     hold: openKnightMenu,
+                                     play: openKnightMenu,
                                      knightAt: { knightCenter = $0 })
                         .padding(.horizontal, 16)
                         .padding(.bottom, 8)
@@ -1839,29 +1839,32 @@ struct HomeAuroraRings: View {
 /// at the top still opens it too.
 struct HomeAuroraTabBar: View {
     let palette: HomeAuroraPalette
-    let play: () -> Void
+    /// The glass Analyze button with the scan mark (Alex picked C, 2026-11-24).
+    let analyze: () -> Void
     /// Home is Today, so its own button goes back to the top of the page.
     var today: () -> Void = {}
     let learn: () -> Void
     let rooms: () -> Void
     let you: () -> Void
-    /// A press and hold on the gold knight: its ironwork menu (Alex, 2026-11-14).
-    var hold: () -> Void = {}
-    /// Where the gold knight's center sits, in Home's own space, for the menu's branches.
+    /// The gold knight is Play now: a tap (or a hold) grows its gold vine menu (Alex, 2026-11-24).
+    var play: () -> Void = {}
+    /// Where the gold knight's center sits, in Home's own space, for the menu's vines.
     var knightAt: (CGPoint) -> Void = { _ in }
     static let space = "home.aurora"
+    /// The two round buttons beside the tabs.
+    static let coin: CGFloat = 58
     /// A finger is on the gold knight: it gives a little, like every other button here.
     @State private var knightPressed = false
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
             HStack(spacing: 0) {
                 tab("Today", icon: .today, on: true, action: today)
                 tab("Learn", icon: .learn, on: false, action: learn)
                 tab("Rooms", icon: .rooms, on: false, action: rooms)
                 tab("You", icon: .you, on: false, action: you)
             }
-            .padding(.horizontal, 6)
+            .padding(.horizontal, 4)
             .frame(height: 64)
             .background {
                 Capsule()
@@ -1870,27 +1873,53 @@ struct HomeAuroraTabBar: View {
                     .overlay(Capsule().strokeBorder(palette.gold.opacity(0.35), lineWidth: 0.75))
                     .shadow(color: .black.opacity(palette.dark ? 0.5 : 0.14), radius: 20, y: 10)
             }
-            // A tap opens Analyze; a press and hold grows the ironwork menu (Alex, 2026-11-14).
+            analyzeButton
             knight
         }
     }
 
-    /// The knight carries its name like the tabs do, so nobody has to guess what it opens.
+    /// Analyze gets its own clear button: a little board inside camera corners, so a new player
+    /// reads "scan a board" at a glance (Alex picked C, 2026-11-24).
+    private var analyzeButton: some View {
+        Button(action: analyze) {
+            VStack(spacing: 2) {
+                ScanBoardGlyph()
+                    .frame(width: 26, height: 25)
+                Text("Analyze")
+                    .font(.system(size: 9.5, weight: .semibold))
+            }
+            .foregroundStyle(palette.dark ? Color(hex: 0xE8C27A) : Color(hex: 0x8A5F1E))
+            .frame(width: Self.coin, height: Self.coin)
+            .background {
+                Circle()
+                    .fill(.ultraThinMaterial)
+                    .overlay(Circle().fill(palette.dark ? Color(hex: 0x14161E).opacity(0.85) : Color.white.opacity(0.92)))
+                    .overlay(Circle().strokeBorder(palette.gold.opacity(0.55), lineWidth: 1))
+                    .shadow(color: .black.opacity(palette.dark ? 0.5 : 0.16), radius: 14, y: 8)
+            }
+            .contentShape(Circle())
+        }
+        .buttonStyle(HomeStagePress())
+        .accessibilityLabel("Analyze")
+        .accessibilityHint("Scan a board from a photo, or set one up")
+    }
+
+    /// The gold knight carries its name like the tabs do: Play, opening the vine menu.
     private var knight: some View {
                 VStack(spacing: 1) {
                     // The Gilded knight, a touch larger so its mane stripes read (Alex, 2026-11-10).
                     AnalyzeKnightGlyph()
-                        .frame(width: 25, height: 30)
-                    Text("Analyze")
-                        .font(.system(size: 9.5, weight: .semibold))
+                        .frame(width: 23, height: 28)
+                    Text("Play")
+                        .font(.system(size: 10, weight: .semibold))
                 }
                     .foregroundStyle(Color(hex: 0x2A1C08))
-                    .frame(width: 64, height: 64)
+                    .frame(width: Self.coin, height: Self.coin)
                     .background {
                         Circle().fill(RadialGradient(stops: [.init(color: Color(hex: 0xFFF1CC), location: 0),
                                                              .init(color: Color(hex: 0xE8C27A), location: 0.45),
                                                              .init(color: Color(hex: 0xA66F25), location: 1)],
-                                                     center: UnitPoint(x: 0.32, y: 0.26), startRadius: 0, endRadius: 40))
+                                                     center: UnitPoint(x: 0.32, y: 0.26), startRadius: 0, endRadius: 37))
                     }
                     .overlay(Circle().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
                     .shadow(color: .black.opacity(palette.dark ? 0.5 : 0.18), radius: 14, y: 8)
@@ -1900,8 +1929,9 @@ struct HomeAuroraTabBar: View {
                     .scaleEffect(knightPressed ? 0.94 : 1)
                     .brightness(knightPressed ? -0.04 : 0)
                     .animation(.spring(response: 0.25, dampingFraction: 0.7), value: knightPressed)
+                    // A tap opens the menu; a hold still does too, for hands that learned it.
                     .onTapGesture(perform: play)
-                    .onLongPressGesture(minimumDuration: 0.35, perform: hold) { pressing in
+                    .onLongPressGesture(minimumDuration: 0.35, perform: play) { pressing in
                         knightPressed = pressing
                     }
                     .onGeometryChange(for: CGPoint.self) { proxy in
@@ -1909,9 +1939,10 @@ struct HomeAuroraTabBar: View {
                         return CGPoint(x: frame.midX, y: frame.midY)
                     } action: { knightAt($0) }
                     .accessibilityElement()
-                    .accessibilityLabel("Analyze")
+                    .accessibilityLabel("Play")
+                    .accessibilityHint("Quick play, Today's Move, Puzzles and A friend")
                     .accessibilityAddTraits(.isButton)
-                    .accessibilityAction(named: "More", hold)
+                    .accessibilityAction(play)
     }
 
     private func tab(_ title: String, icon: HomeTabIcon.Kind, on: Bool, action: @escaping () -> Void) -> some View {
@@ -1920,9 +1951,11 @@ struct HomeAuroraTabBar: View {
             VStack(spacing: 3) {
                 HomeTabIcon(kind: icon,
                             color: on ? (palette.dark ? Color(hex: 0xE8C27A) : Color(hex: 0xB7832E)) : palette.ink.opacity(0.82))
-                    .frame(width: 28, height: 28)
+                    .frame(width: 27, height: 27)
                 Text(title)
                     .font(.system(size: 11, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             .foregroundStyle(on ? palette.ink : palette.ink2)
             .frame(maxWidth: .infinity)

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// What a press and hold on the gold Analyze knight offers (Alex, 2026-11-14): four round gold
+/// What the gold Play knight offers (a tap since 2026-11-24, Analyze has its own button) (Alex, 2026-11-14): four round gold
 /// doors that grow out toward the middle of the screen on living gold vines, each leaving the
 /// knight's orb from its own spot (Alex, 2026-11-15). Rooms has its own tab, so it is not repeated.
 enum HomeKnightDoor: String, CaseIterable, Identifiable {
@@ -96,17 +96,17 @@ struct HomeKnightBranchMenu: View {
     private var knightCoin: some View {
         VStack(spacing: 1) {
             AnalyzeKnightGlyph()
-                .frame(width: 25, height: 30)
-            Text("Analyze")
-                .font(.system(size: 9.5, weight: .semibold))
+                .frame(width: 23, height: 28)
+            Text("Play")
+                .font(.system(size: 10, weight: .semibold))
         }
         .foregroundStyle(Color(hex: 0x2A1C08))
-        .frame(width: 64, height: 64)
+        .frame(width: HomeAuroraTabBar.coin, height: HomeAuroraTabBar.coin)
         .background {
             Circle().fill(RadialGradient(stops: [.init(color: Color(hex: 0xFFF1CC), location: 0),
                                                  .init(color: Color(hex: 0xE8C27A), location: 0.45),
                                                  .init(color: Color(hex: 0xA66F25), location: 1)],
-                                         center: UnitPoint(x: 0.32, y: 0.26), startRadius: 0, endRadius: 40))
+                                         center: UnitPoint(x: 0.32, y: 0.26), startRadius: 0, endRadius: 37))
         }
         .overlay(Circle().strokeBorder(Color(hex: 0xF6DC93).opacity(0.8), lineWidth: 1.5).padding(-3))
         .shadow(color: Color(hex: 0xE6C06A).opacity(0.45), radius: 16)
