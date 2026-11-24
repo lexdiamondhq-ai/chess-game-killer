@@ -82,6 +82,20 @@ final class PremiumTests: XCTestCase {
         XCTAssertTrue(ledger.take(.ratedPuzzle, allowance: allowance, now: tomorrow))
     }
 
+    func testATalkThatNeverGotAnAnswerIsGivenBack() {
+        let ledger = AllowanceLedger(defaults: defaults, calendar: calendar())
+        let allowance = PremiumFeature.Allowance.perWeek(3)
+        let monday = date("2026-10-19T10:00:00-05:00")
+        for _ in 0..<3 { XCTAssertTrue(ledger.take(.talk, allowance: allowance, now: monday)) }
+        XCTAssertEqual(ledger.remaining(.talk, allowance: allowance, now: monday), 0)
+        // The third talk's answer never came (no connection): it doesn't count.
+        ledger.giveBack(.talk, allowance: allowance, now: monday)
+        XCTAssertEqual(ledger.remaining(.talk, allowance: allowance, now: monday), 1)
+        // Nothing to give back never goes below zero used.
+        ledger.giveBack(.scan, allowance: allowance, now: monday)
+        XCTAssertEqual(ledger.remaining(.scan, allowance: allowance, now: monday), 3)
+    }
+
     func testAWeekAllowanceLastsTheWeek() {
         let ledger = AllowanceLedger(defaults: defaults, calendar: calendar())
         let allowance = PremiumFeature.Allowance.perWeek(3)

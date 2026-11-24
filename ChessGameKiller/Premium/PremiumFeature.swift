@@ -102,8 +102,8 @@ enum PremiumFeature: String, CaseIterable, Identifiable, Codable {
     /// One line on where the free part stops, for the offer screen and limit cards.
     var limitLine: String {
         switch self {
-        case .talk: return "That's your 3 free talks this week. Premium talks it through as much as you like."
-        case .scan: return "That's your 3 free photo scans this week. Premium scans as many as you like. Setting up by hand is always free."
+        case .talk: return "That's your 3 free talks this week. Premium gives you up to 50 talks a day."
+        case .scan: return "That's your 3 free photo scans this week. Premium scans up to 30 a day. Setting up by hand is always free."
         case .ratedPuzzle: return "That's today's 15 free puzzles. More tomorrow, or unlimited with Premium."
         case .puzzleRush: return "That's today's free Puzzle Rush. Premium rushes as often as you like."
         case .fullRewind: return "Today's free full Rewind is used. The line and key moments stay free for every game."
@@ -119,7 +119,7 @@ enum PremiumFeature: String, CaseIterable, Identifiable, Codable {
         // The rival boards (Spark to Singularity) left Settings on 2026-11-08, so they are no longer promised here.
         case .boardLooks: return "Gilded, Classic, Noir and Midnight are free. Premium opens every look."
         case .coachProfile: return "Your top weakness is free. Premium shows your whole style and a plan rebuilt after every game."
-        case .deepReview: return "The line and key moments are free for every game. With Premium your coach talks you through the whole game, as often as you like."
+        case .deepReview: return "The line and key moments are free for every game. With Premium your coach talks you through the whole game, up to 20 games a day."
         }
     }
 }

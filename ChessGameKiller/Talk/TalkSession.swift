@@ -554,7 +554,8 @@ final class TalkSession: Identifiable {
             if let answer { speak(.words(answer)) }
             return
         }
-        // No verdicts: nothing to show, so nothing of Leo's either.
+        // No verdicts: nothing to show, so nothing of Leo's either, and the talk isn't counted.
+        Premium.shared.giveBack(.talk)
         if isSpeaking { stopSpeaking() }
         answer = nil
         if let serverError {

@@ -225,8 +225,8 @@ private struct PremiumBenefitList: View {
                 detail: "115,000 rated puzzles, Puzzle Rush, Cycles and your review queue."),
         Benefit(symbol: "graduationcap", title: "Every lesson and drill",
                 detail: "All 15 lessons, 3,865 openings, 22 endgames, master games and unlimited See ahead."),
-        Benefit(symbol: "bubble.left.and.bubble.right", title: "Talk It Through any time",
-                detail: "Plus photo scans, as often as you like."),
+        Benefit(symbol: "bubble.left.and.bubble.right", title: "Talk It Through every day",
+                detail: "Up to 50 talks and 30 photo scans a day."),
         // Premium opens every rival (RivalLadder.opensEverything); the page now says so
         // (Alex, 2026-11-11, audit pick R4).
         Benefit(symbol: "shield.lefthalf.filled", title: "Every rival, from day one",
