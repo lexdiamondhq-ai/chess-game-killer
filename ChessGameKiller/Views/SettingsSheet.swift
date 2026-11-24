@@ -199,13 +199,6 @@ struct SettingsSheet: View {
                             }
                             .buttonStyle(.plain)
                             rule
-                            NavigationLink {
-                                LicensesView(theme: theme)
-                            } label: {
-                                LinkRowLabel(title: "Open-source licenses", symbol: "doc.text", theme: theme)
-                            }
-                            .buttonStyle(.plain)
-                            rule
                             Link(destination: PremiumStyle.privacy) {
                                 LinkRowLabel(title: "Privacy policy", symbol: "hand.raised", theme: theme)
                             }
@@ -231,6 +224,23 @@ struct SettingsSheet: View {
                             .accessibilityElement(children: .combine)
                         }
                     }
+
+                    // The licenses must stay in the app (Stockfish and the cburnett pieces are GPL,
+                    // ChessKit is MIT), but not as a full row: a small gray word under everything
+                    // (Alex picked A, 2026-11-24).
+                    NavigationLink {
+                        LicensesView(theme: theme)
+                    } label: {
+                        Text("Licenses")
+                            .font(.app(.footnote))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, -8)
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 12)
