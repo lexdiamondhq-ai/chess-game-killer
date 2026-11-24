@@ -21,3 +21,9 @@ test("an invite with the default name says A friend, never Player", () => {
   assert.match(html, /A friend challenged you to chess/);
   assert.doesNotMatch(html, /Player challenged you/);
 });
+
+test("a withdrawn invite with the default name says A friend withdrew it", () => {
+  const game = { ...waiting("Player"), status: "over", result: { reason: "cancelled" } };
+  const html = renderInvitePage({ game, origin: "https://example.com", code: "ABCDEF" });
+  assert.match(html, /A friend withdrew this challenge/);
+});

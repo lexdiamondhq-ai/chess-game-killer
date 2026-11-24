@@ -989,7 +989,7 @@ function buildNote(key) {
   if (key === 'note:cancelled') {
     const creatorIsMe = S.seat && g.creator === S.seat;
     title = creatorIsMe ? 'You withdrew this challenge' : "This challenge isn’t here anymore";
-    text = creatorIsMe ? 'The link no longer works. Start a new one any time.' : `${nameOf(g.creator)} withdrew this challenge.`;
+    text = creatorIsMe ? 'The link no longer works. Start a new one any time.' : `${inviterOf(g)} withdrew this challenge.`;
   } else if (key === 'note:expired') {
     title = 'This challenge expired';
     text = 'Nobody played it in time. Start a fresh one.';

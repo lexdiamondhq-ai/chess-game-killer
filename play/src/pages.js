@@ -128,7 +128,7 @@ export function renderInvitePage({ game, origin, code }) {
   if (gone) {
     const withdrawn = game && game.result && game.result.reason === 'cancelled';
     const line = withdrawn
-      ? `${esc(nameOf(game, game.creator))} withdrew this challenge.`
+      ? `${esc(inviterOf(game))} withdrew this challenge.`
       : 'It may have expired, or the person who sent it withdrew it.';
     return `<!doctype html>
 <html lang="en" class="page-gone">
