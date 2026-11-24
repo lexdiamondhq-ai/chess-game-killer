@@ -35,4 +35,5 @@ The main folder and Alex's phone builds are not touched.
   Step 4: main already counts a photo scan only when it is read, so only the talk half of #71 was left; a talk with no answer now gives the free talk back. The rest of #71 (lobby card, offer screen, Rewind) changes screens and still waits for Alex.
 - 2026-11-24: checked the talk give-back in the app: with the coach server unreachable the free talk came back (count 0), and a real talk on the live server counted 1.
   The invite fix moved to its own PR #220 (with "A friend withdrew this challenge"); PR #219 keeps the Premium wording, the talk give-back, and this log.
+  Step 4's scan half was read from the code (a scan counts only when the photo is read); a scan with the network off was not run on the simulator.
   Next: Alex picks the Premium wording and a shadow look, and checks the Analyze arrows on the iPhone.
