@@ -21,19 +21,51 @@ struct GameCoachRow: View {
                      tint: TrainingColor.yellow.color(on: theme)) { EmptyView() }
             } else if match.isOver, coach.savedThisGame > 0 {
                 // At the end of a game the way into practice comes first: it's what the game was for.
-                line(title: coach.savedThisGame == 1 ? "1 position to practice" : "\(coach.savedThisGame) positions to practice",
-                     detail: "The moments that cost you, saved for a second try.",
-                     tint: TrainingColor.pink.color(on: theme)) {
-                    smallButton("Practice", symbol: "arrow.uturn.backward.circle.fill") {
-                        coach.practiceMistakes(store: store)
-                    }
-                }
+                practicePill
             } else if let moment = coach.moment {
                 momentView(moment)
             }
         }
         .animation(.snappy(duration: 0.3), value: coach.moment)
         .animation(.snappy(duration: 0.3), value: coach.retrying)
+    }
+
+    /// The end of a game's one slim pink pill: the count, and Practice at its end
+    /// (Alex's pick A for the game-over card, 2026-11-24). The whole pill is the button.
+    private var practicePill: some View {
+        let pink = TrainingColor.pink.color(on: theme)
+        let accent = theme.trainingAccent
+        let count = coach.savedThisGame
+        return Button {
+            coach.practiceMistakes(store: store)
+        } label: {
+            HStack(spacing: 12) {
+                CoachAvatar(theme: theme, size: 32, tint: pink)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(count == 1 ? "1 position to practice" : "\(count) positions to practice")
+                        .font(.app(.subheadline, weight: .bold))
+                        .foregroundStyle(pink)
+                    Text("Saved for a second try")
+                        .font(.app(.caption))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 4)
+                HStack(spacing: 3) {
+                    Text("Practice")
+                    Image(systemName: "chevron.right").font(.app(.caption2, weight: .bold))
+                }
+                .font(.app(.subheadline, weight: .bold))
+                .foregroundStyle(accent)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(pink.opacity(theme.screenIsDark ? 0.10 : 0.08), in: Capsule())
+            .overlay(Capsule().strokeBorder(pink.opacity(0.3), lineWidth: 1))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(count == 1 ? "1 position to practice" : "\(count) positions to practice")
+        .accessibilityHint("Practice the moments that cost you")
     }
 
     private func momentView(_ moment: CoachMoment) -> some View {

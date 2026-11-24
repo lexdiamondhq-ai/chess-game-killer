@@ -63,6 +63,26 @@ final class TourSnapshotTests: XCTestCase {
         window.isHidden = true
     }
 
+    /// The game-over card as a scoreboard (Alex's pick A, 2026-11-24): the score carved between
+    /// the two sides, the numbers on one gold line, one gold Rematch and quiet words under it.
+    func testTheGameOverScoreboard() throws {
+        let match = MatchController(engine: nil, sounds: nil)
+        match.startTapping()
+        XCTAssertTrue(match.playOwnMove("e2e4"))
+        match.resign()
+        XCTAssertTrue(match.isOver)
+        let view = VStack {
+            Spacer()
+            CoachOrb(match: match, theme: theme, isExpanded: .constant(true),
+                     newGame: nil, home: {}, showGames: {})
+                .padding(.horizontal, 12)
+        }
+        .background(Color(red: 0.12, green: 0.09, blue: 0.06))
+        let window = try show(view, wait: 2)
+        try save(window, "tour-game-over-scoreboard")
+        window.isHidden = true
+    }
+
     func testTheRivalsHall() throws {
         let window = try show(RivalsHall(begin: { _ in }, close: {}), wait: 3)
         try save(window, "tour-rivals-hall")

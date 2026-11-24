@@ -502,20 +502,17 @@ private struct CoachPanel: View {
 
     @ViewBuilder
     private var header: some View {
+        if match.isOver {
+            scoreboard
+        } else {
+            playingHeader
+        }
+    }
+
+    @ViewBuilder
+    private var playingHeader: some View {
         HStack(alignment: .center, spacing: 12) {
-            if match.isOver {
-                let result = ResultText(match: match)
-                resultBadge
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(result.title).font(.app(.headline)).foregroundStyle(resultColor)
-                    Text(result.detail).font(.app(.subheadline)).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 4)
-                // The title has already said who won.
-                EvalChip(text: scoreline, color: resultColor, large: true)
-                    .accessibilityHidden(true)
-            } else if match.isComputerThinking {
+            if match.isComputerThinking {
                 ThinkingSigil(rival: match.setup.rival, size: 40, glows: theme.glows)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(rival) \(rival.agreeing("is", "are")) thinking").font(.app(.headline))
@@ -578,35 +575,74 @@ private struct CoachPanel: View {
         return won ? accent : .primary
     }
 
-    private var resultBadge: some View {
-        let symbol = match.playerWon.map { $0 ? "crown.fill" : "flag.fill" } ?? "equal"
-        return ZStack {
-            Circle().fill(resultColor.opacity(0.16))
-            Circle().strokeBorder(resultColor.opacity(0.55), lineWidth: 1)
-            Image(systemName: symbol)
-                .font(.system(size: 17, weight: .bold))
-                .foregroundStyle(resultColor)
+    /// The game's end as a scoreboard (Alex's pick A, 2026-11-24): White's side, the score
+    /// carved in Cinzel, Black's side, and one quiet line on how it ended.
+    private var scoreboard: some View {
+        let result = ResultText(match: match)
+        return VStack(spacing: 10) {
+            HStack(alignment: .center, spacing: 20) {
+                scoreSide(.white)
+                Text(scoreline)
+                    .font(.custom("Cinzel-Bold", size: 42))
+                    .foregroundStyle(accent)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .fixedSize()
+                scoreSide(.black)
+            }
+            (Text(result.title + ". ").foregroundStyle(resultColor)
+                + Text(result.detail).foregroundStyle(.secondary))
+                .font(.system(size: 16, weight: .regular, design: .serif))
+                .italic()
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity)
         }
-        .frame(width: 38, height: 38)
-        .shadow(color: theme.glows ? resultColor.opacity(0.6) : .clear, radius: 8)
-        .accessibilityHidden(true)
+        .padding(.top, 2)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(result.title). \(result.detail)")
+    }
+
+    /// One side of the scoreboard: the rival's coin, or a king for a person, and the name.
+    private func scoreSide(_ color: Piece.Color) -> some View {
+        let isRival = match.setup.opponent == .computer && !match.game.humanColors.contains(color)
+        return VStack(spacing: 5) {
+            Group {
+                if isRival {
+                    RivalCoin(rival: match.setup.rival, size: 44)
+                } else {
+                    PieceImage(piece: Piece(.king, color: color, square: .e1), theme: theme, size: 30)
+                        .frame(width: 44, height: 44)
+                        .background(Color.primary.opacity(theme.isDark ? 0.07 : 0.05), in: Circle())
+                }
+            }
+            .overlay(Circle().strokeBorder(accent.opacity(0.5), lineWidth: 1))
+            Text(ExecutivePlate.displayName(of: color, in: match, theme: theme))
+                .font(.app(.caption, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .frame(width: 84)
     }
 
     private var scoreline: String {
-        guard let winner = match.winner else { return "½–½" }
-        return winner == .white ? "1–0" : "0–1"
+        guard let winner = match.winner else { return "½ – ½" }
+        return winner == .white ? "1 – 0" : "0 – 1"
     }
 
     // MARK: Details
 
     private var details: some View {
         VStack(spacing: 0) {
+            // Once the game is over the numbers come first, under the score, and the
+            // practice pill after them.
+            if match.isOver { summary.padding(.top, 14) }
             if let gameCoach, let training, GameCoachRow.hasContent(coach: gameCoach, match: match) {
                 GameCoachRow(coach: gameCoach, store: training, match: match, theme: theme)
-                    .padding(.top, 10)
+                    .padding(.top, match.isOver ? 14 : 10)
             }
             if match.isOver {
-                summary.padding(.top, 12)
                 if let hero {
                     PieceOfTheMatchCard(hero: hero, color: match.setup.playerColor, theme: theme)
                         .padding(.top, 10)
@@ -632,17 +668,25 @@ private struct CoachPanel: View {
         match.evaluation.map { match.forPlayer($0).label }
     }
 
+    /// The four numbers on one line, between two thin gold rules, with no boxes.
     private var summary: some View {
-        HStack(spacing: 8) {
-            StatTile(title: "Accuracy", value: match.accuracy.map { "\($0)%" } ?? "–",
-                     color: match.accuracy.map { MoveReview.Grade.forAccuracy($0).color(on: theme) } ?? .secondary,
-                     theme: theme)
-            StatTile(title: "Best", value: "\(match.gradeCounts[.best, default: 0] + match.gradeCounts[.checkmate, default: 0])",
-                     color: .primary, theme: theme)
-            StatTile(title: "Mistakes", value: "\(match.gradeCounts[.mistake, default: 0])",
-                     color: MoveReview.Grade.mistake.color(on: theme), theme: theme)
-            StatTile(title: "Blunders", value: "\(match.gradeCounts[.blunder, default: 0])",
-                     color: MoveReview.Grade.blunder.color(on: theme), theme: theme)
+        VStack(spacing: 0) {
+            GoldRule(accent: accent)
+            HStack(spacing: 0) {
+                StatTile(title: "Accuracy", value: match.accuracy.map { "\($0)%" } ?? "–",
+                         color: match.accuracy.map { MoveReview.Grade.forAccuracy($0).color(on: theme) } ?? .secondary)
+                StatDivider(accent: accent)
+                StatTile(title: "Best", value: "\(match.gradeCounts[.best, default: 0] + match.gradeCounts[.checkmate, default: 0])",
+                         color: .primary)
+                StatDivider(accent: accent)
+                StatTile(title: "Mistakes", value: "\(match.gradeCounts[.mistake, default: 0])",
+                         color: MoveReview.Grade.mistake.color(on: theme))
+                StatDivider(accent: accent)
+                StatTile(title: "Blunders", value: "\(match.gradeCounts[.blunder, default: 0])",
+                         color: MoveReview.Grade.blunder.color(on: theme))
+            }
+            .padding(.vertical, 12)
+            GoldRule(accent: accent)
         }
     }
 
@@ -715,17 +759,16 @@ private struct CoachPanel: View {
     @ViewBuilder
     private var controls: some View {
         if match.isOver {
-            VStack(spacing: 8) {
-                if let next = nextRival { nextRivalOffer(next) }
-                endButtons
-                if canReview || hasHighlights {
-                    HStack(spacing: 8) {
-                        if canReview { reviewButton }
-                        if hasHighlights { highlightsButton }
-                    }
+            // One gold button, and the rest as quiet words under it (Alex's pick A, 2026-11-24).
+            VStack(spacing: 14) {
+                if let next = nextRival {
+                    nextRivalOffer(next)
+                } else {
+                    rematchButton
                 }
+                endLinks
             }
-            .padding(.top, 12)
+            .padding(.top, 16)
         } else {
             actions.padding(.top, 10)
         }
@@ -819,18 +862,17 @@ private struct CoachPanel: View {
                 }
                 .foregroundStyle(Color(hex: 0x1B1408))
                 .frame(maxWidth: .infinity)
-                .frame(minHeight: 50)
+                .frame(minHeight: 52)
                 .background {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    Capsule()
                         .fill(LinearGradient(colors: [Color(hex: 0xF3DDA8), gold, Color(hex: 0xC99A4B)],
                                              startPoint: .top, endPoint: .bottom))
                 }
                 .overlay {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.35), lineWidth: 1)
+                    Capsule().strokeBorder(Color.white.opacity(0.35), lineWidth: 1)
                 }
                 .shadow(color: gold.opacity(theme.glows ? 0.45 : 0.2), radius: 12, y: 3)
-                .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .contentShape(Capsule())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Face \(rival.name)")
@@ -839,62 +881,86 @@ private struct CoachPanel: View {
         .padding(.bottom, 4)
     }
 
-    private var endButtons: some View {
-        HStack(spacing: 10) {
-            rematchButton
-
-            if let newGame {
-                Button {
-                    collapse()
-                    newGame()
-                } label: {
-                    Label("New game", systemImage: "plus")
-                        .font(.app(.headline))
-                        .frame(maxWidth: .infinity)
-                        .frame(minHeight: 50)
+    /// Home (or New game), Review game and Highlights as plain words with dots between;
+    /// Rematch joins them when the next rival's gold button has the top spot.
+    private var endLinks: some View {
+        HStack(spacing: 0) {
+            let links = endLinkKinds
+            ForEach(Array(links.enumerated()), id: \.element) { index, kind in
+                if index > 0 {
+                    Text("·").foregroundStyle(.tertiary).accessibilityHidden(true)
                 }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.roundedRectangle(radius: 16))
-            } else if let home {
-                Button {
-                    collapse()
-                    home()
-                } label: {
-                    Label("Home", image: Glyphs.home)
-                        .font(.app(.headline))
-                        .frame(maxWidth: .infinity)
-                        .frame(minHeight: 50)
-                }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.roundedRectangle(radius: 16))
+                endLink(kind)
             }
+        }
+        .font(.app(.subheadline, weight: .semibold))
+        .lineLimit(1)
+        .minimumScaleFactor(0.8)
+        .frame(maxWidth: .infinity)
+    }
+
+    private enum EndLink: Hashable { case rematch, newGame, home, review, highlights }
+
+    private var endLinkKinds: [EndLink] {
+        var links: [EndLink] = []
+        if nextRival != nil { links.append(.rematch) }
+        if newGame != nil { links.append(.newGame) } else if home != nil { links.append(.home) }
+        if canReview { links.append(.review) }
+        if hasHighlights { links.append(.highlights) }
+        return links
+    }
+
+    @ViewBuilder
+    private func endLink(_ kind: EndLink) -> some View {
+        switch kind {
+        case .rematch:
+            linkButton("Rematch") {
+                collapse()
+                withAnimation(.snappy) { match.rematch() }
+            }
+        case .newGame:
+            linkButton("New game") {
+                collapse()
+                newGame?()
+            }
+        case .home:
+            linkButton("Home") {
+                collapse()
+                home?()
+            }
+        case .review: reviewButton
+        case .highlights: highlightsButton
         }
     }
 
-    /// Rematch is the panel's one solid button, unless the next rival is on offer above it:
-    /// then that is the solid one, and Rematch steps back beside Home.
-    @ViewBuilder
+    /// A quiet word to tap, a full 44 pt tall.
+    private func linkButton(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .foregroundStyle(Color.primary.opacity(0.82))
+                .padding(.horizontal, 12)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// The panel's one gold button: a full-width capsule.
     private var rematchButton: some View {
-        let rematch: () -> Void = {
+        Button {
             collapse()
             withAnimation(.snappy) { match.rematch() }
+        } label: {
+            Label("Rematch", systemImage: "play.fill")
+                .font(.app(.headline))
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 52)
         }
-        let label = Label("Rematch", systemImage: "play.fill")
-            .font(.app(.headline))
-            .frame(maxWidth: .infinity)
-            .frame(minHeight: 50)
-        if nextRival == nil {
-            Button(action: rematch) { label }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.roundedRectangle(radius: 16))
-                .tint(accent)
-                .foregroundStyle(theme.isDark ? Color.black : Color.white)
-                .shadow(color: theme.glows ? accent.opacity(0.5) : .clear, radius: 12)
-        } else {
-            Button(action: rematch) { label }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.roundedRectangle(radius: 16))
-        }
+        .buttonStyle(.borderedProminent)
+        .buttonBorderShape(.capsule)
+        .tint(accent)
+        .foregroundStyle(theme.isDark ? Color.black : Color.white)
+        .shadow(color: accent.opacity(theme.glows ? 0.5 : 0.22), radius: 12, y: 3)
     }
 
     /// Rewind needs somewhere to keep the game, and a move to look back on.
@@ -911,15 +977,13 @@ private struct CoachPanel: View {
             vault?.record(game)
             rewind = vault?.game(game.id) ?? game
         } label: {
-            Label("Review game", systemImage: "backward.circle")
-                .font(.app(.subheadline, weight: .semibold))
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: 28)
+            Text("Review game")
+                .foregroundStyle(Color.primary.opacity(0.82))
+                .padding(.horizontal, 12)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
         }
-        .buttonStyle(.bordered)
-        .buttonBorderShape(.capsule)
-        .controlSize(.small)
-        .tint(.primary)
+        .buttonStyle(.plain)
         .fullScreenCover(item: $rewind) { game in
             if let vault {
                 RewindView(game: game, theme: theme, onPlayAgain: { _ in
@@ -941,15 +1005,13 @@ private struct CoachPanel: View {
             let names = army?.names(for: match.setup.playerColor) ?? [:]
             reel = match.highlightReel(pieceName: { names[$0] }, hero: hero?.line)
         } label: {
-            Label("Highlights", systemImage: "film.stack")
-                .font(.app(.subheadline, weight: .semibold))
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: 28)
+            Text("Highlights")
+                .foregroundStyle(Color.primary.opacity(0.82))
+                .padding(.horizontal, 12)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
         }
-        .buttonStyle(.bordered)
-        .buttonBorderShape(.capsule)
-        .controlSize(.small)
-        .tint(.primary)
+        .buttonStyle(.plain)
         .fullScreenCover(item: $reel) { reel in
             HighlightReelView(reel: reel, theme: theme)
                 .keepsPhoneUpright("highlights")
@@ -1124,31 +1186,51 @@ private struct ActionButton: View {
     }
 }
 
-/// One number from the game's summary.
+/// One number from the game's summary: the number, and its name in small capitals under it.
 private struct StatTile: View {
     let title: String
     let value: String
     let color: Color
-    let theme: BoardTheme
 
     var body: some View {
-        VStack(spacing: 2) {
-            Text(title)
-                .font(.app(.caption2, weight: .semibold))
-                .foregroundStyle(.secondary)
+        VStack(spacing: 3) {
             Text(value)
-                .font(.app(.title3, weight: .heavy).monospacedDigit())
+                .font(.app(.title2, weight: .bold).monospacedDigit())
                 .foregroundStyle(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text(title.uppercased())
+                .font(.app(.caption2, weight: .medium))
+                .tracking(0.8)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
         .frame(maxWidth: .infinity)
-        .frame(minHeight: 54)
-        .background(
-            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .fill(Color.primary.opacity(theme.isDark ? 0.05 : 0.04))
-                .overlay(RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(theme.isDark ? 0.09 : 0.08), lineWidth: 1))
-        )
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(title) \(value)")
+    }
+}
+
+/// A thin gold rule across the panel that fades out at both ends.
+private struct GoldRule: View {
+    let accent: Color
+
+    var body: some View {
+        LinearGradient(colors: [.clear, accent.opacity(0.4), .clear], startPoint: .leading, endPoint: .trailing)
+            .frame(height: 1)
+            .accessibilityHidden(true)
+    }
+}
+
+/// The thin upright line between two numbers, fading out at top and bottom.
+private struct StatDivider: View {
+    let accent: Color
+
+    var body: some View {
+        LinearGradient(colors: [.clear, accent.opacity(0.35), .clear], startPoint: .top, endPoint: .bottom)
+            .frame(width: 1, height: 40)
+            .accessibilityHidden(true)
     }
 }
 
