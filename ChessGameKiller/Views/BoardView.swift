@@ -43,6 +43,20 @@ struct BoardView: View {
                 flatBoard
             }
         }
+        // The better move the person missed, for a moment after they tap the coach's verdict.
+        .overlay {
+            if let missed = match.missedMove {
+                MissedMoveBoard(
+                    missed: missed, theme: theme, flipped: flipped,
+                    in3D: Self.playsIn3D(theme, setting: sculpted3D), framing: framing,
+                    close: { match.hideMissedMove() }
+                )
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.5), value: match.missedMove?.id)
+        // A new move, or a new game, brings the live board back.
+        .onChange(of: game.plyCount) { _, _ in match.hideMissedMove() }
     }
 
     /// Whether this look plays on the real 3D board. The setting was the "3D pieces" switch; it

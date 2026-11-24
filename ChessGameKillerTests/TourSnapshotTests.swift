@@ -198,6 +198,30 @@ final class TourSnapshotTests: XCTestCase {
 
     // MARK: Drawing
 
+    /// Tapping the coach's "Blunder" verdict: the board before the move, the better move's arrow,
+    /// and the piece glided there, see-through (Alex, 2026-11-24).
+    func testTheMissedMoveAfterTappingTheVerdict() throws {
+        let review = MoveReview(
+            id: 1, grade: .blunder, played: "Bc4", best: "Rxe6", evaluation: nil,
+            fenBefore: "r1bqk1nr/1p2b2p/2p1npp1/p5B1/P3R3/2NB4/1PP1QPPP/R5K1 w kq - 0 16",
+            playedUCI: "d3c4", bestUCI: "e4e6"
+        )
+        let missed = try XCTUnwrap(MissedMove(review))
+        XCTAssertEqual(missed.from, Square("e4"))
+        XCTAssertEqual(missed.to, Square("e6"))
+        XCTAssertEqual(missed.after[Square("e6")]?.piece(at: Square("e6")).kind, .rook)
+        XCTAssertNil(missed.after[Square("e4")])
+        let view = ZStack {
+            Color.black.ignoresSafeArea()
+            MissedMoveBoard(missed: missed, theme: theme, flipped: false, in3D: false, framing: .standing, close: {})
+                .padding(.horizontal, 0)
+                .padding(.bottom, 60)
+        }
+        let window = try show(view, wait: 2.6)
+        try save(window, "tour-missed-move")
+        window.isHidden = true
+    }
+
     private func show(_ view: some View, wait: TimeInterval) throws -> UIWindow {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let window = UIWindow(windowScene: scene)

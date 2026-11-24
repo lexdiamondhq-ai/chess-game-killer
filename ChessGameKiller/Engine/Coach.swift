@@ -235,7 +235,7 @@ enum Notation {
 
     private static let pieceValues: [Piece.Kind: Int] = [.pawn: 1, .knight: 3, .bishop: 3, .rook: 5, .queen: 9]
 
-    private static func promotionKind(_ uci: String) -> Piece.Kind {
+    static func promotionKind(_ uci: String) -> Piece.Kind {
         if uci.count == 5, let letter = uci.last, let kind = Piece.Kind(rawValue: letter.uppercased()) {
             return kind
         }

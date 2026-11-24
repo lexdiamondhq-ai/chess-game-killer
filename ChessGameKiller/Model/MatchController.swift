@@ -128,6 +128,9 @@ final class MatchController {
     private(set) var review: MoveReview?
     /// The same verdict, written into the person's own line by the board for a few seconds.
     private(set) var verdictLine: MoveReview?
+    /// The better move the person missed, shown on the board for a moment after they tap the
+    /// verdict (Alex, 2026-11-24). Nil the rest of the time.
+    private(set) var missedMove: MissedMove?
     /// How the position stands, from White's point of view. Drives the eval ring.
     private(set) var evaluation: Evaluation?
     private(set) var isComputerThinking = false
@@ -736,10 +739,23 @@ final class MatchController {
         }
     }
 
+    /// Shows on the board the better move a verdict names: the board goes back to before the move.
+    func showMissedMove(_ review: MoveReview) {
+        guard let missed = MissedMove(review) else { return }
+        missedMove = missed
+    }
+
+    /// Back to the game.
+    func hideMissedMove() {
+        guard missedMove != nil else { return }
+        missedMove = nil
+    }
+
     private func clearVerdictLine() {
         verdictExpiry?.cancel()
         verdictExpiry = nil
         verdictLine = nil
+        missedMove = nil
     }
 
     // MARK: Running the match
