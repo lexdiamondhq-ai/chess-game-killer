@@ -16,6 +16,8 @@ struct ContentView: View {
     @State private var confirmingDraw = false
     /// The welcome's Play, waiting on the first rival's film: its Begin starts this game.
     @State private var welcomeFilm: WelcomeFilm?
+    /// What the welcome picked, held while the intro film plays after it.
+    @State private var introAfterWelcome: PendingWelcomeEnd?
     /// The next rival's film, asked for from a won game's end panel.
     @State private var nextRivalFilm: NextRivalFilm?
     @State private var showingAnalyze = false
@@ -187,6 +189,18 @@ struct ContentView: View {
                 if showingWelcome {
                     WelcomeFlow(canStartGame: !match.newGameForfeits, page: Welcome.showcasePage()) { play, choice in
                         finishWelcome(play: play, choice: choice)
+                    }
+                    .transition(.opacity)
+                }
+            }
+            .overlay {
+                // The intro film, once, right after the welcome; the welcome counts as open until
+                // it ends, so nothing else opens over it.
+                if let pending = introAfterWelcome {
+                    IntroFilmView {
+                        IntroFilm.markSeen()
+                        introAfterWelcome = nil
+                        endWelcome(play: pending.play, choice: pending.choice)
                     }
                     .transition(.opacity)
                 }
@@ -645,6 +659,17 @@ struct ContentView: View {
     /// The welcome is done: the first rival's film, then its game; or leave the player on the
     /// home (or the New Game sheet).
     private func finishWelcome(play: Bool, choice: WelcomeChoice) {
+        // The first time, Road to the Throne plays first (Alex, 2026-11-24).
+        if IntroFilm.shouldShow() {
+            withAnimation(.easeInOut(duration: 0.5)) {
+                introAfterWelcome = PendingWelcomeEnd(play: play, choice: choice)
+            }
+            return
+        }
+        endWelcome(play: play, choice: choice)
+    }
+
+    private func endWelcome(play: Bool, choice: WelcomeChoice) {
         withAnimation(.easeInOut(duration: 0.35)) { showingWelcome = false }
         syncCoachSettings()
         if play {
@@ -1183,6 +1208,12 @@ private struct PendingTalkMove: Equatable {
 private struct NextRivalFilm: Identifiable {
     let id: MatchController.Level
     let setup: MatchController.Setup
+}
+
+/// What the welcome picked, held while the intro film plays.
+private struct PendingWelcomeEnd {
+    let play: Bool
+    let choice: WelcomeChoice
 }
 
 /// What the welcome picked, held while the first rival's film plays.
