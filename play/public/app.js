@@ -588,6 +588,11 @@ function onNotice(n) {
 function nameOf(side) {
   return S.game?.[side]?.name || sideWord(side);
 }
+/** Who sent the invite, as the friend reads it: "A friend" when they left their name blank. */
+function inviterOf(g) {
+  const name = g?.[g?.creator]?.name;
+  return name && name !== 'Player' ? name : 'A friend';
+}
 const GRACE_MS = 60000;
 /** "a minute", or "45 seconds" when the server says otherwise. */
 function graceWords(g = S.game) {
@@ -771,7 +776,7 @@ function render() {
 function renderTitle() {
   const g = S.game;
   let t = 'Beauty of Chess';
-  if (S.view === 'invite') t = `${nameOf(g.creator)} challenged you to chess · ${t}`;
+  if (S.view === 'invite') t = `${inviterOf(g)} challenged you to chess · ${t}`;
   else if (S.view === 'wait') t = `Waiting for your friend · ${t}`;
   else if (S.view === 'game' && g) {
     if (g.status === 'over') t = `${resultWords()[0]} · ${t}`;
@@ -826,7 +831,6 @@ function sideChip(side) {
 function buildInvite() {
   const g = S.game;
   const mySide = other(g.creator);
-  const creator = nameOf(g.creator);
   const input = h('input', {
     class: 'input',
     id: 'join-name',
@@ -886,7 +890,7 @@ function buildInvite() {
 
   return h('section', { class: 'view view-invite' },
     previewBoard(mySide),
-    h('h1', {}, `${creator} challenged you to chess`),
+    h('h1', {}, `${inviterOf(g)} challenged you to chess`),
     h('div', { class: 'chips' }, chip(icon('clock'), clockWords(g.clock, g.days)), sideChip(mySide)),
     form,
     h('p', { class: 'fine fair' }, fairWords()),
