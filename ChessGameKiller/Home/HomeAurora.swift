@@ -370,11 +370,16 @@ struct HomeAuroraView: View {
                 .fill(palette.ink3)
                 .frame(width: 38, height: 4)
                 .padding(.top, 10)
-            // Your move or Quick play, first thing on the page (Alex, 2026-11-13: picked A, one
-            // gold bar above Next game).
-            quickBar
+            // Your move, first thing on the page while a person waits on you (Alex, 2026-11-13:
+            // picked A, one gold bar above Next game). No Quick play bar when nobody waits (Alex,
+            // 2026-11-25): the gold Play coin in the bottom bar opens Quick play.
+            if let mode = HomeAuroraQuickBar.mode(games: info.games) {
+                HomeAuroraQuickBar(mode: mode, palette: palette) {
+                    if case .yourMove(let game, _) = mode { actions.open(game) }
+                }
                 .padding(.horizontal, 16)
                 .padding(.top, 14)
+            }
             // Play a friend, always in sight under the gold bar (Alex, 2026-11-20: "How do I
             // start a game? I thought it was on the homepage"; picked A, a slim row with your
             // friends' faces, a tap on a face sending them a game at once).
@@ -382,7 +387,7 @@ struct HomeAuroraView: View {
                 HomeAuroraFriendRow(people: info.people, palette: palette, open: friend,
                                     challenge: actions.challengeFriend)
                     .padding(.horizontal, 16)
-                    .padding(.top, 10)
+                    .padding(.top, HomeAuroraQuickBar.mode(games: info.games) == nil ? 14 : 10)
             }
             // The Face a rival coins are gone: the rival you're on stands big in the Next game
             // card instead (Alex, 2026-11-08). No All rivals link in the corner (Alex,
@@ -419,18 +424,6 @@ struct HomeAuroraView: View {
                 }
                 .shadow(color: .black.opacity(palette.dark ? 0.5 : 0.1), radius: 30, y: -10)
                 .ignoresSafeArea(edges: .bottom)
-        }
-    }
-
-    /// A game against a person waiting on your move opens from here; otherwise it is Quick play.
-    private var quickBar: some View {
-        let mode = HomeAuroraQuickBar.mode(games: info.games, upNext: info.stage.upNext)
-        return HomeAuroraQuickBar(mode: mode, palette: palette) {
-            if case .yourMove(let game, _) = mode {
-                actions.open(game)
-            } else {
-                actions.quickPlay()
-            }
         }
     }
 
