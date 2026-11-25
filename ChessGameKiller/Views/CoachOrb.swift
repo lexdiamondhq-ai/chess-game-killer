@@ -605,7 +605,11 @@ private struct CoachPanel: View {
 
     /// One side of the scoreboard: the rival's coin, or a king for a person, and the name.
     private func scoreSide(_ color: Piece.Color) -> some View {
-        let isRival = match.setup.opponent == .computer && !match.game.humanColors.contains(color)
+        // Against a rival, the side that isn't the player's is the rival's.
+        let isRival = match.setup.opponent == .computer && color != match.setup.playerColor
+        let name = match.setup.opponent == .computer
+            ? (isRival ? match.setup.rival.name : "You")
+            : theme.name(of: color)
         return VStack(spacing: 5) {
             Group {
                 if isRival {
@@ -617,7 +621,7 @@ private struct CoachPanel: View {
                 }
             }
             .overlay(Circle().strokeBorder(accent.opacity(0.5), lineWidth: 1))
-            Text(ExecutivePlate.displayName(of: color, in: match, theme: theme))
+            Text(name)
                 .font(.app(.caption, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -945,7 +949,7 @@ private struct CoachPanel: View {
         .buttonStyle(.plain)
     }
 
-    /// The panel's one gold button: a full-width capsule.
+    /// The panel's one gold button: a full-width capsule, 52 pt tall.
     private var rematchButton: some View {
         Button {
             collapse()
@@ -953,14 +957,15 @@ private struct CoachPanel: View {
         } label: {
             Label("Rematch", systemImage: "play.fill")
                 .font(.app(.headline))
+                .foregroundStyle(theme.isDark ? Color.black : Color.white)
                 .frame(maxWidth: .infinity)
-                .frame(minHeight: 52)
+                .frame(height: 52)
+                .background(Capsule().fill(accent.gradient))
+                .overlay(Capsule().strokeBorder(Color.white.opacity(0.3), lineWidth: 1))
+                .shadow(color: accent.opacity(theme.glows ? 0.5 : 0.22), radius: 12, y: 3)
+                .contentShape(Capsule())
         }
-        .buttonStyle(.borderedProminent)
-        .buttonBorderShape(.capsule)
-        .tint(accent)
-        .foregroundStyle(theme.isDark ? Color.black : Color.white)
-        .shadow(color: accent.opacity(theme.glows ? 0.5 : 0.22), radius: 12, y: 3)
+        .buttonStyle(.plain)
     }
 
     /// Rewind needs somewhere to keep the game, and a move to look back on.
