@@ -26,15 +26,22 @@ enum ArrowOutline {
         var dotted = false
 
         /// The coach's arrows (lessons, drills, puzzles): straight.
+        /// Every arrow leaves its piece cleanly: the tail begins just past the piece, with a small
+        /// gap, so it never lies on the piece that moves (Alex, 2026-11-25, option A).
+        static let clearOfPiece: CGFloat = 0.55
+        /// The analysis arrow lands on the glass ring round the target piece, the ring's own size.
+        static let ringRadius: CGFloat = 0.42
+
         static func coach(dashed: Bool) -> Proportions {
-            Proportions(shaft: dashed ? 0.12 : 0.15, headLength: 0.4, headWidth: 0.46, startInset: 0.2, tipInset: 0.1)
+            Proportions(shaft: dashed ? 0.12 : 0.15, headLength: 0.4, headWidth: 0.46, startInset: clearOfPiece,
+                        tipInset: 0.1)
         }
 
         /// The analysis arrows, flight paths: the best move fuller and higher, the next best slimmer.
         /// They bow only gently (Alex: "not the curved so much").
         static func analysis(best: Bool) -> Proportions {
             Proportions(shaft: best ? 0.14 : 0.1, headLength: best ? 0.32 : 0.27, headWidth: best ? 0.46 : 0.34,
-                        startInset: 0.24, tipInset: 0.08, bow: best ? 0.08 : 0.06, rise: best ? 0.22 : 0.16,
+                        startInset: clearOfPiece, tipInset: ringRadius, bow: best ? 0.08 : 0.06, rise: best ? 0.22 : 0.16,
                         dotted: !best)
         }
     }
@@ -46,8 +53,17 @@ enum ArrowOutline {
                      side: CGFloat = 1) -> (tail: CGPoint, pull: CGPoint, tip: CGPoint) {
         let length = max(hypot(end.x - start.x, end.y - start.y), 0.001 * unit)
         let u = CGPoint(x: (end.x - start.x) / length, y: (end.y - start.y) / length)
-        let tail = CGPoint(x: start.x + u.x * p.startInset * unit, y: start.y + u.y * p.startInset * unit)
-        let tip = CGPoint(x: end.x - u.x * p.tipInset * unit, y: end.y - u.y * p.tipInset * unit)
+        // A short move (one square) has too little room for both gaps and a whole arrow: the gaps
+        // shrink together, so the head and a stub of shaft always fit between the two pieces.
+        var startInset = p.startInset, tipInset = p.tipInset
+        let room = length / unit - startInset - tipInset, needed = p.headLength + 0.12
+        if room < needed, startInset + tipInset > 0 {
+            let scale = max(0, (length / unit - needed) / (startInset + tipInset))
+            startInset *= scale
+            tipInset *= scale
+        }
+        let tail = CGPoint(x: start.x + u.x * startInset * unit, y: start.y + u.y * startInset * unit)
+        let tip = CGPoint(x: end.x - u.x * tipInset * unit, y: end.y - u.y * tipInset * unit)
         let span = hypot(tip.x - tail.x, tip.y - tail.y)
         // A quadratic curve's middle sits halfway to its pull.
         let reach = 2 * p.bow * span * side
@@ -305,9 +321,10 @@ struct CrispArrow: View {
                 }
             }
             if landing {
-                let ring = CGRect(x: to.x - squareSize * 0.33, y: to.y - squareSize * 0.14,
-                                  width: squareSize * 0.66, height: squareSize * 0.36)
-                context.fill(Path(ellipseIn: ring), with: .color(color.opacity(0.18)))
+                // A glass ring round the target piece, the arrow's tip resting on it. Only its line:
+                // drawn over the board's pieces, a fill would cloud the piece inside.
+                let r = ArrowOutline.Proportions.ringRadius * squareSize
+                let ring = CGRect(x: to.x - r, y: to.y - r, width: r * 2, height: r * 2)
                 context.stroke(Path(ellipseIn: ring), with: .color(tailColor.opacity(min(1, opacity + 0.2))),
                                lineWidth: squareSize * 0.03)
             }

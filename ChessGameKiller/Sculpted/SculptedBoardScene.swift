@@ -364,7 +364,7 @@ final class SculptedBoardScene {
             checkShowsAt = new.checkedKing != nil && animate && landing > 0 ? Date().addingTimeInterval(landing) : nil
         }
         if old.marks != new.marks || old.coachMarks != new.coachMarks || old.coachArrows != new.coachArrows
-            || old.pieces.isEmpty {
+            || old.pieces.isEmpty || (old.framing != new.framing && !new.coachArrows.isEmpty) {
             updateMarks(new)
         }
         if old.heirlooms != new.heirlooms || old.pieces != new.pieces {
@@ -1369,19 +1369,24 @@ final class SculptedBoardScene {
         var seenArrows: Set<SculptedCoachArrow> = []
         for arrow in new.coachArrows where seenArrows.insert(arrow).inserted && arrow.from != arrow.to {
             let fresh = !shownCoachArrows.contains(arrow)
-            let layers = coachArrowLayers(arrow)
+            let layers = coachArrowLayers(arrow, lying: new.framing.lying)
             // Its shadow and landing ring on the stone, its edge, then the arrow over it, then the
             // faint copy over the pieces.
             for (index, parts) in [layers.ground, layers.edge, layers.stone, layers.through].enumerated() {
                 for part in parts {
-                    let node = SCNNode(geometry: part)
+                    let node = SCNNode(geometry: part.geometry)
                     node.simdPosition = SIMD3(0, 0.003, 0)
                     node.simdOrientation = Self.flat
                     node.renderingOrder = 15 + index
                     node.castsShadow = false
+                    // How see-through each part is rides on its node: the phone drew the parts'
+                    // own material transparency as solid (Alex, 2026-11-25: the shadow showed as a
+                    // second, black arrow and the arrow lay solid over the bishop).
                     if fresh {
                         node.opacity = 0
-                        node.runAction(.fadeIn(duration: 0.25))
+                        node.runAction(.fadeOpacity(to: part.alpha, duration: 0.25))
+                    } else {
+                        node.opacity = part.alpha
                     }
                     marksNode.addChildNode(node)
                 }
@@ -1404,25 +1409,35 @@ final class SculptedBoardScene {
 
     /// An arrow's layers: its shadow and landing ring on the stone, its edge, the arrow fading from
     /// its tail color to its own, and the faint copy shown over a piece in front.
+    /// Each part is a shape and how solid it is (0 to 1), which its node carries as its opacity.
     struct ArrowLayers {
-        let ground: [SCNGeometry]
-        let edge: [SCNGeometry]
-        let stone: [SCNGeometry]
-        let through: [SCNGeometry]
+        typealias Part = (geometry: SCNGeometry, alpha: CGFloat)
+        let ground: [Part]
+        let edge: [Part]
+        let stone: [Part]
+        let through: [Part]
+    }
+
+    private struct ArrowKey: Hashable {
+        let arrow: SculptedCoachArrow
+        let lying: Bool
     }
 
     /// Each arrow's shapes, made once: a lesson shows the same few over and over.
-    private var coachArrowShapes: [SculptedCoachArrow: ArrowLayers] = [:]
+    private var coachArrowShapes: [ArrowKey: ArrowLayers] = [:]
 
-    private func coachArrowLayers(_ arrow: SculptedCoachArrow) -> ArrowLayers {
-        if let layers = coachArrowShapes[arrow] { return layers }
+    private func coachArrowLayers(_ arrow: SculptedCoachArrow, lying: Bool) -> ArrowLayers {
+        let key = ArrowKey(arrow: arrow, lying: lying)
+        if let layers = coachArrowShapes[key] { return layers }
         if coachArrowShapes.count > 64 { coachArrowShapes.removeAll() }
-        let layers = Self.arrowLayers(arrow)
-        coachArrowShapes[arrow] = layers
+        let layers = Self.arrowLayers(arrow, lying: lying)
+        coachArrowShapes[key] = layers
         return layers
     }
 
-    static func arrowLayers(_ arrow: SculptedCoachArrow) -> ArrowLayers {
+    /// `lying`: the board seen flat from straight above. The arrow then lies on the stone, with no
+    /// rise and no shadow: from above, a raised arrow drifts away from its own shadow.
+    static func arrowLayers(_ arrow: SculptedCoachArrow, lying: Bool = false) -> ArrowLayers {
         // Together solid, as the flat board's crisp arrow; over a piece in front, only the faint one.
         // The next best analysis arrow is quieter, as on the flat board.
         // Analysis's are see-through, as tinted glass; their parts only touch, so none shows darker
@@ -1430,7 +1445,8 @@ final class SculptedBoardScene {
         let strength: CGFloat = arrow.analysis
             ? CGFloat(arrow.best ? ArrowColors.seeThrough.best : ArrowColors.seeThrough.next) : 0.97
         let seen: CGFloat = min(0.35, strength * 0.5)
-        let p = arrow.proportions
+        var p = arrow.proportions
+        if lying { p.rise = 0 }
         let outlines = arrowOutline(from: arrow.from, to: arrow.to, dashed: arrow.dashed, proportions: p,
                                     seamless: arrow.analysis)
         let (tail, tip) = ArrowOutline.ends(from: middle(arrow.from), to: middle(arrow.to), unit: 1, proportions: p)
@@ -1448,42 +1464,46 @@ final class SculptedBoardScene {
         let strips = outlines.indices.map { !arrow.dashed && outlines.count == 3 && $0 == 1 }
         let edges = arrow.analysis ? [] : outlines.map { ArrowOutline.grown($0, by: 0.03) }
         let stone = (strength - seen) / (1 - seen)
-        var ground: [SCNGeometry] = []
+        var ground: [ArrowLayers.Part] = []
         if p.rise > 0 {
             // The flight's shadow, straight on the stone beneath it, soft at its edges.
             for (width, alpha) in [(p.shaft * 1.6, 0.06), (p.shaft * 0.9, 0.09)] as [(CGFloat, CGFloat)] {
                 let shadow = ArrowOutline.outlines(from: tail, to: tip, unit: 1, dashed: false,
                                                    proportions: .init(shaft: width, headLength: 0, headWidth: 0,
                                                                       startInset: 0, tipInset: 0))[1]
-                ground.append(polygon(shadow, colors: { _ in SIMD3(0, 0, 0) }, alpha: alpha, throughPieces: false, strip: true))
+                ground.append((polygon(shadow, colors: { _ in SIMD3(0, 0, 0) }, throughPieces: false, strip: true), alpha))
             }
         }
         if arrow.analysis && arrow.best {
             // The ring it lands on.
             let target = middle(arrow.to)
-            ground.append(polygon(ArrowOutline.circle(target, radius: 0.33), colors: { _ in headColor }, alpha: 0.18,
-                                  throughPieces: false))
-            let outer = ArrowOutline.circle(target, radius: 0.345), inner = ArrowOutline.circle(target, radius: 0.315)
+            // Round the target piece, the arrow's tip resting on its line; it lies on the stone,
+            // so the piece stands clear inside it.
+            let radius = ArrowOutline.Proportions.ringRadius
+            ground.append((polygon(ArrowOutline.circle(target, radius: radius), colors: { _ in headColor },
+                                   throughPieces: false), 0.12))
+            let outer = ArrowOutline.circle(target, radius: radius + 0.015)
+            let inner = ArrowOutline.circle(target, radius: radius - 0.015)
             for i in outer.indices {
                 let j = (i + 1) % outer.count
-                ground.append(polygon([outer[i], outer[j], inner[j], inner[i]], colors: { _ in tailColor }, alpha: 0.85,
-                                      throughPieces: false))
+                ground.append((polygon([outer[i], outer[j], inner[j], inner[i]], colors: { _ in tailColor },
+                                       throughPieces: false), 0.85))
             }
         }
         return ArrowLayers(
             ground: ground,
-            edge: edges.indices.map { polygon(edges[$0], colors: { _ in edgeColor }, alpha: 0.92, throughPieces: false,
-                                              strip: strips[$0], height: rise) },
-            stone: outlines.indices.map { polygon(outlines[$0], colors: faded, alpha: stone, throughPieces: false,
-                                                  strip: strips[$0], height: rise) },
-            through: outlines.indices.map { polygon(outlines[$0], colors: faded, alpha: seen, throughPieces: true,
-                                                    strip: strips[$0], height: rise) })
+            edge: edges.indices.map { (polygon(edges[$0], colors: { _ in edgeColor }, throughPieces: false,
+                                               strip: strips[$0], height: rise), 0.92) },
+            stone: outlines.indices.map { (polygon(outlines[$0], colors: faded, throughPieces: false,
+                                                   strip: strips[$0], height: rise), stone) },
+            through: outlines.indices.map { (polygon(outlines[$0], colors: faded, throughPieces: true,
+                                                     strip: strips[$0], height: rise), seen) })
     }
 
     /// A flat shape in the board's plane, each corner in its own color (blended between) and at its
     /// own height over the stone. Convex shapes are cut into a fan from the first corner; a `strip`
     /// (one side's corners, then the other side's back) into a quad between each pair.
-    private static func polygon(_ outline: [CGPoint], colors: (CGPoint) -> SIMD3<Float>, alpha: CGFloat,
+    private static func polygon(_ outline: [CGPoint], colors: (CGPoint) -> SIMD3<Float>,
                                 throughPieces: Bool, strip: Bool = false,
                                 height: (CGPoint) -> Float = { _ in 0 }) -> SCNGeometry {
         let vertices = outline.map { SCNVector3(Float($0.x), Float($0.y), height($0)) }
@@ -1512,7 +1532,9 @@ final class SculptedBoardScene {
         let material = SCNMaterial()
         material.lightingModel = .constant
         material.diffuse.contents = UIColor.white
-        material.transparency = alpha
+        // Solid here: how see-through the part is rides on its node's opacity.
+        material.transparencyMode = .aOne
+        material.transparency = 1
         material.writesToDepthBuffer = false
         material.readsFromDepthBuffer = !throughPieces
         material.blendMode = .alpha
