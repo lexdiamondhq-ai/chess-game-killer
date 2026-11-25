@@ -34,7 +34,8 @@ struct PlateRemark<Status: View>: View {
                     .id("vote-\(match.game.plyCount)")
                     .transition(.opacity.combined(with: .offset(y: 3)))
             } else if !isRival, let verdict = match.verdictLine {
-                VerdictLine(review: verdict, theme: theme, stacked: stacked)
+                VerdictLine(review: verdict, theme: theme, stacked: stacked,
+                            showMissed: MissedMove.exists(for: verdict) ? { match.showMissedMove(verdict) } : nil)
                     .id("verdict-\(verdict.id)")
                     .transition(.opacity.combined(with: .offset(y: 3)))
             } else {
@@ -75,13 +76,35 @@ extension PlateRemark {
 }
 
 /// The coach's verdict in a few words, like "Mistake · Nc3 was better", led by the grade's color.
+/// When it names a better move, a tap shows that move on the board (Alex, 2026-11-24).
 private struct VerdictLine: View {
     let review: MoveReview
     let theme: BoardTheme
     var stacked = false
+    var showMissed: (() -> Void)? = nil
 
     var body: some View {
+        if let showMissed {
+            Button(action: showMissed) { lines }
+                .buttonStyle(.plain)
+                .contentShape(Rectangle())
+                .accessibilityHint("Shows the better move on the board.")
+        } else {
+            lines
+        }
+    }
+
+    @ViewBuilder private var lines: some View {
         if stacked { stackedLines } else { oneLine }
+    }
+
+    /// A small eye after the better move, so the line reads as something to tap.
+    @ViewBuilder private var lookMark: some View {
+        if showMissed != nil {
+            Image(systemName: "eye")
+                .font(.app(.caption2, weight: .semibold))
+                .foregroundStyle(Color.primary.opacity(0.5))
+        }
     }
 
     /// The grade in bold in its color, the better move under it.
@@ -96,9 +119,12 @@ private struct VerdictLine: View {
                     .foregroundStyle(review.grade.color(on: theme))
             }
             if let advice {
-                Text(advice.replacingOccurrences(of: "· ", with: ""))
-                    .font(.app(.caption, weight: .medium))
-                    .foregroundStyle(Color.primary.opacity(0.72))
+                HStack(spacing: 5) {
+                    Text(advice.replacingOccurrences(of: "· ", with: ""))
+                        .font(.app(.caption, weight: .medium))
+                        .foregroundStyle(Color.primary.opacity(0.72))
+                    lookMark
+                }
             }
         }
         .lineLimit(1)
@@ -119,6 +145,7 @@ private struct VerdictLine: View {
                 Text(advice)
                     .font(.app(.footnote))
                     .foregroundStyle(Color.primary.opacity(0.72))
+                lookMark
             }
         }
         .lineLimit(1)
