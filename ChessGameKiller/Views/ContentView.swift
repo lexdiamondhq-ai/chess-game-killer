@@ -196,11 +196,11 @@ struct ContentView: View {
             .overlay {
                 // The intro film, once, right after the welcome; the welcome counts as open until
                 // it ends, so nothing else opens over it.
-                if let pending = introAfterWelcome {
+                if introAfterWelcome != nil {
                     IntroFilmView {
                         IntroFilm.markSeen()
                         introAfterWelcome = nil
-                        endWelcome(play: pending.play, choice: pending.choice)
+                        endWelcomeAtHome()
                     }
                     .transition(.opacity)
                 }
@@ -677,6 +677,14 @@ struct ContentView: View {
         } else {
             lookAround()
         }
+    }
+
+    /// After the intro film, Begin always lands on the home, never the first rival's film
+    /// (Alex, 2026-11-24).
+    private func endWelcomeAtHome() {
+        withAnimation(.easeInOut(duration: 0.35)) { showingWelcome = false }
+        syncCoachSettings()
+        if !showingHome { goHome() }
     }
 
     /// "Look around first", or backing out of the first rival's film: the home stays, or the New
