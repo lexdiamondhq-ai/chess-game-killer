@@ -199,13 +199,6 @@ struct SettingsSheet: View {
                             }
                             .buttonStyle(.plain)
                             rule
-                            NavigationLink {
-                                LicensesView(theme: theme)
-                            } label: {
-                                LinkRowLabel(title: "Open-source licenses", symbol: "doc.text", theme: theme)
-                            }
-                            .buttonStyle(.plain)
-                            rule
                             Link(destination: PremiumStyle.privacy) {
                                 LinkRowLabel(title: "Privacy policy", symbol: "hand.raised", theme: theme)
                             }
@@ -217,18 +210,32 @@ struct SettingsSheet: View {
                             }
                             .buttonStyle(.plain)
                             rule
-                            HStack(spacing: 12) {
-                                IconTile(symbol: "info.circle", theme: theme)
-                                Text("Version")
-                                    .font(.app(.body, weight: .semibold))
-                                Spacer(minLength: 0)
-                                Text(Self.version)
-                                    .font(.app(.subheadline).monospacedDigit())
-                                    .foregroundStyle(.secondary)
+                            // The licenses must stay in the app (Stockfish and the cburnett pieces are GPL,
+                            // ChessKit is MIT), but not as a row of their own: tapping Version opens them
+                            // (Alex picked B, 2026-11-24).
+                            NavigationLink {
+                                LicensesView(theme: theme)
+                            } label: {
+                                HStack(spacing: 12) {
+                                    IconTile(symbol: "info.circle", theme: theme)
+                                    Text("Version")
+                                        .font(.app(.body, weight: .semibold))
+                                        .foregroundStyle(Color.primary)
+                                    Spacer(minLength: 0)
+                                    Text(Self.version)
+                                        .font(.app(.subheadline).monospacedDigit())
+                                        .foregroundStyle(.secondary)
+                                    Image(systemName: "chevron.right")
+                                        .font(.app(.footnote, weight: .semibold))
+                                        .foregroundStyle(.tertiary)
+                                }
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 12)
+                                .contentShape(Rectangle())
                             }
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 12)
+                            .buttonStyle(.plain)
                             .accessibilityElement(children: .combine)
+                            .accessibilityHint("Opens the open-source licenses")
                         }
                     }
                 }
