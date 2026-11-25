@@ -24,9 +24,10 @@ final class DrillBoardTests: XCTestCase {
         let tip = try XCTUnwrap(head.max { $0.y < $1.y })
         XCTAssertEqual(tip.x, -3.5, accuracy: 0.0001)
         XCTAssertEqual(tip.y, 3.4, accuracy: 0.0001)
-        // The shaft starts 0.2 past a1's middle, rounded there, and reaches a hair into the head.
-        XCTAssertEqual(try XCTUnwrap(shaft.map(\.y).min()), -3.5 + 0.2, accuracy: 0.0001)
-        XCTAssertEqual(try XCTUnwrap(tail.map(\.y).min()), -3.5 + 0.2 - 0.075, accuracy: 0.001)
+        // The shaft starts 0.55 past a1's middle, clear of the piece, rounded there, and reaches a
+        // hair into the head.
+        XCTAssertEqual(try XCTUnwrap(shaft.map(\.y).min()), -3.5 + 0.55, accuracy: 0.0001)
+        XCTAssertEqual(try XCTUnwrap(tail.map(\.y).min()), -3.5 + 0.55 - 0.075, accuracy: 0.001)
         XCTAssertEqual(try XCTUnwrap(shaft.map(\.y).max()), try XCTUnwrap(head.map(\.y).min()) + 0.03, accuracy: 0.0001)
         // The head is 0.46 across, the shaft 0.15, as on the flat board.
         let xs = head.map(\.x)
@@ -39,9 +40,9 @@ final class DrillBoardTests: XCTestCase {
         let seamless = SculptedBoardScene.arrowOutline(from: .a1, to: .a8, dashed: false, seamless: true)
         XCTAssertEqual(seamless.count, 3)
         let cap = seamless[0], body = seamless[1], point = seamless[2]
-        XCTAssertEqual(try XCTUnwrap(cap.map(\.y).max()), -3.3, accuracy: 0.0001)
-        XCTAssertEqual(try XCTUnwrap(cap.map(\.y).min()), -3.375, accuracy: 0.0001)
-        XCTAssertEqual(try XCTUnwrap(body.map(\.y).min()), -3.3, accuracy: 0.0001)
+        XCTAssertEqual(try XCTUnwrap(cap.map(\.y).max()), -2.95, accuracy: 0.0001)
+        XCTAssertEqual(try XCTUnwrap(cap.map(\.y).min()), -3.025, accuracy: 0.0001)
+        XCTAssertEqual(try XCTUnwrap(body.map(\.y).min()), -2.95, accuracy: 0.0001)
         XCTAssertEqual(try XCTUnwrap(body.map(\.y).max()), try XCTUnwrap(point.map(\.y).min()), accuracy: 0.0001)
     }
 
@@ -74,8 +75,9 @@ final class DrillBoardTests: XCTestCase {
         // Its ends stay on the file.
         let (tail, tip) = ArrowOutline.ends(from: CGPoint(x: 0.5, y: -2.5), to: CGPoint(x: 0.5, y: -0.5), unit: 1,
                                             proportions: best.proportions)
-        XCTAssertEqual(tail.y, -2.26, accuracy: 0.0001)
-        XCTAssertEqual(tip.y, -0.58, accuracy: 0.0001)
+        // It leaves the piece with a small gap and lands on the ring round the target.
+        XCTAssertEqual(tail.y, -2.5 + 0.55, accuracy: 0.0001)
+        XCTAssertEqual(tip.y, -0.5 - 0.42, accuracy: 0.0001)
         XCTAssertEqual(ArrowOutline.along(tail, tail: tail, tip: tip), 0)
         XCTAssertEqual(ArrowOutline.along(tip, tail: tail, tip: tip), 1)
         // It rises most at its middle and touches down at both ends.
@@ -95,6 +97,24 @@ final class DrillBoardTests: XCTestCase {
         XCTAssertTrue(bestLayers.edge.isEmpty)
         XCTAssertFalse(SculptedBoardScene.arrowLayers(SculptedCoachArrow(from: .e2, to: .e4, color: 0x2E9E48)).edge.isEmpty)
         XCTAssertTrue(SculptedBoardScene.arrowLayers(SculptedCoachArrow(from: .e2, to: .e4, color: 0x2E9E48)).ground.isEmpty)
+        // Each part's see-through amount is carried with it, for its node, and is never solid.
+        XCTAssertTrue(bestLayers.stone.allSatisfy { $0.alpha > 0 && $0.alpha < 1 })
+        XCTAssertTrue(nextLayers.ground.allSatisfy { $0.alpha < 0.2 })
+        // From straight above it lies on the stone: no shadow, only the landing ring.
+        XCTAssertEqual(SculptedBoardScene.arrowLayers(next, lying: true).ground.count, 0)
+        XCTAssertEqual(SculptedBoardScene.arrowLayers(best, lying: true).ground.count, bestLayers.ground.count - 2)
+    }
+
+    /// A one-square move still has a whole arrow between the two pieces: the gaps shrink together
+    /// so the head and a bit of shaft fit, tail before tip.
+    func testAOneSquareArrowStillFits() throws {
+        for best in [true, false] {
+            let p = ArrowOutline.Proportions.analysis(best: best)
+            let (tail, tip) = ArrowOutline.ends(from: CGPoint(x: 0, y: 0), to: CGPoint(x: 0, y: 1), unit: 1, proportions: p)
+            XCTAssertGreaterThan(tail.y, 0)
+            XCTAssertLessThan(tip.y, 1)
+            XCTAssertEqual(tip.y - tail.y, p.headLength + 0.12, accuracy: 0.0001)
+        }
     }
 
     /// Dashed, the shaft is a row of short bars, every one between the tail and the head,
