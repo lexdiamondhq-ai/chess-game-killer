@@ -143,3 +143,31 @@ struct AnalyzeKnightGlyph: View {
 #Preview {
     AnalyzeKnightGlyph().frame(width: 25, height: 30).padding().background(Color(hex: 0xE8C27A))
 }
+
+/// The Analyze button's mark (Alex picked C, 2026-11-24): a little chessboard inside four camera
+/// corners, so it reads as "scan a board". Drawn on a 34 by 32 grid in the current foreground style.
+struct ScanBoardGlyph: View {
+    var body: some View {
+        Canvas { context, size in
+            let k = min(size.width / 34, size.height / 32)
+            context.translateBy(x: (size.width - 34 * k) / 2, y: (size.height - 32 * k) / 2)
+            context.scaleBy(x: k, y: k)
+            let ink = GraphicsContext.Shading.foreground
+            var corners = Path()
+            corners.move(to: CGPoint(x: 2, y: 9)); corners.addLine(to: CGPoint(x: 2, y: 3)); corners.addLine(to: CGPoint(x: 9, y: 3))
+            corners.move(to: CGPoint(x: 25, y: 3)); corners.addLine(to: CGPoint(x: 32, y: 3)); corners.addLine(to: CGPoint(x: 32, y: 9))
+            corners.move(to: CGPoint(x: 32, y: 23)); corners.addLine(to: CGPoint(x: 32, y: 29)); corners.addLine(to: CGPoint(x: 25, y: 29))
+            corners.move(to: CGPoint(x: 9, y: 29)); corners.addLine(to: CGPoint(x: 2, y: 29)); corners.addLine(to: CGPoint(x: 2, y: 23))
+            context.stroke(corners, with: ink, style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
+            var squares = Path()
+            for row in 0..<4 {
+                for col in 0..<4 where (row + col) % 2 == 0 {
+                    squares.addRect(CGRect(x: 9 + CGFloat(col) * 4, y: 8 + CGFloat(row) * 4, width: 4, height: 4))
+                }
+            }
+            context.fill(squares, with: ink)
+            context.stroke(Path(CGRect(x: 9, y: 8, width: 16, height: 16)), with: ink, lineWidth: 0.9)
+        }
+        .accessibilityHidden(true)
+    }
+}

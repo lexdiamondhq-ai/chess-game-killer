@@ -15,8 +15,8 @@ struct GuideView: View {
     static let gestures: [(symbol: String, title: String, text: String)] = [
         ("circle.circle", "Tap the orb for the coach",
          "The round button in the middle of the dock opens the coach: grades, the best moves, undo and Analyze. After a game it shows how you played and what comes next."),
-        ("hand.tap", "Hold the gold knight for more",
-         "On the home screen, a tap on the gold knight opens Analyze. Hold it and gold branches grow out to Quick play, Today's Move, Puzzles and A friend."),
+        ("hand.tap", "Tap the gold knight to play",
+         "On the home screen, a tap on the gold knight grows gold vines out to Quick play, Today's Move, Puzzles and A friend. The button beside it, Analyze, scans a board."),
         ("rectangle.landscape.rotate", "Turn sideways against the Ashen King",
          "In a game against the Ashen King, turn your phone on its side to sit across his table. Turn it upright again for everything else."),
     ]
