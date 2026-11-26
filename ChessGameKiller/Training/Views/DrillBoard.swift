@@ -15,6 +15,7 @@ struct DrillBoard: View {
     var showsTurn = true
 
     @AppStorage("sculpted3D") private var sculpted3D = true
+    @AppStorage("haptics") private var hapticsOn = true
 
     private var threeD: Bool { BoardView.playsIn3D(theme, setting: sculpted3D) }
 
@@ -24,6 +25,15 @@ struct DrillBoard: View {
                      onTap: runner.acceptsTaps ? { (square: Square) in runner.tap(square) } : nil,
                      onPromote: { kind in runner.promote(to: kind) },
                      turn: runner.learner, showsTurn: showsTurn)
+            // A right answer is felt as a happy buzz, a wrong one as a short error buzz.
+            .sensoryFeedback(trigger: runner.tone) { _, tone in
+                guard hapticsOn else { return nil }
+                switch tone {
+                case .success: return .success
+                case .wrong: return .error
+                case .coach, .hint: return nil
+                }
+            }
             // A screen that keeps its board for the next puzzle hands it another drill.
             .onChange(of: SoundTiming(drill: ObjectIdentifier(runner), threeD: threeD), initial: true) { _, timing in
                 Self.timeSounds(of: runner, threeD: timing.threeD)

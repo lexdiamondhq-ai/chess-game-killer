@@ -51,6 +51,9 @@ final class DrillRunner {
     let moveLimit: Int
     /// One wrong move ends it and shows the answer, as in Puzzle Rush.
     @ObservationIgnored var strict = false
+    /// Against the clock (Puzzle Rush): the waits are about half as long, and a miss shows only
+    /// the right first move, so the three minutes go on solving rather than on watching.
+    @ObservationIgnored var hurried = false
     /// Hears right and wrong answers, for the coach's spoken reactions ("Nice move", "Try again").
     /// Nil when the drill plays no sound, and in the level check, which is a test.
     @ObservationIgnored var reactions: Reacting?
@@ -59,6 +62,12 @@ final class DrillRunner {
     @ObservationIgnored var landingDelay: @MainActor (PlayedMove) -> TimeInterval = { _ in 0 }
     /// The move sounds. Nil when the drill plays none.
     @ObservationIgnored var sounds: SoundPlaying?
+    /// The clean-solve chime follows the solving move's own sound by this much.
+    static let chimeAfterLanding: TimeInterval = 0.15
+    /// When the last move sounded lands, kept as it was worked out for that sound: by the time
+    /// the drill is judged solved the board is closed to the learner, which would time the same
+    /// move as if it had not been lifted.
+    @ObservationIgnored private var lastLanding: TimeInterval = 0
 
     private let startFEN: String
     private let setup: String?
@@ -171,11 +180,11 @@ final class DrillRunner {
         pending?.cancel()
         pending = Task { [weak self] in
             guard let self else { return }
-            try? await Task.sleep(for: .milliseconds(650))
+            try? await Task.sleep(for: .milliseconds(self.hurried ? 250 : 650))
             guard !Task.isCancelled else { return }
             if let setup = self.setup {
                 self.playMove(setup)
-                try? await Task.sleep(for: .milliseconds(500))
+                try? await Task.sleep(for: .milliseconds(self.hurried ? 350 : 500))
                 guard !Task.isCancelled else { return }
             }
             self.startSolving()
@@ -474,6 +483,10 @@ final class DrillRunner {
         let praise = outcome == .firstTry ? pick(lines?.correct, or: "Yes!") : pick(lines?.correctAfterHint, or: "There it is.")
         message = [note, praise].compactMap { $0 }.joined(separator: " ")
         phase = .done(outcome)
+        // A clean solve is heard: the soft chime, just after the last piece is down.
+        if outcome == .firstTry {
+            sounds?.play(.win, after: lastLanding + Self.chimeAfterLanding)
+        }
         // Every move of a longer puzzle right the first time deserves more than "nice".
         react(outcome == .firstTry ? (solution.count >= 3 ? .brilliant : .nice) : .afterHelp)
     }
@@ -492,7 +505,7 @@ final class DrillRunner {
         phase = .waiting
         game.humanColors = []
         pending = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(900))
+            try? await Task.sleep(for: .milliseconds(self?.hurried == true ? 500 : 900))
             guard let self, !Task.isCancelled else { return }
             self.game.undo()
             if self.strict || self.mistakes >= 3 {
@@ -509,7 +522,8 @@ final class DrillRunner {
 
     /// Plays the rest of the answer with arrows, as a missed drill.
     private func showLine() {
-        let remaining = solution.indices.contains(index) ? Array(solution[index...]) : []
+        let rest = solution.indices.contains(index) ? Array(solution[index...]) : []
+        let remaining = hurried ? Array(rest.prefix(1)) : rest
         phase = .waiting
         game.humanColors = []
         tone = .hint
@@ -520,7 +534,7 @@ final class DrillRunner {
                 if offset.isMultiple(of: 2), let squares = Notation.squares(of: uci) {
                     self.arrows = [BoardArrow(from: squares.from.notation, to: squares.to.notation, color: .green, dashed: nil)]
                 }
-                try? await Task.sleep(for: .milliseconds(offset == 0 ? 700 : 900))
+                try? await Task.sleep(for: .milliseconds(self.hurried ? 600 : offset == 0 ? 700 : 900))
                 guard !Task.isCancelled else { return }
                 self.playMove(uci)
             }
@@ -716,6 +730,7 @@ final class DrillRunner {
     private func sound(for move: PlayedMove) {
         guard let sounds else { return }
         let landing = landingDelay(move)
+        lastLanding = landing
         if move.isCapture {
             sounds.play(.capture, after: landing)
         } else if move.givesCheck {

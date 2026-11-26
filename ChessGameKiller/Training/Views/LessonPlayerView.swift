@@ -160,7 +160,11 @@ struct LessonPlayerView: View {
             }
             Button {
                 muted.toggle()
-                if muted { CoachVoice.shared.stop() }
+                if muted {
+                    CoachVoice.shared.stop()
+                    // Cutting him off would end the step at once: it runs again at reading pace.
+                    if player.phase == .playing { player.replay() }
+                }
             } label: {
                 Image(systemName: muted ? "speaker.slash.fill" : "speaker.wave.2.fill")
                     .font(.system(size: 15, weight: .semibold))
@@ -341,6 +345,7 @@ struct LessonPlayerView: View {
 
 /// The finish card after a lesson on its own.
 struct LessonDoneCard: View {
+    @AppStorage("haptics") private var hapticsOn = true
     let lesson: Lesson
     let theme: BoardTheme
     let reward: TrainingReward
@@ -385,9 +390,20 @@ struct LessonDoneCard: View {
                     }
                 }
                 if let promotion = reward.promotion {
-                    Text("Promoted to \(promotion.title)!")
-                        .font(.app(.headline))
-                        .foregroundStyle(TrainingColor.yellow.color(on: theme))
+                    // A new rank is more than a line of words: its piece springs in, in gold,
+                    // as on the card a session gives it.
+                    HStack(spacing: 10) {
+                        PieceImage(piece: Piece(promotion.pieceKind, color: .white, square: .a1), theme: theme, size: 40)
+                            .scaleEffect(appeared ? 1 : 0.4)
+                            .shadow(color: TrainingColor.yellow.color(on: theme).opacity(0.8), radius: 10)
+                            .animation(.spring(response: 0.5, dampingFraction: 0.55).delay(0.35), value: appeared)
+                        Text("Promoted to \(promotion.title)!")
+                            .font(.app(.headline))
+                            .foregroundStyle(TrainingColor.yellow.color(on: theme))
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .trainingCard(theme, tint: TrainingColor.yellow.color(on: theme), cornerRadius: 16)
                 }
                 if let line {
                     HStack(alignment: .top, spacing: 10) {
@@ -412,6 +428,6 @@ struct LessonDoneCard: View {
             .padding(24)
         }
         .onAppear { appeared = true }
-        .sensoryFeedback(.success, trigger: appeared)
+        .sensoryFeedback(.success, trigger: appeared) { _, _ in hapticsOn }
     }
 }

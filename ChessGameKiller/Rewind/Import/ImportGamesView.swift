@@ -112,7 +112,7 @@ struct ImportGamesView: View {
                         .foregroundStyle(theme.trainingAccent)
                         .accessibilityHidden(true)
                 } else {
-                    ProgressView()
+                    KnightWait(size: 18)
                 }
                 Text(title)
                     .font(.app(.headline))

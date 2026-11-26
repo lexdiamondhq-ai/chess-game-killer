@@ -96,6 +96,8 @@ struct HomeAuroraView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("haptics") private var hapticsOn = true
+    /// The tiles that grow into their screens say so as they are tapped.
+    @Environment(\.homeZoomMark) private var markZoom
     @State private var music = HomeMusic.shared
     @State private var boardStage = SculptedStage()
     /// How far the page has been pulled up over the board, in points.
@@ -252,6 +254,14 @@ struct HomeAuroraView: View {
             boardFrame = nil
         }
         .task(id: "\(reduceMotion)-\(stage.masterpiece?.game.id ?? "")") { await playThrough() }
+        // A scroll that stops partway would leave the bar ghosted, and deaf to taps past half:
+        // once the fade has rested a moment it settles fully on or fully off.
+        .task(id: barHidden) {
+            guard barHidden > 0, barHidden < 1 else { return }
+            try? await Task.sleep(for: .milliseconds(220))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.25)) { barHidden = barHidden < 0.5 ? 0 : 1 }
+        }
     }
 
     /// Scrolling down past where the header tucks away fades the bar over about 80 points;
@@ -416,6 +426,11 @@ struct HomeAuroraView: View {
             HomeAuroraSignOff(palette: palette)
                 .padding(.top, 22)
         }
+        // A part that arrives after the page (the first read of your games, a friend's move)
+        // eases in and the rest makes room, instead of the page jumping.
+        .animation(.snappy(duration: 0.3), value: info.dna != nil)
+        .animation(.snappy(duration: 0.3), value: info.finest != nil)
+        .animation(.snappy(duration: 0.3), value: HomeAuroraQuickBar.mode(games: info.games) != nil)
         .padding(.bottom, 84)
         .frame(maxWidth: .infinity)
         .background {
@@ -551,7 +566,7 @@ struct HomeAuroraView: View {
     /// gold hairlines. Each opens what it counts.
     private var numbers: some View {
         HStack(spacing: 0) {
-            number(stage.rating.map { $0.formatted(.number) } ?? "New", label: "Rating", action: actions.stage.you)
+            number(stage.rating.map { $0.formatted(.number) } ?? "New", label: "Rating", thumps: true, action: actions.stage.you)
             hairline
             // Your training rank, Pawn to King. "Level" beside Rating read as the rival's level.
             number("\(stage.rankNumber)", label: "Rank", action: actions.stage.learn)
@@ -567,7 +582,7 @@ struct HomeAuroraView: View {
             .frame(width: 1, height: 26)
     }
 
-    private func number(_ value: String, label: String, action: @escaping () -> Void) -> some View {
+    private func number(_ value: String, label: String, thumps: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 1) {
                 Text(value)
@@ -584,7 +599,7 @@ struct HomeAuroraView: View {
             .padding(.horizontal, 7)
             .contentShape(Rectangle())
         }
-        .buttonStyle(HomeStagePress())
+        .buttonStyle(HomeStagePress(ticks: !thumps))
         .accessibilityLabel("\(label) \(value)")
     }
 
@@ -642,14 +657,21 @@ struct HomeAuroraView: View {
         case .puzzles:
             HomeAuroraRow(eyebrow: "Puzzles", title: "Sharpen your eye",
                           detail: tile ? "Tactics at your level" : "Tactics at your level, one after another",
-                          accent: palette.violet, palette: palette, tile: tile, action: actions.puzzles) {
+                          accent: palette.violet, palette: palette, tile: tile,
+                          action: { markZoom(.puzzles); actions.puzzles() }) {
                 HomeAuroraJewel(glyph: Glyphs.fineEye, stone: .amethyst)
             }
+            .homeZoomSource(.puzzles)
         case .coach:
             HomeAuroraRow(eyebrow: Coach.current.title, title: stage.plan?.title ?? "Today's lesson", detail: coachLine,
-                          accent: palette.teal, palette: palette, tile: tile, action: actions.stage.coach) {
+                          accent: palette.teal, palette: palette, tile: tile, action: {
+                // With no session planned the tile opens Learn, which slides up as it does from the bar.
+                if stage.plan != nil { markZoom(.session) }
+                actions.stage.coach()
+            }) {
                 HomeAuroraJewel(glyph: Glyphs.fineLaurel, stone: .jade)
             }
+            .homeZoomSource(.session)
         case .masterpiece:
             // Analyze is the gold knight, its one button on Home (Alex, 2026-11-08), so it has no
             // card here. The game of the day, which the board up top plays, opens from its own.
@@ -670,7 +692,8 @@ struct HomeAuroraView: View {
                                         flipped: stage.todaySolver == .black, title: todayTitle,
                                         detail: todayDetail, button: stage.day.played ? "See it" : "Play",
                                         symbol: stage.day.played ? "checkmark" : "play.fill",
-                                        palette: palette, open: actions.stage.dailyMove)
+                                        palette: palette, open: { markZoom(.daily); actions.stage.dailyMove() })
+            .homeZoomSource(.daily)
         let games: [HomeCurrentGame] = info.games.filter(\.isYourMove) + info.games.filter { !$0.isYourMove }
         if games.isEmpty {
             today
@@ -725,7 +748,8 @@ struct HomeAuroraView: View {
     }
 
     private func pickKnightDoor(_ door: HomeKnightDoor) {
-        knightMenuOpen = false
+        // Picking a door fades the menu away as closing it does, rather than cutting it off.
+        closeKnightMenu()
         switch door {
         case .quickPlay: actions.quickPlay()
         case .todaysMove: actions.stage.dailyMove()
@@ -1859,8 +1883,8 @@ struct HomeAuroraTabBar: View {
             HStack(spacing: 0) {
                 tab("Today", icon: .today, on: true, action: today)
                 tab("Learn", icon: .learn, on: false, action: learn)
-                tab("Rooms", icon: .rooms, on: false, action: rooms)
-                tab("You", icon: .you, on: false, action: you)
+                tab("Rooms", icon: .rooms, on: false, thumps: true, action: rooms)
+                tab("You", icon: .you, on: false, thumps: true, action: you)
             }
             .padding(.horizontal, 4)
             .frame(height: 64)
@@ -1950,7 +1974,9 @@ struct HomeAuroraTabBar: View {
                     .accessibilityAction(.default) { play() }
     }
 
-    private func tab(_ title: String, icon: HomeTabIcon.Kind, on: Bool, action: @escaping () -> Void) -> some View {
+    /// `thumps`: its panel answers with a thump as it opens, so the button itself stays quiet.
+    private func tab(_ title: String, icon: HomeTabIcon.Kind, on: Bool, thumps: Bool = false,
+                     action: @escaping () -> Void) -> some View {
         Button(action: action) {
             // The icons stand out (Alex, 2026-11-08): larger, in full ink, the selected one in gold.
             VStack(spacing: 3) {
@@ -1970,7 +1996,7 @@ struct HomeAuroraTabBar: View {
             .overlay { if on { PolishedEdge(shape: Capsule(), edge: .pill, dark: palette.dark) } }
             .contentShape(Capsule())
         }
-        .buttonStyle(HomeStagePress())
+        .buttonStyle(HomeStagePress(ticks: !thumps))
         .accessibilityLabel(title)
         .accessibilityAddTraits(on ? .isSelected : [])
     }

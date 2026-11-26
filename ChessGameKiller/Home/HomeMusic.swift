@@ -45,6 +45,12 @@ final class HomeMusic {
         stop()
     }
 
+    /// The sound was handed back after Leo spoke or listened, which can stop the music while
+    /// Home is showing: it picks up again.
+    func pickUp() {
+        if playing, player?.isPlaying != true { start() }
+    }
+
     func toggle() {
         on.toggle()
         UserDefaults.standard.set(on, forKey: Self.key)

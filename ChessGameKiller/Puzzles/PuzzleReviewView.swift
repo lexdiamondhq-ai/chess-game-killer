@@ -30,7 +30,7 @@ struct PuzzleReviewView: View {
                     if !began {
                         VStack {
                             Spacer()
-                            ProgressView("Loading puzzles…")
+                            KnightWaitPage(title: "Loading puzzles…")
                             Spacer()
                         }
                     } else if let runner, let puzzle {

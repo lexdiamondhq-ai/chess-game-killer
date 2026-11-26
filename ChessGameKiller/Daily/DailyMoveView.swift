@@ -35,11 +35,15 @@ struct DailyMoveView: View {
         _tally = State(initialValue: tally)
     }
 
+    /// The result card's name in the page, to scroll to.
+    private static let resultID = "result"
+
     var body: some View {
         ZStack {
             TrainingBackdrop(theme: theme)
             GeometryReader { geo in
                 let boardSide = max(200, min(geo.size.width - TrainingBoardView.sideRoom, geo.size.height * 0.52))
+                ScrollViewReader { reader in
                 ScrollView {
                         VStack(spacing: 14) {
                             if let runner {
@@ -56,12 +60,22 @@ struct DailyMoveView: View {
                                 resultCard(outcome)
                                     .padding(.horizontal, 16)
                                     .transition(.move(edge: .bottom).combined(with: .opacity))
+                                    .id(Self.resultID)
                             }
                         }
                         .padding(.top, 12)
                         .padding(.bottom, 24)
                     }
                     .scrollBounceBehavior(.basedOnSize)
+                    // The result arrives under the board: the page rolls up to show all of it,
+                    // down to Done, before its coin turns over.
+                    .onChange(of: outcome) { _, outcome in
+                        guard outcome != nil else { return }
+                        Task { @MainActor in
+                            try? await Task.sleep(for: .milliseconds(250))
+                            withAnimation(.snappy(duration: 0.4)) { reader.scrollTo(Self.resultID, anchor: .bottom) }
+                        }
+                    }
                     // The title stays over the page, and the board fades out under it as the
                     // result scrolls up, as the home's top edge does.
                     .safeAreaInset(edge: .top, spacing: 0) {
@@ -70,6 +84,7 @@ struct DailyMoveView: View {
                             .background(alignment: .top) { topFade }
                     }
                     .frame(width: geo.size.width)
+                }
             }
         }
         .screenScheme(theme)
@@ -337,7 +352,8 @@ struct StreakCoins: View {
         }
         .task {
             guard !flipped else { return }
-            if !reduceMotion { try? await Task.sleep(for: .milliseconds(350)) }
+            // After the page has rolled up to show the card (DailyMoveView), so the flip is seen.
+            if !reduceMotion { try? await Task.sleep(for: .milliseconds(800)) }
             withAnimation(.spring(response: 0.5, dampingFraction: 0.62)) { flipped = true }
         }
         .sensoryFeedback(.success, trigger: flipped) { _, now in now && hapticsOn }

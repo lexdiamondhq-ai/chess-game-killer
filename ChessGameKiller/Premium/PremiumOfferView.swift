@@ -13,6 +13,11 @@ struct PremiumOfferView: View {
     @State private var trial = true
     /// Apple's page for the plan, for a subscriber who came here from You.
     @State private var managing = false
+    @AppStorage("haptics") private var hapticsOn = true
+    /// Premium was bought on this sheet a moment ago: it says so before it closes.
+    @State private var justBought = false
+    /// Bumps to bounce the crown.
+    @State private var crown = 0
     private var premium: Premium { .shared }
 
     private var theme: BoardTheme { .named(themeID) }
@@ -25,8 +30,11 @@ struct PremiumOfferView: View {
             TrainingBackdrop(theme: theme).ignoresSafeArea()
             ScrollView {
                 VStack(spacing: 22) {
-                    PremiumOfferHeader(accent: accent)
-                    if premium.isPremium {
+                    PremiumOfferHeader(accent: accent, bounce: crown)
+                    if justBought {
+                        PremiumOwnedCard(text: nil, accent: accent)
+                            .transition(.scale(scale: 0.94).combined(with: .opacity))
+                    } else if premium.isPremium {
                         // Already subscribed: only Premium's own daily caps lead here. Say so,
                         // and never ask them to buy it again.
                         PremiumOwnedCard(text: feature.map(premium.limitLine), accent: accent)
@@ -66,8 +74,18 @@ struct PremiumOfferView: View {
             trial = await premium.hasTrial(.yearly)
         }
         .onChange(of: premium.isPremium) { _, now in
-            if now { dismiss() }
+            guard now else { return }
+            // Bought here: the crown bounces and the sheet says "You have Premium" for a
+            // moment, with a buzz and the chime, before it closes by itself.
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.75)) { justBought = true }
+            crown += 1
+            SoundPlayer.shared.play(.win)
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1.4))
+                dismiss()
+            }
         }
+        .sensoryFeedback(.success, trigger: premium.isPremium) { _, now in now && hapticsOn }
     }
 
     /// A 44-point target with the visible circle inside it, set in from the sheet's rounded
@@ -101,7 +119,7 @@ struct PremiumOfferView: View {
                 .frame(height: 54)
                 .background(accent, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ChallengePressStyle())
     }
 
     private var plans: some View {
@@ -130,7 +148,7 @@ struct PremiumOfferView: View {
                 .frame(height: 54)
                 .background(accent, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ChallengePressStyle())
             .disabled(busy)
             if let problem = premium.problem {
                 Text(problem)
@@ -165,12 +183,15 @@ enum PremiumStyle {
 
 private struct PremiumOfferHeader: View {
     let accent: Color
+    /// Bumps to bounce the crown, as Premium is bought.
+    var bounce = 0
 
     var body: some View {
         VStack(spacing: 12) {
             Image(systemName: "crown.fill")
                 .font(.system(size: 30, weight: .semibold))
                 .foregroundStyle(accent)
+                .symbolEffect(.bounce, value: bounce)
                 .frame(width: 68, height: 68)
                 .glassPane(Circle(), tint: accent)
             Text("Premium")
@@ -400,7 +421,7 @@ struct PremiumLimitCard: View {
                         .frame(height: 48)
                         .background(accent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ChallengePressStyle())
             }
         }
         .padding(20)

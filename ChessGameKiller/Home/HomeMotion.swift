@@ -52,7 +52,7 @@ private struct HomeLiftBody<Content: View>: View {
             .offset(y: drop)
             .scaleEffect(scale)
             .modifier(HomeLiftPop(trigger: releases, tone: tone, radius: radius, still: reduceMotion))
-            .animation(.spring(response: 0.2, dampingFraction: 0.7), value: pressed)
+            .animation(Motion.press, value: pressed)
             .sensoryFeedback(.impact(weight: .medium), trigger: pressed) { _, down in down && hapticsOn }
             .onChange(of: pressed) { old, new in
                 if old && !new { releases += 1 }
@@ -121,6 +121,22 @@ struct HomeLipShape: Shape {
 /// the sheet does: Puzzles, your games and your pieces as well as Today's Move and the coach.
 enum HomeZoomID: String {
     case daily, coach, puzzles, games, army
+    /// Today's session with the coach, which the stage home's coach tile opens. Learn, the
+    /// whole school, keeps `coach`.
+    case session
+}
+
+private struct HomeZoomMarkKey: EnvironmentKey {
+    static let defaultValue: (HomeZoomID) -> Void = { _ in }
+}
+
+extension EnvironmentValues {
+    /// A tile says it was the one tapped, so only its own screen grows out of it. The same
+    /// screen opened from a bar, a menu or a number has no tile to grow from, and slides up.
+    var homeZoomMark: (HomeZoomID) -> Void {
+        get { self[HomeZoomMarkKey.self] }
+        set { self[HomeZoomMarkKey.self] = newValue }
+    }
 }
 
 private struct HomeZoomKey: EnvironmentKey {

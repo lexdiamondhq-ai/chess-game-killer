@@ -96,6 +96,34 @@ final class ChessClockTests: XCTestCase {
         XCTAssertNil(clock.running)
     }
 
+    func testASideIsWarnedOnceAsItRunsIntoItsLastTenSeconds() async {
+        let clock = ChessClock(initial: .milliseconds(10_060))
+        var warned: [Piece.Color] = []
+        clock.onLow = { warned.append($0) }
+        clock.start(.white)
+
+        let deadline = ContinuousClock.now + .seconds(5)
+        while warned.isEmpty, ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertEqual(warned, [.white])
+
+        // Its next turn starts inside the last ten seconds: no second warning.
+        clock.moved(by: .white)
+        clock.moved(by: .black)
+        try? await Task.sleep(for: .milliseconds(150))
+        XCTAssertEqual(warned, [.white])
+    }
+
+    func testAClockStartedInItsLastTenSecondsGivesNoWarning() async {
+        let clock = ChessClock(initial: .seconds(5))
+        var warned: [Piece.Color] = []
+        clock.onLow = { warned.append($0) }
+        clock.start(.black)
+        try? await Task.sleep(for: .milliseconds(150))
+        XCTAssertTrue(warned.isEmpty)
+    }
+
     func testClockLabels() {
         XCTAssertEqual(Duration.seconds(291).clockLabel, "4:51")
         XCTAssertEqual(Duration.seconds(600).clockLabel, "10:00")

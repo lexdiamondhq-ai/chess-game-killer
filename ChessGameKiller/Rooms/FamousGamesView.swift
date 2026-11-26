@@ -184,8 +184,11 @@ final class FamousGamePlayer {
         if finished { restart() }
         playing = true
         task?.cancel()
+        // A game whose first move has a story line of its own: the opening words stay up
+        // long enough to read before that line takes their place.
+        let opensWithStory = index == 0 && FamousGameStory.line(for: game, at: 0) != nil
         task = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(700))
+            try? await Task.sleep(for: opensWithStory ? FamousGamePlayer.storyPause : .milliseconds(700))
             while let self, !Task.isCancelled, !self.finished {
                 let told = self.stepForward(sound: true)
                 try? await Task.sleep(for: told ? FamousGamePlayer.storyPause : FamousGamePlayer.pace)
@@ -212,7 +215,7 @@ final class FamousGamePlayer {
     func stepForward(sound: Bool = true) -> Bool {
         guard !finished else { return false }
         board.playEngineMove(game.moves[index])
-        if sound { SoundPlayer.shared.play(.move) }
+        if sound { MoveSound.play(in: board) }
         let played = index
         index += 1
         if let line = FamousGameStory.line(for: game, at: played) {

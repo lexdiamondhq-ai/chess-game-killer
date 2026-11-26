@@ -283,7 +283,8 @@ private struct OrbFace: View {
                     .font(.app(size: 24, weight: .heavy))
                     .foregroundStyle(.secondary)
             }
-        } else if let review = match.review {
+        } else if !match.gradeIsPending, let review = match.review {
+            // While the newest move waits for its grade, the last move's grade steps aside.
             Group {
                 switch review.grade.mark {
                 case .symbol(let name):
@@ -426,6 +427,13 @@ private struct CoachPanel: View {
     @Environment(GameVault.self) private var vault: GameVault?
     @State private var reel: GameReel?
     @State private var rewind: SavedGame?
+    /// What the finished game did to the rating; worked out once, as the summary appears.
+    @State private var ratingLine: String?
+    @AppStorage("haptics") private var hapticsOn = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The army's news rows are in: they arrive a beat after the numbers, with a buzz.
+    @State private var newsShown = false
+    @State private var newsBuzz = 0
     @State private var confirmingResign = false
 
     /// This game's Piece of the Match, once the game is over and counted.
@@ -534,6 +542,16 @@ private struct CoachPanel: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 4)
+            } else if match.gradeIsPending {
+                // The grade shown would be the last move's: say the new one is on its way.
+                CoachAvatar(theme: theme, size: 40)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(Coach.current.name)").font(.app(.headline))
+                    Text("Your grade is on its way.")
+                        .font(.app(.subheadline)).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 4)
             } else if let review = match.review {
                 GradeBadge(grade: review.grade, glows: theme.glows, theme: theme)
                 VStack(alignment: .leading, spacing: 2) {
@@ -542,6 +560,23 @@ private struct CoachPanel: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 4)
+                // The same eye as the verdict line under the board, which is gone after a few
+                // seconds: the panel closes and the board shows the better move.
+                if MissedMove.exists(for: review) {
+                    Button {
+                        collapse()
+                        match.showMissedMove(review)
+                    } label: {
+                        Image(systemName: "eye")
+                            .font(.app(.subheadline, weight: .semibold))
+                            .foregroundStyle(Color.primary.opacity(0.6))
+                            .frame(width: 36, height: 36)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Show the better move")
+                    .accessibilityHint("Closes this panel and shows the move on the board.")
+                }
                 if let evaluation = review.evaluationForWhite {
                     let score = match.forPlayer(evaluation).label
                     EvalChip(text: score, color: review.grade.color(on: theme), large: true,
@@ -651,6 +686,13 @@ private struct CoachPanel: View {
                     PieceOfTheMatchCard(hero: hero, color: match.setup.playerColor, theme: theme)
                         .padding(.top, 10)
                 }
+                if newsShown {
+                    ForEach(armyNews) { news in
+                        ArmyNewsBanner(news: news, color: match.setup.playerColor, theme: theme, open: nil)
+                            .padding(.top, 10)
+                            .transition(.scale(scale: 0.94, anchor: .top).combined(with: .opacity))
+                    }
+                }
                 LearnedAboutYouRow(gameID: match.gameID, theme: theme)
             } else {
                 if let talk, match.canTalkItThrough {
@@ -665,6 +707,35 @@ private struct CoachPanel: View {
                 }
             }
         }
+        .task(id: armyNews.map(\.id)) { await showArmyNews() }
+        .sensoryFeedback(trigger: newsBuzz) { _, _ in
+            guard hapticsOn else { return nil }
+            return armyNews.contains(where: \.isBadNews) ? .warning : .success
+        }
+    }
+
+    /// What the finished game earned the army (a piece named, rescued, taken prisoner),
+    /// biggest news first. Two rows at most, so the summary stays a summary.
+    private var armyNews: [ArmyNews] {
+        guard match.isOver, let last = army?.lastNews, last.gameID == match.game.ledger?.gameID else { return [] }
+        return Array(last.items.prefix(2))
+    }
+
+    /// Brings the army's rows in a beat after the numbers, once: opened again, they are there.
+    private func showArmyNews() async {
+        guard !armyNews.isEmpty else {
+            newsShown = false
+            return
+        }
+        if army?.lastNews?.seen == true || reduceMotion || Welcome.isUnderTest {
+            newsShown = true
+            return
+        }
+        try? await Task.sleep(for: .seconds(0.9))
+        guard !Task.isCancelled else { return }
+        withAnimation(Motion.panel) { newsShown = true }
+        newsBuzz += 1
+        army?.newsWasSeen()
     }
 
     /// The score from the player's side, plus being good for them. Nil until the engine has answered.
@@ -677,21 +748,39 @@ private struct CoachPanel: View {
         VStack(spacing: 0) {
             GoldRule(accent: accent)
             HStack(spacing: 0) {
-                StatTile(title: "Accuracy", value: match.accuracy.map { "\($0)%" } ?? "–",
+                StatTile(title: "Accuracy", number: match.accuracy, suffix: "%",
                          color: match.accuracy.map { MoveReview.Grade.forAccuracy($0).color(on: theme) } ?? .secondary)
                 StatDivider(accent: accent)
-                StatTile(title: "Best", value: "\(match.gradeCounts[.best, default: 0] + match.gradeCounts[.checkmate, default: 0])",
+                StatTile(title: "Best", number: match.gradeCounts[.best, default: 0] + match.gradeCounts[.checkmate, default: 0],
                          color: .primary)
                 StatDivider(accent: accent)
-                StatTile(title: "Mistakes", value: "\(match.gradeCounts[.mistake, default: 0])",
+                StatTile(title: "Mistakes", number: match.gradeCounts[.mistake, default: 0],
                          color: MoveReview.Grade.mistake.color(on: theme))
                 StatDivider(accent: accent)
-                StatTile(title: "Blunders", value: "\(match.gradeCounts[.blunder, default: 0])",
+                StatTile(title: "Blunders", number: match.gradeCounts[.blunder, default: 0],
                          color: MoveReview.Grade.blunder.color(on: theme))
             }
             .padding(.vertical, 12)
             GoldRule(accent: accent)
+            if let ratingLine {
+                Text(ratingLine)
+                    .font(.app(.caption, weight: .medium).monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 8)
+                    .transition(.opacity)
+            }
         }
+        .onAppear { ratingLine = ratingAfterThisGame() }
+    }
+
+    /// "Rating 1240 (+12)": what this game did to the number on Home. Nil until there is a
+    /// rating to show (three finished games), and for a game that was left unfinished.
+    private func ratingAfterThisGame() -> String? {
+        guard let vault, let game = match.savedGame(), game.result != .unfinished else { return nil }
+        let earlier = vault.games.filter { $0.id != game.id }
+        guard let now = HomeLadder(games: earlier + [game]).yourRating else { return nil }
+        guard let before = HomeLadder(games: earlier).yourRating, before != now else { return "Rating \(now)" }
+        return "Rating \(now) (\(now > before ? "+" : "−")\(abs(now - before)))"
     }
 
     // MARK: Leo's picks
@@ -712,7 +801,7 @@ private struct CoachPanel: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else if match.hints.isEmpty {
                     HStack(spacing: 8) {
-                        ProgressView().controlSize(.small)
+                        KnightWait(size: 16)
                         Text(match.isComputerThinking ? "Waiting for \(rival.midSentence)…" : "Thinking…")
                             .font(.app(.footnote, weight: .medium))
                             .foregroundStyle(.secondary)
@@ -878,7 +967,7 @@ private struct CoachPanel: View {
                 .shadow(color: gold.opacity(theme.glows ? 0.45 : 0.2), radius: 12, y: 3)
                 .contentShape(Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ChallengePressStyle())
             .accessibilityLabel("Face \(rival.name)")
             .accessibilityHint("Plays \(rival.name.possessive) film, then starts the game")
         }
@@ -965,7 +1054,7 @@ private struct CoachPanel: View {
                 .shadow(color: accent.opacity(theme.glows ? 0.5 : 0.22), radius: 12, y: 3)
                 .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ChallengePressStyle())
     }
 
     /// Rewind needs somewhere to keep the game, and a move to look back on.
@@ -1194,16 +1283,39 @@ private struct ActionButton: View {
 /// One number from the game's summary: the number, and its name in small capitals under it.
 private struct StatTile: View {
     let title: String
-    let value: String
+    /// Nil while the number isn't known yet: a dash stands in.
+    let number: Int?
+    var suffix = ""
     let color: Color
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The number on screen: it counts up from nothing as the summary arrives, and rolls to a
+    /// late grade's new total rather than cutting to it.
+    @State private var shown = 0.0
+
+    private var value: String { number.map { "\($0)\(suffix)" } ?? "–" }
 
     var body: some View {
         VStack(spacing: 3) {
-            Text(value)
+            Group {
+                if number == nil {
+                    Text("–")
+                } else {
+                    CountingText(value: shown, suffix: suffix)
+                }
+            }
                 .font(.app(.title2, weight: .bold).monospacedDigit())
                 .foregroundStyle(color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
+                .onChange(of: number, initial: true) { _, number in
+                    let target = Double(number ?? 0)
+                    if reduceMotion || Welcome.isUnderTest {
+                        shown = target
+                    } else {
+                        withAnimation(.easeOut(duration: 0.7)) { shown = target }
+                    }
+                }
             Text(title.uppercased())
                 .font(.app(.caption2, weight: .medium))
                 .tracking(0.8)
@@ -1214,6 +1326,21 @@ private struct StatTile: View {
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(title) \(value)")
+    }
+}
+
+/// A whole number that can be animated: SwiftUI redraws it at every step between two values.
+private struct CountingText: View, Animatable {
+    var value: Double
+    let suffix: String
+
+    var animatableData: Double {
+        get { value }
+        set { value = newValue }
+    }
+
+    var body: some View {
+        Text("\(Int(value.rounded()))\(suffix)")
     }
 }
 

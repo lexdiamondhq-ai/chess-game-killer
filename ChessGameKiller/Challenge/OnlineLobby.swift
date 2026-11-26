@@ -192,6 +192,20 @@ struct PendingDailySeek: Codable, Equatable, Sendable {
 @MainActor
 @Observable
 final class OnlineLobby {
+    /// Who the lobby paired the person with, shown in the filled seat for a moment before the
+    /// game opens: without it the game opened with no word on who it was or which side you play.
+    struct FoundOpponent: Equatable {
+        var name: String
+        /// "1250", in a rated game.
+        var rating: String?
+        var youPlay: FriendSeat
+    }
+
+    private(set) var found: FoundOpponent?
+
+    /// How long "Found" holds before the board opens. Nothing under test, so tests don't wait.
+    static var foundHold: Duration { Welcome.isUnderTest ? .zero : .milliseconds(1000) }
+
     enum Phase: Equatable {
         /// Looking at who is waiting.
         case browsing
@@ -258,6 +272,10 @@ final class OnlineLobby {
     private(set) var problem: String?
     /// Loaded the list at least once.
     private(set) var hasLoaded = false
+    /// Checks of the lobby that failed in a row. Two, and the screen says the connection is lost
+    /// rather than counting up as if it were still looking.
+    private(set) var misses = 0
+    var isOffline: Bool { misses >= 2 }
     /// The player being taken on, while that is under way.
     private(set) var challenging: String?
 
@@ -358,8 +376,10 @@ final class OnlineLobby {
             players = list.players
             waiting = list.waiting
             hasLoaded = true
+            misses = 0
             if problem == ChallengeError.unreachable.message { problem = nil }
         } catch let error as ChallengeError {
+            misses += 1
             if !hasLoaded { problem = error.message }
         } catch {}
     }
@@ -459,6 +479,7 @@ final class OnlineLobby {
     /// Opens the game the lobby started.
     private func open(_ match: LobbyMatch) async {
         guard let center else { return }
+        found = nil
         phase = .starting
         if let pending = PendingDailySeek.load(defaults), pending.id == seekID { PendingDailySeek.save(nil, defaults) }
         seekID = nil
@@ -478,6 +499,11 @@ final class OnlineLobby {
         }
         let record = FriendGame(code: match.code, token: match.token, seat: match.seat, state: state)
         center.store.add(record)
+        // The seat fills with who it is, and holds about a second so it can be read.
+        let them = match.seat.opposite
+        found = FoundOpponent(name: state[them].name ?? "Your opponent", rating: state.ratings?[them].label,
+                              youPlay: match.seat)
+        if Self.foundHold > .zero { try? await Task.sleep(for: Self.foundHold) }
         // A daily game online can wait days for a move: the iPhone asks once to allow alerts for it.
         if record.days != nil { PhoneAlerts.askIfNeeded() }
         center.play(record, initial: state)

@@ -98,23 +98,29 @@ extension View {
 struct ChallengeScreens: View {
     @Environment(ChallengeCenter.self) private var center
     @AppStorage("boardTheme") private var themeID: BoardTheme.ID = .gilded
+    /// The screen last shown: it stays drawn while the cover slides away, so closing never shows an empty page.
+    @State private var last: ChallengeCenter.Screen?
 
     var body: some View {
         let theme = BoardTheme.named(themeID)
+        let shown = center.screen ?? last
         ZStack {
             TrainingBackdrop(theme: theme)
-            screen(theme)
-                .id(center.screen?.key)
+            screen(shown, theme)
+                .id(shown?.key)
                 .transition(.opacity)
         }
-        .animation(.easeInOut(duration: 0.3), value: center.screen?.key)
+        .animation(.easeInOut(duration: 0.3), value: shown?.key)
         .tint(theme.challengeAccent)
         .screenScheme(theme)
+        .onChange(of: center.screen?.key, initial: true) {
+            if let screen = center.screen { last = screen }
+        }
     }
 
     @ViewBuilder
-    private func screen(_ theme: BoardTheme) -> some View {
-        switch center.screen {
+    private func screen(_ shown: ChallengeCenter.Screen?, _ theme: BoardTheme) -> some View {
+        switch shown {
         case .composer(let composer)?:
             ChallengeComposerView(composer: composer, theme: theme)
         case .invite(let invite)?:

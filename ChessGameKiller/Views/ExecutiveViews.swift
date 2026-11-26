@@ -38,6 +38,9 @@ struct ExecutivePlate: View {
     /// The player's army, so a selected named piece shows its name here.
     @Environment(ArmyStore.self) private var army: ArmyStore?
 
+    /// The move count whose check has touched down (see `checkShows`).
+    @State private var checkLandedAfter: Int?
+
     private var isComputer: Bool { match.setup.opponent == .computer && !match.game.humanColors.contains(color) }
     private var isActive: Bool { !match.isOver && match.game.activeColor == color }
     private var accent: Color { theme.accent ?? .accentColor }
@@ -45,7 +48,27 @@ struct ExecutivePlate: View {
     private var glow: Color? { theme.glows && isActive ? theme.sideColor(color) : nil }
 
     var body: some View {
-        if inDock { dockLine } else { card }
+        Group {
+            if inDock { dockLine } else { card }
+        }
+        // The CHECK tag waits for the checking piece to touch down, as the callout over the
+        // king does: on the 3D board a move is news once it has landed.
+        .task(id: checkedAfter) {
+            guard let move = checkedAfter, checkLanding > 0.05 else { return }
+            try? await Task.sleep(for: .seconds(checkLanding))
+            guard !Task.isCancelled else { return }
+            checkLandedAfter = move
+        }
+        .onChange(of: match.game.plyCount) { _, _ in announceRivalMove() }
+    }
+
+    /// The move count of the check this side is in, for as long as it is in it.
+    private var checkedAfter: Int? { inCheck ? match.game.moveCount : nil }
+    /// Seconds from the checking move being played until its piece is down.
+    private var checkLanding: TimeInterval { match.game.lastPlayed.map { match.landingDelay($0) } ?? 0 }
+    /// The CHECK tag is up: this side is in check and the checking piece has landed.
+    private var checkShows: Bool {
+        inCheck && (checkLanding <= 0.05 || checkLandedAfter == match.game.moveCount)
     }
 
     /// A deep, quiet emerald rather than a signal green: brighter on dark looks, deeper on light.
@@ -65,7 +88,7 @@ struct ExecutivePlate: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .dynamicTypeSize(...DynamicTypeSize.xLarge)
         .animation(.snappy(duration: 0.3), value: isActive)
-        .animation(.snappy(duration: 0.3), value: inCheck)
+        .animation(.snappy(duration: 0.3), value: checkShows)
     }
 
     /// In a timed game the words keep the line's whole width and your clock sits under them,
@@ -174,7 +197,7 @@ struct ExecutivePlate: View {
         }
         .dynamicTypeSize(...DynamicTypeSize.xxLarge)
         .animation(.snappy(duration: 0.3), value: isActive)
-        .animation(.snappy(duration: 0.3), value: inCheck)
+        .animation(.snappy(duration: 0.3), value: checkShows)
         .animation(.easeInOut(duration: 0.9), value: mood)
     }
 
@@ -183,7 +206,7 @@ struct ExecutivePlate: View {
     /// your move, takes the place of the dot and the status; CHECK and the captures stay.
     private var statusRow: some View {
         HStack(spacing: 6) {
-            if inCheck {
+            if checkShows {
                 CheckTag(color: theme.check)
                     .transition(.scale.combined(with: .opacity))
             }
@@ -215,7 +238,7 @@ struct ExecutivePlate: View {
     /// CHECK and the status, or for a few seconds the coach's grade over its advice.
     private var dockWords: some View {
         HStack(spacing: 6) {
-            if inCheck {
+            if checkShows {
                 CheckTag(color: theme.check)
                     .transition(.scale.combined(with: .opacity))
             }
@@ -251,14 +274,20 @@ struct ExecutivePlate: View {
                 }
                 .layoutPriority(1)
                 .transition(.opacity)
-            } else if let hintWords {
-                // The spotlit move in words, in the spotlight's gold.
-                Text(hintWords)
-                    .font(.app(.footnote, weight: .semibold))
-                    .foregroundStyle(theme.isDark ? HintSpotlight.gold : Color(red: 0.6, green: 0.43, blue: 0.06))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    .transition(.opacity)
+            } else if let hintWords, let hintPhrase {
+                // The spotlit move in words, in the spotlight's gold. A long one ("Knight takes
+                // the queen, check") drops the word Hint rather than ending in dots.
+                ViewThatFits(in: .horizontal) {
+                    Text(hintWords)
+                        .lineLimit(1)
+                    Text(hintPhrase)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                }
+                .font(.app(.footnote, weight: .semibold))
+                .foregroundStyle(theme.isDark ? HintSpotlight.gold : Color(red: 0.6, green: 0.43, blue: 0.06))
+                .accessibilityLabel(hintWords)
+                .transition(.opacity)
             } else if !status.isEmpty, isTaunt {
                 Text(status)
                     .rivalLetters(voice, theme: theme)
@@ -353,8 +382,24 @@ struct ExecutivePlate: View {
 
     /// With hints on, your turn's best move in words: "Hint · Knight takes the queen".
     private var hintWords: String? {
+        hintPhrase.map { "Hint · " + $0 }
+    }
+
+    /// The hinted move in words alone: "Knight takes the queen, check".
+    private var hintPhrase: String? {
         guard !isComputer, isActive, !match.isOver, let best = match.bestHint else { return nil }
-        return "Hint · " + HintWords.phrase(for: best, in: match.game)
+        return HintWords.phrase(for: best, in: match.game)
+    }
+
+    /// VoiceOver hears the rival's move as it is played: "The Hunter: Knight takes the pawn, check".
+    private func announceRivalMove() {
+        guard !inDock, isComputer, UIAccessibility.isVoiceOverRunning,
+              let played = match.game.lastPlayed, played.color == color,
+              let squares = Notation.squares(of: played.uci) else { return }
+        let mover: Piece.Kind? = played.uci.count == 5 ? .pawn : match.game.piece(at: squares.to)?.kind
+        let taken: Piece.Kind? = played.isCapture ? match.game.captureEvents.last?.piece.kind : nil
+        let words = HintWords.phrase(san: played.san, mover: mover, taken: taken)
+        AccessibilityNotification.Announcement("\(match.setup.rival.name): \(words)").post()
     }
 
     /// The status is the rival's taunt, waiting for your move.
@@ -369,7 +414,8 @@ struct ExecutivePlate: View {
             return match.winner == nil ? "Draw" : "Lost"
         }
         if isComputer {
-            if isActive { return match.engineFailed ? "\(Coach.current.name) is offline" : "Thinking…" }
+            // Engine trouble is the coach's news (its panel says so), never the rival's own line.
+            if isActive { return "Thinking…" }
             return RivalTaunt.line(for: match.setup.level, game: match.gameID, ply: match.game.plyCount, mood: mood)
         }
         return isActive ? "Your move" : ""
@@ -475,7 +521,12 @@ private struct ExecutiveClock: View {
             let remaining = clock.remaining(for: color)
             let urgent = isRunning && remaining < .seconds(10)
             let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
-            Text(remaining.clockLabel)
+            // As wide as its widest reading, so "0:10" turning into "0:09.9" doesn't nudge
+            // the taken pieces beside it.
+            ZStack {
+                Text("0:00.0").hidden()
+                Text(remaining.clockLabel)
+            }
                 .font(.app(.title3, weight: .medium).monospacedDigit())
                 .foregroundStyle(isRunning ? Color.black.opacity(0.88) : Color.secondary)
                 .lineLimit(1)
@@ -550,11 +601,19 @@ struct DockButton: View {
     let theme: BoardTheme
     let action: () -> Void
 
+    /// Counts taps: each one is answered with a light tick, as the orb and the board answer theirs.
+    @State private var taps = 0
+    @AppStorage("haptics") private var hapticsOn = true
+
     var body: some View {
-        Button(action: action) {
+        Button {
+            taps += 1
+            action()
+        } label: {
             DockLabel(title: title, symbol: symbol, lit: isOn == true, theme: theme)
         }
         .buttonStyle(.plain)
+        .sensoryFeedback(.impact(weight: .light), trigger: taps) { _, _ in hapticsOn }
         .accessibilityLabel(title)
         .accessibilityValue(isOn.map { $0 ? "On" : "Off" } ?? "")
         .accessibilityAddTraits(isOn == nil ? [] : .isToggle)

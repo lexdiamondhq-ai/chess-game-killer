@@ -192,7 +192,7 @@ private struct CandidatePositionView: View {
             .opacity(ready ? 1 : 0.45)
         case .checking:
             HStack(spacing: 10) {
-                ProgressView()
+                KnightWait(size: 18)
                 Text("\(Coach.current.name) is checking…")
                     .font(.app(.subheadline, weight: .semibold))
                     .foregroundStyle(.secondary)

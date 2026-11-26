@@ -308,6 +308,7 @@ struct SessionIntro: View {
 
 /// The end of a session: how it went, what was earned, and the next rank.
 struct SessionSummary: View {
+    @AppStorage("haptics") private var hapticsOn = true
     /// A follow-up worth doing right away, offered under Done.
     struct Next {
         let title: String
@@ -397,7 +398,7 @@ struct SessionSummary: View {
         .onAppear {
             withAnimation(.easeOut(duration: 1.1).delay(0.2)) { shown = true }
         }
-        .sensoryFeedback(.success, trigger: shown)
+        .sensoryFeedback(.success, trigger: shown) { _, _ in hapticsOn }
     }
 
     private var headline: String {

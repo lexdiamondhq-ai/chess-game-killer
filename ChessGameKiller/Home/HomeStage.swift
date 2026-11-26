@@ -897,12 +897,28 @@ struct HomeStageMotes: View {
     }
 }
 
-/// A button sinks a little under the finger.
+/// A button sinks a little under the finger, and a light tick answers the touch.
 struct HomeStagePress: ButtonStyle {
+    /// Off for a button whose panel already answers with a thump of its own as it opens.
+    var ticks = true
+
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.95 : 1)
-            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
+        HomeStagePressBody(label: configuration.label, pressed: configuration.isPressed, ticks: ticks)
+    }
+}
+
+private struct HomeStagePressBody<Label: View>: View {
+    let label: Label
+    let pressed: Bool
+    let ticks: Bool
+
+    @AppStorage("haptics") private var hapticsOn = true
+
+    var body: some View {
+        label
+            .scaleEffect(pressed ? 0.95 : 1)
+            .animation(Motion.press, value: pressed)
+            .sensoryFeedback(.impact(weight: .light), trigger: pressed) { _, down in down && ticks && hapticsOn }
     }
 }
 
