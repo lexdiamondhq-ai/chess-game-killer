@@ -105,6 +105,10 @@ struct PuzzlesView: View {
             guard let outcome, let puzzle else { return }
             finished(puzzle, outcome: outcome)
         }
+        // Premium bought from the limit card: the card gives way to the next puzzle at once.
+        .onChange(of: Premium.shared.isPremium) { _, premium in
+            if premium, limit != nil, mode == .rated { nextRated() }
+        }
         .onChange(of: mode) { _, mode in
             runner?.cancel()
             runner = nil
@@ -419,7 +423,7 @@ private struct RushCard: View {
                 .foregroundStyle(theme.trainingAccent)
                 .shadow(color: theme.glows ? theme.trainingAccent.opacity(0.7) : .clear, radius: 14)
             if let last, last.isOver {
-                Text(last.newBest ? "New best!" : "Time!")
+                Text(last.newBest ? "New best!" : last.strikes >= RushRound.lives ? "Three strikes" : "Time!")
                     .font(.app(.title, weight: .bold))
                 Text("\(last.score) solved")
                     .font(.app(.title3, weight: .semibold).monospacedDigit())

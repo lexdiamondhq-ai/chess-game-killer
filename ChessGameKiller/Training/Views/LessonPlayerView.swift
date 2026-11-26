@@ -160,7 +160,11 @@ struct LessonPlayerView: View {
             }
             Button {
                 muted.toggle()
-                if muted { CoachVoice.shared.stop() }
+                if muted {
+                    CoachVoice.shared.stop()
+                    // Cutting him off would end the step at once: it runs again at reading pace.
+                    if player.phase == .playing { player.replay() }
+                }
             } label: {
                 Image(systemName: muted ? "speaker.slash.fill" : "speaker.wave.2.fill")
                     .font(.system(size: 15, weight: .semibold))

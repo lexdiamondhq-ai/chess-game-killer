@@ -503,7 +503,12 @@ final class TalkSession: Identifiable {
                     focus = nil
                 case .answer(let value):
                     let words = value.text.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !words.isEmpty { answer = words }
+                    if !words.isEmpty {
+                        answer = words
+                        // The answer is on screen: the dock offers Talk again and Play now,
+                        // not "is checking…" for as long as the voice takes to arrive.
+                        if check != nil { phase = .answered }
+                    }
                 case .voice(let value):
                     voiceArrived(value)
                 case .done:

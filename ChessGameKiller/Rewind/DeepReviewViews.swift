@@ -81,7 +81,9 @@ struct DeepReviewCard: View {
         HStack(spacing: 12) {
             CoachAvatar(theme: theme, size: 40, coach: player.coach)
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(player.coach.name)'s deep review")
+                Text(player.isWaitingForVoice && player.phase == .playing
+                     ? "\(player.coach.name)'s voice is on its way"
+                     : "\(player.coach.name)'s deep review")
                     .font(.app(.caption2, weight: .semibold))
                     .tracking(2)
                     .textCase(.uppercase)

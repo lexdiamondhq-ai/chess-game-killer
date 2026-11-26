@@ -37,7 +37,10 @@ final class DeepReviewPlayer {
     @ObservationIgnored private var reading: Task<Void, Never>?
 
     /// How long a part waits for its recording before the device's voice reads it instead.
-    static let longestWaitForVoice: Duration = .seconds(10)
+    static let longestWaitForVoice: Duration = .seconds(6)
+    /// A part's words are up but its recording is still on its way: the card says so, rather
+    /// than showing Pause over silence.
+    private(set) var isWaitingForVoice = false
     /// The breath between two parts.
     @ObservationIgnored var gap: Duration = .milliseconds(350)
     /// When nothing was read aloud (the coach is muted), a part's words stay up long enough to read.
@@ -220,9 +223,15 @@ final class DeepReviewPlayer {
     /// A part's recording: the one that arrived or was kept, waiting a little while the server
     /// is still sending. Nil: read it with the device's voice.
     private func recording(for part: Int) async -> Data? {
-        let deadline = ContinuousClock.now + Self.longestWaitForVoice
+        let began = ContinuousClock.now
+        let deadline = began + Self.longestWaitForVoice
+        defer { isWaitingForVoice = false }
         while voices[part] == nil, !voiceless.contains(part), !streamEnded, !Task.isCancelled,
               ContinuousClock.now < deadline {
+            // Said only once the wait is a real one, and never for a muted coach.
+            if !isWaitingForVoice, !CoachVoice.shared.isMuted, ContinuousClock.now - began > .milliseconds(600) {
+                isWaitingForVoice = true
+            }
             try? await Task.sleep(for: .milliseconds(120))
         }
         if let arrived = voices[part] { return arrived }
