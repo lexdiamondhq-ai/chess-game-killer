@@ -40,8 +40,31 @@ final class CoachReportTests: XCTestCase {
         let report = CoachReport.make(games: [game(cleanMoves(30)), game(cleanMoves(30))])
         let safety = report.scores.first { $0.area == .safety }
         XCTAssertEqual(safety?.value ?? 0, 1, accuracy: 0.001)
-        XCTAssertEqual(safety?.verdict, "Strong")
         XCTAssertNil(report.leak, "Nothing to fix")
+        // Two games are too few to put next to real players: the bar says what it has seen.
+        XCTAssertFalse(report.isCompared)
+        XCTAssertEqual(report.gamesLeftToCompare, 6)
+        XCTAssertNil(safety?.standing)
+        XCTAssertEqual(safety?.verdict, "Clean so far")
+        XCTAssertEqual(report.scores.first { $0.area == .endgames }?.verdict, "Not enough yet")
+
+        // Eight are enough. Nothing left hanging in eight games is rarer than it sounds.
+        let more = CoachReport.make(games: (0..<8).map { game(cleanMoves(30), daysAgo: Double($0)) })
+        XCTAssertTrue(more.isCompared)
+        XCTAssertEqual(more.scores.first { $0.area == .safety }?.verdict, "Better than 9 in 10")
+        // More than half of real players never miss a short mate either: level with them, not ahead.
+        XCTAssertEqual(more.scores.first { $0.area == .checkmates }?.verdict, "Like most players")
+    }
+
+    func testBeforeEnoughGamesABarCountsTheCostlyMoves() throws {
+        var moves = cleanMoves(20)
+        moves.append(moment(ply: 7, grade: .blunder, fen: hangingFEN, uci: "f3g5", bestUCI: "d2d3", reply: "h6g5"))
+        let one = CoachReport.make(games: [game(moves)])
+        XCTAssertEqual(one.scores.first { $0.area == .safety }?.verdict, "1 costly move")
+        let two = CoachReport.make(games: [game(moves), game(moves, daysAgo: 1)])
+        XCTAssertEqual(two.scores.first { $0.area == .safety }?.verdict, "2 costly moves")
+        // What to work on doesn't wait for the comparison: two real mistakes are enough.
+        XCTAssertEqual(two.leak?.headline, "Loose pieces")
     }
 
     func testHangingPiecesAreTheLeak() throws {
@@ -56,6 +79,97 @@ final class CoachReportTests: XCTestCase {
         XCTAssertEqual(leak.headline, "Loose pieces")
         XCTAssertEqual(leak.skill, "safety")
         XCTAssertTrue(leak.detail.contains("twice"), leak.detail)
+        XCTAssertEqual(leak.proof, "Left one hanging twice.")
+        XCTAssertEqual(report.weakSpots, [leak])
+        XCTAssertEqual(report.missed[.hungPiece], 2)
+        // Its practice starts with the positions saved from the player's games under that skill.
+        XCTAssertTrue(leak.positions.holds(saved(skill: "safety", fen: hangingFEN)))
+        XCTAssertFalse(leak.positions.holds(saved(skill: "forks", fen: hangingFEN)))
+    }
+
+    private func saved(skill: String, fen: String) -> GameMistake {
+        GameMistake(id: UUID().uuidString, fen: fen, best: "d2d3", played: "f3g5", skill: skill, title: "Missed",
+                    created: .now, due: .now)
+    }
+
+    // MARK: What to work on
+
+    /// One game's part of a report, written out by hand.
+    private func tally(weighted: [CoachReport.Area: Double] = [:], mistakes: [CoachReport.Area: Int] = [:],
+                       kinds: [CoachMoment.Kind: Int] = [:]) -> CoachReport.Tally {
+        var tally = CoachReport.Tally()
+        for area in CoachReport.Area.allCases { tally.moves[area] = 20 }
+        tally.weighted = weighted
+        tally.mistakes = mistakes
+        tally.kinds = kinds
+        return tally
+    }
+
+    func testTheAreasFurthestBehindRealPlayersComeFirst() {
+        // A blunder a game left hanging, two in the opening, three in the middlegame. Real players
+        // lose most in the middlegame too, so the order isn't simply the lowest score first.
+        let game = tally(weighted: [.safety: 3, .openings: 6, .calculation: 9],
+                         mistakes: [.safety: 1, .openings: 2, .calculation: 3], kinds: [.hungPiece: 1])
+        let report = CoachReport.make(tallies: Array(repeating: game, count: 8))
+        XCTAssertEqual(report.gamesRead, 8)
+        func verdict(_ area: CoachReport.Area) -> String? { report.scores.first { $0.area == area }?.verdict }
+        XCTAssertEqual(verdict(.safety), "Like most players")
+        XCTAssertEqual(verdict(.openings), "Below most players")
+        XCTAssertEqual(verdict(.calculation), "Below most players")
+        XCTAssertEqual(verdict(.tactics), "Better than 9 in 10")
+        XCTAssertEqual(report.weakSpots.map(\.area), [.calculation, .openings, .safety])
+        XCTAssertEqual(report.weakSpots.map(\.headline), ["Middlegame decisions", "Shaky starts", "Loose pieces"])
+        XCTAssertEqual(report.weakSpots.map(\.proof), ["24 costly moves with no single pattern.",
+                                                       "16 costly moves in the first 12 moves.",
+                                                       "Left one hanging 8 times."])
+        XCTAssertEqual(report.leak?.area, .calculation)
+        // The same order from the first games on, before any bar says where the player sits.
+        let early = CoachReport.make(tallies: [game, game])
+        XCTAssertFalse(early.isCompared)
+        XCTAssertEqual(early.weakSpots.map(\.area), [.calculation, .openings, .safety])
+    }
+
+    func testAtMostThreeThingsToWorkOn() {
+        let game = tally(weighted: [.safety: 3, .tactics: 6, .checkmates: 3, .openings: 6, .calculation: 9],
+                         mistakes: [.safety: 1, .tactics: 2, .checkmates: 1, .openings: 2, .calculation: 3])
+        let report = CoachReport.make(tallies: Array(repeating: game, count: 8))
+        XCTAssertEqual(report.weakSpots.count, CoachReport.weakSpotLimit)
+        XCTAssertEqual(report.weakSpots.first, report.leak)
+    }
+
+    func testAnAreaAheadOfMostPlayersIsLeftAloneUnlessItIsAllThereIs() {
+        // Two small slips in tactics over three games: still ahead of most real players.
+        let slip = tally(weighted: [.tactics: 1], mistakes: [.tactics: 1])
+        let alone = CoachReport.make(tallies: [slip, slip, tally()])
+        XCTAssertEqual(alone.weakSpots.map(\.area), [.tactics], "Ahead everywhere: the lowest is still the thing to work on")
+        XCTAssertEqual(alone.weakSpots.first?.headline, "Tactics slipping by")
+        XCTAssertEqual(alone.weakSpots.first?.proof, "Went by twice.")
+        // With a real gap elsewhere, that gap is the list.
+        let shaky = tally(weighted: [.tactics: 1, .openings: 8], mistakes: [.tactics: 1, .openings: 3])
+        let both = CoachReport.make(tallies: [shaky, shaky, tally()])
+        XCTAssertEqual(both.weakSpots.map(\.area), [.openings])
+    }
+
+    func testOneCostlyMoveIsNotAHabit() {
+        let once = tally(weighted: [.openings: 3], mistakes: [.openings: 1])
+        XCTAssertTrue(CoachReport.make(tallies: [once, tally(), tally()]).weakSpots.isEmpty)
+    }
+
+    func testWhichSavedPositionsBelongToWhichThingToWorkOn() {
+        // A middlegame with every piece still on, at move 20.
+        let middlegameFEN = "r1bq1rk1/pp2bppp/2n1pn2/3p4/3P4/2NBPN2/PP3PPP/R1BQ1RK1 w - - 0 20"
+        typealias Positions = CoachReport.Positions
+        // A pattern Leo named goes by its skill, wherever in the game it happened.
+        XCTAssertTrue(Positions.skills(["threats", "back-rank"]).holds(saved(skill: "back-rank", fen: endgameFEN)))
+        XCTAssertFalse(Positions.endgame.holds(saved(skill: "forks", fen: endgameFEN)))
+        // A mistake with no pattern goes by the part of the game.
+        XCTAssertTrue(Positions.opening.holds(saved(skill: "", fen: quietFEN)))
+        XCTAssertTrue(Positions.opening.holds(saved(skill: "opening", fen: middlegameFEN)))
+        XCTAssertFalse(Positions.opening.holds(saved(skill: "", fen: middlegameFEN)))
+        XCTAssertTrue(Positions.middlegame.holds(saved(skill: "", fen: middlegameFEN)))
+        XCTAssertFalse(Positions.middlegame.holds(saved(skill: "", fen: endgameFEN)))
+        XCTAssertTrue(Positions.endgame.holds(saved(skill: "", fen: endgameFEN)))
+        XCTAssertFalse(Positions.endgame.holds(saved(skill: "", fen: quietFEN)))
     }
 
     func testMistakesWithNoPatternGoByPhase() {
@@ -88,10 +202,14 @@ final class CoachReportTests: XCTestCase {
         XCTAssertEqual(CoachReport.make(games: games).gamesRead, CoachReport.gameLimit)
     }
 
-    func testGamesAgainstAFriendAreLeftOut() {
-        let friend = game(cleanMoves(20), level: nil)
+    func testAGameAgainstAPersonCountsOnceItIsGraded() {
+        // Kept the moment it ends with no grades of the player's own: nothing to read yet.
+        var friend = game(cleanMoves(20), level: nil)
         XCTAssertEqual(CoachReport.make(games: [friend]).gamesRead, 0)
         XCTAssertEqual(CoachReport.make(games: [friend, game(cleanMoves(20))]).gamesRead, 1)
+        friend.graded = true
+        XCTAssertEqual(CoachReport.make(games: [friend]).gamesRead, 1)
+        XCTAssertEqual(CoachReport.make(games: [friend, game(cleanMoves(20))]).gamesRead, 2)
     }
 }
 

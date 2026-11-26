@@ -141,36 +141,91 @@ enum GameImportBuilder {
 
 // MARK: Grading
 
-/// Grades the player's moves in a game from a chess site the way a game here is graded,
-/// move by move against Stockfish, and keeps it as a saved game.
+/// Grades the player's moves in a finished game the way a game against a rival is graded as
+/// it is played, move by move against Stockfish: a game from a chess site, or a game played
+/// here against a person.
 struct GameImportGrader {
     let engine: any ChessEngine
     var depth = 14
     /// The most time for the position before each of the player's moves, and after it.
     var beforeMs = 350
     var afterMs = 200
+    /// Grading nobody is watching (a game against a person, after it ends). The engine is asked
+    /// quietly, so a game being played never waits on it; a search that had to give way is
+    /// asked again once the engine has been free for a moment.
+    var quiet = false
+    /// How long to stand back after giving way, before asking again.
+    var standBack = Duration.seconds(2)
 
     /// The game as a saved game, or nil if its moves don't replay or the player isn't in it.
     func grade(_ online: ImportedGame, username: String, isCancelled: @Sendable () -> Bool = { Task.isCancelled }) async -> SavedGame? {
         guard let playerIsWhite = online.playerIsWhite(username),
               let replay = GameImportBuilder.replay(online.moves) else { return nil }
+        let san = online.moves.map(GameImportBuilder.cleanSAN)
+        guard let read = await read(uci: replay.uci, positions: replay.positions, san: san,
+                                    playerIsWhite: playerIsWhite, endsInMate: replay.endsInMate,
+                                    isCancelled: isCancelled) else { return nil }
+
+        let playerColor: Piece.Color = playerIsWhite ? .white : .black
+        let winner: Piece.Color? = online.winner.map { $0 == .white ? Piece.Color.white : Piece.Color.black }
+        var game = SavedGame.make(
+            id: UUID(), date: online.date,
+            opponent: playerIsWhite ? online.black : online.white,
+            level: nil, playerColor: playerColor, winner: winner, isOver: true,
+            accuracy: SavedGame.accuracy(of: read.counts),
+            positions: replay.positions, moves: san, moments: read.moments
+        )
+        game.clock = online.clock
+        game.source = online.site.rawValue
+        game.sourceID = online.sourceID
+        game.opponentRating = playerIsWhite ? online.blackRating : online.whiteRating
+        return game
+    }
+
+    /// What became of grading a game played here against a person.
+    enum Reading: Equatable {
+        /// The game, with the player's moves graded.
+        case graded(SavedGame)
+        /// Stopped before the end (cancelled, or the engine had nothing to say): try again later.
+        case stopped
+        /// Its positions aren't a move apart, so there is nothing to grade.
+        case unreadable
+    }
+
+    /// Grades the player's moves in a game played here against a person. The game keeps its
+    /// id and date, so the saved one is brought up to date in place.
+    func grade(_ game: SavedGame, isCancelled: @Sendable () -> Bool = { Task.isCancelled }) async -> Reading {
+        guard game.positions.count == game.moves.count + 1,
+              let replay = GameImportBuilder.moves(through: game.positions) else { return .unreadable }
+        guard let read = await read(uci: replay.uci, positions: game.positions, san: game.moves,
+                                    playerIsWhite: game.playerIsWhite, endsInMate: replay.endsInMate,
+                                    isCancelled: isCancelled) else { return .stopped }
+        var graded = game
+        graded.moments = read.moments
+        graded.accuracy = SavedGame.accuracy(of: read.counts)
+        graded.graded = true
+        return .graded(graded)
+    }
+
+    /// The player's moves, graded, and how many got each grade. Nil when stopped before the end.
+    private func read(uci: [String], positions: [String], san: [String], playerIsWhite: Bool, endsInMate: Bool,
+                      isCancelled: @Sendable () -> Bool) async -> (moments: [SavedMoment], counts: [MoveReview.Grade: Int])? {
         var moments: [SavedMoment] = []
         var counts: [MoveReview.Grade: Int] = [:]
         // Lines already found, by position: the position after one move is the one before the next.
         var known: [Int: [EngineLine]] = [:]
 
-        for index in replay.uci.indices {
+        for index in uci.indices {
             let byWhite = index % 2 == 0
             guard byWhite == playerIsWhite else { continue }
             if isCancelled() { return nil }
-            let uci = replay.uci[index]
-            let fenBefore = replay.positions[index], fenAfter = replay.positions[index + 1]
-            let san = GameImportBuilder.cleanSAN(online.moves[index])
+            let move = uci[index]
+            let fenBefore = positions[index], fenAfter = positions[index + 1]
             let ply = index + 1
-            let isLast = index == replay.uci.count - 1
+            let isLast = index == uci.count - 1
 
-            if isLast, replay.endsInMate {
-                moments.append(SavedMoment(ply: ply, grade: MoveReview.Grade.checkmate.rawValue, san: san, uci: uci,
+            if isLast, endsInMate {
+                moments.append(SavedMoment(ply: ply, grade: MoveReview.Grade.checkmate.rawValue, san: san[index], uci: move,
                                            byWhite: byWhite, fenBefore: fenBefore, fenAfter: fenAfter,
                                            before: 1, after: 1))
                 counts[.checkmate, default: 0] += 1
@@ -179,32 +234,41 @@ struct GameImportGrader {
 
             var before = known[index] ?? []
             if known[index] == nil {
-                before = await engine.analyze(fen: fenBefore, depth: depth, lines: 2, maxTimeMs: beforeMs)
+                guard let found = await lines(fenBefore, count: 2, ms: beforeMs, isCancelled: isCancelled) else { return nil }
+                before = found
                 known[index] = before
             }
-            guard let bestLine = before.first, let bestMove = bestLine.firstMove else { continue }
+            guard let bestLine = before.first, let bestMove = bestLine.firstMove else {
+                // The player moved from here, so there were moves to find: a quiet reading
+                // stops rather than leave the move out. (An import carries on, as it always has.)
+                if quiet { return nil }
+                continue
+            }
 
-            let playedBest = bestMove == uci
+            let playedBest = bestMove == move
             var after: Evaluation?
             var reply: String?
             if playedBest {
                 after = bestLine.evaluation
                 reply = bestLine.moves.dropFirst().first
-            } else if before.count > 1, before[1].firstMove == uci {
+            } else if before.count > 1, before[1].firstMove == move {
                 after = before[1].evaluation
                 reply = before[1].moves.dropFirst().first
             } else {
                 var answer = known[index + 1] ?? []
                 if known[index + 1] == nil {
-                    answer = await engine.analyze(fen: fenAfter, depth: depth, lines: 1, maxTimeMs: afterMs)
+                    guard let found = await lines(fenAfter, count: 1, ms: afterMs, isCancelled: isCancelled) else { return nil }
+                    answer = found
                     known[index + 1] = answer
                 }
                 if let line = answer.first {
                     after = line.evaluation.flipped
                     reply = line.firstMove
-                } else if isLast {
+                } else if isLast, !quiet || !GameImportBuilder.hasMoves(fenAfter) {
                     // Nothing to answer with and no mate: a stalemate, or a draw on the board.
                     after = .centipawns(0)
+                } else if quiet {
+                    return nil
                 }
             }
             guard let after else { continue }
@@ -212,7 +276,7 @@ struct GameImportGrader {
             let grade = MoveReview.grade(before: bestLine.evaluation, after: after, playedBest: playedBest)
             counts[grade, default: 0] += 1
             moments.append(SavedMoment(
-                ply: ply, grade: grade.rawValue, san: san, uci: uci, byWhite: byWhite,
+                ply: ply, grade: grade.rawValue, san: san[index], uci: move, byWhite: byWhite,
                 fenBefore: fenBefore, fenAfter: fenAfter,
                 best: playedBest ? nil : Notation.san(of: bestMove, fen: fenBefore),
                 bestUCI: playedBest ? nil : bestMove,
@@ -222,21 +286,48 @@ struct GameImportGrader {
                 beforeEval: bestLine.evaluation, afterEval: after
             ))
         }
+        return (moments, counts)
+    }
 
-        let playerColor: Piece.Color = playerIsWhite ? .white : .black
-        let winner: Piece.Color? = online.winner.map { $0 == .white ? Piece.Color.white : Piece.Color.black }
-        var game = SavedGame.make(
-            id: UUID(), date: online.date,
-            opponent: playerIsWhite ? online.black : online.white,
-            level: nil, playerColor: playerColor, winner: winner, isOver: true,
-            accuracy: SavedGame.accuracy(of: counts),
-            positions: replay.positions, moves: online.moves.map(GameImportBuilder.cleanSAN), moments: moments
-        )
-        game.clock = online.clock
-        game.source = online.site.rawValue
-        game.sourceID = online.sourceID
-        game.opponentRating = playerIsWhite ? online.blackRating : online.whiteRating
-        return game
+    /// The engine's lines for a position. A quiet reading asks again, after standing back,
+    /// each time it had to give way; nil once cancelled.
+    private func lines(_ fen: String, count: Int, ms: Int, isCancelled: @Sendable () -> Bool) async -> [EngineLine]? {
+        guard quiet else { return await engine.analyze(fen: fen, depth: depth, lines: count, maxTimeMs: ms) }
+        while !isCancelled() {
+            if let found = await engine.analyzeQuietly(fen: fen, depth: depth, lines: count, maxTimeMs: ms) { return found }
+            try? await Task.sleep(for: standBack)
+        }
+        return nil
+    }
+}
+
+extension GameImportBuilder {
+    /// The moves, in engine notation, that lead from each position to the next, and whether
+    /// the last one is mate. Nil if two positions in a row aren't one move apart.
+    static func moves(through positions: [String]) -> (uci: [String], endsInMate: Bool)? {
+        var ucis: [String] = []
+        var endsInMate = false
+        for (fen, next) in zip(positions, positions.dropFirst()) {
+            guard let position = Position(fen: fen) else { return nil }
+            let target = TrainingChess.key(next)
+            var found: (uci: String, board: Board)?
+            for uci in candidates(on: Board(position: position)) {
+                guard let board = TrainingChess.board(after: [uci], from: fen),
+                      TrainingChess.key(board.position.fen) == target else { continue }
+                found = (uci, board)
+                break
+            }
+            guard let found else { return nil }
+            ucis.append(found.uci)
+            endsInMate = TrainingChess.isCheckmate(found.board)
+        }
+        return (ucis, endsInMate)
+    }
+
+    /// Whether the side to move has a legal move.
+    static func hasMoves(_ fen: String) -> Bool {
+        guard let position = Position(fen: fen) else { return false }
+        return !TrainingChess.legalMoves(in: Board(position: position)).isEmpty
     }
 }
 
@@ -353,13 +444,16 @@ final class GameImporter {
     }
 
     /// The game's real mistakes, saved to "Fix your mistakes" like those from games played here.
-    static func saveMistakes(from game: SavedGame, to store: TrainingStore) -> Int {
+    /// `date` is when they count as made: the pile keeps the newest, so a game read long after
+    /// it was played passes its own date and never pushes out fresher mistakes.
+    static func saveMistakes(from game: SavedGame, to store: TrainingStore, at date: Date = .now) -> Int {
         var saved = 0
         for moment in game.playerMoments where [.mistake, .blunder].contains(moment.moveGrade) {
             guard let best = moment.bestUCI else { continue }
-            let found = MomentFinder.find(in: moment.review).flatMap { $0.kind.isPraise ? nil : $0 }
+            let found = MomentFinder.find(in: game.review(of: moment)).flatMap { $0.kind.isPraise ? nil : $0 }
             let title = found.map { GameCoach.words(for: $0, library: store.library).title } ?? "Find the better move"
-            if store.addMistake(fen: moment.fenBefore, best: best, played: moment.uci, skill: found?.skill ?? "", title: title) {
+            if store.addMistake(fen: moment.fenBefore, best: best, played: moment.uci, skill: found?.skill ?? "",
+                                title: title, at: date) {
                 saved += 1
             }
         }

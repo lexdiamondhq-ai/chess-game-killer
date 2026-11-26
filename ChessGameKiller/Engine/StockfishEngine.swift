@@ -15,9 +15,18 @@ protocol ChessEngine: AnyObject, Sendable {
     /// 20 = full strength), how deep to look (nil: as deep as the time allows) and the most
     /// time to take.
     func chooseMove(fen: String, skill: Int, depth: Int?, thinkTimeMs: Int) async -> String?
+    /// An analysis nobody is waiting on, like grading a finished game behind the scenes. It
+    /// never stops another search or stands in its way: it waits until the engine is free, and
+    /// answers nil if it had to give way to someone who asked for the engine while it ran.
+    func analyzeQuietly(fen: String, depth: Int, lines: Int, maxTimeMs: Int) async -> [EngineLine]?
 }
 
 extension ChessEngine {
+    /// Engines with nobody else to give way to just answer.
+    func analyzeQuietly(fen: String, depth: Int, lines: Int, maxTimeMs: Int) async -> [EngineLine]? {
+        await analyze(fen: fen, depth: depth, lines: lines, maxTimeMs: maxTimeMs)
+    }
+
     /// Engines that can't report midway just answer at the end.
     func analyze(fen: String, depth: Int, lines: Int, maxTimeMs: Int?,
                  progress: @escaping @Sendable ([EngineLine], Int) -> Void) async -> [EngineLine] {
@@ -59,6 +68,17 @@ actor StockfishEngine: ChessEngine {
     private var unansweredGos = 0
     /// How long to wait for a given-up search's "bestmove" before counting it lost.
     static let lostAnswer = Duration.seconds(2)
+    /// Searches somebody is waiting on, from the moment they ask until they are answered.
+    /// A quiet search starts only when there are none.
+    private var asking = 0
+    /// When somebody last asked for the engine, or was last answered.
+    private var lastAsked: ContinuousClock.Instant?
+    /// How long the engine must have been left alone before a quiet search starts, so quiet
+    /// work keeps out of a game being played.
+    static let usualCalm = Duration.seconds(6)
+    private var calm = StockfishEngine.usualCalm
+    /// Quiet searches that got as far as the engine, for tests.
+    private(set) var quietSearches = 0
     /// The search threads wanted now, and the number the engine was last told. On a hot phone
     /// or in Low Power Mode one thread searches; see `PowerPolicy`.
     private var threadsWanted = StockfishEngine.searchThreads
@@ -90,6 +110,15 @@ actor StockfishEngine: ChessEngine {
     /// The threads the engine is set to now, for tests.
     var threads: Int { threadsWanted }
 
+    /// How long quiet searches wait after anyone else used the engine. Tests shorten it.
+    func setCalm(_ calm: Duration) {
+        self.calm = calm
+    }
+
+    private var isCalm: Bool {
+        lastAsked.map { ContinuousClock.now - $0 >= calm } ?? true
+    }
+
     private struct PendingSearch {
         let id: Int
         /// Engine output is checked against this, so late output from an
@@ -103,6 +132,8 @@ actor StockfishEngine: ChessEngine {
         var goIssued = false
         var stopSent = false
         var stoppedAt: ContinuousClock.Instant?
+        /// Stopped to make way for a newer request, so its lines aren't as deep as it was asked for.
+        var cutShort = false
         let continuation: AsyncStream<SearchResult>.Continuation
         /// Told the lines so far as the search deepens, if anyone is listening.
         var progress: (@Sendable ([EngineLine], Int) -> Void)?
@@ -114,6 +145,8 @@ actor StockfishEngine: ChessEngine {
     private struct SearchResult: Sendable {
         var bestMove: String?
         var lines: [EngineLine]
+        /// The search was stopped for a newer request (or never got to start).
+        var cutShort = false
     }
 
     // MARK: ChessEngine
@@ -140,6 +173,18 @@ actor StockfishEngine: ChessEngine {
             wanted: max(1, lines)
         )
         return Array(result.lines.prefix(lines))
+    }
+
+    func analyzeQuietly(fen: String, depth: Int, lines: Int, maxTimeMs: Int) async -> [EngineLine]? {
+        let result = await search(
+            fen: fen,
+            options: [("Skill Level", "20"), ("MultiPV", "\(max(1, lines))")],
+            go: .go(depth: depth, movetime: maxTimeMs),
+            timeout: .milliseconds(maxTimeMs + 600),
+            wanted: max(1, lines),
+            quiet: true
+        )
+        return result.cutShort ? nil : Array(result.lines.prefix(lines))
     }
 
     /// Starts Stockfish and loads its networks ahead of the first search, so the
@@ -170,7 +215,8 @@ actor StockfishEngine: ChessEngine {
         go: EngineCommand,
         timeout: Duration,
         progress: (@Sendable ([EngineLine], Int) -> Void)? = nil,
-        wanted: Int = 1
+        wanted: Int = 1,
+        quiet: Bool = false
     ) async -> SearchResult {
         guard let position = Position(fen: fen), await startIfNeeded() else {
             return SearchResult(bestMove: nil, lines: [])
@@ -178,7 +224,41 @@ actor StockfishEngine: ChessEngine {
 
         // A caller whose task was cancelled no longer wants an answer, and must
         // not stop a search someone else is waiting for.
-        if Task.isCancelled { return SearchResult(bestMove: nil, lines: []) }
+        if Task.isCancelled { return SearchResult(bestMove: nil, lines: [], cutShort: quiet) }
+
+        if quiet {
+            // Nobody is waiting on a quiet search, so it never stops another one or stands in
+            // its way: it starts only once the engine is free, nobody is asking for it, and it
+            // has been left alone for a while. Nothing awaits between this check and the search
+            // taking the engine below, so nobody can slip in between.
+            var owedSince: ContinuousClock.Instant?
+            while pending != nil || unansweredGos > 0 || asking > 0 || !isCalm {
+                if Task.isCancelled { return SearchResult(bestMove: nil, lines: [], cutShort: true) }
+                // An answer still owed long after its search was given up on is lost. The next
+                // search somebody asks for would count it lost too; with nobody asking, quiet
+                // work must not wait on it for ever.
+                if pending == nil, asking == 0, unansweredGos > 0 {
+                    let since = owedSince ?? .now
+                    owedSince = since
+                    if ContinuousClock.now - since > Self.lostAnswer {
+                        Self.trace?("an ended search never answered; quiet work carries on")
+                        unansweredGos = 0
+                    }
+                } else {
+                    owedSince = nil
+                }
+                try? await Task.sleep(for: .milliseconds(50))
+            }
+        } else {
+            asking += 1
+            lastAsked = .now
+        }
+        defer {
+            if !quiet {
+                asking -= 1
+                lastAsked = .now
+            }
+        }
 
         // One search at a time, and the newest request goes next: stop the current
         // search and wait for it to report. A request that is still waiting when a
@@ -194,6 +274,7 @@ actor StockfishEngine: ChessEngine {
             if let current = pending, current.goSent, !current.stopSent {
                 pending?.stopSent = true
                 pending?.stoppedAt = .now
+                pending?.cutShort = true
                 Self.trace?("stop search \(current.id) for request \(ticket)")
                 await engine.send(command: .stop)
                 continue
@@ -239,6 +320,7 @@ actor StockfishEngine: ChessEngine {
         await engine.send(command: .position(.fen(fen)))
         // Counted before it is sent, so its answer can never find the count at zero.
         unansweredGos += 1
+        if quiet { quietSearches += 1 }
         pending?.goIssued = true
         await engine.send(command: go)
         if pending?.id == id { pending?.goSent = true }
@@ -467,7 +549,8 @@ actor StockfishEngine: ChessEngine {
         guard let search = pending, search.id == searchID else { return }
         Self.trace?("finish search \(searchID): \(bestMove ?? "no move")")
         let lines = Self.distinct(search.lines)
-        search.continuation.yield(SearchResult(bestMove: bestMove ?? lines.first?.firstMove, lines: lines))
+        search.continuation.yield(SearchResult(bestMove: bestMove ?? lines.first?.firstMove, lines: lines,
+                                               cutShort: search.cutShort))
         search.continuation.finish()
         pending = nil
     }

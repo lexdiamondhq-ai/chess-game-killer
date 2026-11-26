@@ -62,26 +62,18 @@ struct ChessDNACard: View {
 
 // MARK: The full profile
 
-/// Everything the coach has learned about how the player plays: the style and its habits,
-/// the weapon to sharpen and the leak to fix (each a tap from practice), whether each area
-/// is getting better, what they play in the opening, and the opening to learn next.
+/// More of what the coach has learned about how the player plays: the style and its four
+/// habits next to real players, whether each area is getting better, what they play in the
+/// opening, and the opening to learn next. What they are good at and what to work on are on
+/// the page before this one.
 struct ChessDNAView: View {
     let dna: ChessDNA
     let theme: BoardTheme
-    @Environment(TrainingStore.self) private var store
-    @Environment(PuzzleStore.self) private var puzzles
-    @State private var session: SessionPlan?
 
     var body: some View {
         TrainScreen(theme: theme, title: "Your Chess DNA",
                     intro: "\(Coach.current.name) builds this from every game and puzzle you play, and updates it after each one.") {
             styleCard
-            if let weapon = dna.weapon {
-                weaponCard(weapon)
-            }
-            if let leak = dna.leak {
-                leakCard(leak)
-            }
             TrainSectionTitle(text: "Getting better")
             growthCard
             if !dna.openings.isEmpty {
@@ -100,12 +92,6 @@ struct ChessDNAView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 4)
                 .padding(.top, 8)
-        }
-        .task { await puzzles.load() }
-        .fullScreenCover(item: $session) { plan in
-            SessionView(plan: plan, theme: theme, startsAtOnce: true)
-                .environment(store)
-                .environment(puzzles)
         }
     }
 
@@ -127,57 +113,18 @@ struct ChessDNAView: View {
             DNAStyleHeader(dna: dna, theme: theme, compact: false)
             if dna.hasStyle {
                 DNATraitBars(traits: dna.traits, theme: theme, compact: false)
+                DNATypicalLegend()
+            }
+            if let note = dna.styleNote {
+                Text(note)
+                    .font(.app(.caption))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .trainingCard(theme, tint: theme.trainingAccent)
-    }
-
-    // MARK: Weapon and leak
-
-    private func weaponCard(_ weapon: ChessDNA.Weapon) -> some View {
-        let tint = TrainingColor.green.color(on: theme)
-        return DNAFocusCard(label: "YOUR WEAPON", title: weapon.title, detail: weapon.detail,
-                            symbol: weapon.symbol, tint: tint, theme: theme) {
-            Button {
-                session = puzzlePlan(PuzzleTheme.named(weapon.theme))
-            } label: {
-                Label("Sharpen it", systemImage: "bolt.fill")
-            }
-            .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false, tint: tint))
-        }
-    }
-
-    private func leakCard(_ leak: CoachReport.Leak) -> some View {
-        let tint = TrainingColor.orange.color(on: theme)
-        return DNAFocusCard(label: "WORK ON THIS FIRST", title: leak.headline, detail: leak.detail,
-                            symbol: leak.area.symbol, tint: tint, theme: theme) {
-            Button {
-                session = leakPlan(leak)
-            } label: {
-                Label(leak.action, systemImage: "play.fill")
-            }
-            .buttonStyle(TrainingButtonStyle(theme: theme))
-        }
-    }
-
-    /// Real puzzles on one theme at the player's level.
-    private func puzzlePlan(_ theme: PuzzleTheme) -> SessionPlan? {
-        guard let library = puzzles.library, !library.puzzles.isEmpty else { return nil }
-        var builder = PuzzleSessionBuilder(library: library, rating: puzzles.progress.rating,
-                                           avoid: Set(puzzles.progress.recent), seed: UInt64.random(in: 1...UInt64.max))
-        let plan = builder.practice(theme: theme)
-        return plan.isEmpty ? nil : plan
-    }
-
-    /// The coach's own drills while the course has them for the player, puzzles after.
-    private func leakPlan(_ leak: CoachReport.Leak) -> SessionPlan? {
-        let past = store.isPastTheCourse(puzzleRating: puzzles.progress.rating, puzzlesPlayed: puzzles.progress.played)
-        let skill = leak.skill.flatMap { store.library?.skill($0) }
-        if !past, let skill, let plan = store.practicePlan(for: skill) { return plan }
-        if let plan = puzzlePlan(PuzzleSessionBuilder.theme(for: leak)) { return plan }
-        return skill.flatMap { store.practicePlan(for: $0) }
     }
 
     // MARK: Growth
@@ -278,7 +225,7 @@ struct DNAStyleHeader: View {
     }
 }
 
-/// The four habits as bars, each with its ends named.
+/// The four habits as bars: where the player sits next to real players on each.
 struct DNATraitBars: View {
     let traits: [ChessDNA.Trait]
     let theme: BoardTheme
@@ -304,9 +251,11 @@ struct DNATraitBar: View {
                 Text(trait.kind.title)
                     .font(.app(.subheadline, weight: .semibold))
                 Spacer()
-                Text(trait.word)
+                Text(trait.comparison)
                     .font(.app(.caption, weight: .bold))
-                    .foregroundStyle(trait.value == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(theme.trainingAccent))
+                    .foregroundStyle(standsOut ? AnyShapeStyle(theme.trainingAccent) : AnyShapeStyle(.secondary))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             track
             if !compact {
@@ -320,7 +269,12 @@ struct DNATraitBar: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(trait.kind.title): \(trait.word)")
+        .accessibilityLabel("\(trait.kind.title): \(trait.comparison)")
+    }
+
+    /// Clearly on one side of most players: the words are worth the accent.
+    private var standsOut: Bool {
+        trait.standing?.isAhead == true || trait.standing?.isBehind == true
     }
 
     private var track: some View {
@@ -337,6 +291,9 @@ struct DNATraitBar: View {
                     .fill(theme.trainingAccent.opacity(0.55))
                     .frame(width: x + dot / 2, height: 4)
                     .opacity(trait.value == nil ? 0 : 1)
+                // The typical player, in the middle.
+                DNATypicalMark()
+                    .offset(x: width / 2 - 1)
                 Circle()
                     .fill(theme.trainingAccent)
                     .frame(width: dot, height: dot)
@@ -378,44 +335,6 @@ struct DNAChip: View {
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(tint.opacity(0.12)))
-    }
-}
-
-/// A weapon or a leak: what it is, the evidence, and a button to practice.
-struct DNAFocusCard<Action: View>: View {
-    let label: String
-    let title: String
-    let detail: String
-    let symbol: String
-    let tint: Color
-    let theme: BoardTheme
-    @ViewBuilder let action: () -> Action
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: symbol)
-                    .font(.system(size: 13, weight: .bold))
-                Text(label)
-                    .font(.app(.caption, weight: .bold))
-                    .tracking(1)
-            }
-            .foregroundStyle(tint)
-            .accessibilityElement(children: .combine)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.app(.title3, weight: .bold))
-                Text(detail)
-                    .font(.app(.subheadline))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            action()
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .trainingCard(theme, tint: tint)
-        .accessibilityElement(children: .contain)
     }
 }
 

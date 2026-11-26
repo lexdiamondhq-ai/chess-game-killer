@@ -121,7 +121,7 @@ final class HomeSnapshotTests: XCTestCase {
                     HomeAuroraSection(title: "Your Chess DNA", palette: palette, note: ChessDNAView.basis(dna))
                     HomeAuroraDNA(dna: dna, palette: palette, action: {})
                         .padding(.horizontal, 16)
-                    HomeAuroraSection(title: "Before three games", palette: palette)
+                    HomeAuroraSection(title: "Before eight games", palette: palette)
                     HomeAuroraDNA(dna: fresh, palette: palette, action: {})
                         .padding(.horizontal, 16)
                     HomeAuroraSection(title: "Every style", palette: palette)

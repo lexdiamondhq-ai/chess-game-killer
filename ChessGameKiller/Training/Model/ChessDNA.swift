@@ -1,10 +1,12 @@
 import Foundation
 
 /// Your Chess DNA: what the coach has learned about how this player plays, rebuilt from
-/// every saved game against the computer and every rated puzzle after each one. It names a
-/// style from four habits, the player's best weapon and biggest leak, what they really
-/// play in the opening and how it goes, one opening that suits them, and whether each area
-/// is getting better. Pure data in, so it's easy to test, and it runs off the main thread.
+/// every graded game and every rated puzzle after each one. It places four habits next to
+/// real players (`RealPlayers`) and names a style from the one that stands out most, lists
+/// what the player is good at (the first is their weapon) and what to work on (the first is
+/// their leak), what they really play in the opening and how it goes, one opening that suits
+/// them, and whether each area is getting better. Pure data in, so it's easy to test, and it
+/// runs off the main thread.
 struct ChessDNA: Equatable {
     // MARK: Style
 
@@ -84,7 +86,7 @@ struct ChessDNA: Equatable {
         }
     }
 
-    /// One of the four habits, from 0 to 1.
+    /// One of the four habits, placed next to real players.
     struct Trait: Equatable, Identifiable {
         enum Kind: String, CaseIterable {
             case aggression, risk, patience, endgames
@@ -107,26 +109,75 @@ struct ChessDNA: Equatable {
                 case .endgames: return ("Shaky", "Strong")
                 }
             }
+
+            /// The words for a player clearly short of most players on this habit, or clearly past them.
+            var compared: (less: String, more: String) {
+                switch self {
+                case .aggression: return ("Quieter", "More aggressive")
+                case .risk: return ("Safer", "More daring")
+                case .patience: return ("Quicker", "More patient")
+                case .endgames: return ("Shakier", "Stronger")
+                }
+            }
         }
 
         let kind: Kind
-        /// Nil until there's enough to judge.
-        let value: Double?
+        /// Where the habit sits among real players. Nil until there's enough to judge.
+        let standing: RealPlayers.Standing?
 
         var id: String { kind.rawValue }
 
-        /// The nearer end's word, or "Balanced" in the middle.
+        /// Where to draw it on the bar, 0 to 1. The typical player is the middle.
+        var value: Double? { standing?.place }
+
+        /// One word, for a small card: an end's word once the player is clearly on that side
+        /// of most players, "Balanced" otherwise.
         var word: String {
-            guard let value else { return "Not enough yet" }
-            if value >= 0.62 { return kind.ends.high }
-            if value <= 0.38 { return kind.ends.low }
+            guard let standing else { return "Not enough yet" }
+            if standing.isAhead { return kind.ends.high }
+            if standing.isBehind { return kind.ends.low }
             return "Balanced"
         }
+
+        /// The comparison in full: "Safer than 8 in 10", or "Like most players".
+        var comparison: String {
+            guard let standing else { return "Not enough yet" }
+            if standing.isAhead { return "\(kind.compared.more) than \(RealPlayers.Standing.inTen(standing.below)) in 10" }
+            if standing.isBehind { return "\(kind.compared.less) than \(RealPlayers.Standing.inTen(standing.above)) in 10" }
+            return "Like most players"
+        }
+    }
+
+    // MARK: Strengths
+
+    /// Something the player is good at, with the proof.
+    struct Strength: Equatable, Identifiable {
+        /// Like "Forks".
+        let title: String
+        /// The proof in a sentence: "You found 9 of 9. Most players find 7."
+        let detail: String
+        let symbol: String
+        /// The puzzle theme that keeps it sharp, when there is one.
+        var theme: String?
+        /// Where it showed in the player's games, newest game first.
+        var sightings: [Sighting] = []
+
+        var id: String { title }
+    }
+
+    /// One place in one game.
+    struct Sighting: Hashable, Identifiable {
+        let game: UUID
+        /// The player's move, by ply. 0 is the game as a whole.
+        let ply: Int
+
+        var id: String { "\(game.uuidString)-\(ply)" }
     }
 
     // MARK: Weapon
 
-    /// The player's best weapon, with the evidence for it.
+    /// The player's best weapon, with the evidence for it: the first strength that has
+    /// puzzles to keep it sharp.
     struct Weapon: Equatable {
         let title: String
         let detail: String
@@ -194,8 +245,10 @@ struct ChessDNA: Equatable {
     /// Nil until enough games are read.
     let style: Style?
     let traits: [Trait]
-    /// The six areas and the one leak, from the recent games.
+    /// The six areas and what to work on, from the recent games.
     let report: CoachReport
+    /// Up to three things the player is good at, the best proof first.
+    let strengths: [Strength]
     let weapon: Weapon?
     /// Most played first, up to three for each color.
     let openings: [OpeningRecord]
@@ -211,23 +264,32 @@ struct ChessDNA: Equatable {
     }
 
     var leak: CoachReport.Leak? { report.leak }
+    /// Up to three things to work on, the furthest behind real players first.
+    var weakSpots: [CoachReport.Leak] { report.weakSpots }
     var hasStyle: Bool { style != nil }
 
-    /// The small print under the profile: which games it was read from, and which it wasn't.
+    /// The small print under the profile: which games it was read from, and what the bars
+    /// are measured against.
     var basisNote: String {
         let games = gamesRead == 1 ? "1 game" : "\(gamesRead) games"
-        let from = gamesImported > 0 ? "against the rivals or brought in from online" : "against the rivals"
-        return "Read from \(games) \(from), and your rated puzzles. Games played here against friends or online aren't counted."
+        return "Read from \(games) and your rated puzzles. Every game counts: against the rivals, against people (read a little after the game ends) and the ones you bring in from online. The bars and your style come from your newest \(Self.habitWindow) games, next to \(RealPlayers.players) real online players."
     }
 
-    /// "Play one more game against any rival": what the style is still waiting for, counting
-    /// only games long enough to read, so the number goes down when a game is played out.
+    /// How long the style has to stand: said under it once it is named.
+    var styleNote: String? {
+        guard style != nil else { return nil }
+        let games = gamesCounted >= Self.habitWindow ? "your last \(Self.habitWindow) games" : "\(gamesCounted) games"
+        return "Named from \(games). It stays until your games really change."
+    }
+
+    /// "Play one more game": what the style is still waiting for, counting only games long
+    /// enough to read, so the number goes down when a game is played out.
     var styleWait: String {
         let left = max(1, Self.gamesForStyle - gamesCounted)
         let games = left == 1 ? "one more game" : "\(left) more games"
         // Games were played but too short to read: say what counts, or the number looks stuck.
         let long = gamesRead > gamesCounted ? " of ten moves or more" : ""
-        return "Play \(games)\(long) against any rival"
+        return "Play \(games)\(long)"
     }
 
     /// The area that improved most, for the headline.
@@ -252,12 +314,28 @@ struct ChessDNA: Equatable {
 
     // MARK: Limits
 
-    /// Games read for the habits and the openings: everything the vault keeps.
+    /// Games read for the openings and for how the style grew: everything the vault keeps.
     static let gameLimit = 150
+    /// Games the habits are read from: the newest ones long enough to read. The same number the
+    /// ruler was measured on (`RealPlayers`), so "more patient than 7 in 10" means what it says,
+    /// and few enough that a real change in how the player plays shows.
+    static let habitWindow = CoachReport.gameLimit
     /// A game counts once the player made this many moves in it.
     static let movesToCount = 10
-    /// Games needed before a style is named.
-    static let gamesForStyle = 3
+    /// Games needed before a style is named. Fewer, and one odd game renames the player.
+    static let gamesForStyle = 8
+    /// How far a style's habits have to stand out before it is named: 0.5 is the typical player.
+    static let styleFloor = 0.62
+    /// How much further another style has to stand out before the name changes.
+    static let styleMargin = 0.12
+    /// Games the player stood clearly worse in before their comebacks are judged.
+    static let gamesForComebacks = 3
+    /// Chances at a pattern before the share the player found counts as proof.
+    static let chancesToCount = 4
+    /// How far past the usual share that has to be, in `RealPlayers.FindRate` spreads.
+    static let clearLead = 0.3
+    /// The most strengths listed.
+    static let strengthLimit = 3
     /// Games in each window when comparing then and now.
     static let trendWindow = 10
     static let minimumTrendWindow = 4
@@ -268,27 +346,31 @@ struct ChessDNA: Equatable {
 
     static func make(games: [SavedGame], puzzleStats: [String: ThemeRecord] = [:], puzzlesPlayed: Int = 0,
                      index: OpeningIndex = .shared) -> ChessDNA {
-        let computer = games.filter(\.isPlayersOwn).sorted { $0.date > $1.date }.prefix(gameLimit)
-        let counted = computer.filter { $0.playerMoments.count >= movesToCount || $0.moves.count >= 2 * movesToCount }
-        let habits = counted.map(GameHabits.init)
-        let report = CoachReport.make(games: Array(computer))
-
-        let traits = Self.traits(habits: habits, report: report)
-        let style = habits.count >= gamesForStyle ? Self.style(traits: traits, habits: habits) : nil
-        let openings = Self.openings(games: Array(computer), index: index)
+        let own = Array(games.filter(\.isPlayersOwn).sorted { $0.date > $1.date }.prefix(gameLimit))
+        let tallies = own.map { CoachReport.Tally($0) }
+        let report = CoachReport.make(tallies: tallies)
+        // A game too short to read has no habits.
+        let habits: [GameHabits?] = own.map { game in
+            game.playerMoments.count >= movesToCount || game.moves.count >= 2 * movesToCount ? GameHabits(game) : nil
+        }
+        let reading = Self.reading(habits: habits, tallies: tallies)
+        let openings = Self.openings(games: own, index: index)
+        let strengths = Self.strengths(games: own, report: report, puzzleStats: puzzleStats, index: index)
+        let sharpest = strengths.first { $0.theme != nil }
         return ChessDNA(
-            gamesRead: computer.count,
-            gamesCounted: habits.count,
-            gamesImported: computer.filter(\.isImported).count,
+            gamesRead: own.count,
+            gamesCounted: habits.compactMap { $0 }.count,
+            gamesImported: own.filter(\.isImported).count,
             puzzlesRead: puzzlesPlayed,
-            style: style,
-            traits: traits,
+            style: reading.style,
+            traits: reading.traits,
             report: report,
-            weapon: weapon(games: Array(computer), report: report, puzzleStats: puzzleStats),
+            strengths: Array(strengths.prefix(strengthLimit)),
+            weapon: sharpest.map { Weapon(title: $0.title, detail: $0.detail, symbol: $0.symbol, theme: $0.theme ?? "") },
             openings: openings,
-            picks: picks(style: style, openings: openings, index: index),
-            trends: trends(games: Array(computer)),
-            accuracyTrend: accuracyTrend(games: Array(computer))
+            picks: picks(style: reading.style, openings: openings, index: index),
+            trends: trends(games: own),
+            accuracyTrend: accuracyTrend(games: own)
         )
     }
 
@@ -312,7 +394,8 @@ struct ChessDNA: Equatable {
         var earlyCaptures = 0
         /// The whole game's length, in moves each.
         var length = 0
-        /// The player stood clearly worse at some point...
+        /// The player stood clearly worse after one of their own moves, while the game was
+        /// still being played. How it ended doesn't count: every lost game ends badly.
         var wasWorse = false
         /// ...and still won or drew.
         var saved = false
@@ -356,8 +439,7 @@ struct ChessDNA: Equatable {
                     sacrifices += 1
                 }
             }
-            let line = game.lifeline
-            wasWorse = line.contains { $0.value <= Self.clearlyWorse }
+            wasWorse = game.playerMoments.contains { $0.after <= Self.clearlyWorse }
             saved = wasWorse && (game.result == .win || game.result == .draw)
         }
 
@@ -402,122 +484,270 @@ struct ChessDNA: Equatable {
 
     static func clamp(_ value: Double) -> Double { min(1, max(0, value)) }
 
-    static func traits(habits: [GameHabits], report: CoachReport) -> [Trait] {
-        guard habits.count >= gamesForStyle else {
-            return Trait.Kind.allCases.map { Trait(kind: $0, value: nil) }
+    /// The habits of many games, added up.
+    struct HabitSums: Equatable {
+        var games = 0
+        var moves = 0
+        /// Checks and captures.
+        var sharp = 0
+        var forward = 0
+        /// Games castled after move 12, or never.
+        var late = 0
+        /// Sacrifices, at most two counted in a game.
+        var sacrifices = 0
+        var earlyQueens = 0
+        var length = 0
+        var earlyCaptures = 0
+        var worse = 0
+        var saved = 0
+
+        init() {}
+
+        init(_ games: [GameHabits]) {
+            for game in games { add(game) }
         }
-        let games = Double(habits.count)
-        let moves = Double(max(1, habits.reduce(0) { $0 + $1.moves }))
-        let sharp = Double(habits.reduce(0) { $0 + $1.checks + $1.captures })
-        let forward = Double(habits.reduce(0) { $0 + $1.forward })
-        // Checks and captures run about a quarter of a club player's moves, moves into
-        // their half about a third: both at once reads as balanced.
-        let aggression = clamp(((sharp + forward * 0.5) / moves - 0.22) / 0.36)
 
-        let late = Double(habits.filter { ($0.castledOn ?? 99) > 12 && $0.length >= 15 }.count) / games
-        let sacrifices = habits.reduce(0.0) { $0 + min(Double($1.sacrifices), 2) } / games
-        let queen = Double(habits.filter(\.earlyQueen).count) / games
-        let risk = clamp(late * 0.5 + sacrifices * 0.45 + queen * 0.25)
+        mutating func add(_ game: GameHabits) {
+            games += 1
+            moves += game.moves
+            sharp += game.checks + game.captures
+            forward += game.forward
+            if (game.castledOn ?? 99) > 12, game.length >= 15 { late += 1 }
+            sacrifices += min(game.sacrifices, 2)
+            if game.earlyQueen { earlyQueens += 1 }
+            length += game.length
+            earlyCaptures += game.earlyCaptures
+            if game.wasWorse { worse += 1 }
+            if game.saved { saved += 1 }
+        }
 
-        let length = habits.reduce(0.0) { $0 + Double($1.length) } / games
-        let early = habits.reduce(0.0) { $0 + Double($1.earlyCaptures) } / games
-        let patience = clamp(clamp((length - 22) / 40) * 0.65 + clamp(1 - early / 14) * 0.35)
+        /// Of the games the player stood clearly worse in, the share they still won or drew.
+        /// Nil until there are a few such games.
+        var comebacks: Double? {
+            worse >= ChessDNA.gamesForComebacks ? Double(saved) / Double(worse) : nil
+        }
+    }
 
-        let endgame = report.scores.first { $0.area == .endgames }?.value
+    /// The four habits, each placed next to real players. `endgames` is the Endgames score
+    /// from the recent games.
+    static func traits(_ sums: HabitSums, endgames: Double?) -> [Trait] {
+        guard sums.games >= gamesForStyle else {
+            return Trait.Kind.allCases.map { Trait(kind: $0, standing: nil) }
+        }
+        let games = Double(sums.games)
+        let moves = Double(max(1, sums.moves))
+        // Checks and captures, and at half weight moves into their half, as a share of the
+        // player's moves.
+        let aggression = (Double(sums.sharp) + Double(sums.forward) * 0.5) / moves
+        let risk = Double(sums.late) / games * 0.5 + Double(sums.sacrifices) / games * 0.45
+            + Double(sums.earlyQueens) / games * 0.25
+        let length = Double(sums.length) / games
+        let early = Double(sums.earlyCaptures) / games
+        let patience = clamp((length - 22) / 40) * 0.65 + clamp(1 - early / 14) * 0.35
         return [
-            Trait(kind: .aggression, value: aggression),
-            Trait(kind: .risk, value: risk),
-            Trait(kind: .patience, value: patience),
-            Trait(kind: .endgames, value: endgame),
+            Trait(kind: .aggression, standing: RealPlayers.aggression.standing(of: aggression)),
+            Trait(kind: .risk, standing: RealPlayers.risk.standing(of: risk)),
+            Trait(kind: .patience, standing: RealPlayers.patience.standing(of: patience)),
+            Trait(kind: .endgames, standing: endgames.map { RealPlayers.area(.endgames).standing(of: $0) }),
         ]
     }
 
-    static func style(traits: [Trait], habits: [GameHabits]) -> Style {
-        func value(_ kind: Trait.Kind) -> Double { traits.first { $0.kind == kind }?.value ?? 0.5 }
-        let aggression = value(.aggression), risk = value(.risk), patience = value(.patience), endgame = value(.endgames)
-        let worse = habits.filter(\.wasWorse).count
-        let saved = habits.filter(\.saved).count
-        if aggression >= 0.6, risk >= 0.5 { return .attacker }
-        if aggression >= 0.6 { return .tactician }
-        if worse >= 2, Double(saved) / Double(worse) >= 0.5 { return .counterpuncher }
-        if patience >= 0.6, endgame >= 0.6 { return .grinder }
-        if aggression < 0.45, risk < 0.4 { return .builder }
-        return .allRounder
+    // MARK: The style
+
+    /// How far each style's habits stand out, 0 to 1: 0.5 is the typical player. A style whose
+    /// habit can't be judged yet (no endgames played, never clearly worse) has no score.
+    static func styleScores(traits: [Trait], comebacks: Double?) -> [Style: Double] {
+        func place(_ kind: Trait.Kind) -> Double? { traits.first { $0.kind == kind }?.value }
+        guard let aggression = place(.aggression), let risk = place(.risk), let patience = place(.patience) else { return [:] }
+        var scores: [Style: Double] = [
+            .attacker: (aggression + risk) / 2,
+            .tactician: (aggression + (1 - risk)) / 2,
+            .builder: ((1 - aggression) + (1 - risk)) / 2,
+        ]
+        if let endgames = place(.endgames) {
+            scores[.grinder] = (patience + endgames) / 2
+        }
+        if let comebacks {
+            scores[.counterpuncher] = (RealPlayers.comebacks.standing(of: comebacks).place + (1 - aggression)) / 2
+        }
+        return scores
     }
 
-    // MARK: The weapon
+    /// The style to show: the one whose habits stand out most, once they stand out enough to
+    /// name. A style already named stays until another clearly passes it, so one odd game
+    /// doesn't rename the player.
+    static func style(scores: [Style: Double], current: Style?) -> Style {
+        // Ties go to the earlier one.
+        let order: [Style] = [.attacker, .tactician, .counterpuncher, .grinder, .builder]
+        var best = Style.allRounder
+        var top = -1.0
+        for style in order {
+            if let score = scores[style], score > top {
+                best = style
+                top = score
+            }
+        }
+        let named: Style = top >= styleFloor ? best : .allRounder
+        guard let current, current != named else { return named }
+        if named == .allRounder {
+            // Nothing stands out now: the old name stays while its own habits are still close.
+            return (scores[current] ?? 0) >= styleFloor - styleMargin ? current : .allRounder
+        }
+        let held = current == .allRounder ? styleFloor : (scores[current] ?? styleFloor)
+        return top >= held + styleMargin ? named : current
+    }
 
-    static func weapon(games: [SavedGame], report: CoachReport, puzzleStats: [String: ThemeRecord]) -> Weapon? {
-        // Patterns the player found in their games.
-        var found: [CoachMoment.Kind: Int] = [:]
-        for game in games.prefix(CoachReport.gameLimit * 2) {
+    /// The habits and the style, read the way they grew: game by game from the oldest, so the
+    /// style named today is the one the player has held until their games really changed.
+    /// Both lists run newest first, one entry a game; a game too short to read has no habits.
+    static func reading(habits: [GameHabits?], tallies: [CoachReport.Tally]) -> (traits: [Trait], style: Style?) {
+        var window: [GameHabits] = []
+        var style: Style?
+        var traits = Self.traits(HabitSums(), endgames: nil)
+        let oldestFirst = Array(tallies.reversed())
+        for (index, game) in habits.reversed().enumerated() {
+            if let game {
+                window.append(game)
+                if window.count > habitWindow { window.removeFirst() }
+            }
+            guard window.count >= gamesForStyle, oldestFirst.indices.contains(index) else { continue }
+            let sums = HabitSums(window)
+            // The Endgames score as the report had it then: from the newest games of that day.
+            let recent = oldestFirst[max(0, index + 1 - CoachReport.gameLimit)...index]
+            traits = Self.traits(sums, endgames: CoachReport.score(for: .endgames, in: recent).value)
+            style = Self.style(scores: styleScores(traits: traits, comebacks: sums.comebacks), current: style)
+        }
+        return (traits, style)
+    }
+
+    // MARK: Strengths
+
+    /// What the player is good at, the best proof first: patterns they find more often than
+    /// real players do, an opening that keeps scoring, areas where they sit ahead of most
+    /// players, and a puzzle theme well above their own average. Read from the same recent
+    /// games as the report.
+    static func strengths(games: [SavedGame], report: CoachReport, puzzleStats: [String: ThemeRecord],
+                          index: OpeningIndex) -> [Strength] {
+        let recent = games.prefix(CoachReport.gameLimit)
+        var list: [Strength] = []
+
+        // Patterns: how often the player plays one when it is on the board.
+        var found: [CoachMoment.Kind: [Sighting]] = [:]
+        for game in recent {
             for moment in game.playerMoments where [.best, .excellent, .checkmate].contains(moment.moveGrade) {
-                if let kind = MomentFinder.find(in: game.review(of: moment))?.kind, kind.isPraise, kind != .castled, kind != .fixedIt {
-                    found[kind, default: 0] += 1
+                if let kind = MomentFinder.find(in: game.review(of: moment))?.kind, kind.isPraise {
+                    found[kind, default: []].append(Sighting(game: game.id, ply: moment.ply))
                 }
             }
         }
-        func puzzles(_ theme: String) -> ThemeRecord? {
-            guard let record = puzzleStats[theme], record.attempts >= puzzlesToCount else { return nil }
-            return record
+        struct Pattern {
+            let found, missed: CoachMoment.Kind
+            let rate: RealPlayers.FindRate
+            let title, symbol, theme, did, usually: String
         }
-        func percent(_ record: ThemeRecord) -> Int { Int((record.accuracy * 100).rounded()) }
+        let patterns = [
+            Pattern(found: .foundFork, missed: .missedFork, rate: RealPlayers.forks,
+                    title: "Forks", symbol: "arrow.triangle.branch", theme: "fork", did: "found", usually: "find"),
+            Pattern(found: .foundFreePiece, missed: .missedFreePiece, rate: RealPlayers.freePieces,
+                    title: "Free pieces", symbol: "gift.fill", theme: "hangingPiece", did: "took", usually: "take"),
+            Pattern(found: .foundMate, missed: .missedMate, rate: RealPlayers.mates,
+                    title: "Finishing with mate", symbol: "crown.fill", theme: "mateIn2", did: "finished", usually: "finish"),
+        ]
+        var leads: [(lead: Double, strength: Strength)] = []
+        for pattern in patterns {
+            let sightings = found[pattern.found] ?? []
+            let chances = sightings.count + (report.missed[pattern.missed] ?? 0)
+            guard chances >= chancesToCount else { continue }
+            let lead = pattern.rate.lead(of: Double(sightings.count) / Double(chances))
+            guard lead >= clearLead else { continue }
+            let usual = Int((pattern.rate.typical * Double(chances)).rounded())
+            var detail = "You \(pattern.did) \(sightings.count) of \(chances)."
+            if usual < sightings.count { detail += " Most players \(pattern.usually) \(usual)." }
+            leads.append((lead, Strength(title: pattern.title, detail: detail, symbol: pattern.symbol,
+                                         theme: pattern.theme, sightings: sightings)))
+        }
+        list += leads.sorted { $0.lead > $1.lead }.map { $0.strength }
+
+        // An opening that keeps scoring.
+        if let opening = bestOpening(in: Array(recent), index: index) {
+            list.append(opening)
+        }
+
+        // Areas where the player sits ahead of most players. Not one already said as a pattern.
+        let weak = Set(report.weakSpots.map(\.area))
+        let order = CoachReport.Area.allCases
+        let ahead = report.scores
+            .filter { $0.standing?.isAhead == true && !weak.contains($0.area) }
+            .sorted { a, b in
+                let pa = a.standing?.below ?? 0, pb = b.standing?.below ?? 0
+                if pa != pb { return pa > pb }
+                return (order.firstIndex(of: a.area) ?? 0) < (order.firstIndex(of: b.area) ?? 0)
+            }
+        for score in ahead {
+            let theme = areaTheme(score.area)
+            guard let standing = score.standing, !list.contains(where: { $0.theme == theme }) else { continue }
+            if score.area == .tactics, list.contains(where: { $0.theme == "hangingPiece" }) { continue }
+            list.append(Strength(title: areaStrength(score.area), detail: "\(standing.words) players.",
+                                 symbol: score.area.symbol, theme: theme))
+        }
+
+        // A puzzle theme well above the player's own average: the last word, since it is
+        // measured against the player and not against anyone else. Only themes that name a skill:
+        // where a puzzle came from isn't one, and a tag the picker doesn't know has no name to show.
         let allAttempts = puzzleStats.values.reduce(0) { $0 + $1.attempts }
         let allClean = puzzleStats.values.reduce(0) { $0 + $1.clean }
         let overall = allAttempts == 0 ? 0 : Double(allClean) / Double(allAttempts)
-
-        struct Candidate { let weight: Double; let weapon: Weapon }
-        struct Pattern { let kind: CoachMoment.Kind; let title, symbol, theme, found, puzzles: String }
-        var candidates: [Candidate] = []
-        let patterns = [
-            Pattern(kind: .foundFork, title: "Forks", symbol: "arrow.triangle.branch", theme: "fork",
-                    found: "forks found", puzzles: "fork"),
-            Pattern(kind: .foundFreePiece, title: "Punishing loose pieces", symbol: "gift.fill", theme: "hangingPiece",
-                    found: "free pieces taken", puzzles: "free-piece"),
-            Pattern(kind: .foundMate, title: "Finishing the game", symbol: "crown.fill", theme: "mateIn2",
-                    found: "mates found", puzzles: "mate"),
-        ]
-        for pattern in patterns {
-            let count = found[pattern.kind] ?? 0
-            let record = puzzles(pattern.theme)
-            let goodAtPuzzles = record.map { $0.accuracy >= max(0.7, overall + 0.08) } ?? false
-            guard count >= 2 || goodAtPuzzles else { continue }
-            var parts: [String] = []
-            if count >= 2 { parts.append("\(count) \(pattern.found) in your games") }
-            if let record, goodAtPuzzles { parts.append("\(percent(record))% of \(pattern.puzzles) puzzles solved clean") }
-            let joined: String = parts.joined(separator: " and ")
-            let detail: String = joined.prefix(1).uppercased() + String(joined.dropFirst()) + "."
-            let weight: Double = Double(count) + (record?.accuracy ?? 0) * 4
-            candidates.append(Candidate(weight: weight, weapon: Weapon(title: pattern.title, detail: detail,
-                                                                       symbol: pattern.symbol, theme: pattern.theme)))
-        }
-        // An area of the games that's strong.
-        if let best = report.scores.filter({ ($0.value ?? 0) >= 0.85 && $0.area != report.leak?.area })
-            .max(by: { ($0.value ?? 0) < ($1.value ?? 0) }) {
-            let theme = areaTheme(best.area)
-            let detail = best.mistakes == 0
-                ? "No costly moves in \(best.area.title.lowercased()) across \(best.games == 1 ? "a game" : "\(best.games) games")."
-                : "Only \(best.mistakes) costly \(best.mistakes == 1 ? "move" : "moves") in \(best.area.title.lowercased()) across \(best.games) games."
-            // Patterns and puzzles are the sharper evidence: a clean area is the fallback.
-            candidates.append(Candidate(weight: 1.5 + (best.value ?? 0),
-                                        weapon: Weapon(title: areaStrength(best.area), detail: detail,
-                                                       symbol: best.area.symbol, theme: theme)))
-        }
-        // A puzzle theme well above the player's own average. Only themes that name a skill:
-        // where a puzzle came from isn't one, and a tag the picker doesn't know has no name to show.
-        if let top = puzzleStats.filter({ $0.value.attempts >= puzzlesToCount && $0.value.accuracy >= max(0.7, overall + 0.12)
-                && !PuzzleTheme.named($0.key).id.isEmpty && !notSkills.contains($0.key) })
-            .max(by: { $0.value.accuracy < $1.value.accuracy }),
-           !candidates.contains(where: { $0.weapon.theme == top.key }) {
+        let top = puzzleStats
+            .filter { $0.value.attempts >= puzzlesToCount && $0.value.accuracy >= max(0.7, overall + 0.12)
+                && !PuzzleTheme.named($0.key).id.isEmpty && !notSkills.contains($0.key) }
+            .max { a, b in a.value.accuracy != b.value.accuracy ? a.value.accuracy < b.value.accuracy : a.key > b.key }
+        if let top, !list.contains(where: { $0.theme == top.key }) {
             let name = PuzzleTheme.named(top.key)
-            if !name.id.isEmpty {
-                candidates.append(Candidate(weight: 2 + top.value.accuracy * 2,
-                                            weapon: Weapon(title: name.name,
-                                                           detail: "You solve \(percent(top.value))% of \(name.name.lowercased()) puzzles clean, well above your average.",
-                                                           symbol: name.symbol, theme: name.id)))
-            }
+            let percent = Int((top.value.accuracy * 100).rounded())
+            // A pattern keeps its own title: "Forks", not the picker's "Fork".
+            let pattern = patterns.first { $0.theme == top.key }
+            list.append(Strength(title: pattern?.title ?? name.name,
+                                 detail: "You solve \(percent)% of \(name.name.lowercased()) puzzles clean, well above your average.",
+                                 symbol: pattern?.symbol ?? name.symbol, theme: name.id))
         }
-        return candidates.max { $0.weight < $1.weight }?.weapon
+        return list
+    }
+
+    /// The opening that has gone best in these games, with one color: three games or more,
+    /// and most of the points.
+    static func bestOpening(in games: [SavedGame], index: OpeningIndex) -> Strength? {
+        struct Tally { var wins = 0, draws = 0, losses = 0, games: [UUID] = [] }
+        var tallies: [String: Tally] = [:]
+        for game in games where game.result != .unfinished {
+            guard let line = index.opening(of: game.positions) else { continue }
+            let key = "\(line.family) as \(game.playerIsWhite ? "White" : "Black")"
+            var tally = tallies[key] ?? Tally()
+            switch game.result {
+            case .win: tally.wins += 1
+            case .draw: tally.draws += 1
+            case .loss: tally.losses += 1
+            case .unfinished: break
+            }
+            tally.games.append(game.id)
+            tallies[key] = tally
+        }
+        func score(_ tally: Tally) -> Double {
+            (Double(tally.wins) + Double(tally.draws) / 2) / Double(max(1, tally.games.count))
+        }
+        let best = tallies
+            .filter { $0.value.games.count >= 3 && score($0.value) >= 0.6 }
+            .max { a, b in
+                if score(a.value) != score(b.value) { return score(a.value) < score(b.value) }
+                if a.value.games.count != b.value.games.count { return a.value.games.count < b.value.games.count }
+                return a.key > b.key
+            }
+        guard let best else { return nil }
+        func count(_ n: Int, _ one: String, _ many: String) -> String { "\(n) \(n == 1 ? one : many)" }
+        var parts = [count(best.value.wins, "win", "wins")]
+        if best.value.draws > 0 { parts.append(count(best.value.draws, "draw", "draws")) }
+        parts.append(best.value.losses == 0 ? "no losses" : count(best.value.losses, "loss", "losses"))
+        return Strength(title: best.key, detail: parts.joined(separator: ", ") + ".", symbol: "book.closed.fill",
+                        sightings: best.value.games.map { Sighting(game: $0, ply: 0) })
     }
 
     /// Puzzle tags that say where a puzzle came from, not what it trains.

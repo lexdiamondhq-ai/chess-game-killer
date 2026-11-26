@@ -87,7 +87,8 @@ struct DeepReviewRequest: Encodable, Equatable, Sendable {
     var v = 1
     /// "white" or "black".
     var player: String
-    /// The rival's name. Left out for a game from a chess site: a person's handle stays on the phone.
+    /// The rival's name. Left out for a game against a person, here or on a chess site: a
+    /// person's name stays on the phone.
     var rival: String?
     var rivalRating: Int?
     /// "win", "loss" or "draw", the player's.
@@ -115,7 +116,7 @@ struct DeepReviewRequest: Encodable, Equatable, Sendable {
     init?(game: SavedGame, coach: Coach = .current, voice: Bool = true) {
         guard Self.offered(for: game) else { return nil }
         player = game.playerIsWhite ? "white" : "black"
-        rival = game.isImported ? nil : game.opponentShown
+        rival = game.level == nil || game.isImported ? nil : game.opponentShown
         rivalRating = game.opponentRating ?? game.level.flatMap(MatchController.Level.init(rawValue:))?.rating
         result = game.result.rawValue
         if let first = game.positions.first, first != Position.standard.fen { start = first }
