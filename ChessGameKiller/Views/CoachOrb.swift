@@ -429,6 +429,11 @@ private struct CoachPanel: View {
     @State private var rewind: SavedGame?
     /// What the finished game did to the rating; worked out once, as the summary appears.
     @State private var ratingLine: String?
+    @AppStorage("haptics") private var hapticsOn = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The army's news rows are in: they arrive a beat after the numbers, with a buzz.
+    @State private var newsShown = false
+    @State private var newsBuzz = 0
     @State private var confirmingResign = false
 
     /// This game's Piece of the Match, once the game is over and counted.
@@ -681,6 +686,13 @@ private struct CoachPanel: View {
                     PieceOfTheMatchCard(hero: hero, color: match.setup.playerColor, theme: theme)
                         .padding(.top, 10)
                 }
+                if newsShown {
+                    ForEach(armyNews) { news in
+                        ArmyNewsBanner(news: news, color: match.setup.playerColor, theme: theme, open: nil)
+                            .padding(.top, 10)
+                            .transition(.scale(scale: 0.94, anchor: .top).combined(with: .opacity))
+                    }
+                }
                 LearnedAboutYouRow(gameID: match.gameID, theme: theme)
             } else {
                 if let talk, match.canTalkItThrough {
@@ -695,6 +707,35 @@ private struct CoachPanel: View {
                 }
             }
         }
+        .task(id: armyNews.map(\.id)) { await showArmyNews() }
+        .sensoryFeedback(trigger: newsBuzz) { _, _ in
+            guard hapticsOn else { return nil }
+            return armyNews.contains(where: \.isBadNews) ? .warning : .success
+        }
+    }
+
+    /// What the finished game earned the army (a piece named, rescued, taken prisoner),
+    /// biggest news first. Two rows at most, so the summary stays a summary.
+    private var armyNews: [ArmyNews] {
+        guard match.isOver, let last = army?.lastNews, last.gameID == match.game.ledger?.gameID else { return [] }
+        return Array(last.items.prefix(2))
+    }
+
+    /// Brings the army's rows in a beat after the numbers, once: opened again, they are there.
+    private func showArmyNews() async {
+        guard !armyNews.isEmpty else {
+            newsShown = false
+            return
+        }
+        if army?.lastNews?.seen == true || reduceMotion || Welcome.isUnderTest {
+            newsShown = true
+            return
+        }
+        try? await Task.sleep(for: .seconds(0.9))
+        guard !Task.isCancelled else { return }
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.78)) { newsShown = true }
+        newsBuzz += 1
+        army?.newsWasSeen()
     }
 
     /// The score from the player's side, plus being good for them. Nil until the engine has answered.

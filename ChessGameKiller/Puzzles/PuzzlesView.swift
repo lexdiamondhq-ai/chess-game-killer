@@ -281,6 +281,8 @@ struct PuzzlesView: View {
         let item = SessionItem(content: .drill(next.drill), role: .focus)
         let made = DrillRunner(item: item, library: training.library, engine: nil)
         made?.strict = strict
+        // Only Rush is strict here, and Rush is against the clock.
+        made?.hurried = strict
         runner = made
         made?.begin()
     }
@@ -303,7 +305,7 @@ struct PuzzlesView: View {
             }
             let solvedSoFar = round.score
             Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(outcome == .firstTry ? 450 : 900))
+                try? await Task.sleep(for: .milliseconds(outcome == .firstTry ? 350 : 550))
                 guard let current = rush, !current.isOver else { return }
                 withAnimation(.snappy) {
                     show(store.nextRush(solvedSoFar: solvedSoFar, avoid: current.played), strict: true)

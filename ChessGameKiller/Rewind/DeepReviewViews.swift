@@ -52,6 +52,54 @@ struct DeepReviewRow: View {
 
 /// The review as it plays: who is talking and the chapter, how far along it is, the words
 /// being said, and pause, back and forward.
+/// The fifteen seconds before a review: the coach's face, breathing, and a thin bar that fills
+/// over about that long and waits near the end if the review takes longer, so the wait has a
+/// shape instead of a spinner.
+private struct DeepReviewWaiting: View {
+    let theme: BoardTheme
+    let coach: Coach
+    let tint: Color
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var breathing = false
+    @State private var filled = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                CoachAvatar(theme: theme, size: 44, coach: coach)
+                    .scaleEffect(breathing ? 1.05 : 0.97)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("About fifteen seconds.")
+                        .font(.app(.body))
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(Color.primary.opacity(0.1))
+                            Capsule().fill(tint)
+                                .frame(width: geo.size.width * (filled ? 0.94 : 0.03))
+                        }
+                    }
+                    .frame(height: 3)
+                    .accessibilityHidden(true)
+                }
+            }
+            Text("\(coach.subjectCapitalized) reads every move before \(coach.subject) says a word.")
+                .font(.app(.subheadline))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .onAppear {
+            guard !Welcome.isUnderTest else {
+                filled = true
+                return
+            }
+            withAnimation(.easeOut(duration: 16)) { filled = true }
+            guard !reduceMotion else { return }
+            withAnimation(.easeInOut(duration: 1.7).repeatForever(autoreverses: true)) { breathing = true }
+        }
+    }
+}
+
 struct DeepReviewCard: View {
     let theme: BoardTheme
     let player: DeepReviewPlayer
@@ -174,19 +222,9 @@ struct DeepReviewCard: View {
     }
 
     private var waiting: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                ProgressView().controlSize(.small)
-                Text("About fifteen seconds.")
-                    .font(.app(.body))
-            }
-            Text("\(player.coach.subjectCapitalized) reads every move before \(player.coach.subject) says a word.")
-                .font(.app(.subheadline))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.top, 18)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        DeepReviewWaiting(theme: theme, coach: player.coach, tint: gold)
+            .padding(.top, 18)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private func failed(_ why: String) -> some View {

@@ -823,6 +823,16 @@ struct ContentView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
+            // A banner is felt as it slides in: a happy buzz for a mark earned or a piece set
+            // free, a light tap for the news before a game.
+            .sensoryFeedback(trigger: armyNews) { _, news in
+                guard hapticsOn, let news else { return nil }
+                switch news.kind {
+                case .grudge, .staked: return .impact(weight: .light)
+                case .captured: return .warning
+                default: return .success
+                }
+            }
             // A one-line tip the first time a hidden gesture or a rule would help.
             .overlay(alignment: .bottom) {
                 GameTips(match: match, theme: theme, blocked: tipsBlocked)
@@ -1166,10 +1176,9 @@ struct ContentView: View {
     private func recordArmy() {
         guard match.setup.opponent == .computer, let ledger = match.game.ledger else { return }
         let won = match.winner.map { $0 == match.setup.playerColor }
-        guard let news = army.record(ledger, playerColor: match.setup.playerColor, won: won,
-                                       stakes: match.armyStakes).first else { return }
-        // After the finale and the summary, so the end of the game has the stage first.
-        show(news, after: 3.4)
+        // The news is kept on the army (`lastNews`), and the end-of-game summary shows it as
+        // rows of its own: a banner here slid in over the summary a moment after it opened.
+        _ = army.record(ledger, playerColor: match.setup.playerColor, won: won, stakes: match.armyStakes)
     }
 
     /// As a game against a rival starts: the piece that rival keeps taking. It waits until the

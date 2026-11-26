@@ -390,9 +390,20 @@ struct LessonDoneCard: View {
                     }
                 }
                 if let promotion = reward.promotion {
-                    Text("Promoted to \(promotion.title)!")
-                        .font(.app(.headline))
-                        .foregroundStyle(TrainingColor.yellow.color(on: theme))
+                    // A new rank is more than a line of words: its piece springs in, in gold,
+                    // as on the card a session gives it.
+                    HStack(spacing: 10) {
+                        PieceImage(piece: Piece(promotion.pieceKind, color: .white, square: .a1), theme: theme, size: 40)
+                            .scaleEffect(appeared ? 1 : 0.4)
+                            .shadow(color: TrainingColor.yellow.color(on: theme).opacity(0.8), radius: 10)
+                            .animation(.spring(response: 0.5, dampingFraction: 0.55).delay(0.35), value: appeared)
+                        Text("Promoted to \(promotion.title)!")
+                            .font(.app(.headline))
+                            .foregroundStyle(TrainingColor.yellow.color(on: theme))
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .trainingCard(theme, tint: TrainingColor.yellow.color(on: theme), cornerRadius: 16)
                 }
                 if let line {
                     HStack(alignment: .top, spacing: 10) {

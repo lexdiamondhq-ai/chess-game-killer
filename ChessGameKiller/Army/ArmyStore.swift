@@ -275,6 +275,12 @@ struct ArmyNews: Identifiable, Equatable {
 
     var id: String { "\(slot.rawValue)-\(label)" }
 
+    /// A piece taken prisoner: the one piece of news that isn't good.
+    var isBadNews: Bool {
+        if case .captured = kind { return true }
+        return false
+    }
+
     /// The small line above the headline.
     var label: String {
         switch kind {
@@ -361,6 +367,20 @@ final class ArmyStore {
     private(set) var army: Army
     /// The Piece of the Match of the last game recorded.
     private(set) var lastHero: MatchHero?
+    /// What the last game recorded earned the army, biggest news first. The end-of-game
+    /// summary shows it as rows of its own, where it used to slide in over the summary.
+    private(set) var lastNews: GameNews?
+
+    struct GameNews: Equatable {
+        let gameID: UUID
+        let items: [ArmyNews]
+        /// The summary has shown it once, with its moment: opened again, it is simply there.
+        var seen = false
+    }
+
+    func newsWasSeen() {
+        if lastNews?.seen == false { lastNews?.seen = true }
+    }
 
     /// A rival has a grudge with a piece once it has taken it this many times.
     nonisolated static let grudgeAt = 3
@@ -576,7 +596,9 @@ final class ArmyStore {
                              xp: stakes.scale(Self.heroXP))
         }
         save()
-        return news.sorted { $0.priority > $1.priority }
+        let sorted = news.sorted { $0.priority > $1.priority }
+        lastNews = sorted.isEmpty ? nil : GameNews(gameID: ledger.gameID, items: sorted)
+        return sorted
     }
 
     func rename(_ slot: ArmySlot, to name: String) {
@@ -596,6 +618,7 @@ final class ArmyStore {
     func reset() {
         army = Army()
         lastHero = nil
+        lastNews = nil
         save()
     }
 

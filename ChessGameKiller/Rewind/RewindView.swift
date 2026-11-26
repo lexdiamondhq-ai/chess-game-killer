@@ -26,6 +26,10 @@ struct RewindView: View {
     /// The better line being walked through, when "Show me" is on.
     @State private var explorer: LineExplorer?
     @State private var autoplay: Task<Void, Never>?
+    /// The game's own line playing itself, a move at a time at a better line's pace.
+    @State private var replay: Task<Void, Never>?
+    /// Where the replay last put the board. Anywhere else, the player has taken the board back.
+    @State private var replayPly: Int?
     /// The ply the line plays from; moving anywhere else on the game's line ends it.
     @State private var ghostAnchor: Int?
     @AppStorage(ReviewLevel.storageKey) private var levelID = ReviewLevel.club.rawValue
@@ -96,6 +100,9 @@ struct RewindView: View {
                     .frame(maxWidth: 640)
                     .padding(.top, 10)
                     .padding(.horizontal, 8)
+                    if explorer == nil, deep == nil {
+                        stepRow.padding(.top, 2)
+                    }
                     if deep == nil, explorer == nil, DeepReviewRequest.offered(for: game) {
                         DeepReviewRow(theme: theme, coach: keptCoach ?? Coach.current, kept: keptCoach != nil,
                                       open: Premium.shared.opens(.deepReview)) { openDeepReview() }
@@ -116,6 +123,7 @@ struct RewindView: View {
         .tint(accent)
         .onChange(of: ply) { _, now in
             if now != ghostAnchor { stopGhost() }
+            if replay != nil, now != replayPly { stopReplay() }
             // The player moved the board themselves: the coach waits.
             if let deep, now != deepPly { deep.pause() }
         }
@@ -128,6 +136,10 @@ struct RewindView: View {
             deep?.pause()
         }
         .onChange(of: levelID) { _, _ in explorer?.setLevel(level) }
+        // A better line or the coach's review takes the board: the game's own replay stops.
+        .onChange(of: explorer == nil && deep == nil) { _, free in
+            if !free { stopReplay() }
+        }
         .onAppear {
             // Opened on the better line: only when today's full Rewind allows it, without asking.
             if opensLine, explorer == nil, Premium.shared.use(.fullRewind, key: game.id.uuidString) {
@@ -138,6 +150,7 @@ struct RewindView: View {
         }
         .onDisappear {
             stopGhost()
+            stopReplay()
             deep?.close()
         }
         // A tick for each move the person steps to, when haptics are on; none while Leo's
@@ -647,6 +660,73 @@ struct RewindView: View {
 
     private func jump(to moment: SavedMoment) {
         withAnimation(.snappy) { ply = max(0, moment.ply - 1) }
+    }
+
+    // MARK: One move at a time
+
+    /// Back a move, play, forward a move, under the line: in a long game the line is too fine
+    /// to drag to one chosen move.
+    private var stepRow: some View {
+        HStack(spacing: 10) {
+            stepButton("chevron.left", label: "Previous move", disabled: ply == 0) {
+                stopReplay()
+                step(by: -1)
+            }
+            stepButton(replay == nil ? "play.fill" : "pause.fill", label: replay == nil ? "Play the game" : "Pause",
+                       disabled: game.moves.isEmpty) {
+                if replay == nil { startReplay() } else { stopReplay() }
+            }
+            stepButton("chevron.right", label: "Next move", disabled: ply >= game.moves.count) {
+                stopReplay()
+                step(by: 1)
+            }
+        }
+    }
+
+    private func stepButton(_ symbol: String, label: String, disabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.app(.caption, weight: .bold))
+                .frame(width: 34, height: 34)
+                .background(Circle().fill(Color.primary.opacity(0.07)))
+                .frame(width: 44, height: 38)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Color.primary.opacity(disabled ? 0.3 : 0.85))
+        .disabled(disabled)
+        .accessibilityLabel(label)
+    }
+
+    private func step(by change: Int) {
+        let next = max(0, min(game.moves.count, ply + change))
+        if next != ply { withAnimation(.easeInOut(duration: 0.3)) { ply = next } }
+    }
+
+    /// Plays the game from where the board is (from the start, when it is at the end), a move
+    /// every 1.4 s as a better line plays. Touching the board, the line or a button stops it.
+    private func startReplay() {
+        stopReplay()
+        if ply >= game.moves.count {
+            replayPly = 0
+            ply = 0
+        } else {
+            replayPly = ply
+        }
+        replay = Task { @MainActor in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1.4))
+                guard !Task.isCancelled, ply < game.moves.count else { break }
+                replayPly = ply + 1
+                withAnimation(.easeInOut(duration: 0.35)) { ply += 1 }
+            }
+            replay = nil
+        }
+    }
+
+    private func stopReplay() {
+        replay?.cancel()
+        replay = nil
     }
 
     /// Opens the better line from the moment on the board, and plays it unless told not to.
