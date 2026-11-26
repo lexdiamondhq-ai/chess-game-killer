@@ -61,6 +61,8 @@ struct ContentView: View {
     @State private var showingHome: Bool
     /// Where the home's tiles and the screens they open meet, so a screen grows out of its tile.
     @Namespace private var homeZoom
+    /// The Home tile that was just tapped, so the screen it opens grows out of it.
+    @State private var zoomFrom: HomeZoomID?
     @AppStorage(HomeScreen.key) private var homeScreenOn = HomeScreen.defaultOn
     /// The board style (Alex's pick, 1A): the home's board and sheet, and the same sheet across
     /// the foot of the game. Settings > Board and sheet turns it off.
@@ -317,12 +319,12 @@ struct ContentView: View {
     /// The game screen with its sheets and full-screen covers.
     private var presented: some View {
         observed
-            .fullScreenCover(isPresented: $showingTraining) {
+            .fullScreenCover(isPresented: $showingTraining, onDismiss: { zoomFrom = nil }) {
                 TrainingHubView(theme: chosenTheme, door: trainingDoor).environment(training).environment(puzzles).environment(vault)
                     .environment(daily)
-                    .homeZoom(.coach, in: homeZoom, when: showingHome)
+                    .homeZoom(.coach, in: homeZoom, when: zooms(.coach))
             }
-            .fullScreenCover(isPresented: $showingDaily) {
+            .fullScreenCover(isPresented: $showingDaily, onDismiss: { zoomFrom = nil }) {
                 DailyMoveView(theme: chosenTheme, morePuzzles: {
                     // Once Today's Move has slid away: as soon as it has, however it closes
                     // (the zoom back into its card takes longer than a slide).
@@ -333,11 +335,11 @@ struct ContentView: View {
                     }
                 })
                 .environment(daily).environment(puzzles).environment(training)
-                .homeZoom(.daily, in: homeZoom, when: showingHome)
+                .homeZoom(.daily, in: homeZoom, when: zooms(.daily))
             }
-            .fullScreenCover(isPresented: $showingPuzzles) {
+            .fullScreenCover(isPresented: $showingPuzzles, onDismiss: { zoomFrom = nil }) {
                 PuzzlesView(theme: chosenTheme).environment(puzzles).environment(training)
-                    .homeZoom(.puzzles, in: homeZoom, when: zoomsFromSheet)
+                    .homeZoom(.puzzles, in: homeZoom, when: zooms(.puzzles))
             }
             .onChange(of: showingGames) { _, showing in
                 if !showing { rewindOpening = nil; rewindOpeningPly = nil }
@@ -345,7 +347,7 @@ struct ContentView: View {
             .fullScreenCover(isPresented: $showingGames) {
                 RewindGamesView(theme: chosenTheme, opening: rewindOpening, openingPly: rewindOpeningPly, forfeits: forfeits) { game in playAgain(game) }
                     .environment(vault).environment(training)
-                    .homeZoom(.games, in: homeZoom, when: zoomsFromSheet)
+                    .homeZoom(.games, in: homeZoom, when: zooms(.games))
             }
             .fullScreenCover(isPresented: $showingArmy) {
                 // Opened from Home, the quest and a held piece each carry a button that plays the
@@ -353,7 +355,7 @@ struct ContentView: View {
                 ArmyView(theme: chosenTheme, color: match.setup.playerColor, nextRival: armyQuestRival,
                          play: showingHome && stageHome ? { level in playArmyQuest(level) } : nil)
                     .environment(army)
-                    .homeZoom(.army, in: homeZoom, when: zoomsFromSheet)
+                    .homeZoom(.army, in: homeZoom, when: zooms(.army))
             }
             // The welcome's Play shows the first rival's film, as Home's Play does, and its Begin
             // starts the game (audit, 2026-11-09: the films are the app's entrance, so the first
@@ -382,14 +384,14 @@ struct ContentView: View {
             .fullScreenCover(item: $coach.presentedLesson) { lesson in
                 LessonScreen(lesson: lesson, theme: chosenTheme).environment(training).environment(daily)
             }
-            .fullScreenCover(item: $coach.presentedSession) { plan in
+            .fullScreenCover(item: $coach.presentedSession, onDismiss: { zoomFrom = nil }) { plan in
                 // Asked for with one tap, so it starts at once. The puzzle store lets a missed
                 // puzzle in the session come back for review.
                 SessionView(plan: plan, theme: chosenTheme, startsAtOnce: true)
                     .environment(training)
                     .environment(puzzles)
                     .environment(daily)
-                    .homeZoom(.coach, in: homeZoom, when: showingHome)
+                    .homeZoom(stageHome ? .session : .coach, in: homeZoom, when: zooms(.session))
             }
             .fullScreenCover(item: $talk, onDismiss: playTalkMove) { (session: TalkSession) in
                 TalkPanel(session: session, theme: theme, play: { (uci: String) in
@@ -538,6 +540,7 @@ struct ContentView: View {
             HomeView(match: match, theme: .named(themeID), actions: homeActions, tab: homeTab, rises: homeRises,
                      onTab: { tab in homeTab = tab })
                 .environment(\.homeZoom, homeZoom)
+                .environment(\.homeZoomMark, { id in zoomFrom = id })
                 .transition(.opacity)
         } else {
             gameScreen
@@ -790,9 +793,18 @@ struct ContentView: View {
         return theme.isDark ? .dark : nil
     }
 
-    /// Puzzles, your games and your pieces grow out of the board home's rows that open them.
-    /// The tiles home has no such rows, and the game screen opens them as usual.
-    private var zoomsFromSheet: Bool { showingHome && boardSheet }
+    /// Whether a screen grows out of the Home tile that opens it (iOS 18's zoom). On today's Home
+    /// only the tile that was just tapped does: Today's Move, Puzzles and the coach's session.
+    /// The same screens opened from the bar, a menu, a number or the game slide up, since there
+    /// is nothing on screen for them to grow from. The older Home layouts keep their own rule.
+    private func zooms(_ id: HomeZoomID) -> Bool {
+        guard showingHome else { return false }
+        if stageHome { return zoomFrom == id }
+        switch id {
+        case .daily, .coach, .session: return true
+        case .puzzles, .games, .army: return boardSheet
+        }
+    }
 
     /// The board, the players and the dock inside the navigation bar, sized to the screen.
     private var gameScreen: some View {
@@ -1102,7 +1114,7 @@ struct ContentView: View {
                 Color.clear.frame(width: CoachOrb.orbSize + 12, height: 1)
                 HStack(spacing: 0) {
                     DockButton(title: "Undo", symbol: Glyphs.undo, theme: theme) {
-                        withAnimation(.snappy(duration: 0.22)) { match.undo() }
+                        withAnimation(Motion.tap) { match.undo() }
                     }
                     .disabled(!match.canUndo)
                     // Off in the New Game box means off: no button to peek with (Alex, 2026-11-12).
@@ -1113,7 +1125,7 @@ struct ContentView: View {
                         }
                     }
                     DockButton(title: "Flip", symbol: Glyphs.flip, theme: theme) {
-                        withAnimation(.snappy) { match.flipBoard() }
+                        withAnimation(.snappy(duration: 0.45)) { match.flipBoard() }
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -1224,7 +1236,7 @@ struct ContentView: View {
         newsTurn = Task { @MainActor in
             while !newsQueue.isEmpty {
                 let news = newsQueue.removeFirst()
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) { armyNews = news }
+                withAnimation(Motion.panel) { armyNews = news }
                 try? await Task.sleep(for: .seconds(6))
                 if armyNews == news {
                     withAnimation(.easeOut(duration: 0.3)) { armyNews = nil }

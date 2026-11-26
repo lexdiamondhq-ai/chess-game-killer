@@ -1161,7 +1161,7 @@ struct AnalysisView: View {
                 }
                 HStack(spacing: 8) {
                     if model.isThinking {
-                        ProgressView().controlSize(.small)
+                        KnightWait(size: 16)
                         Text(model.depth == 0 ? "Stockfish is thinking" : "Looking deeper")
                     } else if model.failed {
                         Image(systemName: "exclamationmark.triangle.fill")

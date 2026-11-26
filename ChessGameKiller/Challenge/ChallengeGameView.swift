@@ -172,11 +172,14 @@ struct ChallengeGameView: View {
                 .frame(maxWidth: 220)
                 .disabled(retrying)
             } else {
-                ProgressView()
-                    .controlSize(.large)
-                Text("Opening the game…")
-                    .font(theme.challengeFont(15))
-                    .foregroundStyle(.secondary)
+                // Most games open in a blink: the loader shows only when one doesn't.
+                Group {
+                    KnightWait(size: 44)
+                    Text("Opening the game…")
+                        .font(theme.challengeFont(15))
+                        .foregroundStyle(.secondary)
+                }
+                .modifier(LateFadeIn())
             }
         }
         .padding(.horizontal, 32)
@@ -683,8 +686,7 @@ struct ChallengeGameView: View {
 
     private func rematchProgress(_ title: String) -> some View {
         HStack(spacing: 8) {
-            ProgressView()
-                .controlSize(.small)
+            KnightWait(size: 18)
             Text(title)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)

@@ -166,6 +166,28 @@ final class SculptedBoardScene {
     private var finaleGlow: SCNNode?
     /// The king lying on its side, stood back up when the finale ends.
     private var fallenID: Int?
+    /// How that king lies: tipped about the edge of its foot.
+    private var fallenLie: Lie?
+    /// The king getting back on its feet, so a walk home that starts in the same breath carries
+    /// the rise with it rather than snapping the king upright.
+    private var rising: (id: Int, lie: Lie, began: TimeInterval)?
+
+    /// A piece tipped over about a point on the rim of its foot.
+    private struct Lie {
+        let pivot: SIMD3<Float>
+        let axis: SIMD3<Float>
+        let reach: Float
+
+        /// How long the king takes to stand back up.
+        static let riseTime: TimeInterval = 0.25
+
+        /// The tip left at `time` into the rise: all of it at first, none once `within` has passed.
+        func lean(at time: TimeInterval, within: TimeInterval = Lie.riseTime) -> simd_float4x4 {
+            let u = Float(min(max(time / max(within, 0.001), 0), 1))
+            let turn = simd_quatf(angle: reach * (1 - Ease.smooth(u)), axis: axis)
+            return SculptedBoardScene.translation(pivot) * simd_float4x4(turn) * SculptedBoardScene.translation(-pivot)
+        }
+    }
     /// Where the finale's camera leans in, kept through a resize.
     private var leanPoint: SIMD3<Float>?
     /// When the red under a king in check shows: as the checking piece lands.
@@ -825,6 +847,10 @@ final class SculptedBoardScene {
         let model = node.model
         let lift = Self.travelLift
         let t = timing
+        // A king that began to stand up this very moment keeps rising as it is carried home.
+        let lie: Lie? = rising.flatMap { nodes[$0.id] === node && CACurrentMediaTime() - $0.began < 0.1 ? $0.lie : nil }
+        rising = nil
+        let riseTime = min(Lie.riseTime, t.total)
 
         let peak = lift + t.hop
         let flight = t.flight
@@ -847,7 +873,8 @@ final class SculptedBoardScene {
                 tilt = 2.2 * .pi / 180 * exp(-4 * u) * sin(3 * .pi * u)
             }
             root.simdPosition = position
-            model.simdTransform = Self.pose(y: y, axis: axis, angle: tilt, scale: 1, yaw: yaw)
+            let pose = Self.pose(y: y, axis: axis, angle: tilt, scale: 1, yaw: yaw)
+            model.simdTransform = lie.map { $0.lean(at: time, within: riseTime) * pose } ?? pose
         }
         node.root.runAction(action, forKey: "pose")
         node.contact.runAction(.sequence([
@@ -925,6 +952,7 @@ final class SculptedBoardScene {
         let yaw = node.rest
         // A king already lying flat stays down rather than tipping up off the board.
         let reach: Float = node.lies ? 0 : 84 * .pi / 180
+        fallenLie = Lie(pivot: pivot, axis: axis, reach: reach)
         let model = node.model
         let fall = SCNAction.customAction(duration: fallTime) { _, elapsed in
             let u = Float(Double(elapsed) / fallTime)
@@ -977,10 +1005,24 @@ final class SculptedBoardScene {
         finaleGlow = nil
         if let id = fallenID, let node = nodes[id] {
             node.root.removeAction(forKey: "pose")
-            setPose(node, y: 0)
             node.contact.opacity = 1
+            if animated, !UIAccessibility.isReduceMotionEnabled, let lie = fallenLie, lie.reach > 0 {
+                // The king gets up over a quarter of a second rather than in one frame. A walk
+                // home that starts right now (a rematch) takes the rise over: see `animateMove`.
+                rising = (id, lie, CACurrentMediaTime())
+                let model = node.model
+                let yaw = node.rest
+                let stand = SCNAction.customAction(duration: Lie.riseTime) { _, elapsed in
+                    model.simdTransform = lie.lean(at: Double(elapsed))
+                        * Self.pose(y: 0, axis: SIMD3(1, 0, 0), angle: 0, scale: 1, yaw: yaw)
+                }
+                node.root.runAction(stand, forKey: "pose")
+            } else {
+                setPose(node, y: 0)
+            }
         }
         fallenID = nil
+        fallenLie = nil
         leanPoint = nil
         checkFadesAt = nil
         dim(false, duration: animated ? 0.4 : 0)

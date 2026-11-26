@@ -733,7 +733,7 @@ private struct CoachPanel: View {
         }
         try? await Task.sleep(for: .seconds(0.9))
         guard !Task.isCancelled else { return }
-        withAnimation(.spring(response: 0.45, dampingFraction: 0.78)) { newsShown = true }
+        withAnimation(Motion.panel) { newsShown = true }
         newsBuzz += 1
         army?.newsWasSeen()
     }
@@ -801,7 +801,7 @@ private struct CoachPanel: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else if match.hints.isEmpty {
                     HStack(spacing: 8) {
-                        ProgressView().controlSize(.small)
+                        KnightWait(size: 16)
                         Text(match.isComputerThinking ? "Waiting for \(rival.midSentence)…" : "Thinking…")
                             .font(.app(.footnote, weight: .medium))
                             .foregroundStyle(.secondary)
@@ -1329,7 +1329,6 @@ private struct StatTile: View {
     }
 }
 
-/// A thin gold rule across the panel that fades out at both ends.
 /// A whole number that can be animated: SwiftUI redraws it at every step between two values.
 private struct CountingText: View, Animatable {
     var value: Double
@@ -1345,6 +1344,7 @@ private struct CountingText: View, Animatable {
     }
 }
 
+/// A thin gold rule across the panel that fades out at both ends.
 private struct GoldRule: View {
     let accent: Color
 

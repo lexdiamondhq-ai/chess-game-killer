@@ -149,7 +149,7 @@ struct RivalsHall: View {
     /// Opens the rival's film large over the hall, unless it was just watched in full.
     private func playFilm(_ level: MatchController.Level?) {
         guard let level, level != watched, showing == nil, !Welcome.isUnderTest else { return }
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.88)) { playing = level }
+        withAnimation(Motion.panel) { playing = level }
     }
 
     /// The film ended, or was tapped: it holds its last frame, and the words and Face rise.
@@ -234,7 +234,7 @@ struct RivalsHall: View {
                         // select all rivals you should get the video introduction of each").
                         RivalHallCard(film: film, open: ladder.isOpen(film.level), beaten: ladder.beaten(film.rival),
                                       waiting: film.level == playing) {
-                            withAnimation(.easeIn(duration: 0.3)) { showing = film }
+                            withAnimation(Motion.panel) { showing = film }
                         }
                         .frame(width: width, height: height)
                         .scrollTransition(axis: .horizontal) { content, phase in

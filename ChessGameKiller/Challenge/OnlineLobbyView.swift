@@ -167,7 +167,7 @@ struct OnlineLobbyView: View {
                             .font(theme.challengeFont(16, .semibold))
                             .transition(.opacity)
                     } else {
-                        ProgressView()
+                        KnightWait(size: 20)
                         Text("Starting your game…")
                             .font(theme.challengeFont(16, .semibold))
                     }

@@ -58,7 +58,7 @@ struct GameTips: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .animation(.spring(response: 0.45, dampingFraction: 0.85), value: shown)
+        .animation(Motion.panel, value: shown)
         .onAppear {
             if let tip = TipBook.showcased() { shown = tip }
         }

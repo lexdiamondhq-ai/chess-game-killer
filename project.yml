@@ -50,6 +50,13 @@ targets:
         NSSupportsLiveActivities: true
         # Lets the app animate at 120 frames a second on ProMotion iPhones (iOS caps it at 60 without).
         CADisableMinimumFrameDurationOnPhone: true
+        # The launch screen is Home's own cream with the gold knight in the middle, so launch and
+        # Home are one picture (Alex's pick, 2026-11-26). The app keeps the same picture over its
+        # first frame and fades it away (LaunchFade). Both are in Assets.xcassets/Home; the knight
+        # is drawn by scripts/make_launch_knight.py.
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+          UIImageName: launch-knight
     dependencies:
       - package: ChessKit
       - package: ChessKitEngine
@@ -72,10 +79,9 @@ targets:
         MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "1"
         GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
         # Only Apple's own HTTPS is used, so App Store Connect stops asking about encryption on each upload.
         INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
-        # Every look is dark, so the launch screen and system sheets are too (no white flash at launch).
+        # The system's own sheets are dark on every look. (The launch screen has its own color, above.)
         INFOPLIST_KEY_UIUserInterfaceStyle: Dark
         INFOPLIST_KEY_CFBundleDisplayName: Beauty of Chess
         INFOPLIST_KEY_NSCameraUsageDescription: Take a photo of a chess board to find the best move.

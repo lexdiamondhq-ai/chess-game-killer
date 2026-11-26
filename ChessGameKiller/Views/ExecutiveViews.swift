@@ -604,11 +604,19 @@ struct DockButton: View {
     let theme: BoardTheme
     let action: () -> Void
 
+    /// Counts taps: each one is answered with a light tick, as the orb and the board answer theirs.
+    @State private var taps = 0
+    @AppStorage("haptics") private var hapticsOn = true
+
     var body: some View {
-        Button(action: action) {
+        Button {
+            taps += 1
+            action()
+        } label: {
             DockLabel(title: title, symbol: symbol, lit: isOn == true, theme: theme)
         }
         .buttonStyle(.plain)
+        .sensoryFeedback(.impact(weight: .light), trigger: taps) { _, _ in hapticsOn }
         .accessibilityLabel(title)
         .accessibilityValue(isOn.map { $0 ? "On" : "Off" } ?? "")
         .accessibilityAddTraits(isOn == nil ? [] : .isToggle)

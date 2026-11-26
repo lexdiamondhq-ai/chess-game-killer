@@ -9,6 +9,7 @@ struct PuzzlesView: View {
     @Environment(PuzzleStore.self) private var store
     @Environment(TrainingStore.self) private var training
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     enum Mode: String, CaseIterable, Identifiable {
         case rated = "Rated"
@@ -49,7 +50,7 @@ struct PuzzlesView: View {
                     header
                     if store.library == nil {
                         Spacer()
-                        ProgressView("Loading puzzles…")
+                        KnightWaitPage(title: "Loading puzzles…")
                         Spacer()
                     } else if let limit {
                         Spacer()
@@ -70,8 +71,10 @@ struct PuzzlesView: View {
                         }
                         .scrollBounceBehavior(.basedOnSize)
                         .id(puzzle?.id)
-                        .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity),
-                                                removal: .move(edge: .leading).combined(with: .opacity)))
+                        // The next puzzle slides in; with Reduce Motion it fades.
+                        .transition(reduceMotion ? AnyTransition.opacity
+                                    : AnyTransition.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity),
+                                                               removal: .move(edge: .leading).combined(with: .opacity)))
                         Spacer(minLength: 0)
                         if mode == .rated, runner.isDone { ratedFooter }
                     } else {

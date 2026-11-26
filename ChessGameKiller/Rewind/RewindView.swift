@@ -653,13 +653,13 @@ struct RewindView: View {
             return
         }
         deepPly = stop
-        if ply != stop { withAnimation(.easeInOut(duration: 0.35)) { ply = stop } }
+        if ply != stop { withAnimation(Motion.scene) { ply = stop } }
     }
 
     // MARK: Actions
 
     private func jump(to moment: SavedMoment) {
-        withAnimation(.snappy) { ply = max(0, moment.ply - 1) }
+        withAnimation(Motion.scene) { ply = max(0, moment.ply - 1) }
     }
 
     // MARK: One move at a time
@@ -700,7 +700,7 @@ struct RewindView: View {
 
     private func step(by change: Int) {
         let next = max(0, min(game.moves.count, ply + change))
-        if next != ply { withAnimation(.easeInOut(duration: 0.3)) { ply = next } }
+        if next != ply { withAnimation(Motion.scene) { ply = next } }
     }
 
     /// Plays the game from where the board is (from the start, when it is at the end), a move
@@ -718,7 +718,7 @@ struct RewindView: View {
                 try? await Task.sleep(for: .seconds(1.4))
                 guard !Task.isCancelled, ply < game.moves.count else { break }
                 replayPly = ply + 1
-                withAnimation(.easeInOut(duration: 0.35)) { ply += 1 }
+                withAnimation(Motion.scene) { ply += 1 }
             }
             replay = nil
         }
