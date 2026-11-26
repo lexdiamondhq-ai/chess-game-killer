@@ -9,6 +9,7 @@ struct PuzzlesView: View {
     @Environment(PuzzleStore.self) private var store
     @Environment(TrainingStore.self) private var training
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     enum Mode: String, CaseIterable, Identifiable {
         case rated = "Rated"
@@ -49,7 +50,7 @@ struct PuzzlesView: View {
                     header
                     if store.library == nil {
                         Spacer()
-                        ProgressView("Loading puzzles…")
+                        KnightWaitPage(title: "Loading puzzles…")
                         Spacer()
                     } else if let limit {
                         Spacer()
@@ -70,8 +71,10 @@ struct PuzzlesView: View {
                         }
                         .scrollBounceBehavior(.basedOnSize)
                         .id(puzzle?.id)
-                        .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity),
-                                                removal: .move(edge: .leading).combined(with: .opacity)))
+                        // The next puzzle slides in; with Reduce Motion it fades.
+                        .transition(reduceMotion ? AnyTransition.opacity
+                                    : AnyTransition.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity),
+                                                               removal: .move(edge: .leading).combined(with: .opacity)))
                         Spacer(minLength: 0)
                         if mode == .rated, runner.isDone { ratedFooter }
                     } else {
@@ -104,6 +107,10 @@ struct PuzzlesView: View {
         .onChange(of: runner?.outcome) { _, outcome in
             guard let outcome, let puzzle else { return }
             finished(puzzle, outcome: outcome)
+        }
+        // Premium bought from the limit card: the card gives way to the next puzzle at once.
+        .onChange(of: Premium.shared.isPremium) { _, premium in
+            if premium, limit != nil, mode == .rated { nextRated() }
         }
         .onChange(of: mode) { _, mode in
             runner?.cancel()
@@ -277,6 +284,8 @@ struct PuzzlesView: View {
         let item = SessionItem(content: .drill(next.drill), role: .focus)
         let made = DrillRunner(item: item, library: training.library, engine: nil)
         made?.strict = strict
+        // Only Rush is strict here, and Rush is against the clock.
+        made?.hurried = strict
         runner = made
         made?.begin()
     }
@@ -299,7 +308,7 @@ struct PuzzlesView: View {
             }
             let solvedSoFar = round.score
             Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(outcome == .firstTry ? 450 : 900))
+                try? await Task.sleep(for: .milliseconds(outcome == .firstTry ? 350 : 550))
                 guard let current = rush, !current.isOver else { return }
                 withAnimation(.snappy) {
                     show(store.nextRush(solvedSoFar: solvedSoFar, avoid: current.played), strict: true)
@@ -419,7 +428,7 @@ private struct RushCard: View {
                 .foregroundStyle(theme.trainingAccent)
                 .shadow(color: theme.glows ? theme.trainingAccent.opacity(0.7) : .clear, radius: 14)
             if let last, last.isOver {
-                Text(last.newBest ? "New best!" : "Time!")
+                Text(last.newBest ? "New best!" : last.strikes >= RushRound.lives ? "Three strikes" : "Time!")
                     .font(.app(.title, weight: .bold))
                 Text("\(last.score) solved")
                     .font(.app(.title3, weight: .semibold).monospacedDigit())

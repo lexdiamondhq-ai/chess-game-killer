@@ -283,6 +283,47 @@ final class GameModelTests: XCTestCase {
         XCTAssertTrue(game.playEngineMove("e1f1"))
     }
 
+    // MARK: Picking a piece up early
+
+    func testAPieceCanBePickedUpWhileTheOtherSideThinks() {
+        let game = GameModel()
+        game.humanColors = [.white]
+        play(game, "e2e4")
+        // Black, the computer, is to move: White picks the knight up early.
+        game.tap(.g1)
+        XCTAssertEqual(game.selected, .g1)
+        XCTAssertTrue(game.targets.isEmpty, "nowhere to go until the other side has moved")
+
+        XCTAssertTrue(game.playEngineMove("e7e5"))
+        XCTAssertEqual(game.selected, .g1, "still in hand after their move")
+        XCTAssertEqual(game.targets, [.e2, .f3, .h3])
+
+        game.tap(.f3)
+        XCTAssertEqual(game.sideToMove, .black, "the second tap plays it")
+    }
+
+    func testAPiecePickedUpEarlyIsLetGoWhenItIsTaken() {
+        let game = GameModel()
+        game.humanColors = [.white]
+        play(game, "e2e4")
+        XCTAssertTrue(game.playEngineMove("d7d5"))
+        play(game, "g1f3")
+        game.tap(.e4)
+        XCTAssertEqual(game.selected, .e4)
+
+        XCTAssertTrue(game.playEngineMove("d5e4"))
+        XCTAssertNil(game.selected)
+        XCTAssertTrue(game.targets.isEmpty)
+    }
+
+    func testTheOtherSidesPieceCannotBePickedUpEarly() {
+        let game = GameModel()
+        game.humanColors = [.white]
+        play(game, "e2e4")
+        game.tap(.e7)
+        XCTAssertNil(game.selected)
+    }
+
     /// The castling field of the game's FEN, like "KQkq" or "-".
     private func castlingField(_ game: GameModel) -> String {
         String(game.fen.split(separator: " ")[2])

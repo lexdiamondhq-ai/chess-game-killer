@@ -17,6 +17,8 @@ struct ChallengeGameView: View {
     @AppStorage("haptics") private var hapticsOn = true
     @State private var confirming: Confirmation?
     @State private var copied = false
+    /// "Try again" on a game that would not open is fetching it now.
+    @State private var retrying = false
 
     enum Confirmation: Identifiable {
         case resign, abort, leave, cancelChallenge, reportName, reportCheating
@@ -42,8 +44,12 @@ struct ChallengeGameView: View {
             }
             .sensoryFeedback(.warning, trigger: game.toast?.id, condition: warningBuzz)
             .sensoryFeedback(.success, trigger: game.phase, condition: joinedBuzz)
+            .sensoryFeedback(.impact(weight: .medium), trigger: game.drawOfferedToMe, condition: drawOfferBuzz)
             .animation(.snappy(duration: 0.35), value: game.phase)
             .onAppear { game.refreshIdleTimer() }
+            .onChange(of: BoardView.playsIn3D(theme, setting: sculpted3D), initial: true) { _, threeD in
+                game.timeSounds(threeD: threeD)
+            }
     }
 
     private var screen: some View {
@@ -72,6 +78,11 @@ struct ChallengeGameView: View {
     private func warningBuzz(_ old: Int?, _ new: Int?) -> Bool {
         guard hapticsOn, let toast = game.toast else { return false }
         return toast.isWarning
+    }
+
+    /// A tap on the wrist when the other side offers a draw.
+    private func drawOfferBuzz(_ old: Bool, _ new: Bool) -> Bool {
+        hapticsOn && new
     }
 
     /// A success buzz the moment the friend joins.
@@ -143,17 +154,32 @@ struct ChallengeGameView: View {
                     .font(theme.challengeFont(16, .medium))
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
-                Button("Try again") {
-                    Task { await game.refresh() }
+                Button {
+                    guard !retrying else { return }
+                    retrying = true
+                    Task {
+                        await game.refresh()
+                        retrying = false
+                    }
+                } label: {
+                    if retrying {
+                        ProgressView()
+                    } else {
+                        Text("Try again")
+                    }
                 }
                 .buttonStyle(ChallengeButtonStyle(kind: .glass, theme: theme, height: 46))
                 .frame(maxWidth: 220)
+                .disabled(retrying)
             } else {
-                ProgressView()
-                    .controlSize(.large)
-                Text("Opening the game…")
-                    .font(theme.challengeFont(15))
-                    .foregroundStyle(.secondary)
+                // Most games open in a blink: the loader shows only when one doesn't.
+                Group {
+                    KnightWait(size: 44)
+                    Text("Opening the game…")
+                        .font(theme.challengeFont(15))
+                        .foregroundStyle(.secondary)
+                }
+                .modifier(LateFadeIn())
             }
         }
         .padding(.horizontal, 32)
@@ -574,6 +600,7 @@ struct ChallengeGameView: View {
         guard canRematch else { return game.resultDetail }
         switch game.rematchStage {
         case .offered: return "\(game.opponentName) wants a rematch"
+        case .asked where opponentLeft: return "\(game.opponentName) has left."
         case .asked: return "Rematch asked. Waiting for \(game.opponentName)."
         case .starting: return "Starting the rematch…"
         case .ready: return "The rematch is ready"
@@ -600,9 +627,39 @@ struct ChallengeGameView: View {
         return state.white.seated && state.black.seated
     }
 
+    /// The game is over and the other player has closed it: a rematch asked of them now would
+    /// wait for good. (They can still ask for one themselves, which shows as an offer.)
+    private var opponentLeft: Bool {
+        guard game.phase == .over, canRematch, !game.isOnline(game.opponentSeat) else { return false }
+        return game.rematchStage == .none || game.rematchStage == .asked
+    }
+
+    /// Paired in the lobby, where another opponent is one tap away. A friend's game keeps
+    /// Rematch: the friend finds the ask when they next open the game.
+    private var isLobbyGame: Bool { game.state?.online ?? false }
+
     /// The rematch half of the end card's row.
     @ViewBuilder
     private var rematch: some View {
+        if opponentLeft, isLobbyGame {
+            Button {
+                center.playOnline()
+            } label: {
+                Label("New opponent", systemImage: "bolt.fill")
+            }
+            .buttonStyle(ChallengeButtonStyle(kind: .primary, theme: theme))
+        } else if opponentLeft, game.rematchStage == .asked {
+            Button("Done") {
+                center.dismiss()
+            }
+            .buttonStyle(ChallengeButtonStyle(kind: .glass, theme: theme))
+        } else {
+            rematchStageButton
+        }
+    }
+
+    @ViewBuilder
+    private var rematchStageButton: some View {
         switch game.rematchStage {
         case .none:
             rematchButton("Rematch")
@@ -629,8 +686,7 @@ struct ChallengeGameView: View {
 
     private func rematchProgress(_ title: String) -> some View {
         HStack(spacing: 8) {
-            ProgressView()
-                .controlSize(.small)
+            KnightWait(size: 18)
             Text(title)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
@@ -827,8 +883,8 @@ struct FriendPlate: View {
         } else if game.phase == .waiting {
             ChallengeAvatar(name: nil, theme: theme, size: 38)
         } else {
-            ChallengeAvatar(name: game.opponentName, theme: theme, size: 38,
-                            online: game.phase == .playing ? game.isOnline(seat) : nil)
+            // The dot stays after the game, so it shows whether a rematch can be answered.
+            ChallengeAvatar(name: game.opponentName, theme: theme, size: 38, online: game.isOnline(seat))
         }
     }
 
@@ -907,6 +963,7 @@ struct FriendPlate: View {
             if result.winner == seat { return "Winner" }
             return result.winner == nil ? "Draw" : "Lost"
         }
+        if isMe, game.phase == .playing, game.isSendingSlowly { return "Sending your move…" }
         if inCheck { return isMe ? "Your king is in check" : "King in check" }
         if isActive { return isMe ? "Your move" : "To move" }
         if !isMe, game.phase == .playing, !game.isOnline(seat) { return "Offline" }
@@ -977,13 +1034,27 @@ struct FriendClockBox: View {
     let seat: FriendSeat
     let theme: BoardTheme
 
+    @AppStorage("haptics") private var hapticsOn = true
+    /// Counts the times the person's own clock crossed into its last ten seconds, for the buzz.
+    @State private var lowWarnings = 0
+
     var body: some View {
         let running = game.isClockRunning(for: seat)
         TimelineView(.periodic(from: .now, by: running ? 0.1 : 60)) { _ in
             let left = game.timeLeft(for: seat) ?? 0
             let urgent = running && left < 10_000
             let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
-            Text(FriendClockMath.label(left))
+            // As wide as its widest reading, so the last ten seconds don't change the box.
+            ZStack {
+                Text("0:00.0").hidden()
+                Text(FriendClockMath.label(left))
+            }
+                // One soft tick and a buzz as the person's own time runs into its last ten seconds.
+                .onChange(of: left < 10_000) { _, low in
+                    guard low, running, seat == game.seat else { return }
+                    SoundPlayer.shared.play(.select)
+                    lowWarnings += 1
+                }
                 .font(.system(size: 21, weight: .medium).monospacedDigit())
                 .foregroundStyle(running ? (urgent ? Color.black.opacity(0.88) : runningInk) : Color.secondary)
                 .lineLimit(1)
@@ -997,9 +1068,11 @@ struct FriendClockBox: View {
                             .overlay(shape.strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
                     }
                 }
+                .accessibilityElement(children: .ignore)
                 .accessibilityLabel("\(seat.name) has \(FriendClockMath.label(left)) left")
         }
         .animation(.snappy(duration: 0.25), value: running)
+        .sensoryFeedback(.impact(weight: .medium), trigger: lowWarnings) { _, _ in hapticsOn }
     }
 
     /// A running clock's face: the home's one solid fill (ivory in the dark, the set's ink in
@@ -1043,6 +1116,7 @@ struct FriendDaysBox: View {
 private struct WaitingDot: View {
     let color: Color
     @State private var breathing = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Circle()
@@ -1055,6 +1129,7 @@ private struct WaitingDot: View {
                     .opacity(breathing ? 0 : 1)
             }
             .onAppear {
+                guard !reduceMotion else { return }
                 withAnimation(.easeOut(duration: 1.6).repeatForever(autoreverses: false)) { breathing = true }
             }
             .accessibilityHidden(true)

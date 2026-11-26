@@ -89,7 +89,7 @@ final class GuessRunner {
                 try? await Task.sleep(for: .milliseconds(550))
                 guard !Task.isCancelled else { return }
                 self.board.playEngineMove(self.game.moves[self.index])
-                SoundPlayer.shared.play(.move)
+                MoveSound.play(in: self.board)
                 self.index += 1
             }
             if self.index >= self.game.moves.count {
@@ -102,6 +102,7 @@ final class GuessRunner {
     }
 
     private func judge(_ played: PlayedMove) {
+        MoveSound.play(played, in: board)
         board.humanColors = []
         let gm = game.moves[index]
         guesses += 1
@@ -146,7 +147,7 @@ final class GuessRunner {
             try? await Task.sleep(for: .milliseconds(900))
             guard !Task.isCancelled else { return }
             self.board.playEngineMove(gm)
-            SoundPlayer.shared.play(.move)
+            MoveSound.play(in: self.board)
             self.index += 1
             try? await Task.sleep(for: .milliseconds(500))
             self.arrows = []

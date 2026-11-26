@@ -96,6 +96,9 @@ final class ChallengeCenter {
     func challenge(_ person: FriendPerson) {
         let composer = ChallengeComposer(center: self)
         composer.recipient = person
+        // The challenge is made at once: the composer opens on "Sending to Sam…", not on a
+        // form the person never asked to fill in.
+        if friends.you != nil { composer.sendStraight() }
         leaveScreen(keeping: nil)
         screen = .composer(composer)
         guard let you = friends.you else { return }
@@ -301,6 +304,13 @@ final class ChallengeComposer {
     private(set) var link: URL? = nil
     private(set) var isCreating = false
     private(set) var problem: String? = nil
+    /// Opened from a friend's face to send a game at once: the form stays out of sight while
+    /// the challenge is made. If it can't be made, the form comes back with the reason.
+    private(set) var sendsStraight = false
+
+    func sendStraight() {
+        sendsStraight = true
+    }
     /// The friend picked by username, if any: the challenge goes straight to them.
     var recipient: FriendPerson? = nil
     /// Where sending to `recipient` stands once the challenge exists.
@@ -339,7 +349,10 @@ final class ChallengeComposer {
         guard !isCreating, created == nil, let center else { return }
         isCreating = true
         problem = nil
-        defer { isCreating = false }
+        defer {
+            isCreating = false
+            if created == nil { sendsStraight = false }
+        }
         center.rememberName(name)
         do {
             let reply = try await center.api.create(name: ChallengeName.clean(name), side: side, clock: clock, days: clock == nil ? days : nil)

@@ -423,16 +423,8 @@ final class LessonPlayer {
         sound(for: played)
     }
 
+    /// The move's sound, as its piece touches down.
     private func sound(for move: PlayedMove) {
-        guard let sounds else { return }
-        if move.isCapture {
-            sounds.play(.capture)
-        } else if move.givesCheck {
-            sounds.play(.check)
-        } else if move.isCastle {
-            sounds.play(.castle)
-        } else {
-            sounds.play(.move)
-        }
+        MoveSound.play(move, in: game, on: sounds)
     }
 }

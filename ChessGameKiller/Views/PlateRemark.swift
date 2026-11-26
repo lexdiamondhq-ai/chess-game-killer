@@ -43,8 +43,8 @@ struct PlateRemark<Status: View>: View {
                     .transition(.opacity)
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: isRival ? match.rivalLine?.id : match.verdictLine?.id)
-        .animation(.easeInOut(duration: 0.3), value: shownVote)
+        .animation(Motion.change, value: isRival ? match.rivalLine?.id : match.verdictLine?.id)
+        .animation(Motion.change, value: shownVote)
         .onChange(of: match.rivalLine?.id) { _, id in
             // VoiceOver hears each remark once, as it is made.
             guard isRival, banterOn, id != nil, let line = match.rivalLine else { return }

@@ -100,7 +100,7 @@ struct PuzzleCyclesView: View {
     private var loading: some View {
         VStack {
             Spacer()
-            ProgressView("Loading puzzles…")
+            KnightWaitPage(title: "Loading puzzles…")
             Spacer()
         }
     }

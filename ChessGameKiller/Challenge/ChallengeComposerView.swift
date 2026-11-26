@@ -45,6 +45,9 @@ struct ChallengeComposerView: View {
                 if let created = composer.created {
                     createdContent(created)
                         .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                } else if composer.sendsStraight, let person = composer.recipient {
+                    sendingPage(person)
+                        .transition(.opacity)
                 } else {
                     form
                         .transition(.opacity)
@@ -56,6 +59,7 @@ struct ChallengeComposerView: View {
             .padding(.top, 12)
             .padding(.bottom, 28)
             .animation(.snappy(duration: 0.35), value: composer.created?.code)
+            .animation(.snappy(duration: 0.35), value: composer.sendsStraight)
         }
         .scrollDismissesKeyboard(.interactively)
         .safeAreaInset(edge: .top, spacing: 0) {
@@ -68,7 +72,10 @@ struct ChallengeComposerView: View {
             .padding(.bottom, 4)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            bottomBar
+            // Nothing to press while a game is on its way to a picked friend.
+            if composer.created != nil || !composer.sendsStraight {
+                bottomBar
+            }
         }
         .sensoryFeedback(.success, trigger: composer.created?.code) { _, new in hapticsOn && new != nil }
         .sensoryFeedback(.selection, trigger: clockID) { _, _ in hapticsOn }
@@ -166,7 +173,8 @@ struct ChallengeComposerView: View {
         if typed.count >= 2 {
             VStack(spacing: 0) {
                 if friends.results.isEmpty, !friends.isSearching {
-                    Text("Nobody by that name yet. Send them a link instead.")
+                    Text(friends.searchFailed ? "Can't search right now. Check your connection."
+                                              : "Nobody by that name yet. Send them a link instead.")
                         .font(theme.challengeFont(14))
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -357,6 +365,23 @@ struct ChallengeComposerView: View {
     }
 
     // MARK: Once it exists
+
+    /// A tap on a friend's face sends a game at once: their face and "Sending to Sam…" stand
+    /// in for the form until the challenge is ready.
+    private func sendingPage(_ person: FriendPerson) -> some View {
+        VStack(spacing: 18) {
+            ChallengeAvatar(name: person.name, theme: theme, size: 76)
+            Text("Sending to \(person.name)…")
+                .font(theme.challengeFont(24, .bold))
+                .multilineTextAlignment(.center)
+            KnightTraceMark()
+                .frame(width: 26, height: 32)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 72)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Sending to \(person.name)")
+    }
 
     private func createdContent(_ created: FriendGame) -> some View {
         let invite = ChallengeInviteContent(game: created, name: name)

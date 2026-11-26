@@ -470,9 +470,7 @@ struct TalkPanel: View {
 
     private var checkingControls: some View {
         HStack(spacing: 10) {
-            ProgressView()
-                .controlSize(.small)
-                .tint(theme.challengeAccent)
+            KnightWait(size: 18)
             Text("\(Coach.current.name) is checking…")
                 .font(theme.talkFont(.subheadline, .semibold))
                 .foregroundStyle(.secondary)

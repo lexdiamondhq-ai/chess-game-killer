@@ -128,6 +128,17 @@ final class CoachVoice: NSObject {
         let session = AVAudioSession.sharedInstance()
         try? session.setActive(false, options: .notifyOthersOnDeactivation)
         try? session.setCategory(.ambient, options: [.mixWithOthers])
+        Self.pickUpMusic()
+    }
+
+    /// Handing the sound back can stop the app's own music (a rival's theme, Home's strings)
+    /// though its screen is still up: a moment later, whichever should be playing starts again.
+    static func pickUpMusic() {
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(300))
+            RivalTheme.shared.pickUp()
+            HomeMusic.shared.pickUp()
+        }
     }
 
     /// Roughly how long it takes to read a line: about three words a second.

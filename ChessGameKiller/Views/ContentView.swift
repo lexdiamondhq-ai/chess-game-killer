@@ -45,6 +45,12 @@ struct ContentView: View {
     @State private var army = ArmyStore.live()
     @State private var showingArmy = false
     @State private var armyNews: ArmyNews?
+    /// Black behind a rival's film as it gives way to its game: the film's last frame cuts to
+    /// this and the board fades up from it, so the home (or the game before) never shows between.
+    @State private var filmCurtain = false
+    /// Army news waiting for its turn as the banner, and the task that shows them in order.
+    @State private var newsQueue: [ArmyNews] = []
+    @State private var newsTurn: Task<Void, Never>?
     @State private var vault = GameVault.live()
     @State private var showingGames = false
     /// A game picked on the home screen, opened straight away in Rewind.
@@ -55,6 +61,8 @@ struct ContentView: View {
     @State private var showingHome: Bool
     /// Where the home's tiles and the screens they open meet, so a screen grows out of its tile.
     @Namespace private var homeZoom
+    /// The Home tile that was just tapped, so the screen it opens grows out of it.
+    @State private var zoomFrom: HomeZoomID?
     @AppStorage(HomeScreen.key) private var homeScreenOn = HomeScreen.defaultOn
     /// The board style (Alex's pick, 1A): the home's board and sheet, and the same sheet across
     /// the foot of the game. Settings > Board and sheet turns it off.
@@ -119,10 +127,25 @@ struct ContentView: View {
             || showingNewGame || showingSettings || showingAnalyze
             || coach.presentedLesson != nil || coach.presentedSession != nil
             || challenges?.isPresenting == true || talk != nil || showingWelcome
+            // A rival's film is a screen of its own: the phone stays upright under it.
+            || welcomeFilm != nil || nextRivalFilm != nil
     }
     /// The Ashen King's game, or the Cub's, is on screen with nothing over it: turned sideways,
     /// the phone shows his hall or the forest (`BroadcastView`). Every other screen stays upright.
     private var hallOpen: Bool { BroadcastHall(match.setup.level) != nil && match.hasStarted && !boardCovered }
+    /// Seconds from a game ending until its summary opens: long enough for the losing king to
+    /// fall on the 3D board, and one short beat when nothing on the board is moving (a draw,
+    /// or any ending on a flat board).
+    private var summaryWait: TimeInterval {
+        // Decided off the board: a resignation, the clock, a draw agreed.
+        guard match.outcome == nil, let last = match.game.lastPlayed else {
+            let kingFalls = match.winner != nil && BoardView.playsIn3D(theme, setting: sculpted3D)
+            return kingFalls ? SculptedBoardScene.finaleDelay(afterLanding: 0) + 0.7 : 0.9
+        }
+        if match.game.isCheckmate { return match.finaleDelay(last) + 0.7 }
+        return match.landingDelay(last) + 0.9
+    }
+
     /// Starting a game now would cost the one in progress: the rival it is against, so the
     /// screens that start games can ask first.
     private var forfeits: String? {
@@ -186,6 +209,11 @@ struct ContentView: View {
         let _ = ThemeFont.use(theme)
         presented
             .overlay {
+                if filmCurtain {
+                    Color.black.ignoresSafeArea().transition(.opacity)
+                }
+            }
+            .overlay {
                 if showingWelcome {
                     WelcomeFlow(canStartGame: !match.newGameForfeits, page: Welcome.showcasePage()) { play, choice in
                         finishWelcome(play: play, choice: choice)
@@ -199,8 +227,13 @@ struct ContentView: View {
                 if introAfterWelcome != nil {
                     IntroFilmView {
                         IntroFilm.markSeen()
-                        introAfterWelcome = nil
+                        // The welcome goes first, unseen under the film, so its last page never
+                        // flashes back; then the film fades to the home.
+                        var quiet = Transaction()
+                        quiet.disablesAnimations = true
+                        withTransaction(quiet) { showingWelcome = false }
                         endWelcomeAtHome()
+                        withAnimation(.easeInOut(duration: 0.5)) { introAfterWelcome = nil }
                     }
                     .transition(.opacity)
                 }
@@ -261,10 +294,13 @@ struct ContentView: View {
                 recordGame()
                 // A game played to its end makes the day; resigning before a move doesn't.
                 if match.game.plyCount > 0 { daily.record(.game) }
-                // Let the last move land and the king fall, then open the summary.
+                // Let the last move land and the king fall, then open the summary. A game that
+                // ended off the board (a resignation, a draw agreed, a flag) has nothing to
+                // watch, so its summary comes after one short beat.
                 let number = match.gameNumber
+                let wait = summaryWait
                 Task { @MainActor in
-                    try? await Task.sleep(for: .seconds(2.6))
+                    try? await Task.sleep(for: .seconds(wait))
                     guard match.isOver, match.gameNumber == number, !showingNewGame else { return }
                     setCoach(expanded: true)
                 }
@@ -276,30 +312,34 @@ struct ContentView: View {
     private var coversHome: Bool {
         showingTraining || showingDaily || showingPuzzles || showingGames || showingArmy
             || coach.presentedLesson != nil || coach.presentedSession != nil || talk != nil || showingAnalyze
+            // The intro film: Home's strings rest under Leo's voice.
+            || introAfterWelcome != nil
     }
 
     /// The game screen with its sheets and full-screen covers.
     private var presented: some View {
         observed
-            .fullScreenCover(isPresented: $showingTraining) {
+            .fullScreenCover(isPresented: $showingTraining, onDismiss: { zoomFrom = nil }) {
                 TrainingHubView(theme: chosenTheme, door: trainingDoor).environment(training).environment(puzzles).environment(vault)
                     .environment(daily)
-                    .homeZoom(.coach, in: homeZoom, when: showingHome)
+                    .homeZoom(.coach, in: homeZoom, when: zooms(.coach))
             }
-            .fullScreenCover(isPresented: $showingDaily) {
+            .fullScreenCover(isPresented: $showingDaily, onDismiss: { zoomFrom = nil }) {
                 DailyMoveView(theme: chosenTheme, morePuzzles: {
-                    // Once Today's Move has slid away.
+                    // Once Today's Move has slid away: as soon as it has, however it closes
+                    // (the zoom back into its card takes longer than a slide).
                     Task { @MainActor in
-                        try? await Task.sleep(for: .milliseconds(500))
+                        try? await Task.sleep(for: .milliseconds(200))
+                        await ScreenCovers.settled()
                         showingPuzzles = true
                     }
                 })
                 .environment(daily).environment(puzzles).environment(training)
-                .homeZoom(.daily, in: homeZoom, when: showingHome)
+                .homeZoom(.daily, in: homeZoom, when: zooms(.daily))
             }
-            .fullScreenCover(isPresented: $showingPuzzles) {
+            .fullScreenCover(isPresented: $showingPuzzles, onDismiss: { zoomFrom = nil }) {
                 PuzzlesView(theme: chosenTheme).environment(puzzles).environment(training)
-                    .homeZoom(.puzzles, in: homeZoom, when: zoomsFromSheet)
+                    .homeZoom(.puzzles, in: homeZoom, when: zooms(.puzzles))
             }
             .onChange(of: showingGames) { _, showing in
                 if !showing { rewindOpening = nil; rewindOpeningPly = nil }
@@ -307,7 +347,7 @@ struct ContentView: View {
             .fullScreenCover(isPresented: $showingGames) {
                 RewindGamesView(theme: chosenTheme, opening: rewindOpening, openingPly: rewindOpeningPly, forfeits: forfeits) { game in playAgain(game) }
                     .environment(vault).environment(training)
-                    .homeZoom(.games, in: homeZoom, when: zoomsFromSheet)
+                    .homeZoom(.games, in: homeZoom, when: zooms(.games))
             }
             .fullScreenCover(isPresented: $showingArmy) {
                 // Opened from Home, the quest and a held piece each carry a button that plays the
@@ -315,21 +355,16 @@ struct ContentView: View {
                 ArmyView(theme: chosenTheme, color: match.setup.playerColor, nextRival: armyQuestRival,
                          play: showingHome && stageHome ? { level in playArmyQuest(level) } : nil)
                     .environment(army)
-                    .homeZoom(.army, in: homeZoom, when: zoomsFromSheet)
+                    .homeZoom(.army, in: homeZoom, when: zooms(.army))
             }
             // The welcome's Play shows the first rival's film, as Home's Play does, and its Begin
             // starts the game (audit, 2026-11-09: the films are the app's entrance, so the first
             // game shouldn't skip them). Backing out is "Look around first".
             .fullScreenCover(item: $welcomeFilm) { film in
                 RivalsHall(start: film.id, intro: true, begin: { level in
-                    // The film's last frame gives way to the game: the hall closes at once.
-                    var quiet = Transaction()
-                    quiet.disablesAnimations = true
-                    withTransaction(quiet) { welcomeFilm = nil }
                     var setup = film.choice.setup()
                     setup.level = level
-                    withAnimation(.snappy) { match.start(setup) }
-                    leaveHome()
+                    startGame(setup, underFilm: { welcomeFilm = nil })
                 }, close: {
                     welcomeFilm = nil
                     lookAround()
@@ -339,27 +374,24 @@ struct ContentView: View {
             // on the side and clock of the game just played (Alex, 2026-11-11, audit pick R2).
             .fullScreenCover(item: $nextRivalFilm) { film in
                 RivalsHall(start: film.id, intro: true, begin: { level in
-                    var quiet = Transaction()
-                    quiet.disablesAnimations = true
-                    withTransaction(quiet) { nextRivalFilm = nil }
                     var setup = MatchController.Setup(playerColor: film.setup.playerColor, level: level,
                                                       timeControl: film.setup.timeControl)
                     setup.opponent = film.setup.opponent
                     UserDefaults.standard.set(level.rawValue, forKey: "setup.level")
-                    withAnimation(.snappy) { match.start(setup) }
+                    startGame(setup, underFilm: { nextRivalFilm = nil })
                 }, close: { nextRivalFilm = nil })
             }
             .fullScreenCover(item: $coach.presentedLesson) { lesson in
                 LessonScreen(lesson: lesson, theme: chosenTheme).environment(training).environment(daily)
             }
-            .fullScreenCover(item: $coach.presentedSession) { plan in
+            .fullScreenCover(item: $coach.presentedSession, onDismiss: { zoomFrom = nil }) { plan in
                 // Asked for with one tap, so it starts at once. The puzzle store lets a missed
                 // puzzle in the session come back for review.
                 SessionView(plan: plan, theme: chosenTheme, startsAtOnce: true)
                     .environment(training)
                     .environment(puzzles)
                     .environment(daily)
-                    .homeZoom(.coach, in: homeZoom, when: showingHome)
+                    .homeZoom(stageHome ? .session : .coach, in: homeZoom, when: zooms(.session))
             }
             .fullScreenCover(item: $talk, onDismiss: playTalkMove) { (session: TalkSession) in
                 TalkPanel(session: session, theme: theme, play: { (uci: String) in
@@ -431,7 +463,8 @@ struct ContentView: View {
                 guard let id else { return }
                 challenges?.reviewing = nil
                 Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(600))
+                    try? await Task.sleep(for: .milliseconds(200))
+                    await ScreenCovers.settled()
                     rewindOpening = id
                     showingGames = true
                 }
@@ -461,6 +494,8 @@ struct ContentView: View {
             .onChange(of: boardHidden) { _, hidden in
                 if hidden { match.suspend() } else { match.resume() }
             }
+            // The person's clock has run into its last ten seconds: felt once, with its tick.
+            .sensoryFeedback(.impact(weight: .medium), trigger: match.lowTimeWarnings) { _, _ in hapticsOn }
             .onChange(of: hallOpen, initial: true) { _, open in
                 AppOrientation.allowLandscape(open)
             }
@@ -505,6 +540,7 @@ struct ContentView: View {
             HomeView(match: match, theme: .named(themeID), actions: homeActions, tab: homeTab, rises: homeRises,
                      onTab: { tab in homeTab = tab })
                 .environment(\.homeZoom, homeZoom)
+                .environment(\.homeZoomMark, { id in zoomFrom = id })
                 .transition(.opacity)
         } else {
             gameScreen
@@ -519,6 +555,7 @@ struct ContentView: View {
                 withAnimation(.snappy) { match.start(setup) }
                 leaveHome()
             },
+            startFromFilm: { setup, closeFilm in startGame(setup, underFilm: closeFilm) },
             playRival: { level in
                 // The New Game sheet opens on this rival.
                 UserDefaults.standard.set(level.rawValue, forKey: "setup.level")
@@ -693,10 +730,39 @@ struct ContentView: View {
         if !showingHome, !match.hasStarted { showingNewGame = true }
     }
 
-    private func leaveHome() {
+    /// Begin on a rival's film. The film has faded to black (`RivalsHall.face`); `closeFilm`
+    /// takes it away at once onto a black of our own, the game is set up behind that black, and
+    /// the board fades up: the home, or the game just finished, is never seen between the film
+    /// and the game.
+    private func startGame(_ setup: MatchController.Setup, underFilm closeFilm: @escaping () -> Void) {
+        var quiet = Transaction()
+        quiet.disablesAnimations = true
+        withTransaction(quiet) {
+            filmCurtain = true
+            closeFilm()
+        }
+        Task { @MainActor in
+            // A beat, so the film is gone before the screen that showed it is.
+            try? await Task.sleep(for: .milliseconds(80))
+            withTransaction(quiet) {
+                setCoach(expanded: false)
+                match.start(setup)
+                leaveHome(animated: false)
+            }
+            // Pieces walking home from a game just finished do it behind the black.
+            try? await Task.sleep(for: .milliseconds(120))
+            withAnimation(.easeInOut(duration: 0.45)) { filmCurtain = false }
+        }
+    }
+
+    private func leaveHome(animated: Bool = true) {
         guard showingHome else { return }
         homeLit = false
-        withAnimation(.easeInOut(duration: 0.35)) { showingHome = false }
+        if animated {
+            withAnimation(.easeInOut(duration: 0.35)) { showingHome = false }
+        } else {
+            showingHome = false
+        }
         // Back to a rival game under way: its theme picks up where going home faded it.
         if match.hasStarted, !match.isOver { RivalTheme.shared.resume(match.setup) }
     }
@@ -727,9 +793,18 @@ struct ContentView: View {
         return theme.isDark ? .dark : nil
     }
 
-    /// Puzzles, your games and your pieces grow out of the board home's rows that open them.
-    /// The tiles home has no such rows, and the game screen opens them as usual.
-    private var zoomsFromSheet: Bool { showingHome && boardSheet }
+    /// Whether a screen grows out of the Home tile that opens it (iOS 18's zoom). On today's Home
+    /// only the tile that was just tapped does: Today's Move, Puzzles and the coach's session.
+    /// The same screens opened from the bar, a menu, a number or the game slide up, since there
+    /// is nothing on screen for them to grow from. The older Home layouts keep their own rule.
+    private func zooms(_ id: HomeZoomID) -> Bool {
+        guard showingHome else { return false }
+        if stageHome { return zoomFrom == id }
+        switch id {
+        case .daily, .coach, .session: return true
+        case .puzzles, .games, .army: return boardSheet
+        }
+    }
 
     /// The board, the players and the dock inside the navigation bar, sized to the screen.
     private var gameScreen: some View {
@@ -760,6 +835,16 @@ struct ContentView: View {
                     .padding(.horizontal, Self.inset)
                     .padding(.bottom, 8)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            // A banner is felt as it slides in: a happy buzz for a mark earned or a piece set
+            // free, a light tap for the news before a game.
+            .sensoryFeedback(trigger: armyNews) { _, news in
+                guard hapticsOn, let news else { return nil }
+                switch news.kind {
+                case .grudge, .staked: return .impact(weight: .light)
+                case .captured: return .warning
+                default: return .success
                 }
             }
             // A one-line tip the first time a hidden gesture or a rule would help.
@@ -840,6 +925,7 @@ struct ContentView: View {
                 } else {
                     ExecutivePlate(match: match, theme: theme, color: topColor)
                         .frame(width: lineWidth, height: topPlateHeight)
+                        .environment(\.weatherRests, boardHidden)
                 }
             }
             Color.clear.frame(height: gap + side * headroom)
@@ -1028,7 +1114,7 @@ struct ContentView: View {
                 Color.clear.frame(width: CoachOrb.orbSize + 12, height: 1)
                 HStack(spacing: 0) {
                     DockButton(title: "Undo", symbol: Glyphs.undo, theme: theme) {
-                        withAnimation(.snappy(duration: 0.22)) { match.undo() }
+                        withAnimation(Motion.tap) { match.undo() }
                     }
                     .disabled(!match.canUndo)
                     // Off in the New Game box means off: no button to peek with (Alex, 2026-11-12).
@@ -1039,7 +1125,7 @@ struct ContentView: View {
                         }
                     }
                     DockButton(title: "Flip", symbol: Glyphs.flip, theme: theme) {
-                        withAnimation(.snappy) { match.flipBoard() }
+                        withAnimation(.snappy(duration: 0.45)) { match.flipBoard() }
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -1104,10 +1190,9 @@ struct ContentView: View {
     private func recordArmy() {
         guard match.setup.opponent == .computer, let ledger = match.game.ledger else { return }
         let won = match.winner.map { $0 == match.setup.playerColor }
-        guard let news = army.record(ledger, playerColor: match.setup.playerColor, won: won,
-                                       stakes: match.armyStakes).first else { return }
-        // After the finale and the summary, so the end of the game has the stage first.
-        show(news, after: 3.4)
+        // The news is kept on the army (`lastNews`), and the end-of-game summary shows it as
+        // rows of its own: a banner here slid in over the summary a moment after it opened.
+        _ = army.record(ledger, playerColor: match.setup.playerColor, won: won, stakes: match.armyStakes)
     }
 
     /// As a game against a rival starts: the piece that rival keeps taking. It waits until the
@@ -1132,15 +1217,34 @@ struct ContentView: View {
         show(news, after: 4.0)
     }
 
-    /// Slides the army banner in, then away again unless something newer replaced it.
+    /// Lines the army banner up to slide in after `delay`. Banners take turns, each with its
+    /// full six seconds (a streak milestone and the game's own news can come within a second
+    /// of each other), and news from a game since left for a new one is dropped.
     private func show(_ news: ArmyNews, after delay: Double) {
+        let number = match.gameNumber
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(delay))
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) { armyNews = news }
-            try? await Task.sleep(for: .seconds(6))
-            if armyNews == news {
-                withAnimation(.easeOut(duration: 0.3)) { armyNews = nil }
+            guard match.gameNumber == number else { return }
+            newsQueue.append(news)
+            showQueuedNews()
+        }
+    }
+
+    /// Shows the banners waiting, one after another.
+    private func showQueuedNews() {
+        guard newsTurn == nil else { return }
+        newsTurn = Task { @MainActor in
+            while !newsQueue.isEmpty {
+                let news = newsQueue.removeFirst()
+                withAnimation(Motion.panel) { armyNews = news }
+                try? await Task.sleep(for: .seconds(6))
+                if armyNews == news {
+                    withAnimation(.easeOut(duration: 0.3)) { armyNews = nil }
+                }
+                // A breath between two banners, so the second reads as its own news.
+                if !newsQueue.isEmpty { try? await Task.sleep(for: .seconds(0.45)) }
             }
+            newsTurn = nil
         }
     }
 
@@ -1183,7 +1287,8 @@ struct ContentView: View {
             match.landingDelay = { move in SculptedBoardScene.landingDelay(for: move, in: game) }
             match.finaleDelay = { move in SculptedBoardScene.finaleDelay(for: move, in: game) }
         } else {
-            match.landingDelay = { _ in 0 }
+            let game = match.game
+            match.landingDelay = { move in BoardView.flatLandingDelay(for: move, in: game) }
             match.finaleDelay = { _ in 0.4 }
         }
     }

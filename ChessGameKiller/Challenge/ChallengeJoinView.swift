@@ -49,8 +49,7 @@ struct ChallengeJoinView: View {
         switch invite.stage {
         case .loading:
             VStack(spacing: 14) {
-                ProgressView()
-                    .controlSize(.large)
+                KnightWait(size: 44)
                 Text("Opening the challenge…")
                     .font(theme.challengeFont(15))
                     .foregroundStyle(.secondary)

@@ -71,7 +71,7 @@ struct CheckCalloutLayer: View {
                 }
             }
         }
-        .animation(.spring(response: 0.32, dampingFraction: 0.7), value: shownAfter)
+        .animation(Motion.panel, value: shownAfter)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
         .onChange(of: game.moveCount, initial: true) { old, count in

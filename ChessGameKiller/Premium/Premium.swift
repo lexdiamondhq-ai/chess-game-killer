@@ -25,6 +25,8 @@ final class Premium {
     private(set) var isRestoring = false
     /// Why the last purchase or restore didn't work, in plain words.
     var problem: String?
+    /// The last try at loading the plans never reached the App Store (offline, most likely).
+    @ObservationIgnored private var storeUnreachable = false
     /// Goes up with every use, so a screen showing what's left redraws.
     private(set) var uses = 0
 
@@ -132,7 +134,9 @@ final class Premium {
                 if let plan = PremiumPlan(rawValue: product.id) { byPlan[plan] = product }
             }
             products = byPlan
+            storeUnreachable = false
         } catch {
+            storeUnreachable = true
             NSLog("Premium: couldn't load products: \(error.localizedDescription)")
         }
     }
@@ -160,14 +164,18 @@ final class Premium {
     }
 
     func buy(_ plan: PremiumPlan) async {
+        // One purchase at a time, and the button shows it is working from the first tap,
+        // while the prices are still loading too.
+        guard purchasing == nil else { return }
         problem = nil
-        if products.isEmpty { await loadProducts() }
-        guard let product = products[plan] else {
-            problem = "The App Store isn't selling Premium yet. Try again later."
-            return
-        }
         purchasing = plan
         defer { purchasing = nil }
+        if products.isEmpty { await loadProducts() }
+        guard let product = products[plan] else {
+            problem = storeUnreachable ? "Can't reach the App Store. Check your connection and try again."
+                                       : "The App Store isn't selling Premium yet. Try again later."
+            return
+        }
         do {
             switch try await product.purchase() {
             case .success(let verification):

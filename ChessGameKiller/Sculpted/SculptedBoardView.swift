@@ -277,24 +277,28 @@ struct SculptedStillBoard: View {
     var hints: [SculptedHint] = []
     var selected: Square?
     var targets: Set<Square> = []
+    /// Seen from the player's chair, or from above (the Board view setting).
+    var framing: SculptedCamera.Framing = .standing
 
     @State private var stage = SculptedStage()
 
     var body: some View {
         SculptedSceneView(stage: stage, look: look, state: state)
             .id(look.name)
-            .aspectRatio(SculptedBoardView.aspect, contentMode: .fit)
+            .aspectRatio(framing.aspect, contentMode: .fit)
             .allowsHitTesting(false)
     }
 
     private var state: SculptedBoardState {
-        SculptedBoardState(
+        var state = SculptedBoardState(
             pieces: position.pieces.map { PlacedPiece(id: 0, piece: $0) },
             selected: selected,
             targets: targets,
             hints: hints,
             matchesPieces: true
         )
+        state.framing = framing
+        return state
     }
 }
 
