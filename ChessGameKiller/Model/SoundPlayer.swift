@@ -4,8 +4,8 @@ import Foundation
 /// Every sound the game can make. File names match ChessGameKiller/Sounds/*.mp3,
 /// which are generated with ElevenLabs by scripts/make_sounds.py.
 enum GameSound: String, CaseIterable {
-    /// A piece set down. It has several takes (move.mp3, move-2.mp3, ...), one picked at random
-    /// each time, so a game never repeats the same knock.
+    /// A piece set down: the same soft wooden tock as a rival's move (move-soft.mp3, ...), in
+    /// every piece set and on every screen, so no move ever squeaks or clanks (Alex, 2026-11-26).
     case move
     /// A timed game's move: the piece set down, then the chess clock pressed.
     case clockMove = "move-clock"
@@ -19,8 +19,10 @@ enum GameSound: String, CaseIterable {
     /// Training's soft click: a piece picked up, a square found. In a game, picking up a
     /// piece is felt (a haptic), not heard.
     case select
+    /// A capture: the soft tock of a rival's capture (capture-soft.mp3), for everyone.
     case capture
     case check
+    /// Castling: two soft tocks, king then rook (castle.mp3, made from the move-soft takes).
     case castle
     case win
     /// A game that ends with nobody winning: a draw.
@@ -32,19 +34,16 @@ enum GameSound: String, CaseIterable {
     /// The chime as the app opens.
     case welcome
 
-    /// Sets how the sounds sit against each other. The wooden knocks sit a little under full
-    /// volume; a capture lands slightly harder than a move, and check (its file raised 3 dB)
-    /// a touch above a move. The longer cues' files are all made the same loudness
+    /// Sets how the sounds sit against each other. The soft tocks of a move, capture or castle
+    /// sit well under full volume, and check (its file raised 3 dB) above them. The longer cues' files are all made the same loudness
     /// (-16 LUFS, scripts/make_sounds.py), so these alone place them: the endings only a
     /// little above the knocks, so the end of a game is never a jolt, and the welcome softest.
     var volume: Float {
         switch self {
-        case .move, .clockMove: return 0.75
-        case .rivalMove, .rivalCapture: return 0.6
+        case .clockMove: return 0.75
+        case .move, .capture, .castle, .rivalMove, .rivalCapture: return 0.6
         case .select: return 0.3
-        case .capture: return 0.9
         case .check: return 1.0
-        case .castle: return 0.75
         case .win: return 0.7
         case .gameOver: return 0.6
         case .defeat: return 0.6
@@ -96,13 +95,6 @@ final class SoundPlayer: SoundPlaying {
     /// before it; one for each longer cue.
     private var players: [GameSound: [[AVAudioPlayer]]] = [:]
     private var nextPlayer: [GameSound: Int] = [:]
-    /// A piece set's own takes of a knock, by "<sound>.<set>" (move.crystal.mp3,
-    /// move.crystal-2.mp3, ...): each set in Settings > Pieces sounds like what it is made of
-    /// (Alex, 2026-11-14). Stone, the default, has none and plays the sounds above.
-    private var setTakes: [String: [[AVAudioPlayer]]] = [:]
-    /// The knocks a piece set can have its own takes of. Check's bells and a timed game's clock
-    /// are the same in every set.
-    private static let setSounds: [GameSound] = [.move, .capture, .castle]
     /// The take each knock played last, so the next one is a different take.
     private var lastTake: [GameSound: Int] = [:]
     /// Longer cues fading out, to be stopped once they are silent.
@@ -113,12 +105,6 @@ final class SoundPlayer: SoundPlaying {
         try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
         for sound in GameSound.allCases {
             if let takes = Self.load(sound, named: sound.rawValue) { players[sound] = takes }
-        }
-        for sound in Self.setSounds {
-            for set in PieceSet.allCases where set != .stone {
-                let name = "\(sound.rawValue).\(set.rawValue)"
-                if let takes = Self.load(sound, named: name) { setTakes[name] = takes }
-            }
         }
     }
 
@@ -138,11 +124,14 @@ final class SoundPlayer: SoundPlaying {
         return takes.isEmpty ? nil : takes
     }
 
-    /// The takes to play for `sound`: the chosen piece set's own, else the shared ones.
+    /// The takes to play for `sound`. A move and a capture share the rival's soft tocks, so
+    /// every piece set sounds the same, quiet way (the per-set takes squeaked and rang).
     private func takes(of sound: GameSound) -> [[AVAudioPlayer]]? {
-        let set = PieceSet.current
-        if set != .stone, let own = setTakes["\(sound.rawValue).\(set.rawValue)"] { return own }
-        return players[sound]
+        switch sound {
+        case .move: return players[.rivalMove]
+        case .capture: return players[.rivalCapture]
+        default: return players[sound]
+        }
     }
 
     /// The welcome chime, once per launch.
