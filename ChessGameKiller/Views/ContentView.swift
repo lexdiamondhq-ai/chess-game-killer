@@ -269,6 +269,8 @@ struct ContentView: View {
                     setCoach(expanded: true)
                 }
             }
+            // Every pane's gilded edge is cut from this look's metal (see Polish).
+            .environment(\.polishMetal, theme.polishMetal)
     }
 
     /// A screen is open over Home: training, today's move, puzzles, games, the army, a lesson,

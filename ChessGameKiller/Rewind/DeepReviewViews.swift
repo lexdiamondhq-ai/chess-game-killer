@@ -42,7 +42,7 @@ struct DeepReviewRow: View {
             .padding(.horizontal, 12)
             .frame(minHeight: 56)
             .background { shape.fill(gold.opacity(0.10)) }
-            .overlay { shape.strokeBorder(gold.opacity(0.35), lineWidth: 1) }
+            .overlay { PolishedEdge(shape: shape, edge: .card, dark: theme.screenIsDark) }
             .contentShape(shape)
         }
         .buttonStyle(.plain)

@@ -228,8 +228,7 @@ struct HomePane<S: InsettableShape>: ViewModifier {
             }
             shape.strokeBorder(rim, lineWidth: contrast == .increased ? 1 : 0.75)
             // A well keeps a quieter gilding than the card it sits in; a lit one, the full edge.
-            PolishedEdge(shape: shape, edge: lit ? .lit : .pill, dark: tone.scheme == .dark)
-                .opacity(lit ? 1 : 0.6)
+            PolishedEdge(shape: shape, edge: lit ? .lit : .well, dark: tone.scheme == .dark)
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)

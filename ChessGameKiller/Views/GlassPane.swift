@@ -28,7 +28,7 @@ struct GlassPane<S: InsettableShape>: ViewModifier {
             // The gilded edge lies over it, so every pane's border catches the light alike
             // (the frosted pane below draws its own).
             content.glassEffect(GlassSurface<S>.liquidGlass(weight: weight, tint: tint), in: shape)
-                .polishedEdge(shape, .glass)
+                .overlay { if weight == .regular { PolishedEdge(shape: shape, edge: .glass) } }
         } else {
             content.background { GlassSurface(shape: shape, tint: tint, weight: weight) }
         }

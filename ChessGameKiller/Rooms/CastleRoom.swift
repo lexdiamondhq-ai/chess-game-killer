@@ -56,7 +56,7 @@ enum CastleStyle {
     static let edge = Color(red: 0.86, green: 0.70, blue: 0.40).opacity(0.28)
     static let gold = Color(red: 0.90, green: 0.75, blue: 0.45)
     static let ink = Color(red: 0.96, green: 0.93, blue: 0.87)
-    static let ink2 = Color(red: 0.96, green: 0.93, blue: 0.87).opacity(0.62)
+    static let ink2 = Color(red: 0.96, green: 0.93, blue: 0.87).opacity(0.72)
     static let titleFont = "Cinzel-Bold"
 }
 
@@ -253,7 +253,8 @@ struct CastleCard<Content: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(.ultraThinMaterial.opacity(0.6), in: shape)
             .background(CastleStyle.panel, in: shape)
-            .overlay { shape.strokeBorder(CastleStyle.edge, lineWidth: 0.75) }
+            // The rooms are gold on every look, so their edge is the app's gold.
+            .overlay { PolishedEdge(shape: shape, edge: .card, dark: true).environment(\.polishMetal, nil) }
     }
 }
 

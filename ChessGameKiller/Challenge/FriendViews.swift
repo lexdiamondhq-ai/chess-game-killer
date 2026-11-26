@@ -166,8 +166,8 @@ struct FriendInviteBanner: View {
         .padding(.trailing, 8)
         .padding(.vertical, 10)
         .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(.ultraThinMaterial))
-        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
-            .strokeBorder(theme.challengeAccent.opacity(0.4), lineWidth: 0.75))
+        // A friend is asking: the bright edge.
+        .overlay { PolishedEdge(shape: RoundedRectangle(cornerRadius: 22, style: .continuous), edge: .lit) }
         .shadow(color: .black.opacity(0.35), radius: 18, y: 8)
         .padding(.horizontal, 14)
         .accessibilityElement(children: .contain)

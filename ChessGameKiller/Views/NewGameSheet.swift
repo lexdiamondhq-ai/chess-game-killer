@@ -551,8 +551,11 @@ struct NewGameSheet: View {
         return shape
             .fill(selected ? color.opacity(0.1) : Color.primary.opacity(theme.screenIsDark ? 0.05 : 0.03))
             .overlay {
-                shape.strokeBorder(selected ? color : Color.primary.opacity(theme.screenIsDark ? 0.12 : 0.08),
-                                   lineWidth: selected ? 1.5 : 1)
+                if selected {
+                    shape.strokeBorder(color, lineWidth: 1.5)
+                } else {
+                    PolishedEdge(shape: shape, edge: .well, dark: theme.screenIsDark)
+                }
             }
             .shadow(color: selected ? (glow ?? color).opacity(theme.glows ? 0.45 : 0.25) : .clear, radius: 12)
     }

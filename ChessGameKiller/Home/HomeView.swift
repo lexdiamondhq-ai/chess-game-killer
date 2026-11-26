@@ -229,6 +229,8 @@ struct HomeView: View {
         // The window's own light (status bar, system sheets) is set by the app, which knows when
         // the welcome is up and waits for the fade from a game to finish.
         .environment(\.colorScheme, tone.scheme)
+        // Home's cards are gold on every look, so its edges are too (see Polish).
+        .environment(\.polishMetal, nil)
         .tint(tone.metal)
         .sensoryFeedback(.impact(weight: .light), trigger: pullArmed) { _, armed in armed && hapticsOn }
         .sensoryFeedback(.impact(weight: .medium), trigger: you != nil) { _, open in open && hapticsOn }

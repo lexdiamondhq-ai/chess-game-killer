@@ -28,7 +28,7 @@ struct ChallengeEntryRow: View {
         .background {
             shape
                 .fill(theme.screenIsDark ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)))
-                .overlay { shape.strokeBorder(Color.primary.opacity(theme.screenIsDark ? 0.12 : 0.08), lineWidth: 1) }
+                .overlay { PolishedEdge(shape: shape, edge: .card, dark: theme.screenIsDark) }
                 .shadow(color: .black.opacity(theme.screenIsDark ? 0.3 : 0.08), radius: 16, y: 6)
         }
         .clipShape(shape)
