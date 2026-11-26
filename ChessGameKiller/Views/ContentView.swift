@@ -45,6 +45,9 @@ struct ContentView: View {
     @State private var army = ArmyStore.live()
     @State private var showingArmy = false
     @State private var armyNews: ArmyNews?
+    /// Army news waiting for its turn as the banner, and the task that shows them in order.
+    @State private var newsQueue: [ArmyNews] = []
+    @State private var newsTurn: Task<Void, Never>?
     @State private var vault = GameVault.live()
     @State private var showingGames = false
     /// A game picked on the home screen, opened straight away in Rewind.
@@ -119,10 +122,25 @@ struct ContentView: View {
             || showingNewGame || showingSettings || showingAnalyze
             || coach.presentedLesson != nil || coach.presentedSession != nil
             || challenges?.isPresenting == true || talk != nil || showingWelcome
+            // A rival's film is a screen of its own: the phone stays upright under it.
+            || welcomeFilm != nil || nextRivalFilm != nil
     }
     /// The Ashen King's game, or the Cub's, is on screen with nothing over it: turned sideways,
     /// the phone shows his hall or the forest (`BroadcastView`). Every other screen stays upright.
     private var hallOpen: Bool { BroadcastHall(match.setup.level) != nil && match.hasStarted && !boardCovered }
+    /// Seconds from a game ending until its summary opens: long enough for the losing king to
+    /// fall on the 3D board, and one short beat when nothing on the board is moving (a draw,
+    /// or any ending on a flat board).
+    private var summaryWait: TimeInterval {
+        // Decided off the board: a resignation, the clock, a draw agreed.
+        guard match.outcome == nil, let last = match.game.lastPlayed else {
+            let kingFalls = match.winner != nil && BoardView.playsIn3D(theme, setting: sculpted3D)
+            return kingFalls ? SculptedBoardScene.finaleDelay(afterLanding: 0) + 0.7 : 0.9
+        }
+        if match.game.isCheckmate { return match.finaleDelay(last) + 0.7 }
+        return match.landingDelay(last) + 0.9
+    }
+
     /// Starting a game now would cost the one in progress: the rival it is against, so the
     /// screens that start games can ask first.
     private var forfeits: String? {
@@ -261,10 +279,13 @@ struct ContentView: View {
                 recordGame()
                 // A game played to its end makes the day; resigning before a move doesn't.
                 if match.game.plyCount > 0 { daily.record(.game) }
-                // Let the last move land and the king fall, then open the summary.
+                // Let the last move land and the king fall, then open the summary. A game that
+                // ended off the board (a resignation, a draw agreed, a flag) has nothing to
+                // watch, so its summary comes after one short beat.
                 let number = match.gameNumber
+                let wait = summaryWait
                 Task { @MainActor in
-                    try? await Task.sleep(for: .seconds(2.6))
+                    try? await Task.sleep(for: .seconds(wait))
                     guard match.isOver, match.gameNumber == number, !showingNewGame else { return }
                     setCoach(expanded: true)
                 }
@@ -1132,15 +1153,34 @@ struct ContentView: View {
         show(news, after: 4.0)
     }
 
-    /// Slides the army banner in, then away again unless something newer replaced it.
+    /// Lines the army banner up to slide in after `delay`. Banners take turns, each with its
+    /// full six seconds (a streak milestone and the game's own news can come within a second
+    /// of each other), and news from a game since left for a new one is dropped.
     private func show(_ news: ArmyNews, after delay: Double) {
+        let number = match.gameNumber
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(delay))
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) { armyNews = news }
-            try? await Task.sleep(for: .seconds(6))
-            if armyNews == news {
-                withAnimation(.easeOut(duration: 0.3)) { armyNews = nil }
+            guard match.gameNumber == number else { return }
+            newsQueue.append(news)
+            showQueuedNews()
+        }
+    }
+
+    /// Shows the banners waiting, one after another.
+    private func showQueuedNews() {
+        guard newsTurn == nil else { return }
+        newsTurn = Task { @MainActor in
+            while !newsQueue.isEmpty {
+                let news = newsQueue.removeFirst()
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) { armyNews = news }
+                try? await Task.sleep(for: .seconds(6))
+                if armyNews == news {
+                    withAnimation(.easeOut(duration: 0.3)) { armyNews = nil }
+                }
+                // A breath between two banners, so the second reads as its own news.
+                if !newsQueue.isEmpty { try? await Task.sleep(for: .seconds(0.45)) }
             }
+            newsTurn = nil
         }
     }
 

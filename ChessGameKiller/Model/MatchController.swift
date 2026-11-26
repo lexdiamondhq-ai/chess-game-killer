@@ -126,6 +126,9 @@ final class MatchController {
     }
     /// The coach's verdict on the person's last graded move, while verdicts are on.
     private(set) var review: MoveReview?
+    /// The person's newest move is still waiting for its grade: `review` is about the move
+    /// before it, so the orb and the panel show that a grade is coming instead of the old one.
+    private(set) var gradeIsPending = false
     /// The same verdict, written into the person's own line by the board for a few seconds.
     private(set) var verdictLine: MoveReview?
     /// The better move the person missed, shown on the board for a moment after they tap the
@@ -252,6 +255,8 @@ final class MatchController {
     @ObservationIgnored private var work: Task<Void, Never>?
     /// Bumps whenever the game changes under running work, so stale results are dropped.
     @ObservationIgnored private var generation = 0
+    /// When the rival's last move has touched down and settled; the person's grade waits for it.
+    @ObservationIgnored private var rivalLandsAt: ContinuousClock.Instant?
     /// Set from the moment work is owed for the position on the board until it has all been
     /// done, so work cut short while the board was out of sight is picked up again.
     @ObservationIgnored private var workPending = false
@@ -773,6 +778,8 @@ final class MatchController {
         cancelWork()
         workPending = false
         review = nil
+        gradeIsPending = false
+        rivalLandsAt = nil
         clearVerdictLine()
         hints = []
         cachedHints = []
@@ -790,6 +797,7 @@ final class MatchController {
                     endedGame: game.isGameOver, ply: game.plyCount,
                     origin: game.ledger?.origin(of: Square(String(played.uci.dropFirst(2).prefix(2))))
                 ))
+                gradeIsPending = showVerdicts && engine != nil
             }
         }
         moveLanded(played)
@@ -802,13 +810,38 @@ final class MatchController {
     /// reaction, and the clock.
     private func moveLanded(_ played: PlayedMove) {
         playSound(for: played)
-        rivalReacts(to: played)
+        // What the rival says about a move is said once the move is seen: when its piece is down.
+        onceLanded(played) { [weak self] in self?.rivalReacts(to: played) }
         if game.isGameOver {
             clock?.pause()
             game.clearSelection()
         } else {
             clock?.moved(by: played.color)
         }
+    }
+
+    /// Runs `news` when `played`'s piece touches down: at once on the flat board, and never
+    /// if the game has moved on by then (another move, an undo, a new game).
+    private func onceLanded(_ played: PlayedMove, _ news: @escaping @MainActor () -> Void) {
+        let wait = landingDelay(played)
+        guard wait > 0.05 else { return news() }
+        let number = gameNumber
+        let ply = game.plyCount
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(wait))
+            guard let self, self.gameNumber == number, self.game.plyCount == ply else { return }
+            news()
+        }
+    }
+
+    /// Waits until the rival's piece has touched down and settled a moment, so a grade never
+    /// competes with the move the person is watching. False when the game moved on meanwhile.
+    private func rivalHasLanded(generation gen: Int) async -> Bool {
+        if let landsAt = rivalLandsAt {
+            let left = landsAt - ContinuousClock().now
+            if left > .zero { try? await Task.sleep(for: left) }
+        }
+        return gen == generation && !Task.isCancelled
     }
 
     /// One of the person's moves, kept so it can be graded after the computer has already answered it.
@@ -851,6 +884,8 @@ final class MatchController {
             if pendingReviews.first?.ply == next.ply { pendingReviews.removeFirst() }
         }
         guard gen == generation, !Task.isCancelled else { return }
+        // Graded, or let go because the engine had nothing to grade it with.
+        gradeIsPending = false
         await prepareHints(generation: gen)
         if gen == generation, !Task.isCancelled { workPending = false }
     }
@@ -861,6 +896,7 @@ final class MatchController {
         cancelWork()
         guard engine != nil, !pendingReviews.isEmpty else {
             workPending = false
+            gradeIsPending = false
             return
         }
         workPending = true
@@ -872,7 +908,10 @@ final class MatchController {
                 guard await self.review(next, generation: gen, latest: false) else { return }
                 if self.pendingReviews.first?.ply == next.ply { self.pendingReviews.removeFirst() }
             }
-            if gen == self.generation { self.workPending = false }
+            if gen == self.generation {
+                self.workPending = false
+                self.gradeIsPending = false
+            }
         }
     }
 
@@ -946,6 +985,10 @@ final class MatchController {
         let materialLoss = MoveReview.materialLoss(fen: move.fenBefore, best: bestLine.moves, played: playedLine)
         let grade = MoveReview.grade(before: bestLine.evaluation, after: after, playedBest: playedBest, materialLoss: materialLoss)
         let bestSAN = playedBest ? nil : Notation.san(of: bestMove, fen: move.fenBefore)
+        // The grade the person will see is news: it waits its turn behind the rival's move.
+        if latest {
+            guard await rivalHasLanded(generation: gen) else { return false }
+        }
         publishReview(grade, move: move, ply: played.ply, fenAfter: played.fenAfter, best: bestSAN, evaluation: after,
                       bestUCI: bestMove, before: bestLine.evaluation, reply: reply, origin: played.origin,
                       line: playedBest ? [] : bestLine.moves, latest: latest)
@@ -979,6 +1022,7 @@ final class MatchController {
         nextReviewID += 1
         onReview?(made, latest)
         guard latest else { return }
+        gradeIsPending = false
         // The rival notices a blunder, and now and then a best move in a game still in the balance.
         if !isOver {
             switch grade {
@@ -1001,6 +1045,8 @@ final class MatchController {
         isComputerThinking = true
         let clock = ContinuousClock()
         let started = clock.now
+        // How long the person's own move is still in the air.
+        let ownLanding = game.lastPlayed.map { landingDelay($0) } ?? 0
         let fen = game.fen
         let current = self.setup
         // The crowd first: the move real players chose here, while the position is a common one.
@@ -1029,8 +1075,11 @@ final class MatchController {
         }
         let engineAnswered = chosen != nil
 
-        // A short pause so the reply never feels instant.
-        let minimum = Duration.milliseconds(250)
+        // A short pause so the reply never feels instant, and never comes while the person's
+        // own piece is still in the air: two pieces moving at once read as a glitch, and a
+        // recapture would knock over a piece that had not landed. On a stage (the King's hall)
+        // the rival's reach is the pause.
+        let minimum = rivalStage == nil ? Self.replyPause(afterLanding: ownLanding) : Self.shortestReply
         let elapsed = clock.now - started
         if elapsed < minimum {
             try? await Task.sleep(for: minimum - elapsed)
@@ -1057,7 +1106,21 @@ final class MatchController {
             return
         }
         engineFailed = !engineAnswered
+        rivalLandsAt = ContinuousClock().now + .seconds(landingDelay(played) + Self.settleSeconds)
         moveLanded(played)
+    }
+
+    /// The least time the rival takes over a reply.
+    static let shortestReply = Duration.milliseconds(250)
+    /// How long a piece takes to cross the flat board (`PieceGlide`, the flat board's slide).
+    static let flatGlideSeconds: TimeInterval = 0.38
+    /// A beat after a piece is down before the next thing happens.
+    static let settleSeconds: TimeInterval = 0.3
+
+    /// How long the rival waits before replying to a move whose piece touches down `landing`
+    /// seconds after it was played: until that piece is down and has settled.
+    static func replyPause(afterLanding landing: TimeInterval) -> Duration {
+        max(shortestReply, .seconds(max(landing, flatGlideSeconds) + settleSeconds))
     }
 
     /// How many times the computer asks the engine for its move before playing one of its own.

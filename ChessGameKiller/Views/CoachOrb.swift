@@ -283,7 +283,8 @@ private struct OrbFace: View {
                     .font(.app(size: 24, weight: .heavy))
                     .foregroundStyle(.secondary)
             }
-        } else if let review = match.review {
+        } else if !match.gradeIsPending, let review = match.review {
+            // While the newest move waits for its grade, the last move's grade steps aside.
             Group {
                 switch review.grade.mark {
                 case .symbol(let name):
@@ -530,6 +531,16 @@ private struct CoachPanel: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(Coach.current.name) is offline").font(.app(.headline))
                     Text("The engine didn't answer. Play on: grades and hints come back when it does.")
+                        .font(.app(.subheadline)).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 4)
+            } else if match.gradeIsPending {
+                // The grade shown would be the last move's: say the new one is on its way.
+                CoachAvatar(theme: theme, size: 40)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(Coach.current.name)").font(.app(.headline))
+                    Text("Your grade is on its way.")
                         .font(.app(.subheadline)).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }

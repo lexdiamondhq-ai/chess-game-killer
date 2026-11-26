@@ -38,6 +38,9 @@ struct ExecutivePlate: View {
     /// The player's army, so a selected named piece shows its name here.
     @Environment(ArmyStore.self) private var army: ArmyStore?
 
+    /// The move count whose check has touched down (see `checkShows`).
+    @State private var checkLandedAfter: Int?
+
     private var isComputer: Bool { match.setup.opponent == .computer && !match.game.humanColors.contains(color) }
     private var isActive: Bool { !match.isOver && match.game.activeColor == color }
     private var accent: Color { theme.accent ?? .accentColor }
@@ -45,7 +48,26 @@ struct ExecutivePlate: View {
     private var glow: Color? { theme.glows && isActive ? theme.sideColor(color) : nil }
 
     var body: some View {
-        if inDock { dockLine } else { card }
+        Group {
+            if inDock { dockLine } else { card }
+        }
+        // The CHECK tag waits for the checking piece to touch down, as the callout over the
+        // king does: on the 3D board a move is news once it has landed.
+        .task(id: checkedAfter) {
+            guard let move = checkedAfter, checkLanding > 0.05 else { return }
+            try? await Task.sleep(for: .seconds(checkLanding))
+            guard !Task.isCancelled else { return }
+            checkLandedAfter = move
+        }
+    }
+
+    /// The move count of the check this side is in, for as long as it is in it.
+    private var checkedAfter: Int? { inCheck ? match.game.moveCount : nil }
+    /// Seconds from the checking move being played until its piece is down.
+    private var checkLanding: TimeInterval { match.game.lastPlayed.map { match.landingDelay($0) } ?? 0 }
+    /// The CHECK tag is up: this side is in check and the checking piece has landed.
+    private var checkShows: Bool {
+        inCheck && (checkLanding <= 0.05 || checkLandedAfter == match.game.moveCount)
     }
 
     /// A deep, quiet emerald rather than a signal green: brighter on dark looks, deeper on light.
@@ -65,7 +87,7 @@ struct ExecutivePlate: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .dynamicTypeSize(...DynamicTypeSize.xLarge)
         .animation(.snappy(duration: 0.3), value: isActive)
-        .animation(.snappy(duration: 0.3), value: inCheck)
+        .animation(.snappy(duration: 0.3), value: checkShows)
     }
 
     /// In a timed game the words keep the line's whole width and your clock sits under them,
@@ -177,7 +199,7 @@ struct ExecutivePlate: View {
         }
         .dynamicTypeSize(...DynamicTypeSize.xxLarge)
         .animation(.snappy(duration: 0.3), value: isActive)
-        .animation(.snappy(duration: 0.3), value: inCheck)
+        .animation(.snappy(duration: 0.3), value: checkShows)
         .animation(.easeInOut(duration: 0.9), value: mood)
     }
 
@@ -186,7 +208,7 @@ struct ExecutivePlate: View {
     /// your move, takes the place of the dot and the status; CHECK and the captures stay.
     private var statusRow: some View {
         HStack(spacing: 6) {
-            if inCheck {
+            if checkShows {
                 CheckTag(color: theme.check)
                     .transition(.scale.combined(with: .opacity))
             }
@@ -218,7 +240,7 @@ struct ExecutivePlate: View {
     /// CHECK and the status, or for a few seconds the coach's grade over its advice.
     private var dockWords: some View {
         HStack(spacing: 6) {
-            if inCheck {
+            if checkShows {
                 CheckTag(color: theme.check)
                     .transition(.scale.combined(with: .opacity))
             }
@@ -372,7 +394,8 @@ struct ExecutivePlate: View {
             return match.winner == nil ? "Draw" : "Lost"
         }
         if isComputer {
-            if isActive { return match.engineFailed ? "\(Coach.current.name) is offline" : "Thinking…" }
+            // Engine trouble is the coach's news (its panel says so), never the rival's own line.
+            if isActive { return "Thinking…" }
             return RivalTaunt.line(for: match.setup.level, game: match.gameID, ply: match.game.plyCount, mood: mood)
         }
         return isActive ? "Your move" : ""
