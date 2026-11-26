@@ -59,6 +59,7 @@ struct ExecutivePlate: View {
             guard !Task.isCancelled else { return }
             checkLandedAfter = move
         }
+        .onChange(of: match.game.plyCount) { _, _ in announceRivalMove() }
     }
 
     /// The move count of the check this side is in, for as long as it is in it.
@@ -276,14 +277,20 @@ struct ExecutivePlate: View {
                 }
                 .layoutPriority(1)
                 .transition(.opacity)
-            } else if let hintWords {
-                // The spotlit move in words, in the spotlight's gold.
-                Text(hintWords)
-                    .font(.app(.footnote, weight: .semibold))
-                    .foregroundStyle(theme.isDark ? HintSpotlight.gold : Color(red: 0.6, green: 0.43, blue: 0.06))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    .transition(.opacity)
+            } else if let hintWords, let hintPhrase {
+                // The spotlit move in words, in the spotlight's gold. A long one ("Knight takes
+                // the queen, check") drops the word Hint rather than ending in dots.
+                ViewThatFits(in: .horizontal) {
+                    Text(hintWords)
+                        .lineLimit(1)
+                    Text(hintPhrase)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                }
+                .font(.app(.footnote, weight: .semibold))
+                .foregroundStyle(theme.isDark ? HintSpotlight.gold : Color(red: 0.6, green: 0.43, blue: 0.06))
+                .accessibilityLabel(hintWords)
+                .transition(.opacity)
             } else if !status.isEmpty, isTaunt {
                 Text(status)
                     .rivalLetters(voice, theme: theme)
@@ -378,8 +385,24 @@ struct ExecutivePlate: View {
 
     /// With hints on, your turn's best move in words: "Hint · Knight takes the queen".
     private var hintWords: String? {
+        hintPhrase.map { "Hint · " + $0 }
+    }
+
+    /// The hinted move in words alone: "Knight takes the queen, check".
+    private var hintPhrase: String? {
         guard !isComputer, isActive, !match.isOver, let best = match.bestHint else { return nil }
-        return "Hint · " + HintWords.phrase(for: best, in: match.game)
+        return HintWords.phrase(for: best, in: match.game)
+    }
+
+    /// VoiceOver hears the rival's move as it is played: "The Hunter: Knight takes the pawn, check".
+    private func announceRivalMove() {
+        guard !inDock, isComputer, UIAccessibility.isVoiceOverRunning,
+              let played = match.game.lastPlayed, played.color == color,
+              let squares = Notation.squares(of: played.uci) else { return }
+        let mover: Piece.Kind? = played.uci.count == 5 ? .pawn : match.game.piece(at: squares.to)?.kind
+        let taken: Piece.Kind? = played.isCapture ? match.game.captureEvents.last?.piece.kind : nil
+        let words = HintWords.phrase(san: played.san, mover: mover, taken: taken)
+        AccessibilityNotification.Announcement("\(match.setup.rival.name): \(words)").post()
     }
 
     /// The status is the rival's taunt, waiting for your move.

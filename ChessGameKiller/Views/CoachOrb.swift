@@ -889,7 +889,7 @@ private struct CoachPanel: View {
                 .shadow(color: gold.opacity(theme.glows ? 0.45 : 0.2), radius: 12, y: 3)
                 .contentShape(Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ChallengePressStyle())
             .accessibilityLabel("Face \(rival.name)")
             .accessibilityHint("Plays \(rival.name.possessive) film, then starts the game")
         }
@@ -976,7 +976,7 @@ private struct CoachPanel: View {
                 .shadow(color: accent.opacity(theme.glows ? 0.5 : 0.22), radius: 12, y: 3)
                 .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ChallengePressStyle())
     }
 
     /// Rewind needs somewhere to keep the game, and a move to look back on.

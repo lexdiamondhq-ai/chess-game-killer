@@ -28,6 +28,10 @@ struct RivalCardBackdrop: View {
     let rival: Rival
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.weatherRests) private var rests
+    /// Nothing is drawn thirty times a second for a card nobody can see.
+    private var paused: Bool { reduceMotion || rests || scenePhase != .active }
 
     private var weather: RivalWeather { RivalWeather(rival.level) }
 
@@ -40,7 +44,7 @@ struct RivalCardBackdrop: View {
             // Darker on the left, where the coin and the words are.
             LinearGradient(colors: [.black.opacity(0.58), .black.opacity(0.32), .black.opacity(0.12)],
                            startPoint: .leading, endPoint: .trailing)
-            TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion)) { timeline in
+            TimelineView(.animation(minimumInterval: 1.0 / 30, paused: paused)) { timeline in
                 Canvas { context, size in
                     let time = reduceMotion ? 3.2 : timeline.date.timeIntervalSinceReferenceDate
                     WeatherPainter(weather: weather, time: time, size: size).paint(&context)
@@ -49,6 +53,18 @@ struct RivalCardBackdrop: View {
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+}
+
+private struct WeatherRestsKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    /// The screen a rival's card is on is covered by another (Settings, Rewind, Leo): its weather rests.
+    var weatherRests: Bool {
+        get { self[WeatherRestsKey.self] }
+        set { self[WeatherRestsKey.self] = newValue }
     }
 }
 

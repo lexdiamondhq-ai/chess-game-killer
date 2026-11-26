@@ -8,6 +8,7 @@ import SwiftUI
 /// Stockfish, then take the move back and find it yourself. With Premium the coach
 /// also talks through the whole game once, the board following his words (DeepReview.swift).
 struct RewindView: View {
+    @AppStorage("haptics") private var hapticsOn = true
     let theme: BoardTheme
     /// The rival of a game in progress that a rematch would cost, so the person is asked first.
     var forfeits: String?
@@ -139,7 +140,9 @@ struct RewindView: View {
             stopGhost()
             deep?.close()
         }
-        .sensoryFeedback(.selection, trigger: ply)
+        // A tick for each move the person steps to, when haptics are on; none while Leo's
+        // review is moving the board by itself.
+        .sensoryFeedback(.selection, trigger: ply) { _, _ in hapticsOn && deep == nil }
         .sheet(item: $chance) { chance in
             SecondChanceSheet(chance: chance, theme: theme) { solved in
                 if solved {
@@ -718,6 +721,7 @@ struct SecondChance: Identifiable {
 }
 
 private struct SecondChanceSheet: View {
+    @AppStorage("haptics") private var hapticsOn = true
     let chance: SecondChance
     let theme: BoardTheme
     let onFinish: (Bool) -> Void
@@ -768,7 +772,7 @@ private struct SecondChanceSheet: View {
         .screenScheme(theme)
         .tint(theme.trainingAccent)
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: solved)
-        .sensoryFeedback(.success, trigger: solved) { _, now in now }
+        .sensoryFeedback(.success, trigger: solved) { _, now in now && hapticsOn }
         .onAppear { chance.runner.begin() }
         .onDisappear { chance.runner.cancel() }
         .onChange(of: chance.runner.outcome) { _, outcome in

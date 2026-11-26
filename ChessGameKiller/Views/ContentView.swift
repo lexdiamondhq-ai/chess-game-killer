@@ -900,6 +900,7 @@ struct ContentView: View {
                 } else {
                     ExecutivePlate(match: match, theme: theme, color: topColor)
                         .frame(width: lineWidth, height: topPlateHeight)
+                        .environment(\.weatherRests, boardHidden)
                 }
             }
             Color.clear.frame(height: gap + side * headroom)

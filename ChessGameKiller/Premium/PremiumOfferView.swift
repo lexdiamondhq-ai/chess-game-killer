@@ -13,6 +13,7 @@ struct PremiumOfferView: View {
     @State private var trial = true
     /// Apple's page for the plan, for a subscriber who came here from You.
     @State private var managing = false
+    @AppStorage("haptics") private var hapticsOn = true
     private var premium: Premium { .shared }
 
     private var theme: BoardTheme { .named(themeID) }
@@ -68,6 +69,7 @@ struct PremiumOfferView: View {
         .onChange(of: premium.isPremium) { _, now in
             if now { dismiss() }
         }
+        .sensoryFeedback(.success, trigger: premium.isPremium) { _, now in now && hapticsOn }
     }
 
     /// A 44-point target with the visible circle inside it, set in from the sheet's rounded
@@ -101,7 +103,7 @@ struct PremiumOfferView: View {
                 .frame(height: 54)
                 .background(accent, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ChallengePressStyle())
     }
 
     private var plans: some View {
@@ -130,7 +132,7 @@ struct PremiumOfferView: View {
                 .frame(height: 54)
                 .background(accent, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ChallengePressStyle())
             .disabled(busy)
             if let problem = premium.problem {
                 Text(problem)
@@ -400,7 +402,7 @@ struct PremiumLimitCard: View {
                         .frame(height: 48)
                         .background(accent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ChallengePressStyle())
             }
         }
         .padding(20)

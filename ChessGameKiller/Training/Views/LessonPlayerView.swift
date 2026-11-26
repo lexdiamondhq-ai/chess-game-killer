@@ -345,6 +345,7 @@ struct LessonPlayerView: View {
 
 /// The finish card after a lesson on its own.
 struct LessonDoneCard: View {
+    @AppStorage("haptics") private var hapticsOn = true
     let lesson: Lesson
     let theme: BoardTheme
     let reward: TrainingReward
@@ -416,6 +417,6 @@ struct LessonDoneCard: View {
             .padding(24)
         }
         .onAppear { appeared = true }
-        .sensoryFeedback(.success, trigger: appeared)
+        .sensoryFeedback(.success, trigger: appeared) { _, _ in hapticsOn }
     }
 }
