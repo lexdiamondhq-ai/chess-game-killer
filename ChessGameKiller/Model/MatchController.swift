@@ -974,7 +974,8 @@ final class MatchController {
         let made = MoveReview(
             id: nextReviewID, grade: grade, played: move.san, best: best, evaluation: evaluation,
             fenBefore: move.fenBefore, fenAfter: fenAfter, playedUCI: move.uci, bestUCI: bestUCI,
-            before: before, reply: reply, origin: origin
+            before: before, reply: reply, origin: origin,
+            fenEarlier: MoveReview.earlier(in: game.positionFENs, ply: ply, fenBefore: move.fenBefore)
         )
         nextReviewID += 1
         onReview?(made, latest)

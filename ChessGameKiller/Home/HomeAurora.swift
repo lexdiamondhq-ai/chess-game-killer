@@ -1197,9 +1197,7 @@ struct HomeAuroraDNA: View {
 
     private var detail: String {
         if let style = dna.style { return style.portrait }
-        let left = max(1, ChessDNA.gamesForStyle - dna.gamesRead)
-        let games = left == 1 ? "one more game" : "\(left) more games"
-        return "Play \(games) against any rival and \(Coach.current.name) will read how you play."
+        return "\(dna.styleWait) and \(Coach.current.name) will read how you play."
     }
 
     /// The four habits two by two, each a fine gold line with a dot where you sit.

@@ -99,6 +99,14 @@ struct SavedGame: Codable, Equatable, Identifiable {
     var finalFEN: String { positions.last ?? "" }
     var moveCount: Int { (moves.count + 1) / 2 }
 
+    /// The coach's review of one of this game's moves, with the position before the
+    /// opponent's last move, so a recapture isn't praised as a free piece.
+    func review(of moment: SavedMoment) -> MoveReview {
+        var review = moment.review
+        review.fenEarlier = MoveReview.earlier(in: positions, ply: moment.ply, fenBefore: moment.fenBefore)
+        return review
+    }
+
     /// The player's moves, in order. Against a friend both sides count.
     var playerMoments: [SavedMoment] {
         moments

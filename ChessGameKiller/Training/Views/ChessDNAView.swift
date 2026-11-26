@@ -118,10 +118,7 @@ struct ChessDNAView: View {
         return parts.joined(separator: " · ")
     }
 
-    static func footnote(_ dna: ChessDNA) -> String {
-        let games = dna.gamesRead == 1 ? "1 game" : "\(dna.gamesRead) games"
-        return "Read from \(games) against the rivals and your rated puzzles. Games against friends aren't counted."
-    }
+    static func footnote(_ dna: ChessDNA) -> String { dna.basisNote }
 
     // MARK: Style
 
@@ -277,9 +274,7 @@ struct DNAStyleHeader: View {
 
     private var detail: String {
         if let style = dna.style { return style.portrait }
-        let left = max(1, ChessDNA.gamesForStyle - dna.gamesRead)
-        let games = left == 1 ? "one more game" : "\(left) more games"
-        return "Play \(games) against any rival and \(Coach.current.name) will name your style."
+        return "\(dna.styleWait) and \(Coach.current.name) will name your style."
     }
 }
 

@@ -186,6 +186,10 @@ struct ChessDNA: Equatable {
     // MARK: The profile
 
     let gamesRead: Int
+    /// The games long enough to read a style from: a quick resignation tells nothing.
+    let gamesCounted: Int
+    /// Games read that were brought in from Lichess or Chess.com.
+    let gamesImported: Int
     let puzzlesRead: Int
     /// Nil until enough games are read.
     let style: Style?
@@ -208,6 +212,23 @@ struct ChessDNA: Equatable {
 
     var leak: CoachReport.Leak? { report.leak }
     var hasStyle: Bool { style != nil }
+
+    /// The small print under the profile: which games it was read from, and which it wasn't.
+    var basisNote: String {
+        let games = gamesRead == 1 ? "1 game" : "\(gamesRead) games"
+        let from = gamesImported > 0 ? "against the rivals or brought in from online" : "against the rivals"
+        return "Read from \(games) \(from), and your rated puzzles. Games played here against friends or online aren't counted."
+    }
+
+    /// "Play one more game against any rival": what the style is still waiting for, counting
+    /// only games long enough to read, so the number goes down when a game is played out.
+    var styleWait: String {
+        let left = max(1, Self.gamesForStyle - gamesCounted)
+        let games = left == 1 ? "one more game" : "\(left) more games"
+        // Games were played but too short to read: say what counts, or the number looks stuck.
+        let long = gamesRead > gamesCounted ? " of ten moves or more" : ""
+        return "Play \(games)\(long) against any rival"
+    }
 
     /// The area that improved most, for the headline.
     var biggestImprovement: Trend? {
@@ -257,6 +278,8 @@ struct ChessDNA: Equatable {
         let openings = Self.openings(games: Array(computer), index: index)
         return ChessDNA(
             gamesRead: computer.count,
+            gamesCounted: habits.count,
+            gamesImported: computer.filter(\.isImported).count,
             puzzlesRead: puzzlesPlayed,
             style: style,
             traits: traits,
@@ -280,7 +303,8 @@ struct ChessDNA: Equatable {
         var forward = 0
         /// The player's move number when they castled, nil if they never did.
         var castledOn: Int?
-        /// Material given up for at least a move, without the engine calling it a mistake.
+        /// Material given up for at least a move, without the engine calling it a mistake,
+        /// while the game was still to be decided.
         var sacrifices = 0
         /// The queen out before move 6.
         var earlyQueen = false
@@ -297,6 +321,7 @@ struct ChessDNA: Equatable {
             length = game.moveCount
             let playerIsWhite = game.playerIsWhite
             let grades = Dictionary(game.playerMoments.map { ($0.ply, $0.moveGrade) }, uniquingKeysWith: { a, _ in a })
+            let chances = Dictionary(game.playerMoments.map { ($0.ply, $0.before) }, uniquingKeysWith: { a, _ in a })
             for (offset, san) in game.moves.enumerated() {
                 let ply = offset + 1
                 let fen = game.positions.indices.contains(offset) ? game.positions[offset] : ""
@@ -317,9 +342,13 @@ struct ChessDNA: Equatable {
                 if san.hasPrefix("Q"), number < 6 { earlyQueen = true }
                 // A sacrifice: still two points or more down after their answer and the player's
                 // next move (so not a trade halfway through), and the move wasn't a mistake.
+                // Only while the game was alive: more material going in a game already lost
+                // isn't daring, and neither is handing some back when winning by a mile.
                 let grade = grades[ply] ?? .good
                 let sound: Set<MoveReview.Grade> = [.best, .excellent, .good]
-                if sound.contains(grade), game.positions.indices.contains(offset + 3),
+                let stood = chances[ply] ?? 0
+                if sound.contains(grade), stood > Self.clearlyWorse, stood < Self.wonByAMile,
+                   game.positions.indices.contains(offset + 3),
                    let before = Self.balance(game.positions[offset], white: playerIsWhite),
                    let reply = Self.balance(game.positions[offset + 2], white: playerIsWhite),
                    let next = Self.balance(game.positions[offset + 3], white: playerIsWhite),
@@ -328,9 +357,14 @@ struct ChessDNA: Equatable {
                 }
             }
             let line = game.lifeline
-            wasWorse = line.contains { $0.value <= -0.35 }
+            wasWorse = line.contains { $0.value <= Self.clearlyWorse }
             saved = wasWorse && (game.result == .win || game.result == .draw)
         }
+
+        /// Winning chances at which the player stands clearly worse: about two pawns down.
+        static let clearlyWorse = -0.35
+        /// Winning chances at which the game is as good as won: about seven pawns up.
+        static let wonByAMile = 0.85
 
         static func whiteToMove(_ fen: String) -> Bool? {
             let fields = fen.split(separator: " ")
@@ -418,7 +452,7 @@ struct ChessDNA: Equatable {
         var found: [CoachMoment.Kind: Int] = [:]
         for game in games.prefix(CoachReport.gameLimit * 2) {
             for moment in game.playerMoments where [.best, .excellent, .checkmate].contains(moment.moveGrade) {
-                if let kind = MomentFinder.find(in: moment.review)?.kind, kind.isPraise, kind != .castled, kind != .fixedIt {
+                if let kind = MomentFinder.find(in: game.review(of: moment))?.kind, kind.isPraise, kind != .castled, kind != .fixedIt {
                     found[kind, default: 0] += 1
                 }
             }
@@ -469,8 +503,10 @@ struct ChessDNA: Equatable {
                                         weapon: Weapon(title: areaStrength(best.area), detail: detail,
                                                        symbol: best.area.symbol, theme: theme)))
         }
-        // A puzzle theme well above the player's own average.
-        if let top = puzzleStats.filter({ $0.value.attempts >= puzzlesToCount && $0.value.accuracy >= max(0.7, overall + 0.12) })
+        // A puzzle theme well above the player's own average. Only themes that name a skill:
+        // where a puzzle came from isn't one, and a tag the picker doesn't know has no name to show.
+        if let top = puzzleStats.filter({ $0.value.attempts >= puzzlesToCount && $0.value.accuracy >= max(0.7, overall + 0.12)
+                && !PuzzleTheme.named($0.key).id.isEmpty && !notSkills.contains($0.key) })
             .max(by: { $0.value.accuracy < $1.value.accuracy }),
            !candidates.contains(where: { $0.weapon.theme == top.key }) {
             let name = PuzzleTheme.named(top.key)
@@ -483,6 +519,9 @@ struct ChessDNA: Equatable {
         }
         return candidates.max { $0.weight < $1.weight }?.weapon
     }
+
+    /// Puzzle tags that say where a puzzle came from, not what it trains.
+    static let notSkills: Set<String> = ["masterVsMaster"]
 
     static func areaTheme(_ area: CoachReport.Area) -> String {
         switch area {

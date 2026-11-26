@@ -28,6 +28,17 @@ struct MoveReview: Equatable, Identifiable {
     var reply: String? = nil
     /// Where the moving piece started the game, so the army can name it.
     var origin: Square? = nil
+    /// The position before the opponent's last move, when known: it tells taking back
+    /// a piece that was just traded off from taking one that was left free.
+    var fenEarlier: String? = nil
+
+    /// The position before the opponent's last move, out of a game's positions (the one
+    /// before move 1 first). Nil when they don't line up with the move at `ply`.
+    static func earlier(in positions: [String], ply: Int, fenBefore: String?) -> String? {
+        guard ply >= 2, positions.indices.contains(ply - 1), let fenBefore,
+              positions[ply - 1].split(separator: " ").first == fenBefore.split(separator: " ").first else { return nil }
+        return positions[ply - 2]
+    }
 
     var title: String {
         switch grade {

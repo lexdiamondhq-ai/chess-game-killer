@@ -391,12 +391,13 @@ final class TrainingStoreTests: XCTestCase {
 final class CoachMomentTests: XCTestCase {
 
     private func review(_ grade: MoveReview.Grade, played: String, fen: String, best: String? = nil,
-                        before: Evaluation? = nil, after: Evaluation? = nil, reply: String? = nil) -> MoveReview {
+                        before: Evaluation? = nil, after: Evaluation? = nil, reply: String? = nil,
+                        earlier: String? = nil) -> MoveReview {
         let fenAfter = TrainingChess.fen(after: [played], from: fen)
         return MoveReview(id: 1, grade: grade, played: Notation.san(of: played, fen: fen) ?? played,
                           best: best.flatMap { Notation.san(of: $0, fen: fen) }, evaluation: after,
                           fenBefore: fen, fenAfter: fenAfter, playedUCI: played, bestUCI: best,
-                          before: before, reply: reply)
+                          before: before, reply: reply, fenEarlier: earlier)
     }
 
     func testAMissedMateIsNamed() {
@@ -432,6 +433,58 @@ final class CoachMomentTests: XCTestCase {
         let found = MomentFinder.find(in: review(.best, played: "f3h4", fen: fen, after: .centipawns(900)))
         XCTAssertEqual(found?.kind, .foundFreePiece)
         XCTAssertEqual(found?.values["piece"], "queen")
+    }
+
+    func testTakingBackATradedPieceIsNotAFreePiece() {
+        // The Exchange Ruy Lopez: 4.Bxc6 dxc6. The bishop on c6 has no defender, but it
+        // only just took a knight there: that's a trade.
+        let fen = "r1bqkbnr/1ppp1ppp/p1B5/4p3/4P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 0 4"
+        let earlier = "r1bqkbnr/1ppp1ppp/p1n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 4"
+        XCTAssertNil(MomentFinder.find(in: review(.best, played: "d7c6", fen: fen, after: .centipawns(0), earlier: earlier)))
+        // Without the position before their move there's no telling, and it reads as before.
+        XCTAssertEqual(MomentFinder.find(in: review(.best, played: "d7c6", fen: fen, after: .centipawns(0)))?.kind, .foundFreePiece)
+    }
+
+    func testTakingBackMuchMoreThanWasLostIsStillAFreePiece() {
+        // 1.e4 d5 2.exd5 Qxd5 3.Nc3 Qxg2?? 4.Bxg2: a queen for a pawn.
+        let fen = "rnb1kbnr/ppp1pppp/8/8/8/2N5/PPPP1PqP/R1BQKBNR w KQkq - 0 4"
+        let earlier = "rnb1kbnr/ppp1pppp/8/3q4/8/2N5/PPPP1PPP/R1BQKBNR b KQkq - 1 3"
+        let found = MomentFinder.find(in: review(.best, played: "f1g2", fen: fen, after: .centipawns(900), earlier: earlier))
+        XCTAssertEqual(found?.kind, .foundFreePiece)
+        XCTAssertEqual(found?.values["piece"], "queen")
+    }
+
+    func testAPinnedKnightIsAPin() {
+        // Bg5 pins the f6 knight to the queen.
+        let fen = "rnbqkb1r/pppp1ppp/4pn2/8/3P4/2N5/PPP1PPPP/R1BQKBNR w KQkq - 0 3"
+        let found = MomentFinder.find(in: review(.mistake, played: "a2a3", fen: fen, best: "c1g5",
+                                                 before: .centipawns(60), after: .centipawns(-40)))
+        XCTAssertEqual(found?.kind, .missedPin)
+        XCTAssertEqual(found?.values["piece"], "knight")
+        XCTAssertEqual(found?.values["targets"], "queen")
+    }
+
+    func testAPawnInFrontOfARookIsNotCalledAPin() {
+        // Rd1 looks down the file at a pawn with a rook behind it: nothing is pinned.
+        let fen = "3r2k1/5ppp/3p4/8/8/8/5PPP/R5K1 w - - 0 30"
+        XCTAssertNil(MomentFinder.find(in: review(.mistake, played: "h2h3", fen: fen, best: "a1d1",
+                                                  before: .centipawns(60), after: .centipawns(-40))))
+    }
+
+    func testAKingInFrontOfAQueenIsASkewer() {
+        // Re1+ and the queen behind the king falls.
+        let fen = "4q3/8/8/4k3/8/8/5PPP/R5K1 w - - 0 40"
+        let found = MomentFinder.find(in: review(.mistake, played: "h2h3", fen: fen, best: "a1e1",
+                                                 before: .centipawns(600), after: .centipawns(-400)))
+        XCTAssertEqual(found?.kind, .missedSkewer)
+        XCTAssertEqual(found?.values["targets"], "queen")
+    }
+
+    func testAPawnBehindAKnightIsNotCalledASkewer() {
+        // Re1 hits a knight with only a pawn behind it: "the pawn behind it falls" teaches nothing.
+        let fen = "4k3/4p3/8/4n3/8/8/5PPP/R5K1 w - - 0 30"
+        XCTAssertNil(MomentFinder.find(in: review(.mistake, played: "h2h3", fen: fen, best: "a1e1",
+                                                  before: .centipawns(60), after: .centipawns(-40))))
     }
 
     func testCastlingIsPraised() {

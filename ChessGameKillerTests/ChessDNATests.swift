@@ -111,6 +111,24 @@ final class ChessDNATests: XCTestCase {
         XCTAssertGreaterThan(risk, 0.5)
     }
 
+    func testMaterialGoingInALostGameIsNotASacrifice() {
+        // The same knight on f7, but with the engine saying the game was already lost
+        // before each move: that is losing more, not daring.
+        var game = Self.game(Self.friedLiver)
+        XCTAssertGreaterThanOrEqual(ChessDNA.GameHabits(game).sacrifices, 1)
+        game.moments = game.moments.map {
+            SavedMoment(ply: $0.ply, grade: $0.grade, san: $0.san, uci: $0.uci, byWhite: $0.byWhite,
+                        fenBefore: $0.fenBefore, fenAfter: $0.fenAfter, before: -0.6, after: -0.6)
+        }
+        XCTAssertEqual(ChessDNA.GameHabits(game).sacrifices, 0)
+        // Nor is giving material back when the game is as good as won.
+        game.moments = game.moments.map {
+            SavedMoment(ply: $0.ply, grade: $0.grade, san: $0.san, uci: $0.uci, byWhite: $0.byWhite,
+                        fenBefore: $0.fenBefore, fenAfter: $0.fenAfter, before: 0.95, after: 0.95)
+        }
+        XCTAssertEqual(ChessDNA.GameHabits(game).sacrifices, 0)
+    }
+
     func testQuietSafeGamesMakeABuilder() throws {
         let games = (0..<4).map { Self.game(Self.quietLondon, result: .draw, daysAgo: Double($0)) }
         let habits = ChessDNA.GameHabits(games[0])
@@ -138,7 +156,53 @@ final class ChessDNATests: XCTestCase {
         XCTAssertNil(dna.style)
     }
 
+    func testGamesTooShortToReadDontCountTowardTheStyle() {
+        // Three games given up after two moves: read, but nothing to read a style from.
+        let short = (0..<3).map { Self.game("e2e4 e7e5 g1f3 b8c6", result: .loss, daysAgo: Double($0)) }
+        let dna = ChessDNA.make(games: short)
+        XCTAssertEqual(dna.gamesRead, 3)
+        XCTAssertEqual(dna.gamesCounted, 0)
+        XCTAssertNil(dna.style)
+        // The wait used to say "one more game" for ever: three were read, so none seemed left.
+        XCTAssertEqual(dna.styleWait, "Play 3 more games of ten moves or more against any rival")
+
+        let two = ChessDNA.make(games: (0..<2).map { Self.game(Self.quietLondon, daysAgo: Double($0)) })
+        XCTAssertEqual(two.gamesCounted, 2)
+        XCTAssertEqual(two.styleWait, "Play one more game against any rival")
+    }
+
+    func testTheFootnoteSaysWhereTheGamesCameFrom() {
+        var imported = Self.game(Self.quietLondon, daysAgo: 1, level: nil)
+        imported.source = "lichess"
+        let rivals = ChessDNA.make(games: [Self.game(Self.quietLondon)])
+        let both = ChessDNA.make(games: [Self.game(Self.quietLondon), imported])
+        XCTAssertEqual(both.gamesRead, 2)
+        XCTAssertEqual(both.gamesImported, 1)
+        XCTAssertFalse(rivals.basisNote.contains("brought in"))
+        XCTAssertTrue(both.basisNote.hasPrefix("Read from 2 games against the rivals or brought in from online"), both.basisNote)
+        XCTAssertTrue(both.basisNote.contains("friends or online aren't counted"))
+    }
+
     // MARK: Weapon
+
+    func testATradeIsNotCountedAsAFreePieceTaken() throws {
+        // The Exchange Ruy Lopez as Black, four times: 4...dxc6 takes back a bishop that
+        // just took a knight. That used to count as four free pieces and make the weapon.
+        let line = "e2e4 e7e5 g1f3 b8c6 f1b5 a7a6 b5c6 d7c6"
+        let games = (0..<4).map { Self.game(line, white: false, daysAgo: Double($0), grades: [8: .best]) }
+        let moment = try XCTUnwrap(games[0].playerMoments.last)
+        XCTAssertEqual(MomentFinder.find(in: moment.review)?.kind, .foundFreePiece)
+        XCTAssertNil(MomentFinder.find(in: games[0].review(of: moment)))
+        XCTAssertNotEqual(ChessDNA.make(games: games).weapon?.title, "Punishing loose pieces")
+    }
+
+    func testWhereAPuzzleCameFromIsNotAWeapon() throws {
+        // "From master games" says where a puzzle is from, not what the player is good at.
+        let stats = ["masterVsMaster": ThemeRecord(attempts: 20, clean: 20), "fork": ThemeRecord(attempts: 20, clean: 19),
+                     "pin": ThemeRecord(attempts: 40, clean: 10)]
+        let weapon = try XCTUnwrap(ChessDNA.make(games: [], puzzleStats: stats).weapon)
+        XCTAssertEqual(weapon.theme, "fork")
+    }
 
     func testAPuzzleThemeWellAboveAverageIsTheWeapon() throws {
         let stats = ["fork": ThemeRecord(attempts: 20, clean: 18), "pin": ThemeRecord(attempts: 20, clean: 8)]
