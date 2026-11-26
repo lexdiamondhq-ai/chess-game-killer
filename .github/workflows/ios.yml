@@ -45,7 +45,7 @@ on:
         type: boolean
         default: false
       polish:
-        description: PREVIEW ONLY. Picture the polish looks on the simulator instead of running the tests
+        description: PREVIEW ONLY. Picture the polished app on the simulator instead of running the tests
         type: boolean
         default: false
 
@@ -343,8 +343,8 @@ jobs:
           done < mine.txt
 
   polish-shots:
-    # PREVIEW ONLY (comes out before this merges): the app's polish looks, Now / Gentle / Rich /
-    # Bold, on real screens. One build, then each screen launched once per look (`-polish`).
+    # PREVIEW ONLY (comes out before this merges): the polished app on real screens, in Dark,
+    # Light and Middle. One build, then each screen launched once.
     # macos-26 shows Liquid Glass, as on Alex's phone; macos-15 the frosted glass before it.
     if: github.event_name == 'workflow_dispatch' && inputs.polish
     runs-on: ${{ matrix.os }}
@@ -389,7 +389,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO > build.log 2>&1 || status=$?
           grep -E "error:|\*\* " build.log | sort -u | head -60 || true
           exit $status
-      - name: Picture each look
+      - name: Picture each screen
         run: |
           UDID="${{ steps.sim.outputs.udid }}"
           APP=$(find dd/Build/Products -type d -name ChessGameKiller.app | head -1)
@@ -402,32 +402,40 @@ jobs:
           BUNDLE=com.chessgamekiller.app
           snap() {
             name=$1; wait=$2; shift 2
-            for level in off gentle rich bold; do
-              xcrun simctl terminate "$UDID" $BUNDLE 2>/dev/null || true
-              xcrun simctl launch "$UDID" $BUNDLE -polish $level -welcomeSeen YES -tipsOff YES -introFilmSeen YES "$@" >/dev/null || { echo "Could not launch $name"; continue; }
-              sleep "$wait"
-              xcrun simctl io "$UDID" screenshot "shots/$name-$level.png" >/dev/null && echo "$name-$level.png" || echo "No screenshot for $name-$level"
-            done
+            xcrun simctl terminate "$UDID" $BUNDLE 2>/dev/null || true
+            xcrun simctl launch "$UDID" $BUNDLE -welcomeSeen YES -tipsOff YES -introFilmSeen YES "$@" >/dev/null || { echo "Could not launch $name"; return 0; }
+            sleep "$wait"
+            xcrun simctl io "$UDID" screenshot "shots/$name.png" >/dev/null && echo "$name.png" || echo "No screenshot for $name"
           }
-          # The first launch after an install is slow; this one is thrown away.
+          # The first launch after an install is slow, and so is the first 3D board; these are thrown away.
           xcrun simctl launch "$UDID" $BUNDLE -welcomeSeen YES -tipsOff YES -introFilmSeen YES >/dev/null || true
           sleep 20
-          snap home-dark 9 -homeTone dark
-          snap home-light 9 -homeTone light
-          snap today-dark 10 -homeTone dark -showcaseHomeAt today
-          snap today-light 10 -homeTone light -showcaseHomeAt today
-          snap ladder-dark 10 -homeTone dark -showcaseHomeAt ladder
-          snap friends-dark 10 -homeTone dark -showcaseGames YES -showcaseHomeAt friends
-          snap game-3d 11 -showcase game -showcaseLook gilded -showcase3D YES
+          snap warm-up 14 -showcase game -showcaseLook gilded -showcase3D YES
+          rm -f shots/warm-up.png
+          # A game, on the looks the finish has to sit well on.
+          snap game-3d 14 -showcase game -showcaseLook gilded -showcase3D YES
+          snap game-flat 11 -showcase game -showcaseLook gilded -showcase3D NO
           snap game-coach 11 -showcase game -showcaseLook gilded -showcase3D NO -showcaseCoach open
-          snap learn-dark 9 -homeTone dark -showcaseOpen learn
-          snap learn-light 9 -homeTone light -showcaseOpen learn
-          snap settings-dark 9 -homeTone dark -showcaseOpen settings
-          snap newgame-dark 9 -homeTone dark -showcaseOpen newgame
-          snap analyze-dark 9 -homeTone dark -showcaseOpen analyze
-          snap analyze-light 9 -homeTone light -showcaseOpen analyze
-          snap rooms-dark 9 -homeTone dark -showcaseShortcuts YES
-          snap you-dark 9 -homeTone dark -showcaseYou YES
+          snap game-neon 11 -showcase game -showcaseLook neon
+          snap game-classic 11 -showcase game -showcaseLook classic
+          snap game-faberge 11 -showcase game -showcaseLook faberge
+          snap game-midnight 11 -showcase game -showcaseLook midnight -showcase3D NO
+          # The game shots leave their look behind; the home and its sheets are on the gilded one.
+          snap warm-up 11 -showcase game -showcaseLook gilded -showcase3D YES
+          rm -f shots/warm-up.png
+          for tone in dark light middle; do
+            snap home-$tone 9 -homeTone $tone
+          done
+          for tone in dark light; do
+            snap friends-$tone 10 -homeTone $tone -showcaseGames YES -showcaseHomeAt friends
+            snap ladder-$tone 10 -homeTone $tone -showcaseHomeAt ladder
+            snap rooms-$tone 9 -homeTone $tone -showcaseShortcuts YES
+            snap you-$tone 9 -homeTone $tone -showcaseYou YES
+            snap daily-$tone 10 -homeTone $tone -showcaseDaily YES
+            for screen in learn settings newgame analyze puzzles army games premium; do
+              snap $screen-$tone 9 -homeTone $tone -showcaseOpen $screen
+            done
+          done
           xcrun simctl terminate "$UDID" $BUNDLE 2>/dev/null || true
           ls shots | wc -l
       - name: Upload the pictures
@@ -445,7 +453,7 @@ jobs:
           path: build.log
 
   polish-pictures:
-    # PREVIEW ONLY: prints each look's pictures in a Linux job's log, as the pictures jobs do.
+    # PREVIEW ONLY: prints the pictures in a Linux job's log, as the pictures jobs do.
     if: always() && github.event_name == 'workflow_dispatch' && inputs.polish
     needs: polish-shots
     runs-on: ubuntu-latest
@@ -454,17 +462,19 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-26, macos-15]
-        level: [off, gentle, rich, bold]
+        part: [1, 2]
     steps:
       - uses: actions/download-artifact@v4
         with:
           name: polish-${{ matrix.os }}
           path: shots
-      - name: Print this look's pictures
+      - name: Print this half of the pictures
         run: |
           command -v convert >/dev/null || { sudo apt-get update -qq; sudo apt-get install -y -qq imagemagick; }
-          ls shots/*-${{ matrix.level }}.png | sort > mine.txt
-          echo "${{ matrix.os }} ${{ matrix.level }}: $(wc -l < mine.txt) pictures"
+          ls shots/*.png | sort > all.txt
+          half=$(( ($(wc -l < all.txt) + 1) / 2 ))
+          if [ "${{ matrix.part }}" = "1" ]; then head -n "$half" all.txt > mine.txt; else tail -n +"$((half + 1))" all.txt > mine.txt; fi
+          echo "${{ matrix.os }} part ${{ matrix.part }}: $(wc -l < mine.txt) pictures"
           while read -r f; do
             convert "$f" -resize x1500 -quality 78 /tmp/small.jpg
             echo "BEGIN-SCREEN $(basename "$f")"

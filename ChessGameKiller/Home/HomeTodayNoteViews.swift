@@ -48,7 +48,7 @@ struct HomeAuroraTodayCard: View {
             .padding(14)
             .frame(maxWidth: .infinity)
             // A warm gold light from the frame's corner.
-            .auroraCard(shape, palette: palette, gold: 0.32, lit: lit, glow: palette.gold)
+            .auroraCard(shape, palette: palette, lit: lit, glow: palette.gold)
             .contentShape(shape)
         }
         .buttonStyle(HomeStagePress())
@@ -87,14 +87,14 @@ struct HomeAuroraTodayCard: View {
             if solid {
                 Capsule().fill(HomeAuroraPalette.goldButton)
                     .overlay(Capsule().strokeBorder(Color.white.opacity(0.35), lineWidth: 0.75))
-                    .shadow(color: palette.gold.opacity(Polish.pick(0, 0, 0.3, 0.5)), radius: 8, y: 3)
+                    .shadow(color: palette.gold.opacity(0.3), radius: 8, y: 3)
             }
         }
-        .overlay { if !solid { Capsule().strokeBorder(palette.gold.opacity(Polish.pick(0.45, 0.55, 0.7, 0.85)), lineWidth: 1) } }
+        .overlay { if !solid { Capsule().strokeBorder(palette.gold.opacity(0.7), lineWidth: 1) } }
     }
 
-    /// The card's one button is solid gold on the richer finishes, until the day's move is played.
-    private var solid: Bool { Polish.level >= .rich && symbol == "play.fill" }
+    /// The card's one button is solid gold, until the day's move is played.
+    private var solid: Bool { symbol == "play.fill" }
 }
 
 /// Your finest move of the week as one of today's rows, the size of Puzzles: the framed move at

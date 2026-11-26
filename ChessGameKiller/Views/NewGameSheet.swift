@@ -249,13 +249,7 @@ struct NewGameSheet: View {
             let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
             shape
                 .fill(theme.screenIsDark ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)))
-                .overlay {
-                    if Polish.level == .off {
-                        shape.strokeBorder(Color.primary.opacity(theme.screenIsDark ? 0.12 : 0.08), lineWidth: 1)
-                    } else {
-                        PolishedEdge(shape: shape, edge: .card, dark: theme.screenIsDark)
-                    }
-                }
+                .overlay { PolishedEdge(shape: shape, edge: .card, dark: theme.screenIsDark) }
                 .shadow(color: .black.opacity(theme.screenIsDark ? 0.3 : 0.08), radius: 16, y: 6)
         }
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -660,9 +654,8 @@ private struct RivalCard: View {
             shape
                 .fill(theme.screenIsDark ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)))
                 .overlay {
-                    if isSelected || Polish.level == .off {
-                        shape.strokeBorder(isSelected ? rival.hue : Color.primary.opacity(theme.screenIsDark ? 0.12 : 0.08),
-                                           lineWidth: isSelected ? 1.5 : 1)
+                    if isSelected {
+                        shape.strokeBorder(rival.hue, lineWidth: 1.5)
                     } else {
                         PolishedEdge(shape: shape, edge: .card, dark: theme.screenIsDark)
                     }

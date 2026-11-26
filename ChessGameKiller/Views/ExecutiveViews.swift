@@ -147,20 +147,11 @@ struct ExecutivePlate: View {
         }
         .glassPane(shape)
         .overlay {
-            // Whose move it is: a fine edge of the look's gold, as the Home lights the next rung.
+            // Whose move it is. Every pane has a gilded edge, so the side to move wears the
+            // bright one.
             if glow == nil, isActive {
-                if Polish.level == .off {
-                    shape.strokeBorder(
-                        LinearGradient(colors: [accent.opacity(0.7), accent.opacity(0.18), accent.opacity(0.45)],
-                                       startPoint: .topLeading, endPoint: .bottomTrailing),
-                        lineWidth: 1
-                    )
+                PolishedEdge(shape: shape, edge: .lit)
                     .transition(.opacity)
-                } else {
-                    // Every pane has a gilded edge now, so the side to move wears the bright one.
-                    PolishedEdge(shape: shape, edge: .lit)
-                        .transition(.opacity)
-                }
             }
         }
         .overlay {
