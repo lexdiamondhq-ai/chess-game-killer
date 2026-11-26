@@ -813,9 +813,9 @@ struct ChessDNA: Equatable {
     }
 
     /// One opening for each color: the player's own when it scores well, otherwise one that
-    /// fits their style (unless that's one going badly for them).
+    /// fits their style (unless that's one going badly for them). Their own needs no style;
+    /// one that fits the style waits until the style has a name.
     static func picks(style: Style?, openings: [OpeningRecord], index: OpeningIndex) -> [OpeningPick] {
-        guard let style else { return [] }
         var picks: [OpeningPick] = []
         for white in [true, false] {
             let mine = openings.filter { $0.playerIsWhite == white }
@@ -826,6 +826,7 @@ struct ChessDNA: Equatable {
                                          isTheirs: true))
                 continue
             }
+            guard let style else { continue }
             let name = white ? style.openings.white : style.openings.black
             guard let line = index.line(named: name) else { continue }
             if let record = mine.first(where: { $0.family == line.family }), record.games >= 3, record.score < 0.4 {

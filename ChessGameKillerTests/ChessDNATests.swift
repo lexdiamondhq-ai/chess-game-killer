@@ -83,9 +83,18 @@ final class ChessDNATests: XCTestCase {
         let pick = try XCTUnwrap(dna.picks.first { $0.playerIsWhite })
         XCTAssertTrue(pick.isTheirs)
         XCTAssertEqual(pick.line.family, "Italian Game")
-        // For Black there's nothing of theirs yet, so the pick fits the style.
-        let black = try XCTUnwrap(dna.picks.first { !$0.playerIsWhite })
+        // For Black there's nothing of theirs yet, and an opening that fits the style waits
+        // until the style has a name: four games are too few for one.
+        XCTAssertNil(dna.style)
+        XCTAssertEqual(dna.picks.count, 1)
+
+        // Eight games name the style, and Black gets the opening made for it.
+        let named = ChessDNA.make(games: (0..<8).map { Self.game(Self.friedLiver, daysAgo: Double($0)) })
+        XCTAssertEqual(named.style, .attacker)
+        XCTAssertEqual(named.picks.first { $0.playerIsWhite }?.isTheirs, true)
+        let black = try XCTUnwrap(named.picks.first { !$0.playerIsWhite })
         XCTAssertFalse(black.isTheirs)
+        XCTAssertEqual(black.line.name, "Sicilian Defense: Dragon Variation")
     }
 
     func testAnOpeningThatKeepsScoringIsSomethingThePlayerIsGoodAt() throws {
@@ -124,7 +133,9 @@ final class ChessDNATests: XCTestCase {
         XCTAssertNil(dna.styleNote)
         XCTAssertTrue(dna.traits.allSatisfy { $0.value == nil })
         XCTAssertTrue(dna.traits.allSatisfy { $0.word == "Not enough yet" && $0.comparison == "Not enough yet" })
-        XCTAssertTrue(dna.picks.isEmpty)
+        // No opening is "made for" a style with no name. The one that keeps winning is still theirs to learn.
+        XCTAssertEqual(dna.picks.map(\.isTheirs), [true])
+        XCTAssertEqual(dna.picks.first?.line.family, "Italian Game")
     }
 
     func testChecksCapturesAndASacrificeMakeAnAttacker() throws {
