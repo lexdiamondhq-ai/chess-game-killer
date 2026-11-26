@@ -166,7 +166,8 @@ struct ChallengeComposerView: View {
         if typed.count >= 2 {
             VStack(spacing: 0) {
                 if friends.results.isEmpty, !friends.isSearching {
-                    Text("Nobody by that name yet. Send them a link instead.")
+                    Text(friends.searchFailed ? "Can't search right now. Check your connection."
+                                              : "Nobody by that name yet. Send them a link instead.")
                         .font(theme.challengeFont(14))
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)

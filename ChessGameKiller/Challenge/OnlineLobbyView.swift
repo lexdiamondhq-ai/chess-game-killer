@@ -155,7 +155,7 @@ struct OnlineLobbyView: View {
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                OnlineSearchingBar(clock: waitingClock, days: waitingDays, since: since, theme: theme) {
+                OnlineSearchingBar(clock: waitingClock, days: waitingDays, since: since, offline: lobby.isOffline, theme: theme) {
                     Task { await lobby.cancel() }
                 }
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
@@ -248,23 +248,32 @@ struct OnlineSearchingBar: View {
     /// A daily game's days per move.
     var days: Int?
     let since: Date
+    /// The lobby can't be reached: say so, and stop counting as if the search were going on.
+    var offline = false
     let theme: BoardTheme
     let cancel: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
-            OnlineLiveDot(theme: theme, size: 10)
+            OnlineLiveDot(theme: theme, size: 10, live: !offline)
                 .padding(.leading, 6)
             VStack(alignment: .leading, spacing: 1) {
-                Text("Finding an opponent · \(days.map(DailyDays.label) ?? clock?.label ?? "No clock")")
+                Text(offline ? "Connection lost"
+                             : "Finding an opponent · \(days.map(DailyDays.label) ?? clock?.label ?? "No clock")")
                     .font(theme.challengeFont(15, .semibold))
                     .lineLimit(1)
-                TimelineView(.periodic(from: since, by: 1)) { context in
-                    let seconds = max(0, Int(context.date.timeIntervalSince(since)))
-                    Text(days == nil ? "You're in the lobby · \(seconds / 60):\(String(format: "%02d", seconds % 60))"
-                                     : "Posted for a week · \(Self.posted(seconds))")
-                        .font(theme.challengeFont(12.5).monospacedDigit())
+                if offline {
+                    Text("Still trying to reach the lobby…")
+                        .font(theme.challengeFont(12.5))
                         .foregroundStyle(.secondary)
+                } else {
+                    TimelineView(.periodic(from: since, by: 1)) { context in
+                        let seconds = max(0, Int(context.date.timeIntervalSince(since)))
+                        Text(days == nil ? "You're in the lobby · \(seconds / 60):\(String(format: "%02d", seconds % 60))"
+                                         : "Posted for a week · \(Self.posted(seconds))")
+                            .font(theme.challengeFont(12.5).monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -369,19 +378,22 @@ struct OnlineDaysStepper: View {
 struct OnlineLiveDot: View {
     let theme: BoardTheme
     var size: CGFloat = 7
+    /// False while the connection is down: the dot greys and stops breathing.
+    var live = true
 
     @State private var breathe = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Circle()
-            .fill(theme.challengeAccent)
+            .fill(live ? theme.challengeAccent : Color.secondary)
             .frame(width: size, height: size)
             .background {
                 Circle()
                     .fill(theme.challengeAccent.opacity(0.35))
                     .scaleEffect(breathe ? 2.4 : 1)
                     .opacity(breathe ? 0 : 1)
+                    .opacity(live ? 1 : 0)
             }
             .onAppear {
                 guard !reduceMotion else { return }

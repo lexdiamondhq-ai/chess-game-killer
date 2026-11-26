@@ -212,7 +212,7 @@ final class FamousGamePlayer {
     func stepForward(sound: Bool = true) -> Bool {
         guard !finished else { return false }
         board.playEngineMove(game.moves[index])
-        if sound { SoundPlayer.shared.play(.move) }
+        if sound { MoveSound.play(in: board) }
         let played = index
         index += 1
         if let line = FamousGameStory.line(for: game, at: played) {

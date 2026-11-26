@@ -151,6 +151,8 @@ final class FriendDirectory {
     /// Players matching what's typed in the find box.
     private(set) var results: [FriendPerson] = []
     private(set) var isSearching = false
+    /// The last search never reached the server: the screen says so, not "nobody by that name".
+    private(set) var searchFailed = false
     /// Challenges sent to this player by username, newest first.
     private(set) var inbox: [FriendInviteNote] = []
 
@@ -253,6 +255,7 @@ final class FriendDirectory {
         guard let api, query.count >= 2 else {
             results = []
             isSearching = false
+            searchFailed = false
             return
         }
         isSearching = true
@@ -260,9 +263,10 @@ final class FriendDirectory {
         searchTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(250))
             guard !Task.isCancelled else { return }
-            let found = (try? await api.search(player: player, query: query)) ?? []
+            let found = try? await api.search(player: player, query: query)
             guard !Task.isCancelled, let self else { return }
-            self.results = found
+            self.results = found ?? []
+            self.searchFailed = found == nil
             self.isSearching = false
         }
     }
@@ -271,6 +275,7 @@ final class FriendDirectory {
         searchTask?.cancel()
         results = []
         isSearching = false
+        searchFailed = false
     }
 
     /// Sends a waiting game to someone. Answers why not, or nil once it's on its way.

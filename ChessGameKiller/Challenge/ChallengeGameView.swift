@@ -17,6 +17,8 @@ struct ChallengeGameView: View {
     @AppStorage("haptics") private var hapticsOn = true
     @State private var confirming: Confirmation?
     @State private var copied = false
+    /// "Try again" on a game that would not open is fetching it now.
+    @State private var retrying = false
 
     enum Confirmation: Identifiable {
         case resign, abort, leave, cancelChallenge, reportName, reportCheating
@@ -42,8 +44,12 @@ struct ChallengeGameView: View {
             }
             .sensoryFeedback(.warning, trigger: game.toast?.id, condition: warningBuzz)
             .sensoryFeedback(.success, trigger: game.phase, condition: joinedBuzz)
+            .sensoryFeedback(.impact(weight: .medium), trigger: game.drawOfferedToMe, condition: drawOfferBuzz)
             .animation(.snappy(duration: 0.35), value: game.phase)
             .onAppear { game.refreshIdleTimer() }
+            .onChange(of: BoardView.playsIn3D(theme, setting: sculpted3D), initial: true) { _, threeD in
+                game.timeSounds(threeD: threeD)
+            }
     }
 
     private var screen: some View {
@@ -72,6 +78,11 @@ struct ChallengeGameView: View {
     private func warningBuzz(_ old: Int?, _ new: Int?) -> Bool {
         guard hapticsOn, let toast = game.toast else { return false }
         return toast.isWarning
+    }
+
+    /// A tap on the wrist when the other side offers a draw.
+    private func drawOfferBuzz(_ old: Bool, _ new: Bool) -> Bool {
+        hapticsOn && new
     }
 
     /// A success buzz the moment the friend joins.
@@ -143,11 +154,23 @@ struct ChallengeGameView: View {
                     .font(theme.challengeFont(16, .medium))
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
-                Button("Try again") {
-                    Task { await game.refresh() }
+                Button {
+                    guard !retrying else { return }
+                    retrying = true
+                    Task {
+                        await game.refresh()
+                        retrying = false
+                    }
+                } label: {
+                    if retrying {
+                        ProgressView()
+                    } else {
+                        Text("Try again")
+                    }
                 }
                 .buttonStyle(ChallengeButtonStyle(kind: .glass, theme: theme, height: 46))
                 .frame(maxWidth: 220)
+                .disabled(retrying)
             } else {
                 ProgressView()
                     .controlSize(.large)
@@ -907,6 +930,7 @@ struct FriendPlate: View {
             if result.winner == seat { return "Winner" }
             return result.winner == nil ? "Draw" : "Lost"
         }
+        if isMe, game.phase == .playing, game.isSendingSlowly { return "Sending your move…" }
         if inCheck { return isMe ? "Your king is in check" : "King in check" }
         if isActive { return isMe ? "Your move" : "To move" }
         if !isMe, game.phase == .playing, !game.isOnline(seat) { return "Offline" }
@@ -1043,6 +1067,7 @@ struct FriendDaysBox: View {
 private struct WaitingDot: View {
     let color: Color
     @State private var breathing = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Circle()
@@ -1055,6 +1080,7 @@ private struct WaitingDot: View {
                     .opacity(breathing ? 0 : 1)
             }
             .onAppear {
+                guard !reduceMotion else { return }
                 withAnimation(.easeOut(duration: 1.6).repeatForever(autoreverses: false)) { breathing = true }
             }
             .accessibilityHidden(true)

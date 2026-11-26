@@ -258,6 +258,10 @@ final class OnlineLobby {
     private(set) var problem: String?
     /// Loaded the list at least once.
     private(set) var hasLoaded = false
+    /// Checks of the lobby that failed in a row. Two, and the screen says the connection is lost
+    /// rather than counting up as if it were still looking.
+    private(set) var misses = 0
+    var isOffline: Bool { misses >= 2 }
     /// The player being taken on, while that is under way.
     private(set) var challenging: String?
 
@@ -358,8 +362,10 @@ final class OnlineLobby {
             players = list.players
             waiting = list.waiting
             hasLoaded = true
+            misses = 0
             if problem == ChallengeError.unreachable.message { problem = nil }
         } catch let error as ChallengeError {
+            misses += 1
             if !hasLoaded { problem = error.message }
         } catch {}
     }

@@ -79,6 +79,12 @@ final class OnlineGame {
     /// What the player has reported about the friend in this game.
     private(set) var reported: Set<ChallengeAction> = []
     private(set) var pending: PendingMove? = nil
+    /// The place in the game of a pending move that has been on its way for a while (a weak signal):
+    /// the screen says so, and the player's clock runs again, as it does on the server.
+    private var slowPly: Int? = nil
+    /// How long a move may travel before the screen says "Sending…".
+    private static let slowAfter: Duration = .milliseconds(1500)
+    var isSendingSlowly: Bool { pending != nil && pending?.ply == slowPly }
     /// The player's move on the board, waiting for their ✓ on the gold Play bar (Confirm moves).
     /// Nothing is sent until they confirm: their clock runs on meanwhile.
     private(set) var held: PendingMove? = nil
@@ -219,14 +225,17 @@ final class OnlineGame {
     func timeLeft(for seat: FriendSeat, at instant: ContinuousClock.Instant = .now) -> Double? {
         guard let clocks = state?.clocks else { return nil }
         var now = serverNow(at: instant)
-        // The player's clock stops when they move, not when the server hears of it.
-        if let pending, seat == self.seat, clocks.running == seat { now = min(now, pending.at) }
+        // The player's clock stops when they move, not when the server hears of it. A move that is
+        // slow to arrive starts it again from where it stopped: the server is still counting.
+        if let pending, seat == self.seat, clocks.running == seat {
+            now = isSendingSlowly ? max(pending.at, now - 1500) : min(now, pending.at)
+        }
         return FriendClockMath.remaining(clocks, for: seat, serverNow: now)
     }
 
     func isClockRunning(for seat: FriendSeat) -> Bool {
         guard phase == .playing, state?.clocks?.running == seat else { return false }
-        return !(seat == self.seat && pending != nil)
+        return !(seat == self.seat && pending != nil && !isSendingSlowly)
     }
 
     /// Whole seconds before the other side may claim the win from `seat`; nil when it isn't away.
@@ -612,9 +621,15 @@ final class OnlineGame {
 
     private func dispatch(_ move: PendingMove) {
         pending = move
+        slowPly = nil
         moveTask?.cancel()
         moveTask = Task { [weak self] in
             await self?.send(move)
+        }
+        Task { [weak self] in
+            try? await Task.sleep(for: Self.slowAfter)
+            guard let self, self.pending == move else { return }
+            self.slowPly = move.ply
         }
     }
 
@@ -781,19 +796,37 @@ final class OnlineGame {
         boardBase = server.count
     }
 
+    /// The other player's move is heard when it is seen, as a rival's is: on the 3D board when
+    /// the piece touches down, and the end of the game once the mated king has fallen. Check is
+    /// the bigger news, so it wins over a capture.
     private func playSound(for played: PlayedMove) {
         guard let sounds else { return }
         let game = match.game
+        let landing = match.landingDelay(played)
         if game.isGameOver {
-            sounds.play(game.winner == nil ? .gameOver : game.winner == seat.color ? .victory : .defeat)
-        } else if played.isCapture {
-            sounds.play(.capture)
+            sounds.play(game.winner == nil ? .gameOver : game.winner == seat.color ? .victory : .defeat,
+                        after: game.isCheckmate ? match.finaleDelay(played) : landing + 0.35)
         } else if played.givesCheck {
-            sounds.play(.check)
+            sounds.play(.check, after: landing)
+        } else if played.isCapture {
+            sounds.play(.capture, after: landing)
         } else if played.isCastle {
-            sounds.play(.castle)
+            sounds.play(.castle, after: landing)
         } else {
-            sounds.play(.move)
+            sounds.play(.move, after: landing)
+        }
+    }
+
+    /// Tells the game which board it is drawn on, so its sounds land with its pieces: the 3D
+    /// board's pieces take a moment to touch down, the flat board's slide is short.
+    func timeSounds(threeD: Bool) {
+        if threeD {
+            let game = match.game
+            match.landingDelay = { move in SculptedBoardScene.landingDelay(for: move, in: game) }
+            match.finaleDelay = { move in SculptedBoardScene.finaleDelay(for: move, in: game) }
+        } else {
+            match.landingDelay = { _ in 0 }
+            match.finaleDelay = { _ in 0.4 }
         }
     }
 
