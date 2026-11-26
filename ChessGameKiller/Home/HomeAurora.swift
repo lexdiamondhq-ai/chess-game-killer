@@ -108,8 +108,9 @@ struct HomeAuroraView: View {
     @State private var rivalShown: MatchController.Level?
     /// The card in front under For today, as you swipe through your games and Today's Move.
     @State private var todayShown: String?
-    /// How far the bottom bar has faded, 0 to 1: it goes as you scroll down, comes back up.
-    @State private var barHidden: CGFloat = 0
+    /// How far the bottom bar has folded in, 0 to 1: it squeezes in as you scroll down and
+    /// opens back out as you scroll up (Alex picked C, 2026-11-26).
+    @State private var barFolded: CGFloat = 0
     /// Counts the taps on Today, each of which scrolls the page back to its top.
     @State private var toTop = 0
     /// The gold knight's ironwork menu is out, and where the knight sits for its branches.
@@ -166,7 +167,7 @@ struct HomeAuroraView: View {
                                 .onGeometryChange(for: CGFloat.self) { proxy in
                                     -proxy.frame(in: .scrollView).minY
                                 } action: { value in
-                                    hideBar(from: pulled, to: value,
+                                    foldBar(from: pulled, to: value,
                                             tuckStart: boardHeight + 18 - headerHeight - 6)
                                     pulled = value
                                 }
@@ -210,8 +211,9 @@ struct HomeAuroraView: View {
                     HomeAuroraTabBar(palette: palette, analyze: actions.stage.analyze, today: { toTop += 1 },
                                      learn: actions.stage.learn, rooms: actions.stage.rooms, you: actions.stage.you,
                                      play: openKnightMenu,
-                                     knightAt: { knightCenter = $0 })
-                        .padding(.horizontal, 16)
+                                     knightAt: { knightCenter = $0 }, fold: barFolded)
+                        // Both ends come in toward the middle, like an accordion closing.
+                        .padding(.horizontal, 16 + geo.size.width * 0.07 * barFolded)
                         .padding(.bottom, 8)
                         .background(alignment: .bottom) {
                             // The cards fade into the room before they reach the bar, so nothing
@@ -224,14 +226,12 @@ struct HomeAuroraView: View {
                                 .ignoresSafeArea(edges: .bottom)
                                 .allowsHitTesting(false)
                         }
-                        // The bar fades as you read down the page, from where the header
-                        // tucks away, and is back the moment you scroll up (Alex, 2026-11-09:
-                        // "slowly disappear as you are scrolling down, about the same time as
-                        // the top area"; "it reappears as soon as you start to scroll up").
-                        .opacity(1 - Double(barHidden))
-                        .offset(y: reduceMotion ? 0 : 18 * barHidden)
-                        .allowsHitTesting(barHidden < 0.5)
-                        .accessibilityHidden(barHidden >= 1)
+                        // The bar no longer vanishes as you read down the page (Alex,
+                        // 2026-11-26: "instead of disappearing, let's just have it get smaller,
+                        // go from out to in, like an accordion"). From where the header tucks
+                        // away it folds in to about 85 percent, words and all, following your
+                        // finger, and opens back out the moment you scroll up. Every button
+                        // stays there and tappable the whole time.
                 }
                 // Holding the gold knight grows gilded branches out to four doors (Alex, 2026-11-14).
                 if knightMenuOpen, let knightCenter {
@@ -251,24 +251,27 @@ struct HomeAuroraView: View {
             boardFrame = nil
         }
         .task(id: "\(reduceMotion)-\(stage.masterpiece?.game.id ?? "")") { await playThrough() }
-        // A scroll that stops partway would leave the bar ghosted, and deaf to taps past half:
-        // once the fade has rested a moment it settles fully on or fully off.
-        .task(id: barHidden) {
-            guard barHidden > 0, barHidden < 1 else { return }
+        // A scroll that stops partway would leave the bar half folded: once it has rested a
+        // moment it settles fully open or fully folded.
+        .task(id: barFolded) {
+            guard barFolded > 0, barFolded < 1 else { return }
             try? await Task.sleep(for: .milliseconds(220))
             guard !Task.isCancelled else { return }
-            withAnimation(.easeOut(duration: 0.25)) { barHidden = barHidden < 0.5 ? 0 : 1 }
+            withAnimation(Self.barSettle) { barFolded = barFolded < 0.5 ? 0 : 1 }
         }
     }
 
-    /// Scrolling down past where the header tucks away fades the bar over about 80 points;
-    /// any scroll up, or a return above that point, brings it straight back.
-    private func hideBar(from old: CGFloat, to new: CGFloat, tuckStart: CGFloat) {
+    /// The bar opening or settling on its own: a soft spring, like bellows.
+    private static let barSettle: Animation = .spring(response: 0.38, dampingFraction: 0.86)
+
+    /// Scrolling down past where the header tucks away folds the bar in over about 80 points;
+    /// any scroll up, or a return above that point, opens it straight back out.
+    private func foldBar(from old: CGFloat, to new: CGFloat, tuckStart: CGFloat) {
         let delta: CGFloat = new - old
         if new <= tuckStart || delta < -2 {
-            if barHidden > 0 { withAnimation(.easeOut(duration: 0.25)) { barHidden = 0 } }
+            if barFolded > 0 { withAnimation(Self.barSettle) { barFolded = 0 } }
         } else if delta > 0 {
-            barHidden = min(1, barHidden + delta / 80)
+            barFolded = min(1, barFolded + delta / 80)
         }
     }
 
@@ -737,6 +740,8 @@ struct HomeAuroraView: View {
 
     /// The game of the day, in Analyze from its first position, ready to play through.
     private func openKnightMenu() {
+        // The vines grow from the full-size knight, so a folded bar opens out first.
+        if barFolded > 0 { withAnimation(Self.barSettle) { barFolded = 0 } }
         withAnimation(.easeOut(duration: 0.18)) { knightMenuOpen = true }
     }
 
@@ -1867,14 +1872,27 @@ struct HomeAuroraTabBar: View {
     var play: () -> Void = {}
     /// Where the gold knight's center sits, in Home's own space, for the menu's vines.
     var knightAt: (CGPoint) -> Void = { _ in }
+    /// How far the bar has folded in as the page scrolls, 0 (open) to 1 (folded to about 85
+    /// percent). Everything shrinks together and the words stay (Alex picked C, 2026-11-26).
+    var fold: CGFloat = 0
     static let space = "home.aurora"
     /// The two round buttons beside the tabs.
     static let coin: CGFloat = 58
     /// A finger is on the gold knight: it gives a little, like every other button here.
     @State private var knightPressed = false
 
+    /// A size between fully open and fully folded.
+    private func folded(_ open: CGFloat, _ shut: CGFloat) -> CGFloat {
+        let f: CGFloat = min(max(fold, 0), 1)
+        return open + (shut - open) * f
+    }
+    /// The two round buttons, as wide as the fold allows.
+    private var coinSize: CGFloat { folded(Self.coin, 50) }
+    /// How much the words and marks inside the round buttons shrink with them.
+    private var coinScale: CGFloat { coinSize / Self.coin }
+
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: folded(8, 7)) {
             HStack(spacing: 0) {
                 tab("Today", icon: .today, on: true, action: today)
                 tab("Learn", icon: .learn, on: false, action: learn)
@@ -1882,7 +1900,7 @@ struct HomeAuroraTabBar: View {
                 tab("You", icon: .you, on: false, thumps: true, action: you)
             }
             .padding(.horizontal, 4)
-            .frame(height: 64)
+            .frame(height: folded(64, 54))
             .background {
                 Capsule()
                     .fill(.ultraThinMaterial)
@@ -1905,8 +1923,9 @@ struct HomeAuroraTabBar: View {
                 Text("Analyze")
                     .font(.system(size: 9.5, weight: .semibold))
             }
+            .scaleEffect(coinScale)
             .foregroundStyle(palette.dark ? Color(hex: 0xE8C27A) : Color(hex: 0x8A5F1E))
-            .frame(width: Self.coin, height: Self.coin)
+            .frame(width: coinSize, height: coinSize)
             .background {
                 Circle()
                     .fill(.ultraThinMaterial)
@@ -1930,13 +1949,15 @@ struct HomeAuroraTabBar: View {
                     Text("Play")
                         .font(.system(size: 10, weight: .semibold))
                 }
+                    .scaleEffect(coinScale)
                     .foregroundStyle(Color(hex: 0x2A1C08))
-                    .frame(width: Self.coin, height: Self.coin)
+                    .frame(width: coinSize, height: coinSize)
                     .background {
                         Circle().fill(RadialGradient(stops: [.init(color: Color(hex: 0xFFF1CC), location: 0),
                                                              .init(color: Color(hex: 0xE8C27A), location: 0.45),
                                                              .init(color: Color(hex: 0xA66F25), location: 1)],
-                                                     center: UnitPoint(x: 0.32, y: 0.26), startRadius: 0, endRadius: 37))
+                                                     center: UnitPoint(x: 0.32, y: 0.26), startRadius: 0,
+                                                     endRadius: 37 * coinScale))
                     }
                     .overlay(Circle().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
                     .shadow(color: .black.opacity(palette.dark ? 0.5 : 0.18), radius: 14, y: 8)
@@ -1972,18 +1993,21 @@ struct HomeAuroraTabBar: View {
                      action: @escaping () -> Void) -> some View {
         Button(action: action) {
             // The icons stand out (Alex, 2026-11-08): larger, in full ink, the selected one in gold.
-            VStack(spacing: 3) {
+            VStack(spacing: folded(3, 2)) {
                 HomeTabIcon(kind: icon,
                             color: on ? (palette.dark ? Color(hex: 0xE8C27A) : Color(hex: 0xB7832E)) : palette.ink.opacity(0.82))
-                    .frame(width: 27, height: 27)
+                    .frame(width: folded(27, 23), height: folded(27, 23))
                 Text(title)
                     .font(.system(size: 11, weight: .semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
+                    // Scaled rather than resized, so the words shrink smoothly with the bar.
+                    .scaleEffect(folded(1, 0.84))
+                    .frame(height: folded(14, 12))
             }
             .foregroundStyle(on ? palette.ink : palette.ink2)
             .frame(maxWidth: .infinity)
-            .frame(height: 52)
+            .frame(height: folded(52, 44))
             .background(Capsule().fill(on ? palette.glassHi : .clear))
             .contentShape(Capsule())
         }
