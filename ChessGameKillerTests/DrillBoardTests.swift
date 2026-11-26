@@ -47,8 +47,8 @@ final class DrillBoardTests: XCTestCase {
     }
 
     /// Analysis's arrows are flight paths: they bow to one side and rise off the stone at their
-    /// middle, landing back on it at the tip. The best is fuller than the next and lands on a ring.
-    func testAnalysisArrowsFlyAndTheBestLandsOnARing() throws {
+    /// middle, landing back on it at the tip. The best is fuller than the next; neither has a ring.
+    func testAnalysisArrowsFlyWithNoLandingRing() throws {
         let best = SculptedCoachArrow(from: .e2, to: .e4, color: ArrowColors.best, analysis: true)
         let next = SculptedCoachArrow(from: .d2, to: .d4, color: ArrowColors.next, dashed: true, analysis: true,
                                       best: false)
@@ -75,9 +75,9 @@ final class DrillBoardTests: XCTestCase {
         // Its ends stay on the file.
         let (tail, tip) = ArrowOutline.ends(from: CGPoint(x: 0.5, y: -2.5), to: CGPoint(x: 0.5, y: -0.5), unit: 1,
                                             proportions: best.proportions)
-        // It leaves the piece with a small gap and lands on the ring round the target.
+        // It leaves the piece with a small gap and points into the target square, short of its middle.
         XCTAssertEqual(tail.y, -2.5 + 0.55, accuracy: 0.0001)
-        XCTAssertEqual(tip.y, -0.5 - 0.42, accuracy: 0.0001)
+        XCTAssertEqual(tip.y, -0.5 - 0.25, accuracy: 0.0001)
         XCTAssertEqual(ArrowOutline.along(tail, tail: tail, tip: tip), 0)
         XCTAssertEqual(ArrowOutline.along(tip, tail: tail, tip: tip), 1)
         // It rises most at its middle and touches down at both ends.
@@ -87,11 +87,11 @@ final class DrillBoardTests: XCTestCase {
         XCTAssertEqual(ArrowOutline.height(of: middle, tail: tail, tip: tip, proportions: best.proportions),
                        best.proportions.rise * (tip.y - tail.y), accuracy: 0.0001)
 
-        // The best lands on a ring; the next has only its shadow under it. A coach's arrow has neither.
+        // Both have only their shadow under them, no ring or disc (Alex, 2026-11-26). A coach's arrow has none.
         let bestLayers = SculptedBoardScene.arrowLayers(best)
         let nextLayers = SculptedBoardScene.arrowLayers(next)
         XCTAssertEqual(bestLayers.stone.count, 3)
-        XCTAssertGreaterThan(bestLayers.ground.count, nextLayers.ground.count)
+        XCTAssertEqual(bestLayers.ground.count, 2)
         XCTAssertEqual(nextLayers.ground.count, 2)
         // They are see-through, with no edge to show through them.
         XCTAssertTrue(bestLayers.edge.isEmpty)
@@ -100,9 +100,9 @@ final class DrillBoardTests: XCTestCase {
         // Each part's see-through amount is carried with it, for its node, and is never solid.
         XCTAssertTrue(bestLayers.stone.allSatisfy { $0.alpha > 0 && $0.alpha < 1 })
         XCTAssertTrue(nextLayers.ground.allSatisfy { $0.alpha < 0.2 })
-        // From straight above it lies on the stone: no shadow, only the landing ring.
+        // From straight above it lies on the stone: nothing under it at all.
         XCTAssertEqual(SculptedBoardScene.arrowLayers(next, lying: true).ground.count, 0)
-        XCTAssertEqual(SculptedBoardScene.arrowLayers(best, lying: true).ground.count, bestLayers.ground.count - 2)
+        XCTAssertEqual(SculptedBoardScene.arrowLayers(best, lying: true).ground.count, 0)
     }
 
     /// A one-square move still has a whole arrow between the two pieces: the gaps shrink together

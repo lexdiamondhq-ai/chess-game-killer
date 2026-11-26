@@ -28,7 +28,7 @@ struct SculptedCoachArrow: Hashable {
     let color: UInt32
     var dashed = false
     var analysis = false
-    /// For analysis: the best move's fuller arrow, landing on a ring, or the next best's.
+    /// For analysis: the best move's fuller arrow, or the next best's.
     var best = true
 
     var proportions: ArrowOutline.Proportions {
@@ -1370,7 +1370,7 @@ final class SculptedBoardScene {
         for arrow in new.coachArrows where seenArrows.insert(arrow).inserted && arrow.from != arrow.to {
             let fresh = !shownCoachArrows.contains(arrow)
             let layers = coachArrowLayers(arrow, lying: new.framing.lying)
-            // Its shadow and landing ring on the stone, its edge, then the arrow over it, then the
+            // Its shadow on the stone, its edge, then the arrow over it, then the
             // faint copy over the pieces.
             for (index, parts) in [layers.ground, layers.edge, layers.stone, layers.through].enumerated() {
                 for part in parts {
@@ -1407,7 +1407,7 @@ final class SculptedBoardScene {
         return layers
     }
 
-    /// An arrow's layers: its shadow and landing ring on the stone, its edge, the arrow fading from
+    /// An arrow's layers: its shadow on the stone, its edge, the arrow fading from
     /// its tail color to its own, and the faint copy shown over a piece in front.
     /// Each part is a shape and how solid it is (0 to 1), which its node carries as its opacity.
     struct ArrowLayers {
@@ -1472,22 +1472,6 @@ final class SculptedBoardScene {
                                                    proportions: .init(shaft: width, headLength: 0, headWidth: 0,
                                                                       startInset: 0, tipInset: 0))[1]
                 ground.append((polygon(shadow, colors: { _ in SIMD3(0, 0, 0) }, throughPieces: false, strip: true), alpha))
-            }
-        }
-        if arrow.analysis && arrow.best {
-            // The ring it lands on.
-            let target = middle(arrow.to)
-            // Round the target piece, the arrow's tip resting on its line; it lies on the stone,
-            // so the piece stands clear inside it.
-            let radius = ArrowOutline.Proportions.ringRadius
-            ground.append((polygon(ArrowOutline.circle(target, radius: radius), colors: { _ in headColor },
-                                   throughPieces: false), 0.12))
-            let outer = ArrowOutline.circle(target, radius: radius + 0.015)
-            let inner = ArrowOutline.circle(target, radius: radius - 0.015)
-            for i in outer.indices {
-                let j = (i + 1) % outer.count
-                ground.append((polygon([outer[i], outer[j], inner[j], inner[i]], colors: { _ in tailColor },
-                                       throughPieces: false), 0.85))
             }
         }
         return ArrowLayers(
