@@ -96,6 +96,13 @@ final class Premium {
         return took
     }
 
+    /// Gives back a use whose request failed, so a dropped connection never costs a free try.
+    func giveBack(_ feature: PremiumFeature, key: String? = nil) {
+        guard let allowance = allowance(feature) else { return }
+        ledger.giveBack(feature, key: key, allowance: allowance)
+        uses += 1
+    }
+
     /// Where this feature stops for this player: the free limit and its offer, or, for a player
     /// who has Premium, Premium's own daily cap (never a sales pitch).
     func limitLine(_ feature: PremiumFeature) -> String {
