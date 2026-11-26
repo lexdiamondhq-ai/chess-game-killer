@@ -36,22 +36,13 @@ SOUNDS = {
     "castle": ("Two weighted wooden chess pieces with felt bases set down on a hardwood board one "
                "right after the other: two soft knocks a fraction of a second apart. Close-up, "
                "dry room, no music", 0.7),
-    # Realistic sets (Alex, 2026-11-12): the files in the app are not made from the prompts
-    # above. Each was a "real foley recording" take, trimmed to its first sound and set to
-    # the old files' loudness:
-    #   move.mp3     a heavy ebony and boxwood piece, leather base, on polished rosewood
-    #   move-2.mp3   a weighted plastic club piece on a roll-up vinyl mat
-    #   move-3.mp3   the club piece slid a few centimetres, then set down
-    #   move-clock.mp3  a wooden blitz move, then a mechanical chess clock pressed (timed games)
-    #   capture.mp3  a triple-weighted boxwood Staunton piece on maple and walnut, the taken
-    #                piece tipping over
-    # Each other piece set (Alex, 2026-11-14) has its own move.<set>.mp3, move.<set>-2.mp3
-    # (slid), capture.<set>.mp3 and castle.<set>.mp3, made the same way with the set's
-    # material in the prompt: mother-of-pearl on black stone, jade on onyx, cut crystal on
-    # glass, gold on silver, glazed porcelain on ceramic. Stone uses the files above.
-    # The move takes are played at random. castle.mp3 is still the deeper take of 2026-11-10
-    # (two semitones lower, bass=g=5:f=140, equalizer=f=2800:t=q:w=1:g=2.5, a small aecho
-    # room), and check.mp3 is the two bronze bells above with that same warmth.
+    # Piece sounds (Alex, 2026-11-26): every move, capture and castle, in every piece set and
+    # on every screen, plays the soft wooden tock first made for rival moves (move-soft*.mp3,
+    # capture-soft.mp3: a few fading damped wood tones under 3 kHz, made in code). castle.mp3
+    # is two of those tocks 130 ms apart. The older foley takes and each set's own takes were
+    # removed: one slid take squeaked (~2 kHz) and several set takes rang shrill (3 to 9 kHz).
+    # move-clock.mp3 (timed games) is a wooden blitz move, then a mechanical chess clock
+    # pressed, and check.mp3 is the two bronze bells above with a little warmth.
     # The endings: warm and acoustic like the pieces, never arcade synths.
     "win": ("A short, elegant success chime: three warm rising notes on a soft celesta and a "
             "felt piano, a gentle shimmer at the end. Clean, luxurious, understated, no synths, "

@@ -29,8 +29,9 @@ enum ArrowOutline {
         /// Every arrow leaves its piece cleanly: the tail begins just past the piece, with a small
         /// gap, so it never lies on the piece that moves (Alex, 2026-11-25, option A).
         static let clearOfPiece: CGFloat = 0.55
-        /// The analysis arrow lands on the glass ring round the target piece, the ring's own size.
-        static let ringRadius: CGFloat = 0.42
+        /// The analysis arrow points into its target square and stops short of its middle, with no
+        /// ring or disc there (Alex, 2026-11-26: the landing ring read as a big round blob).
+        static let analysisTip: CGFloat = 0.25
 
         static func coach(dashed: Bool) -> Proportions {
             Proportions(shaft: dashed ? 0.12 : 0.15, headLength: 0.4, headWidth: 0.46, startInset: clearOfPiece,
@@ -41,7 +42,7 @@ enum ArrowOutline {
         /// They bow only gently (Alex: "not the curved so much").
         static func analysis(best: Bool) -> Proportions {
             Proportions(shaft: best ? 0.14 : 0.1, headLength: best ? 0.32 : 0.27, headWidth: best ? 0.46 : 0.34,
-                        startInset: clearOfPiece, tipInset: ringRadius, bow: best ? 0.08 : 0.06, rise: best ? 0.22 : 0.16,
+                        startInset: clearOfPiece, tipInset: analysisTip, bow: best ? 0.08 : 0.06, rise: best ? 0.22 : 0.16,
                         dotted: !best)
         }
     }
@@ -214,7 +215,7 @@ enum ArrowOutline {
         }
     }
 
-    /// A circle as a polygon: the rounded tail, the landing ring.
+    /// A circle as a polygon: the rounded tail.
     static func circle(_ center: CGPoint, radius: CGFloat, sides: Int = 28) -> [CGPoint] {
         (0..<sides).map { i in
             let angle = 2 * CGFloat.pi * CGFloat(i) / CGFloat(sides)
@@ -273,7 +274,7 @@ enum ArrowColors {
 
 /// An arrow drawn crisp: an even color that brightens toward its tail, a fine edge, and a soft
 /// shadow under it. An analysis arrow flies: it bows to the side, a solid one's faint shadow lies
-/// straight on the board beneath it, and the best move's lands on a ring.
+/// straight on the board beneath it.
 struct CrispArrow: View {
     let from: CGPoint
     let to: CGPoint
@@ -285,8 +286,6 @@ struct CrispArrow: View {
     var glow: Color? = nil
     /// The fine line round it.
     var edge: Color = .white
-    /// Lands on a ring on its target square.
-    var landing = false
     /// How solid the arrow is; under 1 it is see-through, as tinted glass.
     var opacity: Double = 1
     /// How strong its edge is, against the arrow's own strength.
@@ -319,14 +318,6 @@ struct CrispArrow: View {
                     context.stroke(ground, with: .color(.black.opacity(0.035)),
                                    style: StrokeStyle(lineWidth: p.shaft * squareSize * spread, lineCap: .round))
                 }
-            }
-            if landing {
-                // A glass ring round the target piece, the arrow's tip resting on it. Only its line:
-                // drawn over the board's pieces, a fill would cloud the piece inside.
-                let r = ArrowOutline.Proportions.ringRadius * squareSize
-                let ring = CGRect(x: to.x - r, y: to.y - r, width: r * 2, height: r * 2)
-                context.stroke(Path(ellipseIn: ring), with: .color(tailColor.opacity(min(1, opacity + 0.2))),
-                               lineWidth: squareSize * 0.03)
             }
             if let glow {
                 context.addFilter(.shadow(color: glow.opacity(0.85), radius: squareSize * 0.1))

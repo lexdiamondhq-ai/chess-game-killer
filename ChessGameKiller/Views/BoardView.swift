@@ -495,7 +495,7 @@ struct NameTagPlacement: Layout {
     }
 }
 
-/// A move's flight path from one square to another: the best move fuller, landing on a ring; the
+/// A move's flight path from one square to another: the best move fuller and bolder; the
 /// runner-up slimmer and quieter.
 struct MoveArrow: View {
     let from: CGPoint
@@ -507,7 +507,7 @@ struct MoveArrow: View {
 
     var body: some View {
         CrispArrow(from: from, to: to, squareSize: squareSize, dashed: !isBest, color: color,
-                   proportions: .analysis(best: isBest), glow: glow, edge: .white, landing: isBest,
+                   proportions: .analysis(best: isBest), glow: glow, edge: .white,
                    opacity: isBest ? ArrowColors.seeThrough.best : ArrowColors.seeThrough.next, rim: ArrowColors.rim)
     }
 }
