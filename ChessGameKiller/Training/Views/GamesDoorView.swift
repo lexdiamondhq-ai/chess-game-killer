@@ -64,7 +64,7 @@ struct GamesDoorView: View {
                 recentGames
             }
         }
-        .task(id: vault.games.count) {
+        .task(id: readKey) {
             let games = vault.games
             let stats = puzzles.themeStats
             let played = puzzles.progress.played
@@ -90,6 +90,13 @@ struct GamesDoorView: View {
                 .environment(vault)
                 .environment(store)
         }
+    }
+
+    /// Changes when there is something new to read: a game saved, or a game against a person
+    /// that has just been graded (that happens a little after it ends, sometimes with this page open).
+    private var readKey: String {
+        let read: Int = vault.games.filter { $0.graded == true }.count
+        return "\(vault.games.count) \(read)"
     }
 
     // MARK: Good at, and to work on
