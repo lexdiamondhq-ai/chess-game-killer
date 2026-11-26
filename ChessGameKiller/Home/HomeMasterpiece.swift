@@ -52,6 +52,18 @@ struct HomeMasterpiece: Equatable {
         return HomeMasterpiece(playable[day % playable.count])
     }
 
+    /// Today's game, worked out once a day. Home asks for it on every redraw, and playing a
+    /// whole game through each time (a move at a time, a position per move) cost it frames.
+    static func today(calendar: Calendar = .current) -> HomeMasterpiece? {
+        let day: Int = calendar.ordinality(of: .day, in: .era, for: .now) ?? 0
+        if let kept, kept.day == day { return kept.piece }
+        let piece = of()
+        kept = (day, piece)
+        return piece
+    }
+
+    private static var kept: (day: Int, piece: HomeMasterpiece?)?
+
     init?(_ game: ClassicGame) {
         guard var board = TrainingChess.board(after: [], from: Position.standard.fen) else { return nil }
         var day: [String] = [board.position.fen]

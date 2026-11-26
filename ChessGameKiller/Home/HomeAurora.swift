@@ -249,6 +249,14 @@ struct HomeAuroraView: View {
             boardFrame = nil
         }
         .task(id: "\(reduceMotion)-\(stage.masterpiece?.game.id ?? "")") { await playThrough() }
+        // A scroll that stops partway would leave the bar ghosted, and deaf to taps past half:
+        // once the fade has rested a moment it settles fully on or fully off.
+        .task(id: barHidden) {
+            guard barHidden > 0, barHidden < 1 else { return }
+            try? await Task.sleep(for: .milliseconds(220))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.25)) { barHidden = barHidden < 0.5 ? 0 : 1 }
+        }
     }
 
     /// Scrolling down past where the header tucks away fades the bar over about 80 points;
@@ -413,6 +421,11 @@ struct HomeAuroraView: View {
             HomeAuroraSignOff(palette: palette)
                 .padding(.top, 22)
         }
+        // A part that arrives after the page (the first read of your games, a friend's move)
+        // eases in and the rest makes room, instead of the page jumping.
+        .animation(.snappy(duration: 0.3), value: info.dna != nil)
+        .animation(.snappy(duration: 0.3), value: info.finest != nil)
+        .animation(.snappy(duration: 0.3), value: HomeAuroraQuickBar.mode(games: info.games) != nil)
         .padding(.bottom, 84)
         .frame(maxWidth: .infinity)
         .background {

@@ -225,8 +225,13 @@ struct ContentView: View {
                 if introAfterWelcome != nil {
                     IntroFilmView {
                         IntroFilm.markSeen()
-                        introAfterWelcome = nil
+                        // The welcome goes first, unseen under the film, so its last page never
+                        // flashes back; then the film fades to the home.
+                        var quiet = Transaction()
+                        quiet.disablesAnimations = true
+                        withTransaction(quiet) { showingWelcome = false }
                         endWelcomeAtHome()
+                        withAnimation(.easeInOut(duration: 0.5)) { introAfterWelcome = nil }
                     }
                     .transition(.opacity)
                 }
@@ -305,6 +310,8 @@ struct ContentView: View {
     private var coversHome: Bool {
         showingTraining || showingDaily || showingPuzzles || showingGames || showingArmy
             || coach.presentedLesson != nil || coach.presentedSession != nil || talk != nil || showingAnalyze
+            // The intro film: Home's strings rest under Leo's voice.
+            || introAfterWelcome != nil
     }
 
     /// The game screen with its sheets and full-screen covers.
@@ -317,9 +324,11 @@ struct ContentView: View {
             }
             .fullScreenCover(isPresented: $showingDaily) {
                 DailyMoveView(theme: chosenTheme, morePuzzles: {
-                    // Once Today's Move has slid away.
+                    // Once Today's Move has slid away: as soon as it has, however it closes
+                    // (the zoom back into its card takes longer than a slide).
                     Task { @MainActor in
-                        try? await Task.sleep(for: .milliseconds(500))
+                        try? await Task.sleep(for: .milliseconds(200))
+                        await ScreenCovers.settled()
                         showingPuzzles = true
                     }
                 })
@@ -452,7 +461,8 @@ struct ContentView: View {
                 guard let id else { return }
                 challenges?.reviewing = nil
                 Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(600))
+                    try? await Task.sleep(for: .milliseconds(200))
+                    await ScreenCovers.settled()
                     rewindOpening = id
                     showingGames = true
                 }

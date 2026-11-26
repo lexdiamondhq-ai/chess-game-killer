@@ -99,6 +99,8 @@ struct IntroFilmView: View {
             finish()
             return
         }
+        // Home's strings rest under Leo's voice, as they do under the rival films.
+        HomeMusic.shared.setCovered(true)
         // A film with Leo's voice: it plays with the ring switch off, like the rival films.
         try? AVAudioSession.sharedInstance().setCategory(.playback, options: [.mixWithOthers])
         try? AVAudioSession.sharedInstance().setActive(true)
@@ -130,6 +132,7 @@ struct IntroFilmView: View {
         player?.pause()
         // Everything after the film is quiet on silent again.
         try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
+        HomeMusic.shared.setCovered(false)
     }
 }
 
