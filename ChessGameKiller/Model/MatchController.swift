@@ -179,6 +179,8 @@ final class MatchController {
     /// Seconds from a move being played until its piece touches down. The 3D board sets it, so
     /// the move is heard when it lands; the flat board's slide is quick enough to sound at once.
     @ObservationIgnored var landingDelay: @MainActor (PlayedMove) -> TimeInterval = { _ in 0 }
+    /// Counts the times the person's clock crossed into its last ten seconds, for the buzz.
+    private(set) var lowTimeWarnings = 0
     /// Seconds from the mating move until the end is seen: the king has fallen, in 3D.
     @ObservationIgnored var finaleDelay: @MainActor (PlayedMove) -> TimeInterval = { _ in 0.4 }
 
@@ -709,8 +711,17 @@ final class MatchController {
         }
         let clock = ChessClock(control: setup.timeControl)
         clock.onFlag = { [weak self] loser in self?.flagFell(loser) }
+        clock.onLow = { [weak self] color in self?.clockRanLow(color) }
         if isSuspended { clock.hold() }
         self.clock = clock
+    }
+
+    /// The person's own clock has crossed into its last ten seconds: one soft tick, and a buzz
+    /// from the screen (which watches `lowTimeWarnings`). The rival's clock passes quietly.
+    private func clockRanLow(_ color: Piece.Color) {
+        guard !isOver, color == setup.playerColor else { return }
+        sounds?.play(.select)
+        lowTimeWarnings += 1
     }
 
     /// The clock ran out for `loser`: a win for the other side if it has anything

@@ -492,6 +492,8 @@ struct ContentView: View {
             .onChange(of: boardHidden) { _, hidden in
                 if hidden { match.suspend() } else { match.resume() }
             }
+            // The person's clock has run into its last ten seconds: felt once, with its tick.
+            .sensoryFeedback(.impact(weight: .medium), trigger: match.lowTimeWarnings) { _, _ in hapticsOn }
             .onChange(of: hallOpen, initial: true) { _, open in
                 AppOrientation.allowLandscape(open)
             }

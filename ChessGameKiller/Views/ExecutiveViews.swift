@@ -524,7 +524,12 @@ private struct ExecutiveClock: View {
             let remaining = clock.remaining(for: color)
             let urgent = isRunning && remaining < .seconds(10)
             let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
-            Text(remaining.clockLabel)
+            // As wide as its widest reading, so "0:10" turning into "0:09.9" doesn't nudge
+            // the taken pieces beside it.
+            ZStack {
+                Text("0:00.0").hidden()
+                Text(remaining.clockLabel)
+            }
                 .font(.app(.title3, weight: .medium).monospacedDigit())
                 .foregroundStyle(isRunning ? Color.black.opacity(0.88) : Color.secondary)
                 .lineLimit(1)

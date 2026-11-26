@@ -556,6 +556,9 @@ final class OnlineGame {
             say("\(opponentName) is recording the screen", symbol: "record.circle", warning: true)
         } else if before.away == nil, them.away != nil, FriendClockMath.leaveRuleApplies(new) {
             say("\(opponentName) left the game", symbol: "figure.walk.departure")
+        } else if before.away == nil, them.away != nil, previous.status == .over, new.status == .over {
+            // After the game: a rematch asked of someone who has gone would wait for good.
+            say("\(opponentName) has left", symbol: "figure.walk.departure")
         } else if before.away != nil, them.away == nil, new.status == .active {
             say("\(opponentName) is back", symbol: "figure.walk.arrival")
         } else if previous.drawOffer == seat, new.drawOffer == nil, new.status == .active,

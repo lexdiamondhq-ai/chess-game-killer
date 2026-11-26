@@ -81,10 +81,19 @@ final class ChessClock {
     private(set) var held = false
     /// Called on the main actor when a side runs out of time.
     var onFlag: ((Piece.Color) -> Void)?
+    /// Called on the main actor as a running side's time crosses into its last ten seconds.
+    /// Once per dip: with an increment, a side must climb back over twenty seconds before
+    /// it is warned again, so a time scramble isn't a warning on every move.
+    var onLow: ((Piece.Color) -> Void)?
+
+    /// The last stretch of a side's time, when the clock turns red.
+    static let low: Duration = .seconds(10)
 
     private var stored: [Piece.Color: Duration]
     private var startedAt: ContinuousClock.Instant?
     private var flagTask: Task<Void, Never>?
+    private var lowTask: Task<Void, Never>?
+    private var warned: Set<Piece.Color> = []
 
     init(initial: Duration, increment: Duration = .zero) {
         self.initial = initial
@@ -111,6 +120,7 @@ final class ChessClock {
         running = color
         startedAt = now
         scheduleFlag(for: color)
+        scheduleLow(for: color)
     }
 
     /// The side that just moved stops its clock, gets its increment, and the other side starts.
@@ -156,6 +166,8 @@ final class ChessClock {
     private func stop(at now: ContinuousClock.Instant) {
         flagTask?.cancel()
         flagTask = nil
+        lowTask?.cancel()
+        lowTask = nil
         guard let color = running else { return }
         stored[color] = remaining(for: color, at: now)
         running = nil
@@ -168,6 +180,19 @@ final class ChessClock {
             try? await Task.sleep(for: left)
             guard !Task.isCancelled else { return }
             self?.flag(color)
+        }
+    }
+
+    private func scheduleLow(for color: Piece.Color) {
+        let left = remaining(for: color)
+        if left > Self.low * 2 { warned.remove(color) }
+        // Started inside its last ten seconds: there is no crossing to mark.
+        guard left > Self.low, !warned.contains(color) else { return }
+        lowTask = Task { [weak self] in
+            try? await Task.sleep(for: left - Self.low)
+            guard !Task.isCancelled, let self, self.running == color else { return }
+            self.warned.insert(color)
+            self.onLow?(color)
         }
     }
 

@@ -143,7 +143,8 @@ struct OnlineLobbyView: View {
             }
             if lobby.isSearching || lobby.phase == .starting {
                 // The same seats from waiting to found, so the empty one fills in place.
-                OnlineSeats(name: name, rating: lobby.you?.label, found: lobby.phase == .starting, theme: theme)
+                OnlineSeats(name: name, rating: lobby.you?.label, found: lobby.phase == .starting,
+                            opponent: lobby.found, theme: theme)
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
             switch lobby.phase {
@@ -161,10 +162,17 @@ struct OnlineLobbyView: View {
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
             case .starting:
                 HStack(spacing: 10) {
-                    ProgressView()
-                    Text("Starting your game…")
-                        .font(theme.challengeFont(16, .semibold))
+                    if let found = lobby.found {
+                        Text("You play \(found.youPlay == .white ? "White" : "Black")")
+                            .font(theme.challengeFont(16, .semibold))
+                            .transition(.opacity)
+                    } else {
+                        ProgressView()
+                        Text("Starting your game…")
+                            .font(theme.challengeFont(16, .semibold))
+                    }
                 }
+                .animation(.easeInOut(duration: 0.25), value: lobby.found)
                 .frame(maxWidth: .infinity, minHeight: 52)
                 .challengeGlass(Capsule(style: .continuous))
             case .browsing:
@@ -453,6 +461,8 @@ struct OnlineSeats: View {
     /// Your rating, once the lobby knows it.
     let rating: String?
     let found: Bool
+    /// Who was found, once the lobby knows: their face, name and rating fill the seat.
+    var opponent: OnlineLobby.FoundOpponent? = nil
     let theme: BoardTheme
 
     @State private var arrived = false
@@ -477,7 +487,8 @@ struct OnlineSeats: View {
             withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) { arrived = true }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(found ? "Opponent found" : "Finding an opponent")
+        .animation(.spring(response: 0.42, dampingFraction: 0.72), value: opponent)
+        .accessibilityLabel(opponent.map { "Opponent found: \($0.name)" } ?? (found ? "Opponent found" : "Finding an opponent"))
     }
 
     private var yourSeat: some View {
@@ -495,7 +506,11 @@ struct OnlineSeats: View {
     private var theirSeat: some View {
         VStack(spacing: 6) {
             ZStack {
-                if found {
+                if let opponent {
+                    ChallengeAvatar(name: opponent.name, theme: theme, size: Self.seat)
+                        .overlay { Circle().strokeBorder(theme.challengeAccent, lineWidth: 2) }
+                        .transition(.scale(scale: 0.6).combined(with: .opacity))
+                } else if found {
                     Circle()
                         .fill(theme.challengeAccent)
                         .overlay {
@@ -515,8 +530,8 @@ struct OnlineSeats: View {
                 }
             }
             .frame(width: Self.seat, height: Self.seat)
-            Text(found ? "Found" : "Finding…")
-                .font(theme.challengeFont(12, .semibold))
+            Text(opponent.map { them in them.rating.map { "\(them.name) · \($0)" } ?? them.name } ?? (found ? "Found" : "Finding…"))
+                .font(theme.challengeFont(12, .semibold).monospacedDigit())
                 .foregroundStyle(found ? AnyShapeStyle(theme.challengeAccent) : AnyShapeStyle(HierarchicalShapeStyle.secondary))
                 .lineLimit(1)
         }
