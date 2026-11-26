@@ -57,9 +57,9 @@ struct HomeTone {
     static let warmWhite = Color(red: 0.965, green: 0.945, blue: 0.91)
 
     /// Two quieter steps of the ink. The quietest still reads at small sizes on every room.
-    var ink2: Color { ink.opacity(scheme == .dark ? 0.72 : 0.74) }
-    var ink3: Color { ink.opacity(scheme == .dark ? 0.6 : 0.66) }
-    var hairline: Color { ink.opacity(0.12) }
+    var ink2: Color { ink.opacity(scheme == .dark ? Polish.pick(0.72, 0.76, 0.8, 0.84) : Polish.pick(0.74, 0.77, 0.8, 0.84)) }
+    var ink3: Color { ink.opacity(scheme == .dark ? Polish.pick(0.6, 0.63, 0.66, 0.7) : Polish.pick(0.66, 0.68, 0.7, 0.74)) }
+    var hairline: Color { ink.opacity(Polish.pick(0.12, 0.14, 0.17, 0.2)) }
     /// Something happening right now, like players waiting online: a soft green, the one
     /// color that isn't the board's, kept to a dot.
     var live: Color { scheme == .dark ? Color(hex: 0x7FE0A3) : Color(hex: 0x2E9E5B) }
@@ -227,6 +227,9 @@ struct HomePane<S: InsettableShape>: ViewModifier {
                 ))
             }
             shape.strokeBorder(rim, lineWidth: contrast == .increased ? 1 : 0.75)
+            // A well keeps a quieter gilding than the card it sits in; a lit one, the full edge.
+            PolishedEdge(shape: shape, edge: lit ? .lit : .pill, dark: tone.scheme == .dark)
+                .opacity(lit ? 1 : 0.6)
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)

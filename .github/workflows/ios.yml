@@ -44,10 +44,14 @@ on:
         description: Print every picture in the logs of the pictures jobs
         type: boolean
         default: false
+      polish:
+        description: PREVIEW ONLY. Picture the polish looks on the simulator instead of running the tests
+        type: boolean
+        default: false
 
 concurrency:
   # A run by hand in another tone waits for nothing and replaces nothing.
-  group: ios-${{ github.ref }}-${{ inputs.tone || 'light' }}
+  group: ios-${{ github.ref }}-${{ inputs.tone || 'light' }}${{ inputs.polish && '-polish' || '' }}
   # A newer push to a pull request replaces the run still going; runs on main always finish.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
@@ -100,7 +104,7 @@ jobs:
   build-and-test:
     # Pull requests and by hand. Adding a label other than "screenshots" starts no run.
     if: >-
-      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_dispatch' && !inputs.polish) ||
       (github.event_name == 'pull_request' &&
        (github.event.action != 'labeled' || github.event.label.name == 'screenshots'))
     runs-on: macos-15
@@ -333,6 +337,136 @@ jobs:
           echo "Part ${{ matrix.part }}: $(wc -l < mine.txt) of $total pictures"
           while read -r f; do
             convert "$f" -resize x1100 -quality 72 /tmp/small.jpg
+            echo "BEGIN-SCREEN $(basename "$f")"
+            base64 -w 3000 /tmp/small.jpg
+            echo "END-SCREEN"
+          done < mine.txt
+
+  polish-shots:
+    # PREVIEW ONLY (comes out before this merges): the app's polish looks, Now / Gentle / Rich /
+    # Bold, on real screens. One build, then each screen launched once per look (`-polish`).
+    # macos-26 shows Liquid Glass, as on Alex's phone; macos-15 the frosted glass before it.
+    if: github.event_name == 'workflow_dispatch' && inputs.polish
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-26, macos-15]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache Stockfish networks
+        uses: actions/cache@v4
+        with:
+          path: .nnue-cache
+          key: nnue-1111cefa1111-37f18f62d772
+      - name: Generate Xcode project
+        run: |
+          brew install xcodegen
+          xcodegen
+      - name: Pick an iPhone simulator
+        id: sim
+        run: |
+          if [ "${{ matrix.os }}" = "macos-26" ]; then
+            XCODE=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+            [ -n "$XCODE" ] && sudo xcode-select -s "$XCODE"
+          fi
+          xcodebuild -version
+          xcrun simctl list runtimes
+          DEVICES=$(xcrun simctl list devices available -j \
+            | jq -c '[.devices | to_entries[] | select(.key | contains("iOS")) | .key as $rt | .value[] | select(.name | startswith("iPhone")) | {udid, name, rt: $rt}] | sort_by(.rt) | reverse')
+          UDID=$(echo "$DEVICES" | jq -r '([.[] | select(.name == "iPhone 17 Pro")] + .)[0].udid')
+          echo "$DEVICES" | jq -r '.[] | select(.udid == "'"$UDID"'") | "\(.name) \(.rt)"'
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+      - name: Build
+        run: |
+          status=0
+          xcodebuild build \
+            -project ChessGameKiller.xcodeproj \
+            -scheme ChessGameKiller \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            -derivedDataPath dd \
+            CODE_SIGNING_ALLOWED=NO > build.log 2>&1 || status=$?
+          grep -E "error:|\*\* " build.log | sort -u | head -60 || true
+          exit $status
+      - name: Picture each look
+        run: |
+          UDID="${{ steps.sim.outputs.udid }}"
+          APP=$(find dd/Build/Products -type d -name ChessGameKiller.app | head -1)
+          [ -n "$APP" ] || { echo "No app was built"; exit 1; }
+          xcrun simctl boot "$UDID" 2>/dev/null || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" "$APP"
+          xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3 || true
+          mkdir -p shots
+          BUNDLE=com.chessgamekiller.app
+          snap() {
+            name=$1; wait=$2; shift 2
+            for level in off gentle rich bold; do
+              xcrun simctl terminate "$UDID" $BUNDLE 2>/dev/null || true
+              xcrun simctl launch "$UDID" $BUNDLE -polish $level -welcomeSeen YES -tipsOff YES -introFilmSeen YES "$@" >/dev/null || { echo "Could not launch $name"; continue; }
+              sleep "$wait"
+              xcrun simctl io "$UDID" screenshot "shots/$name-$level.png" >/dev/null && echo "$name-$level.png" || echo "No screenshot for $name-$level"
+            done
+          }
+          # The first launch after an install is slow; this one is thrown away.
+          xcrun simctl launch "$UDID" $BUNDLE -welcomeSeen YES -tipsOff YES -introFilmSeen YES >/dev/null || true
+          sleep 20
+          snap home-dark 9 -homeTone dark
+          snap home-light 9 -homeTone light
+          snap today-dark 10 -homeTone dark -showcaseHomeAt today
+          snap today-light 10 -homeTone light -showcaseHomeAt today
+          snap ladder-dark 10 -homeTone dark -showcaseHomeAt ladder
+          snap friends-dark 10 -homeTone dark -showcaseGames YES -showcaseHomeAt friends
+          snap game-3d 11 -showcase game -showcaseLook gilded -showcase3D YES
+          snap game-coach 11 -showcase game -showcaseLook gilded -showcase3D NO -showcaseCoach open
+          snap learn-dark 9 -homeTone dark -showcaseOpen learn
+          snap learn-light 9 -homeTone light -showcaseOpen learn
+          snap settings-dark 9 -homeTone dark -showcaseOpen settings
+          snap newgame-dark 9 -homeTone dark -showcaseOpen newgame
+          snap analyze-dark 9 -homeTone dark -showcaseOpen analyze
+          snap analyze-light 9 -homeTone light -showcaseOpen analyze
+          snap rooms-dark 9 -homeTone dark -showcaseShortcuts YES
+          snap you-dark 9 -homeTone dark -showcaseYou YES
+          xcrun simctl terminate "$UDID" $BUNDLE 2>/dev/null || true
+          ls shots | wc -l
+      - name: Upload the pictures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: polish-${{ matrix.os }}
+          path: shots
+          if-no-files-found: ignore
+      - name: Upload build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: polish-build-log-${{ matrix.os }}
+          path: build.log
+
+  polish-pictures:
+    # PREVIEW ONLY: prints each look's pictures in a Linux job's log, as the pictures jobs do.
+    if: always() && github.event_name == 'workflow_dispatch' && inputs.polish
+    needs: polish-shots
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-26, macos-15]
+        level: [off, gentle, rich, bold]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: polish-${{ matrix.os }}
+          path: shots
+      - name: Print this look's pictures
+        run: |
+          command -v convert >/dev/null || { sudo apt-get update -qq; sudo apt-get install -y -qq imagemagick; }
+          ls shots/*-${{ matrix.level }}.png | sort > mine.txt
+          echo "${{ matrix.os }} ${{ matrix.level }}: $(wc -l < mine.txt) pictures"
+          while read -r f; do
+            convert "$f" -resize x1500 -quality 78 /tmp/small.jpg
             echo "BEGIN-SCREEN $(basename "$f")"
             base64 -w 3000 /tmp/small.jpg
             echo "END-SCREEN"

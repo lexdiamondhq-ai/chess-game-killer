@@ -658,6 +658,12 @@ struct HomeView: View {
             openShortcuts()
             return
         }
+        // And the You panel with `-showcaseYou YES`.
+        if UserDefaults.standard.bool(forKey: "showcaseYou") {
+            try? await Task.sleep(for: .seconds(1.6))
+            openYou(.bottom)
+            return
+        }
         guard !Welcome.isUnderTest, !vault.games.isEmpty, TipBook.canShow(.jewelShortcuts) else { return }
         try? await Task.sleep(for: .seconds(2.5))
         guard !Task.isCancelled, !veiled, TipBook.canShow(.jewelShortcuts) else { return }
