@@ -260,6 +260,9 @@ final class AnalysisModel {
     /// A pawn moved to the last rank by the person, waiting for them to choose its piece.
     private(set) var promoting: (from: Square, to: Square, color: Piece.Color)?
     private(set) var lines: [EngineLine] = []
+    /// The last score for White, kept while the next position is first looked at: the bar and the
+    /// verdict hold still (dimmed) rather than swinging to even and back on every move.
+    private var heldEvaluation: Evaluation?
     private(set) var hints: [MoveHint] = []
     private(set) var depth = 0
     private(set) var isThinking = false
@@ -301,6 +304,16 @@ final class AnalysisModel {
     var evaluationForWhite: Evaluation? {
         guard let first = lines.first else { return nil }
         return draft.sideToMove == .white ? first.evaluation : first.evaluation.flipped
+    }
+
+    /// What the header shows: the score, or the last one while the next position is first looked at.
+    var shownEvaluationForWhite: Evaluation? {
+        evaluationForWhite ?? (isThinking ? heldEvaluation : nil)
+    }
+
+    /// The header and the lines are showing the last position's answer, until this one's arrives.
+    var isHoldingLastAnswer: Bool {
+        lines.isEmpty && isThinking && heldEvaluation != nil
     }
 
     /// The king of the side to move, while it is in check, for a red glow under it.
@@ -417,6 +430,7 @@ final class AnalysisModel {
     private func show(_ found: [EngineLine], depth: Int, fen: String) {
         lines = found
         self.depth = depth
+        if let score = evaluationForWhite { heldEvaluation = score }
         hints = found.prefix(2).enumerated().compactMap { index, line in
             guard
                 let uci = line.firstMove,
@@ -642,6 +656,10 @@ final class AnalysisModel {
     /// Who is better and by how much, in plain words.
     func verdict(white: String, black: String) -> String {
         guard let evaluation = evaluationForWhite else { return "" }
+        return Self.verdict(evaluation, white: white, black: black)
+    }
+
+    static func verdict(_ evaluation: Evaluation, white: String, black: String) -> String {
         switch evaluation {
         case .mate(let moves):
             if moves == 0 { return "Checkmate" }
