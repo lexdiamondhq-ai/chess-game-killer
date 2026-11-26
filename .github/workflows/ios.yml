@@ -48,10 +48,14 @@ on:
         description: PREVIEW ONLY. Picture the polished app on the simulator instead of running the tests
         type: boolean
         default: false
+      polish_base:
+        description: PREVIEW ONLY. With polish, picture the app as it is on main instead (the before pictures)
+        type: boolean
+        default: false
 
 concurrency:
   # A run by hand in another tone waits for nothing and replaces nothing.
-  group: ios-${{ github.ref }}-${{ inputs.tone || 'light' }}${{ inputs.polish && '-polish' || '' }}
+  group: ios-${{ github.ref }}-${{ inputs.tone || 'light' }}${{ inputs.polish && '-polish' || '' }}${{ inputs.polish_base && '-base' || '' }}
   # A newer push to a pull request replaces the run still going; runs on main always finish.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
@@ -355,6 +359,15 @@ jobs:
         os: [macos-26, macos-15]
     steps:
       - uses: actions/checkout@v4
+      - name: Put main's look back for the before pictures
+        if: inputs.polish_base
+        run: |
+          # The app as on main, but for the two files that carry the launch hooks the shots use.
+          # Polish.swift is not on main, so it stays, with nothing drawing from it.
+          git fetch --depth=1 origin main
+          git checkout FETCH_HEAD -- ChessGameKiller
+          git checkout HEAD -- ChessGameKiller/Views/ContentView.swift ChessGameKiller/Home/HomeView.swift
+          git status --short | head -40
       - name: Cache Stockfish networks
         uses: actions/cache@v4
         with:
