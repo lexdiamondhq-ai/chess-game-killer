@@ -266,7 +266,9 @@ struct HomeView: View {
     private var notesKey: String {
         // The newest game's grades land after it ends: count them too.
         let graded: Int = vault.games.first?.moments.count ?? 0
-        return "\(vault.games.count) \(graded) \(Trainer.dayString(.now))"
+        // Games against people are read later, a few at a time: each one read counts as well.
+        let read: Int = vault.games.filter { $0.graded == true }.count
+        return "\(vault.games.count) \(graded) \(read) \(Trainer.dayString(.now))"
     }
 
     /// Reads the games off the main thread for the week's finest move and your Chess DNA.
