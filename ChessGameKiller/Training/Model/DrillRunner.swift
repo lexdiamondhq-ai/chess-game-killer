@@ -64,6 +64,10 @@ final class DrillRunner {
     @ObservationIgnored var sounds: SoundPlaying?
     /// The clean-solve chime follows the solving move's own sound by this much.
     static let chimeAfterLanding: TimeInterval = 0.15
+    /// When the last move sounded lands, kept as it was worked out for that sound: by the time
+    /// the drill is judged solved the board is closed to the learner, which would time the same
+    /// move as if it had not been lifted.
+    @ObservationIgnored private var lastLanding: TimeInterval = 0
 
     private let startFEN: String
     private let setup: String?
@@ -481,7 +485,7 @@ final class DrillRunner {
         phase = .done(outcome)
         // A clean solve is heard: the soft chime, just after the last piece is down.
         if outcome == .firstTry {
-            sounds?.play(.win, after: (game.lastPlayed.map { landingDelay($0) } ?? 0) + Self.chimeAfterLanding)
+            sounds?.play(.win, after: lastLanding + Self.chimeAfterLanding)
         }
         // Every move of a longer puzzle right the first time deserves more than "nice".
         react(outcome == .firstTry ? (solution.count >= 3 ? .brilliant : .nice) : .afterHelp)
@@ -726,6 +730,7 @@ final class DrillRunner {
     private func sound(for move: PlayedMove) {
         guard let sounds else { return }
         let landing = landingDelay(move)
+        lastLanding = landing
         if move.isCapture {
             sounds.play(.capture, after: landing)
         } else if move.givesCheck {
