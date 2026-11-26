@@ -249,6 +249,10 @@ final class MatchController {
     /// How much engine work a turn may cost. The app reads it from `PowerPolicy`, which holds
     /// back on a hot phone or in Low Power Mode; tests set what they need.
     @ObservationIgnored var budget: @MainActor () -> EngineBudget = { .full }
+    /// How long the rival seems to think over a reply (`firstReply`: its first move of the game).
+    /// The app gives it a second or so (`naturalPause`); on its own a match doesn't dawdle, so
+    /// tests run at full speed.
+    @ObservationIgnored var thinkingPause: @MainActor (_ firstReply: Bool) -> Duration = { _ in .zero }
 
     private let engine: ChessEngine?
     private let sounds: SoundPlaying?
@@ -285,6 +289,11 @@ final class MatchController {
     static func live() -> MatchController {
         let match = MatchController(engine: StockfishEngine.shared, sounds: SoundPlayer.shared)
         match.budget = { PowerPolicy.shared.engineBudget }
+        match.thinkingPause = { [weak match] first in
+            // The app's own tests play against it as fast as it can answer.
+            guard !Welcome.isUnderTest else { return .zero }
+            return MatchController.naturalPause(firstReply: first, timed: match?.clock != nil, roll: Double.random(in: 0..<1))
+        }
         match.crowdBook = LichessCrowdBook.shared
         return match
     }
@@ -1079,7 +1088,11 @@ final class MatchController {
         // own piece is still in the air: two pieces moving at once read as a glitch, and a
         // recapture would knock over a piece that had not landed. On a stage (the King's hall)
         // the rival's reach is the pause.
-        let minimum = rivalStage == nil ? Self.replyPause(afterLanding: ownLanding) : Self.shortestReply
+        // And it takes a moment to think, as a person across the board would (the engine's
+        // own answer comes in a blink).
+        let minimum = rivalStage == nil
+            ? max(Self.replyPause(afterLanding: ownLanding), thinkingPause(game.plyCount <= 1))
+            : Self.shortestReply
         let elapsed = clock.now - started
         if elapsed < minimum {
             try? await Task.sleep(for: minimum - elapsed)
@@ -1121,6 +1134,14 @@ final class MatchController {
     /// seconds after it was played: until that piece is down and has settled.
     static func replyPause(afterLanding landing: TimeInterval) -> Duration {
         max(shortestReply, .seconds(max(landing, flatGlideSeconds) + settleSeconds))
+    }
+
+    /// The rival's thinking time as the app plays it (Alex's pick, 2026-11-26): about a second,
+    /// a little different each time (`roll`, 0..<1), and longer over its first move of a game.
+    /// Against the clock it thinks half as long: the time is its own, but the game is a quick one.
+    static func naturalPause(firstReply: Bool, timed: Bool, roll: Double) -> Duration {
+        let seconds = (firstReply ? 1.4 : 0.8) + 0.5 * roll
+        return .seconds(timed ? seconds / 2 : seconds)
     }
 
     /// How many times the computer asks the engine for its move before playing one of its own.

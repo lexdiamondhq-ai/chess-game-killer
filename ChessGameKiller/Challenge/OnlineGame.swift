@@ -527,7 +527,7 @@ final class OnlineGame {
     private func lockBoard() {
         let game = match.game
         if game.pendingPromotion != nil { game.undo() }
-        if let selected = game.selected, game.isHumanTurn { game.tap(selected) }
+        if game.selected != nil { game.clearSelection() }
     }
 
     private func finish(_ state: FriendGameState, seenLive: Bool) {
@@ -825,7 +825,8 @@ final class OnlineGame {
             match.landingDelay = { move in SculptedBoardScene.landingDelay(for: move, in: game) }
             match.finaleDelay = { move in SculptedBoardScene.finaleDelay(for: move, in: game) }
         } else {
-            match.landingDelay = { _ in 0 }
+            let game = match.game
+            match.landingDelay = { move in BoardView.flatLandingDelay(for: move, in: game) }
             match.finaleDelay = { _ in 0.4 }
         }
     }

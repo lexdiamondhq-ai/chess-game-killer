@@ -219,7 +219,19 @@ final class GameModel {
 
     /// Handles a tap on a square: select a piece, move it, or clear the selection.
     func tap(_ square: Square) {
-        guard pendingPromotion == nil, !isGameOver, isHumanTurn else { return }
+        guard pendingPromotion == nil, !isGameOver else { return }
+        guard isHumanTurn else {
+            // The other side is still thinking. The person may pick a piece of theirs up early:
+            // it waits in hand, with nowhere to go yet, and its moves show the moment the
+            // other side has moved (see `play`). A tap anywhere else puts it down.
+            if let piece = piece(at: square), humanColors.contains(piece.color), selected != square {
+                selected = square
+                targets = []
+            } else {
+                clearSelection()
+            }
+            return
+        }
 
         if let from = selected, targets.contains(square) {
             play(from: from, to: square, promotion: nil)
@@ -227,11 +239,15 @@ final class GameModel {
         }
 
         if let piece = piece(at: square), piece.color == sideToMove, selected != square {
-            selected = square
-            targets = Set(board.legalMoves(forPieceAt: square).filter { !isLostCastling(from: square, to: $0) })
+            pickUp(square)
         } else {
             clearSelection()
         }
+    }
+
+    private func pickUp(_ square: Square) {
+        selected = square
+        targets = Set(board.legalMoves(forPieceAt: square).filter { !isLostCastling(from: square, to: $0) })
     }
 
     /// Finishes a pawn promotion started by `tap`.
@@ -312,6 +328,8 @@ final class GameModel {
         promotedInPlace = false
         lastMove = LastMove(from: from, to: to)
         fenBeforePendingMove = fenBefore
+        // A piece the person picked up while the other side was thinking stays in hand.
+        let heldEarly = humanColors.contains(move.piece.color) ? nil : selected
         clearSelection()
 
         if case .promotion(let pawnMove) = board.state {
@@ -323,6 +341,11 @@ final class GameModel {
             }
         } else {
             finishMove(move)
+        }
+        // Their move is made: the piece in hand shows where it can go, unless it was just taken.
+        if let heldEarly, !isGameOver, isHumanTurn, pendingPromotion == nil,
+           self.piece(at: heldEarly)?.color == sideToMove {
+            pickUp(heldEarly)
         }
         return true
     }

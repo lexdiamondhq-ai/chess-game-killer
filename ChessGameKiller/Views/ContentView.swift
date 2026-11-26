@@ -725,9 +725,10 @@ struct ContentView: View {
         if !showingHome, !match.hasStarted { showingNewGame = true }
     }
 
-    /// Begin on a rival's film. The film cuts to black (`closeFilm` takes it away at once),
-    /// the game is set up behind the black, and the board fades up: the home, or the game
-    /// just finished, is never seen between the film and the game.
+    /// Begin on a rival's film. The film has faded to black (`RivalsHall.face`); `closeFilm`
+    /// takes it away at once onto a black of our own, the game is set up behind that black, and
+    /// the board fades up: the home, or the game just finished, is never seen between the film
+    /// and the game.
     private func startGame(_ setup: MatchController.Setup, underFilm closeFilm: @escaping () -> Void) {
         var quiet = Transaction()
         quiet.disablesAnimations = true
@@ -1263,7 +1264,8 @@ struct ContentView: View {
             match.landingDelay = { move in SculptedBoardScene.landingDelay(for: move, in: game) }
             match.finaleDelay = { move in SculptedBoardScene.finaleDelay(for: move, in: game) }
         } else {
-            match.landingDelay = { _ in 0 }
+            let game = match.game
+            match.landingDelay = { move in BoardView.flatLandingDelay(for: move, in: game) }
             match.finaleDelay = { _ in 0.4 }
         }
     }

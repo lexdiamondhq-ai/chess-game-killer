@@ -31,6 +31,8 @@ struct RivalsHall: View {
     @State private var playing: MatchController.Level?
     /// The playing film has ended: it holds its last frame, with the rival's words and Face.
     @State private var ended: MatchController.Level?
+    /// Face was tapped: the hall is fading to black, and the game opens from that black.
+    @State private var leaving = false
 
     private static let gold = Color(hex: 0xE8C27A)
 
@@ -78,7 +80,7 @@ struct RivalsHall: View {
                         RivalFilmEnding(film: film, open: ladder.isOpen(level),
                                         face: {
                                             RivalIntros.mark(level)
-                                            begin(level)
+                                            face(level)
                                         },
                                         notToday: close)
                         .padding(.horizontal, 24)
@@ -94,7 +96,7 @@ struct RivalsHall: View {
                     .zIndex(1)
             }
             if let film = showing {
-                RivalWelcome(film: film, begin: { begin(film.level) }, back: {
+                RivalWelcome(film: film, fromPlay: intro, begin: { face(film.level) }, back: {
                     // From a Play button, "Not today" goes back to where Play was (audit,
                     // 2026-11-11: it used to land on the hall's cards, a screen never asked for).
                     if intro {
@@ -107,6 +109,12 @@ struct RivalsHall: View {
                 .transition(.opacity)
                 .zIndex(2)
             }
+            // Face: the film goes to black, and the board comes up out of the black.
+            Color.black
+                .ignoresSafeArea()
+                .opacity(leaving ? 1 : 0)
+                .allowsHitTesting(leaving)
+                .zIndex(3)
         }
         .preferredColorScheme(.dark)
         .statusBarHidden(showing != nil || playing != nil)
@@ -124,6 +132,17 @@ struct RivalsHall: View {
         .onChange(of: selected) { _, level in
             watched = nil
             playFilm(level)
+        }
+    }
+
+    /// Face: the film (and, on the welcome, its sound) fades to black in a third of a second,
+    /// then the game starts and its board fades up from that black (Alex's pick, 2026-11-26).
+    private func face(_ level: MatchController.Level) {
+        guard !leaving else { return }
+        withAnimation(.easeIn(duration: 0.3)) { leaving = true }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(320))
+            begin(level)
         }
     }
 
@@ -607,6 +626,9 @@ struct RivalHallFilm<Ending: View>: View {
 /// the art. The film's last frame holds behind it.
 struct RivalWelcome: View {
     let film: RivalFilm
+    /// Opened by a Play button rather than chosen in the hall: the film follows the ring
+    /// switch, and makes no sound with Rival themes off (Alex's pick, 2026-11-26).
+    var fromPlay = false
     let begin: () -> Void
     let back: () -> Void
 
@@ -672,7 +694,7 @@ struct RivalWelcome: View {
             Spacer()
             RivalFilmEnding(film: film, open: true,
                             face: {
-                                player?.pause()
+                                fadeSound()
                                 begin()
                             },
                             notToday: leave)
@@ -688,11 +710,13 @@ struct RivalWelcome: View {
             titled = true
             return
         }
-        // Playback: the film is something you chose to watch, so it plays with the ring switch off.
-        try? AVAudioSession.sharedInstance().setCategory(.playback, options: [.mixWithOthers])
+        // Playback: a film chosen in the hall is something you came to watch, so it plays with
+        // the ring switch off. One that a Play button opened stays quiet on a silenced phone.
+        try? AVAudioSession.sharedInstance().setCategory(fromPlay ? .ambient : .playback, options: [.mixWithOthers])
         try? AVAudioSession.sharedInstance().setActive(true)
         let player = AVPlayer(url: url)
         player.actionAtItemEnd = .pause
+        player.isMuted = fromPlay && !RivalTheme.shared.on
         self.player = player
         player.play()
         withAnimation(reduceMotion ? .easeOut(duration: 0.4) : .easeOut(duration: 1.8)) { iris = 1 }
@@ -702,6 +726,19 @@ struct RivalWelcome: View {
         try? await Task.sleep(for: .seconds(film.beat + 0.8))
         guard !Task.isCancelled else { return }
         showTitle()
+    }
+
+    /// The film's sound fades out over a third of a second, as the screen goes to black.
+    private func fadeSound() {
+        guard let player else { return }
+        let from = player.volume
+        Task { @MainActor in
+            for step in 1...6 {
+                try? await Task.sleep(for: .milliseconds(50))
+                player.volume = from * Float(6 - step) / 6
+            }
+            player.pause()
+        }
     }
 
     private func skip() {

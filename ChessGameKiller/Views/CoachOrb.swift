@@ -427,6 +427,8 @@ private struct CoachPanel: View {
     @Environment(GameVault.self) private var vault: GameVault?
     @State private var reel: GameReel?
     @State private var rewind: SavedGame?
+    /// What the finished game did to the rating; worked out once, as the summary appears.
+    @State private var ratingLine: String?
     @State private var confirmingResign = false
 
     /// This game's Piece of the Match, once the game is over and counted.
@@ -553,6 +555,23 @@ private struct CoachPanel: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 4)
+                // The same eye as the verdict line under the board, which is gone after a few
+                // seconds: the panel closes and the board shows the better move.
+                if MissedMove.exists(for: review) {
+                    Button {
+                        collapse()
+                        match.showMissedMove(review)
+                    } label: {
+                        Image(systemName: "eye")
+                            .font(.app(.subheadline, weight: .semibold))
+                            .foregroundStyle(Color.primary.opacity(0.6))
+                            .frame(width: 36, height: 36)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Show the better move")
+                    .accessibilityHint("Closes this panel and shows the move on the board.")
+                }
                 if let evaluation = review.evaluationForWhite {
                     let score = match.forPlayer(evaluation).label
                     EvalChip(text: score, color: review.grade.color(on: theme), large: true,
@@ -688,21 +707,39 @@ private struct CoachPanel: View {
         VStack(spacing: 0) {
             GoldRule(accent: accent)
             HStack(spacing: 0) {
-                StatTile(title: "Accuracy", value: match.accuracy.map { "\($0)%" } ?? "–",
+                StatTile(title: "Accuracy", number: match.accuracy, suffix: "%",
                          color: match.accuracy.map { MoveReview.Grade.forAccuracy($0).color(on: theme) } ?? .secondary)
                 StatDivider(accent: accent)
-                StatTile(title: "Best", value: "\(match.gradeCounts[.best, default: 0] + match.gradeCounts[.checkmate, default: 0])",
+                StatTile(title: "Best", number: match.gradeCounts[.best, default: 0] + match.gradeCounts[.checkmate, default: 0],
                          color: .primary)
                 StatDivider(accent: accent)
-                StatTile(title: "Mistakes", value: "\(match.gradeCounts[.mistake, default: 0])",
+                StatTile(title: "Mistakes", number: match.gradeCounts[.mistake, default: 0],
                          color: MoveReview.Grade.mistake.color(on: theme))
                 StatDivider(accent: accent)
-                StatTile(title: "Blunders", value: "\(match.gradeCounts[.blunder, default: 0])",
+                StatTile(title: "Blunders", number: match.gradeCounts[.blunder, default: 0],
                          color: MoveReview.Grade.blunder.color(on: theme))
             }
             .padding(.vertical, 12)
             GoldRule(accent: accent)
+            if let ratingLine {
+                Text(ratingLine)
+                    .font(.app(.caption, weight: .medium).monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 8)
+                    .transition(.opacity)
+            }
         }
+        .onAppear { ratingLine = ratingAfterThisGame() }
+    }
+
+    /// "Rating 1240 (+12)": what this game did to the number on Home. Nil until there is a
+    /// rating to show (three finished games), and for a game that was left unfinished.
+    private func ratingAfterThisGame() -> String? {
+        guard let vault, let game = match.savedGame(), game.result != .unfinished else { return nil }
+        let earlier = vault.games.filter { $0.id != game.id }
+        guard let now = HomeLadder(games: earlier + [game]).yourRating else { return nil }
+        guard let before = HomeLadder(games: earlier).yourRating, before != now else { return "Rating \(now)" }
+        return "Rating \(now) (\(now > before ? "+" : "−")\(abs(now - before)))"
     }
 
     // MARK: Leo's picks
@@ -1205,16 +1242,39 @@ private struct ActionButton: View {
 /// One number from the game's summary: the number, and its name in small capitals under it.
 private struct StatTile: View {
     let title: String
-    let value: String
+    /// Nil while the number isn't known yet: a dash stands in.
+    let number: Int?
+    var suffix = ""
     let color: Color
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The number on screen: it counts up from nothing as the summary arrives, and rolls to a
+    /// late grade's new total rather than cutting to it.
+    @State private var shown = 0.0
+
+    private var value: String { number.map { "\($0)\(suffix)" } ?? "–" }
 
     var body: some View {
         VStack(spacing: 3) {
-            Text(value)
+            Group {
+                if number == nil {
+                    Text("–")
+                } else {
+                    CountingText(value: shown, suffix: suffix)
+                }
+            }
                 .font(.app(.title2, weight: .bold).monospacedDigit())
                 .foregroundStyle(color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
+                .onChange(of: number, initial: true) { _, number in
+                    let target = Double(number ?? 0)
+                    if reduceMotion || Welcome.isUnderTest {
+                        shown = target
+                    } else {
+                        withAnimation(.easeOut(duration: 0.7)) { shown = target }
+                    }
+                }
             Text(title.uppercased())
                 .font(.app(.caption2, weight: .medium))
                 .tracking(0.8)
@@ -1229,6 +1289,21 @@ private struct StatTile: View {
 }
 
 /// A thin gold rule across the panel that fades out at both ends.
+/// A whole number that can be animated: SwiftUI redraws it at every step between two values.
+private struct CountingText: View, Animatable {
+    var value: Double
+    let suffix: String
+
+    var animatableData: Double {
+        get { value }
+        set { value = newValue }
+    }
+
+    var body: some View {
+        Text("\(Int(value.rounded()))\(suffix)")
+    }
+}
+
 private struct GoldRule: View {
     let accent: Color
 

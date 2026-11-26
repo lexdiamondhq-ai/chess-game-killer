@@ -31,6 +31,8 @@ struct BoardView: View {
     @AppStorage(BoardTheme.coordinatesKey) private var showsCoordinates = true
     /// Bumps a moment after each game the player wins, for the haptic.
     @State private var wins = 0
+    /// Bumps as each move's piece arrives on the flat board, for the haptic.
+    @State private var landed = 0
 
     private var game: GameModel { match.game }
     private var flipped: Bool { match.isBoardFlipped }
@@ -65,6 +67,13 @@ struct BoardView: View {
         theme.sculptedLook != nil && setting && SculptedAssets.shared.isLoaded
     }
 
+    /// Seconds until a move's piece has arrived on a flat board. The other side's piece glides
+    /// in for about a third of a second, and its knock, buzz and Check tag wait for it, as they
+    /// wait for touchdown on the 3D board. The person's own move stays instant under the finger.
+    static func flatLandingDelay(for move: PlayedMove, in game: GameModel) -> TimeInterval {
+        game.humanColors.contains(move.color) || UIAccessibility.isReduceMotionEnabled ? 0 : 0.3
+    }
+
     /// Width over height of the board: the 3D board, seen at an angle, is wider than tall
     /// (less so seen from above, as in Flat).
     static func aspect(_ theme: BoardTheme, setting: Bool, framing: SculptedCamera.Framing = .standing) -> CGFloat {
@@ -84,8 +93,20 @@ struct BoardView: View {
         }
         .aspectRatio(1, contentMode: .fit)
         // One tap as each move lands: firmer for a capture, a sharp knock for a check against the player.
-        .sensoryFeedback(trigger: game.moveCount) { _, _ in
+        .sensoryFeedback(trigger: landed) { _, _ in
             hapticsOn ? MoveFeel(of: game).feedback(heavy: false) : nil
+        }
+        .onChange(of: game.moveCount) { _, count in
+            let wait = game.lastPlayed.map { Self.flatLandingDelay(for: $0, in: game) } ?? 0
+            guard wait > 0 else {
+                landed += 1
+                return
+            }
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(wait))
+                // A move made in the meantime brings its own.
+                if game.moveCount == count { landed += 1 }
+            }
         }
         .sensoryFeedback(.selection, trigger: game.selected) { _, new in hapticsOn && new != nil }
         .sensoryFeedback(.success, trigger: wins) { _, _ in hapticsOn }
@@ -154,7 +175,9 @@ struct BoardView: View {
     }
 
     private func checkCallout(size sq: CGFloat) -> some View {
-        CheckCalloutLayer(game: game, color: calloutColor, anchor: { (square: Square) -> CGPoint in
+        CheckCalloutLayer(game: game, color: calloutColor, landing: { game in
+            game.lastPlayed.map { Self.flatLandingDelay(for: $0, in: game) } ?? 0
+        }, anchor: { (square: Square) -> CGPoint in
             calloutPoint(over: square, size: sq)
         })
         // Each game starts with a fresh layer: the move count runs on across games.
