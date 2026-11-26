@@ -304,6 +304,7 @@ final class SpeechListener: TalkListener {
         let audio = AVAudioSession.sharedInstance()
         try? audio.setActive(false, options: .notifyOthersOnDeactivation)
         try? audio.setCategory(saved.category, mode: saved.mode, options: saved.options)
+        Task { @MainActor in CoachVoice.pickUpMusic() }
     }
 
     // MARK: Permission

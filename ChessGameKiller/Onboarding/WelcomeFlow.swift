@@ -19,6 +19,8 @@ struct WelcomeFlow: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static let pages = 4
+    /// The way the last page turn went, so the pages slide the right way.
+    @State private var forward = true
 
     init(canStartGame: Bool = true, page: Int = 0,
          finish: @escaping (_ play: Bool, _ choice: WelcomeChoice) -> Void) {
@@ -58,9 +60,12 @@ struct WelcomeFlow: View {
         .animation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.45, dampingFraction: 0.88), value: page)
     }
 
+    /// Pages come in from the side you are heading to: Back slides the way you came.
     private var pageTransition: AnyTransition {
-        reduceMotion ? .opacity : .asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity),
-                                              removal: .move(edge: .leading).combined(with: .opacity))
+        let ahead: Edge = forward ? .trailing : .leading
+        let behind: Edge = forward ? .leading : .trailing
+        return reduceMotion ? .opacity : .asymmetric(insertion: .move(edge: ahead).combined(with: .opacity),
+                                                     removal: .move(edge: behind).combined(with: .opacity))
     }
 
     // MARK: Chrome
@@ -69,6 +74,7 @@ struct WelcomeFlow: View {
         HStack {
             if page > 0 {
                 Button {
+                    forward = false
                     page -= 1
                 } label: {
                     Image(systemName: "chevron.left")
@@ -104,7 +110,12 @@ struct WelcomeFlow: View {
         let last = page == Self.pages - 1
         VStack(spacing: 6) {
             Button {
-                if last { done(play: canStartGame) } else { page += 1 }
+                if last {
+                    done(play: canStartGame)
+                } else {
+                    forward = true
+                    page += 1
+                }
             } label: {
                 Text(primaryTitle)
                     .font(.app(.headline))
@@ -112,7 +123,8 @@ struct WelcomeFlow: View {
                     .padding(.vertical, 8)
             }
             .modifier(WelcomePrimaryButton(tone: tone, accent: accent))
-            if last, canStartGame {
+            // With the intro film still to come, both buttons would lead to the same place.
+            if last, canStartGame, !filmComesNext {
                 Button("Look around first") { done(play: false) }
                     .font(.app(.subheadline, weight: .semibold))
                     .foregroundStyle(.secondary)
@@ -123,8 +135,13 @@ struct WelcomeFlow: View {
 
     private var primaryTitle: String {
         guard page == Self.pages - 1 else { return "Continue" }
+        // The first time, Road to the Throne plays next and ends on the home, not in a game.
+        if filmComesNext { return "Begin" }
         return canStartGame ? "Play \(rival.name)" : "Done"
     }
+
+    /// The intro film follows this welcome (once, the first time).
+    private var filmComesNext: Bool { IntroFilm.shouldShow() }
 
     private func done(play: Bool) {
         choice.apply()

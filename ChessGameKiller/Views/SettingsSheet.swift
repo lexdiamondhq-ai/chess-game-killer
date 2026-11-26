@@ -353,6 +353,7 @@ struct BoardPreview: View {
     var pieceSet = PieceSet.stone
 
     @AppStorage(BoardTheme.coordinatesKey) private var showsCoordinates = true
+    @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.tilted
 
     private static let position = Position(fen: "r1bqk2r/ppp2ppp/2np1n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQK2R w KQkq - 0 6")
     private static let best = (from: Square.e1, to: Square.g1)
@@ -363,9 +364,11 @@ struct BoardPreview: View {
     var body: some View {
         if threeD, SculptedAssets.shared.isLoaded, let position = Self.position {
             // As tall as the flat preview, and as wide as the angled board needs.
+            // Tilted or Flat, as the Board view row below sets it.
             SculptedStillBoard(position: position, look: pieceSet.dress(theme.sculptedLook ?? .gilded), hints: stillHints,
-                               selected: Self.selected, targets: Self.targets)
-                .frame(width: size * SculptedBoardView.aspect, height: size)
+                               selected: Self.selected, targets: Self.targets, framing: tilt.framing)
+                .frame(width: size * tilt.framing.aspect, height: size)
+                .animation(.snappy(duration: 0.3), value: tilt)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(pieceSet == .stone ? "Preview of the \(theme.name) board"
                                     : "Preview of the \(theme.name) board with the \(pieceSet.title) pieces")

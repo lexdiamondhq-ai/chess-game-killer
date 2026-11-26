@@ -210,6 +210,7 @@ final class EndgameRunner {
     }
 
     private func respond(to played: PlayedMove) {
+        MoveSound.play(played, in: board, on: sounds)
         board.humanColors = []
         marks = []
         hintLevel = 0
@@ -260,7 +261,7 @@ final class EndgameRunner {
             becomeUnavailable()
             return
         }
-        sounds?.play(.move)
+        MoveSound.play(in: board, on: sounds)
         if board.isGameOver {
             endOfGame(after: nil)
             return

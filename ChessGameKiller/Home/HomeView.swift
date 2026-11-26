@@ -8,6 +8,9 @@ struct HomeActions {
     var play: () -> Void = {}
     /// Starts this game straight away.
     var start: (MatchController.Setup) -> Void = { _ in }
+    /// Starts this game from a rival's film: `closeFilm` takes the film away, and the board
+    /// comes up in its place without the home showing in between.
+    var startFromFilm: (MatchController.Setup, _ closeFilm: @escaping () -> Void) -> Void = { _, _ in }
     /// Opens the New Game sheet with this rival picked.
     var playRival: (MatchController.Level) -> Void = { _ in }
     var resume: () -> Void = {}
@@ -78,12 +81,13 @@ struct HomeView: View {
     @State private var interacting = false
     /// Ready to open again once the page is back near the top (before iOS 18).
     @State private var pullReady = true
-    /// Today's session, worked out once rather than on every redraw.
-    @State private var plan: SessionPlan?
+    /// Today's session, worked out once rather than on every redraw. It starts from what the
+    /// last Home showed (`HomeRecall`), so coming back from a game the page opens whole.
+    @State private var plan: SessionPlan? = HomeRecall.plan
     /// Your finest move of the week for Today, read from your games once rather than on every redraw.
-    @State private var finestMove: HomeFinestMove?
+    @State private var finestMove: HomeFinestMove? = HomeRecall.finestMove
     /// Your Chess DNA for the Home card, read from your games once rather than on every redraw.
-    @State private var dna: ChessDNA?
+    @State private var dna: ChessDNA? = HomeRecall.dna
     /// The board window has scrolled out of sight; the dock carries its button instead.
     @State private var windowGone = false
     /// The jewel's shortcuts are open above it.
@@ -248,6 +252,7 @@ struct HomeView: View {
             // The same plan as the Train page's Today card: Coach Leo's course while there is
             // course left, then real puzzles at the player's level aimed at what their games show.
             plan = await training.planToday(puzzles: puzzles, games: vault.games)
+            HomeRecall.plan = plan
         }
         .task(id: notesKey) { await readToday() }
     }
@@ -268,11 +273,13 @@ struct HomeView: View {
     private func readToday() async {
         let games: [SavedGame] = vault.games
         finestMove = await Task.detached(priority: .utility) { HomeFinestMove.pick(games: games) }.value
+        HomeRecall.finestMove = finestMove
         let stats = puzzles.themeStats
         let played = puzzles.progress.played
         dna = await Task.detached(priority: .utility) {
             ChessDNA.make(games: games, puzzleStats: stats, puzzlesPlayed: played)
         }.value
+        HomeRecall.dna = dna
     }
 
     // MARK: The page
@@ -742,7 +749,7 @@ extension HomeView {
         let puzzle: HomePuzzle? = dailyPuzzle
         let info = HomeStageInfo(upNext: upNext, day: dailyState, rating: HomeLadder(games: vault.games).yourRating,
                                  rankNumber: training.rankNumber, plan: plan, trainedToday: training.trainedToday,
-                                 masterpiece: HomeMasterpiece.of(), name: playerName,
+                                 masterpiece: HomeMasterpiece.today(), name: playerName,
                                  gameFEN: match.game.fen, todayFEN: puzzle?.fen, todaySolver: puzzle?.solver,
                                  pieceTheme: pieceTheme)
         let stageActions = HomeStageActions(
@@ -803,11 +810,19 @@ extension HomeView {
             }
             .fullScreenCover(item: $hall) { visit in
                 RivalsHall(start: visit.start, intro: visit.intro, begin: { level in
-                    // The film's last frame gives way to the game: the hall closes at once.
-                    var quiet = Transaction()
-                    quiet.disablesAnimations = true
-                    withTransaction(quiet) { hall = nil }
-                    playRival(level)
+                    // During a game the New Game sheet opens on that rival, as before.
+                    guard !upNext.inProgress else {
+                        var quiet = Transaction()
+                        quiet.disablesAnimations = true
+                        withTransaction(quiet) { hall = nil }
+                        playRival(level)
+                        return
+                    }
+                    // The film's last frame gives way to the game, never to the home under it.
+                    storedLevel = level.rawValue
+                    actions.startFromFilm(MatchController.Setup(playerColor: side.color, level: level, timeControl: timeControl)) {
+                        hall = nil
+                    }
                 }, close: { hall = nil })
             }
     }
@@ -836,6 +851,15 @@ extension HomeView {
     private func showFilm(_ level: MatchController.Level) {
         hall = HallVisit(start: level, intro: true)
     }
+}
+
+/// What Home last worked out from the player's games, kept while the app runs. Home is built
+/// again each time a game is left, and without this its cards arrived a moment after the page
+/// and pushed it down.
+enum HomeRecall {
+    static var plan: SessionPlan?
+    static var finestMove: HomeFinestMove?
+    static var dna: ChessDNA?
 }
 
 /// One visit to the rivals' hall: the rival it opens on (nil: the one up next) and whether that
@@ -1146,7 +1170,7 @@ extension HomeView {
                     .transition(.opacity)
                     .homeRise(4)
             }
-            if let masterpiece = HomeMasterpiece.of() {
+            if let masterpiece = HomeMasterpiece.today() {
                 HomeMasterpieceTile(masterpiece: masterpiece, tone: tone, pieceTheme: pieceTheme,
                                     open: actions.analyzePosition)
                     .homeRise(5)

@@ -36,6 +36,8 @@ struct ChessGameKillerApp: App {
                                     match: showcase.match, coachOpen: showcase.coachOpen)
                     } else {
                         ContentView()
+                            // The launch screen's picture stays over the first frame and fades.
+                            .modifier(LaunchFade())
                     }
                 }
                 .challengeHost()
@@ -52,6 +54,34 @@ struct ChessGameKillerApp: App {
         return ["XCTestConfigurationFilePath", "XCTestBundlePath", "XCTestSessionIdentifier"]
             .contains { environment[$0] != nil }
     }()
+}
+
+/// The launch screen's own picture (Home's cream, the gold knight in the middle), kept over the
+/// app's first frame and faded away, so the app arrives out of its launch screen instead of
+/// cutting from it (Alex's pick, 2026-11-26).
+struct LaunchFade: ViewModifier {
+    /// Tests and screenshots start on the app itself.
+    @State private var covered = !Welcome.isUnderTest
+
+    func body(content: Content) -> some View {
+        content
+            .overlay {
+                if covered {
+                    ZStack {
+                        Color("LaunchBackground")
+                        Image("launch-knight")
+                    }
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+                    .accessibilityHidden(true)
+                }
+            }
+            .task {
+                // A beat for the first frame behind it to be drawn, then the dissolve.
+                try? await Task.sleep(for: .milliseconds(150))
+                withAnimation(.easeOut(duration: 0.45)) { covered = false }
+            }
+    }
 }
 
 /// Gilded, the black-and-gold set, replaced Noir as the default look. The first launch with it

@@ -79,6 +79,11 @@ struct DungeonView: View {
     @State private var refresh = 0
     /// How many times the cell had been held before this visit.
     @State private var heldBefore = 0
+    /// The cell just escaped, its lock still drawn shut for a beat so it is seen to open.
+    @State private var opening: EndgameStudy.ID?
+    /// Counts the escapes seen, for the buzz and the lock's bounce.
+    @State private var escapes = 0
+    @AppStorage("haptics") private var hapticsOn = true
 
     var body: some View {
         let cells = DungeonCells.all()
@@ -101,6 +106,7 @@ struct DungeonView: View {
             .padding(.bottom, 32)
         }
         .scrollIndicators(.hidden)
+        .sensoryFeedback(.success, trigger: escapes) { _, _ in hapticsOn }
         .fullScreenCover(item: $playing, onDismiss: noteEscape) { study in
             // Alone: holding the cell ends on Done, back here where the lock opens, not on the
             // next study of Learn's endgame course.
@@ -111,7 +117,7 @@ struct DungeonView: View {
     }
 
     private func todayCard(_ cell: EndgameStudy, number: Int) -> some View {
-        let escaped = DungeonCells.escapedToday()
+        let escaped = DungeonCells.escapedToday() && opening != cell.id
         let run = DungeonCells.run()
         return CastleCard {
             VStack(alignment: .leading, spacing: 12) {
@@ -119,6 +125,8 @@ struct DungeonView: View {
                     Image(systemName: escaped ? "lock.open.fill" : "lock.fill")
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(escaped ? CastleStyle.gold : CastleStyle.ink)
+                        .contentTransition(.symbolEffect(.replace))
+                        .symbolEffect(.bounce, value: escapes)
                     Text("TODAY'S CELL · \(number)")
                         .font(.custom(CastleStyle.titleFont, size: 15, relativeTo: .headline))
                         .tracking(1.5)
@@ -160,12 +168,14 @@ struct DungeonView: View {
 
     /// One lock for every cell, open once escaped.
     private func cellRow(_ cells: [EndgameStudy]) -> some View {
-        let escaped = DungeonCells.escapedStudies()
+        var escaped = DungeonCells.escapedStudies()
+        if let opening { escaped.remove(opening) }
         return CastleCard(padding: 14) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 0) {
                     ForEach(cells) { cell in
                         Image(systemName: escaped.contains(cell.id) ? "lock.open.fill" : "lock.fill")
+                            .contentTransition(.symbolEffect(.replace))
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(escaped.contains(cell.id) ? CastleStyle.gold : CastleStyle.ink2.opacity(0.6))
                             .frame(maxWidth: .infinity)
@@ -189,7 +199,20 @@ struct DungeonView: View {
         enteredOn = nil
         guard let record = EndgameProgress.shared.records[cell.id],
               record.completions > heldBefore else { return }
+        let firstEscape = !DungeonCells.escapedToday(day)
         DungeonCells.markEscaped(cell, on: day)
-        refresh += 1
+        guard firstEscape else {
+            refresh += 1
+            return
+        }
+        // The door opens: the lock stays shut for a beat, then swings open with a buzz and
+        // the chime, so the escape is seen rather than found already done.
+        opening = cell.id
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(450))
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) { opening = nil }
+            escapes += 1
+            SoundPlayer.shared.play(.win)
+        }
     }
 }

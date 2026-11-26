@@ -55,6 +55,7 @@ final class OpeningDrillRunner {
     }
 
     private func moved(_ played: PlayedMove) {
+        MoveSound.play(played, in: board)
         board.humanColors = []
         if played.uci == moves[index] {
             index += 1
@@ -91,7 +92,7 @@ final class OpeningDrillRunner {
                 try? await Task.sleep(for: .milliseconds(450))
                 guard !Task.isCancelled else { return }
                 self.board.playEngineMove(self.moves[self.index])
-                SoundPlayer.shared.play(.move)
+                MoveSound.play(in: self.board)
                 self.index += 1
             }
             if self.index >= self.moves.count {

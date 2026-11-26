@@ -103,7 +103,9 @@ final class SoundPlayer: SoundPlaying {
     private init() {
         // Ambient: respects the silent switch and mixes with the player's music.
         try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
-        for sound in GameSound.allCases {
+        // A move and a capture play the soft tocks (`takes(of:)`), so their own older takes
+        // are never heard: leaving them out spares two dozen players at launch.
+        for sound in GameSound.allCases where sound != .move && sound != .capture {
             if let takes = Self.load(sound, named: sound.rawValue) { players[sound] = takes }
         }
     }

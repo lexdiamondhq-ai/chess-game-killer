@@ -24,9 +24,16 @@ struct RivalFilm {
 
     var filmURL: URL? { Bundle.main.url(forResource: "rival-\(rival.slug)-film", withExtension: "mp4") }
     var themeURL: URL? { Bundle.main.url(forResource: "rival-\(rival.slug)-theme", withExtension: "mp3") }
+    /// The film's still, read from the app once: the hall asks for it on every redraw, and
+    /// reading a 900 by 1600 picture each time cost frames as the cards were swiped.
     var cardImage: UIImage? {
-        Bundle.main.path(forResource: "rival-\(rival.slug)-card", ofType: "jpg").flatMap(UIImage.init(contentsOfFile:))
+        let name = "rival-\(rival.slug)-card"
+        if let kept = Self.stills.object(forKey: name as NSString) { return kept }
+        guard let image = Bundle.main.path(forResource: name, ofType: "jpg").flatMap(UIImage.init(contentsOfFile:)) else { return nil }
+        Self.stills.setObject(image, forKey: name as NSString)
+        return image
     }
+    private static let stills = NSCache<NSString, UIImage>()
 
     /// The rival before this one on the ladder, nil for the Cub.
     var previous: Rival? {
@@ -216,6 +223,13 @@ final class RivalTheme {
             player.play()
         }
         player.setVolume(Self.volume, fadeDuration: 3)
+    }
+
+    /// The sound was handed back after Leo spoke or listened, which can stop a theme in the
+    /// middle of its game: it picks up again.
+    func pickUp() {
+        guard let level = playing, player?.isPlaying != true else { return }
+        play(level)
     }
 
     /// Fades the theme out, as the game ends or leaves the screen.

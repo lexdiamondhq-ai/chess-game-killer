@@ -574,8 +574,12 @@ final class DrillRunnerTests: XCTestCase {
             try await started(runner)
             move(runner, "a1a8")
             XCTAssertEqual(runner.outcome, .firstTry)
-            let last = try XCTUnwrap(sounds.played.last)
+            // A clean solve chimes just after the piece is down.
+            let chime = try XCTUnwrap(sounds.played.last)
+            XCTAssertEqual(chime.sound, .win)
+            let last = try XCTUnwrap(sounds.played.last(where: { $0.sound != .win }))
             XCTAssertEqual(last.sound, .check)
+            XCTAssertEqual(chime.delay, last.delay + DrillRunner.chimeAfterLanding, accuracy: 0.001)
             if threeD {
                 // The rook glides seven squares: about half a second.
                 XCTAssertGreaterThan(last.delay, 0.3)

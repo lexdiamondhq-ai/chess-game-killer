@@ -113,13 +113,24 @@ struct ArmyNewsBanner: View {
     let news: ArmyNews
     let color: Piece.Color
     let theme: BoardTheme
-    let open: () -> Void
+    /// Opens the army. Nil: a row to read, as in the end-of-game summary.
+    let open: (() -> Void)?
 
     var body: some View {
+        if let open {
+            Button(action: open) { row(opens: true) }
+                .buttonStyle(.plain)
+                .accessibilityHint("Opens your army")
+        } else {
+            row(opens: false)
+                .accessibilityElement(children: .combine)
+        }
+    }
+
+    private func row(opens: Bool) -> some View {
         let piece = Piece(news.slot.kind, color: color, square: .a1)
         let tint = news.rank.pageColor(for: piece, theme: theme)
-        Button(action: open) {
-            HStack(spacing: 12) {
+        return HStack(spacing: 12) {
                 PieceImage(piece: piece, theme: theme, size: 38)
                     .modifier(VeteranAura(rank: news.rank, piece: piece, theme: theme, size: 38, onBoard: false))
                 VStack(alignment: .leading, spacing: 2) {
@@ -140,16 +151,15 @@ struct ArmyNewsBanner: View {
                     }
                 }
                 Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.app(.footnote, weight: .bold))
-                    .foregroundStyle(.secondary)
+                if opens {
+                    Image(systemName: "chevron.right")
+                        .font(.app(.footnote, weight: .bold))
+                        .foregroundStyle(.secondary)
+                }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .trainingCard(theme, tint: tint, cornerRadius: 18)
-        }
-        .buttonStyle(.plain)
-        .accessibilityHint("Opens your army")
     }
 }
 

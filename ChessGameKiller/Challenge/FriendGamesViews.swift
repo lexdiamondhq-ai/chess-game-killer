@@ -191,7 +191,7 @@ struct FriendRowPressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .background(Color.primary.opacity(configuration.isPressed ? 0.07 : 0))
-            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
+            .animation(Motion.press, value: configuration.isPressed)
     }
 }
 

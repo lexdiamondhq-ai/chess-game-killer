@@ -84,7 +84,11 @@ struct ClockLabel: View {
         TimelineView(.periodic(from: .now, by: isRunning ? 0.1 : 60)) { _ in
             let remaining = clock.remaining(for: color)
             let urgent = isRunning && remaining < .seconds(10)
-            Text(remaining.clockLabel)
+            // As wide as its widest reading, so "0:10" turning into "0:09.9" moves nothing.
+            ZStack {
+                Text("0:00.0").hidden()
+                Text(remaining.clockLabel)
+            }
                 .font(.app(size: size, weight: .semibold).monospacedDigit())
                 .foregroundStyle(urgent ? Color(hex: 0xFF4D6D) : (isRunning ? Color.primary : Color.secondary))
                 .lineLimit(1)

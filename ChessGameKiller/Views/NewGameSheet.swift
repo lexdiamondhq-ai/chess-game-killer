@@ -298,7 +298,7 @@ struct NewGameSheet: View {
 
     /// Applies a choice, then folds the row back up a beat later so the check is seen.
     private func choose(_ change: @escaping () -> Void) {
-        withAnimation(.snappy) { change() }
+        withAnimation(Motion.change) { change() }
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(260))
             openRow = nil

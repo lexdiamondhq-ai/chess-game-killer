@@ -148,6 +148,8 @@ struct CalculationView: View {
     @AppStorage("calc.blindfold") private var blindfold = false
     /// The longest run of right answers, kept for the Calculation door.
     @AppStorage(Self.bestStreakKey) private var bestStreak = 0
+    /// The answer just given took the streak past the best one (a tie isn't a new best).
+    @State private var beatBest = false
     @State private var runner: CalcRunner?
 
     static let bestStreakKey = "calc.bestStreak"
@@ -202,6 +204,7 @@ struct CalculationView: View {
         .onChange(of: blindfold) { _, _ in restart() }
         .onChange(of: runner?.solved) { _, solved in
             guard let runner, solved != nil, runner.phase == .right else { return }
+            beatBest = runner.streak > bestStreak
             bestStreak = max(bestStreak, runner.streak)
             training?.recordPractice(xp: 4 + 2 * runner.depth)
         }
@@ -230,7 +233,7 @@ struct CalculationView: View {
             let side = runner.player == .white ? "White" : "Black"
             return "Play the moves above in your head. Then find \(side)'s winning move: tap its piece's square, then where it goes."
         case .right:
-            let record = runner.streak >= bestStreak && runner.streak > 1 ? " A new best!" : ""
+            let record = beatBest && runner.streak > 1 ? " A new best!" : ""
             return "Yes, \(runner.answerSAN)! That's the position you saw in your head. Streak \(runner.streak).\(record)"
         case .wrong: return "The move was \(runner.answerSAN). Here's the position you were picturing."
         }

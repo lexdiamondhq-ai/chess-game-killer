@@ -190,6 +190,7 @@ extension AnalyzeSheet {
             // The analysis board straight away, while the photo is read (Alex, 2026-11-13,
             // "Board right away"): its pieces and arrows come in when the reading lands.
             AnalysisView(draft: .empty, theme: theme, engine: nil, rival: rival, clock: clock,
+                         photo: session.photo,
                          readingPhoto: true,
                          onStopReading: { withAnimation(.snappy) { session.stopReading() } },
                          onLeaveReading: { session.leaveReading() }) { _ in }
@@ -630,9 +631,18 @@ struct AnalysisView: View {
     @State private var flipped: Bool
     @State private var showingPhoto = false
     @State private var showingHelp = false
+    /// The two lines as last shown, kept to hold their place while the next position is looked at.
+    @State private var lastLines: [LineText] = []
     @AppStorage("haptics") private var hapticsOn = true
     @AppStorage("sculpted3D") private var sculpted3D = true
     @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.tilted
+
+    /// A line as it reads on screen: its first move, its score and the moves after.
+    private struct LineText: Equatable {
+        let move: String?
+        let score: String
+        let line: String
+    }
 
     /// `model` is the board to pick up where it was left, when there is one.
     init(draft: PositionDraft, theme: BoardTheme, engine: ChessEngine?, model: AnalysisModel? = nil,
@@ -831,9 +841,12 @@ struct AnalysisView: View {
         ScrollView {
             VStack(spacing: 14) {
                 if readingPhoto {
+                    // The same rows over the board as the analysis has, so the board keeps its
+                    // place when the reading lands and only its pieces and arrows arrive.
+                    readingPhotoRow
+                    readingHeader
                     board
                         .allowsHitTesting(false)
-                    readingPill
                 } else {
                     photoRow
                     header
@@ -848,6 +861,9 @@ struct AnalysisView: View {
             }
             .padding(16)
             .animation(.snappy, value: model.lines)
+            .onChange(of: model.lines, initial: true) {
+                if !model.lines.isEmpty { lastLines = lineTexts }
+            }
             .animation(.snappy(duration: 0.25), value: model.statusNote)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -926,21 +942,32 @@ struct AnalysisView: View {
 
     // MARK: The photo
 
-    /// Under the empty board while the photo is read: the knight tracing itself, and what's
-    /// happening. The pieces take its place in about three seconds.
-    private var readingPill: some View {
-        HStack(spacing: 10) {
-            KnightTraceMark()
-                .frame(width: 20, height: 25)
-            Text("Reading your board…")
-                .font(.app(.subheadline, weight: .semibold))
+    /// Over the empty board while the photo is read, where the verdict will be: the knight
+    /// tracing itself, what's happening, and the bar at rest. The verdict takes its place in
+    /// about three seconds, and the board under it doesn't move.
+    private var readingHeader: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                KnightTraceMark()
+                    .frame(width: 16, height: 20)
+                Text("Reading your board…")
+                    .font(.app(.headline))
+                Spacer()
+            }
+            EvaluationBar(winningChances: 0, theme: theme)
         }
-        .padding(.horizontal, 18)
-        .frame(minHeight: 44)
-        .glassPane(Capsule())
-        .frame(maxWidth: .infinity)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("Reading your board")
+    }
+
+    /// The photo being read, in the row the analysis keeps it in. Edit position waits for the reading.
+    @ViewBuilder
+    private var readingPhotoRow: some View {
+        if let photo {
+            PhotoSourceRow(photo: photo, doubts: nil, theme: theme, canEdit: false) {
+                showingPhoto = true
+            } onEdit: {}
+        }
     }
 
     /// The photo the position was read from, with the way to fix its pieces.
@@ -966,26 +993,31 @@ struct AnalysisView: View {
                 .foregroundStyle(accent)
                 .frame(maxWidth: .infinity, alignment: .leading)
         } else {
+            // While the next position is first looked at, the last verdict stays (dimmed) and
+            // the bar holds, rather than both swinging to even and back on every move.
+            let shown = model.shownEvaluationForWhite
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text(headline)
                         .font(.app(.headline))
                     Spacer()
-                    if let evaluation = model.evaluationForWhite {
-                        Text(evaluation.label)
+                    if let shown {
+                        Text(shown.label)
                             .font(.app(.headline).monospacedDigit())
                             .contentTransition(.numericText())
                     }
                 }
-                EvaluationBar(winningChances: model.evaluationForWhite?.winningChances ?? 0, theme: theme)
+                .opacity(model.isHoldingLastAnswer ? 0.5 : 1)
+                .animation(.easeOut(duration: 0.15), value: model.isHoldingLastAnswer)
+                EvaluationBar(winningChances: shown?.winningChances ?? 0, theme: theme)
             }
         }
     }
 
     /// The verdict, or why there isn't one.
     private var headline: String {
-        if model.evaluationForWhite != nil {
-            return model.verdict(white: "White", black: "Black")
+        if let shown = model.shownEvaluationForWhite {
+            return AnalysisModel.verdict(shown, white: "White", black: "Black")
         }
         if model.failed {
             return model.draft.problems.first?.message(white: "White", black: "Black") ?? "Couldn't evaluate this position"
@@ -1088,10 +1120,15 @@ struct AnalysisView: View {
     @ViewBuilder
     private var lines: some View {
         if model.ending == nil {
+            // While the next position is first looked at, the last two lines stay, dimmed and
+            // not for tapping, so the panel doesn't fold shut and open again on every move.
+            let live = lineTexts
+            let holding = live.isEmpty && model.isThinking
             VStack(alignment: .leading, spacing: 12) {
-                ForEach(Array(model.lines.prefix(2).enumerated()), id: \.offset) { index, line in
+                ForEach(Array((holding ? lastLines : live).enumerated()), id: \.offset) { index, text in
                     Button {
-                        if let uci = line.firstMove { model.play(uci, fromLine: true) }
+                        guard !holding, index < model.lines.count, let uci = model.lines[index].firstMove else { return }
+                        model.play(uci, fromLine: true)
                     } label: {
                         VStack(alignment: .leading, spacing: 4) {
                             HStack(spacing: 8) {
@@ -1099,16 +1136,16 @@ struct AnalysisView: View {
                                 Text(index == 0 ? "Best" : "Next best")
                                     .font(.app(.subheadline))
                                     .foregroundStyle(.secondary)
-                                if index < model.hints.count {
-                                    Text(model.hints[index].san)
+                                if let move = text.move {
+                                    Text(move)
                                         .font(.app(.headline))
                                 }
                                 Spacer()
-                                Text(scoreLabel(line))
+                                Text(text.score)
                                     .font(.app(.subheadline, weight: .semibold).monospacedDigit())
                                     .foregroundStyle(.secondary)
                             }
-                            Text(model.readable(line))
+                            Text(text.line)
                                 .font(.app(.footnote))
                                 .foregroundStyle(.secondary)
                                 .multilineTextAlignment(.leading)
@@ -1117,12 +1154,14 @@ struct AnalysisView: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .disabled(holding)
+                    .opacity(holding ? 0.45 : 1)
                     .accessibilityElement(children: .combine)
                     .accessibilityHint("Plays this move on the board")
                 }
                 HStack(spacing: 8) {
                     if model.isThinking {
-                        ProgressView().controlSize(.small)
+                        KnightWait(size: 16)
                         Text(model.depth == 0 ? "Stockfish is thinking" : "Looking deeper")
                     } else if model.failed {
                         Image(systemName: "exclamationmark.triangle.fill")
@@ -1144,6 +1183,14 @@ struct AnalysisView: View {
     private func scoreLabel(_ line: EngineLine) -> String {
         (model.draft.sideToMove == .white ? line.evaluation : line.evaluation.flipped).label
     }
+
+    /// The engine's two lines as they read on screen now.
+    private var lineTexts: [LineText] {
+        model.lines.prefix(2).enumerated().map { index, line in
+            LineText(move: index < model.hints.count ? model.hints[index].san : nil,
+                     score: scoreLabel(line), line: model.readable(line))
+        }
+    }
 }
 
 /// Over the analysis of a photo: the photo to compare with, what the reader wasn't sure of,
@@ -1153,6 +1200,8 @@ private struct PhotoSourceRow: View {
     let photo: UIImage
     let doubts: String?
     let theme: BoardTheme
+    /// False while the photo is still being read: there are no pieces to edit yet.
+    var canEdit = true
     let onShowPhoto: () -> Void
     let onEdit: () -> Void
 
@@ -1185,6 +1234,7 @@ private struct PhotoSourceRow: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
+            .disabled(!canEdit)
             .accessibilityHint("Move, add or take off pieces, or change whose turn it is, then analyze again")
         }
         .padding(10)

@@ -363,6 +363,50 @@ struct BoardKnightRimSegment: Shape {
     KnightLoadingView().preferredColorScheme(.dark)
 }
 
+/// The app's own waiting mark, wherever a system spinner would stand beside or over a line of
+/// words: the knight's outline with a spark running round it (Alex's pick, 2026-11-26, "use the
+/// gold knight in every wait"). Small spinners inside buttons stay as they are.
+struct KnightWait: View {
+    /// Its height: about 18 beside a line of words, 44 on a page of its own.
+    var size: CGFloat = 18
+
+    var body: some View {
+        KnightTraceMark()
+            .frame(width: (size * 0.8).rounded(), height: size)
+    }
+}
+
+/// A page that is only a wait: the knight over what is being waited for.
+struct KnightWaitPage: View {
+    let title: String
+
+    var body: some View {
+        VStack(spacing: 12) {
+            KnightWait(size: 44)
+            Text(title)
+                .font(.app(.subheadline))
+                .foregroundStyle(.secondary)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+    }
+}
+
+/// Fades a loader in only when the wait outlasts a moment, so a quick load never flashes one.
+struct LateFadeIn: ViewModifier {
+    @State private var shown = Welcome.isUnderTest
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(shown ? 1 : 0)
+            .task {
+                try? await Task.sleep(for: .milliseconds(400))
+                guard !Task.isCancelled else { return }
+                withAnimation(.easeIn(duration: 0.25)) { shown = true }
+            }
+    }
+}
+
 /// The same knight and spark at pill size, beside "Reading your board…" while a photo is read
 /// over its analysis board (Alex, 2026-11-13, "Board right away"): the outline with a small
 /// spark running round it, and no big glow.
