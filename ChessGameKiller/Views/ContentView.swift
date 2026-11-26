@@ -45,6 +45,9 @@ struct ContentView: View {
     @State private var army = ArmyStore.live()
     @State private var showingArmy = false
     @State private var armyNews: ArmyNews?
+    /// Black behind a rival's film as it gives way to its game: the film's last frame cuts to
+    /// this and the board fades up from it, so the home (or the game before) never shows between.
+    @State private var filmCurtain = false
     /// Army news waiting for its turn as the banner, and the task that shows them in order.
     @State private var newsQueue: [ArmyNews] = []
     @State private var newsTurn: Task<Void, Never>?
@@ -204,6 +207,11 @@ struct ContentView: View {
         let _ = ThemeFont.use(theme)
         presented
             .overlay {
+                if filmCurtain {
+                    Color.black.ignoresSafeArea().transition(.opacity)
+                }
+            }
+            .overlay {
                 if showingWelcome {
                     WelcomeFlow(canStartGame: !match.newGameForfeits, page: Welcome.showcasePage()) { play, choice in
                         finishWelcome(play: play, choice: choice)
@@ -343,14 +351,9 @@ struct ContentView: View {
             // game shouldn't skip them). Backing out is "Look around first".
             .fullScreenCover(item: $welcomeFilm) { film in
                 RivalsHall(start: film.id, intro: true, begin: { level in
-                    // The film's last frame gives way to the game: the hall closes at once.
-                    var quiet = Transaction()
-                    quiet.disablesAnimations = true
-                    withTransaction(quiet) { welcomeFilm = nil }
                     var setup = film.choice.setup()
                     setup.level = level
-                    withAnimation(.snappy) { match.start(setup) }
-                    leaveHome()
+                    startGame(setup, underFilm: { welcomeFilm = nil })
                 }, close: {
                     welcomeFilm = nil
                     lookAround()
@@ -360,14 +363,11 @@ struct ContentView: View {
             // on the side and clock of the game just played (Alex, 2026-11-11, audit pick R2).
             .fullScreenCover(item: $nextRivalFilm) { film in
                 RivalsHall(start: film.id, intro: true, begin: { level in
-                    var quiet = Transaction()
-                    quiet.disablesAnimations = true
-                    withTransaction(quiet) { nextRivalFilm = nil }
                     var setup = MatchController.Setup(playerColor: film.setup.playerColor, level: level,
                                                       timeControl: film.setup.timeControl)
                     setup.opponent = film.setup.opponent
                     UserDefaults.standard.set(level.rawValue, forKey: "setup.level")
-                    withAnimation(.snappy) { match.start(setup) }
+                    startGame(setup, underFilm: { nextRivalFilm = nil })
                 }, close: { nextRivalFilm = nil })
             }
             .fullScreenCover(item: $coach.presentedLesson) { lesson in
@@ -540,6 +540,7 @@ struct ContentView: View {
                 withAnimation(.snappy) { match.start(setup) }
                 leaveHome()
             },
+            startFromFilm: { setup, closeFilm in startGame(setup, underFilm: closeFilm) },
             playRival: { level in
                 // The New Game sheet opens on this rival.
                 UserDefaults.standard.set(level.rawValue, forKey: "setup.level")
@@ -714,10 +715,38 @@ struct ContentView: View {
         if !showingHome, !match.hasStarted { showingNewGame = true }
     }
 
-    private func leaveHome() {
+    /// Begin on a rival's film. The film cuts to black (`closeFilm` takes it away at once),
+    /// the game is set up behind the black, and the board fades up: the home, or the game
+    /// just finished, is never seen between the film and the game.
+    private func startGame(_ setup: MatchController.Setup, underFilm closeFilm: @escaping () -> Void) {
+        var quiet = Transaction()
+        quiet.disablesAnimations = true
+        withTransaction(quiet) {
+            filmCurtain = true
+            closeFilm()
+        }
+        Task { @MainActor in
+            // A beat, so the film is gone before the screen that showed it is.
+            try? await Task.sleep(for: .milliseconds(80))
+            withTransaction(quiet) {
+                setCoach(expanded: false)
+                match.start(setup)
+                leaveHome(animated: false)
+            }
+            // Pieces walking home from a game just finished do it behind the black.
+            try? await Task.sleep(for: .milliseconds(120))
+            withAnimation(.easeInOut(duration: 0.45)) { filmCurtain = false }
+        }
+    }
+
+    private func leaveHome(animated: Bool = true) {
         guard showingHome else { return }
         homeLit = false
-        withAnimation(.easeInOut(duration: 0.35)) { showingHome = false }
+        if animated {
+            withAnimation(.easeInOut(duration: 0.35)) { showingHome = false }
+        } else {
+            showingHome = false
+        }
         // Back to a rival game under way: its theme picks up where going home faded it.
         if match.hasStarted, !match.isOver { RivalTheme.shared.resume(match.setup) }
     }

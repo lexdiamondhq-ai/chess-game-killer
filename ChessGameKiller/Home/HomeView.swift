@@ -8,6 +8,9 @@ struct HomeActions {
     var play: () -> Void = {}
     /// Starts this game straight away.
     var start: (MatchController.Setup) -> Void = { _ in }
+    /// Starts this game from a rival's film: `closeFilm` takes the film away, and the board
+    /// comes up in its place without the home showing in between.
+    var startFromFilm: (MatchController.Setup, _ closeFilm: @escaping () -> Void) -> Void = { _, _ in }
     /// Opens the New Game sheet with this rival picked.
     var playRival: (MatchController.Level) -> Void = { _ in }
     var resume: () -> Void = {}
@@ -803,11 +806,19 @@ extension HomeView {
             }
             .fullScreenCover(item: $hall) { visit in
                 RivalsHall(start: visit.start, intro: visit.intro, begin: { level in
-                    // The film's last frame gives way to the game: the hall closes at once.
-                    var quiet = Transaction()
-                    quiet.disablesAnimations = true
-                    withTransaction(quiet) { hall = nil }
-                    playRival(level)
+                    // During a game the New Game sheet opens on that rival, as before.
+                    guard !upNext.inProgress else {
+                        var quiet = Transaction()
+                        quiet.disablesAnimations = true
+                        withTransaction(quiet) { hall = nil }
+                        playRival(level)
+                        return
+                    }
+                    // The film's last frame gives way to the game, never to the home under it.
+                    storedLevel = level.rawValue
+                    actions.startFromFilm(MatchController.Setup(playerColor: side.color, level: level, timeControl: timeControl)) {
+                        hall = nil
+                    }
                 }, close: { hall = nil })
             }
     }
