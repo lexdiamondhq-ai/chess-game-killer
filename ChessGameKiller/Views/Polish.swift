@@ -93,14 +93,19 @@ extension EnvironmentValues {
 }
 
 extension BoardTheme {
-    /// The metal this look's edges are cut from: nil for the app's gold, which every warm look
-    /// wears; its own on the looks whose metal is not gold.
+    /// The metal the game screen's edges are cut from: nil for the app's gold, which every warm
+    /// look wears; Sculpted's silver; and the lit color of Neon and the rivals' boards.
     var polishMetal: Color? {
         switch id {
-        case .sculpted, .neon, .spark, .drift, .pulse, .vector, .singularity: return trainingAccent
+        case .sculpted: return trainingAccent
+        case .neon, .spark, .drift, .pulse, .vector, .singularity: return accent
         default: return nil
         }
     }
+
+    /// The same for the screens around the board, which wear the home's metal (see
+    /// `screenScheme`): gold on every look but Sculpted.
+    var screenPolishMetal: Color? { id == .sculpted ? trainingAccent : nil }
 }
 
 /// A shape's gilded edge (see `Polish`).

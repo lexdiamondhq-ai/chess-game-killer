@@ -13,7 +13,14 @@ enum VineGold {
     static let metal = LinearGradient(colors: [light, deep, bright], startPoint: .top, endPoint: .bottom)
 
     /// Gold words: warm on dark rooms, a deeper gold on light ones so they still read.
-    static func text(_ theme: BoardTheme) -> Color { theme.isDark ? Color(hex: 0xE6C06A) : Color(hex: 0x8C6620) }
+    static func text(_ theme: BoardTheme) -> Color { theme.screenIsDark ? Color(hex: 0xE6C06A) : Color(hex: 0x8C6620) }
+
+    /// The carved title: the vine's own metal on dark rooms, a deeper cut on light ones.
+    static func title(_ theme: BoardTheme) -> LinearGradient {
+        guard !theme.screenIsDark else { return metal }
+        return LinearGradient(colors: [Color(hex: 0xC99436), Color(hex: 0x8C6620), Color(hex: 0xB7832E)],
+                              startPoint: .top, endPoint: .bottom)
+    }
 
     static func carved(_ size: CGFloat) -> Font { .custom("Cinzel-Bold", size: size) }
 }
@@ -151,7 +158,7 @@ struct LearningVinePage: View {
                 Text("YOUR VINE")
                     .font(VineGold.carved(30))
                     .tracking(2.5)
-                    .foregroundStyle(VineGold.metal)
+                    .foregroundStyle(VineGold.title(theme))
                     .accessibilityAddTraits(.isHeader)
                 Text(subtitle)
                     .font(.app(.subheadline))
