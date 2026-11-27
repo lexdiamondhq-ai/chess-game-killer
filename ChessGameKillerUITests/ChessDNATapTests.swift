@@ -14,8 +14,7 @@ final class ChessDNATapTests: TapTestCase {
     func testBackFromChessDNAIsLearn() {
         openChessDNA()
         goBack(to: "Learn")
-        tap(buttons(startingWith: "Your vine"), "The vine on Learn")
-        expect(anything(labeled: "YOUR VINE"), "Tapping the vine on Learn did not open the vine's page")
+        openVine()
     }
 
     /// The card on top opens the whole profile.

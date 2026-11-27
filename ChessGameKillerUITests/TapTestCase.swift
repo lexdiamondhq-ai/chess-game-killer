@@ -44,6 +44,22 @@ class TapTestCase: XCTestCase {
         expectPage(door, after: "Tapping the \(door) door")
     }
 
+    /// The vine's own page, opened by its card on Learn.
+    ///
+    /// The page is known by words it says and Learn does not ("3 leaves grown"). The card and
+    /// the page both carry "YOUR VINE", so those words can't tell one from the other.
+    func openVine(file: StaticString = #filePath, line: UInt = #line) {
+        let grown = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'grown'"))
+        if grown.firstMatch.exists {
+            fail("Learn already says what only the vine's page should", file: file, line: line)
+        }
+        tap(vineCard, "The vine on Learn", file: file, line: line)
+        expect(grown.firstMatch, "Tapping the vine on Learn did not open the vine's page", file: file, line: line)
+    }
+
+    /// The vine's card on Learn.
+    var vineCard: XCUIElementQuery { buttons(startingWith: "Your vine") }
+
     // MARK: Finding
 
     // The Home stays in the accessibility tree under a screen opened over it, so a search can
@@ -279,10 +295,7 @@ class TapTestCase: XCTestCase {
     /// Prints what is on the screen without failing, on a line the CI log repeats ("TAPNOTE"):
     /// how a new test learns the words on a screen it can't see.
     func note(_ title: String) {
-        let words = "TAPNOTE \(title): \(screen())"
-        print(words)
-        // An activity's name is written to the test log as well, should the print not be.
-        XCTContext.runActivity(named: words) { _ in }
+        print("TAPNOTE \(title): \(screen())")
     }
 
     /// The bars, then the newest buttons and texts in the tree, from one snapshot. The Home stays

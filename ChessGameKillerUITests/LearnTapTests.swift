@@ -27,16 +27,17 @@ final class LearnTapTests: TapTestCase {
     /// The vine card opens the vine's own page, and Back comes home to Learn.
     func testTheVineOpens() {
         openLearn()
-        tap(buttons(startingWith: "Your vine"), "The vine on Learn")
-        expect(anything(labeled: "YOUR VINE"), "Tapping the vine on Learn did not open the vine's page")
+        note("Learn before the vine is tapped (YOUR VINE in the tree: \(anything(labeled: "YOUR VINE").exists))")
+        openVine()
+        note("After the vine is tapped")
         goBack(to: "Learn")
+        expectTouchable(vineCard, "Back from the vine's page did not come home to Learn")
     }
 
     /// Under the vine, a free player's "See Premium" opens the Premium offer, and Close comes back.
     func testTheVinePageOffersPremium() {
         openLearn(Self.free)
-        tap(buttons(startingWith: "Your vine"), "The vine on Learn")
-        expect(anything(labeled: "YOUR VINE"), "Tapping the vine on Learn did not open the vine's page")
+        openVine()
         let seePremium = buttons("See Premium")
         tap(seePremium, "See Premium under the vine")
         expectPremiumOffer(after: "Tapping See Premium under the vine")
