@@ -167,8 +167,8 @@ fun GameScreen(rival: Rival, playWhite: Boolean, onExit: () -> Unit, onAnalyze: 
                 Image(
                     painterResource(rival.portrait),
                     contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(44.dp).clip(CircleShape).border(1.dp, rival.hue, CircleShape),
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(48.dp),
                 )
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {

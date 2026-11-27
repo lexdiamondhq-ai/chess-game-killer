@@ -153,8 +153,8 @@ private fun RivalCard(rival: Rival, onPlay: () -> Unit) {
         Image(
             painterResource(rival.portrait),
             contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.size(76.dp).clip(CircleShape).border(1.5.dp, rival.hue, CircleShape),
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.size(80.dp),
         )
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
