@@ -540,7 +540,7 @@ final class ChallengeTests: XCTestCase {
         let refused = await game.sendChat("something rude")
         XCTAssertFalse(refused)
         XCTAssertEqual(game.toast?.text, "Let's keep it friendly.")
-        XCTAssertEqual(game.chatLines.count, 3)
+        XCTAssertEqual(game.chatLines.count, 4, "the turned-away line never joins the list")
     }
 
     func testChatDecodes() throws {
