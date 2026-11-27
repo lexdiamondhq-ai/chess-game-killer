@@ -379,6 +379,8 @@ jobs:
           grep -E "Test Case .* (passed|failed|skipped)" taps.log | head -90 || true
           # A failure says what was on the screen (TapTestCase.fail).
           grep -E "error:|\*\* " taps.log | cut -c1-3600 | head -40 || true
+          # A test that hung or took the test runner down is named by xcodebuild, not by a test line.
+          grep -E "exceeded|timed out|crashed|Restarting after|Testing failed|encountered an error" taps.log | cut -c1-700 | head -20 || true
           grep -E "Executed" taps.log | tail -3 || true
           # How often a tap had to wait for the app's animations to settle (each wait is slow).
           echo "Waits for animations: $(grep -c "App animations complete notification not received" taps.log || true)"

@@ -170,12 +170,13 @@ class TapTestCase: XCTestCase {
     static let bottomStrip: CGFloat = 0.07
 
     /// A row can count as touchable while it sits under the status bar at the top of the screen,
-    /// or over the Home indicator at the bottom, and a tap there may never reach it: a tap on
-    /// "Practice" on Chess DNA landed 42 points from the top and opened nothing, with nothing
-    /// wrong in the app (2026-11-27; `EdgeTapTests` parks a row there on purpose). So the page is
-    /// moved until the tap lands in the middle part of the screen, as a thumb would move it. Each
-    /// move is written down ("TAPNOTE"), so the log says when it was needed. Something pinned in a
-    /// strip does not move, and is tapped where it is. Nil when the row can't be touched any more.
+    /// and a tap there never reaches it: a tap on "Practice" on Chess DNA landed 42 points from
+    /// the top and opened nothing, with nothing wrong in the app (2026-11-27; `EdgeTapTests` parks
+    /// a button there on purpose). The strip over the Home indicator at the bottom is kept clear
+    /// as well, as a precaution. So the page is moved until the tap lands in the middle part of
+    /// the screen, as a thumb would move it. Each move is written down ("TAPNOTE"), so the log
+    /// says when it was needed. Something pinned in a strip does not move, and is tapped where it
+    /// is. Nil when the row can't be touched any more.
     private func broughtIn(_ matches: XCUIElementQuery, _ reached: XCUIElement, _ name: String,
                            at spot: CGVector?) -> XCUIElement? {
         let screen = screenRect
@@ -224,9 +225,6 @@ class TapTestCase: XCTestCase {
         }
         return false
     }
-
-    /// The screen's height, in points.
-    var screenHeight: CGFloat { screenRect.height }
 
     /// How far down the screen a tap on something with this frame lands: the spot asked for, or
     /// the middle of the part of it that is on the screen.
