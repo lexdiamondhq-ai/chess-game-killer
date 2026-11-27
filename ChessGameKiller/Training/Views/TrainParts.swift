@@ -243,39 +243,3 @@ struct StreakPill: View {
         .accessibilityLabel("Training streak: \(streak) \(streak == 1 ? "day" : "days")")
     }
 }
-
-/// The learner's rank: the piece it's named after, the XP and how far to the next.
-struct RankStrip: View {
-    let theme: BoardTheme
-    @Environment(TrainingStore.self) private var store
-
-    var body: some View {
-        if let rank = store.rank {
-            HStack(spacing: 12) {
-                PieceImage(piece: Piece(rank.pieceKind, color: .white, square: .a1), theme: theme, size: 34)
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text(rank.title)
-                            .font(.display(.subheadline, weight: .semibold))
-                        Text("\(store.progress.xp) XP")
-                            .font(.app(.caption, weight: .medium).monospacedDigit())
-                            .foregroundStyle(.secondary)
-                        Spacer(minLength: 4)
-                        if let next = store.nextRank {
-                            Text("Next: \(next.title)")
-                                .font(.app(.caption))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    ProgressView(value: store.rankProgress)
-                        .tint(theme.trainingAccent)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .trainingCard(theme, cornerRadius: 18)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Rank \(rank.title), \(store.progress.xp) XP" + (store.nextRank.map { ", next \($0.title)" } ?? ""))
-        }
-    }
-}

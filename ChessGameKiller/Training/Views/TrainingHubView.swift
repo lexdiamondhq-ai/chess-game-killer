@@ -51,11 +51,10 @@ struct TrainingHubView: View {
                         // What's been learned, what's next, and what Premium opens (Alex, 2026-11-14).
                         VineCard(vine: vine, theme: theme)
                             .homeRise(2)
+                        // No rank card under the doors (Alex, 2026-11-27: "Let's delete these"):
+                        // the rank still shows on the vine and at the end of each lesson.
                         doors
                             .homeRise(3)
-                        RankStrip(theme: theme)
-                            .padding(.top, 2)
-                            .homeRise(4)
                     }
                     .padding(.horizontal, 16)
                     .padding(.bottom, 28)

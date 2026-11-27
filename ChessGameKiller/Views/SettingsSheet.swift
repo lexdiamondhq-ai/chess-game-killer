@@ -761,6 +761,9 @@ struct LicensesView: View {
         Credit(name: "Lichess puzzle database", license: "CC0",
                detail: "The puzzles and Puzzle Rush: positions from real games, rated by Lichess players.",
                url: URL(string: "https://database.lichess.org/#puzzles")!),
+        Credit(name: "Piece sounds", license: "Pixabay",
+               detail: "The wooden moves, captures and castling: a real recording of chess pieces by simone_ds on Freesound.",
+               url: URL(string: "https://pixabay.com/sound-effects/film-special-effects-chess-pieces-60890/")!),
     ]
 
     /// "ChessKit on GitHub", or the site's own name, such as "stockfishchess.org".
