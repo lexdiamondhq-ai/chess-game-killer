@@ -8,7 +8,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -28,7 +28,10 @@ class TapTests {
 
     private fun snap(name: String) {
         rule.waitForIdle()
-        val bitmap = rule.onRoot().captureToImage().asAndroidBitmap()
+        // With a dialog up there are two windows: take the top one.
+        val roots = rule.onAllNodes(isRoot())
+        val count = roots.fetchSemanticsNodes().size
+        val bitmap = roots[count - 1].captureToImage().asAndroidBitmap()
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val dir = File(context.getExternalFilesDir(null), "screens").apply { mkdirs() }
         File(dir, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
@@ -91,7 +94,8 @@ class TapTests {
         tap("square-d8") // take Black's queen off
         snap("07-analyze-editing")
         tap("edit-pieces") // Done
-        rule.onNodeWithTag("eval-bar").assertIsDisplayed()
+        snap("07b-analyze-done")
+        rule.onNodeWithTag("eval-bar", useUnmergedTree = true).assertIsDisplayed()
         tap("square-e2"); tap("square-e4")
         rule.onNodeWithTag("analyze-undo").performScrollTo().performClick()
     }

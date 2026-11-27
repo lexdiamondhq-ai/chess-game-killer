@@ -126,8 +126,9 @@ jobs:
           disable-animations: true
           working-directory: android
           script: |
-            ./gradlew --no-daemon :app:connectedDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true
+            ./gradlew --no-daemon :app:connectedDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true || touch ../tests-failed
             adb pull /sdcard/Android/data/com.chessgamekiller.app/files/screens ../screens || true
+            test ! -f ../tests-failed
 
       - uses: actions/upload-artifact@v4
         if: always()
