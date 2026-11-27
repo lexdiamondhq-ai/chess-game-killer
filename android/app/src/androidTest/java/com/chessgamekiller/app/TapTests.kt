@@ -6,6 +6,9 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.isRoot
@@ -174,6 +177,13 @@ class TapTests {
     private fun waitForTag(tag: String, ms: Long = 8000) =
         rule.waitUntil(ms) { rule.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
 
+    /** Waits until the button under this tag can be tapped (a drill's buttons rest while the board moves). */
+    private fun waitForEnabled(tag: String, ms: Long = 8000) =
+        rule.waitUntil(ms) {
+            rule.onAllNodes(isEnabled() and hasClickAction() and (hasTestTag(tag) or hasAnyAncestor(hasTestTag(tag))), useUnmergedTree = true)
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+
     private fun waitForText(text: String, ms: Long = 8000) =
         rule.waitUntil(ms) { rule.onAllNodes(hasText(text, substring = true), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
 
@@ -211,13 +221,14 @@ class TapTests {
         snap("24-puzzles")
         press("puzzles-start")
         waitForTag("drill-prompt")
-        Thread.sleep(800)
+        waitForEnabled("drill-show")
         snap("25-puzzle")
         press("drill-show")
         waitForTag("drill-next", 10_000)
         snap("26-puzzle-shown")
         press("drill-next")
         waitForTag("drill-show")
+        waitForEnabled("drill-show")
     }
 
     @Test fun todaysMoveVineAndChessDna() {
