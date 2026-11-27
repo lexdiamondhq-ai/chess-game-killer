@@ -179,6 +179,11 @@ final class TrainSnapshotTests: XCTestCase {
         }
         let door = try show(environment(NavigationStack { GamesDoorView(theme: theme) }), wait: 3)
         try save(door, "dna-0-door")
+        // Further down the same page: what to work on, then the six bars next to real players.
+        scroll(door, to: 600)
+        try save(door, "dna-0b-door-work-on")
+        scroll(door, to: 1_200)
+        try save(door, "dna-0c-door-bars")
         door.isHidden = true
 
         let profile = try show(environment(NavigationStack { ChessDNAView(dna: dna, theme: theme) }), wait: 2.5)

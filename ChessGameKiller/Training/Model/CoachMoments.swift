@@ -72,7 +72,8 @@ enum MomentFinder {
         case .checkmate:
             return Found(kind: .foundMate, skill: nil, values: values)
         case .best, .excellent:
-            return praise(played: played, mover: mover, before: before, after: after, values: values)
+            return praise(played: played, mover: mover, before: before, after: after,
+                          earlier: review.fenEarlier.flatMap(BoardGeometry.init(fen:)), values: values)
         case .good:
             return nil
         case .inaccuracy, .mistake, .blunder:
@@ -159,6 +160,9 @@ enum MomentFinder {
                 }
                 for line in next.lineups(from: best.to) {
                     guard let front = next.piece(at: line.front), let back = next.piece(at: line.back) else { continue }
+                    // A pawn in front of something is not a pin worth the name, and a pawn behind
+                    // something is no prize for a skewer: both have to be pieces.
+                    guard front.kind != .pawn, back.kind != .pawn else { continue }
                     let frontValue = BoardGeometry.exchangeValue(front.kind)
                     let backValue = BoardGeometry.exchangeValue(back.kind)
                     values["piece"] = BoardGeometry.name(front.kind)
@@ -187,13 +191,15 @@ enum MomentFinder {
         mover: Piece,
         before: BoardGeometry,
         after: BoardGeometry,
+        earlier: BoardGeometry?,
         values: [String: String]
     ) -> Found? {
         var values = values
         let me = mover.color
 
         if let target = before.piece(at: played.to), target.color != me,
-           BoardGeometry.value(target.kind) >= 3, !before.isDefended(played.to, by: target.color) {
+           BoardGeometry.value(target.kind) >= 3, !before.isDefended(played.to, by: target.color),
+           !isTrade(taking: target, on: played.to, earlier: earlier) {
             values["piece"] = BoardGeometry.name(target.kind)
             values["square"] = played.to.notation
             return Found(kind: .foundFreePiece, skill: "free-pieces", values: values)
@@ -216,6 +222,14 @@ enum MomentFinder {
     }
 
     // MARK: Helpers
+
+    /// Taking back a piece that only just took one of ours is a trade, not a free piece,
+    /// unless theirs was worth clearly more than what it took. `earlier` is the board
+    /// before their last move; without it every capture counts as before.
+    private static func isTrade(taking target: Piece, on square: Square, earlier: BoardGeometry?) -> Bool {
+        guard let lost = earlier?.piece(at: square), lost.color != target.color else { return false }
+        return BoardGeometry.value(target.kind) - BoardGeometry.value(lost.kind) < 2
+    }
 
     /// A rook or queen landing on the defender's back rank, with the king still there.
     private static func isBackRank(_ reply: String?, on board: BoardGeometry, defender: Piece.Color) -> Bool {

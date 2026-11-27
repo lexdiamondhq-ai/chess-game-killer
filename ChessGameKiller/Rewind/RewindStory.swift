@@ -12,10 +12,12 @@ struct RewindNote: Equatable {
     /// The training skill behind it, for "Practice this".
     let skill: String?
 
-    static func make(for moment: SavedMoment, library: TrainingLibrary?) -> RewindNote {
+    /// `game` is the game the moment is from, when there is one: with it a recapture
+    /// isn't praised as a free piece.
+    static func make(for moment: SavedMoment, in game: SavedGame? = nil, library: TrainingLibrary?) -> RewindNote {
         let grade = moment.moveGrade
         let isLesson = [.inaccuracy, .mistake, .blunder].contains(grade)
-        if let found = MomentFinder.find(in: moment.review), found.kind.isPraise != isLesson {
+        if let found = MomentFinder.find(in: game?.review(of: moment) ?? moment.review), found.kind.isPraise != isLesson {
             let words = GameCoach.words(for: found, library: library)
             return RewindNote(tag: tag(for: found.kind), title: words.title, detail: words.detail,
                               isLesson: isLesson, skill: found.skill)

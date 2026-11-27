@@ -1154,8 +1154,8 @@ struct HomeAuroraRow<Picture: View>: View {
 
 /// Your Chess DNA on Home (Alex, 2026-11-09), dressed like the rows for today: a white card with
 /// a thin gold edge, your style in serif with its portrait, a gold emblem at the right, then the
-/// four habits as fine gold bars and your weapon and leak. A tap opens the Chess DNA page. Before
-/// three games are read, it says how many more Coach Leo needs.
+/// four habits as fine gold bars and your weapon and leak. A tap opens the Chess DNA page. Until
+/// enough games are read to name a style, it says how many more Coach Leo needs.
 struct HomeAuroraDNA: View {
     let dna: ChessDNA
     let palette: HomeAuroraPalette
@@ -1223,9 +1223,7 @@ struct HomeAuroraDNA: View {
 
     private var detail: String {
         if let style = dna.style { return style.portrait }
-        let left = max(1, ChessDNA.gamesForStyle - dna.gamesRead)
-        let games = left == 1 ? "one more game" : "\(left) more games"
-        return "Play \(games) against any rival and \(Coach.current.name) will read how you play."
+        return "\(dna.styleWait) and \(Coach.current.name) will read how you play."
     }
 
     /// The four habits two by two, each a fine gold line with a dot where you sit.

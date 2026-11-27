@@ -211,11 +211,33 @@ final class DeepReviewTests: XCTestCase {
         ungraded.moments = Array(game.moments.prefix(2))
         XCTAssertFalse(DeepReviewRequest.offered(for: ungraded))
 
-        // A game with a friend on this phone is both sides': there's no one player to coach.
-        let friend = SavedGame(id: UUID(), date: .now, opponent: "Friend", level: nil, playerIsWhite: true,
+        // A game against a person is kept the moment it ends, before Leo has graded the
+        // player's side of it: nothing to review yet.
+        var friend = SavedGame(id: UUID(), date: .now, opponent: "Sam", level: nil, playerIsWhite: true,
                                result: .win, accuracy: nil, positions: game.positions, moves: game.moves,
                                moments: game.moments)
         XCTAssertFalse(DeepReviewRequest.offered(for: friend))
+        XCTAssertNil(DeepReviewRequest(game: friend))
+        // Once it is graded it is the player's own like any other game.
+        friend.graded = true
+        XCTAssertTrue(DeepReviewRequest.offered(for: friend))
+    }
+
+    func testAPersonsNameStaysOnThePhone() throws {
+        let game = RewindSample.game()
+        var friend = SavedGame(id: UUID(), date: .now, opponent: "Sam", level: nil, playerIsWhite: true,
+                               result: .win, accuracy: nil, positions: game.positions, moves: game.moves,
+                               moments: game.moments)
+        friend.graded = true
+        let request = try XCTUnwrap(DeepReviewRequest(game: friend, coach: .leo, voice: true))
+        XCTAssertNil(request.rival, "The review is of the player's moves: who they played isn't sent")
+        XCTAssertNil(request.rivalRating)
+        XCTAssertEqual(request.result, "win")
+        XCTAssertEqual(request.moves, game.moves)
+        let body = try XCTUnwrap(DeepReviewAPI(baseURL: URL(string: "https://review.stub")!).makeRequest(request).httpBody)
+        XCTAssertFalse(String(decoding: body, as: UTF8.self).contains("Sam"))
+        // A rival is the app's own character, and is named.
+        XCTAssertEqual(DeepReviewRequest(game: game, coach: .leo, voice: true)?.rival, game.opponentShown)
     }
 
     func testTheServersLinesAreRead() throws {

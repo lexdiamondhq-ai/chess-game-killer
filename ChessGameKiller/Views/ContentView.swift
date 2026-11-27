@@ -52,6 +52,8 @@ struct ContentView: View {
     @State private var newsQueue: [ArmyNews] = []
     @State private var newsTurn: Task<Void, Never>?
     @State private var vault = GameVault.live()
+    /// Grades the games played against people, quietly, after they end. Made the first time it is wanted.
+    @State private var quietGrader: QuietGrader?
     @State private var showingGames = false
     /// A game picked on the home screen, opened straight away in Rewind.
     @State private var rewindOpening: UUID?
@@ -246,10 +248,15 @@ struct ContentView: View {
                 syncCoachSettings()
                 // A game left unfinished when a new one starts is still kept.
                 match.onArchive = { [vault] game in vault.record(game) }
-                // So is a finished friend game, and it counts for the day.
+                // So is a finished game against a person, and it counts for the day. Leo grades
+                // the player's side of it quietly afterwards, so Chess DNA reads it too.
+                let grader = gameReader()
                 challenges?.onGameFinished = { [vault, daily] game in
+                    // A game already graded isn't put back as it was before.
+                    guard vault.game(game.id)?.graded != true else { return }
                     vault.record(game)
                     daily.record(.game)
+                    if !Welcome.isUnderTest { grader.catchUp() }
                 }
                 hookUpDaily()
                 match.onAbandon = { [army] ledger, setup, assisted in
@@ -267,6 +274,8 @@ struct ContentView: View {
                 // The welcome chime as the app opens, once per launch.
                 SoundPlayer.shared.playWelcome()
                 await StockfishEngine.shared.warmUp()
+                // Games against people that ended before they could be graded are read now.
+                if !Welcome.isUnderTest { gameReader().catchUp() }
             }
             .onChange(of: showBestMoves) { _, on in
                 // Hints turned back on anywhere (Settings) bring the button back for good.
@@ -1269,6 +1278,14 @@ struct ContentView: View {
             }
             newsTurn = nil
         }
+    }
+
+    /// The quiet grader for games against people, made the first time it is wanted.
+    private func gameReader() -> QuietGrader {
+        if let quietGrader { return quietGrader }
+        let made = QuietGrader(vault: vault, store: training)
+        quietGrader = made
+        return made
     }
 
     /// Keeps the game for Rewind. Called again as late grades arrive; the vault updates it in place.

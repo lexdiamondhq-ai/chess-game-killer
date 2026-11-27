@@ -458,7 +458,7 @@ struct RewindView: View {
     /// Words on top, which scroll when a small screen runs out of room;
     /// the buttons pinned at the bottom.
     private var card: some View {
-        let note = focused.map { RewindNote.make(for: $0, library: training?.library) }
+        let note = focused.map { RewindNote.make(for: $0, in: game, library: training?.library) }
         return VStack(alignment: .leading, spacing: 0) {
             if let deep {
                 DeepReviewCard(theme: theme, player: deep) { closeDeepReview() }

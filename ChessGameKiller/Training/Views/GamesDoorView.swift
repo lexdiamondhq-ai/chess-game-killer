@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// Behind the "Your games" door: what Coach Leo sees in the player's own games, the one
-/// thing to work on first, the positions from those games still to fix, and the games
-/// themselves to rewind.
+/// Behind the "Your games" door: what Coach Leo sees in the player's own games, what they
+/// are good at and what to work on (each a tap from practice), the positions from those
+/// games still to fix, and the games themselves to rewind.
 struct GamesDoorView: View {
     let theme: BoardTheme
     @Environment(TrainingStore.self) private var store
@@ -37,14 +37,16 @@ struct GamesDoorView: View {
             }
             if let report {
                 if report.hasEnough {
-                    // The top weakness is free; the whole six-area profile is Premium's.
-                    if Premium.shared.opens(.coachProfile) {
+                    // The top weakness is free; the strengths, the rest of the list and the
+                    // whole six-area profile are Premium's.
+                    let whole = Premium.shared.opens(.coachProfile)
+                    if whole, let dna {
+                        strengths(dna)
+                    }
+                    weakSpots(whole ? report.weakSpots : Array(report.weakSpots.prefix(1)))
+                    if whole {
                         CoachReportCard(report: report, theme: theme)
-                    }
-                    if let leak = report.leak {
-                        leakCard(leak)
-                    }
-                    if !Premium.shared.opens(.coachProfile) {
+                    } else {
                         PremiumLimitCard(feature: .coachProfile, accent: theme.trainingAccent)
                     }
                 } else if (dna?.gamesRead ?? 0) == 0 || !Premium.shared.opens(.coachProfile) {
@@ -62,7 +64,7 @@ struct GamesDoorView: View {
                 recentGames
             }
         }
-        .task(id: vault.games.count) {
+        .task(id: readKey) {
             let games = vault.games
             let stats = puzzles.themeStats
             let played = puzzles.progress.played
@@ -90,60 +92,72 @@ struct GamesDoorView: View {
         }
     }
 
-    // MARK: The leak
-
-    private func leakCard(_ leak: CoachReport.Leak) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: leak.area.symbol)
-                    .font(.system(size: 13, weight: .bold))
-                Text("WORK ON THIS FIRST")
-                    .font(.app(.caption, weight: .bold))
-                    .tracking(1)
-            }
-            .foregroundStyle(theme.trainingAccent)
-            .accessibilityElement(children: .combine)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(leak.headline)
-                    .font(.app(.title3, weight: .bold))
-                Text(leak.detail)
-                    .font(.app(.subheadline))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            leakAction(leak)
-        }
-        .padding(18)
-        .trainingCard(theme, tint: theme.trainingAccent)
-        .accessibilityElement(children: .contain)
+    /// Changes when there is something new to read: a game saved, or a game against a person
+    /// that has just been graded (that happens a little after it ends, sometimes with this page open).
+    private var readKey: String {
+        let read: Int = vault.games.filter { $0.graded == true }.count
+        return "\(vault.games.count) \(read)"
     }
 
-    /// Practice for the leak: Coach Leo's drills while the course still has them for
-    /// the player, real puzzles on the same idea once they're past it, and the
-    /// Endgames or Calculation door when that's where the work is.
+    // MARK: Good at, and to work on
+
+    /// What the player is good at, with proof. Until something stands out, one line says so.
     @ViewBuilder
-    private func leakAction(_ leak: CoachReport.Leak) -> some View {
-        switch leak.area {
-        case .endgames:
-            NavigationLink(value: TrainDoor.endgames) {
-                Label(leak.action, systemImage: TrainDoor.endgames.symbol)
+    private func strengths(_ dna: ChessDNA) -> some View {
+        DNAListTitle(text: "You are good at", note: Self.basis(dna.report),
+                     tint: TrainingColor.green.color(on: theme))
+        if dna.strengths.isEmpty {
+            Text("Nothing stands out yet. A few more games and \(Coach.current.name) will have proof.")
+                .font(.app(.subheadline))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .trainingCard(theme)
+        } else {
+            DNAStrengthList(strengths: dna.strengths, theme: theme) { strength in
+                session = strength.theme.flatMap { puzzlePlan(PuzzleTheme.named($0)) }
             }
-            .buttonStyle(TrainingButtonStyle(theme: theme))
-        case .calculation:
-            NavigationLink(value: TrainDoor.calculation) {
-                Label(leak.action, systemImage: TrainDoor.calculation.symbol)
-            }
-            .buttonStyle(TrainingButtonStyle(theme: theme))
-        default:
-            Button {
-                session = practicePlan(for: leak)
-            } label: {
-                Label(leak.action, systemImage: "play.fill")
-            }
-            .buttonStyle(TrainingButtonStyle(theme: theme))
         }
     }
 
+    /// What to work on, the biggest gap first. A free player sees the first one.
+    @ViewBuilder
+    private func weakSpots(_ spots: [CoachReport.Leak]) -> some View {
+        if !spots.isEmpty {
+            DNAListTitle(text: spots.count == 1 ? "Work on this first" : "Work on these",
+                         note: spots.count == 1 ? nil : "biggest gap first",
+                         tint: TrainingColor.orange.color(on: theme))
+            DNAWeakSpotList(spots: spots, theme: theme) { spot in
+                SessionPlan.ownPositions(for: spot, in: store.openMistakes).count
+            } practice: { spot in
+                session = SessionPlan.practice(spot, mistakes: store.openMistakes, more: practicePlan(for: spot))
+            }
+            Text("Practice starts with your own positions from your games, then puzzles of the same kind.")
+                .font(.app(.footnote))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 4)
+        }
+    }
+
+    /// "from your last 20 games".
+    private static func basis(_ report: CoachReport) -> String {
+        report.gamesRead == 1 ? "from your last game" : "from your last \(report.gamesRead) games"
+    }
+
+    /// Real puzzles on one theme at the player's level.
+    private func puzzlePlan(_ theme: PuzzleTheme) -> SessionPlan? {
+        guard let library = puzzles.library, !library.puzzles.isEmpty else { return nil }
+        var builder = PuzzleSessionBuilder(library: library, rating: puzzles.progress.rating,
+                                           avoid: Set(puzzles.progress.recent),
+                                           seed: UInt64.random(in: 1...UInt64.max))
+        let plan = builder.practice(theme: theme)
+        return plan.isEmpty ? nil : plan
+    }
+
+    /// More of the same kind: Coach Leo's drills while the course still has them for the
+    /// player, real puzzles on the same idea once they're past it.
     private func practicePlan(for leak: CoachReport.Leak) -> SessionPlan? {
         let pastTheCourse = store.isPastTheCourse(puzzleRating: puzzles.progress.rating,
                                                   puzzlesPlayed: puzzles.progress.played)
@@ -151,13 +165,7 @@ struct GamesDoorView: View {
            let plan = store.practicePlan(for: skill) {
             return plan
         }
-        if let library = puzzles.library, !library.puzzles.isEmpty {
-            var builder = PuzzleSessionBuilder(library: library, rating: puzzles.progress.rating,
-                                               avoid: Set(puzzles.progress.recent),
-                                               seed: UInt64.random(in: 1...UInt64.max))
-            let plan = builder.practice(theme: PuzzleSessionBuilder.theme(for: leak))
-            if !plan.isEmpty { return plan }
-        }
+        if let plan = puzzlePlan(PuzzleSessionBuilder.theme(for: leak)) { return plan }
         return leak.skill.flatMap { store.library?.skill($0) }.flatMap { store.practicePlan(for: $0) }
     }
 
@@ -295,7 +303,8 @@ struct RecentGameRow: View {
     }
 }
 
-/// Coach Leo's report on the player's games: six areas, each with a bar and a word.
+/// Coach Leo's report on the player's games: six areas, each a bar that shows where the
+/// player sits next to real players, with a mark for the typical one.
 struct CoachReportCard: View {
     let report: CoachReport
     let theme: BoardTheme
@@ -317,6 +326,15 @@ struct CoachReportCard: View {
                     row(score)
                 }
             }
+            if report.isCompared {
+                DNATypicalLegend()
+            } else {
+                // Too few games to say where the player sits: the bars wait, and say for what.
+                Text("\(Coach.current.name) puts you next to real players after \(CoachReport.gamesToCompare) games. \(report.gamesLeftToCompare) to go.")
+                    .font(.app(.caption2))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .padding(18)
         .trainingCard(theme)
@@ -324,27 +342,29 @@ struct CoachReportCard: View {
 
     private func row(_ score: CoachReport.Score) -> some View {
         let isLeak = report.leak?.area == score.area
-        return HStack(spacing: 10) {
-            Image(systemName: score.area.symbol)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(theme.trainingAccent)
-                .frame(width: 20)
-                .accessibilityHidden(true)
-            Text(score.area.title)
-                .font(.app(.subheadline, weight: isLeak ? .bold : .medium))
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .frame(width: 96, alignment: .leading)
-            ProgressView(value: score.value ?? 0)
-                .tint(theme.trainingAccent)
-                .opacity(score.value == nil ? 0.35 : 1)
-                .accessibilityHidden(true)
-            Text(score.verdict)
-                .font(.app(.caption, weight: isLeak ? .bold : .medium))
-                .foregroundStyle(isLeak ? AnyShapeStyle(theme.trainingAccent) : AnyShapeStyle(.secondary))
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-                .frame(width: 78, alignment: .trailing)
+        let standing = score.standing
+        let tint = standing?.tint(on: theme) ?? theme.trainingAccent
+        // Words in the bar's color once the player is clearly on one side of most players.
+        let stands = standing?.isAhead == true || standing?.isBehind == true
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 10) {
+                Image(systemName: score.area.symbol)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(theme.trainingAccent)
+                    .frame(width: 20)
+                    .accessibilityHidden(true)
+                Text(score.area.title)
+                    .font(.app(.subheadline, weight: isLeak ? .bold : .medium))
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+                Text(score.verdict)
+                    .font(.app(.caption, weight: stands ? .bold : .medium))
+                    .foregroundStyle(stands ? AnyShapeStyle(tint) : AnyShapeStyle(.secondary))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            DNAStandingBar(place: standing?.place, tint: tint)
+                .opacity(standing == nil ? 0.35 : 1)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(score.area.title): \(score.verdict)\(isLeak ? ", work on this first" : "")")

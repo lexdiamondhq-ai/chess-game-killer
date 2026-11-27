@@ -88,18 +88,36 @@ struct SavedGame: Codable, Equatable, Identifiable {
     var sourceID: String? = nil
     /// The opponent's rating on that site, when it gave one.
     var opponentRating: Int? = nil
+    /// Set once Leo has graded the player's moves in a game played here against a person.
+    /// Those games are kept the moment they end and graded quietly afterwards (`QuietGrader`).
+    var graded: Bool? = nil
 
     /// A game the player played on Lichess or Chess.com and brought in.
     var isImported: Bool { source != nil }
-    /// One side's game: against a rival here, or the player's own game from a chess site.
-    /// A game with a friend on this phone is both sides' and isn't read as the player's.
-    var isPlayersOwn: Bool { level != nil || isImported }
+    /// A game played here against a person: a friend's link, online, or a daily game.
+    var isAgainstPerson: Bool { level == nil && !isImported }
+    /// A finished game against a person that Leo hasn't graded yet.
+    var awaitsGrading: Bool {
+        isAgainstPerson && graded != true && moments.isEmpty && result != .unfinished
+    }
+    /// A game whose moves Leo has graded for the player's side: against a rival here, brought
+    /// in from a chess site, or against a person once it has been graded. Until then a game
+    /// against a person is only replayed, and isn't read as the player's.
+    var isPlayersOwn: Bool { level != nil || isImported || graded == true }
 
     var playerColor: Piece.Color { playerIsWhite ? .white : .black }
     var finalFEN: String { positions.last ?? "" }
     var moveCount: Int { (moves.count + 1) / 2 }
 
-    /// The player's moves, in order. Against a friend both sides count.
+    /// The coach's review of one of this game's moves, with the position before the
+    /// opponent's last move, so a recapture isn't praised as a free piece.
+    func review(of moment: SavedMoment) -> MoveReview {
+        var review = moment.review
+        review.fenEarlier = MoveReview.earlier(in: positions, ply: moment.ply, fenBefore: moment.fenBefore)
+        return review
+    }
+
+    /// The player's moves, in order.
     var playerMoments: [SavedMoment] {
         moments
             .filter { !isPlayersOwn || $0.byWhite == playerIsWhite }
