@@ -28,10 +28,18 @@ final class TrophyHallLayoutTests: TapTestCase {
         let rivals = frames("trophy-hall.rival")
         XCTAssertEqual(rivals.count, 5, "The shelf should hold the five rivals")
         guard let first = rivals.first else { return }
+        // A rival's frame is its coin and name together, as wide as the wider of the two
+        // ("Berserker" is a little wider than its coin), so the width check is that each holds a full coin.
         for (index, frame) in rivals.enumerated() {
-            XCTAssertTrue(same(frame.width, first.width), "Rival \(index + 1) is \(frame.width) wide, the first is \(first.width)")
+            XCTAssertGreaterThanOrEqual(frame.width, 49, "Rival \(index + 1) is only \(frame.width) wide")
             XCTAssertTrue(same(frame.height, first.height), "Rival \(index + 1) is \(frame.height) tall, the first is \(first.height)")
             XCTAssertTrue(same(frame.minY, first.minY), "Rival \(index + 1) is not on the same line as the first")
+        }
+        // Evenly spaced: the same distance from each rival's middle to the next.
+        let middles = rivals.map(\.midX)
+        let gaps = zip(middles, middles.dropFirst()).map { $1 - $0 }
+        for gap in gaps {
+            XCTAssertTrue(same(gap, gaps[0]), "The rivals are not evenly spaced: \(gaps)")
         }
         // Side by side, never overlapping (the names ran into each other).
         for (left, right) in zip(rivals, rivals.dropFirst()) {
