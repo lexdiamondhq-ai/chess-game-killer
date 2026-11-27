@@ -50,15 +50,12 @@ class TapTests {
         tap("square-e2")
         snap("03-game-selected")
         tap("square-e4")
-        // The Cub replies: the move list then has a Black move after 1. e4.
+        // The Cub replies, and it is the player's move again with 1. e4 on the list.
+        rule.waitForIdle()
         rule.waitUntil(15_000) {
-            rule.onAllNodes(hasTestTag("move-list") and hasText("1. e4 ", substring = true))
-                .fetchSemanticsNodes().any { node ->
-                    val text = node.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.Text)
-                        ?.joinToString("") { it.text } ?: ""
-                    text.trim().split(' ').size >= 3
-                }
+            rule.onAllNodes(hasTestTag("game-status") and hasText("Your move")).fetchSemanticsNodes().isNotEmpty()
         }
+        rule.onNode(hasTestTag("move-list") and hasText("1. e4 ", substring = true)).assertIsDisplayed()
         snap("04-game-after-reply")
         tap("take-back")
         rule.waitUntil(5_000) {
@@ -69,6 +66,7 @@ class TapTests {
     @Test fun resignEndsTheGame() {
         rule.onNodeWithTag("play-cub").performScrollTo().performClick()
         tap("square-d2"); tap("square-d4")
+        rule.waitForIdle()
         rule.waitUntil(15_000) {
             rule.onAllNodes(hasTestTag("game-status") and hasText("Your move")).fetchSemanticsNodes().isNotEmpty()
         }
