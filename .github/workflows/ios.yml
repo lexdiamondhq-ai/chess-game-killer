@@ -1,13 +1,15 @@
 name: iOS build and tests
 
 # Mac runners cost about ten times what Linux ones do, so this workflow keeps them short:
-# - Pull requests run the tests (build-and-test), only when the app's own files change,
-#   and a new push cancels the run it replaces.
+# - Pull requests run the tests (build-and-test) and, beside them on a second Mac, the tap
+#   tests (taps), only when the app's own files change, and a new push cancels the run it replaces.
 # - Main runs only the newest-Xcode build (xcode-26-build); the pull request already ran the tests.
 # - The simulator screenshots (about 15 minutes) run only when asked for: add the
 #   "screenshots" label to the pull request, or run the workflow by hand.
 # - By hand, the tests' pictures can be drawn in Middle or Dark instead of Light (tone), and every
 #   picture printed across the logs of the "pictures" jobs, which run on Linux (pictures).
+# - By hand, a few tap tests can be run by name and nothing else (only): the short run for a
+#   tap test that is being fixed, before everything runs once more.
 on:
   push:
     branches: [main]
@@ -46,6 +48,14 @@ on:
         description: Print every picture in the logs of the pictures jobs
         type: boolean
         default: false
+      taps:
+        description: Run the tap tests
+        type: boolean
+        default: false
+      only:
+        description: Run only these tap tests and no other job, like "LearnTapTests/testTheVineOpens ChessDNATapTests" (spaces between)
+        type: string
+        default: ""
 
 concurrency:
   # A run by hand in another tone waits for nothing and replaces nothing.
@@ -58,7 +68,7 @@ jobs:
     # Alex builds on the newest Xcode, whose type checker gives up sooner on long
     # SwiftUI expressions. This build flags any expression slower than 150 ms.
     # It runs on main and by hand, not on every pull request push.
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && !inputs.only
     runs-on: macos-26
     timeout-minutes: 45
     steps:
@@ -102,7 +112,7 @@ jobs:
   build-and-test:
     # Pull requests and by hand. Adding a label other than "screenshots" starts no run.
     if: >-
-      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_dispatch' && !inputs.only) ||
       (github.event_name == 'pull_request' &&
        (github.event.action != 'labeled' || github.event.label.name == 'screenshots'))
     runs-on: macos-15
@@ -133,29 +143,6 @@ jobs:
           mkdir -p snapshots
           echo "$DEVICES" | jq -r '.[] | select(.udid == "'"$UDID"'") | "\(.name) \(.rt)"' > snapshots/device.txt
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
-      - name: Tap through the app
-        # The unit tests below draw each screen, and a picture can't tell whether a tap opens
-        # anything (the vine on Learn did nothing when touched, 2026-11-27). These launch the app
-        # on the simulator and tap it (ChessGameKillerUITests). They run first, so a dead tap is
-        # known in minutes, and the app is removed afterwards so the unit tests start clean.
-        run: |
-          status=0
-          xcodebuild test \
-            -project ChessGameKiller.xcodeproj \
-            -scheme ChessGameKillerTaps \
-            -destination "id=${{ steps.sim.outputs.udid }}" \
-            -test-timeouts-enabled YES \
-            -default-test-execution-time-allowance 240 \
-            -maximum-test-execution-time-allowance 240 \
-            CODE_SIGNING_ALLOWED=NO > taps.log 2>&1 || status=$?
-          grep -E "Test Case .* (passed|failed)" taps.log | head -60 || true
-          # A failure says what was on the screen (TapTestCase.fail).
-          grep -E "error:|\*\* " taps.log | cut -c1-3200 | head -40 || true
-          grep -E "Executed" taps.log | tail -3 || true
-          # How often a tap had to wait for the app's animations to settle (each wait is slow).
-          echo "Waits for animations: $(grep -c "App animations complete notification not received" taps.log || true)"
-          xcrun simctl uninstall "${{ steps.sim.outputs.udid }}" com.chessgamekiller.app 2>/dev/null || true
-          exit $status
       - name: Build and test
         run: |
           status=0
@@ -260,9 +247,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-log
-          path: |
-            build.log
-            taps.log
+          path: build.log
       - name: Upload screen pictures
         if: always()
         uses: actions/upload-artifact@v4
@@ -320,13 +305,6 @@ jobs:
         if: failure()
         # The pictures above can push the test results out of the log's tail, so they come again, last.
         run: |
-          # The tap tests first: what failed, what was on the screen, and how long each step took.
-          if [ -f taps.log ]; then
-            grep -E "Test Case .* (passed|failed)" taps.log | head -60 || true
-            grep -E "error:|\*\* " taps.log | cut -c1-3200 | head -40 || true
-            grep -E "Executed" taps.log | tail -3 || true
-            grep -E "App animations complete notification not received|Failed to|Timed out|exceeded" taps.log | head -20 || true
-          fi
           [ -f build.log ] || exit 0
           grep -E "error:|Test Case .* failed|\*\* " build.log | head -80 || true
           grep -E "Executed" build.log | tail -3 || true
@@ -334,6 +312,94 @@ jobs:
           # The engine's own account, for a failing engine test.
           grep -E "Stockfish: " build.log | head -10 || true
           grep -E "\] TIMING " build.log | tail -40 || true
+
+  taps:
+    # The tests draw each screen, and a picture can't tell whether a tap opens anything (the
+    # vine on Learn did nothing when touched, 2026-11-27). These launch the app on the simulator
+    # and tap what a player taps (ChessGameKillerUITests). They run beside the tests on a Mac
+    # of their own, so a pull request waits no longer for them, and their log ends with their
+    # own results. On pull requests, and by hand when asked (taps, or only for a few by name).
+    if: >-
+      (github.event_name == 'workflow_dispatch' && (inputs.taps || inputs.only != '')) ||
+      (github.event_name == 'pull_request' && github.event.action != 'labeled')
+    # The Mac with the Xcode the phone's build is made with and the newest iOS a runner offers:
+    # as near the phone as a runner gets. (No runner has the phone's own iOS.) The dead vine
+    # showed the same on macos-15, which is a quarter quicker, should the minutes matter more.
+    runs-on: macos-26
+    timeout-minutes: 85
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache Stockfish networks
+        uses: actions/cache@v4
+        with:
+          path: .nnue-cache
+          key: nnue-1111cefa1111-37f18f62d772
+      - name: Generate Xcode project
+        run: |
+          brew install xcodegen
+          xcodegen
+      - name: Pick an iPhone simulator
+        id: sim
+        run: |
+          xcodebuild -version | tr '\n' ' '; echo
+          # The newest iOS, on an iPhone 17 Pro when the runner has one (as build-and-test picks).
+          DEVICES=$(xcrun simctl list devices available -j \
+            | jq -c '[.devices | to_entries[] | select(.key | contains("iOS")) | .key as $rt | .value[] | select(.name | startswith("iPhone")) | {udid, name, rt: $rt}] | sort_by(.rt) | reverse')
+          UDID=$(echo "$DEVICES" | jq -r '([.[] | select(.name == "iPhone 17 Pro")] + .)[0].udid')
+          echo "$DEVICES" | jq -r '.[] | select(.udid == "'"$UDID"'") | "\(.name) \(.rt)"'
+          echo "Using simulator $UDID"
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+      - name: Tap through the app
+        # Stopped before the job is, so the next step can still say what ran.
+        timeout-minutes: 75
+        env:
+          ONLY_TESTS: ${{ inputs.only }}
+        run: |
+          # The simulator is started and fully up before the tests ask for it. On a cold one the
+          # app's first launch can time out ("Timed out while requesting launch progress").
+          xcrun simctl bootstatus "${{ steps.sim.outputs.udid }}" -b > /dev/null || true
+          # All of them, or the few asked for by name.
+          only=()
+          for name in $ONLY_TESTS; do only+=("-only-testing:ChessGameKillerUITests/$name"); done
+          # A test that fails is tried once more: a slow runner can time out a launch or a look
+          # at the screen. A tap that is really dead fails both times (the vine did, every time,
+          # on two Macs). Both tries are in the results below, so a first failure is never hidden.
+          xcodebuild test \
+            -project ChessGameKiller.xcodeproj \
+            -scheme ChessGameKillerTaps \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            "${only[@]}" \
+            -retry-tests-on-failure \
+            -test-iterations 2 \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 300 \
+            -maximum-test-execution-time-allowance 300 \
+            CODE_SIGNING_ALLOWED=NO > taps.log 2>&1
+      - name: What the taps found
+        # Last in the log, whether the taps passed, failed or ran out of time.
+        if: always()
+        run: |
+          echo "On macOS $(sw_vers -productVersion), $(xcodebuild -version | tr '\n' ' ')"
+          [ -f taps.log ] || { echo "No tap log"; exit 0; }
+          # What a test wrote down about a screen without failing (TapTestCase.note).
+          grep -E "^TAPNOTE" taps.log | cut -c1-3600 | head -60 || true
+          # Each test, with how long it took. One that failed and was tried again is here twice.
+          grep -E "Test Case .* (passed|failed|skipped)" taps.log | head -90 || true
+          echo "Tries that failed: $(grep -cE "Test Case .* failed" taps.log || true)"
+          # A failure says what was on the screen (TapTestCase.fail).
+          grep -E "error:|\*\* " taps.log | cut -c1-3600 | head -40 || true
+          # A test that hung or took the test runner down is named by xcodebuild, not by a test line.
+          grep -E "exceeded|timed out|crashed|Restarting after|Testing failed|encountered an error" taps.log | cut -c1-700 | head -20 || true
+          grep -E "Executed" taps.log | tail -3 || true
+          # How often a tap had to wait for the app's animations to settle (each wait is slow).
+          echo "Waits for animations: $(grep -c "App animations complete notification not received" taps.log || true)"
+      - name: Upload the tap log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tap-log
+          path: taps.log
+          if-no-files-found: ignore
 
   pictures:
     # By hand only. A job's log can be read back 5,000 lines at a time, which holds about a

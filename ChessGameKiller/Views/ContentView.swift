@@ -100,7 +100,8 @@ struct ContentView: View {
     /// tests and screenshots that picture the game screen skip both, and may open the coach.
     init(startsWithNewGame: Bool = true, startsAtHome: Bool? = nil,
          match: MatchController? = nil, coachOpen: Bool = false) {
-        let trainingStore = TrainingStore.live()
+        // The tap tests bring a sample player's saved mistakes (`-showcaseMistakes YES`).
+        let trainingStore = Showcase.training() ?? TrainingStore.live()
         _training = State(initialValue: trainingStore)
         // The training streak carries over into the daily one the first time.
         _daily = State(initialValue: DailyStore.live(trainingStreak: trainingStore.progress.streak))
