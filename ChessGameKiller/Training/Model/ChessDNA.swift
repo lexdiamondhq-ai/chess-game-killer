@@ -45,7 +45,7 @@ struct ChessDNA: Equatable {
             case .counterpuncher: return "You're hard to put away. You absorb pressure, wait for their slip, then hit back."
             case .grinder: return "You like long games. You keep pieces on, squeeze, and win the endgame."
             case .builder: return "You set up soundly and avoid risks. Your games are calm until you decide they aren't."
-            case .allRounder: return "No single habit stands out yet: you play the position in front of you."
+            case .allRounder: return "No one style fits you: you play the position in front of you."
             }
         }
 
