@@ -224,10 +224,11 @@ object Planner {
         val level = Training.rating
         val random = java.util.Random(seed * 31 + skills.hashCode())
         // The nearest to the player's level, a little spread, unseen ones ahead of seen ones.
-        val ranked = pool.sortedBy { d ->
+        // Each drill's key is worked out once: a key drawn afresh on every comparison breaks the sort.
+        val ranked = pool.map { d ->
             val distance = abs(d.rating - level) + random.nextInt(140)
-            distance + if (Training.recentlySeen(d.id)) 2_000 else 0
-        }
+            d to distance + if (Training.recentlySeen(d.id)) 2_000 else 0
+        }.sortedBy { it.second }.map { it.first }
         val out = mutableListOf<Drill>()
         var playouts = 0
         for (d in ranked) {
