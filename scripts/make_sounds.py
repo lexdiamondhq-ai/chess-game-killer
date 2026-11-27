@@ -36,13 +36,16 @@ SOUNDS = {
     "castle": ("Two weighted wooden chess pieces with felt bases set down on a hardwood board one "
                "right after the other: two soft knocks a fraction of a second apart. Close-up, "
                "dry room, no music", 0.7),
-    # Piece sounds (Alex, 2026-11-26): every move, capture and castle, in every piece set and
-    # on every screen, plays the soft wooden tock first made for rival moves (move-soft*.mp3,
-    # capture-soft.mp3: a few fading damped wood tones under 3 kHz, made in code). castle.mp3
-    # is two of those tocks 130 ms apart. The older foley takes and each set's own takes were
+    # Piece sounds (Alex, 2026-11-27): every move, capture and castle, in every piece set and
+    # on every screen, plays move-soft*.mp3 / capture-soft.mp3 / castle.mp3, which are NOT made
+    # here: they are cut from a real recording of wooden chess pieces on a wooden board
+    # ("chess pieces" by simone_ds on Freesound, via Pixabay, Pixabay Content License). Three
+    # move takes, a capture (a light tap, then a firm knock 50 ms later) and castle (two takes
+    # 130 ms apart). The code-made tocks they replace sounded like beeps. The older foley takes and each set's own takes were
     # removed: one slid take squeaked (~2 kHz) and several set takes rang shrill (3 to 9 kHz).
     # move-clock.mp3 (timed games) is a wooden blitz move, then a mechanical chess clock
-    # pressed, and check.mp3 is the two bronze bells above with a little warmth.
+    # pressed. check.mp3 is not made here either (2026-11-27): two wooden knocks from the same
+    # recording, the second 3 semitones lower ("tok-tok"); the "check" prompt is the old bells.
     # The endings: warm and acoustic like the pieces, never arcade synths.
     "win": ("A short, elegant success chime: three warm rising notes on a soft celesta and a "
             "felt piano, a gentle shimmer at the end. Clean, luxurious, understated, no synths, "
