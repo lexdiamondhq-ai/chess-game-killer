@@ -192,17 +192,17 @@ fun YouPage() {
         }
         SectionTitle("Appearance")
         Choices(Appearance.entries.map { it.label }, Appearance.entries.indexOf(Progress.appearance), "appearance") {
-            Progress.setAppearance(Appearance.entries[it])
+            Progress.chooseAppearance(Appearance.entries[it])
         }
         SectionTitle("Play as")
         Choices(SideChoice.entries.map { it.label }, SideChoice.entries.indexOf(Progress.side), "side") {
-            Progress.setSide(SideChoice.entries[it])
+            Progress.chooseSide(SideChoice.entries[it])
         }
         SectionTitle("Sound")
         Column(Modifier.padding(horizontal = 16.dp).fillMaxWidth().card(padding = 4.dp)) {
-            Toggle("Board sounds", "Wooden pieces on every move", Progress.soundsOn, "toggle-sounds") { Progress.setSounds(it) }
+            Toggle("Board sounds", "Wooden pieces on every move", Progress.soundsOn, "toggle-sounds") { Progress.chooseSounds(it) }
             Box(Modifier.padding(horizontal = 14.dp).fillMaxWidth().height(0.7.dp).background(Palette.line))
-            Toggle("Home music", "\"The Long Winter\" on Today", Progress.musicOn, "toggle-music") { Progress.setMusic(it) }
+            Toggle("Home music", "\"The Long Winter\" on Today", Progress.musicOn, "toggle-music") { Progress.chooseMusic(it) }
         }
         SectionTitle("About")
         Column(Modifier.padding(horizontal = 16.dp).fillMaxWidth().card(), verticalArrangement = Arrangement.spacedBy(6.dp)) {

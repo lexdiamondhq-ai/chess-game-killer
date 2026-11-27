@@ -145,8 +145,8 @@ fun App() {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         for (choice in SideChoice.entries) {
                             val on = Progress.side == choice
-                            if (on) GoldButton(choice.label, modifier = Modifier.weight(1f).testTag("option-${choice.name.lowercase()}")) { Progress.setSide(choice) }
-                            else QuietButton(choice.label, modifier = Modifier.weight(1f).testTag("option-${choice.name.lowercase()}")) { Progress.setSide(choice) }
+                            if (on) GoldButton(choice.label, modifier = Modifier.weight(1f).testTag("option-${choice.name.lowercase()}")) { Progress.chooseSide(choice) }
+                            else QuietButton(choice.label, modifier = Modifier.weight(1f).testTag("option-${choice.name.lowercase()}")) { Progress.chooseSide(choice) }
                         }
                     }
                     Text("No clock. ${rival.blurb}", style = Type.small)

@@ -56,10 +56,10 @@ object Progress {
         streak = liveStreak()
     }
 
-    fun setAppearance(value: Appearance) { appearance = value; prefs.edit().putString("appearance", value.name).apply() }
-    fun setSounds(on: Boolean) { soundsOn = on; prefs.edit().putBoolean("sounds", on).apply() }
-    fun setMusic(on: Boolean) { musicOn = on; prefs.edit().putBoolean("music", on).apply() }
-    fun setSide(value: SideChoice) { side = value; prefs.edit().putString("side", value.name).apply() }
+    fun chooseAppearance(value: Appearance) { appearance = value; prefs.edit().putString("appearance", value.name).apply() }
+    fun chooseSounds(on: Boolean) { soundsOn = on; prefs.edit().putBoolean("sounds", on).apply() }
+    fun chooseMusic(on: Boolean) { musicOn = on; prefs.edit().putBoolean("music", on).apply() }
+    fun chooseSide(value: SideChoice) { side = value; prefs.edit().putString("side", value.name).apply() }
 
     /** The rival up next: the first one not yet beaten, else the Ashen King. */
     val upNext: Rival get() = Rival.entries.firstOrNull { it.name !in beaten } ?: Rival.ASHEN_KING
