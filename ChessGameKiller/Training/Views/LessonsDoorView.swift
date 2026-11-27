@@ -83,7 +83,7 @@ struct HabitCard: View {
                     TrafficLightDots(theme: theme, size: 10)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("The Traffic Light")
-                            .font(.app(.headline))
+                            .font(.display(.headline, weight: .semibold))
                         Text("Three questions before every move")
                             .font(.app(.subheadline))
                             .foregroundStyle(.secondary)
@@ -157,7 +157,7 @@ struct UnitCard: View {
                     TrainIcon(symbol: unit.symbol, theme: theme, size: 40, tint: color)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(unit.title)
-                            .font(.app(.headline))
+                            .font(.display(.headline, weight: .semibold))
                         Text(unit.subtitle)
                             .font(.app(.caption))
                             .foregroundStyle(.secondary)

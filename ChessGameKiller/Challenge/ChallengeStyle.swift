@@ -81,8 +81,10 @@ private struct ChallengeButtonBody: View {
             .padding(.horizontal, 18)
             .frame(maxWidth: .infinity, minHeight: height)
             .background {
-                if kind == .primary, let tone = theme.screenTone {
-                    HomeIvoryFill(tone: tone)
+                if kind == .primary, theme.screenTone != nil {
+                    // A small pill in a list (Play, beside a waiting player) keeps the gold
+                    // without the glow, so the page's one big button still leads.
+                    PolishedFill(shape: Capsule(), quiet: height < 48)
                 } else if kind == .primary {
                     shape.fill(theme.challengeAccent)
                         .overlay { shape.strokeBorder(Color.white.opacity(0.25), lineWidth: 0.75) }
@@ -98,7 +100,7 @@ private struct ChallengeButtonBody: View {
 
     private var foreground: Color {
         switch kind {
-        case .primary: return theme.screenTone?.onIvory ?? Color.black.opacity(0.88)
+        case .primary: return theme.screenTone == nil ? Color.black.opacity(0.88) : Polish.onMetal
         case .glass: return Color.primary
         case .destructive: return ChallengeColors.urgent
         }
@@ -147,7 +149,7 @@ struct ChallengeTopBar<Trailing: View>: View {
         ZStack {
             VStack(spacing: 1) {
                 Text(title)
-                    .font(theme.challengeFont(15, .semibold))
+                    .font(.display(size: 16, weight: .semibold))
                     .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -260,17 +262,13 @@ struct FairPlayCard: View {
     }
 }
 
-/// A section's name, in small capitals.
+/// A section's name: carved gold capitals and a fine rule (`SectionLabel`).
 struct ChallengeSectionTitle: View {
     let title: String
 
     var body: some View {
-        Text(title.uppercased())
-            .font(.app(.caption, weight: .semibold))
-            .tracking(1.1)
-            .foregroundStyle(.secondary)
+        SectionLabel(text: title)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityAddTraits(.isHeader)
     }
 }
 

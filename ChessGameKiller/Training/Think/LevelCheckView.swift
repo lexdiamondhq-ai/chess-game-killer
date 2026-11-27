@@ -90,7 +90,7 @@ struct LevelCheckView: View {
                         .accessibilityHidden(true)
                     VStack(spacing: 8) {
                         Text("Find your level")
-                            .font(.app(.title2, weight: .bold))
+                            .font(.display(.title2, weight: .semibold))
                         Text("A quick check so \(Coach.current.name) starts you in the right place, and you skip what you already know.")
                             .font(.app(.subheadline))
                             .foregroundStyle(.secondary)
@@ -222,7 +222,7 @@ struct LevelCheckView: View {
                             .font(.app(.largeTitle, weight: .bold).monospacedDigit())
                             .foregroundStyle(theme.trainingAccent)
                         Text(band.name)
-                            .font(.app(.title3, weight: .semibold))
+                            .font(.display(.title3, weight: .semibold))
                         LevelBandScale(band: band, theme: theme)
                             .padding(.top, 4)
                         Text(band.advice)

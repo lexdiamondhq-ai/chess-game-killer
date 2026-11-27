@@ -81,7 +81,7 @@ struct EndgamesDoorView: View {
             if let next {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(next.title)
-                        .font(.app(.title3, weight: .bold))
+                        .font(.display(.title3, weight: .semibold))
                     Text(next.goalText)
                         .font(.app(.footnote, weight: .semibold))
                         .foregroundStyle(theme.trainingAccent)

@@ -429,13 +429,13 @@ private struct RushCard: View {
                 .shadow(color: theme.glows ? theme.trainingAccent.opacity(0.7) : .clear, radius: 14)
             if let last, last.isOver {
                 Text(last.newBest ? "New best!" : last.strikes >= RushRound.lives ? "Three strikes" : "Time!")
-                    .font(.app(.title, weight: .bold))
+                    .font(.display(.title, weight: .semibold))
                 Text("\(last.score) solved")
                     .font(.app(.title3, weight: .semibold).monospacedDigit())
                     .foregroundStyle(theme.trainingAccent)
             } else {
                 Text("Puzzle Rush")
-                    .font(.app(.title, weight: .bold))
+                    .font(.display(.title, weight: .semibold))
                 Text("Three minutes. The puzzles start easy and get harder with every one you solve. Three mistakes and you're out.")
                     .font(.app(.subheadline))
                     .foregroundStyle(.secondary)

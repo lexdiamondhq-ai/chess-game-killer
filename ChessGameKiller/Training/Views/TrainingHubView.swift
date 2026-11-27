@@ -304,7 +304,7 @@ struct TodayCard: View {
                         .tracking(1)
                         .foregroundStyle(theme.trainingAccent)
                     Text(title)
-                        .font(.app(.title2, weight: .bold))
+                        .font(.display(.title2, weight: .semibold))
                         .lineLimit(2)
                         .minimumScaleFactor(0.8)
                     Text(reason)

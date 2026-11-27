@@ -32,9 +32,22 @@ enum TrainDoor: String, CaseIterable, Identifiable, Hashable {
         case .games: return Glyphs.games
         }
     }
+
+    /// The door's own stone. Puzzles and Lessons wear the stones they wear on Home's tiles.
+    var stone: HomeAuroraJewel.Stone {
+        switch self {
+        case .puzzles: return .amethyst
+        case .lessons: return .jade
+        case .openings: return .sapphire
+        case .endgames: return .ruby
+        case .calculation: return .violet
+        case .games: return .amber
+        }
+    }
 }
 
-/// A square of color behind an icon, in the accent.
+/// A square of color behind an icon, in the accent: lit from above, with a fine rim, so it
+/// reads as a small enamel plate and not a flat patch.
 struct TrainIcon: View {
     let symbol: String
     let theme: BoardTheme
@@ -43,13 +56,18 @@ struct TrainIcon: View {
 
     var body: some View {
         let color = tint ?? theme.trainingAccent
+        let tile = RoundedRectangle(cornerRadius: size * 0.3, style: .continuous)
         Glyph(name: symbol, size: size * (Glyph.isGlyph(symbol) ? 0.62 : 0.56), weight: .semibold)
             .foregroundStyle(color)
             .frame(width: size, height: size)
-            .background(color.opacity(0.14), in: RoundedRectangle(cornerRadius: size * 0.3, style: .continuous))
+            .background {
+                tile.fill(LinearGradient(colors: [color.opacity(0.24), color.opacity(0.1)],
+                                         startPoint: .top, endPoint: .bottom))
+            }
             .overlay {
-                RoundedRectangle(cornerRadius: size * 0.3, style: .continuous)
-                    .strokeBorder(color.opacity(0.22), lineWidth: 0.6)
+                tile.strokeBorder(LinearGradient(colors: [color.opacity(0.5), color.opacity(0.2)],
+                                                 startPoint: .top, endPoint: .bottom),
+                                  lineWidth: 0.8)
             }
             .accessibilityHidden(true)
     }
@@ -81,7 +99,7 @@ struct DoorTile: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top) {
-                TrainIcon(symbol: door.symbol, theme: theme, size: 42)
+                JewelIcon(symbol: door.symbol, stone: door.stone, size: 44)
                 Spacer(minLength: 0)
                 if badge > 0 {
                     TrainBadge(count: badge, theme: theme)
@@ -89,7 +107,7 @@ struct DoorTile: View {
             }
             Spacer(minLength: 12)
             Text(door.title)
-                .font(.app(.headline))
+                .font(.display(.title3, weight: .semibold))
                 .foregroundStyle(.primary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
@@ -101,7 +119,7 @@ struct DoorTile: View {
                 .padding(.top, 2)
         }
         .padding(15)
-        .frame(maxWidth: .infinity, minHeight: 118, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: 124, alignment: .topLeading)
         .trainingCard(theme)
         .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .accessibilityElement(children: .ignore)
@@ -125,7 +143,7 @@ struct TrainRow: View {
             TrainIcon(symbol: symbol, theme: theme, size: 44, tint: tint)
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.app(.headline))
+                    .font(.display(.headline, weight: .semibold))
                     .foregroundStyle(.primary)
                 Text(detail)
                     .font(.app(.subheadline))
@@ -156,18 +174,15 @@ struct TrainRow: View {
     }
 }
 
-/// A quiet heading above a group of rows.
+/// A heading above a group of rows: carved gold capitals and a fine rule (`SectionLabel`).
 struct TrainSectionTitle: View {
     let text: String
 
     var body: some View {
-        Text(text.uppercased())
-            .font(.app(.caption, weight: .semibold))
-            .tracking(0.9)
-            .foregroundStyle(.secondary)
-            .padding(.leading, 4)
-            .padding(.top, 10)
-            .accessibilityAddTraits(.isHeader)
+        SectionLabel(text: text)
+            .padding(.horizontal, 4)
+            .padding(.top, 12)
+            .padding(.bottom, 1)
     }
 }
 
@@ -241,7 +256,7 @@ struct RankStrip: View {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(rank.title)
-                            .font(.app(.subheadline, weight: .semibold))
+                            .font(.display(.subheadline, weight: .semibold))
                         Text("\(store.progress.xp) XP")
                             .font(.app(.caption, weight: .medium).monospacedDigit())
                             .foregroundStyle(.secondary)

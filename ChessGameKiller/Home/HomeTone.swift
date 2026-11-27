@@ -163,7 +163,7 @@ extension Color {
 /// The home's type, all Geist. It follows the reader's text size.
 enum HomeType {
     /// A panel's name, like the You panel's.
-    static let section = Font.app(.title2, weight: .semibold)
+    static let section = Font.display(.title2, weight: .medium)
 }
 
 /// One set of measures for every card, so all their edges and insides line up.
@@ -250,21 +250,18 @@ extension View {
 
 // MARK: - Buttons
 
-/// The ivory capsule behind the one solid button, lit from above and lifted off the glass.
+/// The capsule behind the one solid button: the app's gold (see `PolishedFill`), where it was
+/// ivory in the dark and the set's black by day. The thing to do next is gold on every screen,
+/// as Home's Play already was (Alex, 2026-11-27: make the designs stick out).
 struct HomeIvoryFill: View {
     let tone: HomeTone
 
     var body: some View {
-        Capsule()
-            .fill(tone.ivory)
-            .overlay {
-                Capsule().fill(LinearGradient(colors: [.white.opacity(0.35), .clear], startPoint: .top, endPoint: .center))
-            }
-            .shadow(color: .black.opacity(0.25), radius: 8, y: 4)
+        PolishedFill(shape: Capsule())
     }
 }
 
-/// The one solid button on a card: ivory, like the white pieces, with dark type.
+/// The one solid button on a card: gold, with dark type.
 struct HomeIvoryButtonStyle: ButtonStyle {
     let tone: HomeTone
     var compact = false
@@ -272,7 +269,7 @@ struct HomeIvoryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(compact ? .app(.subheadline, weight: .semibold) : .app(.headline))
-            .foregroundStyle(tone.onIvory)
+            .foregroundStyle(Polish.onMetal)
             .lineLimit(1)
             .minimumScaleFactor(0.85)
             .padding(.horizontal, compact ? 18 : 22)
@@ -343,6 +340,8 @@ struct HomePressStyle: ButtonStyle {
 /// front only where it says something the words don't.
 struct HomeLinkRow: View {
     var glyph: String? = nil
+    /// With a glyph: the glyph in gold on this stone's tile (`JewelIcon`), for a panel of doors.
+    var stone: HomeAuroraJewel.Stone? = nil
     let title: String
     let detail: String
     let tone: HomeTone
@@ -353,14 +352,16 @@ struct HomeLinkRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 14) {
-                if let glyph {
+                if let glyph, let stone {
+                    JewelIcon(symbol: glyph, stone: stone, size: 40)
+                } else if let glyph {
                     Glyph(name: glyph, size: iconSize)
                         .foregroundStyle(tone.ink2)
                         .frame(width: iconSize + 6)
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.app(.body, weight: .semibold))
+                        .font(.display(.body, weight: .semibold))
                         .foregroundStyle(tone.ink)
                     Text(detail)
                         .font(.app(.subheadline))

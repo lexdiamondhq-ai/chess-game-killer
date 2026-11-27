@@ -15,13 +15,13 @@ struct ChallengeEntryRow: View {
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
         VStack(spacing: 0) {
-            row(glyph: Glyphs.challenge, title: "Play a friend", detail: "by username or link",
+            row(glyph: Glyphs.challenge, stone: .sapphire, title: "Play a friend", detail: "by username or link",
                 label: "Play a friend, by username or link", action: action)
             if let online {
                 Divider()
                     .overlay(Color.primary.opacity(0.06))
                     .padding(.leading, 58)
-                row(glyph: Glyphs.online, title: "Play online", detail: onlineDetail,
+                row(glyph: Glyphs.online, stone: .jade, title: "Play online", detail: onlineDetail,
                     label: "Play online, \(onlineDetail)", action: online)
             }
         }
@@ -39,13 +39,13 @@ struct ChallengeEntryRow: View {
         return waiting == 1 ? "1 waiting now" : "\(waiting) waiting now"
     }
 
-    private func row(glyph: String, title: String, detail: String, label: String,
+    private func row(glyph: String, stone: HomeAuroraJewel.Stone, title: String, detail: String, label: String,
                      action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                GlyphTile(theme: theme) { Glyph(name: glyph, size: 22) }
+                JewelIcon(symbol: glyph, stone: stone, size: 34)
                 (Text(title)
-                    .font(.app(.callout, weight: .bold))
+                    .font(.display(.callout, weight: .semibold))
                     .foregroundStyle(.primary)
                     + Text("  ·  \(detail)")
                     .font(.app(.footnote))

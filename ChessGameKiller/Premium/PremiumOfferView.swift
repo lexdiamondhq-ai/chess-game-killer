@@ -24,13 +24,26 @@ struct PremiumOfferView: View {
     /// The home's metal on its pages, or the board's own gold.
     private var accent: Color { theme.screenTone?.metal ?? theme.accent ?? PremiumStyle.gold }
     private var onAccent: Color { theme.screenIsDark ? .black : .white }
+    /// On the home's pages the sheet is dressed as Home is: a gold medallion and the gold button.
+    private var gilded: Bool { theme.screenTone != nil }
+    private var mainInk: Color { gilded ? Polish.onMetal : onAccent }
+
+    /// Behind the sheet's one main button: the app's gold, or the board's accent on the older home.
+    @ViewBuilder
+    private var mainFill: some View {
+        if gilded {
+            PolishedFill(shape: Capsule())
+        } else {
+            RoundedRectangle(cornerRadius: 16, style: .continuous).fill(accent)
+        }
+    }
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
             TrainingBackdrop(theme: theme).ignoresSafeArea()
             ScrollView {
                 VStack(spacing: 22) {
-                    PremiumOfferHeader(accent: accent, bounce: crown)
+                    PremiumOfferHeader(accent: accent, gilded: gilded, bounce: crown)
                     if justBought {
                         PremiumOwnedCard(text: nil, accent: accent)
                             .transition(.scale(scale: 0.94).combined(with: .opacity))
@@ -114,10 +127,10 @@ struct PremiumOfferView: View {
         } label: {
             Text("Done")
                 .font(.app(.headline))
-                .foregroundStyle(onAccent)
+                .foregroundStyle(mainInk)
                 .frame(maxWidth: .infinity)
                 .frame(height: 54)
-                .background(accent, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .background { mainFill }
         }
         .buttonStyle(ChallengePressStyle())
     }
@@ -140,13 +153,13 @@ struct PremiumOfferView: View {
             } label: {
                 ZStack {
                     Text(title).opacity(busy ? 0 : 1)
-                    if busy { ProgressView().tint(onAccent) }
+                    if busy { ProgressView().tint(mainInk) }
                 }
                 .font(.app(.headline))
-                .foregroundStyle(onAccent)
+                .foregroundStyle(mainInk)
                 .frame(maxWidth: .infinity)
                 .frame(height: 54)
-                .background(accent, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .background { mainFill }
             }
             .buttonStyle(ChallengePressStyle())
             .disabled(busy)
@@ -183,19 +196,31 @@ enum PremiumStyle {
 
 private struct PremiumOfferHeader: View {
     let accent: Color
+    /// The crown on a solid gold medallion, as on Home's pages.
+    var gilded = false
     /// Bumps to bounce the crown, as Premium is bought.
     var bounce = 0
 
     var body: some View {
         VStack(spacing: 12) {
-            Image(systemName: "crown.fill")
-                .font(.system(size: 30, weight: .semibold))
-                .foregroundStyle(accent)
-                .symbolEffect(.bounce, value: bounce)
-                .frame(width: 68, height: 68)
-                .glassPane(Circle(), tint: accent)
+            if gilded {
+                Image(systemName: "crown.fill")
+                    .font(.system(size: 32, weight: .semibold))
+                    .foregroundStyle(Polish.onMetal)
+                    .symbolEffect(.bounce, value: bounce)
+                    .frame(width: 76, height: 76)
+                    .background { PolishedFill(shape: Circle()) }
+                    .padding(.bottom, 2)
+            } else {
+                Image(systemName: "crown.fill")
+                    .font(.system(size: 30, weight: .semibold))
+                    .foregroundStyle(accent)
+                    .symbolEffect(.bounce, value: bounce)
+                    .frame(width: 68, height: 68)
+                    .glassPane(Circle(), tint: accent)
+            }
             Text("Premium")
-                .font(.app(size: 34, weight: .bold))
+                .font(.display(size: 38, weight: .semibold))
             Text("Get better faster. Your coach learns how you play and builds every session around it.")
                 .font(.app(.body))
                 .foregroundStyle(.secondary)
@@ -279,10 +304,18 @@ private struct PremiumBenefitRow: View {
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(accent)
                 .frame(width: 34, height: 34)
-                .background(accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .background {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(LinearGradient(colors: [accent.opacity(0.26), accent.opacity(0.1)],
+                                             startPoint: .top, endPoint: .bottom))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .strokeBorder(accent.opacity(0.4), lineWidth: 0.8)
+                        }
+                }
             VStack(alignment: .leading, spacing: 2) {
                 Text(benefit.title)
-                    .font(.app(.headline))
+                    .font(.display(.headline, weight: .semibold))
                 Text(benefit.detail)
                     .font(.app(.subheadline))
                     .foregroundStyle(.secondary)
@@ -455,7 +488,6 @@ struct PremiumSettingsCard: View {
     @State private var managing = false
 
     var body: some View {
-        let accent: Color = theme.accent ?? PremiumStyle.gold
         let active: Bool = premium.isPremium
         Button {
             // With Premium on there is nothing to sell: the row opens Apple's page to change or
@@ -463,14 +495,10 @@ struct PremiumSettingsCard: View {
             if active { managing = true } else { open() }
         } label: {
             HStack(spacing: 12) {
-                Image(systemName: "crown.fill")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(accent)
-                    .frame(width: 34, height: 34)
-                    .background(accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                JewelIcon(symbol: "crown.fill", stone: .amber, size: 38)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(active ? "Premium is on" : "Premium")
-                        .font(.app(.body, weight: .semibold))
+                        .font(.display(.body, weight: .semibold))
                         .foregroundStyle(Color.primary)
                     Text(active ? "Everything is open. Tap to manage your plan." : "A coach that learns you, full Rewind, unlimited puzzles and every look.")
                         .font(.app(.footnote))

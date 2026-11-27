@@ -53,7 +53,7 @@ struct UsernamePicker: View {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 6) {
                 Text(center.friends.you == nil ? "Pick your username" : "Change your username")
-                    .font(theme.challengeFont(26, .bold))
+                    .font(.display(size: 26, weight: .semibold))
                 Text("Friends find you by it and send you challenges. Letters, numbers, _ and . only.")
                     .font(theme.challengeFont(15))
                     .foregroundStyle(.secondary)

@@ -377,7 +377,7 @@ struct LessonDoneCard: View {
                 }
                 VStack(spacing: 6) {
                     Text("Lesson complete")
-                        .font(.app(.title2, weight: .bold))
+                        .font(.display(.title2, weight: .semibold))
                     Text(lesson.title)
                         .font(.app(.subheadline))
                         .foregroundStyle(.secondary)

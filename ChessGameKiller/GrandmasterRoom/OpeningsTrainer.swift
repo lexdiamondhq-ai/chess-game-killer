@@ -235,7 +235,7 @@ struct OpeningsView: View {
             }
             Text(count == 0 ? "Start your repertoire"
                  : due.isEmpty ? "Nothing due today" : (due.count == 1 ? "1 line to review" : "\(due.count) lines to review"))
-                .font(.app(.title3, weight: .bold))
+                .font(.display(.title3, weight: .semibold))
             Text(count == 0
                  ? "Open an opening below, pick a line and tap Add. Reviews come back tomorrow, then in 3, 7, 16 and 35 days."
                  : due.isEmpty ? "Every line is fresh. The next one comes back \(nextDue)."

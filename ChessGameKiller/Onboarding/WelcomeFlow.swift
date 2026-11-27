@@ -164,7 +164,7 @@ struct WelcomeFlow: View {
     private func heading(_ title: String, _ subtitle: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(.app(.largeTitle, weight: .bold))
+                .font(.display(.largeTitle, weight: .semibold))
                 .fixedSize(horizontal: false, vertical: true)
             if let subtitle {
                 Text(subtitle)
@@ -263,7 +263,7 @@ private struct WelcomeIvoryStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .foregroundStyle(tone.onIvory)
+            .foregroundStyle(Polish.onMetal)
             .padding(.vertical, 6)
             .frame(minHeight: 50)
             .background { HomeIvoryFill(tone: tone) }

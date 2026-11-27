@@ -518,7 +518,7 @@ struct RewindView: View {
                     .foregroundStyle(.secondary)
             }
             Text(rewritten ? "You found it." : note.title)
-                .font(.app(.title2, weight: .semibold))
+                .font(.display(.title2, weight: .semibold))
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 10)
             Text(rewritten ? "This moment is rewritten. \(game.leftToRewrite == 0 ? "Every moment in this game is fixed." : "\(game.leftToRewrite) left in this game.")" : note.detail)

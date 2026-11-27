@@ -173,7 +173,7 @@ struct GamesDoorView: View {
         VStack(alignment: .leading, spacing: 10) {
             CoachAvatar(theme: theme, size: 40)
             Text(gamesRead == 0 ? "Play a game and I'll read it" : "A couple more games")
-                .font(.app(.title3, weight: .bold))
+                .font(.display(.title3, weight: .semibold))
             Text(gamesRead == 0
                  ? "Play any rival. I'll look at every move you make and show you where your points go, and how to win them back."
                  : "I've read \(gamesRead == 1 ? "one game" : "\(gamesRead) games") so far. After a few longer ones I can tell you what's really costing you.")

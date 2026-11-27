@@ -136,7 +136,7 @@ struct ImportGamesView: View {
         VStack(alignment: .leading, spacing: 10) {
             CoachAvatar(theme: theme, size: 40)
             Text(added == 0 ? "You're up to date" : added == 1 ? "1 game brought in" : "\(added) games brought in")
-                .font(.app(.title3, weight: .bold))
+                .font(.display(.title3, weight: .semibold))
             Text(finishedDetail(added: added, mistakes: mistakes))
                 .font(.app(.subheadline))
                 .foregroundStyle(.secondary)

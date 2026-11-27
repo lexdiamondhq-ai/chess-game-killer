@@ -321,10 +321,8 @@ struct SettingsSheet: View {
 
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(title.uppercased())
-                .font(.app(.caption, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .tracking(1)
+            SectionLabel(text: title)
+                .padding(.horizontal, 2)
             content()
         }
     }
@@ -677,11 +675,17 @@ private struct IconTile: View {
 
     var body: some View {
         let accent = theme.trainingAccent
+        let tile = RoundedRectangle(cornerRadius: 10, style: .continuous)
         Image(systemName: symbol)
             .font(.system(size: 15, weight: .semibold))
             .foregroundStyle(accent)
             .frame(width: 34, height: 34)
-            .background(accent.opacity(theme.screenIsDark ? 0.14 : 0.12), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .background {
+                // Lit from above with a fine rim, as the Learn rows' plates are.
+                tile.fill(LinearGradient(colors: [accent.opacity(0.26), accent.opacity(0.1)],
+                                         startPoint: .top, endPoint: .bottom))
+            }
+            .overlay { tile.strokeBorder(accent.opacity(0.4), lineWidth: 0.8) }
             .accessibilityHidden(true)
     }
 }

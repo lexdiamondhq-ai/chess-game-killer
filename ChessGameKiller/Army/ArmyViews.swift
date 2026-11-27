@@ -301,7 +301,7 @@ struct ArmyView: View {
     private var header: some View {
         VStack(spacing: 6) {
             Text("Every piece remembers.")
-                .font(.app(.title3, weight: .bold))
+                .font(.display(.title3, weight: .semibold))
             Text("Win with them and they earn a name, then a battle scar, then a gold name.")
                 .font(.app(.subheadline))
                 .foregroundStyle(.secondary)
@@ -446,7 +446,7 @@ struct ArmyView: View {
     private var ranksCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Ranks")
-                .font(.app(.headline))
+                .font(.display(.title3, weight: .semibold))
             ForEach(ArmyRank.allCases, id: \.self) { rank in
                 let piece = Piece(.knight, color: color, square: .a1)
                 HStack(spacing: 12) {
@@ -454,7 +454,7 @@ struct ArmyView: View {
                         .modifier(VeteranAura(rank: rank, piece: piece, theme: theme, size: 30, onBoard: false))
                     VStack(alignment: .leading, spacing: 1) {
                         Text(rank.title)
-                            .font(.app(.subheadline, weight: .semibold))
+                            .font(.display(.subheadline, weight: .semibold))
                         Text(rank.reward)
                             .font(.app(.caption))
                             .foregroundStyle(.secondary)
@@ -526,7 +526,7 @@ struct PieceDetailView: View {
                 VStack(spacing: 4) {
                     HStack(spacing: 6) {
                         Text(record.name ?? slot.title)
-                            .font(.app(.title2, weight: .bold))
+                            .font(.display(.title2, weight: .semibold))
                         if record.name != nil {
                             Button {
                                 draftName = record.name ?? ""

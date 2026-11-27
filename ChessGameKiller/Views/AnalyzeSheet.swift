@@ -176,7 +176,7 @@ struct AnalyzeSheet: View {
         .premiumOffer($offer)
         .tint(accent)
         .presentationBackground {
-            TrainingBackdrop(theme: theme)
+            TrainingBackdrop(theme: theme, wash: false)
         }
         .screenScheme(theme)
     }
@@ -326,7 +326,7 @@ private struct SolidBottomBar: ViewModifier {
         content
             .background {
                 // The sheet's own backdrop, so the strip reads as part of the page.
-                TrainingBackdrop(theme: theme)
+                TrainingBackdrop(theme: theme, wash: false)
                     .clipped()
                     .ignoresSafeArea(edges: .bottom)
             }

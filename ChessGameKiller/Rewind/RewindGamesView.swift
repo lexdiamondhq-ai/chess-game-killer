@@ -89,7 +89,7 @@ struct RewindGamesView: View {
                 .font(.system(size: 44, weight: .light))
                 .foregroundStyle(.secondary)
             Text("No games yet")
-                .font(.app(.title3, weight: .semibold))
+                .font(.display(.title3, weight: .semibold))
             Text("Finish a game and it lands here. Rewind it to see the moments that mattered, then go back and fix them.")
                 .font(.app(.body))
                 .foregroundStyle(.secondary)
@@ -170,7 +170,7 @@ private struct GameCard: View {
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
                             Text(game.opponentShown)
-                                .font(.app(.headline))
+                                .font(.display(.headline, weight: .semibold))
                                 .lineLimit(1)
                             Spacer(minLength: 4)
                             Text(game.result.title.uppercased())
