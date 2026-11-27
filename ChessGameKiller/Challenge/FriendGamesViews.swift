@@ -122,7 +122,7 @@ struct FriendGameRow: View {
                 badge
                 VStack(alignment: .leading, spacing: 2) {
                     Text(game.title)
-                        .font(.app(size: 16, weight: .semibold))
+                        .font(.display(size: 17, weight: .semibold))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                     Text(game.statusLine)

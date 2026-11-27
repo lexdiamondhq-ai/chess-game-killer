@@ -507,7 +507,7 @@ private struct ThemeCard: View {
                     }
                 VStack(alignment: .leading, spacing: 1) {
                     Text(option.name)
-                        .font(.app(.headline))
+                        .font(.display(.headline, weight: .semibold))
                         .foregroundStyle(locked ? Color.secondary : Color.primary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)

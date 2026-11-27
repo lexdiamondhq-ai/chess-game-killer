@@ -24,7 +24,7 @@ struct DeepReviewRow: View {
                 CoachAvatar(theme: theme, size: 36, coach: coach)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("\(coach.name)'s deep review")
-                        .font(.app(.subheadline, weight: .semibold))
+                        .font(.display(.callout, weight: .semibold))
                         .foregroundStyle(.primary)
                     Text(subtitle)
                         .font(.app(.caption))
@@ -209,8 +209,8 @@ struct DeepReviewCard: View {
                         .font(.app(.subheadline, weight: .semibold))
                         .padding(.horizontal, 18)
                         .frame(minHeight: 44)
-                        .foregroundStyle(.background)
-                        .background(Capsule().fill(Color.primary.opacity(0.92)))
+                        .foregroundStyle(Polish.pillInk(gilded: theme.screenTone != nil))
+                        .background { MainPillFill(gilded: theme.screenTone != nil, plain: Color.primary.opacity(0.92)) }
                 }
                 .buttonStyle(.plain)
             } else {
@@ -240,8 +240,8 @@ struct DeepReviewCard: View {
                     .font(.app(.subheadline, weight: .semibold))
                     .padding(.horizontal, 16)
                     .frame(minHeight: 44)
-                    .foregroundStyle(.background)
-                    .background(Capsule().fill(Color.primary.opacity(0.92)))
+                    .foregroundStyle(Polish.pillInk(gilded: theme.screenTone != nil))
+                    .background { MainPillFill(gilded: theme.screenTone != nil, plain: Color.primary.opacity(0.92)) }
             }
             .buttonStyle(.plain)
         }

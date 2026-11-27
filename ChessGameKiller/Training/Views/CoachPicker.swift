@@ -48,7 +48,7 @@ private struct CoachCard: View {
             VStack(spacing: 8) {
                 CoachAvatar(theme: theme, size: 56, tint: isSelected ? accent : nil, coach: coach)
                 Text(coach.title)
-                    .font(.app(.subheadline, weight: .semibold))
+                    .font(.display(.callout, weight: .semibold))
                     .foregroundStyle(.primary)
                 HStack(spacing: 4) {
                     Image(systemName: "speaker.wave.2.fill")

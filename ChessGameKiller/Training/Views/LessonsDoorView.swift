@@ -213,7 +213,7 @@ struct UnitCard: View {
                 .frame(width: 34)
             VStack(alignment: .leading, spacing: 1) {
                 Text(lesson.title)
-                    .font(.app(.subheadline, weight: .semibold))
+                    .font(.display(.callout, weight: .semibold))
                 Text(lesson.subtitle)
                     .font(.app(.caption))
                     .foregroundStyle(.secondary)

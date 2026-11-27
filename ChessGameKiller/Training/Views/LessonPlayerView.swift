@@ -133,7 +133,7 @@ struct LessonPlayerView: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(lesson.title)
-                    .font(.app(.headline))
+                    .font(.display(.headline, weight: .semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
                 Text(lesson.subtitle)

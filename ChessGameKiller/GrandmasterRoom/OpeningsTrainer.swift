@@ -305,7 +305,7 @@ private struct OpeningFamilyRow: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(name)
-                    .font(.app(.subheadline, weight: .semibold))
+                    .font(.display(.callout, weight: .semibold))
                     .foregroundStyle(.primary)
                 Text(caption)
                     .font(.app(.caption))

@@ -95,6 +95,28 @@ struct PolishedFill<S: InsettableShape>: View {
     }
 }
 
+/// The fill of a small capsule that is a card's own main action ("Take it back", "Done", "Play"):
+/// the main button's gold on a gold look, and the look's own fill on any other.
+struct MainPillFill<Plain: ShapeStyle>: View {
+    let gilded: Bool
+    let plain: Plain
+
+    var body: some View {
+        if gilded {
+            PolishedFill(shape: Capsule(), quiet: true)
+        } else {
+            Capsule().fill(plain)
+        }
+    }
+}
+
+extension Polish {
+    /// Ink on a small main capsule: espresso on the gold, the page's own color on a plain fill.
+    static func pillInk(gilded: Bool) -> AnyShapeStyle {
+        gilded ? AnyShapeStyle(onMetal) : AnyShapeStyle(.background)
+    }
+}
+
 // MARK: - Labels
 
 /// A group's label: a few carved gold capitals and a fine gold rule running off to the right,
