@@ -62,6 +62,7 @@ test("a new game seats its creator and waits", () => {
     turn: "white",
     clocks: { white: 600000, black: 600000, running: null, since: null },
     drawOffer: null,
+    chat: [],
     rematch: null,
     result: null,
     leaveGraceMs: GRACE,
@@ -952,4 +953,33 @@ test("a reaction is kept on the sender's seat and told to the other side", () =>
 test("no reaction before anyone has joined", () => {
   const game = newGame({ joined: false });
   assert.equal(rules.act(game, "white", "react_whoa", T0 + 1000).error, "bad_request");
+});
+
+test("chat lines are kept, tidied and starred, and told to the other side", () => {
+  const game = newGame();
+  assert.deepEqual(rules.view(game, T0).chat, []);
+  const out = rules.act(game, "white", "chat", T0 + 1000, { text: "  good   luck  " });
+  assert.equal(out.ok, true);
+  assert.deepEqual(out.notices, [{ kind: "chat", seat: "white", at: T0 + 1000 }]);
+  assert.deepEqual(rules.view(game, T0 + 1000).chat, [{ seat: "white", text: "good luck", at: T0 + 1000 }]);
+  // Too soon after the last line from the same seat.
+  assert.equal(rules.act(game, "white", "chat", T0 + 1200, { text: "again" }).error, "too_fast");
+  // The other side may answer at once; a rude word is starred.
+  assert.equal(rules.act(game, "black", "chat", T0 + 1300, { text: "you shit" }).ok, true);
+  assert.equal(rules.view(game, T0 + 1300).chat[1].text, "you ****");
+  // Nothing to say, or spaced-out rudeness, is refused.
+  assert.equal(rules.act(game, "white", "chat", T0 + 5000, { text: "   " }).error, "bad_chat");
+  assert.equal(rules.act(game, "white", "chat", T0 + 6000, { text: "f u c k" }).error, "bad_chat");
+  // Long lines are cut, and only the newest lines are kept.
+  rules.act(game, "white", "chat", T0 + 7000, { text: "x".repeat(500) });
+  assert.equal(rules.view(game, T0 + 7000).chat.at(-1).text.length, 200);
+  for (let i = 0; i < 80; i++) rules.act(game, "black", "chat", T0 + 10000 + i * 1000, { text: `line ${i}` });
+  const lines = rules.view(game, T0 + 100000).chat;
+  assert.equal(lines.length, rules.CHAT_KEEP);
+  assert.equal(lines.at(-1).text, "line 79");
+});
+
+test("no chat before anyone has joined", () => {
+  const game = newGame({ joined: false });
+  assert.equal(rules.act(game, "white", "chat", T0 + 1000, { text: "hi" }).error, "bad_request");
 });

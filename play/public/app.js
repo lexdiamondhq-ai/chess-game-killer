@@ -582,6 +582,12 @@ function onNotice(n) {
     case 'draw_offer': if (!S.seat) toast(`${name} offers a draw`, 'draw'); break;
     case 'draw_declined': toast(`${name} declined the draw`, 'draw'); break;
     case 'rematch_offer': toast(`${name} wants a rematch`, 'rematch'); break;
+    case 'chat': {
+      // A chat line from the app; the state that came just before holds it.
+      const line = (S.game.chat || []).filter((l) => l.seat === n.seat).at(-1);
+      if (line) toast(`${name}: ${line.text}`, 'person');
+      break;
+    }
     case 'reaction': {
       // A quick bubble from the app (React); the state that came just before says which.
       const words = REACTION_WORDS[S.game[n.seat]?.reaction?.kind];
