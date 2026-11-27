@@ -325,7 +325,11 @@ struct DNAProofView: View {
             }
             if let id = strength.theme {
                 Button {
-                    session = puzzlePlan(PuzzleTheme.named(id))
+                    // Once the puzzles are in: a tap before they load found nothing to play.
+                    Task {
+                        await puzzles.load()
+                        session = puzzlePlan(PuzzleTheme.named(id))
+                    }
                 } label: {
                     Label("Sharpen it", systemImage: "bolt.fill")
                 }

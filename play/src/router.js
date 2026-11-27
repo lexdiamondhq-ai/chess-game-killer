@@ -221,7 +221,9 @@ async function gameRequest(request, env, url, rawCode, part) {
   }
   // A rematch can start a new game, so it also counts against the new-game limit.
   if (type === "rematch" && (await overLimit(env.CREATE_LIMITER, request))) return rateLimited();
-  return fromRoom(await room.action({ token, type }));
+  const text = body.value.text;
+  if (type === "chat" && typeof text !== "string") return badRequest('"text" must be text.');
+  return fromRoom(await room.action(type === "chat" ? { token, type, text } : { token, type }));
 }
 
 // ---------------------------------------------------------------------------

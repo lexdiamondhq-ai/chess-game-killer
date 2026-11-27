@@ -131,6 +131,19 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         # Made once when the tests load: draws their pictures in the tone CI asks for (SnapshotTone.swift).
         INFOPLIST_KEY_NSPrincipalClass: SnapshotTone
+  ChessGameKillerUITests:
+    # Real taps on the simulator (scheme ChessGameKillerTaps). The unit tests draw each screen,
+    # and a picture can't tell whether a tap opens anything; these launch the app and tap it.
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [ChessGameKillerUITests]
+    dependencies:
+      - target: ChessGameKiller
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: ChessGameKiller
+        TARGETED_DEVICE_FAMILY: "1"
 schemes:
   ChessGameKiller:
     build:
@@ -145,3 +158,11 @@ schemes:
       storeKitConfiguration: Support/Premium.storekit
     test:
       targets: [ChessGameKillerTests]
+  # The tap tests alone, so they can run before the unit tests and be read on their own.
+  ChessGameKillerTaps:
+    build:
+      targets:
+        ChessGameKiller: all
+        ChessGameKillerUITests: [test]
+    test:
+      targets: [ChessGameKillerUITests]

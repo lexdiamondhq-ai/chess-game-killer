@@ -73,6 +73,7 @@ Every REST reply carries `{ "game": GameState }`, and the WebSocket sends `{ "ty
   "turn": "white",
   "clocks": { "white": 600000, "black": 600000, "running": null, "since": null },
   "drawOffer": null,
+  "chat": [],
   "rematch": null,
   "result": null,
   "leaveGraceMs": 60000,
@@ -135,6 +136,10 @@ instead of the Authorization header, so a browser can report `away` with `naviga
   - `react_nice`, `react_whoa`, `react_hmm`, `react_gg`: a quick bubble for the other side, during the game or after
     it (`bad_request` before anyone joined). The latest is the seat's `reaction` (`{ "kind": "nice", "at": ms }`, or
     `null`); one sent sooner than 1.5 s after the last is dropped quietly.
+  - `chat`, with `"text": "..."` in the body: a line for the other side, during the game or after it
+    (`bad_request` before anyone joined). Spaces are collapsed, it is cut to 200 characters, and a slur or obscene
+    word is starred out; a line with nothing left, or that still reads as offensive, is refused (`bad_chat`, 422).
+    Lines from one seat are at least 0.7 s apart (`too_fast`, 429). The game keeps the newest 60 in `chat`.
 
 Error codes: `not_found` 404, `bad_request` 400, `unauthorized` 401, `seat_taken` 409, `not_your_turn` 409,
 `stale` 409, `game_over` 409, `cannot_claim` 409, `illegal_move` 422, `rate_limited` 429, and `server_error` 500 if something breaks on
@@ -192,7 +197,7 @@ and either side may `abort` it at any time (no result).
 Server → client:
 - `{ "type": "state", "game": GameState }`: on connect and after every change.
 - `{ "type": "notice", "kind": KIND, "seat": "white" | "black", "at": ms }` for moments a client may show as a toast.
-  Kinds: `joined`, `screenshot`, `recording`, `away`, `back`, `draw_offer`, `draw_declined`, `rematch_offer`, `reaction`.
+  Kinds: `joined`, `screenshot`, `recording`, `away`, `back`, `draw_offer`, `draw_declined`, `rematch_offer`, `reaction`, `chat`.
   `seat` is the side it is about; a notice goes to the other side and spectators, not to that seat itself.
 
 Client → server: the text `ping` (the server answers `pong` without waking the game). Clients send one every 20 s.

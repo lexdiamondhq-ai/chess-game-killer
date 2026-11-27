@@ -26,6 +26,8 @@ enum ChallengeAction: String, Sendable {
     case reactWhoa = "react_whoa"
     case reactHmm = "react_hmm"
     case reactGG = "react_gg"
+    /// A short message for the other side (Chat). Sent with its words, by `chat(_:in:token:)`.
+    case chat
 }
 
 /// The game server, as the app uses it. The live one talks to play/; tests use a fake.
@@ -39,6 +41,8 @@ protocol ChallengeAPI: AnyObject {
     /// `ply` is the number of half-moves already played: the index this move will have.
     func move(_ code: String, uci: String, ply: Int, token: String) async throws -> FriendGameState
     func act(_ action: ChallengeAction, in code: String, token: String) async throws -> FriendGameState
+    /// Sends the other side a short message. The server tidies it, and may turn it away (`bad_chat`, `too_fast`).
+    func chat(_ text: String, in code: String, token: String) async throws -> FriendGameState
     /// The live connection for a seat, or nil when there is none to be had.
     func live(_ code: String, token: String) -> ChallengeLive?
 
@@ -117,6 +121,12 @@ final class LiveChallengeAPI: ChallengeAPI {
 
     func act(_ action: ChallengeAction, in code: String, token: String) async throws -> FriendGameState {
         let reply: FriendGameReply = try await send("POST", "api/games/\(code)/action", body: ActionBody(type: action.rawValue), token: token)
+        return reply.game
+    }
+
+    func chat(_ text: String, in code: String, token: String) async throws -> FriendGameState {
+        let body = ActionBody(type: ChallengeAction.chat.rawValue, text: text)
+        let reply: FriendGameReply = try await send("POST", "api/games/\(code)/action", body: body, token: token)
         return reply.game
     }
 
@@ -247,6 +257,8 @@ final class LiveChallengeAPI: ChallengeAPI {
 
     private struct ActionBody: Encodable {
         let type: String
+        /// Only for chat; left out of the body otherwise.
+        var text: String?
     }
 
     private func send<Reply: Decodable>(_ method: String, _ path: String, query: [URLQueryItem] = [],
