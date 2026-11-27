@@ -27,9 +27,8 @@ final class LearnTapTests: TapTestCase {
     /// The vine card opens the vine's own page, and Back comes home to Learn.
     func testTheVineOpens() {
         openLearn()
-        note("Learn before the vine is tapped (YOUR VINE in the tree: \(anything(labeled: "YOUR VINE").exists))")
         openVine()
-        note("After the vine is tapped")
+        note("The vine's page")
         goBack(to: "Learn")
         expectTouchable(vineCard, "Back from the vine's page did not come home to Learn")
     }

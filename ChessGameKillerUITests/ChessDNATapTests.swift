@@ -4,9 +4,12 @@ import XCTest
 /// the card, the two lists, the games under them and the rows at the foot of the page.
 final class ChessDNATapTests: TapTestCase {
     /// Learn opened on Chess DNA, as the Home's Chess DNA card opens it. `mistakes` saves the
-    /// slips from those games as positions to fix (`-showcaseMistakes YES`).
-    private func openChessDNA(mistakes: Bool = false) {
-        launch(Self.premium + ["-showcaseDNA", "YES", "-showcaseOpen", "dna"] + (mistakes ? ["-showcaseMistakes", "YES"] : []))
+    /// slips from those games as positions to fix (`-showcaseMistakes YES`). `full` is the same
+    /// player with a strength found in their moves and a second thing to work on
+    /// (`-showcaseFull YES`).
+    private func openChessDNA(mistakes: Bool = false, full: Bool = false) {
+        launch(Self.premium + ["-showcaseDNA", "YES", "-showcaseOpen", "dna"]
+            + (mistakes ? ["-showcaseMistakes", "YES"] : []) + (full ? ["-showcaseFull", "YES"] : []))
         expectPage("Chess DNA", after: "Opening Chess DNA")
     }
 
@@ -57,20 +60,21 @@ final class ChessDNATapTests: TapTestCase {
         expectGame(after: "Tapping a game on the strength's page")
     }
 
-    /// "Sharpen it" under a strength's games starts puzzles of that kind.
-    func testSharpenItUnderAStrengthsGamesStartsPuzzles() throws {
-        openChessDNA()
-        tap(buttons(containing: "See them"), "See them on a strength")
-        if !leaves(bar("Chess DNA")) {
-            fail("Tapping See them on a strength did not open its games")
-        }
+    /// A strength found in the player's moves (Forks) shows where, "Sharpen it" under them
+    /// starts puzzles of that kind, and one of the moves opens its game.
+    func testAStrengthInTheMovesSharpensAndShowsTheMove() {
+        openChessDNA(full: true)
+        note("Chess DNA, the fuller player")
+        tap(buttons(startingWith: "Forks"), "See them on Forks")
+        expectPage("Forks", after: "Tapping See them on Forks")
         let sharpen = buttons("Sharpen it")
-        guard sharpen.firstMatch.waitForExistence(timeout: 5) else {
-            throw XCTSkip("The sample player's first strength with games has no puzzles of its kind")
-        }
-        tap(sharpen, "Sharpen it under a strength's games")
-        expectSession(after: "Tapping Sharpen it under a strength's games", patience: 90)
+        tap(sharpen, "Sharpen it under the forks")
+        expectSession(after: "Tapping Sharpen it under the forks", patience: 90)
         endSession(backTo: sharpen, "the puzzles")
+
+        // "Move 6 · Win · 2 days ago" under the rival's name.
+        tap(buttons(containing: " · "), "A fork on the strength's page")
+        expectGame(after: "Tapping a fork on the strength's page")
     }
 
     /// "Sharpen" on a strength starts puzzles of that kind.
@@ -88,17 +92,11 @@ final class ChessDNATapTests: TapTestCase {
         expectSession(after: "Tapping Practice on the thing to work on", patience: 90)
     }
 
-    /// "Train" on a thing to work on opens the room where that work is done, and Back comes home.
-    func testTrainOpensItsRoom() throws {
-        openChessDNA()
-        let calculation = buttons("Train calculation")
-        let endgames = buttons("Train endgames")
-        let toCalculation = calculation.firstMatch.waitForExistence(timeout: 5)
-        guard toCalculation || endgames.firstMatch.exists else {
-            throw XCTSkip("The sample player has nothing to train in Endgames or Calculation")
-        }
-        tap(toCalculation ? calculation : endgames, "Train on a thing to work on")
-        expectPage(toCalculation ? "Calculation" : "Endgames", after: "Tapping Train on a thing to work on")
+    /// "Train" on a thing to work on in the middlegame opens Calculation, and Back comes home.
+    func testTrainOpensItsRoom() {
+        openChessDNA(full: true)
+        tap(buttons("Train calculation"), "Train on the middlegame to work on")
+        expectPage("Calculation", after: "Tapping Train on the middlegame to work on")
         goBack(to: "Chess DNA")
     }
 
