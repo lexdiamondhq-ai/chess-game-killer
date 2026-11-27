@@ -1340,8 +1340,9 @@ private struct FriendBubbleLabel: View {
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
         }
+        // Hugs short words; a long message wraps at 230 points.
         .frame(maxWidth: 230, alignment: .leading)
-        .fixedSize(horizontal: false, vertical: true)
+        .fixedSize()
         .padding(.horizontal, 11)
         .padding(.vertical, 6)
         .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.white))
