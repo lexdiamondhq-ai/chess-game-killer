@@ -20,7 +20,8 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  # Write, to keep the newest build on a private draft release (android-testing) for signing and upload.
+  contents: write
 
 concurrency:
   group: android-${{ github.ref }}
@@ -97,6 +98,16 @@ jobs:
           path: out/
           retention-days: 30
 
+      - name: Keep the newest build on the draft release
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view android-testing >/dev/null 2>&1 || \
+            gh release create android-testing --draft --target "${GITHUB_SHA}" \
+              --title "Android testing build" --notes "The newest Android build for Google Play testing. A draft: only people who can push here see it."
+          gh release upload android-testing out/beauty-of-chess-*.aab out/beauty-of-chess-*-debug.apk --clobber
+
   tap-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -129,6 +140,16 @@ jobs:
             ./gradlew --no-daemon :app:connectedDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true || touch ../tests-failed
             adb pull /sdcard/Android/data/com.chessgamekiller.app/files/screens ../screens || true
             test ! -f ../tests-failed
+
+      - name: Keep the pictures on the draft release
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -d screens ] && gh release view android-testing >/dev/null 2>&1; then
+            (cd screens && zip -q -r ../android-screens.zip .)
+            gh release upload android-testing android-screens.zip --clobber
+          fi
 
       - uses: actions/upload-artifact@v4
         if: always()
