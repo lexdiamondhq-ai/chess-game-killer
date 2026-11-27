@@ -234,18 +234,19 @@ enum ArrowOutline {
 
 /// The colors of the analysis arrows on every board, Dusk Blue (Alex's pick, 2026-11-07): a soft
 /// dusty blue for the best move, like a winter sky, and pearl for the next best, slimmer and
-/// quieter. Each brightens toward its tail and is see-through, as tinted glass with a soft white
-/// rim (`seeThrough`, `rim`), so the squares and pieces show through it.
+/// quieter. Each brightens toward its tail and is nearly solid with a thin white edge, so it reads
+/// clearly on a light square, a dark one and over a piece (Alex's pick "crisp", 2026-11-26; the
+/// glassier 0.66 / 0.5 was too faint to see in Analyze).
 enum ArrowColors {
     static let best: UInt32 = 0x7F9CC1
     static let bestTail: UInt32 = 0xD6E2F0
     static let next: UInt32 = 0xC7C1B7
     static let nextTail: UInt32 = 0xEFECE6
     /// How solid the analysis arrows are: the best move's, then the next best's.
-    static let seeThrough: (best: Double, next: Double) = (0.66, 0.5)
+    static let seeThrough: (best: Double, next: Double) = (0.97, 0.9)
     /// How strong their white rim is, against the arrow's own strength.
     static let rim: Double = 0.55
-    /// The coach's arrows' thin white edge, which keeps them crisp on a light square, a dark one
+    /// Every arrow's thin white edge, which keeps it crisp on a light square, a dark one
     /// and over a piece.
     static let edge: UInt32 = 0xFFFFFF
 

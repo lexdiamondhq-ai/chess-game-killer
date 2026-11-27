@@ -554,6 +554,35 @@ final class ScanSessionTests: XCTestCase {
 @MainActor
 final class AnalysisModelTests: XCTestCase {
 
+    /// On the 3D board a move is heard as its piece touches down, as in a game, not the moment it
+    /// is tapped; on the flat board, where it is there at once, straight away.
+    func testAMoveIsHeardAsItsPieceLands() throws {
+        let defaults = UserDefaults.standard
+        let saved = (defaults.object(forKey: "sculpted3D"), defaults.object(forKey: "boardTheme"))
+        defer {
+            defaults.set(saved.0, forKey: "sculpted3D")
+            defaults.set(saved.1, forKey: "boardTheme")
+        }
+        defaults.set(BoardTheme.ID.gilded.rawValue, forKey: "boardTheme")
+        for threeD in [true, false] {
+            defaults.set(threeD, forKey: "sculpted3D")
+            XCTAssertEqual(MoveSound.boardIs3D, threeD)
+            let sounds = TimedSounds()
+            let model = AnalysisModel(draft: .standard, engine: nil, sounds: sounds)
+            model.tap(.e2)
+            model.tap(.e4)
+            let move = try XCTUnwrap(sounds.played.last)
+            XCTAssertEqual(move.sound, .move)
+            if threeD {
+                XCTAssertEqual(move.delay, SculptedBoardScene.touchdown(from: .e2, to: .e4, knight: false, taken: nil,
+                                                                        lifted: true), accuracy: 0.001)
+                XCTAssertGreaterThan(move.delay, 0.2)
+            } else {
+                XCTAssertEqual(move.delay, 0)
+            }
+        }
+    }
+
     func testFindsTwoBestMovesWithArrows() async {
         let model = AnalysisModel(draft: .standard, engine: FakeEngine())
         await model.run()
