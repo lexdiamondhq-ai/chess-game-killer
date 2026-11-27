@@ -109,6 +109,8 @@ jobs:
           gh release upload android-testing out/beauty-of-chess-*.aab out/beauty-of-chess-*-debug.apk --clobber
 
   tap-tests:
+    # After the build, so the draft release exists for the pictures.
+    needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
