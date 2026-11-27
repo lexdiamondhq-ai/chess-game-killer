@@ -124,10 +124,22 @@ struct FriendGameState: Codable, Equatable, Sendable {
         var claimableAt: Double?
         var screenshots = 0
         var recordings = 0
+        /// The latest quick bubble this side sent (React), or nil.
+        var reaction: SentReaction?
+        /// The server keeps reactions (it says `reaction`, even as null): an older one doesn't,
+        /// and then the app hides React.
+        var knowsReactions = false
 
         enum CodingKeys: String, CodingKey {
-            case name, seated, online, away, claimableAt, screenshots, recordings
+            case name, seated, online, away, claimableAt, screenshots, recordings, reaction
         }
+    }
+
+    /// A bubble as the server keeps it: its kind, and when it was sent (server milliseconds).
+    struct SentReaction: Codable, Equatable, Sendable {
+        /// The raw kind: a kind this version of the app doesn't know is shown as nothing.
+        var kind: String
+        var at: Double
     }
 
     /// Each side's time in milliseconds: the running side's as of `since`, the waiting side's exactly.
@@ -350,6 +362,43 @@ extension FriendGameState.Player {
         claimableAt = try c.decodeIfPresent(Double.self, forKey: .claimableAt)
         screenshots = try c.decodeIfPresent(Int.self, forKey: .screenshots) ?? 0
         recordings = try c.decodeIfPresent(Int.self, forKey: .recordings) ?? 0
+        knowsReactions = c.contains(.reaction)
+        reaction = (try? c.decodeIfPresent(FriendGameState.SentReaction.self, forKey: .reaction)) ?? nil
+    }
+}
+
+/// A quick bubble a player sends the other side in a friend or online game (Alex's pick, 2026-11-27):
+/// friendly words only, so it never helps anyone win.
+enum FriendReaction: String, CaseIterable, Identifiable, Sendable {
+    case nice, whoa, hmm, gg
+
+    var id: Self { self }
+
+    var emoji: String {
+        switch self {
+        case .nice: return "👏"
+        case .whoa: return "😮"
+        case .hmm: return "🤔"
+        case .gg: return "🤝"
+        }
+    }
+
+    var words: String {
+        switch self {
+        case .nice: return "Nice move"
+        case .whoa: return "Whoa"
+        case .hmm: return "Hmm"
+        case .gg: return "Good game"
+        }
+    }
+
+    var action: ChallengeAction {
+        switch self {
+        case .nice: return .reactNice
+        case .whoa: return .reactWhoa
+        case .hmm: return .reactHmm
+        case .gg: return .reactGG
+        }
     }
 }
 

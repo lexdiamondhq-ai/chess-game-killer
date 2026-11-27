@@ -70,8 +70,9 @@ struct HomeAuroraQuickBar: View {
                     .clipShape(shape)
                     .allowsHitTesting(false)
             }
-            .overlay(shape.strokeBorder(palette.gold.opacity(0.75), lineWidth: 1.5))
-            .shadow(color: palette.gold.opacity(0.28), radius: 14, y: 6)
+            // Your move: the brightest edge on the page.
+            .overlay { PolishedEdge(shape: shape, edge: .lit, dark: palette.dark) }
+            .shadow(color: palette.gold.opacity(0.36), radius: 14, y: 6)
             .contentShape(shape)
         }
         .buttonStyle(HomeStagePress())

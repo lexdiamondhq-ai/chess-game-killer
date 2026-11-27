@@ -233,6 +233,8 @@ struct HomeView: View {
         // The window's own light (status bar, system sheets) is set by the app, which knows when
         // the welcome is up and waits for the fade from a game to finish.
         .environment(\.colorScheme, tone.scheme)
+        // Home's cards are gold on every look, so its edges are too (see Polish).
+        .environment(\.polishMetal, nil)
         .tint(tone.metal)
         .sensoryFeedback(.impact(weight: .light), trigger: pullArmed) { _, armed in armed && hapticsOn }
         .sensoryFeedback(.impact(weight: .medium), trigger: you != nil) { _, open in open && hapticsOn }
@@ -665,6 +667,12 @@ struct HomeView: View {
         if UserDefaults.standard.bool(forKey: "showcaseShortcuts") {
             try? await Task.sleep(for: .seconds(1.6))
             openShortcuts()
+            return
+        }
+        // And the You panel with `-showcaseYou YES`.
+        if UserDefaults.standard.bool(forKey: "showcaseYou") {
+            try? await Task.sleep(for: .seconds(1.6))
+            openYou(.bottom)
             return
         }
         guard !Welcome.isUnderTest, !vault.games.isEmpty, TipBook.canShow(.jewelShortcuts) else { return }

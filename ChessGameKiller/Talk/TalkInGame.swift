@@ -64,7 +64,7 @@ struct TalkEntryRow: View {
             .background {
                 shape
                     .fill(Color.primary.opacity(theme.isDark ? 0.05 : 0.04))
-                    .overlay { shape.strokeBorder(Color.primary.opacity(theme.isDark ? 0.09 : 0.08), lineWidth: 1) }
+                    .overlay { PolishedEdge(shape: shape, edge: .well, dark: theme.isDark) }
             }
             .contentShape(shape)
         }

@@ -47,6 +47,12 @@ function nameOf(game, side) {
   return (game && game[side] && game[side].name) || (side === 'white' ? 'White' : 'Black');
 }
 
+/** Who sent the invite, as the friend reads it: "A friend" when they left their name blank. */
+function inviterOf(game) {
+  const name = game && game[game.creator] && game[game.creator].name;
+  return name && name !== 'Player' ? name : 'A friend';
+}
+
 function resultWords(game) {
   const r = game.result;
   if (!r) return 'Game over';
@@ -122,7 +128,7 @@ export function renderInvitePage({ game, origin, code }) {
   if (gone) {
     const withdrawn = game && game.result && game.result.reason === 'cancelled';
     const line = withdrawn
-      ? `${esc(nameOf(game, game.creator))} withdrew this challenge.`
+      ? `${esc(inviterOf(game))} withdrew this challenge.`
       : 'It may have expired, or the person who sent it withdrew it.';
     return `<!doctype html>
 <html lang="en" class="page-gone">
@@ -146,11 +152,10 @@ ${CREDITS}
 </html>`;
   }
 
-  const creator = nameOf(game, game.creator);
   let ogTitle;
   let description;
   if (game.status === 'waiting') {
-    ogTitle = `${creator} challenged you to chess`;
+    ogTitle = `${inviterOf(game)} challenged you to chess`;
     description = `${clockWords(game.clock)} · Play in your browser or in the ${SITE} app`;
   } else if (game.status === 'active') {
     ogTitle = `${nameOf(game, 'white')} vs ${nameOf(game, 'black')}, live`;

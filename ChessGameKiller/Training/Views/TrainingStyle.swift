@@ -47,6 +47,7 @@ private struct ScreenScheme: ViewModifier {
             content
                 .preferredColorScheme(tone.scheme)
                 .tint(tone.metal)
+                .environment(\.polishMetal, theme.screenPolishMetal)
         } else {
             content.preferredColorScheme(theme.isDark ? .dark : nil)
         }

@@ -501,6 +501,7 @@ final class SculptedBoardScene {
     var plinth: UIColor? {
         didSet {
             guard plinth != oldValue else { return }
+            fadeShadowsPastFrame()
             plinthNode?.removeFromParentNode()
             plinthNode = nil
             guard let color = plinth else { return }
@@ -531,6 +532,20 @@ final class SculptedBoardScene {
             scene.rootNode.addChildNode(holder)
             plinthNode = holder
         }
+    }
+
+    /// The floor that shows the board's and pieces' shadows on whatever is behind the view.
+    private var shadowCatcher: SCNMaterial?
+
+    /// The pieces' long shadows fade out just past the frame, so the edge of the view never cuts
+    /// them off in a straight line. On the stone stage the whole floor is in view, so they stay.
+    private func fadeShadowsPastFrame() {
+        shadowCatcher?.shaderModifiers = plinth != nil ? nil : [.fragment: """
+        float4 world = scn_frame.inverseViewTransform * float4(_surface.position, 1.0);
+        float2 p = abs(world.xz);
+        float d = pow(pow(p.x, 6.0) + pow(p.y, 6.0), 1.0 / 6.0);
+        _output.color *= smoothstep(4.85, 4.4, d);
+        """]
     }
 
     /// Stone: the color, flecked lighter and darker.
@@ -1819,6 +1834,8 @@ final class SculptedBoardScene {
         floor.simdOrientation = Self.flat
         floor.simdPosition = SIMD3(0, -0.14, 0)
         floor.castsShadow = false
+        shadowCatcher = catcher
+        fadeShadowsPastFrame()
         surroundNode.addChildNode(floor)
 
         let ground = SCNNode(geometry: Self.mark(size: 10.2, color: .black, alpha: 0.55, mask: MarkImages.boardShadow))

@@ -77,9 +77,8 @@ struct HomeAuroraArmy: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
-        .background(shape.fill(palette.card))
         .clipShape(shape)
-        .overlay(shape.strokeBorder(palette.line, lineWidth: 1))
+        .auroraCard(shape, palette: palette)
         .contentShape(shape)
     }
 

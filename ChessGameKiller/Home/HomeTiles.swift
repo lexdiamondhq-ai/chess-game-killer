@@ -911,7 +911,7 @@ struct HomeIconChip: View {
                 shape.fill(LinearGradient(colors: [tone.metal.opacity(0.26), tone.metal.opacity(0.05)],
                                           startPoint: .topLeading, endPoint: .bottomTrailing))
             }
-            .overlay { shape.strokeBorder(tone.metal.opacity(0.32), lineWidth: 0.75) }
+            .overlay { shape.strokeBorder(tone.metal.opacity(0.45), lineWidth: 0.75) }
             .accessibilityHidden(true)
     }
 }

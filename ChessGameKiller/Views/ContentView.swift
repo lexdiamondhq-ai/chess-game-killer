@@ -314,6 +314,8 @@ struct ContentView: View {
                     setCoach(expanded: true)
                 }
             }
+            // Every pane's gilded edge is cut from this look's metal (see Polish).
+            .environment(\.polishMetal, theme.polishMetal)
     }
 
     /// A screen is open over Home: training, today's move, puzzles, games, the army, a lesson,
@@ -617,6 +619,27 @@ struct ContentView: View {
         // CI's pictures open Today's Move with `-showcaseDaily YES`; a normal launch never passes it.
         if UserDefaults.standard.bool(forKey: "showcaseDaily") { DailyLink.pending = true }
         if DailyLink.pending { openDaily() }
+        // CI's pictures open one screen over the home with `-showcaseOpen learn`.
+        if let screen = UserDefaults.standard.string(forKey: "showcaseOpen") { openForShowcase(screen) }
+    }
+
+    /// The screens CI can picture on the simulator: `-showcaseOpen learn` (or settings, analyze,
+    /// newgame, puzzles, army, games, premium). A normal launch never passes it.
+    private func openForShowcase(_ screen: String) {
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.2))
+            switch screen {
+            case "learn": showingTraining = true
+            case "settings": showingSettings = true
+            case "analyze": showingAnalyze = true
+            case "newgame": showingNewGame = true
+            case "puzzles": showingPuzzles = true
+            case "army": showingArmy = true
+            case "games": showingGames = true
+            case "premium": showingPremium = true
+            default: break
+            }
+        }
     }
 
     private func refreshDaily() {

@@ -566,6 +566,9 @@ function reportPresence(type) {
   }).catch(() => {});
 }
 
+/** The quick bubbles the app can send (React). */
+const REACTION_WORDS = { nice: '👏 Nice move', whoa: '😮 Whoa', hmm: '🤔 Hmm', gg: '🤝 Good game' };
+
 function onNotice(n) {
   if (!S.game) return;
   const mine = S.seat && n.seat === S.seat;
@@ -579,6 +582,12 @@ function onNotice(n) {
     case 'draw_offer': if (!S.seat) toast(`${name} offers a draw`, 'draw'); break;
     case 'draw_declined': toast(`${name} declined the draw`, 'draw'); break;
     case 'rematch_offer': toast(`${name} wants a rematch`, 'rematch'); break;
+    case 'reaction': {
+      // A quick bubble from the app (React); the state that came just before says which.
+      const words = REACTION_WORDS[S.game[n.seat]?.reaction?.kind];
+      if (words) toast(`${name}: ${words}`, 'person');
+      break;
+    }
     default: break;
   }
 }
@@ -587,6 +596,11 @@ function onNotice(n) {
 
 function nameOf(side) {
   return S.game?.[side]?.name || sideWord(side);
+}
+/** Who sent the invite, as the friend reads it: "A friend" when they left their name blank. */
+function inviterOf(g) {
+  const name = g?.[g?.creator]?.name;
+  return name && name !== 'Player' ? name : 'A friend';
 }
 const GRACE_MS = 60000;
 /** "a minute", or "45 seconds" when the server says otherwise. */
@@ -771,7 +785,7 @@ function render() {
 function renderTitle() {
   const g = S.game;
   let t = 'Beauty of Chess';
-  if (S.view === 'invite') t = `${nameOf(g.creator)} challenged you to chess · ${t}`;
+  if (S.view === 'invite') t = `${inviterOf(g)} challenged you to chess · ${t}`;
   else if (S.view === 'wait') t = `Waiting for your friend · ${t}`;
   else if (S.view === 'game' && g) {
     if (g.status === 'over') t = `${resultWords()[0]} · ${t}`;
@@ -826,7 +840,6 @@ function sideChip(side) {
 function buildInvite() {
   const g = S.game;
   const mySide = other(g.creator);
-  const creator = nameOf(g.creator);
   const input = h('input', {
     class: 'input',
     id: 'join-name',
@@ -886,7 +899,7 @@ function buildInvite() {
 
   return h('section', { class: 'view view-invite' },
     previewBoard(mySide),
-    h('h1', {}, `${creator} challenged you to chess`),
+    h('h1', {}, `${inviterOf(g)} challenged you to chess`),
     h('div', { class: 'chips' }, chip(icon('clock'), clockWords(g.clock, g.days)), sideChip(mySide)),
     form,
     h('p', { class: 'fine fair' }, fairWords()),
@@ -985,7 +998,7 @@ function buildNote(key) {
   if (key === 'note:cancelled') {
     const creatorIsMe = S.seat && g.creator === S.seat;
     title = creatorIsMe ? 'You withdrew this challenge' : "This challenge isn’t here anymore";
-    text = creatorIsMe ? 'The link no longer works. Start a new one any time.' : `${nameOf(g.creator)} withdrew this challenge.`;
+    text = creatorIsMe ? 'The link no longer works. Start a new one any time.' : `${inviterOf(g)} withdrew this challenge.`;
   } else if (key === 'note:expired') {
     title = 'This challenge expired';
     text = 'Nobody played it in time. Start a fresh one.';
