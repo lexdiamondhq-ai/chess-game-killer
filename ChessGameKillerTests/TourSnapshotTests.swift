@@ -32,6 +32,34 @@ final class TourSnapshotTests: XCTestCase {
         try await super.tearDown()
     }
 
+    /// A game against a friend in the Rich finish (Alex's pick B, 2026-11-27): marble, gilded player
+    /// cards with a glow on the side to move, gold crests, a gold rim on the flat board, the moves
+    /// on glass and the dock's gold coins with React; then the React row open and a bubble sent.
+    func testAFriendGame() throws {
+        var state = FriendGameState.sample(moves: ["d2d4", "d7d5", "e2e4"], clock: nil, white: "Alex", black: "Chris")
+        state.white.knowsReactions = true
+        state.black.knowsReactions = true
+        let api = FakeChallengeAPI()
+        api.games[state.code] = state
+        let game = OnlineGame(record: .sample(state, seat: .white), api: api, sounds: nil, initial: state)
+        let center = ChallengeCenter(api: api, store: ChallengeStore(), sounds: nil)
+        let view = ZStack {
+            TrainingBackdrop(theme: theme)
+            ChallengeGameView(game: game, theme: theme)
+        }
+        .tint(theme.challengeAccent)
+        .screenScheme(theme)
+        .environment(center)
+        let window = try show(view, wait: 4)
+        try save(window, "tour-friend-game-1")
+        Task { await game.react(.nice) }
+        RunLoop.main.run(until: Date().addingTimeInterval(1))
+        XCTAssertEqual(game.bubbles[.white]?.reaction, .nice)
+        XCTAssertEqual(api.actions.last?.action, .reactNice)
+        try save(window, "tour-friend-game-2-bubble")
+        window.isHidden = true
+    }
+
     func testSettingsFromTopToFoot() throws {
         let window = try show(SettingsSheet(), wait: 3)
         try save(window, "tour-settings-1")

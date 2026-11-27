@@ -123,6 +123,17 @@ final class OnlineGame {
     /// The start of the player's own absence already answered with `back`, so it is said once.
     @ObservationIgnored private var reclaimedAway: Double?
     @ObservationIgnored private var nextToastID = 0
+
+    /// A quick bubble over a player's line (React), for a few seconds.
+    struct Bubble: Equatable, Identifiable {
+        let id: Int
+        let reaction: FriendReaction
+    }
+
+    /// The bubble showing over each side's line, if any.
+    private(set) var bubbles: [FriendSeat: Bubble] = [:]
+    @ObservationIgnored private var bubbleTasks: [FriendSeat: Task<Void, Never>] = [:]
+    @ObservationIgnored private var nextBubbleID = 0
     /// The friend's screenshots and recordings already told.
     @ObservationIgnored private var toldShots = 0
     @ObservationIgnored private var toldRecordings = 0
@@ -406,6 +417,44 @@ final class OnlineGame {
             symbol: "checkmark.shield")
     }
 
+    /// React is on offer: the friend has sat down, the game is on or just over, and the server
+    /// keeps bubbles (an older one doesn't, and then the button is hidden).
+    var canReact: Bool {
+        guard let state, phase == .playing || phase == .over else { return false }
+        return state[opponentSeat].seated && state[seat].knowsReactions
+    }
+
+    /// Sends the friend a quick bubble. It shows over your own line at once; the friend sees it
+    /// over yours too. Quiet if it doesn't get through: it is only a bubble.
+    func react(_ reaction: FriendReaction) async {
+        guard canReact else { return }
+        showBubble(reaction, on: seat)
+        let code = record.code
+        let token = record.token
+        guard let state = try? await api.act(reaction.action, in: code, token: token) else { return }
+        apply(state)
+    }
+
+    private func showBubble(_ reaction: FriendReaction, on side: FriendSeat) {
+        nextBubbleID += 1
+        let shown = Bubble(id: nextBubbleID, reaction: reaction)
+        bubbles[side] = shown
+        bubbleTasks[side]?.cancel()
+        bubbleTasks[side] = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(3.5))
+            guard !Task.isCancelled, let self, self.bubbles[side]?.id == shown.id else { return }
+            self.bubbles[side] = nil
+        }
+    }
+
+    /// The friend's newest bubble, when it is new since the last state.
+    private func tellReaction(from previous: FriendGameState?, to new: FriendGameState) {
+        guard let previous, let sent = new[opponentSeat].reaction,
+              sent != previous[opponentSeat].reaction,
+              let reaction = FriendReaction(rawValue: sent.kind) else { return }
+        showBubble(reaction, on: opponentSeat)
+    }
+
     /// The friend has sat down: there is someone to report.
     var canReport: Bool {
         guard let state, phase == .playing || phase == .over else { return false }
@@ -471,6 +520,7 @@ final class OnlineGame {
         updatePhase(to: new)
         reclaimPresence(new)
         tellChanges(from: previous, to: new)
+        tellReaction(from: previous, to: new)
         scheduleDeadline()
         refreshIdleTimer()
         onChange?(record)

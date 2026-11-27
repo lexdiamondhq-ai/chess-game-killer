@@ -65,8 +65,8 @@ Every REST reply carries `{ "game": GameState }`, and the WebSocket sends `{ "ty
   "deadline": null,
   "creator": "white",
   "look": "gilded",
-  "white": { "name": "Alex", "seated": true, "online": true, "away": null, "claimableAt": null, "screenshots": 0, "recordings": 0 },
-  "black": { "name": null, "seated": false, "online": false, "away": null, "claimableAt": null, "screenshots": 0, "recordings": 0 },
+  "white": { "name": "Alex", "seated": true, "online": true, "away": null, "claimableAt": null, "screenshots": 0, "recordings": 0, "reaction": null },
+  "black": { "name": null, "seated": false, "online": false, "away": null, "claimableAt": null, "screenshots": 0, "recordings": 0, "reaction": null },
   "moves": ["e2e4", "e7e5"],
   "san": ["e4", "e5"],
   "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
@@ -132,6 +132,9 @@ instead of the Authorization header, so a browser can report `away` with `naviga
   - `screenshot`, `recording` (reported to the other side; counted only while the game is `active`),
   - `claim_win` (see Fair play; `cannot_claim` 409 when it's too early, the friend is back, or the rule doesn't apply),
   - `report_name`, `report_cheating` (see Fair play; `bad_request` before anyone joined).
+  - `react_nice`, `react_whoa`, `react_hmm`, `react_gg`: a quick bubble for the other side, during the game or after
+    it (`bad_request` before anyone joined). The latest is the seat's `reaction` (`{ "kind": "nice", "at": ms }`, or
+    `null`); one sent sooner than 1.5 s after the last is dropped quietly.
 
 Error codes: `not_found` 404, `bad_request` 400, `unauthorized` 401, `seat_taken` 409, `not_your_turn` 409,
 `stale` 409, `game_over` 409, `cannot_claim` 409, `illegal_move` 422, `rate_limited` 429, and `server_error` 500 if something breaks on
@@ -189,7 +192,7 @@ and either side may `abort` it at any time (no result).
 Server → client:
 - `{ "type": "state", "game": GameState }`: on connect and after every change.
 - `{ "type": "notice", "kind": KIND, "seat": "white" | "black", "at": ms }` for moments a client may show as a toast.
-  Kinds: `joined`, `screenshot`, `recording`, `away`, `back`, `draw_offer`, `draw_declined`, `rematch_offer`.
+  Kinds: `joined`, `screenshot`, `recording`, `away`, `back`, `draw_offer`, `draw_declined`, `rematch_offer`, `reaction`.
   `seat` is the side it is about; a notice goes to the other side and spectators, not to that seat itself.
 
 Client → server: the text `ping` (the server answers `pong` without waking the game). Clients send one every 20 s.
