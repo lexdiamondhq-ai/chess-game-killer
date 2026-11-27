@@ -355,14 +355,22 @@ jobs:
         env:
           ONLY_TESTS: ${{ inputs.only }}
         run: |
+          # The simulator is started and fully up before the tests ask for it. On a cold one the
+          # app's first launch can time out ("Timed out while requesting launch progress").
+          xcrun simctl bootstatus "${{ steps.sim.outputs.udid }}" -b > /dev/null || true
           # All of them, or the few asked for by name.
           only=()
           for name in $ONLY_TESTS; do only+=("-only-testing:ChessGameKillerUITests/$name"); done
+          # A test that fails is tried once more: a slow runner can time out a launch or a look
+          # at the screen. A tap that is really dead fails both times (the vine did, every time,
+          # on two Macs). Both tries are in the results below, so a first failure is never hidden.
           xcodebuild test \
             -project ChessGameKiller.xcodeproj \
             -scheme ChessGameKillerTaps \
             -destination "id=${{ steps.sim.outputs.udid }}" \
             "${only[@]}" \
+            -retry-tests-on-failure \
+            -test-iterations 2 \
             -test-timeouts-enabled YES \
             -default-test-execution-time-allowance 300 \
             -maximum-test-execution-time-allowance 300 \
@@ -375,8 +383,9 @@ jobs:
           [ -f taps.log ] || { echo "No tap log"; exit 0; }
           # What a test wrote down about a screen without failing (TapTestCase.note).
           grep -E "^TAPNOTE" taps.log | cut -c1-3600 | head -60 || true
-          # Each test, with how long it took.
+          # Each test, with how long it took. One that failed and was tried again is here twice.
           grep -E "Test Case .* (passed|failed|skipped)" taps.log | head -90 || true
+          echo "Tries that failed: $(grep -cE "Test Case .* failed" taps.log || true)"
           # A failure says what was on the screen (TapTestCase.fail).
           grep -E "error:|\*\* " taps.log | cut -c1-3600 | head -40 || true
           # A test that hung or took the test runner down is named by xcodebuild, not by a test line.
