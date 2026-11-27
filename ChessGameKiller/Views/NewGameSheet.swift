@@ -186,11 +186,7 @@ struct NewGameSheet: View {
 
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(title.uppercased())
-                .font(.app(.caption, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .tracking(1)
-                .accessibilityAddTraits(.isHeader)
+            SectionLabel(text: title)
             content()
         }
     }
@@ -406,7 +402,7 @@ struct NewGameSheet: View {
                             .modifier(VeteranAura(rank: record.rank, piece: piece, theme: theme, size: 40, onBoard: false))
                     } else {
                         Image(systemName: "minus")
-                            .font(.app(.title3, weight: .semibold))
+                            .font(.display(.title3, weight: .semibold))
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -628,7 +624,7 @@ private struct RivalCard: View {
             // the strength bars, or who to beat first, or the piece the rival is holding.
             VStack(alignment: .leading, spacing: 4) {
                 Text(rival.name)
-                    .font(.app(.title2, weight: .heavy))
+                    .font(.display(.title2, weight: .semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                     .fixedSize(horizontal: false, vertical: true)

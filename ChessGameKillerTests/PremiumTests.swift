@@ -287,7 +287,7 @@ final class PremiumTests: XCTestCase {
         try snapshot("premium-offer-midnight", PremiumOfferView(feature: .ratedPuzzle))
         let card = ZStack {
             ThemeBackdrop(theme: .gilded).ignoresSafeArea()
-            PremiumLimitCard(feature: .talk, accent: BoardTheme.gilded.accent ?? PremiumStyle.gold)
+            PremiumLimitCard(feature: .talk, accent: BoardTheme.gilded.accent ?? PremiumStyle.gold, gilded: true)
                 .padding(20)
         }
         .preferredColorScheme(.dark)

@@ -76,8 +76,7 @@ struct PuzzlesDoorView: View {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("RATED")
-                        .font(.app(.caption, weight: .bold))
-                        .tracking(1)
+                        .eyebrow()
                         .foregroundStyle(theme.trainingAccent)
                     Text("\(progress.rating)")
                         .font(.app(size: 44, weight: .bold).monospacedDigit())

@@ -518,7 +518,7 @@ struct RewindView: View {
                     .foregroundStyle(.secondary)
             }
             Text(rewritten ? "You found it." : note.title)
-                .font(.app(.title2, weight: .semibold))
+                .font(.display(.title2, weight: .semibold))
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 10)
             Text(rewritten ? "This moment is rewritten. \(game.leftToRewrite == 0 ? "Every moment in this game is fixed." : "\(game.leftToRewrite) left in this game.")" : note.detail)
@@ -541,7 +541,8 @@ struct RewindView: View {
                         if fullRewind() { startGhost() }
                     }
                     if !rewritten {
-                        CardButton(title: "Take it back", symbol: "arrow.counterclockwise", prominent: true, accent: accent) {
+                        CardButton(title: "Take it back", symbol: "arrow.counterclockwise", prominent: true,
+                                   gilded: theme.screenTone != nil, accent: accent) {
                             if fullRewind() { takeBack(moment, note: note) }
                         }
                     }
@@ -1036,8 +1037,8 @@ private struct ExplorerCard: View {
                         .font(.app(.subheadline, weight: .semibold))
                         .padding(.horizontal, 14)
                         .frame(minHeight: 44)
-                        .foregroundStyle(.background)
-                        .background(Capsule().fill(Color.primary.opacity(0.92)))
+                        .foregroundStyle(Polish.pillInk(gilded: theme.screenTone != nil))
+                        .background { MainPillFill(gilded: theme.screenTone != nil, plain: Color.primary.opacity(0.92)) }
                 }
                 .buttonStyle(.plain)
             } else {
@@ -1102,20 +1103,29 @@ private struct CardButton: View {
     let title: String
     let symbol: String
     var prominent = false
+    /// On a gold look the prominent button is cut from the main button's gold, as on every screen.
+    var gilded = false
     var accent: Color = .primary
     let action: () -> Void
 
     var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+        let golden: Bool = prominent && gilded
+        let ink: AnyShapeStyle = golden ? AnyShapeStyle(Polish.onMetal)
+            : (prominent ? AnyShapeStyle(.background) : AnyShapeStyle(.primary))
         Button(action: action) {
             VStack(spacing: 5) {
                 Image(systemName: symbol).font(.app(.body, weight: .semibold))
                 Text(title).font(.app(.footnote, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity, minHeight: 52)
-            .foregroundStyle(prominent ? AnyShapeStyle(.background) : AnyShapeStyle(.primary))
+            .foregroundStyle(ink)
             .background {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(prominent ? AnyShapeStyle(Color.primary.opacity(0.92)) : AnyShapeStyle(Color.primary.opacity(0.06)))
+                if golden {
+                    PolishedFill(shape: shape, quiet: true)
+                } else {
+                    shape.fill(prominent ? AnyShapeStyle(Color.primary.opacity(0.92)) : AnyShapeStyle(Color.primary.opacity(0.06)))
+                }
             }
             .overlay {
                 if !prominent {

@@ -164,7 +164,7 @@ struct WelcomeFlow: View {
     private func heading(_ title: String, _ subtitle: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(.app(.largeTitle, weight: .bold))
+                .font(.display(.largeTitle, weight: .semibold))
                 .fixedSize(horizontal: false, vertical: true)
             if let subtitle {
                 Text(subtitle)
@@ -182,12 +182,13 @@ struct WelcomeFlow: View {
                 .foregroundStyle(accent)
             heading("Chess, with a coach beside you")
             VStack(alignment: .leading, spacing: 18) {
-                WelcomeRow(glyph: Glyphs.play, title: "Play",
-                           text: "Five computer rivals, from first moves to grandmaster.", accent: accent)
-                WelcomeRow(glyph: Glyphs.coach, title: "Learn",
-                           text: "\(Coach.current.title) grades every move and shows you a better one.", accent: accent)
-                WelcomeRow(glyph: Glyphs.army, title: "Grow",
-                           text: "Your pieces remember every game, earn experience and get names.", accent: accent)
+                // Each wears the stone its door wears inside the app: New game, Lessons, Your army.
+                WelcomeRow(glyph: Glyphs.play, stone: .emerald, title: "Play",
+                           text: "Five computer rivals, from first moves to grandmaster.")
+                WelcomeRow(glyph: Glyphs.coach, stone: .sapphire, title: "Learn",
+                           text: "\(Coach.current.title) grades every move and shows you a better one.")
+                WelcomeRow(glyph: Glyphs.army, stone: .ruby, title: "Grow",
+                           text: "Your pieces remember every game, earn experience and get names.")
             }
         }
     }
@@ -263,7 +264,7 @@ private struct WelcomeIvoryStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .foregroundStyle(tone.onIvory)
+            .foregroundStyle(Polish.onMetal)
             .padding(.vertical, 6)
             .frame(minHeight: 50)
             .background { HomeIvoryFill(tone: tone) }
@@ -274,21 +275,19 @@ private struct WelcomeIvoryStyle: ButtonStyle {
     }
 }
 
-/// An icon, a bold word and one line.
+/// A jewel, a word in the display face and one line.
 private struct WelcomeRow: View {
     let glyph: String
+    let stone: HomeAuroraJewel.Stone
     let title: String
     let text: String
-    let accent: Color
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
-            Glyph(name: glyph, size: 26)
-                .foregroundStyle(accent)
-                .frame(width: 30)
+            JewelIcon(symbol: glyph, stone: stone, size: 40)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.app(.headline))
+                    .font(.display(.title3, weight: .semibold))
                 Text(text)
                     .font(.app(.subheadline))
                     .foregroundStyle(.secondary)
@@ -373,7 +372,7 @@ struct HouseRuleRow: View {
                 .frame(width: 30)
             VStack(alignment: .leading, spacing: 3) {
                 Text(rule.title)
-                    .font(.app(.headline))
+                    .font(.display(.headline, weight: .semibold))
                 Text(rule.text)
                     .font(.app(.subheadline))
                     .foregroundStyle(.secondary)

@@ -396,7 +396,7 @@ private struct CycleSetupView: View {
                     .padding(.top, 16)
                 VStack(spacing: 10) {
                     Text("The same puzzles, faster each round")
-                        .font(.app(.title2, weight: .bold))
+                        .font(.display(.title2, weight: .semibold))
                     Text("Solve a set at your own pace. Rest a day, then solve it again in half the time. Repeat until you see the answers at a glance.")
                         .font(.app(.subheadline))
                         .foregroundStyle(.secondary)
@@ -548,7 +548,7 @@ private struct CycleSummaryView: View {
             VStack(spacing: 18) {
                 VStack(spacing: 6) {
                     Text(title)
-                        .font(.app(.title, weight: .bold))
+                        .font(.display(.title, weight: .semibold))
                     Text(subtitle)
                         .font(.app(.subheadline).monospacedDigit())
                         .foregroundStyle(.secondary)

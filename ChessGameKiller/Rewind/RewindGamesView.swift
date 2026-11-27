@@ -85,11 +85,11 @@ struct RewindGamesView: View {
 
     private var empty: some View {
         VStack(spacing: 10) {
-            Image(systemName: "backward.circle")
-                .font(.system(size: 44, weight: .light))
-                .foregroundStyle(.secondary)
+            // The same jade stone "Your games" wears in the You panel.
+            JewelIcon(symbol: Glyphs.games, stone: .jade, size: 64)
+                .padding(.bottom, 6)
             Text("No games yet")
-                .font(.app(.title3, weight: .semibold))
+                .font(.display(.title3, weight: .semibold))
             Text("Finish a game and it lands here. Rewind it to see the moments that mattered, then go back and fix them.")
                 .font(.app(.body))
                 .foregroundStyle(.secondary)
@@ -105,7 +105,7 @@ struct RewindGamesView: View {
         let next = vault.games.first { $0.leftToRewrite > 0 }
         return VStack(alignment: .leading, spacing: 8) {
             Text("This week")
-                .font(.app(.caption, weight: .semibold))
+                .font(.carved(11))
                 .tracking(2)
                 .textCase(.uppercase)
                 .foregroundStyle(RewindPalette.goldInk(on: theme))
@@ -170,7 +170,7 @@ private struct GameCard: View {
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
                             Text(game.opponentShown)
-                                .font(.app(.headline))
+                                .font(.display(.headline, weight: .semibold))
                                 .lineLimit(1)
                             Spacer(minLength: 4)
                             Text(game.result.title.uppercased())

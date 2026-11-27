@@ -302,11 +302,11 @@ struct TodayCard: View {
             HStack(alignment: .top, spacing: 14) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(eyebrow(done: done))
-                        .font(.app(.caption, weight: .bold))
-                        .tracking(1)
+                        .font(.carved(11))
+                        .tracking(1.4)
                         .foregroundStyle(theme.trainingAccent)
                     Text(title)
-                        .font(.app(.title2, weight: .bold))
+                        .font(.display(.title2, weight: .semibold))
                         .lineLimit(2)
                         .minimumScaleFactor(0.8)
                     Text(reason)

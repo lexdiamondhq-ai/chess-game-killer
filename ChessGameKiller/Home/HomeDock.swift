@@ -402,6 +402,30 @@ enum HomeShortcutKind: String, CaseIterable, Identifiable {
         }
     }
 
+    /// A room's door in the Rooms panel: its drawing, solid, to be cut in gold on its stone.
+    var roomGlyph: String {
+        switch self {
+        case .trophies: return "trophy.fill"
+        case .famous: return "book.fill"
+        case .dungeon: return "lock.fill"
+        default: return glyph
+        }
+    }
+
+    /// A room's own stone in the Rooms panel.
+    var stone: HomeAuroraJewel.Stone {
+        switch self {
+        case .online: return .jade
+        case .friend: return .sapphire
+        case .newGame: return .emerald
+        case .rivals: return .violet
+        case .games: return .jade
+        case .trophies: return .amber
+        case .famous: return .sapphire
+        case .dungeon: return .ruby
+        }
+    }
+
     var hint: String {
         switch self {
         case .online: return "Play someone at your level now"
@@ -476,7 +500,7 @@ struct HomeShortcutsPanel: View {
                     .padding(.bottom, 2)
                     .accessibilityHidden(true)
                 Text("Rooms")
-                    .font(.system(size: 20, weight: .medium, design: .serif))
+                    .font(HomeType.section)
                     .foregroundStyle(tone.ink)
                     .padding(.leading, 6)
                     .padding(.bottom, 4)
@@ -577,36 +601,17 @@ struct HomeShortcutsPanel: View {
     /// champion's card under it.
     private func armyRow(_ card: HomeAuroraArmy) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("YOUR ARMY")
-                    .accessibilityAddTraits(.isHeader)
-                Spacer(minLength: 8)
-                if let armyNote {
-                    Text(armyNote.uppercased())
-                }
-            }
-            .font(.system(size: 11, weight: .semibold))
-            .tracking(1)
-            .foregroundStyle(tone.ink2)
-            .lineLimit(1)
-            .minimumScaleFactor(0.8)
-            .padding(.horizontal, 6)
+            SectionLabel(text: "Your army", note: armyNote)
+                .padding(.horizontal, 6)
             card
         }
-        .padding(.top, 6)
+        .padding(.top, 8)
     }
 
     private func shortcutButton(_ shortcut: HomeShortcut) -> some View {
         Button { pick(shortcut.action) } label: {
-            VStack(spacing: 6) {
-                Glyph(name: shortcut.glyph, size: 24)
-                    .foregroundStyle(tone.ink)
-                    .frame(width: 48, height: 48)
-                    .background {
-                        Circle()
-                            .fill(tone.ink.opacity(0.08))
-                            .overlay { Circle().strokeBorder(tone.ink.opacity(0.16), lineWidth: 0.75) }
-                    }
+            VStack(spacing: asRooms ? 8 : 6) {
+                shortcutFace(shortcut)
                     .overlay(alignment: .topTrailing) {
                         if shortcut.live {
                             Circle()
@@ -617,7 +622,7 @@ struct HomeShortcutsPanel: View {
                         }
                     }
                 Text(shortcut.title)
-                    .font(.app(.caption2, weight: .medium))
+                    .font(asRooms ? Font.app(.caption, weight: .semibold) : Font.app(.caption2, weight: .medium))
                     .foregroundStyle(tone.ink)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
@@ -631,6 +636,23 @@ struct HomeShortcutsPanel: View {
         .buttonStyle(HomePressStyle())
         .accessibilityLabel(shortcut.title)
         .accessibilityHint(shortcut.hint)
+    }
+
+    /// A room's door is its drawing in gold on its own stone; elsewhere a quiet ink coin.
+    @ViewBuilder
+    private func shortcutFace(_ shortcut: HomeShortcut) -> some View {
+        if asRooms {
+            JewelIcon(symbol: shortcut.kind.roomGlyph, stone: shortcut.kind.stone, size: 54)
+        } else {
+            Glyph(name: shortcut.glyph, size: 24)
+                .foregroundStyle(tone.ink)
+                .frame(width: 48, height: 48)
+                .background {
+                    Circle()
+                        .fill(tone.ink.opacity(0.08))
+                        .overlay { Circle().strokeBorder(tone.ink.opacity(0.16), lineWidth: 0.75) }
+                }
+        }
     }
 
     /// Closes the panel, then opens what was picked.
@@ -710,17 +732,17 @@ struct HomeYouPanel: View {
             }
             VStack(spacing: 0) {
                 if let friends {
-                    HomeLinkRow(title: "Friends", detail: friendsLine, tone: tone) { go(friends) }
-                    HomeHairline(tone: tone)
+                    HomeLinkRow(glyph: Glyphs.challenge, stone: .sapphire, title: "Friends", detail: friendsLine, tone: tone) { go(friends) }
+                    HomeHairline(tone: tone, inset: 54)
                 }
-                HomeLinkRow(title: "Your army", detail: piecesLine, tone: tone) { go(actions.army) }
-                HomeHairline(tone: tone)
-                HomeLinkRow(title: "Your games", detail: gamesLine, tone: tone) { go(actions.rewind) }
-                HomeHairline(tone: tone)
-                HomeLinkRow(title: "Settings", detail: "Board look, sound, hints", tone: tone) { go(actions.settings) }
+                HomeLinkRow(glyph: Glyphs.army, stone: .ruby, title: "Your army", detail: piecesLine, tone: tone) { go(actions.army) }
+                HomeHairline(tone: tone, inset: 54)
+                HomeLinkRow(glyph: Glyphs.games, stone: .jade, title: "Your games", detail: gamesLine, tone: tone) { go(actions.rewind) }
+                HomeHairline(tone: tone, inset: 54)
+                HomeLinkRow(glyph: Glyphs.settings, stone: .slate, title: "Settings", detail: "Board look, sound, hints", tone: tone) { go(actions.settings) }
                 if let premium = actions.premium {
-                    HomeHairline(tone: tone)
-                    HomeLinkRow(title: "Premium", detail: Premium.shared.youLine, tone: tone) { go(premium) }
+                    HomeHairline(tone: tone, inset: 54)
+                    HomeLinkRow(glyph: Glyphs.king, stone: .amber, title: "Premium", detail: Premium.shared.youLine, tone: tone) { go(premium) }
                 }
             }
         }

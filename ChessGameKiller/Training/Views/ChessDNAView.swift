@@ -14,8 +14,7 @@ struct ChessDNACard: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline) {
                 Text("YOUR CHESS DNA")
-                    .font(.app(.caption, weight: .bold))
-                    .tracking(1)
+                    .eyebrow()
                     .foregroundStyle(theme.trainingAccent)
                 Spacer()
                 Text(ChessDNAView.basis(dna))
@@ -198,13 +197,15 @@ struct DNAStyleHeader: View {
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
             if let style = dna.style {
-                TrainIcon(symbol: style.symbol, theme: theme, size: compact ? 44 : 56)
+                // The same emblem on the same stone as Home's Chess DNA card.
+                HomeAuroraJewel(style: style)
+                    .frame(width: compact ? 46 : 60, height: compact ? 46 : 60)
             } else {
                 CoachAvatar(theme: theme, size: compact ? 44 : 56)
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.app(compact ? .title3 : .title2, weight: .bold))
+                    .font(.display(compact ? .title3 : .title2, weight: .semibold))
                 Text(detail)
                     .font(.app(.subheadline))
                     .foregroundStyle(.secondary)

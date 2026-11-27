@@ -73,8 +73,7 @@ struct OpeningStatsPanel: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Text("HOW PEOPLE PLAY HERE")
-                    .font(.app(.caption2, weight: .bold))
-                    .tracking(0.9)
+                    .eyebrow()
                     .foregroundStyle(theme.trainingAccent)
                 Spacer(minLength: 4)
                 if bookCode != "m", levelOpen {

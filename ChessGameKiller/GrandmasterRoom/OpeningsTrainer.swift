@@ -177,7 +177,7 @@ struct OpeningsView: View {
                 everyOpening
                     .padding(.top, 8)
             } else if !allOpen {
-                PremiumLimitCard(feature: .allOpenings, accent: theme.trainingAccent)
+                PremiumLimitCard(feature: .allOpenings, accent: theme.trainingAccent, gilded: theme.screenTone != nil)
                     .padding(.top, 20)
             } else if matches.isEmpty {
                 Text("No opening matches \u{201C}\(query)\u{201D}.")
@@ -223,8 +223,7 @@ struct OpeningsView: View {
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 Text("YOUR REPERTOIRE")
-                    .font(.app(.caption, weight: .bold))
-                    .tracking(1)
+                    .eyebrow()
                     .foregroundStyle(theme.trainingAccent)
                 Spacer()
                 if count > 0 {
@@ -235,7 +234,7 @@ struct OpeningsView: View {
             }
             Text(count == 0 ? "Start your repertoire"
                  : due.isEmpty ? "Nothing due today" : (due.count == 1 ? "1 line to review" : "\(due.count) lines to review"))
-                .font(.app(.title3, weight: .bold))
+                .font(.display(.title3, weight: .semibold))
             Text(count == 0
                  ? "Open an opening below, pick a line and tap Add. Reviews come back tomorrow, then in 3, 7, 16 and 35 days."
                  : due.isEmpty ? "Every line is fresh. The next one comes back \(nextDue)."
@@ -306,7 +305,7 @@ private struct OpeningFamilyRow: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(name)
-                    .font(.app(.subheadline, weight: .semibold))
+                    .font(.display(.callout, weight: .semibold))
                     .foregroundStyle(.primary)
                 Text(caption)
                     .font(.app(.caption))

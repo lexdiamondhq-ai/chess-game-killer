@@ -275,7 +275,7 @@ struct SettingsSheet: View {
                          threeD: theme.sculptedLook != nil && sculpted3D, pieceSet: pieceSet)
                 .padding(.top, 6)
             Text("Live preview")
-                .font(.app(.caption, weight: .semibold))
+                .font(.carved(11))
                 .tracking(1.5)
                 .textCase(.uppercase)
                 .foregroundStyle(.secondary)
@@ -321,10 +321,8 @@ struct SettingsSheet: View {
 
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(title.uppercased())
-                .font(.app(.caption, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .tracking(1)
+            SectionLabel(text: title)
+                .padding(.horizontal, 2)
             content()
         }
     }
@@ -509,7 +507,7 @@ private struct ThemeCard: View {
                     }
                 VStack(alignment: .leading, spacing: 1) {
                     Text(option.name)
-                        .font(.app(.headline))
+                        .font(.display(.headline, weight: .semibold))
                         .foregroundStyle(locked ? Color.secondary : Color.primary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
@@ -677,11 +675,17 @@ private struct IconTile: View {
 
     var body: some View {
         let accent = theme.trainingAccent
+        let tile = RoundedRectangle(cornerRadius: 10, style: .continuous)
         Image(systemName: symbol)
             .font(.system(size: 15, weight: .semibold))
             .foregroundStyle(accent)
             .frame(width: 34, height: 34)
-            .background(accent.opacity(theme.screenIsDark ? 0.14 : 0.12), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .background {
+                // Lit from above with a fine rim, as the Learn rows' plates are.
+                tile.fill(LinearGradient(colors: [accent.opacity(0.26), accent.opacity(0.1)],
+                                         startPoint: .top, endPoint: .bottom))
+            }
+            .overlay { tile.strokeBorder(accent.opacity(0.4), lineWidth: 0.8) }
             .accessibilityHidden(true)
     }
 }
