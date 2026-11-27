@@ -85,6 +85,10 @@ fun ChessBoard(
     highlights: Set<Int> = emptySet(),
     onMove: (Move) -> Unit = {},
     onSquareTap: ((Int) -> Unit)? = null,
+    /** Letters and numbers on the edge squares; off on a small board. */
+    coordinates: Boolean = true,
+    /** Square tags for the tap tests; off on a small board so they stay unique. */
+    tagged: Boolean = true,
 ) {
     var selected by remember { mutableStateOf<Int?>(null) }
     var promotion by remember { mutableStateOf<Pair<Int, Int>?>(null) }
@@ -117,7 +121,7 @@ fun ChessBoard(
             .aspectRatio(1f)
             .clip(RoundedCornerShape(6.dp))
             .border(1.dp, Palette.gold.copy(alpha = 0.45f), RoundedCornerShape(6.dp))
-            .testTag("board"),
+            .then(if (tagged) Modifier.testTag("board") else Modifier),
     ) {
         val cell = maxWidth / 8
         Column(Modifier.fillMaxSize()) {
@@ -143,7 +147,7 @@ fun ChessBoard(
                                         else -> Color.Transparent
                                     },
                                 )
-                                .testTag("square-${squareName(sq)}")
+                                .then(if (tagged) Modifier.testTag("square-${squareName(sq)}") else Modifier)
                                 .semantics {
                                     contentDescription = squareName(sq) + if (piece != '.') ", " + pieceName(piece) else ""
                                 }
@@ -172,13 +176,13 @@ fun ChessBoard(
                                 else Box(Modifier.fillMaxSize().padding(2.dp).border(3.dp, Palette.hintDot, CircleShape))
                             }
                             // Coordinates on the edge squares.
-                            if (col == 0) Text(
+                            if (coordinates && col == 0) Text(
                                 "${'1' + rank}",
                                 fontSize = 9.sp, fontWeight = FontWeight.SemiBold,
                                 color = if (light) Palette.labelOnLight else Palette.labelOnDark,
                                 modifier = Modifier.align(Alignment.TopStart).padding(start = 2.dp, top = 1.dp),
                             )
-                            if (row == 7) Text(
+                            if (coordinates && row == 7) Text(
                                 "${'a' + file}",
                                 fontSize = 9.sp, fontWeight = FontWeight.SemiBold,
                                 color = if (light) Palette.labelOnLight else Palette.labelOnDark,
