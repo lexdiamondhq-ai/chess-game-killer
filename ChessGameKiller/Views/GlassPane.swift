@@ -25,7 +25,10 @@ struct GlassPane<S: InsettableShape>: ViewModifier {
         #if compiler(>=6.2)
         if #available(iOS 26.0, *) {
             // Glass on the view itself, as the system does it, so what sits on it reads well.
+            // The gilded edge lies over it, so every pane's border catches the light alike
+            // (the frosted pane below draws its own).
             content.glassEffect(GlassSurface<S>.liquidGlass(weight: weight, tint: tint), in: shape)
+                .overlay { if weight == .regular { PolishedEdge(shape: shape, edge: .glass) } }
         } else {
             content.background { GlassSurface(shape: shape, tint: tint, weight: weight) }
         }
@@ -46,6 +49,8 @@ struct GlassSurface<S: InsettableShape>: View {
 
     var body: some View {
         pane
+            // Not on the board's clear frame, which has its own fine line where glass meets stone.
+            .overlay { if weight == .regular { PolishedEdge(shape: shape, edge: .glass) } }
             .allowsHitTesting(false)
             .accessibilityHidden(true)
     }

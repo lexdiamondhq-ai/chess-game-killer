@@ -83,8 +83,7 @@ struct HomeAuroraFriendRow: View {
         .padding(.leading, faces.isEmpty ? 12 : 21)
         .padding(.trailing, 12)
         .frame(maxWidth: .infinity, minHeight: 58)
-        .background(shape.fill(palette.card.opacity(palette.dark ? 0.8 : 0.9)))
-        .overlay(shape.strokeBorder(palette.gold.opacity(0.3), lineWidth: 1))
+        .auroraCard(shape, palette: palette, fill: palette.dark ? 0.8 : 0.9)
         .sensoryFeedback(.impact(weight: .light), trigger: tapped) { _, new in hapticsOn && new != nil }
     }
 

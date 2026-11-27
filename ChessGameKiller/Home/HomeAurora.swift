@@ -59,20 +59,23 @@ struct HomeAuroraPalette {
     var bg: Color { dark ? Color(hex: 0x100B08) : Color(hex: 0xF6F3EE) }
     var bgLow: Color { dark ? Color(hex: 0x140F0C) : Color(hex: 0xEFEAE2) }
     var ink: Color { dark ? Color(hex: 0xF2EEE6) : Color(hex: 0x1C1813) }
-    var ink2: Color { ink.opacity(dark ? 0.62 : 0.6) }
-    var ink3: Color { ink.opacity(dark ? 0.36 : 0.38) }
-    var line: Color { dark ? Color.white.opacity(0.08) : Color(hex: 0x1C1813).opacity(0.08) }
+    var ink2: Color { ink.opacity(dark ? 0.74 : 0.72) }
+    var ink3: Color { ink.opacity(dark ? 0.5 : 0.52) }
+    var line: Color { dark ? Color.white.opacity(0.12) : Color(hex: 0x1C1813).opacity(0.12) }
     var glass: Color { dark ? Color.white.opacity(0.06) : Color.white.opacity(0.72) }
     var glassHi: Color { dark ? Color.white.opacity(0.12) : Color.white }
-    var card: Color { dark ? Color(hex: 0x1D1814) : Color.white }
+    /// A card's body: a shade off the page, so its gilded edge has something to stand on.
+    var card: Color { dark ? Color(hex: 0x221B16) : Color.white }
     /// The page that slides up over the board.
     var sheet: Color { dark ? Color(hex: 0x110C09).opacity(0.97) : Color(hex: 0xF8F5F0).opacity(0.98) }
-    var gold: Color { dark ? Color(hex: 0xE8C27A) : Color(hex: 0xB7832E) }
-    var rose: Color { dark ? Color(hex: 0xF0708A) : Color(hex: 0xD9466A) }
-    var violet: Color { dark ? Color(hex: 0x8B6CFF) : Color(hex: 0x6A4BE0) }
-    var teal: Color { dark ? Color(hex: 0x3FD1B8) : Color(hex: 0x169C86) }
+    /// The metal and the three jewels, run rich: a warm, full gold, a red ruby, a deep amethyst
+    /// and a green jade.
+    var gold: Color { dark ? Color(hex: 0xF0C76E) : Color(hex: 0xAE761C) }
+    var rose: Color { dark ? Color(hex: 0xFF6688) : Color(hex: 0xD9335E) }
+    var violet: Color { dark ? Color(hex: 0x9B7CFF) : Color(hex: 0x603CEA) }
+    var teal: Color { dark ? Color(hex: 0x2FE2C2) : Color(hex: 0x089F84) }
     var shadow: Color { .black.opacity(dark ? 0.45 : 0.12) }
-    var glow: Double { dark ? 1 : 0.5 }
+    var glow: Double { dark ? 1.3 : 0.65 }
 
     static let goldButton = LinearGradient(colors: [Color(hex: 0xF6DEA3), Color(hex: 0xC99B4E)],
                                            startPoint: .top, endPoint: .bottom)
@@ -360,9 +363,9 @@ struct HomeAuroraView: View {
         .padding(.bottom, 10)
         .overlay(alignment: .bottom) {
             // A slight gold underline, fading at both ends.
-            LinearGradient(colors: [palette.gold.opacity(0), palette.gold.opacity(0.4), palette.gold.opacity(0)],
+            LinearGradient(colors: [palette.gold.opacity(0), palette.gold.opacity(0.8), palette.gold.opacity(0)],
                            startPoint: .leading, endPoint: .trailing)
-                .frame(height: 0.75)
+                .frame(height: 1)
                 .padding(.horizontal, 20)
         }
     }
@@ -434,8 +437,8 @@ struct HomeAuroraView: View {
             shape.fill(palette.sheet)
                 .overlay(alignment: .top) {
                     // A fine gold edge along the top of the page.
-                    shape.strokeBorder(LinearGradient(colors: [palette.gold.opacity(0.5), palette.gold.opacity(0)],
-                                                      startPoint: .top, endPoint: .center), lineWidth: 1)
+                    shape.strokeBorder(LinearGradient(colors: [palette.gold.opacity(0.9), palette.gold.opacity(0)],
+                                                      startPoint: .top, endPoint: .center), lineWidth: 1.25)
                 }
                 .shadow(color: .black.opacity(palette.dark ? 0.5 : 0.1), radius: 30, y: -10)
                 .ignoresSafeArea(edges: .bottom)
@@ -850,8 +853,7 @@ struct HomeAuroraGameTile: View {
             }
             .padding(12)
             .frame(height: 128)
-            .background(shape.fill(palette.card))
-            .overlay(shape.strokeBorder(card.yourMove ? palette.gold.opacity(0.4) : palette.line, lineWidth: 1))
+            .auroraCard(shape, palette: palette, lit: card.yourMove)
         }
         .buttonStyle(HomeStagePress())
         .accessibilityElement(children: .combine)
@@ -953,7 +955,7 @@ struct HomeAuroraNextRival: View {
                             .accessibilityLabel("Locked. Beat \(lockedBy.name) first")
                     } else {
                         Button(action: play) {
-                            pill(card.upNext?.inProgress == true ? "Resume" : "Play", symbol: "play.fill")
+                            pill(card.upNext?.inProgress == true ? "Resume" : "Play", symbol: "play.fill", main: true)
                         }
                             .buttonStyle(HomeStagePress())
                             .accessibilityLabel("Play \(rival.name)")
@@ -969,15 +971,8 @@ struct HomeAuroraNextRival: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity)
-        .background(shape.fill(palette.card))
-        .background(alignment: .topLeading) {
-            // A warm gold light from the frame's corner, as on your finest move.
-            RadialGradient(colors: [palette.gold.opacity(palette.dark ? 0.18 : 0.14), palette.gold.opacity(0)],
-                           center: .topLeading, startRadius: 0, endRadius: 220)
-                .clipShape(shape)
-                .allowsHitTesting(false)
-        }
-        .overlay(shape.strokeBorder(palette.gold.opacity(0.32), lineWidth: 1))
+        // A warm gold light from the frame's corner, as on your finest move.
+        .auroraCard(shape, palette: palette, glow: palette.gold)
     }
 
     /// "1000 · No clock · You're White".
@@ -985,17 +980,25 @@ struct HomeAuroraNextRival: View {
         ([rival.elo.replacingOccurrences(of: "~", with: "")] + card.tags).joined(separator: " · ")
     }
 
-    private func pill(_ title: String, symbol: String) -> some View {
+    /// `main`: the card's one action, solid gold so it leads the eye.
+    private func pill(_ title: String, symbol: String, main solid: Bool = false) -> some View {
         HStack(spacing: 5) {
             Image(systemName: symbol)
                 .font(.system(size: 9.5, weight: .bold))
             Text(title)
                 .font(.system(size: 12, weight: .bold))
         }
-        .foregroundStyle(palette.gold)
-        .padding(.horizontal, 11)
+        .foregroundStyle(solid ? Color(hex: 0x2A1E0F) : palette.gold)
+        .padding(.horizontal, solid ? 13 : 11)
         .frame(height: 28)
-        .overlay(Capsule().strokeBorder(palette.gold.opacity(0.45), lineWidth: 1))
+        .background {
+            if solid {
+                Capsule().fill(HomeAuroraPalette.goldButton)
+                    .overlay(Capsule().strokeBorder(Color.white.opacity(0.35), lineWidth: 0.75))
+                    .shadow(color: palette.gold.opacity(0.3), radius: 8, y: 3)
+            }
+        }
+        .overlay { if !solid { Capsule().strokeBorder(palette.gold.opacity(0.7), lineWidth: 1) } }
         .contentShape(Capsule())
     }
 }
@@ -1079,8 +1082,8 @@ struct HomeAuroraRow<Picture: View>: View {
                     rowBody
                 }
             }
-            .background(shape.fill(palette.card))
-            .overlay(shape.strokeBorder(palette.line, lineWidth: 1))
+            // Each of today's things glows faintly in its own jewel's color.
+            .auroraCard(shape, palette: palette, glow: accent)
             .contentShape(shape)
         }
         .buttonStyle(HomeStagePress())
@@ -1091,7 +1094,7 @@ struct HomeAuroraRow<Picture: View>: View {
         HStack(spacing: 14) {
             Capsule()
                 .fill(LinearGradient(colors: [accent, accent.opacity(0.2)], startPoint: .top, endPoint: .bottom))
-                .frame(width: 3)
+                .frame(width: 3.5)
                 .padding(.vertical, 4)
             VStack(alignment: .leading, spacing: 4) {
                 Text(eyebrow.uppercased())
@@ -1181,8 +1184,7 @@ struct HomeAuroraDNA: View {
             .padding(.leading, 14)
             .padding(.trailing, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(shape.fill(palette.card))
-            .overlay(shape.strokeBorder(palette.line, lineWidth: 1))
+            .auroraCard(shape, palette: palette, glow: palette.gold)
             .contentShape(shape)
         }
         .buttonStyle(HomeStagePress())
@@ -1194,7 +1196,7 @@ struct HomeAuroraDNA: View {
         HStack(spacing: 14) {
             Capsule()
                 .fill(LinearGradient(colors: [palette.gold, palette.gold.opacity(0.2)], startPoint: .top, endPoint: .bottom))
-                .frame(width: 3)
+                .frame(width: 3.5)
                 .padding(.vertical, 4)
             VStack(alignment: .leading, spacing: 4) {
                 Text(dna.hasStyle ? "YOUR STYLE" : "STILL READING YOU")
@@ -1257,10 +1259,11 @@ struct HomeAuroraDNA: View {
             let dot: CGFloat = 8
             let x: CGFloat = (geo.size.width - dot) * CGFloat(value ?? 0.5)
             ZStack(alignment: .leading) {
-                Capsule().fill(palette.ink.opacity(0.08)).frame(height: 2)
-                Capsule().fill(palette.gold.opacity(0.55)).frame(width: x + dot / 2, height: 2)
+                Capsule().fill(palette.ink.opacity(0.12)).frame(height: 3)
+                Capsule().fill(palette.gold.opacity(0.85)).frame(width: x + dot / 2, height: 3)
                     .opacity(value == nil ? 0 : 1)
                 Circle().fill(palette.gold).frame(width: dot, height: dot)
+                    .shadow(color: palette.gold.opacity(0.6), radius: 4)
                     .offset(x: x)
                     .opacity(value == nil ? 0.25 : 1)
             }
@@ -1291,7 +1294,10 @@ struct HomeAuroraDNA: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(tint.opacity(palette.dark ? 0.12 : 0.07)))
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .fill(tint.opacity(palette.dark ? 0.17 : 0.1)))
+        // The chip's own jewel on its edge.
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(tint.opacity(0.35), lineWidth: 1))
     }
 }
 
@@ -1684,9 +1690,9 @@ struct HomeAuroraSection: View {
                     .font(.system(size: 22, weight: .medium, design: .serif))
                     .foregroundStyle(palette.ink)
                 // A slight gold underline.
-                LinearGradient(colors: [palette.gold.opacity(0.7), palette.gold.opacity(0)],
+                LinearGradient(colors: [palette.gold, palette.gold.opacity(0)],
                                startPoint: .leading, endPoint: .trailing)
-                    .frame(width: 44, height: 1)
+                    .frame(width: 64, height: 1.5)
             }
             Spacer()
             if let note, let action {
@@ -1750,8 +1756,7 @@ struct HomeAuroraTile<Content: View>: View {
                 if let fill {
                     shape.fill(fill)
                 } else {
-                    shape.fill(palette.card)
-                        .overlay(shape.strokeBorder(palette.line, lineWidth: 1))
+                    Color.clear.auroraCard(shape, palette: palette)
                 }
             }
             .clipShape(shape)
@@ -1887,7 +1892,7 @@ struct HomeAuroraTabBar: View {
                 Capsule()
                     .fill(.ultraThinMaterial)
                     .overlay(Capsule().fill(palette.dark ? Color(hex: 0x14161E).opacity(0.85) : Color.white.opacity(0.92)))
-                    .overlay(Capsule().strokeBorder(palette.gold.opacity(0.35), lineWidth: 0.75))
+                    .overlay { PolishedEdge(shape: Capsule(), edge: .card, dark: palette.dark) }
                     .shadow(color: .black.opacity(palette.dark ? 0.5 : 0.14), radius: 20, y: 10)
             }
             analyzeButton
@@ -1911,7 +1916,7 @@ struct HomeAuroraTabBar: View {
                 Circle()
                     .fill(.ultraThinMaterial)
                     .overlay(Circle().fill(palette.dark ? Color(hex: 0x14161E).opacity(0.85) : Color.white.opacity(0.92)))
-                    .overlay(Circle().strokeBorder(palette.gold.opacity(0.55), lineWidth: 1))
+                    .overlay { PolishedEdge(shape: Circle(), edge: .lit, dark: palette.dark) }
                     .shadow(color: .black.opacity(palette.dark ? 0.5 : 0.16), radius: 14, y: 8)
             }
             .contentShape(Circle())
@@ -1939,6 +1944,8 @@ struct HomeAuroraTabBar: View {
                                                      center: UnitPoint(x: 0.32, y: 0.26), startRadius: 0, endRadius: 37))
                     }
                     .overlay(Circle().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
+                    // The Play coin glows a little in its own gold.
+                    .shadow(color: Color(hex: 0xE8C27A).opacity(0.35), radius: 10)
                     .shadow(color: .black.opacity(palette.dark ? 0.5 : 0.18), radius: 14, y: 8)
     }
 
@@ -1985,6 +1992,8 @@ struct HomeAuroraTabBar: View {
             .frame(maxWidth: .infinity)
             .frame(height: 52)
             .background(Capsule().fill(on ? palette.glassHi : .clear))
+            // The tab you're on wears a fine gold rim.
+            .overlay { if on { PolishedEdge(shape: Capsule(), edge: .pill, dark: palette.dark) } }
             .contentShape(Capsule())
         }
         .buttonStyle(HomeStagePress(ticks: !thumps))
@@ -2074,5 +2083,54 @@ struct HomeTabIcon: View {
             }
         }
         .accessibilityHidden(true)
+    }
+}
+
+
+// MARK: - A card's body and edge
+
+/// A Home card's body and its edge: the gilded edge, a little light on the card's top, a faint
+/// glow of its own color from the corner, and (by day) a soft shadow that lifts the white card
+/// off the page.
+struct HomeAuroraCardBack<S: InsettableShape>: ViewModifier {
+    let shape: S
+    let palette: HomeAuroraPalette
+    /// The one to look at: your move.
+    var lit = false
+    /// A color glowing faintly from the top left corner.
+    var glow: Color?
+    var fill: Double = 1
+
+    func body(content: Content) -> some View {
+        content
+            .background {
+                ZStack {
+                    shape.fill(palette.card.opacity(fill))
+                    if palette.dark {
+                        shape.fill(LinearGradient(colors: [Color.white.opacity(0.04), .clear],
+                                                  startPoint: .top, endPoint: .center))
+                    }
+                    if let glow {
+                        RadialGradient(colors: [glow.opacity(glowStrength), glow.opacity(0)],
+                                       center: .topLeading, startRadius: 0, endRadius: 220)
+                            .clipShape(shape)
+                    }
+                }
+                .shadow(color: .black.opacity(lift), radius: 10, y: 4)
+                .allowsHitTesting(false)
+            }
+            .overlay { PolishedEdge(shape: shape, edge: lit ? .lit : .card, dark: palette.dark) }
+    }
+
+    private var glowStrength: Double { palette.dark ? 0.16 : 0.11 }
+
+    /// By day a soft shadow lifts the white card off the page.
+    private var lift: Double { palette.dark ? 0 : 0.06 }
+}
+
+extension View {
+    func auroraCard<S: InsettableShape>(_ shape: S, palette: HomeAuroraPalette, lit: Bool = false,
+                                        glow: Color? = nil, fill: Double = 1) -> some View {
+        modifier(HomeAuroraCardBack(shape: shape, palette: palette, lit: lit, glow: glow, fill: fill))
     }
 }
