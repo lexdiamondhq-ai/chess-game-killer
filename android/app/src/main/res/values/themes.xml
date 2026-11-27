@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="espresso">#0E0B08</color>
+    <color name="launcher_back">#0C0403</color>
+    <style name="Theme.BeautyOfChess" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/espresso</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+</resources>
