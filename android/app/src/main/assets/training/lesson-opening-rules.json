@@ -1,0 +1,147 @@
+{
+  "id": "opening-rules",
+  "title": "Start Strong",
+  "subtitle": "Center, develop, castle",
+  "skill": "opening",
+  "steps": [
+    {
+      "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      "say": "The opening has three simple rules. Rule one: take the center. These four squares are the best real estate on the board.",
+      "marks": [
+        {
+          "square": "d4",
+          "color": "teal"
+        },
+        {
+          "square": "e4",
+          "color": "teal"
+        },
+        {
+          "square": "d5",
+          "color": "teal"
+        },
+        {
+          "square": "e5",
+          "color": "teal"
+        }
+      ],
+      "task": {
+        "type": "move",
+        "prompt": "Play a first move that fights for the center.",
+        "solution": [
+          "e2e4"
+        ],
+        "accept": [
+          [
+            "d2d4",
+            "c2c4",
+            "g1f3",
+            "b1c3"
+          ]
+        ],
+        "feedback": {
+          "e2e3": "That's playable, but push a center pawn two squares to really grab the middle.",
+          "d2d3": "That's playable, but push a center pawn two squares to really grab the middle.",
+          "g2g3": "That gets your bishop ready, but the center comes first.",
+          "c2c3": "That's a quiet start. Grab the center with a pawn two squares forward.",
+          "a2a4": "Edge pawns don't help in the middle. Try a center pawn.",
+          "h2h4": "Edge pawns don't help in the middle. Try a center pawn.",
+          "g1h3": "A knight on the edge reaches fewer squares. Head for the middle.",
+          "b1a3": "A knight on the edge reaches fewer squares. Head for the middle."
+        },
+        "hint": "Push one of the middle pawns two squares.",
+        "success": "Great start! You grab space and open lines for your pieces."
+      }
+    },
+    {
+      "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+      "say": "Rule two: bring out your knights and bishops. Every move, a new piece joins the game.",
+      "task": {
+        "type": "move",
+        "prompt": "Bring out a knight or a bishop. Bonus points if it attacks something.",
+        "solution": [
+          "g1f3"
+        ],
+        "accept": [
+          [
+            "b1c3",
+            "f1c4",
+            "f1b5"
+          ]
+        ],
+        "feedback": {
+          "g1e2": "That develops, but on e2 the knight blocks your bishop. f3 is a better home.",
+          "f1e2": "That works, but the bishop does more on c4 or b5.",
+          "f1d3": "On d3 the bishop blocks your d-pawn. Find a square with open lines.",
+          "f1a6": "The b7 pawn would take it. Green light!",
+          "g1h3": "A knight on the edge reaches fewer squares. Head for the middle.",
+          "b1a3": "A knight on the edge reaches fewer squares. Head for the middle.",
+          "d1h5": "That's the queen, not a knight or bishop. Early queens get chased."
+        },
+        "hint": "Which knight can jump out and attack the e5 pawn?",
+        "success": "Nicely developed. Every piece you bring out makes your army stronger."
+      }
+    },
+    {
+      "fen": "r1bqk1nr/pppp1ppp/2n5/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4",
+      "say": "Rule three: castle early. It tucks your king into the corner and brings a rook toward the middle.",
+      "task": {
+        "type": "move",
+        "prompt": "Castle!",
+        "solution": [
+          "e1g1"
+        ],
+        "hint": "Move your king two squares toward the rook on h1.",
+        "success": "Castled! King safe, rook ready."
+      }
+    },
+    {
+      "fen": "rnb1kbnr/ppp1pppp/8/3q4/8/8/PPPP1PPP/RNBQKBNR w KQkq - 0 3",
+      "say": "Why not bring the queen out early? Watch. Black's queen took on d5, and White's knight comes out with an attack.",
+      "moves": [
+        "b1c3"
+      ]
+    },
+    {
+      "say": "Now Black has to spend a move running away, while White brings out another piece. Early queens get chased.",
+      "arrows": [
+        {
+          "from": "c3",
+          "to": "d5",
+          "color": "red"
+        }
+      ]
+    },
+    {
+      "fen": "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3",
+      "task": {
+        "type": "choice",
+        "prompt": "Which move follows the opening rules?",
+        "options": [
+          {
+            "text": "Bishop to c4",
+            "correct": true,
+            "move": "f1c4",
+            "why": "It develops a piece and aims at f7."
+          },
+          {
+            "text": "Pawn to h3",
+            "correct": false,
+            "move": "h2h3",
+            "why": "Edge pawn moves don't develop anything. Bring out a piece."
+          },
+          {
+            "text": "Queen to e2",
+            "correct": false,
+            "move": "d1e2",
+            "why": "Too early for the queen, and she blocks your bishop."
+          }
+        ],
+        "success": "Exactly."
+      }
+    },
+    {
+      "say": "Center, develop, castle. Follow those three, and you'll get a good game every time."
+    }
+  ]
+}

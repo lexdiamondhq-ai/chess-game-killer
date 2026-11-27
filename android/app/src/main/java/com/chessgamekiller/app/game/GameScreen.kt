@@ -104,7 +104,10 @@ fun GameScreen(rival: Rival, playWhite: Boolean, onExit: () -> Unit, onAnalyze: 
             showEnd = true
             if (!recorded) {
                 recorded = true
-                Progress.record(rival, when (won) { true -> 1.0; false -> 0.0; null -> 0.5 })
+                val score = when (won) { true -> 1.0; false -> 0.0; null -> 0.5 }
+                Progress.record(rival, score)
+                // Chess DNA: Leo reads the game's moves in the background.
+                com.chessgamekiller.app.learn.Dna.recordGame(context, rival.name, playWhite, game.moves.map { it.move.uci }, score)
             }
         }
     }
@@ -286,7 +289,11 @@ fun GameScreen(rival: Rival, playWhite: Boolean, onExit: () -> Unit, onAnalyze: 
                     rivalJob?.cancel(); thinking = false
                     resigned = true; showEnd = true
                     sounds.playEnd(false)
-                    if (!recorded) { recorded = true; Progress.record(rival, 0.0) }
+                    if (!recorded) {
+                        recorded = true
+                        Progress.record(rival, 0.0)
+                        com.chessgamekiller.app.learn.Dna.recordGame(context, rival.name, playWhite, game.moves.map { it.move.uci }, 0.0)
+                    }
                 }
             },
             dismissButton = { QuietButton("Keep playing") { confirmResign = false } },

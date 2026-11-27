@@ -83,6 +83,10 @@ fun ChessBoard(
     arrows: List<BoardArrow> = emptyList(),
     interactive: Boolean = true,
     highlights: Set<Int> = emptySet(),
+    /** Squares tinted by a lesson or drill: green found, red wrong, yellow a hint. */
+    marks: Map<Int, Color> = emptyMap(),
+    /** Small words on squares, from a lesson ("3", "x"). */
+    labels: Map<Int, String> = emptyMap(),
     onMove: (Move) -> Unit = {},
     onSquareTap: ((Int) -> Unit)? = null,
     /** Letters and numbers on the edge squares; off on a small board. */
@@ -142,6 +146,7 @@ fun ChessBoard(
                                 .background(
                                     when {
                                         sq == selected -> Palette.selected
+                                        sq in marks -> marks.getValue(sq).copy(alpha = 0.5f)
                                         sq in highlights -> Palette.info.copy(alpha = 0.35f)
                                         lastMove != null && (sq == lastMove.from || sq == lastMove.to) -> Palette.lastMove
                                         else -> Color.Transparent
@@ -170,6 +175,12 @@ fun ChessBoard(
                                     contentDescription = null,
                                     modifier = Modifier.fillMaxSize().padding(cell * 0.06f),
                                 )
+                            }
+                            labels[sq]?.let { word ->
+                                Box(
+                                    Modifier.align(Alignment.Center).clip(RoundedCornerShape(50))
+                                        .background(Color(0xCC1A140F)).padding(horizontal = 5.dp, vertical = 1.dp),
+                                ) { Text(word, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Palette.goldTop) }
                             }
                             if (sq in targets) {
                                 if (piece == '.') Box(Modifier.size(cell * 0.3f).clip(CircleShape).background(Palette.hintDot))

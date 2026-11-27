@@ -1,0 +1,52 @@
+{
+  "id": "discovered",
+  "title": "Discovered Attacks",
+  "subtitle": "Move one piece, uncover another",
+  "skill": "discovered",
+  "steps": [
+    {
+      "fen": "4k2r/pp3ppp/8/q3B3/8/8/PP3PPP/4R1K1 w - - 0 1",
+      "say": "A discovered attack: one piece steps out of the way, and the piece behind it attacks. Here your bishop stands in front of your rook.",
+      "arrows": [
+        {
+          "from": "e1",
+          "to": "e8",
+          "color": "yellow",
+          "dashed": true
+        }
+      ]
+    },
+    {
+      "say": "Red light first: their queen attacks your rook on e1. But you have something much better than defending.",
+      "arrows": [
+        {
+          "from": "a5",
+          "to": "e1",
+          "color": "red"
+        }
+      ],
+      "task": {
+        "type": "move",
+        "prompt": "Move the bishop with check from your rook, and attack the queen at the same time.",
+        "solution": [
+          "e5c3"
+        ],
+        "feedback": {
+          "e5g7": "Careful! That opens the diagonal, and their queen takes your rook. Checkmate, for them."
+        },
+        "hint": "Find a square where the bishop attacks the queen. The rook does the checking.",
+        "success": "Discovered check!"
+      }
+    },
+    {
+      "say": "They have to answer the rook's check, and your bishop takes the queen.",
+      "moves": [
+        "e8d8",
+        "c3a5"
+      ]
+    },
+    {
+      "say": "Discovered checks are the strongest kind. They must answer the check first, so your other piece gets a free hit."
+    }
+  ]
+}

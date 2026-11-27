@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Rule
@@ -52,7 +53,7 @@ class TapTests {
         rule.onNodeWithTag("page-rooms").assertIsDisplayed()
         snap("03-rooms")
         tap("tab-learn")
-        rule.onNodeWithTag("learn-leo").assertIsDisplayed()
+        rule.onNodeWithTag("learn-today").assertIsDisplayed()
         snap("04-learn")
         tap("tab-you")
         snap("05-you")
@@ -157,5 +158,70 @@ class TapTests {
         rule.onNodeWithTag("leo-input").performScrollTo().assertIsDisplayed()
         rule.onNodeWithTag("leo-mic").assertIsDisplayed()
         snap("17-game-leo")
+    }
+
+    private fun waitForTag(tag: String, ms: Long = 8000) =
+        rule.waitUntil(ms) { rule.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+
+    private fun waitForText(text: String, ms: Long = 8000) =
+        rule.waitUntil(ms) { rule.onAllNodes(hasText(text, substring = true), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+
+    @Test fun learnStartsTodaysLessonWithLeo() {
+        tap("tab-learn")
+        rule.onNodeWithTag("learn-today").assertIsDisplayed()
+        snap("20-learn-top")
+        tap("learn-start")
+        waitForTag("lesson")
+        waitForTag("lesson-say")
+        snap("21-lesson-welcome")
+        tap("learn-back")
+        rule.onNodeWithTag("learn-today").assertIsDisplayed()
+    }
+
+    @Test fun aLessonTaskTakesTheRightMove() {
+        tap("tab-learn")
+        rule.onNodeWithTag("door-lessons").performScrollTo().performClick()
+        waitForTag("lessons-page")
+        snap("22-lessons")
+        rule.onNodeWithTag("lesson-forks").performScrollTo().performClick()
+        waitForTag("drill-prompt")
+        Thread.sleep(500)
+        tap("square-b5"); tap("square-c7")
+        waitForText("Fork!")
+        snap("23-lesson-fork-found")
+        tap("lesson-continue")
+        rule.onNodeWithTag("lesson-say").assertIsDisplayed()
+    }
+
+    @Test fun puzzlesPlayAndGoOn() {
+        tap("tab-learn")
+        rule.onNodeWithTag("door-puzzles").performScrollTo().performClick()
+        waitForTag("puzzles-page")
+        snap("24-puzzles")
+        tap("puzzles-start")
+        waitForTag("drill-prompt")
+        Thread.sleep(800)
+        snap("25-puzzle")
+        tap("drill-show")
+        waitForTag("drill-next", 10_000)
+        snap("26-puzzle-shown")
+        tap("drill-next")
+        waitForTag("drill-show")
+    }
+
+    @Test fun todaysMoveVineAndChessDna() {
+        rule.onNodeWithTag("tile-daily").performScrollTo().performClick()
+        waitForTag("daily")
+        Thread.sleep(800)
+        snap("27-todays-move")
+        tap("learn-back")
+        tap("tab-learn")
+        rule.onNodeWithTag("learn-vine").performScrollTo().performClick()
+        waitForTag("vine-page")
+        snap("28-vine")
+        tap("learn-back")
+        rule.onNodeWithTag("door-dna").performScrollTo().performClick()
+        waitForTag("dna-page")
+        snap("29-chess-dna")
     }
 }

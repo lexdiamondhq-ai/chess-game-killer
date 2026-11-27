@@ -1,0 +1,154 @@
+{
+  "id": "welcome",
+  "title": "Meet Coach Leo",
+  "subtitle": "The Traffic Light: three questions that win games",
+  "skill": "threats",
+  "orientation": "black",
+  "steps": [
+    {
+      "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      "say": "Hi, I'm Leo, your coach. I've lost more games than I can count, and every loss taught me something. Let me save you a few."
+    },
+    {
+      "say": "Strong players aren't magic. They ask the same three questions before every move. I call it the Traffic Light."
+    },
+    {
+      "say": "Red light: what is my opponent threatening? Yellow light: what can I attack? Green light: is my move safe?"
+    },
+    {
+      "say": "Let's try it on a famous trap. White brings out the bishop and the queen, fast.",
+      "moves": [
+        "e2e4",
+        "e7e5",
+        "f1c4",
+        "b8c6",
+        "d1h5"
+      ]
+    },
+    {
+      "say": "Red light. White's queen just came to h5. What is she after?",
+      "task": {
+        "type": "tap",
+        "prompt": "Tap the square White is attacking twice.",
+        "squares": [
+          "f7"
+        ],
+        "hint": "Follow the queen's diagonal and the bishop's diagonal. Where do they meet?",
+        "success": "Yes, f7! Only your king guards it, and two attackers beat one defender.",
+        "wrong": "Trace the lines from the queen on h5 and the bishop on c4."
+      }
+    },
+    {
+      "say": "If Black forgets to look, watch what happens. Knight f6 attacks the queen, but...",
+      "moves": [
+        "g8f6",
+        "h5f7"
+      ],
+      "arrows": [
+        {
+          "from": "h5",
+          "to": "f7",
+          "color": "red"
+        },
+        {
+          "from": "c4",
+          "to": "f7",
+          "color": "red"
+        }
+      ]
+    },
+    {
+      "say": "Checkmate in four moves. It's called Scholar's Mate, and it catches thousands of players every day.",
+      "marks": [
+        {
+          "square": "e8",
+          "color": "red"
+        }
+      ]
+    },
+    {
+      "fen": "r1bqkbnr/pppp1ppp/2n5/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 3 3",
+      "say": "Let's rewind. You're Black, and this time your red light is on.",
+      "arrows": [
+        {
+          "from": "h5",
+          "to": "f7",
+          "color": "red"
+        },
+        {
+          "from": "c4",
+          "to": "f7",
+          "color": "red"
+        }
+      ],
+      "task": {
+        "type": "move",
+        "prompt": "Stop the checkmate. Guard f7, or block the queen.",
+        "solution": [
+          "g7g6"
+        ],
+        "accept": [
+          [
+            "d8e7",
+            "d8f6"
+          ]
+        ],
+        "feedback": {
+          "g8f6": "Careful! Knight f6 attacks the queen, but Queen takes f7 is still checkmate.",
+          "g8h6": "That guards f7, but it puts your knight on the edge. There's a move that guards f7 and attacks the queen."
+        },
+        "hint": "A pawn can step into the queen's path and attack her at the same time.",
+        "success": "That stops the mate. f7 is safe!",
+        "wrong": "Not quite. f7 needs another guard, or the queen's path needs blocking."
+      }
+    },
+    {
+      "say": "Here's one strong way: pawn to g6 blocks the queen and kicks her. But White tries again, queen to f3, aiming at f7 once more.",
+      "moves": [
+        "h5f3"
+      ]
+    },
+    {
+      "arrows": [
+        {
+          "from": "f3",
+          "to": "f7",
+          "color": "red"
+        },
+        {
+          "from": "c4",
+          "to": "f7",
+          "color": "red"
+        }
+      ],
+      "task": {
+        "type": "move",
+        "prompt": "Red light again! Guard f7, and bring out a piece while you're at it.",
+        "solution": [
+          "g8f6"
+        ],
+        "accept": [
+          [
+            "d8e7",
+            "d8f6"
+          ]
+        ],
+        "feedback": {
+          "f7f5": "That blocks the queen too, but it doesn't bring out a piece. Can you do both?"
+        },
+        "hint": "A knight can block the queen's path to f7.",
+        "success": "That's the habit. You saw the threat and stopped it.",
+        "wrong": "Not that one. Find a move that guards f7 and brings a new piece into the game."
+      }
+    },
+    {
+      "say": "Knight f6 is my favorite: it blocks the queen and brings a piece into the game. Two jobs, one move."
+    },
+    {
+      "say": "That's the Traffic Light. Red, yellow, green, every move. In your games, tap Think and I'll go through it with you."
+    },
+    {
+      "say": "And when something goes wrong in a game, I'll save the position for practice. Your mistakes become your puzzles. Let's get started!"
+    }
+  ]
+}

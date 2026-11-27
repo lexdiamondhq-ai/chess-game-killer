@@ -1,0 +1,52 @@
+{
+  "id": "pins",
+  "title": "Pins",
+  "subtitle": "Freeze a piece in front of a bigger one",
+  "skill": "pins",
+  "steps": [
+    {
+      "fen": "r1bqkbnr/ppp2ppp/2np4/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 4",
+      "say": "A pin freezes a piece. Black's knight on c6 can't move, because then your bishop would be attacking the king.",
+      "arrows": [
+        {
+          "from": "b5",
+          "to": "e8",
+          "color": "yellow",
+          "dashed": true
+        }
+      ],
+      "marks": [
+        {
+          "square": "c6",
+          "color": "yellow"
+        }
+      ]
+    },
+    {
+      "say": "When the piece behind is the king, moving is against the rules. When it's the queen or a rook, moving is allowed, but it costs them."
+    },
+    {
+      "fen": "rnb1kbnr/ppp1pppp/2q5/8/8/2N5/PPPP1PPP/R1BQKBNR w KQkq - 2 4",
+      "say": "Here Black's queen went to c6. Look at the diagonal from the queen to the king.",
+      "task": {
+        "type": "move",
+        "prompt": "Pin the queen to the king and win her.",
+        "solution": [
+          "f1b5"
+        ],
+        "hint": "Your bishop can attack the queen from b5, and your knight guards that square.",
+        "success": "Pinned! The queen can't step away without exposing the king."
+      }
+    },
+    {
+      "say": "The best Black can do is give the queen for your bishop.",
+      "moves": [
+        "c6b5",
+        "c3b5"
+      ]
+    },
+    {
+      "say": "Look for their pieces lined up with their king or queen. If you can attack the front one, you might have a pin."
+    }
+  ]
+}

@@ -86,44 +86,7 @@ private fun Page(title: String, tag: String, content: @Composable ColumnScope.()
 @Composable
 fun LearnPage(actions: HomeActions) {
     Page("Learn", "page-learn") {
-        SectionTitle("With Coach Leo")
-        Column(Modifier.padding(horizontal = 16.dp).fillMaxWidth().card(glow = Palette.teal), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                JewelTile(Jewel.JADE) { TabIcon(TabKind.LEARN, JewelGold, Modifier.size(26.dp)) }
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("COACH LEO", style = Type.small.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, color = Palette.teal))
-                    Text("Talk any position through", style = Type.title.copy(fontSize = 20.sp, fontWeight = FontWeight.Normal))
-                }
-            }
-            Text(
-                "Set up a board or snap a photo of one, then ask Leo why a move works. He answers out loud and draws on the board.",
-                style = Type.small.copy(fontSize = 13.sp),
-            )
-            GoldButton("Ask Leo", modifier = Modifier.fillMaxWidth().testTag("learn-leo")) { actions.askLeo() }
-        }
-        SectionTitle("Coming to Android")
-        Column(Modifier.padding(horizontal = 16.dp).fillMaxWidth().card(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(
-                "These are on the iPhone and on their way here:",
-                style = Type.small.copy(fontSize = 13.sp),
-            )
-            for ((name, what) in listOf(
-                "The Gilded Vine" to "Lessons from Pawn to King",
-                "Today's Move" to "One position a day, with a streak",
-                "Puzzles" to "Tactics at your level",
-                "Your Chess DNA" to "Your style, named from your games",
-            )) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(6.dp).clip(RoundedCornerShape(50)).background(Palette.gold))
-                    Spacer(Modifier.width(10.dp))
-                    Column {
-                        Text(name, style = Type.heading.copy(fontSize = 17.sp))
-                        Text(what, style = Type.small.copy(fontSize = 12.5.sp))
-                    }
-                }
-            }
-        }
+        com.chessgamekiller.app.learn.LearnTab(open = actions.learn, askLeo = actions.askLeo)
     }
 }
 

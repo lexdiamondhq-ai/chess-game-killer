@@ -83,6 +83,8 @@ class HomeActions(
     val takePhoto: () -> Unit,
     val askLeo: () -> Unit,
     val replay: (ClassicGame) -> Unit,
+    /** Opens a Learn page: today, daily, vine, lessons, puzzles, dna, lesson:<id>... */
+    val learn: (String) -> Unit = {},
 )
 
 /**
@@ -192,6 +194,7 @@ private fun Hairline() {
 /** The page that sits over the board: Next game, then For today. */
 @Composable
 private fun TodaySheet(day: ClassicGame?, actions: HomeActions, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
     val shape = RoundedCornerShape(topStart = 34.dp, topEnd = 34.dp)
     Column(
         modifier
@@ -224,6 +227,27 @@ private fun TodaySheet(day: ClassicGame?, actions: HomeActions, modifier: Modifi
                 accent = Palette.violet, stone = Jewel.AMETHYST, modifier = Modifier.weight(1f).testTag("home-scan"),
                 icon = { ScanGlyph(JewelGold, Modifier.size(26.dp)) },
                 onClick = actions.scanPhoto,
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        // Today's Move and today's training, as the iPhone's For today square.
+        val library = remember { com.chessgamekiller.app.learn.Library.get(context) }
+        val puzzle = remember { library.dailyPuzzle() }
+        val played = com.chessgamekiller.app.learn.Training.playedDailyToday
+        Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Tile(
+                eyebrow = "Today's Move", title = if (played) "Played today" else (puzzle?.difficulty ?: "Today"),
+                detail = if (played) "Next one tomorrow" else (puzzle?.headline ?: "One move a day"),
+                accent = Palette.rose, stone = Jewel.RUBY, modifier = Modifier.weight(1f).testTag("tile-daily"),
+                icon = { Text("♚", fontSize = 22.sp, color = JewelGold) },
+                onClick = { actions.learn("daily") },
+            )
+            Tile(
+                eyebrow = "Learn", title = if (com.chessgamekiller.app.learn.Training.trainedToday) "Trained today" else "Today's training",
+                detail = "Lessons and puzzles with Leo",
+                accent = Palette.gold, stone = Jewel.AMBER, modifier = Modifier.weight(1f).testTag("tile-train"),
+                icon = { TabIcon(TabKind.LEARN, JewelGold, Modifier.size(26.dp)) },
+                onClick = { actions.learn("today") },
             )
         }
         Spacer(Modifier.navigationBarsPadding().height(120.dp))

@@ -44,6 +44,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Progress.load(this)
+        com.chessgamekiller.app.learn.Training.load(this)
+        com.chessgamekiller.app.learn.Dna.load(this)
         enableEdgeToEdge()
         setContent {
             val dark = when (Progress.appearance) {
@@ -76,6 +78,7 @@ fun App() {
     var replayId by rememberSaveable { mutableStateOf("") }
     var optionsFor by rememberSaveable { mutableStateOf<String?>(null) }
     var choosingAnalyze by rememberSaveable { mutableStateOf(false) }
+    var learnRoute by rememberSaveable { mutableStateOf("today") }
 
     fun play(rival: Rival) {
         rivalName = rival.name
@@ -108,6 +111,14 @@ fun App() {
                 onAnalyze = { fen -> analyze(AnalyzeStart.POSITION, fen, "replay") },
             )
         }
+        if (screen == "learn" || (screen == "analyze" && analyzeFrom == "learn")) {
+            com.chessgamekiller.app.learn.LearnHost(
+                start = learnRoute,
+                onExit = { screen = "home" },
+                onPlay = ::play,
+                onAskLeo = { analyze(AnalyzeStart.POSITION, from = "learn") },
+            )
+        }
         if (screen == "analyze") {
             AnalyzeScreen(
                 start = analyzeStart,
@@ -127,6 +138,7 @@ fun App() {
                     takePhoto = { analyze(AnalyzeStart.TAKE_PHOTO) },
                     askLeo = { analyze(AnalyzeStart.POSITION) },
                     replay = { replayId = it.id; screen = "replay" },
+                    learn = { learnRoute = it; screen = "learn" },
                 ),
             )
         }

@@ -75,14 +75,21 @@ object Progress {
         rating = (now + k * (score - expected)).roundToInt().coerceIn(100, 3200)
         games += 1
         if (score >= 1.0) { wins += 1; beaten = beaten + rival.name }
+        prefs.edit()
+            .putInt("rating", rating!!).putInt("games", games).putInt("wins", wins)
+            .putStringSet("beaten", beaten)
+            .apply()
+        markActiveDay()
+    }
+
+    /** A game, a lesson, a session or Today's Move keeps the streak: one run of days for the whole app. */
+    fun markActiveDay() {
+        if (!::prefs.isInitialized) return
         val today = LocalDate.now().toEpochDay()
         val last = prefs.getLong("lastDay", -1)
         val run = prefs.getInt("run", 0)
         val newRun = when (today - last) { 0L -> run.coerceAtLeast(1); 1L -> run + 1; else -> 1 }
-        prefs.edit()
-            .putInt("rating", rating!!).putInt("games", games).putInt("wins", wins)
-            .putStringSet("beaten", beaten).putLong("lastDay", today).putInt("run", newRun)
-            .apply()
+        prefs.edit().putLong("lastDay", today).putInt("run", newRun).apply()
         streak = newRun
     }
 
