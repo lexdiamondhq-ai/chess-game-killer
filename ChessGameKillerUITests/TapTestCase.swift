@@ -10,6 +10,9 @@ import XCTest
 /// A failure says what was on the screen at that moment, so the log alone explains it.
 class TapTestCase: XCTestCase {
     private(set) var app = XCUIApplication()
+    private var screenFrame = CGRect.zero
+    /// The newest tap and where it landed, for a failure to say.
+    private var lastTap = "none yet"
 
     /// How long a screen has to arrive. CI's simulator is slow, and a screen that never comes is the failure.
     static let patience: TimeInterval = 30
@@ -25,6 +28,8 @@ class TapTestCase: XCTestCase {
         fresh.launchArguments = ["-welcomeSeen", "YES", "-introFilmSeen", "YES", "-tipsOff", "YES"] + arguments
         fresh.launch()
         app = fresh
+        screenFrame = .zero
+        lastTap = "none yet"
     }
 
     /// A player with Premium, and one without it, whatever the simulator's account says.
@@ -125,9 +130,9 @@ class TapTestCase: XCTestCase {
             Thread.sleep(forTimeInterval: 0.3)
             found = touchable(matches)
         }
+        var moves = 0
         if scrolls {
             // Further down the page first (rows in a lazy grid don't exist until they are near), then back up.
-            var moves = 0
             while found == nil, moves < 8 {
                 drag(from: 0.78, to: 0.30)
                 moves += 1
@@ -139,15 +144,78 @@ class TapTestCase: XCTestCase {
                 found = touchable(matches)
             }
         }
+        // What a drag brought into reach is first brought to rest, clear of the bottom edge.
+        if moves > 0, let reached = found {
+            found = rested(matches, reached, name, at: spot)
+        }
         guard let found else {
             fail("\(name) can't be touched", file: file, line: line)
             return
         }
+        lastTap = "\(name) \(place(found.frame, spot))"
         if let spot {
             found.coordinate(withNormalizedOffset: spot).tap()
         } else {
             found.tap()
         }
+    }
+
+    /// A row that a drag brought into reach can be touched while it only peeps over the bottom
+    /// edge of the screen, and while the page is still gliding. A tap on the edge strip (the Home
+    /// indicator's) or on a moving page may open nothing, with nothing wrong in the app. So the
+    /// row is brought up clear of the strip, as a thumb would bring it, and the page is left to
+    /// stop. Each lift is written down ("TAPNOTE"), so the log says when it was needed.
+    /// Nil when the row can't be touched any more.
+    private func rested(_ matches: XCUIElementQuery, _ reached: XCUIElement, _ name: String,
+                        at spot: CGVector?) -> XCUIElement? {
+        let screen = screenRect
+        guard screen.height > 200 else { return reached }
+        let strip = screen.maxY - screen.height * 0.07
+        var element = reached
+        var frame = reached.frame
+        var lifts = 0
+        while lifts < 2, tapHeight(frame, spot) > strip {
+            print("TAPNOTE Lifted \(name): its tap would land \(place(frame, spot)), its frame \(frame)")
+            // Up by what hangs under the strip's line, and a little more.
+            let lift = min(max(frame.maxY - strip + 16, 48), screen.height * 0.4)
+            drag(from: 0.62, to: 0.62 - lift / screen.height)
+            lifts += 1
+            guard let again = waitTouchable(matches, patience: 3) else { return nil }
+            element = again
+            let moved = again.frame
+            if moved == frame { break } // The page is at its end: the row goes no higher.
+            frame = moved
+        }
+        // Still, when two looks in a row find it in the same place.
+        for _ in 0..<8 {
+            Thread.sleep(forTimeInterval: 0.25)
+            guard element.exists else { return waitTouchable(matches, patience: 3) }
+            let now = element.frame
+            if now == frame { break }
+            frame = now
+        }
+        return element
+    }
+
+    /// How far down the screen a tap on something with this frame lands: the spot asked for, or
+    /// the middle of the part of it that is on the screen.
+    private func tapHeight(_ frame: CGRect, _ spot: CGVector?) -> CGFloat {
+        if let spot { return frame.minY + frame.height * spot.dy }
+        let seen = frame.intersection(screenRect)
+        return seen.isNull ? frame.midY : seen.midY
+    }
+
+    /// Where a tap lands, in words for the log: "at 201,849 on a 402x874 screen".
+    private func place(_ frame: CGRect, _ spot: CGVector?) -> String {
+        let across = frame.minX + frame.width * (spot?.dx ?? 0.5)
+        let screen = screenRect
+        return "at \(Int(across)),\(Int(tapHeight(frame, spot))) on a \(Int(screen.width))x\(Int(screen.height)) screen"
+    }
+
+    /// The screen, read once for each launch.
+    private var screenRect: CGRect {
+        if screenFrame.isEmpty { screenFrame = app.frame }
+        return screenFrame
     }
 
     /// The first match a finger could reach: on the screen, with nothing over it.
@@ -287,9 +355,10 @@ class TapTestCase: XCTestCase {
 
     // MARK: Failing
 
-    /// Fails with what is on the screen, on one line, so the log says why without a second run.
+    /// Fails with the newest tap and what is on the screen, on one line, so the log says why
+    /// without a second run.
     func fail(_ message: String, file: StaticString = #filePath, line: UInt = #line) {
-        XCTFail("\(message). ON SCREEN: \(screen())", file: file, line: line)
+        XCTFail("\(message). LAST TAP: \(lastTap). ON SCREEN: \(screen())", file: file, line: line)
     }
 
     /// Prints what is on the screen without failing, on a line the CI log repeats ("TAPNOTE"):

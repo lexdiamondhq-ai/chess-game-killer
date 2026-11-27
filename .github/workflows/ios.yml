@@ -374,7 +374,7 @@ jobs:
           echo "On macOS $(sw_vers -productVersion), $(xcodebuild -version | tr '\n' ' ')"
           [ -f taps.log ] || { echo "No tap log"; exit 0; }
           # What a test wrote down about a screen without failing (TapTestCase.note).
-          grep -E "^TAPNOTE" taps.log | cut -c1-3600 | head -12 || true
+          grep -E "^TAPNOTE" taps.log | cut -c1-3600 | head -30 || true
           # Each test, with how long it took.
           grep -E "Test Case .* (passed|failed|skipped)" taps.log | head -90 || true
           # A failure says what was on the screen (TapTestCase.fail).
