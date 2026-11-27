@@ -119,7 +119,8 @@ class TapTestCase: XCTestCase {
     // MARK: Tapping
 
     /// Scrolls the page until one of the matches can be touched, then touches it.
-    /// `scrolls` off waits for it where it is (the Home's own bar never needs a scroll).
+    /// `scrolls` off waits for it where it is (the Home's own bar never needs a scroll); on, the
+    /// page may be dragged, so it is for rows on a page that scrolls.
     /// `at` touches a spot inside it instead of its middle: (0.9, 0.5) is near its right edge.
     func tap(_ matches: XCUIElementQuery, _ name: String, scrolls: Bool = true, at spot: CGVector? = nil,
              file: StaticString = #filePath, line: UInt = #line) {
@@ -130,23 +131,12 @@ class TapTestCase: XCTestCase {
             Thread.sleep(forTimeInterval: 0.3)
             found = touchable(matches)
         }
-        var moves = 0
         if scrolls {
-            // Further down the page first (rows in a lazy grid don't exist until they are near), then back up.
-            while found == nil, moves < 8 {
-                drag(from: 0.78, to: 0.30)
-                moves += 1
-                found = touchable(matches)
+            if found == nil { found = hunted(matches) }
+            // What sits in the strip at the top or the bottom of the screen is first brought inside.
+            if let reached = found {
+                found = broughtIn(matches, reached, name, at: spot) ?? hunted(matches)
             }
-            while found == nil, moves < 16 {
-                drag(from: 0.30, to: 0.78)
-                moves += 1
-                found = touchable(matches)
-            }
-        }
-        // What a drag brought into reach is first brought to rest, clear of the bottom edge.
-        if moves > 0, let reached = found {
-            found = rested(matches, reached, name, at: spot)
         }
         guard let found else {
             fail("\(name) can't be touched", file: file, line: line)
@@ -160,48 +150,83 @@ class TapTestCase: XCTestCase {
         }
     }
 
-    /// A row that a drag brought into reach can be touched while it only peeps over the bottom
-    /// edge of the screen, and while the page is still gliding. A tap on the edge strip (the Home
-    /// indicator's) or on a moving page may open nothing, with nothing wrong in the app. So the
-    /// row is brought up clear of the strip, as a thumb would bring it, and the page is left to
-    /// stop. Each lift and each wait for a moving page is written down ("TAPNOTE"), so the log
-    /// says when either was needed.
-    /// Nil when the row can't be touched any more.
-    private func rested(_ matches: XCUIElementQuery, _ reached: XCUIElement, _ name: String,
-                        at spot: CGVector?) -> XCUIElement? {
+    /// Drags the page until one of the matches can be touched: further down the page first (rows
+    /// in a lazy grid don't exist until they are near), then back up.
+    private func hunted(_ matches: XCUIElementQuery) -> XCUIElement? {
+        for move in 0..<16 {
+            if move < 8 {
+                drag(from: 0.78, to: 0.30)
+            } else {
+                drag(from: 0.30, to: 0.78)
+            }
+            if let found = touchable(matches) { return found }
+        }
+        return nil
+    }
+
+    /// How much of the screen's height, at its top and at its bottom, a tap should stay out of:
+    /// the status bar and the page's own bar, and the Home indicator's strip.
+    static let topStrip: CGFloat = 0.15
+    static let bottomStrip: CGFloat = 0.07
+
+    /// A row can count as touchable while it sits under the status bar at the top of the screen,
+    /// or over the Home indicator at the bottom, and a tap there may never reach it: a tap on
+    /// "Practice" on Chess DNA landed 42 points from the top and opened nothing, with nothing
+    /// wrong in the app (2026-11-27; `EdgeTapTests` parks a row there on purpose). So the page is
+    /// moved until the tap lands in the middle part of the screen, as a thumb would move it. Each
+    /// move is written down ("TAPNOTE"), so the log says when it was needed. Something pinned in a
+    /// strip does not move, and is tapped where it is. Nil when the row can't be touched any more.
+    private func broughtIn(_ matches: XCUIElementQuery, _ reached: XCUIElement, _ name: String,
+                           at spot: CGVector?) -> XCUIElement? {
         let screen = screenRect
         guard screen.height > 200 else { return reached }
-        let strip = screen.maxY - screen.height * 0.07
+        let top = screen.minY + screen.height * Self.topStrip
+        let bottom = screen.maxY - screen.height * Self.bottomStrip
         var element = reached
         var frame = reached.frame
-        var lifts = 0
-        while lifts < 2, tapHeight(frame, spot) > strip {
-            print("TAPNOTE Lifted \(name): its tap would land \(place(frame, spot)), its frame \(frame)")
-            // Up by what hangs under the strip's line, and a little more.
-            let lift = min(max(frame.maxY - strip + 16, 48), screen.height * 0.4)
-            drag(from: 0.62, to: 0.62 - lift / screen.height)
-            lifts += 1
+        for _ in 0..<3 {
+            let height = tapHeight(frame, spot)
+            // How far the page has to go: down the screen (+) from under the top, up (-) from the bottom.
+            let need: CGFloat
+            if height < top {
+                need = max(top - frame.minY, (top - height) * 2)
+            } else if height > bottom {
+                need = -max(frame.maxY - bottom, (height - bottom) * 2)
+            } else {
+                break
+            }
+            print("TAPNOTE Moved the page for \(name): its tap would land \(place(frame, spot)), its frame \(frame)")
+            let far = min(max(abs(need) + 16, 48), screen.height * 0.4)
+            let start: CGFloat = need > 0 ? 0.38 : 0.62
+            drag(from: start, to: start + (need > 0 ? far : -far) / screen.height)
             guard let again = waitTouchable(matches, patience: 3) else { return nil }
             element = again
             let moved = again.frame
-            if moved == frame { break } // The page is at its end: the row goes no higher.
+            if moved == frame { break } // Pinned, or the page is at its end: it goes no further.
             frame = moved
-        }
-        // Still, when two looks in a row find it in the same place.
-        var glides = 0
-        for _ in 0..<8 {
-            Thread.sleep(forTimeInterval: 0.25)
-            guard element.exists else { return waitTouchable(matches, patience: 3) }
-            let now = element.frame
-            if now == frame { break }
-            glides += 1
-            frame = now
-        }
-        if glides > 0 {
-            print("TAPNOTE Waited for \(name): the page was still moving when it came into reach (\(glides) looks)")
         }
         return element
     }
+
+    /// Slides the page until this edge of the element rests at this height on the screen, give
+    /// or take `slack`. False when it could not be put there. For the helper's own checks.
+    func park(_ element: XCUIElement, _ edge: (CGRect) -> CGFloat, at target: CGFloat, slack: CGFloat) -> Bool {
+        let screen = screenRect
+        guard screen.height > 200 else { return false }
+        for _ in 0..<12 {
+            guard element.exists else { return false }
+            // Too low on the screen (+): the page goes up. Too high (-): it comes down.
+            let off = edge(element.frame) - target
+            if abs(off) <= slack { return true }
+            let far = min(max(abs(off), 24), screen.height * 0.35)
+            let start: CGFloat = off > 0 ? 0.7 : 0.3
+            drag(from: start, to: start + (off > 0 ? -far : far) / screen.height)
+        }
+        return false
+    }
+
+    /// The screen's height, in points.
+    var screenHeight: CGFloat { screenRect.height }
 
     /// How far down the screen a tap on something with this frame lands: the spot asked for, or
     /// the middle of the part of it that is on the screen.
