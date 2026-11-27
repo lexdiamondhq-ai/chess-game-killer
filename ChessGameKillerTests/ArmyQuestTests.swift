@@ -104,8 +104,6 @@ final class ArmyQuestTests: XCTestCase {
                 let doors: [HomeShortcut] = HomeShortcutKind.rooms.map { HomeShortcut(kind: $0, action: {}) }
                 let page = VStack(spacing: 0) {
                     Spacer()
-                    HomeAuroraSignOff(palette: palette)
-                    Spacer()
                     HomeShortcutsPanel(tone: tone, next: .club, underWay: false, shortcuts: doors,
                                        playRival: { _ in }, close: {}, asRooms: true,
                                        army: card, armyNote: HomeAuroraArmy.note(army))
