@@ -56,7 +56,8 @@ struct ChessDNACard: View {
         .trainingCard(theme, tint: theme.trainingAccent)
         .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isButton)
+        // A button only when it opens something: a free player's card is the card alone.
+        .accessibilityAddTraits(opens ? .isButton : [])
     }
 }
 

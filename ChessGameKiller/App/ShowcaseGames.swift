@@ -5,11 +5,11 @@ import Foundation
 /// (`-showcaseDNA YES`): attacking wins as White, the older ones with a slip or two, and three
 /// quiet games as Black. Enough for a style, a strength with games to show and something to
 /// work on. Kept in memory and never saved; a normal launch never passes it.
+/// `-showcaseMistakes YES` saves the slips as positions to fix as well.
 extension Showcase {
     @MainActor
     static func vault(_ defaults: UserDefaults = .standard) -> GameVault? {
-        guard let asked = defaults.string(forKey: "showcaseDNA")?.lowercased(),
-              ["yes", "true", "1"].contains(asked) else { return nil }
+        guard asked("showcaseDNA", defaults) else { return nil }
         let slip: [Int: MoveReview.Grade] = [21: .mistake, 25: .blunder]
         var games: [SavedGame] = []
         for day in 0..<8 {
@@ -21,6 +21,33 @@ extension Showcase {
                               daysAgo: Double(day * 2 + 1), grades: [:]))
         }
         return GameVault(games: games.sorted { $0.date > $1.date })
+    }
+
+    /// The same player's training with the slips from those games saved to fix
+    /// (`-showcaseMistakes YES`, with `-showcaseDNA YES`), so "Fix your mistakes" and practice
+    /// from the player's own positions have something to open. Kept in memory and never saved.
+    @MainActor
+    static func training(_ defaults: UserDefaults = .standard) -> TrainingStore? {
+        guard asked("showcaseMistakes", defaults), let sample = vault(defaults) else { return nil }
+        var progress = TrainingProgress()
+        var saved = Set<String>()
+        for game in sample.games {
+            for moment in game.moments {
+                guard let grade = MoveReview.Grade(rawValue: moment.grade), CoachReport.weight(of: grade) != nil,
+                      saved.insert(moment.fenBefore).inserted else { continue }
+                // Castling was there to play in both slips, and either one is a calmer move.
+                progress.mistakes.append(GameMistake(id: "showcase-\(saved.count)", fen: moment.fenBefore, best: "e1g1",
+                                                     played: moment.uci, skill: "", title: "",
+                                                     created: game.date, due: game.date))
+            }
+        }
+        return TrainingStore(library: TrainingLibrary.shared, progress: progress)
+    }
+
+    /// A YES launch argument. Arguments arrive as text, which a Bool setting won't read.
+    private static func asked(_ key: String, _ defaults: UserDefaults) -> Bool {
+        guard let text = defaults.string(forKey: key)?.lowercased() else { return false }
+        return ["yes", "true", "1"].contains(text)
     }
 
     /// The Fried Liver: a knight given up on f7 for an attack on the king, checks all the way.

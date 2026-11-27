@@ -27,6 +27,23 @@ class TapTestCase: XCTestCase {
         app = fresh
     }
 
+    /// A player with Premium, and one without it, whatever the simulator's account says.
+    static let premium = ["-premium", "YES"]
+    static let free = ["-premium", "NO"]
+
+    /// Learn, as the Home's tab opens it (CI's pictures open it the same way, with `-showcaseOpen learn`).
+    func openLearn(_ arguments: [String] = []) {
+        launch(["-showcaseOpen", "learn"] + arguments)
+        expectPage("Learn", after: "Opening Learn")
+    }
+
+    /// One of Learn's six doors, opened by its tile on Learn.
+    func openDoor(_ door: String, _ arguments: [String] = []) {
+        openLearn(arguments)
+        tap(buttons(startingWith: door + "."), "The \(door) door")
+        expectPage(door, after: "Tapping the \(door) door")
+    }
+
     // MARK: Finding
 
     // The Home stays in the accessibility tree under a screen opened over it, so a search can
@@ -53,6 +70,16 @@ class TapTestCase: XCTestCase {
         app.buttons.matching(NSPredicate(format: "label CONTAINS %@", words))
     }
 
+    /// Texts with exactly this label.
+    func texts(_ label: String) -> XCUIElementQuery {
+        app.staticTexts.matching(Self.named(label))
+    }
+
+    /// Anything with exactly this label, whatever kind of element SwiftUI made it (a menu's button, say).
+    func anythings(_ label: String) -> XCUIElementQuery {
+        app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", label))
+    }
+
     /// The navigation bar of the page with this title.
     func bar(_ title: String) -> XCUIElement {
         app.navigationBars.matching(Self.named(title)).firstMatch
@@ -72,7 +99,8 @@ class TapTestCase: XCTestCase {
 
     /// Scrolls the page until one of the matches can be touched, then touches it.
     /// `scrolls` off waits for it where it is (the Home's own bar never needs a scroll).
-    func tap(_ matches: XCUIElementQuery, _ name: String, scrolls: Bool = true,
+    /// `at` touches a spot inside it instead of its middle: (0.9, 0.5) is near its right edge.
+    func tap(_ matches: XCUIElementQuery, _ name: String, scrolls: Bool = true, at spot: CGVector? = nil,
              file: StaticString = #filePath, line: UInt = #line) {
         // A screen that is still arriving gets a moment before anything is dragged.
         let settled = Date().addingTimeInterval(scrolls ? 1.5 : Self.patience)
@@ -99,12 +127,26 @@ class TapTestCase: XCTestCase {
             fail("\(name) can't be touched", file: file, line: line)
             return
         }
-        found.tap()
+        if let spot {
+            found.coordinate(withNormalizedOffset: spot).tap()
+        } else {
+            found.tap()
+        }
     }
 
     /// The first match a finger could reach: on the screen, with nothing over it.
-    private func touchable(_ matches: XCUIElementQuery) -> XCUIElement? {
+    func touchable(_ matches: XCUIElementQuery) -> XCUIElement? {
         matches.allElementsBoundByIndex.first { $0.isHittable }
+    }
+
+    /// Waits for a match a finger could reach; nil when none came.
+    func waitTouchable(_ matches: XCUIElementQuery, patience: TimeInterval = TapTestCase.patience) -> XCUIElement? {
+        let deadline = Date().addingTimeInterval(patience)
+        repeat {
+            if let found = touchable(matches) { return found }
+            Thread.sleep(forTimeInterval: 0.4)
+        } while Date() < deadline
+        return nil
     }
 
     /// A slow drag up or down the middle of the screen, so the page scrolls without a fling.
@@ -147,6 +189,14 @@ class TapTestCase: XCTestCase {
         }
     }
 
+    /// Fails unless one of the matches arrives where a finger could reach it.
+    func expectTouchable(_ matches: XCUIElementQuery, _ message: String, patience: TimeInterval = TapTestCase.patience,
+                         file: StaticString = #filePath, line: UInt = #line) {
+        if waitTouchable(matches, patience: patience) == nil {
+            fail(message, file: file, line: line)
+        }
+    }
+
     /// Fails unless one of these buttons arrives.
     func expectButton(among labels: [String], _ message: String, patience: TimeInterval = TapTestCase.patience,
                       file: StaticString = #filePath, line: UInt = #line) {
@@ -170,6 +220,45 @@ class TapTestCase: XCTestCase {
         expectButton(among: ["Next move", "Previous move"], "\(action) did not open the game", file: file, line: line)
     }
 
+    // MARK: Rooms, sessions and the Premium offer
+
+    /// Fails unless a training room opened over the page: a Close button that can be touched,
+    /// and the room's name at its top when one is given (`RoomHeader`).
+    func expectRoom(_ title: String? = nil, after action: String, patience: TimeInterval = TapTestCase.patience,
+                    file: StaticString = #filePath, line: UInt = #line) {
+        expectTouchable(buttons("Close"), "\(action) did not open its room", patience: patience, file: file, line: line)
+        if let title, !texts(title).firstMatch.waitForExistence(timeout: 5) {
+            fail("\(action) opened something other than \(title)", file: file, line: line)
+        }
+    }
+
+    /// Fails unless the Premium offer came up: its plans, and a Close button that can be touched.
+    func expectPremiumOffer(after action: String, file: StaticString = #filePath, line: UInt = #line) {
+        expectTouchable(buttons("Close"), "\(action) did not open the Premium offer", file: file, line: line)
+        if !buttons(startingWith: "Yearly").firstMatch.waitForExistence(timeout: 5) {
+            fail("\(action) opened something other than the Premium offer", file: file, line: line)
+        }
+    }
+
+    /// Touches what closes a screen, then waits for what opened it to be back under a finger.
+    func close(_ closer: XCUIElementQuery, backTo opener: XCUIElementQuery, _ name: String,
+               file: StaticString = #filePath, line: UInt = #line) {
+        tap(closer, "The way out of \(name)", scrolls: false, file: file, line: line)
+        expectTouchable(opener, "Closing \(name) did not come back to where it was opened", file: file, line: line)
+    }
+
+    /// Ends the session that is open (its lesson first, when it starts with one), then waits for
+    /// what opened it to be back under a finger.
+    func endSession(backTo opener: XCUIElementQuery, _ name: String, file: StaticString = #filePath, line: UInt = #line) {
+        let ways = app.buttons.matching(NSPredicate(format: "label == 'End session' OR label == 'Close lesson' OR label == 'Close'"))
+        for attempt in 0..<3 {
+            if attempt > 0, waitTouchable(opener, patience: 4) != nil { return }
+            guard let way = waitTouchable(ways, patience: attempt == 0 ? Self.patience : 4) else { break }
+            way.tap()
+        }
+        expectTouchable(opener, "Ending \(name) did not come back to where it was opened", file: file, line: line)
+    }
+
     /// Waits for the element to leave the screen; false when it is still there at the end.
     func leaves(_ element: XCUIElement) -> Bool {
         let deadline = Date().addingTimeInterval(Self.patience)
@@ -187,11 +276,33 @@ class TapTestCase: XCTestCase {
         XCTFail("\(message). ON SCREEN: \(screen())", file: file, line: line)
     }
 
+    /// Prints what is on the screen without failing, on a line the CI log repeats ("TAPNOTE"):
+    /// how a new test learns the words on a screen it can't see.
+    func note(_ title: String) {
+        let words = "TAPNOTE \(title): \(screen())"
+        print(words)
+        // An activity's name is written to the test log as well, should the print not be.
+        XCTContext.runActivity(named: words) { _ in }
+    }
+
+    /// The bars, then the newest buttons and texts in the tree, from one snapshot. The Home stays
+    /// in the tree under a screen opened over it and comes first, so the last ones are the screen on top.
     private func screen() -> String {
-        let bars = app.navigationBars.allElementsBoundByIndex.map { $0.identifier }
-        let buttons = app.buttons.allElementsBoundByIndex.prefix(30).map { $0.label }
-        let texts = app.staticTexts.allElementsBoundByIndex.prefix(30).map { $0.label }
-        let all = "bars \(bars) | buttons \(buttons) | texts \(texts)"
-        return String(all.replacingOccurrences(of: "\n", with: " ").prefix(2_400))
+        guard let tree = try? app.snapshot() else { return "the screen could not be read" }
+        var bars: [String] = []
+        var buttons: [String] = []
+        var texts: [String] = []
+        func walk(_ node: XCUIElementSnapshot) {
+            switch node.elementType {
+            case .navigationBar: bars.append(node.identifier)
+            case .button where !node.label.isEmpty: buttons.append(node.label)
+            case .staticText where !node.label.isEmpty: texts.append(node.label)
+            default: break
+            }
+            node.children.forEach(walk)
+        }
+        walk(tree)
+        let all = "bars \(bars) | buttons \(Array(buttons.suffix(45))) | texts \(Array(texts.suffix(30)))"
+        return String(all.replacingOccurrences(of: "\n", with: " ").prefix(3_200))
     }
 }
