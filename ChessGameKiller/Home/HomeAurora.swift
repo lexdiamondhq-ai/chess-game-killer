@@ -423,11 +423,8 @@ struct HomeAuroraView: View {
                 todayRows
             }
             .padding(.horizontal, 16)
-            // Your army moved to Rooms (Alex, 2026-11-24). A carved line still closes the page,
-            // and only as much room under it as the bottom bar needs when it comes back (Alex,
-            // 2026-11-12: "Too much bottom space here"; picked C, tighter with a carved sign-off).
-            HomeAuroraSignOff(palette: palette)
-                .padding(.top, 22)
+            // The page ends on For today: no carved sign-off under it (Alex, 2026-11-27: "Let's
+            // delete these"), only as much room as the bottom bar needs.
         }
         // A part that arrives after the page (the first read of your games, a friend's move)
         // eases in and the rest makes room, instead of the page jumping.
