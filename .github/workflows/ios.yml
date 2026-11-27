@@ -8,6 +8,8 @@ name: iOS build and tests
 #   "screenshots" label to the pull request, or run the workflow by hand.
 # - By hand, the tests' pictures can be drawn in Middle or Dark instead of Light (tone), and every
 #   picture printed across the logs of the "pictures" jobs, which run on Linux (pictures).
+# - By hand, a few tap tests can be run by name and nothing else (only): the short run for a
+#   tap test that is being fixed, before everything runs once more.
 on:
   push:
     branches: [main]
@@ -50,6 +52,10 @@ on:
         description: Run the tap tests
         type: boolean
         default: false
+      only:
+        description: Run only these tap tests and no other job, like "LearnTapTests/testTheVineOpens ChessDNATapTests" (spaces between)
+        type: string
+        default: ""
 
 concurrency:
   # A run by hand in another tone waits for nothing and replaces nothing.
@@ -62,7 +68,7 @@ jobs:
     # Alex builds on the newest Xcode, whose type checker gives up sooner on long
     # SwiftUI expressions. This build flags any expression slower than 150 ms.
     # It runs on main and by hand, not on every pull request push.
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && !inputs.only
     runs-on: macos-26
     timeout-minutes: 45
     steps:
@@ -106,7 +112,7 @@ jobs:
   build-and-test:
     # Pull requests and by hand. Adding a label other than "screenshots" starts no run.
     if: >-
-      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_dispatch' && !inputs.only) ||
       (github.event_name == 'pull_request' &&
        (github.event.action != 'labeled' || github.event.label.name == 'screenshots'))
     runs-on: macos-15
@@ -312,18 +318,14 @@ jobs:
     # vine on Learn did nothing when touched, 2026-11-27). These launch the app on the simulator
     # and tap what a player taps (ChessGameKillerUITests). They run beside the tests on a Mac
     # of their own, so a pull request waits no longer for them, and their log ends with their
-    # own results. On pull requests, and by hand when asked (taps).
+    # own results. On pull requests, and by hand when asked (taps, or only for a few by name).
     if: >-
-      (github.event_name == 'workflow_dispatch' && inputs.taps) ||
+      (github.event_name == 'workflow_dispatch' && (inputs.taps || inputs.only != '')) ||
       (github.event_name == 'pull_request' && github.event.action != 'labeled')
-    strategy:
-      # Each Mac finishes, whatever the other finds.
-      fail-fast: false
-      matrix:
-        # macos-26 has the Xcode Alex builds with and the newest iOS a runner offers; macos-15 is
-        # where the tests' pictures are drawn. Both, while the vine is looked into (2026-11-27).
-        mac: [macos-15, macos-26]
-    runs-on: ${{ matrix.mac }}
+    # The Mac with the Xcode the phone's build is made with and the newest iOS a runner offers:
+    # as near the phone as a runner gets. (No runner has the phone's own iOS.) The dead vine
+    # showed the same on macos-15, which is a quarter quicker, should the minutes matter more.
+    runs-on: macos-26
     timeout-minutes: 85
     steps:
       - uses: actions/checkout@v4
@@ -350,11 +352,17 @@ jobs:
       - name: Tap through the app
         # Stopped before the job is, so the next step can still say what ran.
         timeout-minutes: 75
+        env:
+          ONLY_TESTS: ${{ inputs.only }}
         run: |
+          # All of them, or the few asked for by name.
+          only=()
+          for name in $ONLY_TESTS; do only+=("-only-testing:ChessGameKillerUITests/$name"); done
           xcodebuild test \
             -project ChessGameKiller.xcodeproj \
             -scheme ChessGameKillerTaps \
             -destination "id=${{ steps.sim.outputs.udid }}" \
+            "${only[@]}" \
             -test-timeouts-enabled YES \
             -default-test-execution-time-allowance 300 \
             -maximum-test-execution-time-allowance 300 \
@@ -363,6 +371,7 @@ jobs:
         # Last in the log, whether the taps passed, failed or ran out of time.
         if: always()
         run: |
+          echo "On macOS $(sw_vers -productVersion), $(xcodebuild -version | tr '\n' ' ')"
           [ -f taps.log ] || { echo "No tap log"; exit 0; }
           # What a test wrote down about a screen without failing (TapTestCase.note).
           grep -E "^TAPNOTE" taps.log | cut -c1-3600 | head -12 || true
@@ -377,7 +386,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: tap-log-${{ matrix.mac }}
+          name: tap-log
           path: taps.log
           if-no-files-found: ignore
 
