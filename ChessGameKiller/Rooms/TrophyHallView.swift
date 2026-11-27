@@ -100,7 +100,9 @@ struct TrophyHallView: View {
         let beaten = records.rivals.filter { $0.beaten }.count
         return CastleCard(padding: 14) {
             VStack(spacing: 12) {
-                HStack(alignment: .bottom, spacing: 0) {
+                // Every coin the same size on one line, each in an equal fifth of the shelf
+                // (Alex, 2026-11-27: the coins grew rival by rival and the names ran together).
+                HStack(alignment: .top, spacing: 4) {
                     ForEach(records.rivals) { entry in
                         trophy(entry.level.rival, beaten: entry.beaten)
                     }
@@ -119,10 +121,12 @@ struct TrophyHallView: View {
         }
     }
 
+    /// One size for every rival's coin on the shelf.
+    static let coinSize: CGFloat = 50
+
     private func trophy(_ rival: Rival, beaten: Bool) -> some View {
-        let size: CGFloat = 40 + 4 * CGFloat(rival.level.rawValue)
-        return VStack(spacing: 5) {
-            RivalCoin(rival: rival, size: size)
+        VStack(spacing: 6) {
+            RivalCoin(rival: rival, size: Self.coinSize)
                 .saturation(beaten ? 1 : 0)
                 .brightness(beaten ? 0 : -0.35)
                 .padding(3)
@@ -133,14 +137,18 @@ struct TrophyHallView: View {
                             .shadow(color: CastleStyle.gold.opacity(0.6), radius: 6)
                     }
                 }
+            // One type size for every name: a long name wraps onto a second line (Ashen / King)
+            // instead of shrinking, and every name keeps room for two lines so the coins line up.
             Text(rival.shortName)
                 .font(.app(.caption2, weight: .semibold))
                 .foregroundStyle(beaten ? CastleStyle.ink : CastleStyle.ink2)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                .multilineTextAlignment(.center)
+                .lineLimit(2, reservesSpace: true)
+                .allowsTightening(true)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .top)
         .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("trophy-hall.rival")
         .accessibilityLabel(rival.name)
         .accessibilityValue(beaten ? "Beaten" : "Not beaten yet")
     }
@@ -229,11 +237,15 @@ struct TrophyHallView: View {
         return LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10),
                                    GridItem(.flexible())], spacing: 10) {
             ForEach(tiles, id: \.label) { tile in
+                // Every card the same height: the label always keeps room for two lines, so a
+                // one-line label ("Wins") sits in a card as tall as a two-line one (Alex, 2026-11-27).
                 CastleCard(padding: 12) {
                     VStack(alignment: .leading, spacing: 6) {
                         Image(systemName: tile.symbol)
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(CastleStyle.gold)
+                            // Glyphs are not all one height (a crown is shorter than a flame).
+                            .frame(height: 20, alignment: .leading)
                         Text(tile.value)
                             .font(.app(.title3, weight: .bold).monospacedDigit())
                             .foregroundStyle(CastleStyle.ink)
@@ -242,11 +254,13 @@ struct TrophyHallView: View {
                         Text(tile.label)
                             .font(.app(.caption2, weight: .medium))
                             .foregroundStyle(CastleStyle.ink2)
-                            .lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
+                            .lineLimit(2, reservesSpace: true)
+                            .minimumScaleFactor(0.8)
                     }
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
                 .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("trophy-hall.record")
             }
         }
     }
