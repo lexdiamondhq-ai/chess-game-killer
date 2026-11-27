@@ -116,7 +116,7 @@ struct GamesDoorView: View {
                 .trainingCard(theme)
         } else {
             DNAStrengthList(strengths: dna.strengths, theme: theme) { strength in
-                session = strength.theme.flatMap { puzzlePlan(PuzzleTheme.named($0)) }
+                start { strength.theme.flatMap { puzzlePlan(PuzzleTheme.named($0)) } }
             }
         }
     }
@@ -131,13 +131,22 @@ struct GamesDoorView: View {
             DNAWeakSpotList(spots: spots, theme: theme) { spot in
                 SessionPlan.ownPositions(for: spot, in: store.openMistakes).count
             } practice: { spot in
-                session = SessionPlan.practice(spot, mistakes: store.openMistakes, more: practicePlan(for: spot))
+                start { SessionPlan.practice(spot, mistakes: store.openMistakes, more: practicePlan(for: spot)) }
             }
             Text("Practice starts with your own positions from your games, then puzzles of the same kind.")
                 .font(.app(.footnote))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 4)
+        }
+    }
+
+    /// Opens a run of practice once the puzzles are in. They load as this page opens, so a
+    /// quick tap on Sharpen or Practice could come first, find nothing to play and do nothing.
+    private func start(_ plan: @escaping () -> SessionPlan?) {
+        Task {
+            await puzzles.load()
+            session = plan()
         }
     }
 

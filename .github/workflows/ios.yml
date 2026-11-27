@@ -14,6 +14,7 @@ on:
     paths:
       - "ChessGameKiller/**"
       - "ChessGameKillerTests/**"
+      - "ChessGameKillerUITests/**"
       - "ChessGameKillerWidget/**"
       - "Shared/**"
       - "Support/**"
@@ -24,6 +25,7 @@ on:
     paths:
       - "ChessGameKiller/**"
       - "ChessGameKillerTests/**"
+      - "ChessGameKillerUITests/**"
       - "ChessGameKillerWidget/**"
       - "Shared/**"
       - "Support/**"
@@ -131,6 +133,29 @@ jobs:
           mkdir -p snapshots
           echo "$DEVICES" | jq -r '.[] | select(.udid == "'"$UDID"'") | "\(.name) \(.rt)"' > snapshots/device.txt
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+      - name: Tap through the app
+        # The unit tests below draw each screen, and a picture can't tell whether a tap opens
+        # anything (the vine on Learn did nothing when touched, 2026-11-27). These launch the app
+        # on the simulator and tap it (ChessGameKillerUITests). They run first, so a dead tap is
+        # known in minutes, and the app is removed afterwards so the unit tests start clean.
+        run: |
+          status=0
+          xcodebuild test \
+            -project ChessGameKiller.xcodeproj \
+            -scheme ChessGameKillerTaps \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 240 \
+            -maximum-test-execution-time-allowance 240 \
+            CODE_SIGNING_ALLOWED=NO > taps.log 2>&1 || status=$?
+          grep -E "Test Case .* (passed|failed)" taps.log | head -60 || true
+          # A failure says what was on the screen (TapTestCase.fail).
+          grep -E "error:|\*\* " taps.log | cut -c1-3200 | head -40 || true
+          grep -E "Executed" taps.log | tail -3 || true
+          # How often a tap had to wait for the app's animations to settle (each wait is slow).
+          echo "Waits for animations: $(grep -c "App animations complete notification not received" taps.log || true)"
+          xcrun simctl uninstall "${{ steps.sim.outputs.udid }}" com.chessgamekiller.app 2>/dev/null || true
+          exit $status
       - name: Build and test
         run: |
           status=0
@@ -235,7 +260,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-log
-          path: build.log
+          path: |
+            build.log
+            taps.log
       - name: Upload screen pictures
         if: always()
         uses: actions/upload-artifact@v4
@@ -293,6 +320,13 @@ jobs:
         if: failure()
         # The pictures above can push the test results out of the log's tail, so they come again, last.
         run: |
+          # The tap tests first: what failed, what was on the screen, and how long each step took.
+          if [ -f taps.log ]; then
+            grep -E "Test Case .* (passed|failed)" taps.log | head -60 || true
+            grep -E "error:|\*\* " taps.log | cut -c1-3200 | head -40 || true
+            grep -E "Executed" taps.log | tail -3 || true
+            grep -E "App animations complete notification not received|Failed to|Timed out|exceeded" taps.log | head -20 || true
+          fi
           [ -f build.log ] || exit 0
           grep -E "error:|Test Case .* failed|\*\* " build.log | head -80 || true
           grep -E "Executed" build.log | tail -3 || true

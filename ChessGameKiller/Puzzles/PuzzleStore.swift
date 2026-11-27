@@ -58,6 +58,8 @@ final class PuzzleStore {
     private(set) var upNext: LichessPuzzle?
     /// The last puzzle served, so the next one picked is a different one even before it is played.
     @ObservationIgnored private var lastServed: String?
+    /// The pack being read, so everyone who asks meanwhile shares the one read.
+    @ObservationIgnored private var reading: Task<PuzzleLibrary?, Never>?
     /// Told about every rated puzzle recorded, for the daily streak (three solved make a day).
     @ObservationIgnored var onRated: ((Outcome) -> Void)?
 
@@ -84,11 +86,14 @@ final class PuzzleStore {
                            cycles: ProgressFile.read(PuzzleCycleFile.self, at: cyclesURL) ?? PuzzleCycleFile(), cyclesURL: cyclesURL)
     }
 
-    /// Reads the bundled pack off the main thread, once.
+    /// Reads the bundled pack off the main thread, once. A screen that asks while it is being
+    /// read waits for that same read (a tap on Sharpen can ask while its page's own read is under way).
     func load() async {
         guard library == nil else { return }
-        let loaded = await Task.detached(priority: .userInitiated) { PuzzleLibrary.bundled() }.value
-        library = loaded ?? PuzzleLibrary(puzzles: [])
+        let read = reading ?? Task.detached(priority: .userInitiated) { PuzzleLibrary.bundled() }
+        reading = read
+        let loaded = await read.value
+        if library == nil { library = loaded ?? PuzzleLibrary(puzzles: []) }
     }
 
     var theme: PuzzleTheme {
