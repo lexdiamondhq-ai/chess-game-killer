@@ -252,7 +252,7 @@ struct SessionIntro: View {
                 CoachAvatar(theme: theme, size: 84)
                 VStack(spacing: 6) {
                     Text(plan.title)
-                        .font(.app(.title, weight: .bold))
+                        .font(.display(.title, weight: .semibold))
                         .multilineTextAlignment(.center)
                     if let focus = plan.focus {
                         Label(focus.title, systemImage: focus.symbol)
@@ -348,7 +348,7 @@ struct SessionSummary: View {
                 .padding(.top, 28)
 
                 Text(headline)
-                    .font(.app(.title2, weight: .bold))
+                    .font(.display(.title2, weight: .semibold))
                     .multilineTextAlignment(.center)
 
                 HStack(spacing: 10) {
@@ -459,7 +459,7 @@ struct SessionSummary: View {
                 .scaleEffect(shown ? 1 : 0.4)
                 .shadow(color: gold.opacity(0.8), radius: 16)
             Text("Promoted to \(rank.title)!")
-                .font(.app(.title3, weight: .bold))
+                .font(.display(.title3, weight: .semibold))
                 .foregroundStyle(gold)
             Text(store.library?.course.lines.promotion.randomElement() ?? "A new rank. Well earned.")
                 .font(.app(.subheadline))

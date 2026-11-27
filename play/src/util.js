@@ -21,6 +21,8 @@ export const ERROR_STATUS = {
   stale: 409,
   game_over: 409,
   cannot_claim: 409,
+  bad_chat: 422,
+  too_fast: 429,
   pairing: 409,
   username_taken: 409,
   illegal_move: 422,
@@ -151,6 +153,27 @@ export function isOffensiveName(name) {
   if (BANNED_ANYWHERE.some((bad) => squashed.includes(bad) || single.includes(bad))) return true;
   // Single letters spaced apart make a word too: "a s s".
   return words.length > 1 && words.every((word) => word.length === 1) && BANNED_WORDS.has(squashed);
+}
+
+/** The longest chat line, in characters. */
+export const MAX_CHAT_LENGTH = 200;
+
+/**
+ * Tidies one chat line: spaces collapsed, cut to MAX_CHAT_LENGTH, and any word that is a slur
+ * or plainly obscene (isOffensiveName) starred out. Null for a line with nothing left to say,
+ * or one that still reads as offensive once starred (letters spaced apart, say).
+ */
+export function cleanChat(input) {
+  if (typeof input !== "string") return null;
+  let text = input.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim();
+  if (!text) return null;
+  text = Array.from(text).slice(0, MAX_CHAT_LENGTH).join("").trim();
+  const starred = text
+    .split(" ")
+    .map((word) => (isOffensiveName(word) ? "*".repeat(Math.min(Array.from(word).length, 8)) : word))
+    .join(" ");
+  if (isOffensiveName(starred.replace(/\*+/g, " "))) return null;
+  return starred;
 }
 
 /** Reads a whole number from a setting such as LEAVE_GRACE_MS, kept within min and max. */

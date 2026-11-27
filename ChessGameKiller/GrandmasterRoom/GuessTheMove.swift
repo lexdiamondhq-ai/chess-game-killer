@@ -294,7 +294,7 @@ struct RoomHeader: View {
             .accessibilityLabel("Close")
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(.app(.headline))
+                    .font(.display(.headline, weight: .semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 if let subtitle {

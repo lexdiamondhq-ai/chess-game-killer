@@ -16,6 +16,8 @@ struct ChessGameKillerApp: App {
         HomeLayouts.settle()
         // Before the showcase, which may ask for the flat board for a screenshot.
         SculptedSetting.settle()
+        // Every bar's title in the display face, set before any bar is made.
+        DesignChrome.dressBars()
         showcase = Showcase.fromLaunchArguments()
         // A tapped daily reminder opens Today's Move.
         UNUserNotificationCenter.current().delegate = DailyNotificationDelegate.shared

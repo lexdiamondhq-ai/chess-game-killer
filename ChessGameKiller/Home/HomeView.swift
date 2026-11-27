@@ -1314,6 +1314,9 @@ extension HomeView {
 /// sits, and a breath of the pieces' gold lower down, so the glass tiles have light to catch.
 struct HomeBackdrop: View {
     let tone: HomeTone
+    /// Home's amethyst and rose light at the top of the page (see `AuroraWash`). Off for Analyze,
+    /// which keeps its plain page.
+    var wash = true
 
     var body: some View {
         ZStack {
@@ -1322,6 +1325,9 @@ struct HomeBackdrop: View {
                            center: UnitPoint(x: 0.5, y: 0.16), startRadius: 0, endRadius: 440)
             RadialGradient(colors: [tone.metal.opacity(0.08), tone.canvas.opacity(0)],
                            center: UnitPoint(x: 0.92, y: 0.62), startRadius: 0, endRadius: 320)
+            if wash {
+                AuroraWash(dark: tone.scheme == .dark)
+            }
         }
         .ignoresSafeArea()
         .allowsHitTesting(false)

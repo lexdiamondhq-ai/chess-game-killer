@@ -223,7 +223,7 @@ private struct ReviewCaughtUpView: View {
                     .accessibilityHidden(true)
                 VStack(spacing: 6) {
                     Text("All caught up")
-                        .font(.app(.title, weight: .bold))
+                        .font(.display(.title, weight: .semibold))
                     if reviewed > 0 {
                         Text("\(reviewed) reviewed · \(clean) clean")
                             .font(.app(.subheadline).monospacedDigit())

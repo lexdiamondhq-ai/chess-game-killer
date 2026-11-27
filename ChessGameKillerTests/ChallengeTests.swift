@@ -491,6 +491,72 @@ final class ChallengeTests: XCTestCase {
         XCTAssertFalse(try JSONDecoder().decode(FriendGameState.Player.self, from: Data(older.utf8)).knowsReactions)
     }
 
+    /// Chat (took React's place): hidden on a server that doesn't keep chat; a message you send
+    /// goes to the server and joins the list; the friend's new one pops over their line and lights
+    /// the dot until the panel opens; a turned-away message stays unsent with a word why.
+    func testChatGoesBothWays() async throws {
+        let api = FakeChallengeAPI()
+        var start = FriendGameState.sample(moves: ["e2e4"])
+        api.games[start.code] = start
+        let old = OnlineGame(record: .sample(start, seat: .white), api: api, sounds: nil, initial: start)
+        XCTAssertFalse(old.canChat, "an older server keeps no chat")
+
+        start.knowsChat = true
+        start.chat = [FriendGameState.ChatLine(seat: .black, text: "hi from before", at: start.now - 5_000)]
+        api.games[start.code] = start
+        let game = OnlineGame(record: .sample(start, seat: .white), api: api, sounds: nil, initial: start)
+        XCTAssertTrue(game.canChat)
+        XCTAssertEqual(game.unreadChat, 0, "what was said before the game opened counts as read")
+
+        let sent = await game.sendChat("  good luck!  ")
+        XCTAssertTrue(sent)
+        XCTAssertEqual(api.chats.last?.text, "good luck!")
+        XCTAssertEqual(game.chatLines.last?.text, "good luck!")
+        XCTAssertEqual(game.chatLines.last?.seat, .white)
+        XCTAssertNil(game.bubbles[.white], "your own words stay in the panel")
+        let empty = await game.sendChat("   ")
+        XCTAssertFalse(empty)
+
+        var theirs = try XCTUnwrap(game.state)
+        theirs.now += 2_000
+        theirs.updatedAt = theirs.now
+        theirs.chat.append(FriendGameState.ChatLine(seat: .black, text: "you too", at: theirs.now))
+        game.apply(theirs)
+        XCTAssertEqual(game.bubbles[.black]?.text, "you too")
+        XCTAssertNil(game.bubbles[.black]?.reaction)
+        XCTAssertEqual(game.unreadChat, 1)
+        game.chatOpen = true
+        XCTAssertEqual(game.unreadChat, 0)
+
+        var more = theirs
+        more.now += 2_000
+        more.updatedAt = more.now
+        more.chat.append(FriendGameState.ChatLine(seat: .black, text: "nice move", at: more.now))
+        game.apply(more)
+        XCTAssertEqual(game.unreadChat, 0, "read at once while the panel is open")
+        game.chatOpen = false
+
+        api.chatFailure = ChallengeError.server(status: 422, code: "bad_chat", message: nil, game: nil)
+        let refused = await game.sendChat("something rude")
+        XCTAssertFalse(refused)
+        XCTAssertEqual(game.toast?.text, "Let's keep it friendly.")
+        XCTAssertEqual(game.chatLines.count, 4, "the turned-away line never joins the list")
+    }
+
+    func testChatDecodes() throws {
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(Self.protocolSample.utf8)) as? [String: Any])
+        json["chat"] = [["seat": "black", "text": "gg", "at": 12], ["seat": "white", "text": "thanks", "at": 15]]
+        let state = try JSONDecoder().decode(FriendGameState.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertTrue(state.knowsChat)
+        XCTAssertEqual(state.chat, [FriendGameState.ChatLine(seat: .black, text: "gg", at: 12),
+                                    FriendGameState.ChatLine(seat: .white, text: "thanks", at: 15)])
+        json["chat"] = "not a list"
+        let odd = try JSONDecoder().decode(FriendGameState.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertTrue(odd.chat.isEmpty, "lines the app can't read never hide the game")
+        json.removeValue(forKey: "chat")
+        XCTAssertFalse(try JSONDecoder().decode(FriendGameState.self, from: JSONSerialization.data(withJSONObject: json)).knowsChat)
+    }
+
     func testYourMovesGoToTheServerWithTheirPly() async throws {
         let api = FakeChallengeAPI()
         let start = FriendGameState.sample()

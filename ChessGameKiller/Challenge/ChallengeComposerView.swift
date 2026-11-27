@@ -275,7 +275,7 @@ struct ChallengeComposerView: View {
         VStack(alignment: .leading, spacing: 24) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Play a friend")
-                    .font(theme.challengeFont(30, .bold))
+                    .font(.display(size: 30, weight: .semibold))
                 Text("Pick a friend by username, or send a link. They play in the app, or right in the browser.")
                     .font(theme.challengeFont(15))
                     .foregroundStyle(.secondary)
@@ -372,7 +372,7 @@ struct ChallengeComposerView: View {
         VStack(spacing: 18) {
             ChallengeAvatar(name: person.name, theme: theme, size: 76)
             Text("Sending to \(person.name)…")
-                .font(theme.challengeFont(24, .bold))
+                .font(.display(size: 24, weight: .semibold))
                 .multilineTextAlignment(.center)
             KnightTraceMark()
                 .frame(width: 26, height: 32)
@@ -388,7 +388,7 @@ struct ChallengeComposerView: View {
         return VStack(spacing: 20) {
             VStack(spacing: 8) {
                 Text("Your challenge is ready")
-                    .font(theme.challengeFont(26, .bold))
+                    .font(.display(size: 26, weight: .semibold))
                     .multilineTextAlignment(.center)
                 Text(composer.recipient == nil
                      ? "Next to you? Let them scan. Far away? Send the link below."
@@ -517,7 +517,7 @@ struct ChallengeComposerView: View {
                             .opacity(composer.isCreating ? 0 : 1)
                         if composer.isCreating {
                             ProgressView()
-                                .tint(theme.screenTone?.onIvory ?? Color.black.opacity(0.8))
+                                .tint(theme.screenTone == nil ? Color.black.opacity(0.8) : Polish.onMetal)
                         }
                     }
                 }

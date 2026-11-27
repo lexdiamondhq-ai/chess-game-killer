@@ -124,11 +124,24 @@ final class OnlineGame {
     @ObservationIgnored private var reclaimedAway: Double?
     @ObservationIgnored private var nextToastID = 0
 
-    /// A quick bubble over a player's line (React), for a few seconds.
+    /// A bubble over a player's line for a few seconds: a new chat message, or a quick reaction
+    /// from a friend on an older version of the app.
     struct Bubble: Equatable, Identifiable {
         let id: Int
-        let reaction: FriendReaction
+        /// The words shown.
+        let text: String
+        /// Set when it is a quick reaction (shown with its emoji); nil for a chat message.
+        var reaction: FriendReaction? = nil
     }
+
+    /// The chat panel is open: new messages from the friend count as read, with no bubble.
+    var chatOpen = false {
+        didSet { if chatOpen { markChatRead() } }
+    }
+    /// The friend's messages the player hasn't seen yet (the dot on the Chat coin).
+    private(set) var unreadChat = 0
+    /// The newest friend message already seen, in server milliseconds.
+    @ObservationIgnored private var chatReadUpTo: Double = 0
 
     /// The bubble showing over each side's line, if any.
     private(set) var bubbles: [FriendSeat: Bubble] = [:]
@@ -436,8 +449,12 @@ final class OnlineGame {
     }
 
     private func showBubble(_ reaction: FriendReaction, on side: FriendSeat) {
+        showBubble(Bubble(id: 0, text: reaction.words, reaction: reaction), on: side)
+    }
+
+    private func showBubble(_ bubble: Bubble, on side: FriendSeat) {
         nextBubbleID += 1
-        let shown = Bubble(id: nextBubbleID, reaction: reaction)
+        let shown = Bubble(id: nextBubbleID, text: bubble.text, reaction: bubble.reaction)
         bubbles[side] = shown
         bubbleTasks[side]?.cancel()
         bubbleTasks[side] = Task { [weak self] in
@@ -453,6 +470,67 @@ final class OnlineGame {
               sent != previous[opponentSeat].reaction,
               let reaction = FriendReaction(rawValue: sent.kind) else { return }
         showBubble(reaction, on: opponentSeat)
+    }
+
+    // MARK: Chat
+
+    /// Chat is on offer: the friend has sat down, the game is on or just over, and the server
+    /// keeps chat (an older one doesn't, and then the button is hidden).
+    var canChat: Bool {
+        guard let state, phase == .playing || phase == .over else { return false }
+        return state[opponentSeat].seated && state.knowsChat
+    }
+
+    /// Every message so far, oldest first.
+    var chatLines: [FriendGameState.ChatLine] { state?.chat ?? [] }
+
+    /// The longest message the server keeps.
+    static let chatLimit = 200
+
+    /// Sends the friend a message. True once the server has it; false (with a word why) when it
+    /// was turned away, so the words stay in the box to fix.
+    @discardableResult
+    func sendChat(_ text: String) async -> Bool {
+        let words = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard canChat, !words.isEmpty else { return false }
+        let code = record.code
+        let token = record.token
+        do {
+            apply(try await api.chat(String(words.prefix(Self.chatLimit)), in: code, token: token))
+            return true
+        } catch let error as ChallengeError {
+            switch error {
+            case .server(_, "bad_chat", _, _): say("Let's keep it friendly.", symbol: "hand.raised", warning: true)
+            case .server(_, "too_fast", _, _): say("One moment, then send again.", symbol: "clock", warning: true)
+            default: say(error.message, symbol: "exclamationmark.bubble", warning: true)
+            }
+        } catch {
+            say("Your message didn't send. Try again.", symbol: "exclamationmark.bubble", warning: true)
+        }
+        return false
+    }
+
+    /// Everything the friend has said so far counts as seen.
+    func markChatRead() {
+        chatReadUpTo = max(chatReadUpTo, chatLines.last(where: { $0.seat == opponentSeat })?.at ?? 0)
+        unreadChat = 0
+    }
+
+    /// The friend's new messages since the last state: a bubble over their line and the dot,
+    /// unless the panel is open. The first state counts as already read.
+    private func tellChat(from previous: FriendGameState?, to new: FriendGameState) {
+        guard previous != nil else {
+            markChatRead()
+            return
+        }
+        let fresh = new.chat.filter { $0.seat == opponentSeat && $0.at > chatReadUpTo }
+        guard let newest = fresh.last else { return }
+        if chatOpen {
+            markChatRead()
+        } else {
+            unreadChat = fresh.count
+            showBubble(Bubble(id: 0, text: newest.text), on: opponentSeat)
+        }
     }
 
     /// The friend has sat down: there is someone to report.
@@ -521,6 +599,7 @@ final class OnlineGame {
         reclaimPresence(new)
         tellChanges(from: previous, to: new)
         tellReaction(from: previous, to: new)
+        tellChat(from: previous, to: new)
         scheduleDeadline()
         refreshIdleTimer()
         onChange?(record)

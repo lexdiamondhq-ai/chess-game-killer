@@ -80,17 +80,22 @@ struct LevelCheckView: View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(spacing: 20) {
-                    Image(systemName: "scope")
-                        .font(.system(size: 30, weight: .semibold))
-                        .foregroundStyle(theme.trainingAccent)
-                        .frame(width: 64, height: 64)
-                        .background(theme.trainingAccent.opacity(0.14),
-                                    in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                        .shadow(color: theme.glows ? theme.trainingAccent.opacity(0.6) : .clear, radius: 12)
-                        .accessibilityHidden(true)
+                    if theme.screenTone != nil {
+                        // On the gold looks: the amber stone, as a thing worth finding.
+                        JewelIcon(symbol: "scope", stone: .amber, size: 64)
+                    } else {
+                        Image(systemName: "scope")
+                            .font(.system(size: 30, weight: .semibold))
+                            .foregroundStyle(theme.trainingAccent)
+                            .frame(width: 64, height: 64)
+                            .background(theme.trainingAccent.opacity(0.14),
+                                        in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .shadow(color: theme.glows ? theme.trainingAccent.opacity(0.6) : .clear, radius: 12)
+                            .accessibilityHidden(true)
+                    }
                     VStack(spacing: 8) {
                         Text("Find your level")
-                            .font(.app(.title2, weight: .bold))
+                            .font(.display(.title2, weight: .semibold))
                         Text("A quick check so \(Coach.current.name) starts you in the right place, and you skip what you already know.")
                             .font(.app(.subheadline))
                             .foregroundStyle(.secondary)
@@ -222,7 +227,7 @@ struct LevelCheckView: View {
                             .font(.app(.largeTitle, weight: .bold).monospacedDigit())
                             .foregroundStyle(theme.trainingAccent)
                         Text(band.name)
-                            .font(.app(.title3, weight: .semibold))
+                            .font(.display(.title3, weight: .semibold))
                         LevelBandScale(band: band, theme: theme)
                             .padding(.top, 4)
                         Text(band.advice)

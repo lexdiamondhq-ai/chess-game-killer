@@ -73,8 +73,8 @@ struct DNAListTitle: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
             Text(text.uppercased())
-                .font(.app(.caption, weight: .bold))
-                .tracking(0.9)
+                .font(.carved(12))
+                .tracking(1.4)
                 .foregroundStyle(tint)
                 .accessibilityAddTraits(.isHeader)
             Spacer(minLength: 8)

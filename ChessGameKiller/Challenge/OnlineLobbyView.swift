@@ -65,7 +65,7 @@ struct OnlineLobbyView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Play someone online")
-                .font(theme.challengeFont(30, .bold))
+                .font(.display(size: 30, weight: .semibold))
             Text(clock == nil && days == nil
                  ? "Games just for fun with players waiting now. Take one on, or find a game."
                  : "Rated games with players waiting now. Take one on, or find a game at your clock.")

@@ -70,8 +70,7 @@ struct EndgamesDoorView: View {
         return VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline) {
                 Text(next == nil ? "ALL LEARNED" : "NEXT UP")
-                    .font(.app(.caption, weight: .bold))
-                    .tracking(1)
+                    .eyebrow()
                     .foregroundStyle(theme.trainingAccent)
                 Spacer()
                 Text("\(progress.doneCount) of \(progress.total)")
@@ -81,7 +80,7 @@ struct EndgamesDoorView: View {
             if let next {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(next.title)
-                        .font(.app(.title3, weight: .bold))
+                        .font(.display(.title3, weight: .semibold))
                     Text(next.goalText)
                         .font(.app(.footnote, weight: .semibold))
                         .foregroundStyle(theme.trainingAccent)

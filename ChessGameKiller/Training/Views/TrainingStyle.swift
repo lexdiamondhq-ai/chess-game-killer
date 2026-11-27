@@ -119,12 +119,14 @@ extension BoardTheme {
 /// The room behind the training views: the home's, or on the older home the game screen's.
 struct TrainingBackdrop: View {
     let theme: BoardTheme
+    /// Home's soft light at the top of the page; Analyze passes false and keeps its plain page.
+    var wash = true
     @AppStorage(HomeLayout.key) private var sheet = HomeLayout.defaultOn
     @AppStorage(HomeToneMode.key) private var mode = HomeToneMode.defaultMode
 
     var body: some View {
         if let tone = HomeTone.screen(for: theme, sheet: sheet, mode: mode) {
-            HomeBackdrop(tone: tone)
+            HomeBackdrop(tone: tone, wash: wash)
         } else {
             ThemeBackdrop(theme: theme)
         }
@@ -188,7 +190,7 @@ extension View {
     }
 }
 
-/// A big rounded button: the home's ivory button, or its clear glass one when not prominent
+/// A big rounded button: the app's gold button, or its clear glass one when not prominent
 /// (a tint fills it instead, for an answer's color). On the older home, the board's accent:
 /// solid on the executive looks, Neon's glowing gradient on Neon.
 struct TrainingButtonStyle: ButtonStyle {
@@ -227,7 +229,7 @@ private struct TrainingButton: View {
             .padding(.horizontal, 12)
             // A quiet button keeps the page's ink: a tint (a hint's yellow) only colors its edge
             // and fill, since a pale tint would be lost as text on a light page.
-            .foregroundStyle(prominent ? (tint == nil ? tone.onIvory : (tone.scheme == .dark ? Color.black : Color.white))
+            .foregroundStyle(prominent ? (tint == nil ? Polish.onMetal : (tone.scheme == .dark ? Color.black : Color.white))
                              : tone.ink)
             .background {
                 if prominent, let tint {

@@ -121,7 +121,7 @@ struct TalkPanel: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
                 Text("Talk it through")
-                    .font(theme.challengeFont(15, .semibold))
+                    .font(.display(size: 16, weight: .semibold))
                     .lineLimit(1)
                 Text(status)
                     .font(theme.challengeFont(11, .medium))
@@ -767,8 +767,13 @@ private struct TalkPanelButtonBody: View {
     private func surface(_ shape: Capsule) -> some View {
         switch kind {
         case .primary:
-            shape.fill(theme.challengeAccent)
-                .overlay { shape.strokeBorder(Color.white.opacity(0.25), lineWidth: 0.75) }
+            if theme.screenTone != nil {
+                // The one thing to do next is cut from the main button's gold, as on every screen.
+                PolishedFill(shape: shape, quiet: true)
+            } else {
+                shape.fill(theme.challengeAccent)
+                    .overlay { shape.strokeBorder(Color.white.opacity(0.25), lineWidth: 0.75) }
+            }
         case .quiet:
             shape.fill(Color.primary.opacity(0.08))
                 .overlay { shape.strokeBorder(Color.primary.opacity(0.14), lineWidth: 0.75) }
@@ -777,7 +782,7 @@ private struct TalkPanelButtonBody: View {
 
     private var foreground: Color {
         switch kind {
-        case .primary: return theme.onChallengeAccent
+        case .primary: return theme.screenTone != nil ? Polish.onMetal : theme.onChallengeAccent
         case .quiet: return Color.primary
         }
     }

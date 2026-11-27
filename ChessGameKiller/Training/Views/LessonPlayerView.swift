@@ -133,7 +133,7 @@ struct LessonPlayerView: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(lesson.title)
-                    .font(.app(.headline))
+                    .font(.display(.headline, weight: .semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
                 Text(lesson.subtitle)
@@ -377,7 +377,7 @@ struct LessonDoneCard: View {
                 }
                 VStack(spacing: 6) {
                     Text("Lesson complete")
-                        .font(.app(.title2, weight: .bold))
+                        .font(.display(.title2, weight: .semibold))
                     Text(lesson.title)
                         .font(.app(.subheadline))
                         .foregroundStyle(.secondary)

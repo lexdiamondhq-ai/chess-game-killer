@@ -133,7 +133,7 @@ struct DailyMoveView: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 Text("Today's Move")
-                    .font(.app(.headline, weight: .semibold))
+                    .font(.display(.headline, weight: .semibold))
                 Text(dateline)
                     .font(.app(.caption))
                     .foregroundStyle(.secondary)
@@ -175,7 +175,7 @@ struct DailyMoveView: View {
     private func resultCard(_ outcome: Outcome) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(Self.verdict(outcome))
-                .font(.app(.title2, weight: .semibold))
+                .font(.display(.title2, weight: .semibold))
             if practiceDay == nil {
                 tallyLine
                 Divider().opacity(0.5)

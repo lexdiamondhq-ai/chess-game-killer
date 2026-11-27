@@ -165,11 +165,11 @@ export class GameRoom extends DurableObject {
     return reply(200, { game: this.#view() });
   }
 
-  async action({ token, type } = {}) {
+  async action({ token, type, text } = {}) {
     const seat = await this.#seatOf(token);
     if (!this.game) return refuse("not_found", NO_GAME);
     if (!seat) return refuse("unauthorized", BAD_TOKEN);
-    const out = rules.act(this.game, seat, type, Date.now());
+    const out = rules.act(this.game, seat, type, Date.now(), { text });
     await this.#settle(out);
     if (!out.ok) return refuse(out.error, out.message, this.#view());
     // Reports go to the worker's logs (Workers Logs in the Cloudflare dashboard): search "player_report".

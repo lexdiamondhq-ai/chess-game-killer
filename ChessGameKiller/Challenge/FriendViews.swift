@@ -53,7 +53,7 @@ struct UsernamePicker: View {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 6) {
                 Text(center.friends.you == nil ? "Pick your username" : "Change your username")
-                    .font(theme.challengeFont(26, .bold))
+                    .font(.display(size: 26, weight: .semibold))
                 Text("Friends find you by it and send you challenges. Letters, numbers, _ and . only.")
                     .font(theme.challengeFont(15))
                     .foregroundStyle(.secondary)
@@ -148,10 +148,10 @@ struct FriendInviteBanner: View {
             Spacer(minLength: 6)
             Button("Play", action: open)
                 .font(theme.challengeFont(14, .bold))
-                .foregroundStyle(theme.onChallengeAccent)
+                .foregroundStyle(theme.screenTone != nil ? Polish.onMetal : theme.onChallengeAccent)
                 .padding(.horizontal, 16)
                 .frame(height: 34)
-                .background(Capsule().fill(theme.challengeAccent))
+                .background { MainPillFill(gilded: theme.screenTone != nil, plain: theme.challengeAccent) }
                 .buttonStyle(ChallengePressStyle())
             Button(action: close) {
                 Image(systemName: "xmark")
