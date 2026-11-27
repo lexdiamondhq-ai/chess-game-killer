@@ -20,7 +20,7 @@ struct TrainingHubView: View {
     @State private var think = ThinkStore.live()
     /// The pages open over Learn. A path of any kind of page, not of doors alone: the vine's
     /// page is not a door, and a list of doors dropped its tap without a word (2026-11-27).
-    @State private var path: NavigationPath
+    @State private var path: [TrainDoor]
     /// Today's session, made once so the card shows exactly what Start plays.
     @State private var today: SessionPlan?
     @State private var session: SessionPlan?
@@ -31,7 +31,7 @@ struct TrainingHubView: View {
     /// Opens straight on one door, Learn behind it (Home's Chess DNA card opens on Chess DNA).
     init(theme: BoardTheme, door: TrainDoor? = nil) {
         self.theme = theme
-        _path = State(initialValue: NavigationPath(door.map { [$0] } ?? []))
+        _path = State(initialValue: door.map { [$0] } ?? [])
     }
 
     var body: some View {
