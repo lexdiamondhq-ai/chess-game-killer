@@ -1172,7 +1172,7 @@ struct HomeAuroraDNA: View {
                     bars
                 }
                 if dna.weapon != nil || dna.leak != nil {
-                    HStack(alignment: .top, spacing: 10) {
+                    DNAChipPair {
                         if let weapon = dna.weapon {
                             chip("Weapon", weapon.title, symbol: weapon.symbol, tint: palette.teal)
                         }
@@ -1293,7 +1293,8 @@ struct HomeAuroraDNA: View {
             Spacer(minLength: 0)
         }
         .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        // Both chips one size, however many lines each one's words take.
+        .dnaChipFrame()
         .background(RoundedRectangle(cornerRadius: 14, style: .continuous)
             .fill(tint.opacity(palette.dark ? 0.17 : 0.1)))
         // The chip's own jewel on its edge.
