@@ -443,6 +443,54 @@ final class ChallengeTests: XCTestCase {
         XCTAssertEqual(game.boardMoves, newer.moves)
     }
 
+    /// React: hidden on a server that doesn't keep bubbles; a bubble you send shows over your line
+    /// and goes to the server; the friend's newest shows over theirs, once.
+    func testReactionsGoBothWays() async throws {
+        let api = FakeChallengeAPI()
+        var start = FriendGameState.sample(moves: ["e2e4"])
+        api.games[start.code] = start
+        let old = OnlineGame(record: .sample(start, seat: .white), api: api, sounds: nil, initial: start)
+        XCTAssertFalse(old.canReact, "an older server keeps no bubbles")
+
+        start.white.knowsReactions = true
+        start.black.knowsReactions = true
+        api.games[start.code] = start
+        let game = OnlineGame(record: .sample(start, seat: .white), api: api, sounds: nil, initial: start)
+        XCTAssertTrue(game.canReact)
+        await game.react(.gg)
+        XCTAssertEqual(game.bubbles[.white]?.reaction, .gg)
+        XCTAssertEqual(api.actions.last?.action, .reactGG)
+
+        var theirs = start
+        theirs.now += 2_000
+        theirs.updatedAt = theirs.now
+        theirs.black.reaction = FriendGameState.SentReaction(kind: "whoa", at: theirs.now)
+        game.apply(theirs)
+        XCTAssertEqual(game.bubbles[.black]?.reaction, .whoa)
+
+        // A kind this app doesn't know shows nothing.
+        var unknown = theirs
+        unknown.now += 2_000
+        unknown.updatedAt = unknown.now
+        unknown.black.reaction = FriendGameState.SentReaction(kind: "party", at: unknown.now)
+        let fresh = OnlineGame(record: .sample(theirs, seat: .white), api: api, sounds: nil, initial: theirs)
+        fresh.apply(unknown)
+        XCTAssertNil(fresh.bubbles[.black])
+    }
+
+    func testReactionsDecode() throws {
+        let withIt = #"{"name":"Sam","seated":true,"reaction":{"kind":"nice","at":12}}"#
+        let player = try JSONDecoder().decode(FriendGameState.Player.self, from: Data(withIt.utf8))
+        XCTAssertTrue(player.knowsReactions)
+        XCTAssertEqual(player.reaction, FriendGameState.SentReaction(kind: "nice", at: 12))
+        let none = #"{"name":"Sam","seated":true,"reaction":null}"#
+        let quiet = try JSONDecoder().decode(FriendGameState.Player.self, from: Data(none.utf8))
+        XCTAssertTrue(quiet.knowsReactions)
+        XCTAssertNil(quiet.reaction)
+        let older = #"{"name":"Sam","seated":true}"#
+        XCTAssertFalse(try JSONDecoder().decode(FriendGameState.Player.self, from: Data(older.utf8)).knowsReactions)
+    }
+
     func testYourMovesGoToTheServerWithTheirPly() async throws {
         let api = FakeChallengeAPI()
         let start = FriendGameState.sample()

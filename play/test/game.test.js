@@ -54,8 +54,8 @@ test("a new game seats its creator and waits", () => {
     deadline: null,
     creator: "white",
     look: null,
-    white: { name: "Alex", seated: true, online: true, away: null, claimableAt: null, screenshots: 0, recordings: 0 },
-    black: { name: null, seated: false, online: false, away: null, claimableAt: null, screenshots: 0, recordings: 0 },
+    white: { name: "Alex", seated: true, online: true, away: null, claimableAt: null, screenshots: 0, recordings: 0, reaction: null },
+    black: { name: null, seated: false, online: false, away: null, claimableAt: null, screenshots: 0, recordings: 0, reaction: null },
     moves: [],
     san: [],
     fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
@@ -927,4 +927,29 @@ test("a friend game can have days per move: unrated, and out of days loses", () 
   const { now } = play(game, "e2e4 e7e5", { from: T0 + SECOND });
   rules.tick(game, now + 2 * DAY);
   assert.deepEqual(game.result, { winner: "black", reason: "timeout" });
+});
+
+test("a reaction is kept on the sender's seat and told to the other side", () => {
+  const game = newGame();
+  const view0 = rules.view(game, T0);
+  assert.equal(view0.white.reaction, null);
+  const out = rules.act(game, "white", "react_nice", T0 + 5000);
+  assert.equal(out.ok, true);
+  assert.equal(out.changed, true);
+  assert.deepEqual(out.notices, [{ kind: "reaction", seat: "white", at: T0 + 5000 }]);
+  assert.deepEqual(rules.view(game, T0 + 5000).white.reaction, { kind: "nice", at: T0 + 5000 });
+  // Too soon after the last: dropped quietly.
+  const flood = rules.act(game, "white", "react_gg", T0 + 5500);
+  assert.equal(flood.ok, true);
+  assert.equal(flood.changed, false);
+  assert.equal(rules.view(game, T0 + 5500).white.reaction.kind, "nice");
+  // After the game too.
+  rules.act(game, "black", "resign", T0 + 6000);
+  assert.equal(rules.act(game, "black", "react_gg", T0 + 7000).ok, true);
+  assert.equal(rules.view(game, T0 + 7000).black.reaction.kind, "gg");
+});
+
+test("no reaction before anyone has joined", () => {
+  const game = newGame({ joined: false });
+  assert.equal(rules.act(game, "white", "react_whoa", T0 + 1000).error, "bad_request");
 });

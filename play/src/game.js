@@ -35,7 +35,16 @@ export const ACTIONS = [
   "claim_win",
   "report_name",
   "report_cheating",
+  "react_nice",
+  "react_whoa",
+  "react_hmm",
+  "react_gg",
 ];
+
+/** The quick bubbles a player can send the other side (react_<kind>). */
+export const REACTIONS = ["nice", "whoa", "hmm", "gg"];
+/** A player's bubbles are at least this far apart, so they can't be sent in a flood. */
+export const REACTION_GAP_MS = 1500;
 
 /** How long a player in a timed game may be away before the other side may claim the win. */
 export const DEFAULT_LEAVE_GRACE_MS = 60000;
@@ -644,6 +653,11 @@ export function act(game, seat, type, now) {
       notify(out, type, seat, now);
       return out;
     }
+    case "react_nice":
+    case "react_whoa":
+    case "react_hmm":
+    case "react_gg":
+      return react(game, seat, type.slice("react_".length), now, out);
     case "rematch":
       return askForRematch(game, seat, now, out);
     case "claim_win":
@@ -715,6 +729,22 @@ export function isOnline(game) {
   return Boolean(game.online || game.rated);
 }
 
+/**
+ * `seat` sends the other side a quick bubble (REACTIONS), during the game or after it.
+ * Only the latest one is kept, in the seat's `reaction`; one sooner than REACTION_GAP_MS
+ * after the last is dropped quietly.
+ */
+function react(game, seat, kind, now, out) {
+  if (!REACTIONS.includes(kind)) return fail(out, "bad_request", "Unknown action.");
+  const player = game[seat];
+  if (!player || !game[other(seat)]) return fail(out, "bad_request", NOT_JOINED);
+  if (player.reaction && now - player.reaction.at < REACTION_GAP_MS) return out;
+  player.reaction = { kind, at: now };
+  touch(game, out, now);
+  notify(out, "reaction", seat, now);
+  return out;
+}
+
 /** The other side has been away past the grace period: `seat` takes the win. */
 function claimWin(game, seat, now, out) {
   if (game.result) return fail(out, "game_over", GAME_OVER);
@@ -769,7 +799,7 @@ function askForRematch(game, seat, now, out) {
 
 function seatView(game, seat, connected) {
   const player = game[seat];
-  if (!player) return { name: null, seated: false, online: false, away: null, claimableAt: null, screenshots: 0, recordings: 0 };
+  if (!player) return { name: null, seated: false, online: false, away: null, claimableAt: null, screenshots: 0, recordings: 0, reaction: null };
   return {
     name: player.name,
     seated: true,
@@ -778,6 +808,7 @@ function seatView(game, seat, connected) {
     claimableAt: claimableAt(game, seat),
     screenshots: player.screenshots,
     recordings: player.recordings,
+    reaction: player.reaction ? { kind: player.reaction.kind, at: player.reaction.at } : null,
   };
 }
 

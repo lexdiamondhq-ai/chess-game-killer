@@ -17,6 +17,8 @@ struct ChallengeGameView: View {
     @AppStorage("haptics") private var hapticsOn = true
     @State private var confirming: Confirmation?
     @State private var copied = false
+    /// The React row is open over the dock.
+    @State private var reacting = false
     /// "Try again" on a game that would not open is fetching it now.
     @State private var retrying = false
 
@@ -27,8 +29,8 @@ struct ChallengeGameView: View {
     }
 
     private static let spacing: CGFloat = 12
-    private static let plateHeight: CGFloat = 50
-    private static let ribbonHeight: CGFloat = 24
+    private static let plateHeight: CGFloat = 58
+    private static let ribbonHeight: CGFloat = 32
     /// As on the game screen: the board stops growing here, and so does the column around it.
     private static let maxBoardSide: CGFloat = 680
 
@@ -66,6 +68,9 @@ struct ChallengeGameView: View {
         .overlay(alignment: .top) {
             notices
         }
+        .background {
+            FriendMarble(theme: theme)
+        }
         .safeAreaInset(edge: .top, spacing: 8) {
             topBar
         }
@@ -100,14 +105,25 @@ struct ChallengeGameView: View {
         let aspect = BoardView.aspect(theme, setting: sculpted3D, framing: tilt.framing)
         let spare = size.height - Self.plateHeight * 2 - Self.ribbonHeight - Self.spacing * 5
         let width = max(0, min(size.width, spare * aspect, Self.maxBoardSide))
+        // The block sits high, under the bar, rather than floating in the middle with a gap
+        // above it: a quarter of what is left goes above it, the rest below (Alex's pick B Rich,
+        // 2026-11-27).
+        let left = max(0, spare - width / aspect)
         return VStack(spacing: Self.spacing) {
-            Spacer(minLength: 0)
+            Color.clear.frame(height: left * 0.25)
             FriendPlate(game: game, seat: topSeat, theme: theme)
                 .frame(height: Self.plateHeight)
             // This screen follows Light or dark, so the frame's letters take a dark ink on the
             // light page, where the pale one was all but invisible.
             BoardView(match: game.match, theme: theme, framing: tilt.framing, frameLabel: theme.frameLabel(on: colorScheme))
                 .frame(width: width, height: width / aspect)
+                .overlay {
+                    // A square board seen from straight above wears a gold rim; the tilted
+                    // 3D board has its own frame.
+                    if abs(aspect - 1) < 0.02 {
+                        FriendBoardRim()
+                    }
+                }
             FriendPlate(game: game, seat: topSeat.opposite, theme: theme)
                 .frame(height: Self.plateHeight)
                 // Confirm moves: while a move waits, the gold Play bar stands in the plate's place.
@@ -130,8 +146,12 @@ struct ChallengeGameView: View {
                     }
                 }
                 .animation(.snappy(duration: 0.25), value: game.held)
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
+                // The moves on their own glass, as in a rival game.
                 MoveRibbon(moves: game.ribbon, theme: theme)
+                    .padding(.horizontal, 14)
+                    .frame(maxHeight: .infinity)
+                    .glassPane(Capsule())
                 BoardViewSwitch(theme: theme)
             }
             .frame(height: Self.ribbonHeight)
@@ -353,6 +373,11 @@ struct ChallengeGameView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .alignmentGuide(.top) { $0[.bottom] + 10 }
                         .transition(.move(edge: .bottom).combined(with: .opacity))
+                } else if reacting, game.canReact {
+                    reactionRow
+                        .fixedSize()
+                        .alignmentGuide(.top) { $0[.bottom] + 8 }
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
             .overlay(alignment: .bottom) {
@@ -373,17 +398,22 @@ struct ChallengeGameView: View {
 
     private var dock: some View {
         HStack(spacing: 0) {
-            DockButton(title: drawTitle, symbol: "equal.circle", isOn: game.drawOfferedByMe, theme: theme) {
+            FriendDockButton(title: drawTitle, symbol: "equal", isOn: game.drawOfferedByMe, theme: theme) {
                 Task {
                     if game.drawOfferedToMe { await game.acceptDraw() } else { await game.offerDraw() }
                 }
             }
             .disabled(game.drawOfferedByMe || game.sending != nil)
-            DockButton(title: game.endsAnyTime ? "End" : game.canAbort ? "Abort" : "Resign", symbol: "flag", theme: theme) {
+            FriendDockButton(title: game.endsAnyTime ? "End" : game.canAbort ? "Abort" : "Resign", symbol: "flag", theme: theme) {
                 confirming = game.canAbort ? .abort : .resign
             }
             .disabled(game.sending != nil)
-            DockButton(title: "Flip", symbol: Glyphs.flip, theme: theme) {
+            if game.canReact {
+                FriendDockButton(title: "React", symbol: "face.smiling", isOn: reacting, theme: theme) {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) { reacting.toggle() }
+                }
+            }
+            FriendDockButton(title: "Flip", symbol: "arrow.triangle.2.circlepath", theme: theme) {
                 withAnimation(.snappy) { game.match.flipBoard() }
             }
         }
@@ -394,6 +424,23 @@ struct ChallengeGameView: View {
         .padding(.horizontal, 16)
         .padding(.top, 6)
         .padding(.bottom, 6)
+    }
+
+    /// The quick bubbles React offers, in a row over the dock. A tap sends one and folds the row.
+    private var reactionRow: some View {
+        HStack(spacing: 8) {
+            ForEach(FriendReaction.allCases) { reaction in
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) { reacting = false }
+                    Task { await game.react(reaction) }
+                } label: {
+                    FriendBubbleLabel(reaction: reaction, theme: theme)
+                }
+                .buttonStyle(ChallengePressStyle())
+                .accessibilityLabel("Send \(reaction.words)")
+            }
+        }
+        .padding(.horizontal, 12)
     }
 
     private var drawTitle: String {
@@ -870,7 +917,28 @@ struct FriendPlate: View {
                 FriendDaysBox(game: game, seat: seat, theme: theme)
             }
         }
-        .padding(.horizontal, 4)
+        .padding(.horizontal, 10)
+        .frame(maxHeight: .infinity)
+        // Each player on a gilded card, as in a rival game; the side to move glows
+        // (Alex's pick B Rich, 2026-11-27).
+        .glassPane(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            if isActive {
+                PolishedEdge(shape: RoundedRectangle(cornerRadius: 18, style: .continuous), edge: .lit)
+                    .transition(.opacity)
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            // A quick bubble this side sent (React), popping up over its line.
+            if let bubble = game.bubbles[seat] {
+                FriendBubbleLabel(reaction: bubble.reaction, theme: theme)
+                    .id(bubble.id)
+                    .offset(x: -14, y: -18)
+                    .transition(.scale(scale: 0.6, anchor: .bottomTrailing).combined(with: .opacity))
+                    .accessibilityLabel("\(name): \(bubble.reaction.words)")
+            }
+        }
+        .animation(.spring(response: 0.35, dampingFraction: 0.7), value: game.bubbles[seat])
         .animation(.snappy(duration: 0.3), value: isActive)
         .animation(.snappy(duration: 0.3), value: inCheck)
         .accessibilityElement(children: .combine)
@@ -879,12 +947,12 @@ struct FriendPlate: View {
     @ViewBuilder
     private var avatar: some View {
         if isMe {
-            ChallengeAvatar(name: game.myName.isEmpty ? "You" : game.myName, theme: theme, size: 38)
+            ChallengeAvatar(name: game.myName.isEmpty ? "You" : game.myName, theme: theme, size: 38, crest: true)
         } else if game.phase == .waiting {
-            ChallengeAvatar(name: nil, theme: theme, size: 38)
+            ChallengeAvatar(name: nil, theme: theme, size: 38, crest: true)
         } else {
             // The dot stays after the game, so it shows whether a rematch can be answered.
-            ChallengeAvatar(name: game.opponentName, theme: theme, size: 38, online: game.isOnline(seat))
+            ChallengeAvatar(name: game.opponentName, theme: theme, size: 38, online: game.isOnline(seat), crest: true)
         }
     }
 
@@ -940,18 +1008,30 @@ struct FriendPlate: View {
                 if inCheck {
                     CheckTag(color: theme.check)
                         .transition(.scale.combined(with: .opacity))
-                } else if isActive {
-                    Circle()
-                        .fill(accent)
-                        .frame(width: 6, height: 6)
-                        .transition(.scale.combined(with: .opacity))
                 }
-                Text(statusText)
-                    .font(theme.challengeFont(12.5, isActive ? .medium : .regular))
-                    .foregroundStyle(isActive ? Color.primary.opacity(0.8) : Color.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
-                    .layoutPriority(1)
+                if isActive && !inCheck {
+                    // Whose move it is, on a small gold pill.
+                    Text(statusText)
+                        .font(theme.challengeFont(11.5, .semibold))
+                        .foregroundStyle(Color(hex: 0x2A1C08))
+                        .lineLimit(1)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 3)
+                        .background {
+                            Capsule().fill(LinearGradient(colors: [Color(hex: 0xEDCB82), Color(hex: 0xC49543)],
+                                                          startPoint: .top, endPoint: .bottom))
+                        }
+                        .shadow(color: Color(hex: 0xD9AE5A).opacity(0.45), radius: 5)
+                        .layoutPriority(1)
+                        .transition(.scale.combined(with: .opacity))
+                } else {
+                    Text(statusText)
+                        .font(theme.challengeFont(12.5, .regular))
+                        .foregroundStyle(Color.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                        .layoutPriority(1)
+                }
                 FriendCaptures(game: game, theme: theme, by: color)
             }
         }
@@ -1133,5 +1213,142 @@ private struct WaitingDot: View {
                 withAnimation(.easeOut(duration: 1.6).repeatForever(autoreverses: false)) { breathing = true }
             }
             .accessibilityHidden(true)
+    }
+}
+
+/// The gold rim round a board seen from straight above (Alex's pick B Rich, 2026-11-27).
+private struct FriendBoardRim: View {
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        let dark = scheme == .dark
+        let shape = RoundedRectangle(cornerRadius: 3, style: .continuous)
+        shape
+            .inset(by: -3)
+            .strokeBorder(LinearGradient(colors: [Polish.goldCatch(dark: dark), Polish.goldBase(dark: dark),
+                                                  Polish.goldDeep(dark: dark), Polish.goldBase(dark: dark)],
+                                         startPoint: .topLeading, endPoint: .bottomTrailing),
+                          lineWidth: 2)
+            .padding(-3)
+            .shadow(color: Color.black.opacity(dark ? 0.4 : 0.22), radius: 12, y: 8)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+}
+
+/// The page under a friend game: Home's veined marble, faint, so the game sits in the same room
+/// as the rest of the app instead of on a bare page. Neon keeps its own light.
+private struct FriendMarble: View {
+    let theme: BoardTheme
+
+    var body: some View {
+        if !theme.glows {
+            Image(theme.screenIsDark ? "home-marble-dark" : "home-marble")
+                .resizable()
+                .scaledToFill()
+                .opacity(theme.screenIsDark ? 0.5 : 0.6)
+                .mask(LinearGradient(stops: [.init(color: .black, location: 0),
+                                             .init(color: .black.opacity(0.55), location: 0.7),
+                                             .init(color: .black.opacity(0.35), location: 1)],
+                                     startPoint: .top, endPoint: .bottom))
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
+    }
+}
+
+/// A dock control in a friend game: its icon in a small dark coin with a gold rim, its name under
+/// it, so the row reads as one set (Alex's pick, 2026-11-27: "the icons look off"). Neon keeps the
+/// app's plain dock control.
+private struct FriendDockButton: View {
+    let title: String
+    let symbol: String
+    var isOn: Bool? = nil
+    let theme: BoardTheme
+    let action: () -> Void
+
+    @State private var taps = 0
+    @AppStorage("haptics") private var hapticsOn = true
+    @Environment(\.isEnabled) private var isEnabled
+
+    var body: some View {
+        if theme.glows {
+            DockButton(title: title, symbol: symbol, isOn: isOn, theme: theme, action: action)
+        } else {
+            Button {
+                taps += 1
+                action()
+            } label: {
+                VStack(spacing: 4) {
+                    FriendCoin(symbol: symbol, lit: isOn == true)
+                    Text(title)
+                        .font(.app(.caption2, weight: .medium))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .foregroundStyle(Color.primary.opacity(0.8))
+                }
+                .opacity(isEnabled ? 1 : 0.5)
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(ChallengePressStyle())
+            .sensoryFeedback(.impact(weight: .light), trigger: taps) { _, _ in hapticsOn }
+            .accessibilityLabel(title)
+            .accessibilityValue(isOn.map { $0 ? "On" : "Off" } ?? "")
+            .accessibilityAddTraits(isOn == nil ? [] : .isToggle)
+            .accessibilityShowsLargeContentViewer()
+        }
+    }
+}
+
+/// The coin a dock icon sits in: dark espresso, a gold rim, the icon in gold. Lit, it fills with gold.
+private struct FriendCoin: View {
+    let symbol: String
+    var lit = false
+
+    private static let size: CGFloat = 34
+
+    var body: some View {
+        let rim = LinearGradient(colors: [Polish.goldCatch(dark: false), Polish.goldBase(dark: false), Polish.goldDeep(dark: false)],
+                                 startPoint: .topLeading, endPoint: .bottomTrailing)
+        Image(systemName: symbol)
+            .font(.system(size: 14.5, weight: .semibold))
+            .foregroundStyle(lit ? Color(hex: 0x2A1C08) : Polish.goldBase(dark: true))
+            .frame(width: Self.size, height: Self.size)
+            .background {
+                if lit {
+                    Circle().fill(LinearGradient(colors: [Color(hex: 0xEDCB82), Color(hex: 0xC49543)],
+                                                 startPoint: .top, endPoint: .bottom))
+                } else {
+                    Circle().fill(RadialGradient(colors: [Color(hex: 0x3A2A18), Color(hex: 0x120C06)],
+                                                 center: UnitPoint(x: 0.35, y: 0.3), startRadius: 0, endRadius: Self.size * 0.7))
+                }
+            }
+            .overlay { Circle().strokeBorder(rim, lineWidth: 1.25) }
+            .shadow(color: .black.opacity(0.2), radius: 3, y: 2)
+            .animation(.snappy(duration: 0.25), value: lit)
+    }
+}
+
+/// A quick bubble: its emoji and words on a white chip with a gold rim.
+private struct FriendBubbleLabel: View {
+    let reaction: FriendReaction
+    let theme: BoardTheme
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Text(reaction.emoji)
+                .font(.system(size: 14))
+            Text(reaction.words)
+                .font(theme.challengeFont(13, .semibold))
+                .foregroundStyle(Color(hex: 0x2A2116))
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 6)
+        .background(Capsule().fill(Color.white))
+        .overlay { Capsule().strokeBorder(Polish.goldBase(dark: false).opacity(0.85), lineWidth: 1) }
+        .shadow(color: .black.opacity(0.18), radius: 6, y: 3)
     }
 }

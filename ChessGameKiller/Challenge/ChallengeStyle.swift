@@ -183,18 +183,35 @@ struct ChallengeAvatar: View {
     var size: CGFloat = 38
     /// Nil hides the dot.
     var online: Bool? = nil
+    /// A gold crest: the initial in Cinzel on a dark coin with a gold rim, as on the game screen
+    /// (Alex's pick B Rich, 2026-11-27). Neon keeps the plain circle.
+    var crest = false
 
     var body: some View {
         let accent = theme.challengeAccent
+        let gilded = crest && !theme.glows
         Text(initial)
-            .font(.app(size: size * 0.42, weight: .semibold))
-            .foregroundStyle(.primary)
+            .font(gilded ? Font.custom("Cinzel-Bold", size: size * 0.44) : Font.app(size: size * 0.42, weight: .semibold))
+            .foregroundStyle(gilded ? Polish.goldBase(dark: true) : Color.primary)
             .frame(width: size, height: size)
             .background {
-                Circle().fill(LinearGradient(colors: [accent.opacity(0.34), accent.opacity(0.1)],
-                                             startPoint: .topLeading, endPoint: .bottomTrailing))
+                if gilded {
+                    Circle().fill(RadialGradient(colors: [Color(hex: 0x3A2A18), Color(hex: 0x120C06)],
+                                                 center: UnitPoint(x: 0.35, y: 0.3), startRadius: 0, endRadius: size * 0.7))
+                        .shadow(color: .black.opacity(0.25), radius: 3, y: 2)
+                } else {
+                    Circle().fill(LinearGradient(colors: [accent.opacity(0.34), accent.opacity(0.1)],
+                                                 startPoint: .topLeading, endPoint: .bottomTrailing))
+                }
             }
-            .overlay { Circle().strokeBorder(Color.primary.opacity(0.16), lineWidth: 0.75) }
+            .overlay {
+                if gilded {
+                    Circle().strokeBorder(LinearGradient(colors: [Polish.goldCatch(dark: false), Polish.goldBase(dark: false), Polish.goldDeep(dark: false)],
+                                                         startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1.5)
+                } else {
+                    Circle().strokeBorder(Color.primary.opacity(0.16), lineWidth: 0.75)
+                }
+            }
             .overlay(alignment: .bottomTrailing) {
                 if let online {
                     Circle()

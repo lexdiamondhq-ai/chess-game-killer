@@ -566,6 +566,9 @@ function reportPresence(type) {
   }).catch(() => {});
 }
 
+/** The quick bubbles the app can send (React). */
+const REACTION_WORDS = { nice: '👏 Nice move', whoa: '😮 Whoa', hmm: '🤔 Hmm', gg: '🤝 Good game' };
+
 function onNotice(n) {
   if (!S.game) return;
   const mine = S.seat && n.seat === S.seat;
@@ -579,6 +582,12 @@ function onNotice(n) {
     case 'draw_offer': if (!S.seat) toast(`${name} offers a draw`, 'draw'); break;
     case 'draw_declined': toast(`${name} declined the draw`, 'draw'); break;
     case 'rematch_offer': toast(`${name} wants a rematch`, 'rematch'); break;
+    case 'reaction': {
+      // A quick bubble from the app (React); the state that came just before says which.
+      const words = REACTION_WORDS[S.game[n.seat]?.reaction?.kind];
+      if (words) toast(`${name}: ${words}`, 'person');
+      break;
+    }
     default: break;
   }
 }

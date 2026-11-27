@@ -21,6 +21,11 @@ enum ChallengeAction: String, Sendable {
     /// Reports about the friend. A name report hides their name at once.
     case reportName = "report_name"
     case reportCheating = "report_cheating"
+    /// A quick bubble for the other side (see FriendReaction).
+    case reactNice = "react_nice"
+    case reactWhoa = "react_whoa"
+    case reactHmm = "react_hmm"
+    case reactGG = "react_gg"
 }
 
 /// The game server, as the app uses it. The live one talks to play/; tests use a fake.
