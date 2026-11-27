@@ -44,7 +44,8 @@ SOUNDS = {
     # 130 ms apart). The code-made tocks they replace sounded like beeps. The older foley takes and each set's own takes were
     # removed: one slid take squeaked (~2 kHz) and several set takes rang shrill (3 to 9 kHz).
     # move-clock.mp3 (timed games) is a wooden blitz move, then a mechanical chess clock
-    # pressed, and check.mp3 is the two bronze bells above with a little warmth.
+    # pressed. check.mp3 is not made here either (2026-11-27): two wooden knocks from the same
+    # recording, the second 3 semitones lower ("tok-tok"); the "check" prompt is the old bells.
     # The endings: warm and acoustic like the pieces, never arcade synths.
     "win": ("A short, elegant success chime: three warm rising notes on a soft celesta and a "
             "felt piano, a gentle shimmer at the end. Clean, luxurious, understated, no synths, "

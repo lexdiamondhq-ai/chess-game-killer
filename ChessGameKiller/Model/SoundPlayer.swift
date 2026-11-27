@@ -22,6 +22,8 @@ enum GameSound: String, CaseIterable {
     case select
     /// A capture: the soft tock of a rival's capture (capture-soft.mp3), for everyone.
     case capture
+    /// Check: two wooden knocks, the second lower ("tok-tok"), cut from the same real recording
+    /// as the moves. Alex picked it over clicks and bells, 2026-11-27.
     case check
     /// Castling: two soft tocks, king then rook (castle.mp3, made from the move-soft takes).
     case castle
@@ -36,7 +38,7 @@ enum GameSound: String, CaseIterable {
     case welcome
 
     /// Sets how the sounds sit against each other. The soft tocks of a move, capture or castle
-    /// sit well under full volume, and check (its file raised 3 dB) above them. The longer cues' files are all made the same loudness
+    /// sit well under full volume, and check's two knocks a little above them. The longer cues' files are all made the same loudness
     /// (-16 LUFS, scripts/make_sounds.py), so these alone place them: the endings only a
     /// little above the knocks, so the end of a game is never a jolt, and the welcome softest.
     var volume: Float {
@@ -44,7 +46,7 @@ enum GameSound: String, CaseIterable {
         case .clockMove: return 0.75
         case .move, .capture, .castle, .rivalMove, .rivalCapture: return 0.6
         case .select: return 0.3
-        case .check: return 1.0
+        case .check: return 0.7
         case .win: return 0.7
         case .gameOver: return 0.6
         case .defeat: return 0.6
