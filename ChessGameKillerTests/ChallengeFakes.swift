@@ -33,6 +33,17 @@ final class FakeChallengeAPI: ChallengeAPI {
         let token: String
     }
 
+    struct ChatRequest: Equatable {
+        let text: String
+        let code: String
+        let token: String
+    }
+
+    /// Every chat message sent, in order.
+    var chats: [ChatRequest] = []
+    /// Set to turn chat messages away, as the server does with `bad_chat` or `too_fast`.
+    var chatFailure: Error?
+
     /// The games the server knows, by code.
     var games: [String: FriendGameState] = [:]
     /// The reply to a create.
@@ -110,6 +121,18 @@ final class FakeChallengeAPI: ChallengeAPI {
             return state
         }
         guard let game = games[code] else { throw Self.notFound }
+        return game
+    }
+
+    func chat(_ text: String, in code: String, token: String) async throws -> FriendGameState {
+        chats.append(ChatRequest(text: text, code: code, token: token))
+        if let failure = chatFailure ?? failure { throw failure }
+        guard var game = games[code] else { throw Self.notFound }
+        let seat: FriendSeat = token.hasSuffix("black") ? .black : .white
+        game.knowsChat = true
+        game.chat.append(FriendGameState.ChatLine(seat: seat, text: text, at: game.now + Double(game.chat.count)))
+        game.updatedAt += 1
+        games[code] = game
         return game
     }
 

@@ -16,7 +16,7 @@
 // The record also holds the hashes of the seat tokens; view() leaves them out.
 
 import { Chess, DEFAULT_POSITION } from "../public/vendor/chess.js";
-import { cleanName, DEFAULT_NAME } from "./util.js";
+import { cleanChat, cleanName, DEFAULT_NAME } from "./util.js";
 
 export const SEATS = ["white", "black"];
 export const SIDES = ["white", "black", "random"];
@@ -39,12 +39,17 @@ export const ACTIONS = [
   "react_whoa",
   "react_hmm",
   "react_gg",
+  "chat",
 ];
 
 /** The quick bubbles a player can send the other side (react_<kind>). */
 export const REACTIONS = ["nice", "whoa", "hmm", "gg"];
 /** A player's bubbles are at least this far apart, so they can't be sent in a flood. */
 export const REACTION_GAP_MS = 1500;
+/** A player's chat lines are at least this far apart. */
+export const CHAT_GAP_MS = 700;
+/** The newest chat lines a game keeps. */
+export const CHAT_KEEP = 60;
 
 /** How long a player in a timed game may be away before the other side may claim the win. */
 export const DEFAULT_LEAVE_GRACE_MS = 60000;
@@ -638,7 +643,7 @@ export function setAway(game, seat, away, now) {
 }
 
 /** Applies one of the action types in PROTOCOL.md for `seat`. */
-export function act(game, seat, type, now) {
+export function act(game, seat, type, now, extra = {}) {
   if (type === "away" || type === "back") return setAway(game, seat, type === "away", now);
   const out = begin(game, now);
   const status = statusOf(game);
@@ -658,6 +663,8 @@ export function act(game, seat, type, now) {
     case "react_hmm":
     case "react_gg":
       return react(game, seat, type.slice("react_".length), now, out);
+    case "chat":
+      return chat(game, seat, extra.text, now, out);
     case "rematch":
       return askForRematch(game, seat, now, out);
     case "claim_win":
@@ -742,6 +749,25 @@ function react(game, seat, kind, now, out) {
   player.reaction = { kind, at: now };
   touch(game, out, now);
   notify(out, "reaction", seat, now);
+  return out;
+}
+
+/**
+ * `seat` says something to the other side, during the game or after it. The line is tidied and
+ * starred (cleanChat); the game keeps the newest CHAT_KEEP lines. A line sooner than CHAT_GAP_MS
+ * after the last one from the same seat is refused.
+ */
+function chat(game, seat, input, now, out) {
+  if (!game[seat] || !game[other(seat)]) return fail(out, "bad_request", NOT_JOINED);
+  const text = cleanChat(input);
+  if (text === null) return fail(out, "bad_chat", "Let's keep it friendly.");
+  game.chat ??= [];
+  const last = [...game.chat].reverse().find((line) => line.seat === seat);
+  if (last && now - last.at < CHAT_GAP_MS) return fail(out, "too_fast", "One moment, then send again.");
+  game.chat.push({ seat, text, at: now });
+  if (game.chat.length > CHAT_KEEP) game.chat.splice(0, game.chat.length - CHAT_KEEP);
+  touch(game, out, now);
+  notify(out, "chat", seat, now);
   return out;
 }
 
@@ -837,6 +863,7 @@ export function view(game, now, connected = {}) {
       ? { white: game.remaining.white, black: game.remaining.black, running: game.running, since: game.since }
       : null,
     drawOffer: game.drawOffer,
+    chat: (game.chat ?? []).map((line) => ({ seat: line.seat, text: line.text, at: line.at })),
     rematch: game.rematch ? { by: game.rematch.by, code: game.rematch.code } : null,
     result: game.result ? { winner: game.result.winner, reason: game.result.reason } : null,
     leaveGraceMs: game.leaveGraceMs,

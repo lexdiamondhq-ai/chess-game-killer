@@ -18,7 +18,7 @@ struct ChallengeGameView: View {
     @State private var confirming: Confirmation?
     @State private var copied = false
     /// The React row is open over the dock.
-    @State private var reacting = false
+    @State private var chatting = false
     /// "Try again" on a game that would not open is fetching it now.
     @State private var retrying = false
 
@@ -49,6 +49,10 @@ struct ChallengeGameView: View {
             .sensoryFeedback(.impact(weight: .medium), trigger: game.drawOfferedToMe, condition: drawOfferBuzz)
             .animation(.snappy(duration: 0.35), value: game.phase)
             .onAppear { game.refreshIdleTimer() }
+            .sheet(isPresented: $chatting) {
+                FriendChatSheet(game: game, theme: theme)
+            }
+            .onChange(of: chatting) { _, open in game.chatOpen = open }
             .onChange(of: BoardView.playsIn3D(theme, setting: sculpted3D), initial: true) { _, threeD in
                 game.timeSounds(threeD: threeD)
             }
@@ -373,11 +377,6 @@ struct ChallengeGameView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .alignmentGuide(.top) { $0[.bottom] + 10 }
                         .transition(.move(edge: .bottom).combined(with: .opacity))
-                } else if reacting, game.canReact {
-                    reactionRow
-                        .fixedSize()
-                        .alignmentGuide(.top) { $0[.bottom] + 8 }
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
             .overlay(alignment: .bottom) {
@@ -408,10 +407,13 @@ struct ChallengeGameView: View {
                 confirming = game.canAbort ? .abort : .resign
             }
             .disabled(game.sending != nil)
-            if game.canReact {
-                FriendDockButton(title: "React", symbol: "face.smiling", isOn: reacting, theme: theme) {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) { reacting.toggle() }
+            // Chat took React's place (Alex's pick, 2026-11-27). The dot means new words from the friend.
+            if game.canChat {
+                FriendDockButton(title: "Chat", symbol: "bubble.left.and.text.bubble.right", isOn: chatting,
+                                 dot: game.unreadChat > 0, theme: theme) {
+                    chatting = true
                 }
+                .accessibilityValue(game.unreadChat > 0 ? "\(game.unreadChat) new" : "")
             }
             FriendDockButton(title: "Flip", symbol: "arrow.triangle.2.circlepath", theme: theme) {
                 withAnimation(.snappy) { game.match.flipBoard() }
@@ -424,23 +426,6 @@ struct ChallengeGameView: View {
         .padding(.horizontal, 16)
         .padding(.top, 6)
         .padding(.bottom, 6)
-    }
-
-    /// The quick bubbles React offers, in a row over the dock. A tap sends one and folds the row.
-    private var reactionRow: some View {
-        HStack(spacing: 8) {
-            ForEach(FriendReaction.allCases) { reaction in
-                Button {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) { reacting = false }
-                    Task { await game.react(reaction) }
-                } label: {
-                    FriendBubbleLabel(reaction: reaction, theme: theme)
-                }
-                .buttonStyle(ChallengePressStyle())
-                .accessibilityLabel("Send \(reaction.words)")
-            }
-        }
-        .padding(.horizontal, 12)
     }
 
     private var drawTitle: String {
@@ -929,13 +914,13 @@ struct FriendPlate: View {
             }
         }
         .overlay(alignment: .topTrailing) {
-            // A quick bubble this side sent (React), popping up over its line.
+            // A new chat message (or an older friend's quick bubble), popping up over its line.
             if let bubble = game.bubbles[seat] {
-                FriendBubbleLabel(reaction: bubble.reaction, theme: theme)
+                FriendBubbleLabel(text: bubble.text, emoji: bubble.reaction?.emoji, theme: theme)
                     .id(bubble.id)
                     .offset(x: -14, y: -18)
                     .transition(.scale(scale: 0.6, anchor: .bottomTrailing).combined(with: .opacity))
-                    .accessibilityLabel("\(name): \(bubble.reaction.words)")
+                    .accessibilityLabel("\(name): \(bubble.text)")
             }
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.7), value: game.bubbles[seat])
@@ -1265,6 +1250,8 @@ private struct FriendDockButton: View {
     let title: String
     let symbol: String
     var isOn: Bool? = nil
+    /// A small red dot on the coin: something new waits behind it.
+    var dot = false
     let theme: BoardTheme
     let action: () -> Void
 
@@ -1275,6 +1262,7 @@ private struct FriendDockButton: View {
     var body: some View {
         if theme.glows {
             DockButton(title: title, symbol: symbol, isOn: isOn, theme: theme, action: action)
+                .overlay(alignment: .top) { if dot { FriendDot().offset(x: 14, y: 2) } }
         } else {
             Button {
                 taps += 1
@@ -1282,6 +1270,8 @@ private struct FriendDockButton: View {
             } label: {
                 VStack(spacing: 4) {
                     FriendCoin(symbol: symbol, lit: isOn == true)
+                        .overlay(alignment: .topTrailing) { if dot { FriendDot().offset(x: 3, y: -2) } }
+                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: dot)
                     Text(title)
                         .font(.app(.caption2, weight: .medium))
                         .lineLimit(1)
@@ -1331,24 +1321,203 @@ private struct FriendCoin: View {
     }
 }
 
-/// A quick bubble: its emoji and words on a white chip with a gold rim.
+/// A bubble over a player's line: a new chat message (or a quick reaction with its emoji) on a
+/// white chip with a gold rim.
 private struct FriendBubbleLabel: View {
-    let reaction: FriendReaction
+    let text: String
+    var emoji: String? = nil
     let theme: BoardTheme
 
     var body: some View {
         HStack(spacing: 5) {
-            Text(reaction.emoji)
-                .font(.system(size: 14))
-            Text(reaction.words)
+            if let emoji {
+                Text(emoji)
+                    .font(.system(size: 14))
+            }
+            Text(text)
                 .font(theme.challengeFont(13, .semibold))
                 .foregroundStyle(Color(hex: 0x2A2116))
-                .lineLimit(1)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
         }
+        // Hugs short words; a long message wraps at 230 points.
+        .frame(maxWidth: 230, alignment: .leading)
+        .fixedSize()
         .padding(.horizontal, 11)
         .padding(.vertical, 6)
-        .background(Capsule().fill(Color.white))
-        .overlay { Capsule().strokeBorder(Polish.goldBase(dark: false).opacity(0.85), lineWidth: 1) }
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.white))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Polish.goldBase(dark: false).opacity(0.85), lineWidth: 1)
+        }
         .shadow(color: .black.opacity(0.18), radius: 6, y: 3)
+    }
+}
+
+/// The small red dot for something new.
+private struct FriendDot: View {
+    var body: some View {
+        Circle()
+            .fill(Color(hex: 0xD2412F))
+            .frame(width: 10, height: 10)
+            .overlay { Circle().strokeBorder(Color.white, lineWidth: 1.5) }
+            .transition(.scale.combined(with: .opacity))
+            .accessibilityHidden(true)
+    }
+}
+
+/// Chat with the friend: the messages so far (yours on the right in gold, theirs on the left in
+/// white), and a box to write in. Opened from the Chat coin in the dock.
+struct FriendChatSheet: View {
+    let game: OnlineGame
+    let theme: BoardTheme
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var draft = ""
+    @State private var sending = false
+    @FocusState private var writing: Bool
+
+    private var canSend: Bool {
+        !sending && game.canChat && !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            header
+            messages
+            inputRow
+        }
+        .background { FriendMarble(theme: theme).ignoresSafeArea() }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(28)
+    }
+
+    private var header: some View {
+        HStack {
+            Text("Chat with \(game.opponentName)")
+                .font(theme.challengeFont(17, .semibold))
+                .lineLimit(1)
+            Spacer()
+            Button("Done") { dismiss() }
+                .font(theme.challengeFont(15, .semibold))
+                .foregroundStyle(Polish.goldDeep(dark: theme.screenIsDark))
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 22)
+        .padding(.bottom, 10)
+    }
+
+    private var messages: some View {
+        ScrollViewReader { reader in
+            ScrollView {
+                LazyVStack(spacing: 8) {
+                    if game.chatLines.isEmpty {
+                        Text("Say hi to \(game.opponentName). Only the two of you see these.")
+                            .font(theme.challengeFont(14))
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.top, 30)
+                            .padding(.horizontal, 30)
+                    }
+                    ForEach(Array(game.chatLines.enumerated()), id: \.offset) { index, line in
+                        FriendChatRow(text: line.text, mine: line.seat == game.seat, theme: theme)
+                            .id(index)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .onAppear { reader.scrollTo(game.chatLines.count - 1, anchor: .bottom) }
+            .onChange(of: game.chatLines.count) { _, count in
+                withAnimation(.snappy) { reader.scrollTo(count - 1, anchor: .bottom) }
+                game.markChatRead()
+            }
+        }
+    }
+
+    private var inputRow: some View {
+        HStack(spacing: 10) {
+            TextField("Say something nice", text: $draft, axis: .vertical)
+                .font(theme.challengeFont(15))
+                .lineLimit(1...4)
+                .focused($writing)
+                .submitLabel(.send)
+                .onSubmit(send)
+                .onChange(of: draft) { _, new in
+                    if new.count > OnlineGame.chatLimit { draft = String(new.prefix(OnlineGame.chatLimit)) }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Color.white.opacity(theme.screenIsDark ? 0.1 : 0.85)))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .strokeBorder(Polish.goldBase(dark: theme.screenIsDark).opacity(0.6), lineWidth: 1)
+                }
+            Button(action: send) {
+                Image(systemName: "arrow.up")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(Color(hex: 0x2A1C08))
+                    .frame(width: 40, height: 40)
+                    .background {
+                        Circle().fill(LinearGradient(colors: [Color(hex: 0xEDCB82), Color(hex: 0xC49543)],
+                                                     startPoint: .top, endPoint: .bottom))
+                    }
+                    .overlay { Circle().strokeBorder(Polish.goldDeep(dark: false), lineWidth: 1) }
+                    .opacity(canSend ? 1 : 0.45)
+            }
+            .buttonStyle(ChallengePressStyle())
+            .disabled(!canSend)
+            .accessibilityLabel("Send")
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 12)
+    }
+
+    private func send() {
+        guard canSend else { return }
+        let words = draft
+        sending = true
+        Task {
+            if await game.sendChat(words) { draft = "" }
+            sending = false
+            writing = true
+        }
+    }
+}
+
+/// One chat message: yours on the right in gold, your friend's on the left in white.
+private struct FriendChatRow: View {
+    let text: String
+    let mine: Bool
+    let theme: BoardTheme
+
+    var body: some View {
+        HStack {
+            if mine { Spacer(minLength: 50) }
+            Text(text)
+                .font(theme.challengeFont(15))
+                .foregroundStyle(Color(hex: mine ? 0x2A1C08 : 0x2A2116))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
+                .background {
+                    let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    if mine {
+                        shape.fill(LinearGradient(colors: [Color(hex: 0xF1D592), Color(hex: 0xD2A452)],
+                                                  startPoint: .top, endPoint: .bottom))
+                    } else {
+                        shape.fill(Color.white)
+                    }
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(Polish.goldBase(dark: false).opacity(mine ? 0.9 : 0.6), lineWidth: 1)
+                }
+                .shadow(color: .black.opacity(0.08), radius: 3, y: 1)
+                .accessibilityLabel(mine ? "You: \(text)" : text)
+            if !mine { Spacer(minLength: 50) }
+        }
     }
 }

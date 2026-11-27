@@ -273,6 +273,17 @@ struct FriendGameState: Codable, Equatable, Sendable {
     var rated = false
     /// Each side's rating in a rated game; nil otherwise.
     var ratings: Ratings?
+    /// Short messages the two players sent each other (Chat), oldest first. The server keeps the last 60.
+    var chat: [ChatLine] = []
+    /// The server keeps chat (it says `chat`, even as an empty list): an older one doesn't, and then the app hides Chat.
+    var knowsChat = false
+
+    /// One chat message: who sent it, the words (already tidied by the server), and when (server milliseconds).
+    struct ChatLine: Codable, Equatable, Sendable {
+        var seat: FriendSeat
+        var text: String
+        var at: Double
+    }
 
     /// A rated game's ratings: as the game began, and once it is over and counted, after.
     struct Ratings: Codable, Equatable, Sendable {
@@ -300,7 +311,7 @@ struct FriendGameState: Codable, Equatable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case code, status, createdAt, updatedAt, clock, days, deadline, creator, white, black, moves, san, fen, turn
-        case clocks, drawOffer, rematch, result, leaveGraceMs, now, online, rated, ratings
+        case clocks, drawOffer, rematch, result, leaveGraceMs, now, online, rated, ratings, chat
     }
 
     subscript(seat: FriendSeat) -> Player {
@@ -339,6 +350,9 @@ extension FriendGameState {
         online = try c.decodeIfPresent(Bool.self, forKey: .online) ?? rated
         // Ratings the app can't read never hide the game itself.
         ratings = (try? c.decodeIfPresent(Ratings.self, forKey: .ratings)) ?? nil
+        knowsChat = c.contains(.chat)
+        // Lines the app can't read never hide the game itself.
+        chat = (try? c.decodeIfPresent([ChatLine].self, forKey: .chat)) ?? []
     }
 }
 

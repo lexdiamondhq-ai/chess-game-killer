@@ -34,11 +34,13 @@ final class TourSnapshotTests: XCTestCase {
 
     /// A game against a friend in the Rich finish (Alex's pick B, 2026-11-27): marble, gilded player
     /// cards with a glow on the side to move, gold crests, a gold rim on the flat board, the moves
-    /// on glass and the dock's gold coins with React; then the React row open and a bubble sent.
+    /// on glass and the dock's gold coins with Chat; then a message from the friend popping over
+    /// their line with the dot on Chat, and the chat panel.
     func testAFriendGame() throws {
         var state = FriendGameState.sample(moves: ["d2d4", "d7d5", "e2e4"], clock: nil, white: "Alex", black: "Chris")
-        state.white.knowsReactions = true
-        state.black.knowsReactions = true
+        state.knowsChat = true
+        state.chat = [FriendGameState.ChatLine(seat: .black, text: "Good luck!", at: state.now - 60_000),
+                      FriendGameState.ChatLine(seat: .white, text: "You too. Be gentle", at: state.now - 50_000)]
         let api = FakeChallengeAPI()
         api.games[state.code] = state
         let game = OnlineGame(record: .sample(state, seat: .white), api: api, sounds: nil, initial: state)
@@ -52,12 +54,22 @@ final class TourSnapshotTests: XCTestCase {
         .environment(center)
         let window = try show(view, wait: 4)
         try save(window, "tour-friend-game-1")
-        Task { await game.react(.nice) }
+        // Chris writes: the words pop over Chris's line and the Chat coin gets its dot.
+        var theirs = state
+        theirs.now += 2_000
+        theirs.updatedAt = theirs.now
+        theirs.chat.append(FriendGameState.ChatLine(seat: .black, text: "Ooh, a gambit?", at: theirs.now))
+        game.apply(theirs)
         RunLoop.main.run(until: Date().addingTimeInterval(1))
-        XCTAssertEqual(game.bubbles[.white]?.reaction, .nice)
-        XCTAssertEqual(api.actions.last?.action, .reactNice)
-        try save(window, "tour-friend-game-2-bubble")
+        XCTAssertEqual(game.bubbles[.black]?.text, "Ooh, a gambit?")
+        XCTAssertEqual(game.unreadChat, 1)
+        try save(window, "tour-friend-game-2-chat-bubble")
         window.isHidden = true
+
+        // The panel the coin opens.
+        let panel = try show(FriendChatSheet(game: game, theme: theme).screenScheme(theme), wait: 2)
+        try save(panel, "tour-friend-game-3-chat-panel")
+        panel.isHidden = true
     }
 
     func testSettingsFromTopToFoot() throws {
