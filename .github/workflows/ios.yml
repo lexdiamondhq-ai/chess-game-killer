@@ -14,6 +14,7 @@ on:
     paths:
       - "ChessGameKiller/**"
       - "ChessGameKillerTests/**"
+      - "ChessGameKillerUITests/**"
       - "ChessGameKillerWidget/**"
       - "Shared/**"
       - "Support/**"
@@ -24,6 +25,7 @@ on:
     paths:
       - "ChessGameKiller/**"
       - "ChessGameKillerTests/**"
+      - "ChessGameKillerUITests/**"
       - "ChessGameKillerWidget/**"
       - "Shared/**"
       - "Support/**"
@@ -44,14 +46,10 @@ on:
         description: Print every picture in the logs of the pictures jobs
         type: boolean
         default: false
-      design:
-        description: PREVIEW ONLY. Picture the design pass on the simulator instead of running the tests
-        type: boolean
-        default: false
 
 concurrency:
   # A run by hand in another tone waits for nothing and replaces nothing.
-  group: ios-${{ github.ref }}-${{ inputs.tone || 'light' }}${{ inputs.design && '-design' || '' }}
+  group: ios-${{ github.ref }}-${{ inputs.tone || 'light' }}
   # A newer push to a pull request replaces the run still going; runs on main always finish.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
@@ -60,7 +58,7 @@ jobs:
     # Alex builds on the newest Xcode, whose type checker gives up sooner on long
     # SwiftUI expressions. This build flags any expression slower than 150 ms.
     # It runs on main and by hand, not on every pull request push.
-    if: github.event_name != 'pull_request' && !inputs.design
+    if: github.event_name != 'pull_request'
     runs-on: macos-26
     timeout-minutes: 45
     steps:
@@ -104,7 +102,7 @@ jobs:
   build-and-test:
     # Pull requests and by hand. Adding a label other than "screenshots" starts no run.
     if: >-
-      (github.event_name == 'workflow_dispatch' && !inputs.design) ||
+      github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'pull_request' &&
        (github.event.action != 'labeled' || github.event.label.name == 'screenshots'))
     runs-on: macos-15
@@ -135,6 +133,29 @@ jobs:
           mkdir -p snapshots
           echo "$DEVICES" | jq -r '.[] | select(.udid == "'"$UDID"'") | "\(.name) \(.rt)"' > snapshots/device.txt
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+      - name: Tap through the app
+        # The unit tests below draw each screen, and a picture can't tell whether a tap opens
+        # anything (the vine on Learn did nothing when touched, 2026-11-27). These launch the app
+        # on the simulator and tap it (ChessGameKillerUITests). They run first, so a dead tap is
+        # known in minutes, and the app is removed afterwards so the unit tests start clean.
+        run: |
+          status=0
+          xcodebuild test \
+            -project ChessGameKiller.xcodeproj \
+            -scheme ChessGameKillerTaps \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 240 \
+            -maximum-test-execution-time-allowance 240 \
+            CODE_SIGNING_ALLOWED=NO > taps.log 2>&1 || status=$?
+          grep -E "Test Case .* (passed|failed)" taps.log | head -60 || true
+          # A failure says what was on the screen (TapTestCase.fail).
+          grep -E "error:|\*\* " taps.log | cut -c1-3200 | head -40 || true
+          grep -E "Executed" taps.log | tail -3 || true
+          # How often a tap had to wait for the app's animations to settle (each wait is slow).
+          echo "Waits for animations: $(grep -c "App animations complete notification not received" taps.log || true)"
+          xcrun simctl uninstall "${{ steps.sim.outputs.udid }}" com.chessgamekiller.app 2>/dev/null || true
+          exit $status
       - name: Build and test
         run: |
           status=0
@@ -239,7 +260,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-log
-          path: build.log
+          path: |
+            build.log
+            taps.log
       - name: Upload screen pictures
         if: always()
         uses: actions/upload-artifact@v4
@@ -297,6 +320,13 @@ jobs:
         if: failure()
         # The pictures above can push the test results out of the log's tail, so they come again, last.
         run: |
+          # The tap tests first: what failed, what was on the screen, and how long each step took.
+          if [ -f taps.log ]; then
+            grep -E "Test Case .* (passed|failed)" taps.log | head -60 || true
+            grep -E "error:|\*\* " taps.log | cut -c1-3200 | head -40 || true
+            grep -E "Executed" taps.log | tail -3 || true
+            grep -E "App animations complete notification not received|Failed to|Timed out|exceeded" taps.log | head -20 || true
+          fi
           [ -f build.log ] || exit 0
           grep -E "error:|Test Case .* failed|\*\* " build.log | head -80 || true
           grep -E "Executed" build.log | tail -3 || true
@@ -337,117 +367,6 @@ jobs:
           echo "Part ${{ matrix.part }}: $(wc -l < mine.txt) of $total pictures"
           while read -r f; do
             convert "$f" -resize x1100 -quality 72 /tmp/small.jpg
-            echo "BEGIN-SCREEN $(basename "$f")"
-            base64 -w 3000 /tmp/small.jpg
-            echo "END-SCREEN"
-          done < mine.txt
-
-  design-shots:
-    # PREVIEW ONLY (comes out before this merges): the design pass on real screens, in Light
-    # and Dark. One build on the newest Xcode (Liquid Glass, as on Alex's phone), then each
-    # screen launched once.
-    if: github.event_name == 'workflow_dispatch' && inputs.design
-    runs-on: macos-26
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v4
-      - name: Cache Stockfish networks
-        uses: actions/cache@v4
-        with:
-          path: .nnue-cache
-          key: nnue-1111cefa1111-37f18f62d772
-      - name: Generate Xcode project
-        run: |
-          brew install xcodegen
-          xcodegen
-      - name: Pick an iPhone simulator
-        id: sim
-        run: |
-          XCODE=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
-          [ -n "$XCODE" ] && sudo xcode-select -s "$XCODE"
-          xcodebuild -version
-          DEVICES=$(xcrun simctl list devices available -j \
-            | jq -c '[.devices | to_entries[] | select(.key | contains("iOS")) | .key as $rt | .value[] | select(.name | startswith("iPhone")) | {udid, name, rt: $rt}] | sort_by(.rt) | reverse')
-          UDID=$(echo "$DEVICES" | jq -r '([.[] | select(.name == "iPhone 17 Pro")] + .)[0].udid')
-          echo "$DEVICES" | jq -r '.[] | select(.udid == "'"$UDID"'") | "\(.name) \(.rt)"'
-          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
-      - name: Build
-        run: |
-          status=0
-          xcodebuild build \
-            -project ChessGameKiller.xcodeproj \
-            -scheme ChessGameKiller \
-            -destination "id=${{ steps.sim.outputs.udid }}" \
-            -derivedDataPath dd \
-            CODE_SIGNING_ALLOWED=NO > build.log 2>&1 || status=$?
-          grep -E "error:|\*\* " build.log | sort -u | head -80 || true
-          exit $status
-      - name: Picture each screen
-        run: |
-          UDID="${{ steps.sim.outputs.udid }}"
-          APP=$(find dd/Build/Products -type d -name ChessGameKiller.app | head -1)
-          [ -n "$APP" ] || { echo "No app was built"; exit 1; }
-          xcrun simctl boot "$UDID" 2>/dev/null || true
-          xcrun simctl bootstatus "$UDID" -b
-          xcrun simctl install "$UDID" "$APP"
-          xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3 || true
-          mkdir -p shots
-          BUNDLE=com.chessgamekiller.app
-          snap() {
-            name=$1; wait=$2; shift 2
-            xcrun simctl terminate "$UDID" $BUNDLE 2>/dev/null || true
-            xcrun simctl launch "$UDID" $BUNDLE -welcomeSeen YES -tipsOff YES -introFilmSeen YES "$@" >/dev/null || { echo "Could not launch $name"; return 0; }
-            sleep "$wait"
-            xcrun simctl io "$UDID" screenshot "shots/$name.png" >/dev/null && echo "$name.png" || echo "No screenshot for $name"
-          }
-          # The first launch after an install is slow, and so is the first 3D board; these are thrown away.
-          xcrun simctl launch "$UDID" $BUNDLE -welcomeSeen YES -tipsOff YES -introFilmSeen YES >/dev/null || true
-          sleep 20
-          snap warm-up 14 -homeTone light
-          rm -f shots/warm-up.png
-          for tone in light dark; do
-            snap home-$tone 9 -homeTone $tone
-            snap friends-$tone 10 -homeTone $tone -showcaseGames YES -showcaseHomeAt friends
-            snap rooms-$tone 9 -homeTone $tone -showcaseShortcuts YES
-            snap you-$tone 9 -homeTone $tone -showcaseYou YES
-            snap daily-$tone 10 -homeTone $tone -showcaseDaily YES
-            for screen in learn settings newgame analyze puzzles army games premium; do
-              snap $screen-$tone 9 -homeTone $tone -showcaseOpen $screen
-            done
-          done
-          xcrun simctl terminate "$UDID" $BUNDLE 2>/dev/null || true
-          ls shots | wc -l
-      - name: Upload the pictures
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: design-shots
-          path: shots
-          if-no-files-found: ignore
-
-  design-pictures:
-    # PREVIEW ONLY: prints the pictures in a Linux job's log, as the pictures jobs do.
-    if: always() && github.event_name == 'workflow_dispatch' && inputs.design
-    needs: design-shots
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        part: [1, 2, 3]
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: design-shots
-          path: shots
-      - name: Print this third of the pictures
-        run: |
-          command -v convert >/dev/null || { sudo apt-get update -qq; sudo apt-get install -y -qq imagemagick; }
-          ls shots/*.png | sort > all.txt
-          awk -v p="${{ matrix.part }}" 'NR % 3 == p % 3' all.txt > mine.txt
-          echo "part ${{ matrix.part }}: $(wc -l < mine.txt) pictures"
-          while read -r f; do
-            convert "$f" -resize x1500 -quality 78 /tmp/small.jpg
             echo "BEGIN-SCREEN $(basename "$f")"
             base64 -w 3000 /tmp/small.jpg
             echo "END-SCREEN"
