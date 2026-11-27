@@ -51,7 +51,8 @@ struct ContentView: View {
     /// Army news waiting for its turn as the banner, and the task that shows them in order.
     @State private var newsQueue: [ArmyNews] = []
     @State private var newsTurn: Task<Void, Never>?
-    @State private var vault = GameVault.live()
+    /// The player's own games; the tap tests and CI's pictures bring a sample player (`-showcaseDNA YES`).
+    @State private var vault = Showcase.vault() ?? GameVault.live()
     /// Grades the games played against people, quietly, after they end. Made the first time it is wanted.
     @State private var quietGrader: QuietGrader?
     @State private var showingGames = false
@@ -623,13 +624,17 @@ struct ContentView: View {
         if let screen = UserDefaults.standard.string(forKey: "showcaseOpen") { openForShowcase(screen) }
     }
 
-    /// The screens CI can picture on the simulator: `-showcaseOpen learn` (or settings, analyze,
+    /// The screens CI can picture on the simulator: `-showcaseOpen learn` (or dna, settings, analyze,
     /// newgame, puzzles, army, games, premium). A normal launch never passes it.
     private func openForShowcase(_ screen: String) {
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(1.2))
             switch screen {
             case "learn": showingTraining = true
+            // Learn opened on Chess DNA, as Home's Chess DNA card opens it.
+            case "dna":
+                trainingDoor = .games
+                showingTraining = true
             case "settings": showingSettings = true
             case "analyze": showingAnalyze = true
             case "newgame": showingNewGame = true
