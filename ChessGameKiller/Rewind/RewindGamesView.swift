@@ -105,7 +105,7 @@ struct RewindGamesView: View {
         let next = vault.games.first { $0.leftToRewrite > 0 }
         return VStack(alignment: .leading, spacing: 8) {
             Text("This week")
-                .font(.app(.caption, weight: .semibold))
+                .font(.carved(11))
                 .tracking(2)
                 .textCase(.uppercase)
                 .foregroundStyle(RewindPalette.goldInk(on: theme))

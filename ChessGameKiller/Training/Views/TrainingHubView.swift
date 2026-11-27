@@ -300,8 +300,8 @@ struct TodayCard: View {
             HStack(alignment: .top, spacing: 14) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(eyebrow(done: done))
-                        .font(.app(.caption, weight: .bold))
-                        .tracking(1)
+                        .font(.carved(11))
+                        .tracking(1.4)
                         .foregroundStyle(theme.trainingAccent)
                     Text(title)
                         .font(.display(.title2, weight: .semibold))

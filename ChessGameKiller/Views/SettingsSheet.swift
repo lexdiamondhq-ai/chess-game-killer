@@ -275,7 +275,7 @@ struct SettingsSheet: View {
                          threeD: theme.sculptedLook != nil && sculpted3D, pieceSet: pieceSet)
                 .padding(.top, 6)
             Text("Live preview")
-                .font(.app(.caption, weight: .semibold))
+                .font(.carved(11))
                 .tracking(1.5)
                 .textCase(.uppercase)
                 .foregroundStyle(.secondary)

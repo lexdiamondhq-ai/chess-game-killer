@@ -396,12 +396,7 @@ private struct TalkPanelVerdicts: View {
 
     private var header: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text("LEO CHECKED")
-                .font(.app(.caption, weight: .semibold))
-                .tracking(1.1)
-                .foregroundStyle(.secondary)
-                .accessibilityAddTraits(.isHeader)
-            Spacer(minLength: 0)
+            SectionLabel(text: "Leo checked")
             if check.judgedCount > 0 {
                 Text("\(check.rightCount) of \(check.judgedCount) right")
                     .font(theme.talkFont(.footnote, .semibold))
