@@ -29,9 +29,28 @@ class TapTestCase: XCTestCase {
 
     // MARK: Finding
 
-    /// The first button with exactly this label.
-    func button(_ label: String) -> XCUIElement {
-        app.buttons.matching(Self.named(label)).firstMatch
+    // The Home stays in the accessibility tree under a screen opened over it, so a search can
+    // match one of its buttons as well ("Sharpen your eye" under Chess DNA's "Sharpen"). Each
+    // search is a query, and a tap goes to the first match that can really be touched.
+
+    /// Buttons with exactly this label.
+    func buttons(_ label: String) -> XCUIElementQuery {
+        app.buttons.matching(Self.named(label))
+    }
+
+    /// Buttons whose label starts with these words.
+    func buttons(startingWith words: String) -> XCUIElementQuery {
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", words))
+    }
+
+    /// Buttons whose label ends with these words.
+    func buttons(endingWith words: String) -> XCUIElementQuery {
+        app.buttons.matching(NSPredicate(format: "label ENDSWITH %@", words))
+    }
+
+    /// Buttons with these words anywhere in their label.
+    func buttons(containing words: String) -> XCUIElementQuery {
+        app.buttons.matching(NSPredicate(format: "label CONTAINS %@", words))
     }
 
     /// The navigation bar of the page with this title.
@@ -39,61 +58,57 @@ class TapTestCase: XCTestCase {
         app.navigationBars.matching(Self.named(title)).firstMatch
     }
 
-    /// By label or by identifier: a navigation bar carries its title as its identifier.
-    private static func named(_ name: String) -> NSPredicate {
-        NSPredicate(format: "label == %@ OR identifier == %@", name, name)
-    }
-
-    /// The first button whose label starts with these words.
-    func button(startingWith words: String) -> XCUIElement {
-        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", words)).firstMatch
-    }
-
-    /// The first button with these words anywhere in its label.
-    func button(containing words: String) -> XCUIElement {
-        app.buttons.matching(NSPredicate(format: "label CONTAINS %@", words)).firstMatch
-    }
-
     /// Anything with exactly this label, whatever kind of element SwiftUI made it.
     func anything(labeled label: String) -> XCUIElement {
         app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", label)).firstMatch
     }
 
+    /// By label or by identifier: a navigation bar carries its title as its identifier.
+    private static func named(_ name: String) -> NSPredicate {
+        NSPredicate(format: "label == %@ OR identifier == %@", name, name)
+    }
+
     // MARK: Tapping
 
-    /// Scrolls the page until the element can be touched, then touches it.
+    /// Scrolls the page until one of the matches can be touched, then touches it.
     /// `scrolls` off waits for it where it is (the Home's own bar never needs a scroll).
-    func tap(_ element: XCUIElement, _ name: String, scrolls: Bool = true,
+    func tap(_ matches: XCUIElementQuery, _ name: String, scrolls: Bool = true,
              file: StaticString = #filePath, line: UInt = #line) {
         // A screen that is still arriving gets a moment before anything is dragged.
-        let settled = Date().addingTimeInterval(scrolls ? 4 : Self.patience)
-        while !canTouch(element), Date() < settled {
+        let settled = Date().addingTimeInterval(scrolls ? 1.5 : Self.patience)
+        var found = touchable(matches)
+        while found == nil, Date() < settled {
             Thread.sleep(forTimeInterval: 0.3)
+            found = touchable(matches)
         }
         if scrolls {
             // Further down the page first (rows in a lazy grid don't exist until they are near), then back up.
             var moves = 0
-            while !canTouch(element), moves < 12 {
-                drag(from: 0.72, to: 0.36)
+            while found == nil, moves < 8 {
+                drag(from: 0.78, to: 0.30)
                 moves += 1
+                found = touchable(matches)
             }
-            while !canTouch(element), moves < 24 {
-                drag(from: 0.36, to: 0.72)
+            while found == nil, moves < 16 {
+                drag(from: 0.30, to: 0.78)
                 moves += 1
+                found = touchable(matches)
             }
         }
-        guard canTouch(element) else {
+        guard let found else {
             fail("\(name) can't be touched", file: file, line: line)
             return
         }
-        element.tap()
+        found.tap()
     }
 
-    private func canTouch(_ element: XCUIElement) -> Bool {
-        element.exists && element.isHittable
+    /// The first match a finger could reach: on the screen, with nothing over it.
+    private func touchable(_ matches: XCUIElementQuery) -> XCUIElement? {
+        matches.allElementsBoundByIndex.first { $0.isHittable }
     }
 
     /// A slow drag up or down the middle of the screen, so the page scrolls without a fling.
+    /// Under half a screen at a time, so nothing is carried past unseen.
     private func drag(from start: CGFloat, to end: CGFloat) {
         let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: start))
         let to = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: end))
@@ -133,19 +148,21 @@ class TapTestCase: XCTestCase {
     }
 
     /// Fails unless one of these buttons arrives.
-    func expectButton(among labels: [String], _ message: String, file: StaticString = #filePath, line: UInt = #line) {
-        let deadline = Date().addingTimeInterval(Self.patience)
+    func expectButton(among labels: [String], _ message: String, patience: TimeInterval = TapTestCase.patience,
+                      file: StaticString = #filePath, line: UInt = #line) {
+        let deadline = Date().addingTimeInterval(patience)
         repeat {
-            if labels.contains(where: { button($0).exists }) { return }
+            if labels.contains(where: { buttons($0).firstMatch.exists }) { return }
             Thread.sleep(forTimeInterval: 0.4)
         } while Date() < deadline
         fail(message, file: file, line: line)
     }
 
     /// Fails unless a training session opened: its intro, its lesson or its first position.
-    func expectSession(after action: String, file: StaticString = #filePath, line: UInt = #line) {
+    func expectSession(after action: String, patience: TimeInterval = TapTestCase.patience,
+                       file: StaticString = #filePath, line: UInt = #line) {
         expectButton(among: ["End session", "Close lesson", "Skip the lesson", "Let's go"],
-                     "\(action) did not start a session", file: file, line: line)
+                     "\(action) did not start a session", patience: patience, file: file, line: line)
     }
 
     /// Fails unless a finished game opened in Rewind.
