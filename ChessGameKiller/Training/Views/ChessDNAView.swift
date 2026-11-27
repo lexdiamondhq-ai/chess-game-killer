@@ -26,7 +26,7 @@ struct ChessDNACard: View {
                 DNATraitBars(traits: dna.traits, theme: theme, compact: true)
             }
             if dna.weapon != nil || dna.leak != nil {
-                HStack(alignment: .top, spacing: 10) {
+                DNAChipPair {
                     if let weapon = dna.weapon {
                         DNAChip(label: "WEAPON", title: weapon.title, symbol: weapon.symbol,
                                 tint: TrainingColor.green.color(on: theme), theme: theme)
@@ -316,10 +316,12 @@ struct DNAChip: View {
     let theme: BoardTheme
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(alignment: .top, spacing: 8) {
             Image(systemName: symbol)
                 .font(.system(size: 13, weight: .bold))
                 .foregroundStyle(tint)
+                .frame(width: 16)
+                .padding(.top, 1)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
                 Text(label)
@@ -334,8 +336,43 @@ struct DNAChip: View {
             Spacer(minLength: 0)
         }
         .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .dnaChipFrame()
         .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(tint.opacity(0.12)))
+    }
+}
+
+/// The weapon and the leak side by side, always one size (Alex, 2026-11-27: "The weapon and leak
+/// shapes are not the same"). Each chip was only as tall as its own words, so a weapon that wraps
+/// onto a second line ("Middlegame decisions") stood taller than a one-line leak ("Loose pieces").
+/// The row now takes the taller chip's height and both chips fill it, their words starting on the
+/// same top line. Used by the Chess DNA card on Learn and the one on Home.
+struct DNAChipPair<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            content
+        }
+        // Asks each chip for its natural height, keeps the tallest, then lets both fill it.
+        .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// The size of each weapon and leak chip as laid out, for the test that keeps the pair one size.
+struct DNAChipSizes: PreferenceKey {
+    static let defaultValue: [CGSize] = []
+    static func reduce(value: inout [CGSize], nextValue: () -> [CGSize]) {
+        value += nextValue()
+    }
+}
+
+extension View {
+    /// A weapon or leak chip filling its half of a ``DNAChipPair``, words at the top left.
+    func dnaChipFrame() -> some View {
+        frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(GeometryReader { proxy in
+                Color.clear.preference(key: DNAChipSizes.self, value: [proxy.size])
+            })
     }
 }
 
