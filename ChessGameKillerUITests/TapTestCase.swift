@@ -164,7 +164,8 @@ class TapTestCase: XCTestCase {
     /// edge of the screen, and while the page is still gliding. A tap on the edge strip (the Home
     /// indicator's) or on a moving page may open nothing, with nothing wrong in the app. So the
     /// row is brought up clear of the strip, as a thumb would bring it, and the page is left to
-    /// stop. Each lift is written down ("TAPNOTE"), so the log says when it was needed.
+    /// stop. Each lift and each wait for a moving page is written down ("TAPNOTE"), so the log
+    /// says when either was needed.
     /// Nil when the row can't be touched any more.
     private func rested(_ matches: XCUIElementQuery, _ reached: XCUIElement, _ name: String,
                         at spot: CGVector?) -> XCUIElement? {
@@ -187,12 +188,17 @@ class TapTestCase: XCTestCase {
             frame = moved
         }
         // Still, when two looks in a row find it in the same place.
+        var glides = 0
         for _ in 0..<8 {
             Thread.sleep(forTimeInterval: 0.25)
             guard element.exists else { return waitTouchable(matches, patience: 3) }
             let now = element.frame
             if now == frame { break }
+            glides += 1
             frame = now
+        }
+        if glides > 0 {
+            print("TAPNOTE Waited for \(name): the page was still moving when it came into reach (\(glides) looks)")
         }
         return element
     }
