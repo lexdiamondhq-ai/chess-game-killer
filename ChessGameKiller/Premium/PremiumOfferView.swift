@@ -431,13 +431,20 @@ extension View {
 struct PremiumLimitCard: View {
     let feature: PremiumFeature
     let accent: Color
+    /// On the gold looks the crown sits on its amber stone and the button is the gold main
+    /// button; a look with its own color (Neon, Blueprint) keeps that color.
+    var gilded = false
     @State private var offer: PremiumFeature?
 
     var body: some View {
         VStack(spacing: 14) {
-            Image(systemName: "crown.fill")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(accent)
+            if gilded {
+                JewelIcon(symbol: "crown.fill", stone: .amber, size: 40)
+            } else {
+                Image(systemName: "crown.fill")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(accent)
+            }
             Text(Premium.shared.limitLine(feature))
                 .font(.app(.subheadline, weight: .medium))
                 .multilineTextAlignment(.center)
@@ -449,10 +456,16 @@ struct PremiumLimitCard: View {
                 } label: {
                     Text("See Premium")
                         .font(.app(.headline))
-                        .foregroundStyle(Color.black)
+                        .foregroundStyle(gilded ? Polish.onMetal : Color.black)
                         .frame(maxWidth: 260)
                         .frame(height: 48)
-                        .background(accent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .background {
+                            if gilded {
+                                PolishedFill(shape: Capsule(), quiet: true)
+                            } else {
+                                RoundedRectangle(cornerRadius: 14, style: .continuous).fill(accent)
+                            }
+                        }
                 }
                 .buttonStyle(ChallengePressStyle())
             }

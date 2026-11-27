@@ -317,8 +317,7 @@ struct ArmyView: View {
         VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("TODAY'S QUEST")
-                    .font(.system(size: 10.5, weight: .bold))
-                    .tracking(1.3)
+                    .eyebrow()
                     .foregroundStyle(theme.trainingAccent)
                 Text(quest.line(store))
                     .font(.app(.subheadline))

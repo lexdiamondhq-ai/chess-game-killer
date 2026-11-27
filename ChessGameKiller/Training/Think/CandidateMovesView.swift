@@ -472,12 +472,17 @@ private struct CandidateRoundSummary: View {
             ScrollView {
                 VStack(spacing: 16) {
                     VStack(spacing: 10) {
-                        Image(systemName: "list.number")
-                            .font(.system(size: 28, weight: .semibold))
-                            .foregroundStyle(theme.trainingAccent)
-                            .frame(width: 60, height: 60)
-                            .background(theme.trainingAccent.opacity(0.14),
-                                        in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        if theme.screenTone != nil {
+                            // Calculation's own stone, as on its door.
+                            JewelIcon(symbol: "list.number", stone: TrainDoor.calculation.stone, size: 60)
+                        } else {
+                            Image(systemName: "list.number")
+                                .font(.system(size: 28, weight: .semibold))
+                                .foregroundStyle(theme.trainingAccent)
+                                .frame(width: 60, height: 60)
+                                .background(theme.trainingAccent.opacity(0.14),
+                                            in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        }
                         Text("\(round.points)")
                             .font(.app(.largeTitle, weight: .bold).monospacedDigit())
                             .foregroundStyle(theme.trainingAccent)

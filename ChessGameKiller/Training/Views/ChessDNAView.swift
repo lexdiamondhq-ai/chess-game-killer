@@ -14,8 +14,7 @@ struct ChessDNACard: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline) {
                 Text("YOUR CHESS DNA")
-                    .font(.app(.caption, weight: .bold))
-                    .tracking(1)
+                    .eyebrow()
                     .foregroundStyle(theme.trainingAccent)
                 Spacer()
                 Text(ChessDNAView.basis(dna))

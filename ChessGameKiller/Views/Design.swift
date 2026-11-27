@@ -135,6 +135,14 @@ struct SectionLabel: View {
     }
 }
 
+extension Text {
+    /// A card's eyebrow: a few carved capitals over its headline ("NEXT UP", "RATED"), in the
+    /// same hand as a group's label, so a card and the group above it read as one family.
+    func eyebrow() -> Text {
+        font(.carved(11)).tracking(1.4)
+    }
+}
+
 // MARK: - Jewels
 
 /// A door's own stone: a fine gold drawing on a deep jewel tile, the look of Home's Today tiles
@@ -190,10 +198,17 @@ struct AuroraWash: View {
         .accessibilityHidden(true)
     }
 
+    /// One pool of light. The gradient is elliptical, so it reaches nothing at the very edge of
+    /// its own frame all the way round, and it falls away on a soft curve: no rim to be seen.
     private func glow(_ color: Color, opacity: Double, at point: CGPoint, size: CGFloat) -> some View {
-        Ellipse()
-            .fill(RadialGradient(colors: [color.opacity(opacity), color.opacity(0)],
-                                 center: .center, startRadius: 0, endRadius: size / 2))
+        let stops: [Gradient.Stop] = [
+            .init(color: color.opacity(opacity), location: 0),
+            .init(color: color.opacity(opacity * 0.72), location: 0.3),
+            .init(color: color.opacity(opacity * 0.3), location: 0.6),
+            .init(color: color.opacity(opacity * 0.07), location: 0.85),
+            .init(color: color.opacity(0), location: 1)
+        ]
+        return EllipticalGradient(stops: stops, center: .center, startRadiusFraction: 0, endRadiusFraction: 0.5)
             .frame(width: size, height: size * 0.8)
             .position(point)
     }

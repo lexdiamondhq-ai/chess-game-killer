@@ -287,12 +287,15 @@ struct ChallengeChip: View {
                 .font(theme.challengeFont(size, .semibold).monospacedDigit())
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
-                .foregroundStyle(isOn ? theme.onChallengeAccent : Color.primary)
+                .foregroundStyle(ink)
                 .padding(.horizontal, 6)
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .background {
                     let shape = Capsule(style: .continuous)
-                    if isOn {
+                    if isOn, theme.screenTone != nil {
+                        // The chosen one is cut from the main button's gold, without its glow.
+                        PolishedFill(shape: shape, quiet: true)
+                    } else if isOn {
                         shape.fill(theme.challengeAccent)
                     } else {
                         Color.clear.challengeGlass(shape)
@@ -303,6 +306,11 @@ struct ChallengeChip: View {
         .buttonStyle(ChallengePressStyle())
         .animation(.snappy(duration: 0.2), value: isOn)
         .accessibilityAddTraits(isOn ? .isSelected : [])
+    }
+
+    private var ink: Color {
+        guard isOn else { return .primary }
+        return theme.screenTone == nil ? theme.onChallengeAccent : Polish.onMetal
     }
 }
 

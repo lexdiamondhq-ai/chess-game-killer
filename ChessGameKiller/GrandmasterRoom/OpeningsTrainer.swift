@@ -177,7 +177,7 @@ struct OpeningsView: View {
                 everyOpening
                     .padding(.top, 8)
             } else if !allOpen {
-                PremiumLimitCard(feature: .allOpenings, accent: theme.trainingAccent)
+                PremiumLimitCard(feature: .allOpenings, accent: theme.trainingAccent, gilded: theme.screenTone != nil)
                     .padding(.top, 20)
             } else if matches.isEmpty {
                 Text("No opening matches \u{201C}\(query)\u{201D}.")
@@ -223,8 +223,7 @@ struct OpeningsView: View {
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 Text("YOUR REPERTOIRE")
-                    .font(.app(.caption, weight: .bold))
-                    .tracking(1)
+                    .eyebrow()
                     .foregroundStyle(theme.trainingAccent)
                 Spacer()
                 if count > 0 {

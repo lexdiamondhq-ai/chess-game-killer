@@ -183,7 +183,7 @@ struct TalkPanelConversation: View {
                     .transition(arrival)
             }
             if session.phase == .failed, session.outOfTalks {
-                PremiumLimitCard(feature: .talk, accent: theme.challengeAccent)
+                PremiumLimitCard(feature: .talk, accent: theme.challengeAccent, gilded: theme.screenTone != nil)
                     .id(Self.problemID)
                     .transition(arrival)
             } else if session.phase == .failed {

@@ -70,8 +70,7 @@ struct EndgamesDoorView: View {
         return VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline) {
                 Text(next == nil ? "ALL LEARNED" : "NEXT UP")
-                    .font(.app(.caption, weight: .bold))
-                    .tracking(1)
+                    .eyebrow()
                     .foregroundStyle(theme.trainingAccent)
                 Spacer()
                 Text("\(progress.doneCount) of \(progress.total)")

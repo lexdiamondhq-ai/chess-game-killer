@@ -47,7 +47,7 @@ struct GamesDoorView: View {
                     if whole {
                         CoachReportCard(report: report, theme: theme)
                     } else {
-                        PremiumLimitCard(feature: .coachProfile, accent: theme.trainingAccent)
+                        PremiumLimitCard(feature: .coachProfile, accent: theme.trainingAccent, gilded: theme.screenTone != nil)
                     }
                 } else if (dna?.gamesRead ?? 0) == 0 || !Premium.shared.opens(.coachProfile) {
                     waitingCard(gamesRead: report.gamesRead)
@@ -313,8 +313,7 @@ struct CoachReportCard: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline) {
                 Text("WHAT \(Coach.current.name.uppercased()) SEES")
-                    .font(.app(.caption, weight: .bold))
-                    .tracking(1)
+                    .eyebrow()
                     .foregroundStyle(theme.trainingAccent)
                 Spacer()
                 Text(report.gamesRead == 1 ? "Your last game" : "Your last \(report.gamesRead) games")

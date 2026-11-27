@@ -85,9 +85,9 @@ struct RewindGamesView: View {
 
     private var empty: some View {
         VStack(spacing: 10) {
-            Image(systemName: "backward.circle")
-                .font(.system(size: 44, weight: .light))
-                .foregroundStyle(.secondary)
+            // The same jade stone "Your games" wears in the You panel.
+            JewelIcon(symbol: Glyphs.games, stone: .jade, size: 64)
+                .padding(.bottom, 6)
             Text("No games yet")
                 .font(.display(.title3, weight: .semibold))
             Text("Finish a game and it lands here. Rewind it to see the moments that mattered, then go back and fix them.")

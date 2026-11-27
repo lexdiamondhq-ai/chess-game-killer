@@ -54,7 +54,7 @@ struct PuzzlesView: View {
                         Spacer()
                     } else if let limit {
                         Spacer()
-                        PremiumLimitCard(feature: limit, accent: theme.trainingAccent)
+                        PremiumLimitCard(feature: limit, accent: theme.trainingAccent, gilded: theme.screenTone != nil)
                             .padding(.horizontal, 16)
                         Spacer()
                     } else if mode == .rush, rush == nil || rush?.isOver == true {
