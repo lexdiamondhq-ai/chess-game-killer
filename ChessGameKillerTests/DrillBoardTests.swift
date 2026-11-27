@@ -93,8 +93,12 @@ final class DrillBoardTests: XCTestCase {
         XCTAssertEqual(bestLayers.stone.count, 3)
         XCTAssertEqual(bestLayers.ground.count, 2)
         XCTAssertEqual(nextLayers.ground.count, 2)
-        // They are see-through, with no edge to show through them.
-        XCTAssertTrue(bestLayers.edge.isEmpty)
+        // They are nearly solid with a thin white edge, like a coach's, so they read on any square
+        // (Alex's pick "crisp", 2026-11-26).
+        XCTAssertFalse(bestLayers.edge.isEmpty)
+        XCTAssertFalse(nextLayers.edge.isEmpty)
+        XCTAssertGreaterThan(ArrowColors.seeThrough.best, 0.9)
+        XCTAssertGreaterThan(ArrowColors.seeThrough.next, 0.85)
         XCTAssertFalse(SculptedBoardScene.arrowLayers(SculptedCoachArrow(from: .e2, to: .e4, color: 0x2E9E48)).edge.isEmpty)
         XCTAssertTrue(SculptedBoardScene.arrowLayers(SculptedCoachArrow(from: .e2, to: .e4, color: 0x2E9E48)).ground.isEmpty)
         // Each part's see-through amount is carried with it, for its node, and is never solid.

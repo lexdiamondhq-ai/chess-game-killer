@@ -596,21 +596,33 @@ final class AnalysisModel {
         settle(on: board.position.fen)
     }
 
-    /// A move has landed: the board, its sound, and a fresh look.
+    /// A move has landed: the board, its sound, and a fresh look. On the 3D board the piece glides
+    /// there first, so the sound waits for it to touch down, as it does in a game.
     private func land(on fen: String, uci: String, move: Move) {
-        lastMove = Notation.squares(of: uci)
+        let squares = Notation.squares(of: uci)
+        lastMove = squares
         if let sounds {
+            let landing = Self.landing(of: move, squares: squares, lifted: selected != nil)
             if TrainingChess.isCapture(move) {
-                sounds.play(.capture)
+                sounds.play(.capture, after: landing)
             } else if TrainingChess.givesCheck(move) {
-                sounds.play(.check)
+                sounds.play(.check, after: landing)
             } else if case .castle = move.result {
-                sounds.play(.castle)
+                sounds.play(.castle, after: landing)
             } else {
-                sounds.play(.move)
+                sounds.play(.move, after: landing)
             }
         }
         settle(on: fen)
+    }
+
+    /// Seconds until `move`'s piece touches down on Analyze's board: 0 on the flat board.
+    private static func landing(of move: Move, squares: (from: Square, to: Square)?, lifted: Bool) -> TimeInterval {
+        guard MoveSound.boardIs3D, let squares else { return 0 }
+        var taken: Piece.Kind?
+        if case .capture(let captured) = move.result { taken = captured.kind }
+        return SculptedBoardScene.touchdown(from: squares.from, to: squares.to, knight: move.piece.kind == .knight,
+                                            taken: taken, lifted: lifted)
     }
 
     private func settle(on fen: String) {

@@ -408,14 +408,17 @@ final class SculptedBoardScene {
         // A pawn that waited on the last rank for the picker: its new piece rises in its place.
         // One played in one go (the computer's, or Leo's for the person) walks there first.
         if promotion, game.promotedInPlace { return riseDelay + riseTime }
-        let taken = game.captureEvents.last?.piece.kind
-        let timing = MoveTiming(
-            from: squares.from, to: squares.to,
-            knight: !promotion && game.piece(at: squares.to)?.kind == .knight,
-            capturing: move.isCapture, lifted: byPerson,
-            dramatic: move.isCapture && (taken == .queen || taken == .rook)
-        )
-        return timing.touchdown
+        return touchdown(from: squares.from, to: squares.to,
+                         knight: !promotion && game.piece(at: squares.to)?.kind == .knight,
+                         taken: move.isCapture ? game.captureEvents.last?.piece.kind : nil, lifted: byPerson)
+    }
+
+    /// Seconds from one piece starting its move until it touches down on the 3D board: a knight
+    /// hops, a capture (`taken`, the piece it takes) slows down, a queen or rook taken most, and a
+    /// piece already lifted by the person sets off sooner. Same timing as the animation.
+    static func touchdown(from: Square, to: Square, knight: Bool, taken: Piece.Kind?, lifted: Bool) -> TimeInterval {
+        MoveTiming(from: from, to: to, knight: knight, capturing: taken != nil, lifted: lifted,
+                   dramatic: taken == .queen || taken == .rook).touchdown
     }
 
     /// Seconds from a mating move being played until the fallen king has settled.
@@ -1497,8 +1500,8 @@ final class SculptedBoardScene {
     static func arrowLayers(_ arrow: SculptedCoachArrow, lying: Bool = false) -> ArrowLayers {
         // Together solid, as the flat board's crisp arrow; over a piece in front, only the faint one.
         // The next best analysis arrow is quieter, as on the flat board.
-        // Analysis's are see-through, as tinted glass; their parts only touch, so none shows darker
-        // where they would overlap, and they have no edge, which would show through them.
+        // Analysis's are nearly solid with the same thin white edge; their parts only touch, so none
+        // shows darker where they would overlap.
         let strength: CGFloat = arrow.analysis
             ? CGFloat(arrow.best ? ArrowColors.seeThrough.best : ArrowColors.seeThrough.next) : 0.97
         let seen: CGFloat = min(0.35, strength * 0.5)
@@ -1519,7 +1522,7 @@ final class SculptedBoardScene {
         }
         // A solid arrow's middle outline is its shaft, one strip down the curve.
         let strips = outlines.indices.map { !arrow.dashed && outlines.count == 3 && $0 == 1 }
-        let edges = arrow.analysis ? [] : outlines.map { ArrowOutline.grown($0, by: 0.03) }
+        let edges = outlines.map { ArrowOutline.grown($0, by: 0.03) }
         let stone = (strength - seen) / (1 - seen)
         var ground: [ArrowLayers.Part] = []
         if p.rise > 0 {
@@ -1584,8 +1587,15 @@ final class SculptedBoardScene {
         return geometry
     }
 
+    /// A hex color as SceneKit vertex color. SceneKit reads vertex colors as linear light, so the
+    /// sRGB hex is converted first; passed as is, every 3D arrow came out lighter and more washed
+    /// out than the color picked for it.
     private static func rgb(_ hex: UInt32) -> SIMD3<Float> {
-        SIMD3(Float((hex >> 16) & 0xFF) / 255, Float((hex >> 8) & 0xFF) / 255, Float(hex & 0xFF) / 255)
+        func linear(_ byte: UInt32) -> Float {
+            let v = Float(byte & 0xFF) / 255
+            return v <= 0.04045 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4)
+        }
+        return SIMD3(linear(hex >> 16), linear(hex >> 8), linear(hex))
     }
 
     /// A square's middle on the board, in squares: a1's at (-3.5, -3.5), h8's at (3.5, 3.5).
