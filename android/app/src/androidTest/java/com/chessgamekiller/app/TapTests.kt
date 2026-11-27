@@ -166,7 +166,9 @@ class TapTests {
     private fun press(tag: String) {
         val node = rule.onNodeWithTag(tag, useUnmergedTree = true)
         runCatching { node.performScrollTo() }
-        node.performSemanticsAction(SemanticsActions.OnClick)
+        // A card answers the click itself; a gold button's tag sits on the frame around its button.
+        if (SemanticsActions.OnClick in node.fetchSemanticsNode().config) node.performSemanticsAction(SemanticsActions.OnClick)
+        else node.performClick()
     }
 
     private fun waitForTag(tag: String, ms: Long = 8000) =
