@@ -236,8 +236,11 @@ final class RivalTheme {
 
     /// The sound was handed back after Leo spoke or listened, which can stop a theme in the
     /// middle of its game: it picks up again.
+    /// Handing the sound back silences it, though the player can go on saying it plays, so it
+    /// is started again rather than asked (as Home's strings were, 2026-11-28).
     func pickUp() {
-        guard let level = playing, player?.isPlaying != true else { return }
+        guard let level = playing else { return }
+        player?.pause()
         play(level)
     }
 

@@ -247,6 +247,16 @@ struct HomeAuroraView: View {
             .coordinateSpace(.named(HomeAuroraTabBar.space))
         }
         .environment(\.colorScheme, tone.scheme)
+        // For the tap tests only (`-musicProbe YES`): says whether the strings are going.
+        .overlay(alignment: .topLeading) {
+            if HomeMusic.probes {
+                Text(music.heard ? "Home music playing" : "Home music quiet")
+                    .font(.system(size: 2))
+                    .opacity(0.02)
+                    .allowsHitTesting(false)
+                    .accessibilityIdentifier("homeMusicProbe")
+            }
+        }
         .onAppear { music.homeAppeared() }
         .onDisappear {
             music.homeDisappeared()
