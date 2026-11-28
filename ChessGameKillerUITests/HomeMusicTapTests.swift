@@ -10,7 +10,7 @@ final class HomeMusicTapTests: TapTestCase {
     private var probe: XCUIElement { app.staticTexts["homeMusicProbe"] }
 
     /// Today's training on Home: the coach's card under For today.
-    private var todaysTraining: XCUIElementQuery { buttons(startingWith: "Coach ") }
+    private var todaysTraining: XCUIElementQuery { buttons(startingWith: "COACH ") }
 
     /// Fails unless Home says its music is going, within a few seconds.
     private func expectMusic(_ when: String, file: StaticString = #filePath, line: UInt = #line) {
