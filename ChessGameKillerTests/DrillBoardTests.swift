@@ -109,15 +109,40 @@ final class DrillBoardTests: XCTestCase {
         XCTAssertEqual(SculptedBoardScene.arrowLayers(best, lying: true).ground.count, 0)
     }
 
-    /// A one-square move still has a whole arrow between the two pieces: the gaps shrink together
-    /// so the head and a bit of shaft fit, tail before tip.
-    func testAOneSquareArrowStillFits() throws {
+    /// A one-square move, straight or diagonal, gets a whole arrow: smaller, straight, with tighter
+    /// gaps, so a real stretch of shaft shows past the piece and the whole head lands in the target
+    /// square (Alex, 2026-11-28: only a stub of head showed). Every board draws it, flipped or not,
+    /// since the arrow lies in the board's own squares.
+    func testAOneSquareArrowIsWhole() throws {
         for best in [true, false] {
             let p = ArrowOutline.Proportions.analysis(best: best)
-            let (tail, tip) = ArrowOutline.ends(from: CGPoint(x: 0, y: 0), to: CGPoint(x: 0, y: 1), unit: 1, proportions: p)
-            XCTAssertGreaterThan(tail.y, 0)
-            XCTAssertLessThan(tip.y, 1)
-            XCTAssertEqual(tip.y - tail.y, p.headLength + 0.12, accuracy: 0.0001)
+            for end in [CGPoint(x: 0, y: 1), CGPoint(x: 1, y: 1), CGPoint(x: -1, y: -1), CGPoint(x: 0, y: -1)] {
+                let length = hypot(end.x, end.y)
+                let fitted = p.fitted(toLength: length)
+                let (tail, tip) = ArrowOutline.ends(from: .zero, to: end, unit: 1, proportions: p)
+                let along = { (q: CGPoint) in (q.x * end.x + q.y * end.y) / length }
+                XCTAssertEqual(along(tail), 0.4, accuracy: 0.0001)
+                XCTAssertEqual(along(tip), length - 0.06, accuracy: 0.0001)
+                // The shaft between the piece and the head is at least a fifth of a square.
+                XCTAssertGreaterThan(along(tip) - fitted.headLength - along(tail), 0.2)
+                // The head lies wholly in the target square.
+                XCTAssertGreaterThan(along(tip) - fitted.headLength, length - 0.5)
+                // Straight: every point lies on the line from square to square.
+                let outlines = ArrowOutline.outlines(from: .zero, to: end, unit: 1, dashed: !best, proportions: p)
+                for point in outlines.joined() {
+                    let off = abs(point.x * end.y - point.y * end.x) / length
+                    XCTAssertLessThanOrEqual(off, fitted.headWidth / 2 + 0.0001)
+                }
+            }
+            // Longer moves keep their full arrow.
+            XCTAssertEqual(p.fitted(toLength: 2), p)
+            XCTAssertEqual(p.fitted(toLength: hypot(1, 2)), p)
+        }
+        // On the 3D board too: rook h1 to h2 and king g7 to f8, as in Alex's screenshot.
+        for (from, to) in [(Square.h1, Square.h2), (Square.g7, Square.f8)] {
+            let outlines = SculptedBoardScene.arrowOutline(from: from, to: to, dashed: false,
+                                                           proportions: .analysis(best: true))
+            XCTAssertEqual(outlines.count, 3)
         }
     }
 

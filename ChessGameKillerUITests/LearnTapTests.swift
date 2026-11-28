@@ -10,6 +10,33 @@ final class LearnTapTests: TapTestCase {
     /// The menu behind the three dots at the top of Learn.
     private var settings: XCUIElementQuery { anythings("Training settings") }
 
+    /// Skip in the corner of Learn's film.
+    private var skipFilm: XCUIElementQuery { buttons("Skip the film") }
+
+    /// The first time Learn opens, its film plays over it, and Skip gives way to Learn.
+    func testTheFilmPlaysTheFirstTimeLearnOpens() {
+        launch(["-learnFilmSeen", "NO"])
+        tap(buttons("Learn"), "The Learn tab on Home", scrolls: false)
+        expectTouchable(skipFilm, "Learn's film did not play the first time Learn opened")
+        if touchable(vineCard) != nil { fail("Learn can be touched through its film") }
+        tap(skipFilm, "Skip on Learn's film", scrolls: false)
+        expectPage("Learn", after: "Skipping Learn's film")
+        expectTouchable(vineCard, "Skipping Learn's film did not leave Learn under a finger")
+        if !leaves(skipFilm.firstMatch) { fail("Learn's film stayed after Skip") }
+    }
+
+    /// A player who has seen the film opens Learn without it; "Watch the film" in the menu plays
+    /// it again, and Skip comes back to Learn.
+    func testWatchTheFilmPlaysItAgain() {
+        openLearn()
+        expectTouchable(vineCard, "Learn did not open on its own page")
+        if skipFilm.firstMatch.exists { fail("Learn's film played for a player who has seen it") }
+        tap(settings, "The menu at the top of Learn", scrolls: false)
+        tap(buttons("Watch the film"), "Watch the film in the menu", scrolls: false)
+        expectTouchable(skipFilm, "Watch the film in the menu did not play the film")
+        close(skipFilm, backTo: vineCard, "Learn's film")
+    }
+
     /// The Home's own Learn tab, touched.
     func testTheLearnTabOpensLearn() {
         launch()
