@@ -224,7 +224,7 @@ struct StreakPill: View {
     let theme: BoardTheme
 
     var body: some View {
-        let color = theme.festive(.orange)
+        let color = theme.streakFlame
         HStack(spacing: 5) {
             Image(systemName: "flame.fill")
                 .font(.system(size: 15, weight: .semibold))

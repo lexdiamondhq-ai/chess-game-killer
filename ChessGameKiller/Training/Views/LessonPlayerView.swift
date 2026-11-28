@@ -284,7 +284,7 @@ struct LessonPlayerView: View {
                     } label: {
                         Label("Hint", systemImage: "lightbulb.fill")
                     }
-                    .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false, tint: theme.hintTint))
+                    .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false, tint: theme.hintTint, hint: true))
                 }
                 Button {
                     withAnimation(.snappy) { player.showAnswer() }
@@ -405,7 +405,7 @@ struct LessonDoneCard: View {
                     TrainingChip(text: "+\(reward.xp) XP", symbol: "sparkles", color: theme.trainingAccent)
                     if streakDays > 0 {
                         TrainingChip(text: "\(streakDays)-day streak", symbol: "flame.fill",
-                                     color: theme.festive(.orange))
+                                     color: theme.festive(.orange), symbolColor: theme.streakFlame)
                     }
                 }
                 if let promotion = reward.promotion {

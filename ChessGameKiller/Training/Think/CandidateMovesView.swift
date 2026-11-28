@@ -483,7 +483,7 @@ private struct CandidateRoundSummary: View {
                                             in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                         }
                         Text("\(round.points)")
-                            .font(.app(.largeTitle, weight: .bold))
+                            .font(.app(.largeTitle, weight: .bold).monospacedDigit())
                             .foregroundStyle(theme.trainingAccent)
                         Text("points out of \(CandidateRound.maxPoints)")
                             .font(.app(.subheadline))

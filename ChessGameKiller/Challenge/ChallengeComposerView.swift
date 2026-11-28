@@ -419,7 +419,7 @@ struct ChallengeComposerView: View {
 
     private func codeCard(_ created: FriendGame, invite: ChallengeInviteContent) -> some View {
         VStack(spacing: 12) {
-            InviteQRCode(url: invite.url)
+            InviteQRCode(url: invite.url, rimmed: theme.screenTone != nil && !theme.screenIsDark)
                 .frame(width: 210, height: 210)
                 .accessibilityLabel("QR code for the challenge. Your friend scans it with their camera.")
             Text("SCAN, OR TYPE THE CODE")

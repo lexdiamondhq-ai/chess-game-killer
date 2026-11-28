@@ -240,9 +240,10 @@ struct DailyCalendarView: View {
         return HStack(spacing: 0) {
             ForEach(ordered, id: \.self) { name in
                 Text(name.uppercased())
-                    .font(.app(size: 10, weight: .semibold))
+                    // Quiet capitals, the weight of the tally's labels one row up.
+                    .font(.app(size: 10, weight: .regular))
                     .tracking(1.2)
-                    .foregroundStyle(Color.faintInk)
+                    .foregroundStyle(Color.quietInk)
                     .frame(maxWidth: .infinity)
             }
         }

@@ -304,7 +304,7 @@ struct BoardScanView: View {
                 .eyebrow()
                 .foregroundStyle(accent)
             Text("\(summary.percent)%")
-                .font(.app(size: 56, weight: .bold))
+                .font(.app(size: 56, weight: .bold).monospacedDigit())
             HStack(spacing: 0) {
                 stat("\(summary.found) of \(summary.total)", label: "found")
                 stat("\(summary.slips)", label: summary.slips == 1 ? "slip" : "slips")

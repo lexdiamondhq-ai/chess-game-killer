@@ -5,6 +5,8 @@ import SwiftUI
 /// The challenge's link as a QR code, dark on ivory, for a friend next to you to scan with their camera.
 struct InviteQRCode: View {
     let url: URL
+    /// On a light page the ivory plate takes a fine gold rim, or it melts into the cream card.
+    var rimmed: Bool = false
 
     var body: some View {
         Group {
@@ -19,6 +21,12 @@ struct InviteQRCode: View {
         }
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color(hex: 0xF3EEE6)))
+        .overlay {
+            if rimmed {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(Polish.goldBase(dark: false).opacity(0.45), lineWidth: 0.75)
+            }
+        }
     }
 
     /// The QR code at one point a module; the view scales it up without smoothing.

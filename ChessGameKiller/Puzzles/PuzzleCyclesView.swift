@@ -34,7 +34,8 @@ struct PuzzleCyclesView: View {
             TrainingBackdrop(theme: theme)
             VStack(spacing: 0) {
                 RoomHeader(title: "Cycles", subtitle: "The Woodpecker Method") { close() }
-                    .overlay(alignment: .topTrailing) { optionsMenu }
+                    // Centred on the header's row, so its disc sits on the close disc's centre line.
+                    .overlay(alignment: .trailing) { optionsMenu }
                 screen
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }

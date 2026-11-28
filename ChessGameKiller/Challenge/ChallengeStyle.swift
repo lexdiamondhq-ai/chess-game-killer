@@ -153,7 +153,7 @@ struct ChallengeTopBar<Trailing: View>: View {
         ZStack {
             VStack(spacing: 1) {
                 Text(title)
-                    .font(.display(size: 17, weight: .semibold))
+                    .font(.display(size: 16, weight: .semibold))
                     .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)

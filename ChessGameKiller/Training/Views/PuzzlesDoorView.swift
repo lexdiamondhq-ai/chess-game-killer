@@ -79,7 +79,7 @@ struct PuzzlesDoorView: View {
                         .eyebrow()
                         .foregroundStyle(theme.trainingAccent)
                     Text("\(progress.rating)")
-                        .font(.app(size: 44, weight: .semibold))
+                        .font(.app(size: 44, weight: .bold).monospacedDigit())
                     Text(progress.played == 0 ? "Your puzzle rating moves with every puzzle."
                          : "Best \(progress.highestRating) · \(progress.solved) of \(progress.played) solved")
                         .font(.app(.footnote))
@@ -87,7 +87,8 @@ struct PuzzlesDoorView: View {
                 }
                 Spacer(minLength: 8)
                 if progress.streak > 1 {
-                    TrainingChip(text: "\(progress.streak) in a row", symbol: "flame.fill", color: theme.trainingAccent)
+                    TrainingChip(text: "\(progress.streak) in a row", symbol: "flame.fill", color: theme.trainingAccent,
+                                 symbolColor: theme.trainingFill)
                 }
             }
             HStack(spacing: 8) {

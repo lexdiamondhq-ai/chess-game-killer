@@ -223,7 +223,7 @@ struct LevelCheckView: View {
                             .font(.app(.subheadline, weight: .semibold))
                             .foregroundStyle(.secondary)
                         Text("\(runner.rating)")
-                            .font(.app(.largeTitle, weight: .semibold))
+                            .font(.app(.largeTitle, weight: .bold).monospacedDigit())
                             .foregroundStyle(theme.trainingAccent)
                         Text(band.name)
                             .font(.display(.title3, weight: .semibold))

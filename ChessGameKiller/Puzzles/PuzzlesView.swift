@@ -201,9 +201,14 @@ struct PuzzlesView: View {
                     .font(.app(.subheadline, weight: .semibold))
                 Spacer()
                 if store.progress.streak > 1 {
-                    Label("\(store.progress.streak) in a row", systemImage: "flame.fill")
-                        .font(.app(.caption, weight: .bold).monospacedDigit())
-                        .foregroundStyle(theme.festive(.orange))
+                    // The flame is lit in the fill's gold; the words keep the gold ink.
+                    Label {
+                        Text("\(store.progress.streak) in a row")
+                    } icon: {
+                        Image(systemName: "flame.fill").foregroundStyle(theme.streakFlame)
+                    }
+                    .font(.app(.caption, weight: .bold).monospacedDigit())
+                    .foregroundStyle(theme.festive(.orange))
                 }
                 Text("Theme")
                     .font(.app(.caption))

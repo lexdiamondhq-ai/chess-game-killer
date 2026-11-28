@@ -97,18 +97,20 @@ struct DNAListRow<Trailing: View>: View {
     let title: String
     let detail: String
     let tint: Color
+    /// The plate's own fill on a light page, where a deep tint's wash would read as grey.
+    var lightPlate: Color? = nil
     @ViewBuilder let trailing: () -> Trailing
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
+        let plate: Color = scheme == .dark ? tint.opacity(0.17) : (lightPlate ?? tint.opacity(0.10))
         HStack(spacing: 12) {
             Image(systemName: symbol)
                 .font(.system(size: 12, weight: .heavy))
                 .foregroundStyle(tint)
                 .frame(width: 28, height: 28)
                 // Set like Home's chips: a wash and a fine edge of the same stone.
-                .background(tint.opacity(scheme == .dark ? 0.17 : 0.10),
-                            in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .background(plate, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 9, style: .continuous)
                         .strokeBorder(tint.opacity(0.35), lineWidth: 0.75)
@@ -239,10 +241,17 @@ struct DNAWeakSpotList: View {
 
     private var tint: Color { TrainingColor.orange.color(on: theme) }
 
+    /// The plate behind the mark on a light gold page: a peach enamel, since the carnelian's
+    /// own wash is a grey pink on cream. The mark and the rim stay carnelian.
+    private var lightPlate: Color? {
+        theme.screenTone != nil && !theme.glows ? Color(hex: 0xEE7A12).opacity(0.16) : nil
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(spots.enumerated()), id: \.element.id) { offset, spot in
-                DNAListRow(symbol: "exclamationmark", title: spot.headline, detail: spot.proof, tint: tint) {
+                DNAListRow(symbol: "exclamationmark", title: spot.headline, detail: spot.proof, tint: tint,
+                           lightPlate: lightPlate) {
                     action(spot)
                 }
                 .accessibilityElement(children: .contain)

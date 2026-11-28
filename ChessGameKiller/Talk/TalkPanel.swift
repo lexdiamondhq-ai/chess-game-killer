@@ -121,7 +121,7 @@ struct TalkPanel: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
                 Text("Talk it through")
-                    .font(.display(size: 17, weight: .semibold))
+                    .font(.display(size: 16, weight: .semibold))
                     .lineLimit(1)
                 Text(status)
                     .font(theme.challengeFont(11, .medium))
@@ -680,13 +680,15 @@ private struct TalkPanelTalkButton: View {
         let glow: Double = listening ? 0.6 : 0.28
         let radius: CGFloat = listening ? 18 : 8
         let lift: CGFloat = listening ? 0 : 3
+        // The ring is the disc's own metal: on a light page the ink's gold is a flat bronze beside it.
+        let ringGold: Color = gilded ? theme.trainingFill : accent
         ZStack {
             Circle()
                 .fill(accent.opacity(0.18))
                 .scaleEffect(haloScale)
                 .opacity(listening ? 1 : 0)
             Circle()
-                .strokeBorder(accent.opacity(0.8), lineWidth: 2)
+                .strokeBorder(ringGold.opacity(0.8), lineWidth: 2)
                 .scaleEffect(ringScale)
                 .opacity(listening ? 1 : 0)
             Group {

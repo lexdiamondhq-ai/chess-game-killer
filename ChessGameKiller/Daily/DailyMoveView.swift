@@ -234,7 +234,7 @@ struct DailyMoveView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 Image(systemName: "flame.fill")
-                    .foregroundStyle(theme.trainingAccent)
+                    .foregroundStyle(theme.trainingFill)
                     .symbolEffect(.bounce, value: daily.streak)
                 Text(daily.streak == 1 ? "1-day streak" : "\(daily.streak)-day streak")
                     .font(.app(.headline).monospacedDigit())

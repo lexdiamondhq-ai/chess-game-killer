@@ -138,7 +138,7 @@ struct RewindGamesView: View {
 
     private func stat(_ value: Int, _ label: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 5) {
-            Text("\(value)").font(.app(.title, weight: .semibold))
+            Text("\(value)").font(.app(.title, weight: .semibold).monospacedDigit())
             Text(label).font(.app(.subheadline)).foregroundStyle(.secondary)
         }
     }

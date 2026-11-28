@@ -19,9 +19,16 @@ enum RewindPalette {
         theme.screenIsDark ? gold : theme.trainingAccent
     }
 
+    /// The gold for a fine drawing on the page with no theme in hand (the ghost line): the pale
+    /// gold is made for a dark page, so a light one takes the gold ink.
+    static let fineGold: Color = Color.ink(light: 0x8A5F1E, dark: goldHex)
+
     /// A moment's color on the page (its tag, its ring on the line): inks, not the board's light.
-    static func color(for moment: SavedMoment, rewritten: Bool) -> Color {
-        let fixed: Color = Color.ink(light: 0x8A5F1E, dark: goldHex)
+    /// A thin ring of the gold ink reads as khaki on cream, so `ring` takes the lighter gold
+    /// made for small solid shapes there.
+    static func color(for moment: SavedMoment, rewritten: Bool, ring: Bool = false) -> Color {
+        let lightGold: UInt32 = ring ? 0xB7832E : 0x8A5F1E
+        let fixed: Color = Color.ink(light: lightGold, dark: goldHex)
         if rewritten { return fixed }
         switch moment.moveGrade {
         case .blunder: return coral
@@ -95,8 +102,8 @@ struct Lifeline: View {
                         path.addCurve(to: to, control1: CGPoint(x: (from.x + to.x) / 2, y: from.y),
                                       control2: CGPoint(x: (from.x + to.x) / 2, y: to.y))
                     }
-                    .stroke(RewindPalette.gold, style: StrokeStyle(lineWidth: 2.5, lineCap: .round, dash: [1, 6]))
-                    Circle().fill(RewindPalette.gold).frame(width: 7, height: 7).position(to)
+                    .stroke(RewindPalette.fineGold, style: StrokeStyle(lineWidth: 2.5, lineCap: .round, dash: [1, 6]))
+                    Circle().fill(RewindPalette.fineGold).frame(width: 7, height: 7).position(to)
                 }
 
                 // What hasn't happened yet at this point of the game sits back.
@@ -114,7 +121,7 @@ struct Lifeline: View {
                     let center = point(ply: moment.ply, value: game.value(at: moment.ply), in: size)
                     let current = moment.ply == ply || moment.ply == ply + 1
                     let rewritten = game.rewritten.contains(moment.ply)
-                    let color = RewindPalette.color(for: moment, rewritten: rewritten)
+                    let color = RewindPalette.color(for: moment, rewritten: rewritten, ring: true)
                     ZStack {
                         Circle().fill(dotFill)
                         Circle().strokeBorder(color, lineWidth: current ? 3 : 2)

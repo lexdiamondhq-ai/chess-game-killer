@@ -16,6 +16,7 @@ struct FriendGamesList: View {
             VStack(alignment: .leading, spacing: 10) {
                 ChallengeSectionTitle(title: "Friend games")
                 FriendGamesRows(games: games, design: theme.challengeDesign,
+                                bead: theme.screenTone != nil ? theme.trainingFill : nil,
                                 open: { center.play($0) }, remove: { center.remove($0) })
                     .challengeGlass(RoundedRectangle(cornerRadius: FriendGamesRows.radius, style: .continuous))
             }
@@ -32,6 +33,8 @@ struct FriendGamesCard: View {
     /// False leaves the rows bare, for a card of the caller's own.
     var drawsCard = true
     var design: Font.Design = .default
+    /// The gold of the "your move" bead on a light page; nil keeps the surrounding tint.
+    var bead: Color? = nil
 
     @Environment(ChallengeCenter.self) private var center: ChallengeCenter?
     @State private var showsAll = false
@@ -57,7 +60,7 @@ struct FriendGamesCard: View {
         let games = center.store.sorted
         let shown = showsAll ? games : Array(games.prefix(limit))
         return VStack(spacing: 0) {
-            FriendGamesRows(games: shown, design: design,
+            FriendGamesRows(games: shown, design: design, bead: bead,
                             open: { center.play($0) }, remove: { center.remove($0) })
             if games.count > limit {
                 FriendGamesRows.hairline
@@ -81,6 +84,7 @@ struct FriendGamesCard: View {
 struct FriendGamesRows: View {
     let games: [FriendGame]
     var design: Font.Design = .default
+    var bead: Color? = nil
     let open: (FriendGame) -> Void
     let remove: (FriendGame) -> Void
 
@@ -99,7 +103,7 @@ struct FriendGamesRows: View {
     var body: some View {
         VStack(spacing: 0) {
             ForEach(games, id: \.code) { game in
-                FriendGameSwipeRow(game: game, design: design, revealed: $revealed,
+                FriendGameSwipeRow(game: game, design: design, bead: bead, revealed: $revealed,
                                    open: { open(game) }, remove: { remove(game) })
                 if game.code != games.last?.code {
                     Self.hairline
@@ -114,6 +118,8 @@ struct FriendGamesRows: View {
 struct FriendGameRow: View {
     let game: FriendGame
     var design: Font.Design = .default
+    /// The gold of the "your move" bead on a light page; nil keeps the surrounding tint.
+    var bead: Color? = nil
     let open: () -> Void
 
     @Environment(\.colorScheme) private var scheme
@@ -153,6 +159,31 @@ struct FriendGameRow: View {
 
     /// The friend's initial; a paper plane while the link is out.
     private var badge: some View {
+        avatar
+            .overlay(alignment: .topTrailing) {
+                if game.isYourMove {
+                    yourMoveBead
+                        .offset(x: 2, y: -2)
+                }
+            }
+            .accessibilityHidden(true)
+    }
+
+    /// The bead's gold, on a light page that gave one.
+    private var goldBead: Color? { scheme == .light ? bead : nil }
+
+    /// Under a gold bead the disc has a round bite, so the card itself is the bead's ring,
+    /// whatever the room's color.
+    @ViewBuilder
+    private var avatar: some View {
+        if goldBead != nil, game.isYourMove {
+            disc.mask { BeadBite().fill(Color.black, style: FillStyle(eoFill: true)) }
+        } else {
+            disc
+        }
+    }
+
+    private var disc: some View {
         ZStack {
             Circle()
                 .fill(.tint)
@@ -170,25 +201,41 @@ struct FriendGameRow: View {
             }
         }
         .frame(width: 38, height: 38)
-        .overlay(alignment: .topTrailing) {
-            if game.isYourMove {
-                Circle()
-                    .fill(.tint)
-                    .frame(width: 10, height: 10)
-                    // The ring is cut from the page: dark on espresso, white on cream.
-                    .overlay {
-                        Circle().strokeBorder(scheme == .dark ? Color.black.opacity(0.5) : Color.white.opacity(0.92),
-                                              lineWidth: 1.5)
-                    }
-                    .offset(x: 2, y: -2)
-            }
+    }
+
+    /// The "your move" bead on the avatar's edge.
+    @ViewBuilder
+    private var yourMoveBead: some View {
+        if let gold = goldBead {
+            // Solid gold at its full 10 pt; its ring is the bite in the avatar.
+            Circle()
+                .fill(gold)
+                .frame(width: 10, height: 10)
+        } else {
+            Circle()
+                .fill(.tint)
+                .frame(width: 10, height: 10)
+                // The ring is cut from the page: dark on espresso, white on cream.
+                .overlay {
+                    Circle().strokeBorder(scheme == .dark ? Color.black.opacity(0.5) : Color.white.opacity(0.92),
+                                          lineWidth: 1.5)
+                }
         }
-        .accessibilityHidden(true)
     }
 
     private var initial: String {
         guard let first = game.opponentName?.trimmingCharacters(in: .whitespacesAndNewlines).first else { return "?" }
         return String(first).uppercased()
+    }
+}
+
+/// The 38 pt avatar's mask under a gold bead: everything but a round hole where the 10 pt bead
+/// sits (2 pt out at the top right) with 1.5 pt of room around it. Filled even-odd.
+private struct BeadBite: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path(rect.insetBy(dx: -4, dy: -4))
+        path.addEllipse(in: CGRect(x: rect.maxX - 9.5, y: rect.minY - 3.5, width: 13, height: 13))
+        return path
     }
 }
 
@@ -205,6 +252,7 @@ struct FriendRowPressStyle: ButtonStyle {
 private struct FriendGameSwipeRow: View {
     let game: FriendGame
     let design: Font.Design
+    let bead: Color?
     @Binding var revealed: String?
     let open: () -> Void
     let remove: () -> Void
@@ -235,7 +283,7 @@ private struct FriendGameSwipeRow: View {
     }
 
     private var row: some View {
-        FriendGameRow(game: game, design: design, open: tapped)
+        FriendGameRow(game: game, design: design, bead: bead, open: tapped)
             .offset(x: offset)
             .background(alignment: .trailing) {
                 if offset < 0 {

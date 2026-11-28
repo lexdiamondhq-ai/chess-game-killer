@@ -155,10 +155,16 @@ extension BoardTheme {
     /// on cream. Neon keeps its yellow.
     var hintTint: Color { glows || screenTone == nil ? TrainingColor.yellow.color(on: self) : trainingAccent }
 
-    /// The streak's flame and a promotion's shine: gold on the home's pages, as Home's own
+    /// The streak's words and a promotion's shine: gold on the home's pages, as Home's own
     /// streak is; the bright set elsewhere.
     func festive(_ color: TrainingColor) -> Color {
         glows || screenTone == nil ? color.color(on: self) : trainingAccent
+    }
+
+    /// A lit streak flame, which is a small solid shape: the fill's gold on the home's pages,
+    /// since the ink's deep gold reads as olive brown at that size on cream. Orange elsewhere.
+    var streakFlame: Color {
+        glows || screenTone == nil ? TrainingColor.orange.color(on: self) : trainingFill
     }
 
     func trainingTone(_ tone: LessonPlayer.Tone) -> Color {
@@ -267,9 +273,13 @@ struct TrainingButtonStyle: ButtonStyle {
     /// The gold button while it can't be pressed yet: a quiet gold glass with a readable
     /// label. Fading the whole button instead turns its gold to mud on espresso.
     var dimmed = false
+    /// A Hint button. On the Light page its quiet pill is champagne enamel with a gold rim and
+    /// a gold label: the gold ink's own wash is a greige there, hard to tell from a plain pill.
+    var hint = false
 
     func makeBody(configuration: Configuration) -> some View {
-        TrainingButton(theme: theme, prominent: prominent, tint: tint, dimmed: dimmed, configuration: configuration)
+        TrainingButton(theme: theme, prominent: prominent, tint: tint, dimmed: dimmed, hint: hint,
+                       configuration: configuration)
     }
 }
 
@@ -292,6 +302,7 @@ private struct TrainingButton: View {
     let prominent: Bool
     let tint: Color?
     var dimmed = false
+    var hint = false
     let configuration: ButtonStyleConfiguration
     @AppStorage(HomeLayout.key) private var sheet = HomeLayout.defaultOn
     @AppStorage(HomeToneMode.key) private var mode = HomeToneMode.defaultMode
@@ -307,6 +318,14 @@ private struct TrainingButton: View {
     private func homeButton(_ tone: HomeTone) -> some View {
         let waiting: Bool = dimmed && prominent && tint == nil
         let solidInk: Color = tint == nil ? Polish.onMetal : (tone.scheme == .dark ? Color.black : Color.white)
+        // A Hint on the Light page: the gold button's own pale metal, worn thin, as its plate.
+        // Neon keeps its yellow hint.
+        let champagne: Bool = hint && !prominent && mode == .light && !theme.glows
+        let enamel: Color = Polish.buttonMetal(theme.screenPolishMetal).top
+        let enamelMetal: Polish.Metal = Polish.metal(theme.screenPolishMetal, dark: false)
+        let enamelRim: Color = enamelMetal.base
+        // The metal's shade is the gold ink itself; on Sculpted it is a silver deep enough to read.
+        let quietInk: Color = champagne ? enamelMetal.deep : tone.ink
         return configuration.label
             .font(.app(.headline))
             .lineLimit(1)
@@ -314,11 +333,9 @@ private struct TrainingButton: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
             .padding(.horizontal, 12)
-            // One height for the main button on every screen (Home's and Challenge's 52).
-            .frame(minHeight: 52)
-            // A quiet button keeps the page's ink: a tint (a hint's yellow) only colors its edge
-            // and fill, since a pale tint would be lost as text on a light page.
-            .foregroundStyle(waiting ? tone.ink.opacity(tone.scheme == .dark ? 0.42 : 0.6) : (prominent ? solidInk : tone.ink))
+            // A quiet button keeps the page's ink: a tint only colors its edge and fill, since a
+            // pale tint would be lost as text on a light page. A Hint's gold ink reads there.
+            .foregroundStyle(waiting ? tone.ink.opacity(tone.scheme == .dark ? 0.42 : 0.6) : (prominent ? solidInk : quietInk))
             .background {
                 if waiting {
                     WaitingFill()
@@ -326,6 +343,10 @@ private struct TrainingButton: View {
                     Capsule().fill(tint)
                 } else if prominent {
                     HomeIvoryFill(tone: tone)
+                } else if champagne {
+                    Capsule()
+                        .fill(enamel.opacity(configuration.isPressed ? 0.7 : 0.5))
+                        .overlay { Capsule().strokeBorder(enamelRim.opacity(0.7), lineWidth: 0.75) }
                 } else {
                     Capsule()
                         .fill((tint ?? tone.ink).opacity(configuration.isPressed ? 0.2 : (tint == nil ? 0.08 : 0.16)))
@@ -503,13 +524,17 @@ struct TrainingChip: View {
     let text: String
     var symbol: String?
     let color: Color
+    /// The symbol's own color, when it is not the words' (a lit flame beside gold ink).
+    var symbolColor: Color? = nil
 
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         HStack(spacing: 4) {
             if let symbol {
-                Image(systemName: symbol).font(.app(.caption2, weight: .bold))
+                Image(systemName: symbol)
+                    .font(.app(.caption2, weight: .bold))
+                    .foregroundStyle(symbolColor ?? color)
             }
             Text(text).font(.app(.caption, weight: .semibold))
         }

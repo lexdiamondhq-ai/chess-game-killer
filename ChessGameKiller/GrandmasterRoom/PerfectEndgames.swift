@@ -127,7 +127,7 @@ struct EndgameView: View {
                 } label: {
                     Label("Hint", systemImage: "lightbulb.fill")
                 }
-                .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false, tint: theme.hintTint))
+                .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false, tint: theme.hintTint, hint: true))
                 .disabled(runner.phase != .playing)
                 // Dimmed only before the study starts, so the buttons don't flicker with every move.
                 .opacity(runner.phase == .loading ? 0.5 : 1)

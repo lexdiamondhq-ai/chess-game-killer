@@ -281,7 +281,7 @@ private struct PremiumBenefitList: View {
                 detail: "Up to 50 talks and 30 photo scans a day."),
         // Premium opens every rival (RivalLadder.opensEverything); the page now says so
         // (Alex, 2026-11-11, audit pick R4).
-        Benefit(symbol: "shield.lefthalf.filled", title: "Every rival, from day one",
+        Benefit(symbol: "shield.fill", title: "Every rival, from day one",
                 detail: "Face any of the five without beating the ones before."),
         // Every set of pieces is free for everyone; the boards are what Premium opens
         // (four free, ten in all), so the line promises only that (inspection, 2026-11-14).
@@ -464,7 +464,7 @@ struct PremiumLimitCard: View {
                         .font(.app(.headline))
                         .foregroundStyle(gilded ? Polish.onMetal : Color.black)
                         .frame(maxWidth: 260)
-                        .frame(minHeight: 52)
+                        .frame(height: 48)
                         .background {
                             if gilded {
                                 PolishedFill(shape: Capsule(), quiet: true)

@@ -253,7 +253,8 @@ enum StoneInk {
         switch self {
         case .emerald: return (0x1F7A4D, 0x6FCF97)
         case .ruby: return (0xB3283B, 0xEC6A78)
-        case .carnelian: return (0xB4531F, 0xF09460)
+        // A touch redder than the gold ink, so small capitals in it never read as gold.
+        case .carnelian: return (0xB84A14, 0xF09460)
         case .citrine: return (0xD49B00, 0xE6D04A)
         case .sapphire: return (0x2B5FB8, 0x8AAEF0)
         case .amethyst: return (0x5B3FB8, 0xB5A2F5)

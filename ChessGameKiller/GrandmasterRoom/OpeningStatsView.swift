@@ -144,7 +144,7 @@ private struct OpeningStatsRow: View {
             Text("\(share)%")
                 .font(.app(.caption, weight: .semibold).monospacedDigit())
                 .frame(width: 38, alignment: .trailing)
-            ResultBar(white: move.whiteShare, draw: move.drawShare)
+            ResultBar(white: move.whiteShare, draw: move.drawShare, dark: theme.screenIsDark)
                 .frame(height: 8)
             Text("\(score)")
                 .font(.app(.caption2).monospacedDigit())
@@ -160,19 +160,24 @@ private struct OpeningStatsRow: View {
 private struct ResultBar: View {
     let white: Double
     let draw: Double
+    /// The page is dark. On cream the white part needs an ivory fill and a warm rim to be seen.
+    let dark: Bool
 
     var body: some View {
         GeometryReader { geo in
             let width: CGFloat = geo.size.width
             let whiteWidth: CGFloat = width * CGFloat(white)
             let drawWidth: CGFloat = width * CGFloat(draw)
+            let whiteFill: Color = dark ? Color(white: 0.92) : Color(hex: 0xFFFCF4)
+            let rim: Color = dark ? Color.white.opacity(0.18) : Polish.track(dark: false, strong: true)
+            let rimWidth: CGFloat = dark ? 0.5 : 0.75
             HStack(spacing: 0) {
-                Rectangle().fill(Color(white: 0.92)).frame(width: whiteWidth)
+                Rectangle().fill(whiteFill).frame(width: whiteWidth)
                 Rectangle().fill(Color(white: 0.55)).frame(width: drawWidth)
                 Rectangle().fill(Color(white: 0.16))
             }
             .clipShape(Capsule())
-            .overlay(Capsule().strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5))
+            .overlay(Capsule().strokeBorder(rim, lineWidth: rimWidth))
         }
     }
 }

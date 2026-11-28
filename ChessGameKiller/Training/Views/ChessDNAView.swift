@@ -447,7 +447,7 @@ struct DNAOpeningRow: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(record.family)
-                    .font(.display(.callout, weight: .semibold))
+                    .font(.app(.subheadline, weight: .semibold))
                     .lineLimit(1)
                 Text(caption)
                     .font(.app(.caption))

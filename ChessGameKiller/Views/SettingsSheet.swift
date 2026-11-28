@@ -68,7 +68,7 @@ struct SettingsSheet: View {
                     // never moves the boards under the finger.
                     section("Pieces") {
                         SettingsGroup(theme: theme) {
-                            PieceSetPicker(selection: $pieceSet, accent: accent)
+                            PieceSetPicker(selection: $pieceSet, accent: theme.trainingFill)
                         }
                         .opacity(theme.sculptedLook == nil ? 0.4 : 1)
                         .disabled(theme.sculptedLook == nil)
@@ -151,7 +151,7 @@ struct SettingsSheet: View {
                     // Moved down from Appearance, under Voice reactions (Alex, 2026-11-09).
                     section("App icon") {
                         SettingsGroup(theme: theme) {
-                            AppIconPicker(accent: accent)
+                            AppIconPicker(accent: theme.trainingFill)
                         }
                     }
 
@@ -687,6 +687,8 @@ private struct IconTile: View {
         let accent = theme.trainingAccent
         let tile = RoundedRectangle(cornerRadius: 10, style: .continuous)
         Image(systemName: symbol)
+            // One strength for the whole glyph: the Haptics phone's waves are drawn faint otherwise.
+            .symbolRenderingMode(.monochrome)
             .font(.system(size: 15, weight: .semibold))
             .foregroundStyle(accent)
             .frame(width: 34, height: 34)

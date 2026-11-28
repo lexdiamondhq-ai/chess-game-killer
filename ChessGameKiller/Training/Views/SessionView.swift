@@ -354,7 +354,7 @@ struct SessionSummary: View {
                 HStack(spacing: 10) {
                     stat("+\(runner.reward.xp)", "XP", "sparkles", theme.trainingAccent)
                     stat("\(days)", days == 1 ? "day" : "days", "flame.fill",
-                         theme.festive(.orange))
+                         theme.streakFlame)
                 }
 
                 if let promotion = runner.reward.promotion {
