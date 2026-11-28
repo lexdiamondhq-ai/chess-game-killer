@@ -306,7 +306,7 @@ struct JewelIcon: View {
             .overlay {
                 // The fine inner thread, in the drawing's own gold: one metal on every stone.
                 RoundedRectangle(cornerRadius: size * 0.24, style: .continuous)
-                    .strokeBorder(HomeAuroraJewel.gold.opacity(0.9), lineWidth: 0.75)
+                    .strokeBorder(AnyShapeStyle(HomeAuroraJewel.gold).opacity(0.9), lineWidth: 0.75)
                     .padding(size * 0.06)
             }
             .overlay {

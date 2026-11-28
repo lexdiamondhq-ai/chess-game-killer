@@ -1456,7 +1456,7 @@ struct HomeAuroraJewel: View {
                 }
                 .overlay {
                     RoundedRectangle(cornerRadius: side * 0.195, style: .continuous)
-                        .strokeBorder(Self.gold.opacity(0.9), lineWidth: 0.75)
+                        .strokeBorder(AnyShapeStyle(Self.gold).opacity(0.9), lineWidth: 0.75)
                         .padding(side * 0.055)
                 }
                 .overlay {

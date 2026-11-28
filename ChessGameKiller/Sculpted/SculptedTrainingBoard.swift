@@ -125,7 +125,7 @@ struct SculptedTrainingBoard: View {
                 if let square = Self.square(named: label.square) {
                     let frame = camera.frame(of: square, in: size)
                     let cell = frame.width
-                    let color = (label.color ?? .blue).color(on: theme)
+                    let color = (label.color ?? .blue).boardColor(on: theme)
                     Text(label.text)
                         .font(.app(size: cell * 0.24, weight: .heavy))
                         .monospacedDigit()

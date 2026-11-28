@@ -326,6 +326,8 @@ private struct TrainingButton: View {
                 }
             }
             .contentShape(Capsule())
+            // A waiting quiet or tinted button has no plate of its own, so it fades.
+            .opacity(dimmed && !waiting ? 0.45 : 1)
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .opacity(configuration.isPressed ? 0.9 : 1)
             .animation(.spring(response: 0.25, dampingFraction: 0.8), value: configuration.isPressed)

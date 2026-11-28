@@ -407,6 +407,8 @@ struct RivalHallWords: View {
                             .environment(\.polishMetal, nil)
                             .environment(\.colorScheme, .dark)
                     }
+                    // The metal takes no touches, so the whole capsule is named as the target.
+                    .contentShape(Capsule())
             }
             .buttonStyle(HomeStagePress())
             .accessibilityHint("Plays \(film.rival.name)'s welcome, then starts the game")
