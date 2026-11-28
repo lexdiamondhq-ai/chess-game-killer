@@ -146,13 +146,18 @@ struct FriendInviteBanner: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 6)
-            Button("Play", action: open)
-                .font(theme.challengeFont(15, .semibold))
-                .foregroundStyle(theme.screenTone != nil ? Polish.onMetal : theme.onChallengeAccent)
-                .padding(.horizontal, 16)
-                .frame(height: 34)
-                .background { MainPillFill(gilded: theme.screenTone != nil, plain: theme.challengeAccent) }
-                .buttonStyle(ChallengePressStyle())
+            // The pill is the button's own label, so the whole gold shape takes the tap and not
+            // only the word.
+            Button(action: open) {
+                Text("Play")
+                    .font(theme.challengeFont(15, .semibold))
+                    .foregroundStyle(theme.screenTone != nil ? Polish.onMetal : theme.onChallengeAccent)
+                    .padding(.horizontal, 16)
+                    .frame(height: 34)
+                    .background { MainPillFill(gilded: theme.screenTone != nil, plain: theme.challengeAccent) }
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(ChallengePressStyle())
             Button(action: close) {
                 Image(systemName: "xmark")
                     .font(.system(size: 13, weight: .bold))

@@ -351,6 +351,8 @@ struct ChallengeGameView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 11)
             .challengeGlass(Capsule(style: .continuous))
+            // The glass takes no touches, so the whole capsule is named as the target.
+            .contentShape(Capsule(style: .continuous))
         }
         .buttonStyle(ChallengePressStyle())
         .accessibilityHint("Dismisses this message")
