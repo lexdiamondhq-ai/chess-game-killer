@@ -22,12 +22,14 @@ class TapTestCase: XCTestCase {
         continueAfterFailure = false
     }
 
-    /// Starts the app as a returning player: no welcome, no intro film, no tips, and Learn's film
-    /// already seen (a test that wants the film passes `-learnFilmSeen NO`).
+    /// Starts the app as a returning player: no welcome, no intro film, no tips, and Learn's and
+    /// Chess DNA's films already seen (a test that wants one passes `-learnFilmSeen NO` or
+    /// `-dnaFilmSeen NO`).
     func launch(_ arguments: [String] = []) {
         let fresh = XCUIApplication()
         var returning = ["-welcomeSeen", "YES", "-introFilmSeen", "YES", "-tipsOff", "YES"]
         if !arguments.contains("-learnFilmSeen") { returning += ["-learnFilmSeen", "YES"] }
+        if !arguments.contains("-dnaFilmSeen") { returning += ["-dnaFilmSeen", "YES"] }
         fresh.launchArguments = returning + arguments
         fresh.launch()
         app = fresh
