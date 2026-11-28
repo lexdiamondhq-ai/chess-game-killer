@@ -270,7 +270,7 @@ struct RivalsHall: View {
                             .font(.custom(HomeCarvingFont.plain, size: 14, relativeTo: .footnote))
                             .foregroundStyle(isSelected ? Self.gold : .white.opacity(ladder.isOpen(film.level) ? 0.6 : 0.28))
                         Circle()
-                            .fill(ladder.beaten(film.rival) ? Self.gold : (isSelected ? Color(hex: 0xF3DDA8) : Color.white.opacity(0.18)))
+                            .fill(ladder.beaten(film.rival) ? Self.gold : .white.opacity(isSelected ? 0.7 : 0.18))
                             .frame(width: 5, height: 5)
                     }
                     .frame(minWidth: 30, minHeight: 36)

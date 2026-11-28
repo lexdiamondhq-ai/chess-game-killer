@@ -37,7 +37,11 @@ struct DeepReviewRow: View {
                     .font(.app(.footnote, weight: .bold))
                     .foregroundStyle(gold)
                     .frame(width: 36, height: 36)
-                    .background(Circle().fill(gold.opacity(0.16)))
+                    // The same gold well as the step and play discs in the review itself.
+                    .background {
+                        Circle().fill(gold.opacity(0.12))
+                            .overlay { Circle().strokeBorder(gold.opacity(0.35), lineWidth: 0.75) }
+                    }
             }
             .padding(.horizontal, 12)
             .frame(minHeight: 56)

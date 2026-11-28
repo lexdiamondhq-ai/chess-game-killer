@@ -291,7 +291,7 @@ struct ChallengeChip: View {
                 if title == "∞" {
                     // The symbol is centered and weighs what the digits beside it weigh.
                     Image(systemName: "infinity")
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(.system(size: 17, weight: .bold))
                 } else {
                     Text(title)
                         .font(theme.challengeFont(size, .semibold).monospacedDigit())

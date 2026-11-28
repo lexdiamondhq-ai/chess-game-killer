@@ -29,11 +29,11 @@ struct ChessDNACard: View {
                 DNAChipPair {
                     if let weapon = dna.weapon {
                         DNAChip(label: "WEAPON", title: weapon.title, symbol: weapon.symbol,
-                                tint: TrainingColor.teal.color(on: theme), theme: theme)
+                                tint: TrainingColor.green.color(on: theme), theme: theme)
                     }
                     if let leak = dna.leak {
                         DNAChip(label: "LEAK", title: leak.headline, symbol: leak.area.symbol,
-                                tint: TrainingColor.pink.color(on: theme), theme: theme)
+                                tint: TrainingColor.orange.color(on: theme), theme: theme)
                     }
                 }
             }

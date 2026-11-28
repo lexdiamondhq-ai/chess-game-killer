@@ -526,9 +526,10 @@ struct PremiumGate: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Image(systemName: "crown.fill")
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
                 Text(isOn ? "PREMIUM IS ON" : "GOLD BUDS OPEN WITH PREMIUM")
-                    .eyebrow()
+                    .font(VineGold.carved(12.5))
+                    .tracking(1.6)
             }
             .foregroundStyle(VineGold.text(theme))
             if isOn {

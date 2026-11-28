@@ -89,7 +89,7 @@ struct SettingsSheet: View {
                             // board). A look with a 3D board always plays on it, Tilted or Flat;
                             // SculptedSetting.settle() puts anyone who turned it off back.
                             if theme.sculptedLook != nil {
-                                PickerRow(title: "Board view", subtitle: tilt.blurb, symbol: "perspective", theme: theme) {
+                                PickerRow(title: "Board view", subtitle: tilt.blurb, symbol: "cube.fill", theme: theme) {
                                     Picker("Board view", selection: $tilt) {
                                         ForEach(BoardTilt.allCases) { choice in
                                             Text(choice.title).tag(choice)

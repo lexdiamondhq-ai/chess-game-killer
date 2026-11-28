@@ -424,14 +424,15 @@ struct HomeAuroraView: View {
             }
             .padding(.horizontal, 16)
             // The page ends on For today: no carved sign-off under it (Alex, 2026-11-27: "Let's
-            // delete these"), only as much room as the bottom bar needs.
+            // delete these"), only as much room as the bottom bar and the fade above it need, so
+            // the last row of cards can be pulled clear of both.
         }
         // A part that arrives after the page (the first read of your games, a friend's move)
         // eases in and the rest makes room, instead of the page jumping.
         .animation(.snappy(duration: 0.3), value: info.dna != nil)
         .animation(.snappy(duration: 0.3), value: info.finest != nil)
         .animation(.snappy(duration: 0.3), value: HomeAuroraQuickBar.mode(games: info.games) != nil)
-        .padding(.bottom, 84)
+        .padding(.bottom, 120)
         .frame(maxWidth: .infinity)
         .background {
             shape.fill(palette.sheet)
@@ -1174,10 +1175,10 @@ struct HomeAuroraDNA: View {
                 if dna.weapon != nil || dna.leak != nil {
                     DNAChipPair {
                         if let weapon = dna.weapon {
-                            chip("Weapon", weapon.title, symbol: weapon.symbol, tint: StoneInk.jade.color(dark: palette.dark))
+                            chip("Weapon", weapon.title, symbol: weapon.symbol, tint: palette.teal)
                         }
                         if let leak = dna.leak {
-                            chip("Leak", leak.headline, symbol: leak.area.symbol, tint: StoneInk.rose.color(dark: palette.dark))
+                            chip("Leak", leak.headline, symbol: leak.area.symbol, tint: palette.rose)
                         }
                     }
                 }

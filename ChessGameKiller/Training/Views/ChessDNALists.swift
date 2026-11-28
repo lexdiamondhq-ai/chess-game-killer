@@ -143,11 +143,11 @@ struct DNAPillStyle: ButtonStyle {
         let gilded: Bool = theme.screenTone != nil
         let solidInk: Color = gilded ? Polish.onMetal : Color.black.opacity(0.85)
         return configuration.label
-            .font(.app(.subheadline, weight: .semibold).monospacedDigit())
+            .font(.app(.footnote, weight: .semibold).monospacedDigit())
             .lineLimit(1)
             .fixedSize()
             .padding(.horizontal, 12)
-            .padding(.vertical, 6)
+            .padding(.vertical, 7)
             .foregroundStyle(prominent ? solidInk : theme.trainingAccent)
             .background {
                 if prominent {

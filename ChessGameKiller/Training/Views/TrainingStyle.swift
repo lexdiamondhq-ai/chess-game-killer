@@ -281,8 +281,9 @@ private struct WaitingFill: View {
     var body: some View {
         let dark: Bool = scheme == .dark
         Capsule()
-            .fill(Polish.buttonMetal(ownMetal).foot.opacity(dark ? 0.18 : 0.22))
-            .overlay { Capsule().strokeBorder(Polish.metal(ownMetal, dark: dark).base.opacity(0.45), lineWidth: 1) }
+            // A dimmed gold, not an outline: an outlined pill reads as a second, ready button.
+            .fill(Polish.buttonMetal(ownMetal).foot.opacity(dark ? 0.34 : 0.36))
+            .overlay { Capsule().strokeBorder(Polish.metal(ownMetal, dark: dark).base.opacity(0.22), lineWidth: 0.75) }
     }
 }
 
@@ -317,7 +318,7 @@ private struct TrainingButton: View {
             .frame(minHeight: 52)
             // A quiet button keeps the page's ink: a tint (a hint's yellow) only colors its edge
             // and fill, since a pale tint would be lost as text on a light page.
-            .foregroundStyle(waiting ? tone.ink.opacity(tone.scheme == .dark ? 0.5 : 0.65) : (prominent ? solidInk : tone.ink))
+            .foregroundStyle(waiting ? tone.ink.opacity(tone.scheme == .dark ? 0.42 : 0.6) : (prominent ? solidInk : tone.ink))
             .background {
                 if waiting {
                     WaitingFill()

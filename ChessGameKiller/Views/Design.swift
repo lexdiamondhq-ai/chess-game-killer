@@ -35,8 +35,7 @@ enum DesignChrome {
     static func dressBars() {
         let bar = UINavigationBar.appearance()
         bar.largeTitleTextAttributes = [.font: serif(34, weight: .medium, style: .largeTitle)]
-        // 17 pt, the size of the titles the training, Challenge and Talk bars draw themselves.
-        bar.titleTextAttributes = [.font: serif(17, weight: .semibold, style: .headline)]
+        bar.titleTextAttributes = [.font: serif(18, weight: .semibold, style: .headline)]
     }
 
     /// The system's serif, following the reader's text size.
@@ -176,8 +175,9 @@ struct GildedSegments<Value: Hashable>: View {
                 .accessibilityAddTraits(isOn ? .isSelected : [])
             }
         }
-        .padding(3)
-        .frame(height: 36)
+        // As tall as the system's own two-way switch, so swapping one for the other moves nothing.
+        .padding(2)
+        .frame(height: 32)
         .glassPane(Capsule())
         .accessibilityElement(children: .contain)
         .accessibilityLabel(title)
