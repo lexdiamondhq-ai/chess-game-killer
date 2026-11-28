@@ -20,10 +20,18 @@ final class HomeMusic {
     @ObservationIgnored private var showing = false
     /// Another screen covers Home (training, lessons, Leo, puzzles, Analyze): the music rests.
     @ObservationIgnored private var covered = false
+    @ObservationIgnored private var observers: [NSObjectProtocol] = []
+
+    /// For the tap tests only (`-musicProbe YES`): whether the strings are really going, read
+    /// from the track moving on, since a player whose sound was taken away can still say it plays.
+    static let probes = UserDefaults.standard.bool(forKey: "musicProbe")
+    private(set) var heard = false
+    @ObservationIgnored private var lastTime: TimeInterval = -1
 
     private init() {
         on = UserDefaults.standard.object(forKey: Self.key) as? Bool ?? true
         available = Bundle.main.url(forResource: Self.track, withExtension: "mp3") != nil
+        if Self.probes { probe() }
     }
 
     private var playing: Bool { showing && on && !covered }
@@ -81,6 +89,19 @@ final class HomeMusic {
             try? await Task.sleep(for: .milliseconds(850))
             guard let self, !self.playing else { return }
             self.player?.pause()
+        }
+    }
+
+    /// Twice a second, whether the track has moved on since the last look.
+    private func probe() {
+        Task { @MainActor [weak self] in
+            while let self {
+                let now = self.player?.currentTime ?? -1
+                let moving = self.player?.isPlaying == true && now >= 0 && now != self.lastTime
+                if moving != self.heard { self.heard = moving }
+                self.lastTime = now
+                try? await Task.sleep(for: .milliseconds(500))
+            }
         }
     }
 }
