@@ -603,6 +603,48 @@ final class HomeSnapshotTests: XCTestCase {
 
     // MARK: Drawing
 
+    /// The weather behind each rival on the Next game card (Alex, 2026-11-28), large enough to
+    /// judge: leaves around the Cub, snow around the Hunter, rain around the Berserker, embers
+    /// around the Lionheart, and the Ashen King twice, between strikes and as lightning falls.
+    func testTheWeatherBehindEachRival() throws {
+        let strike: Double = HomeRivalWeatherPainter.strike(5) + 0.2
+        let frames: [(MatchController.Level, Double)] = [
+            (.beginner, 20.75), (.casual, 20.75), (.club, 20.75), (.expert, 20.75),
+            (.grandmaster, HomeRivalWeatherPainter.strike(5) - 0.3), (.grandmaster, strike),
+        ]
+        let study = VStack(spacing: 14) {
+            ForEach(0..<3, id: \.self) { row in
+                HStack(spacing: 14) {
+                    ForEach(0..<2, id: \.self) { column in
+                        let frame = frames[row * 2 + column]
+                        HomeRivalFrame(rival: frame.0.rival, side: 176, weatherTime: frame.1)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(hex: 0xF6F2EB))
+        let window = try show(study, wait: 1)
+        try save(window, "study-rival-weather")
+        window.isHidden = true
+    }
+
+    /// Lightning strikes once in each stretch and is over before the next begins; between
+    /// strikes nothing lights the sky.
+    func testLightningStrikesOnceInEachStretch() {
+        for cycle in [0, 5, 1_000, 180_000_000] {
+            let start: Double = HomeRivalWeatherPainter.strike(cycle)
+            let stretch: Double = Double(cycle) * HomeRivalWeatherPainter.strikeEvery
+            XCTAssertGreaterThanOrEqual(start, stretch)
+            XCTAssertLessThanOrEqual(start + HomeRivalWeatherPainter.strikeLasts, stretch + HomeRivalWeatherPainter.strikeEvery)
+        }
+        XCTAssertEqual(HomeRivalSky(.beginner), .leaves)
+        XCTAssertEqual(HomeRivalSky(.casual), .snow)
+        XCTAssertEqual(HomeRivalSky(.club), .rain)
+        XCTAssertEqual(HomeRivalSky(.expert), .embers)
+        XCTAssertEqual(HomeRivalSky(.grandmaster), .lightning)
+    }
+
     /// The castle's three rooms behind Rooms (Alex, 2026-11-14), each past its film: the Trophy
     /// Hall, Famous Games and the Dungeon; and a famous game being played out.
     func testTheCastleRooms() throws {

@@ -500,7 +500,9 @@ struct HomeAuroraView: View {
                 ScrollView(.horizontal) {
                     HStack(alignment: .top, spacing: 16) {
                         ForEach(levels) { level in
-                            rivalCard(level, card: card, upNext: upNext, ladder: ladder)
+                            // The rival in front and the ones beside it, which show as you swipe.
+                            rivalCard(level, card: card, upNext: upNext, ladder: ladder,
+                                      weatherMoves: abs(level.rawValue - shown.rawValue) <= 1)
                                 .containerRelativeFrame(.horizontal)
                                 .id(level)
                         }
@@ -533,7 +535,7 @@ struct HomeAuroraView: View {
     }
 
     private func rivalCard(_ level: MatchController.Level, card: HomeAuroraGameCard, upNext: HomeUpNext,
-                           ladder: RivalLadder) -> some View {
+                           ladder: RivalLadder, weatherMoves: Bool) -> some View {
         let rival: Rival = level.rival
         let isOpen: Bool = ladder.isOpen(level)
         let lockedBy: Rival? = isOpen ? nil : MatchController.Level(rawValue: level.rawValue - 1)?.rival
@@ -544,6 +546,7 @@ struct HomeAuroraView: View {
             return ladder.beaten(rival) ? "\(place) · Beaten" : place
         }()
         return HomeAuroraNextRival(card: card, rival: rival, palette: palette, status: status, lockedBy: lockedBy,
+                                   weatherMoves: weatherMoves,
                                    play: { level == upNext.level ? open(card) : actions.playRival(level) },
                                    change: { level == upNext.level ? actions.stage.change() : actions.options(level) },
                                    meet: { actions.rivals(level) })
@@ -909,6 +912,8 @@ struct HomeAuroraNextRival: View {
     var status: String? = nil
     /// Set when this rival is still locked: the one to beat first.
     var lockedBy: Rival? = nil
+    /// False for a card swiped out of sight, whose weather then holds still.
+    var weatherMoves: Bool = true
     let play: () -> Void
     let change: () -> Void
     let meet: () -> Void
@@ -917,7 +922,7 @@ struct HomeAuroraNextRival: View {
         let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
         HStack(spacing: 14) {
             Button(action: meet) {
-                HomeRivalFrame(rival: rival, side: 112)
+                HomeRivalFrame(rival: rival, side: 112, weatherMoves: weatherMoves)
                     .saturation(lockedBy == nil ? 1 : 0.15)
                     .opacity(lockedBy == nil ? 1 : 0.75)
                     .overlay {
@@ -1010,6 +1015,10 @@ struct HomeAuroraNextRival: View {
 struct HomeRivalFrame: View {
     let rival: Rival
     let side: CGFloat
+    /// The weather behind the rival moves (HomeRivalWeather); a card out of sight holds still.
+    var weatherMoves: Bool = true
+    /// Tests stop the weather at a moment of their choosing.
+    var weatherTime: Double? = nil
 
     /// The stills, read once each.
     @MainActor private static var stills: [String: UIImage] = [:]
@@ -1038,6 +1047,10 @@ struct HomeRivalFrame: View {
                     .offset(y: -top * inner * 16 / 9)
                     .frame(width: inner, height: inner, alignment: .top)
                     .clipped()
+                    // Leaves, snow, rain, embers or lightning, behind the rival (Alex, 2026-11-28).
+                    .overlay {
+                        HomeRivalWeather(rival: rival, side: inner, top: top, moves: weatherMoves, at: weatherTime)
+                    }
             } else {
                 Image(rival.portraitName)
                     .resizable()
