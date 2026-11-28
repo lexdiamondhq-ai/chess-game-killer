@@ -70,7 +70,10 @@ struct PieceSetPicker: View {
                 .padding(.top, 10)
         }
         .padding(.vertical, 14)
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width.rounded() } action: { new in
+            // Only a real change of width moves the cards, so a layout pass can't feed itself.
+            if abs(new - width) >= 1 { width = new }
+        }
         .onAppear { centered = selection }
         // Swiping picks: the set that settles in the middle is the one the board wears.
         .onChange(of: centered) { _, set in
@@ -110,7 +113,9 @@ struct PieceSetPicker: View {
             // The dark of the tiles' studio, warming toward the stone.
             LinearGradient(colors: [Color(white: 0.04), Color(red: 0.16, green: 0.12, blue: 0.09)],
                            startPoint: .top, endPoint: .bottom)
-            if SculptedAssets.shared.isLoaded {
+            // Under tests the card shows the set's picture: a live 3D view inside the swiping row
+            // kept the Settings snapshot tests from ever finishing.
+            if SculptedAssets.shared.isLoaded && PieceSetShowcaseScene.mayTurn {
                 PieceSetShowcaseView(look: set.dress(board), turning: isOn)
             } else {
                 set.preview
