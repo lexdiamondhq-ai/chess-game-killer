@@ -27,7 +27,7 @@ struct HomeAuroraTodayCard: View {
                     Text(eyebrow.uppercased())
                         .font(.system(size: 10, weight: .bold))
                         .tracking(1.2)
-                        .foregroundStyle(palette.gold)
+                        .foregroundStyle(palette.goldInk)
                         .lineLimit(1)
                     Text(title)
                         .font(.system(size: 24, weight: .regular, design: .serif))
@@ -80,7 +80,7 @@ struct HomeAuroraTodayCard: View {
             Text(title)
                 .font(.system(size: 12, weight: .bold))
         }
-        .foregroundStyle(solid ? Color(hex: 0x2A1E0F) : palette.gold)
+        .foregroundStyle(solid ? Color(hex: 0x2A1E0F) : palette.goldInk)
         .padding(.horizontal, solid ? 13 : 11)
         .frame(height: 28)
         .background {

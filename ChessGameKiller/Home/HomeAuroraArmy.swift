@@ -112,7 +112,7 @@ struct HomeAuroraArmy: View {
     private func words(_ slot: ArmySlot) -> some View {
         let record: PieceRecord = army.record(for: slot)
         let named: Bool = record.name != nil
-        let nameColor: Color = record.rank == .legend ? palette.gold : palette.ink
+        let nameColor: Color = record.rank == .legend ? palette.goldInk : palette.ink
         var parts: [String] = [record.rank.title]
         if let next = record.rank.next {
             parts.append("\(next.threshold - record.xp) XP to \(next.title)")
