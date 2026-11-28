@@ -145,7 +145,7 @@ struct DNAPillStyle: ButtonStyle {
         let gilded: Bool = theme.screenTone != nil
         let solidInk: Color = gilded ? Polish.onMetal : Color.black.opacity(0.85)
         return configuration.label
-            .font(.app(.footnote, weight: .semibold).monospacedDigit())
+            .font(.app(.footnote, weight: .bold).monospacedDigit())
             .lineLimit(1)
             .fixedSize()
             .padding(.horizontal, 12)

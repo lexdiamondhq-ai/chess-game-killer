@@ -75,7 +75,8 @@ private struct CoachCard: View {
         return GlassSurface(shape: shape)
             .overlay {
                 if isSelected {
-                    shape.strokeBorder(accent, lineWidth: 1.5)
+                    // A ring is a small solid shape: the fill gold, like the chosen piece set's ring.
+                    shape.strokeBorder(theme.trainingFill, lineWidth: 1.5)
                 }
             }
     }
