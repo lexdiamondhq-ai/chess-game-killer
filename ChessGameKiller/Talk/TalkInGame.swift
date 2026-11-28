@@ -85,7 +85,8 @@ struct TalkMic: View {
         let accent: Color = theme.accent ?? .accentColor
         let side: CGFloat = min(max(scaled, 30), 42)
         // On the gold pages the disc is cut from the main button's metal, not a flat accent.
-        let gilded: Bool = theme.screenTone != nil
+        // Neon keeps its own lit disc and glow: this mic also sits in the coach on the game screen.
+        let gilded: Bool = theme.screenTone != nil && !theme.glows
         let glowing: Bool = theme.glows && !gilded
         let shade: Color = gilded ? Polish.cast(dark: theme.screenIsDark) : accent.opacity(theme.glows ? 0.55 : 0.25)
         ZStack {
