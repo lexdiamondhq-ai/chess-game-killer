@@ -544,7 +544,7 @@ private struct CoachPanel: View {
                 Spacer(minLength: 4)
             } else if match.gradeIsPending {
                 // The grade shown would be the last move's: say the new one is on its way.
-                CoachAvatar(theme: theme, size: 40)
+                CoachAvatar(theme: theme, size: 40, boardRing: true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(Coach.current.name)").font(.app(.headline))
                     Text("Your grade is on its way.")
@@ -583,7 +583,7 @@ private struct CoachPanel: View {
                              spoken: "Score \(score) for you")
                 }
             } else {
-                CoachAvatar(theme: theme, size: 40)
+                CoachAvatar(theme: theme, size: 40, boardRing: true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(Coach.current.name)").font(.app(.headline))
                     Text("Play a move and I'll tell you how it was.")

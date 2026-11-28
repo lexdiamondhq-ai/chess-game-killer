@@ -80,7 +80,7 @@ struct PolishedFill<S: InsettableShape>: View {
         let metal = Polish.buttonMetal(ownMetal)
         let lightRoom: Bool = scheme != .dark
         // In a dark room the upper lip is a line of light. On cream, light on light is no line
-        // at all, so the lip is the edge's own gold there and the light sits just inside it.
+        // at all, so the lip is the edge's own gold there: one clean edge, lit by the sheen.
         let lip: Color = lightRoom ? Polish.metal(ownMetal, dark: false).catchLight.opacity(0.9)
                                    : Color.white.opacity(0.6)
         let glow: Double = quiet ? 0 : (lightRoom ? 0.26 : 0.3)
@@ -94,14 +94,6 @@ struct PolishedFill<S: InsettableShape>: View {
                 shape.strokeBorder(LinearGradient(colors: [lip, metal.rim.opacity(0.85)],
                                                   startPoint: .top, endPoint: .bottom),
                                    lineWidth: 1)
-            }
-            .overlay {
-                if lightRoom {
-                    shape.inset(by: 1)
-                        .strokeBorder(LinearGradient(colors: [Color.white.opacity(0.55), Color.white.opacity(0)],
-                                                     startPoint: .top, endPoint: .center),
-                                      lineWidth: 1)
-                }
             }
             // On cream the glow falls under the button, not around it.
             .shadow(color: metal.foot.opacity(glow), radius: lightRoom ? 8 : 10, y: lightRoom ? 5 : 4)
@@ -159,7 +151,7 @@ struct GildedSegments<Value: Hashable>: View {
                     Text(option.label)
                         .font(.app(.subheadline, weight: .semibold))
                         .foregroundStyle(isOn ? (gilded ? AnyShapeStyle(Polish.onMetal) : AnyShapeStyle(Color.primary))
-                                              : AnyShapeStyle(Color.secondary))
+                                              : AnyShapeStyle(Color.quietInk))
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                         .padding(.horizontal, 10)
@@ -262,7 +254,7 @@ enum StoneInk {
         case .emerald: return (0x1F7A4D, 0x6FCF97)
         case .ruby: return (0xB3283B, 0xEC6A78)
         case .carnelian: return (0xB4531F, 0xF09460)
-        case .citrine: return (0xD49B00, 0xEBCB5E)
+        case .citrine: return (0xD49B00, 0xE6D04A)
         case .sapphire: return (0x2B5FB8, 0x8AAEF0)
         case .amethyst: return (0x5B3FB8, 0xB5A2F5)
         case .jade: return (0x17786A, 0x6CCFC0)

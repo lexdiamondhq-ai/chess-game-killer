@@ -572,7 +572,8 @@ private struct ThemeCard: View {
                               lineWidth: theme.screenIsDark ? 0.75 : 1)
         }
         .shadow(color: option.backdrop != nil ? Polish.cast(dark: theme.screenIsDark, strength: 1.75)
-                    : option.isDark ? Color(hex: 0x3CDCE6).opacity(0.35) : .black.opacity(0.1), radius: 5, y: 2)
+                    : option.isDark ? Color(hex: 0x3CDCE6).opacity(0.35) : .black.opacity(0.1),
+                radius: 5, y: option.backdrop != nil ? 2 : 0)
         .accessibilityHidden(true)
     }
 
@@ -691,10 +692,13 @@ private struct IconTile: View {
             .frame(width: 34, height: 34)
             .background {
                 // Lit from above with a fine rim, as the Learn rows' plates are.
-                tile.fill(LinearGradient(colors: [accent.opacity(0.26), accent.opacity(0.1)],
+                tile.fill(LinearGradient(colors: [accent.opacity(0.24), accent.opacity(0.1)],
                                          startPoint: .top, endPoint: .bottom))
             }
-            .overlay { tile.strokeBorder(accent.opacity(0.4), lineWidth: 0.75) }
+            .overlay {
+                tile.strokeBorder(LinearGradient(colors: [accent.opacity(0.5), accent.opacity(0.2)],
+                                                 startPoint: .top, endPoint: .bottom), lineWidth: 0.75)
+            }
             .accessibilityHidden(true)
     }
 }

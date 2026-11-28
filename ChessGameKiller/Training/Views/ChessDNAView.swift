@@ -486,12 +486,13 @@ struct LearnedAboutYouRow: View {
         VStack(spacing: 0) {
             if let line {
                 HStack(alignment: .top, spacing: 12) {
-                    CoachAvatar(theme: theme, size: 34)
+                    // This row sits in the coach on the game screen, which is always dark.
+                    CoachAvatar(theme: theme, size: 34, boardRing: true)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("\(Coach.current.name.uppercased()) LEARNED")
                             .font(.app(.caption2, weight: .semibold))
                             .tracking(1.2)
-                            .foregroundStyle(theme.trainingAccent)
+                            .foregroundStyle(theme.homeMetalAccent)
                         Text(line)
                             .font(.app(.subheadline, weight: .medium))
                             .fixedSize(horizontal: false, vertical: true)

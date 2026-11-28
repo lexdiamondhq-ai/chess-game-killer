@@ -62,7 +62,10 @@ struct HomeTone {
     var hairline: Color { ink.opacity(0.17) }
     /// Something happening right now, like players waiting online: a soft green, the one
     /// color that isn't the board's, kept to a dot.
-    var live: Color { StoneInk.emerald.color(dark: scheme == .dark) }
+    /// On a light page the dot is a step brighter than the emerald ink: at 6 to 8 pt the ink
+    /// reads near black.
+    var live: Color { scheme == .dark ? StoneInk.emerald.color(dark: true) : HomeTone.liveOnLight }
+    static let liveOnLight = Color(hex: 0x258F55)
     /// How dark the shadow under the sheet and the cards falls.
     var shadow: Double { scheme == .dark ? 0.35 : 0.12 }
 

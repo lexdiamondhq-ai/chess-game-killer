@@ -121,7 +121,7 @@ extension TrainingColor {
 extension BoardTheme {
     /// The training screens' main color, for words, icons and fine edges: the app's gold ink
     /// on the home's pages (the gold of a carved label, so every gold word on a page is one
-    /// metal), Sculpted's silver and Noir's champagne on theirs, or the board's own accent.
+    /// metal), Sculpted's silver on its pages, or the board's own accent.
     var trainingAccent: Color {
         guard let tone = screenTone else { return accent ?? .accentColor }
         if wearsOwnMetal(tone) { return tone.metal }
@@ -133,6 +133,8 @@ extension BoardTheme {
     var trainingFill: Color {
         guard let tone = screenTone else { return accent ?? .accentColor }
         if wearsOwnMetal(tone) { return tone.metal }
+        // On the Middle room's stone the lighter gold is lost (2.2:1): the ink's gold there.
+        if onStone { return Polish.goldInk(dark: false) }
         return Polish.goldFill(dark: tone.scheme == .dark)
     }
 
@@ -140,9 +142,13 @@ extension BoardTheme {
     /// screen exactly as it is.
     var homeMetalAccent: Color { screenTone?.metal ?? accent ?? .accentColor }
 
-    /// Sculpted's pages are silver in every light; Noir's are champagne in the dark.
-    private func wearsOwnMetal(_ tone: HomeTone) -> Bool {
-        id == .sculpted || (id == .noir && tone.scheme == .dark)
+    /// Sculpted's pages are silver in every light. Every other look's edges, labels and gold
+    /// buttons are the app's gold, so its words are too: one metal on a page.
+    private func wearsOwnMetal(_ tone: HomeTone) -> Bool { id == .sculpted }
+
+    /// The home's Middle room: a light scheme on a stone page.
+    private var onStone: Bool {
+        UserDefaults.standard.string(forKey: HomeToneMode.key) == HomeToneMode.middle.rawValue
     }
 
     /// A hint's tint: the page's gold, since yellow glass turns olive on espresso and lemon
@@ -311,7 +317,7 @@ private struct TrainingButton: View {
             .frame(minHeight: 52)
             // A quiet button keeps the page's ink: a tint (a hint's yellow) only colors its edge
             // and fill, since a pale tint would be lost as text on a light page.
-            .foregroundStyle(waiting ? tone.ink.opacity(0.5) : (prominent ? solidInk : tone.ink))
+            .foregroundStyle(waiting ? tone.ink.opacity(tone.scheme == .dark ? 0.5 : 0.65) : (prominent ? solidInk : tone.ink))
             .background {
                 if waiting {
                     WaitingFill()
@@ -375,6 +381,8 @@ struct CoachAvatar: View {
     var tint: Color?
     /// Whose portrait: the picked coach unless one is named (the picker shows both).
     var coach: Coach?
+    /// On the game screen the ring keeps the board's own accent.
+    var boardRing = false
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -384,7 +392,7 @@ struct CoachAvatar: View {
         if theme.id == .neon {
             return [Color(hex: 0x19C6CF), Color(hex: 0x9B4BEA), Color(hex: 0xE04BC4), Color(hex: 0x19C6CF)]
         }
-        if theme.screenTone != nil {
+        if theme.screenTone != nil, !boardRing {
             // Solid stops from the edge's gold: a see-through stop lets the dark face show
             // and turns the ring to bronze on a light page.
             let metal = Polish.metal(theme.screenPolishMetal, dark: colorScheme == .dark)
@@ -439,11 +447,13 @@ struct TrafficLightDots: View {
     var size: CGFloat = 10
     /// Which light to brighten, or nil for all.
     var lit: Int?
+    /// On the game screen, which is always dark: the bright set.
+    var bright = false
 
     var body: some View {
         HStack(spacing: size * 0.45) {
             ForEach(Array([TrainingColor.red, .yellow, .green].enumerated()), id: \.offset) { index, light in
-                let color = light.color(on: theme)
+                let color = bright ? light.boardColor(on: theme) : light.color(on: theme)
                 let on = lit == nil || lit == index
                 Circle()
                     .fill(color.opacity(on ? 1 : 0.25))

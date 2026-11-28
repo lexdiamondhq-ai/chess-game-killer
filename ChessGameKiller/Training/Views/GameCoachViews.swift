@@ -18,7 +18,7 @@ struct GameCoachRow: View {
         Group {
             if let retry = coach.retrying {
                 line(title: "Your turn again", detail: "Find something better than \(sanOf(retry)).",
-                     tint: TrainingColor.yellow.color(on: theme)) { EmptyView() }
+                     tint: TrainingColor.yellow.boardColor(on: theme)) { EmptyView() }
             } else if match.isOver, coach.savedThisGame > 0 {
                 // At the end of a game the way into practice comes first: it's what the game was for.
                 practicePill
@@ -33,8 +33,9 @@ struct GameCoachRow: View {
     /// The end of a game's one slim pink pill: the count, and Practice at its end
     /// (Alex's pick A for the game-over card, 2026-11-24). The whole pill is the button.
     private var practicePill: some View {
-        let pink = TrainingColor.pink.color(on: theme)
-        let accent = theme.trainingAccent
+        // The game screen is always dark, whatever the home's tone: the bright set, as on a board.
+        let pink = TrainingColor.pink.boardColor(on: theme)
+        let accent = theme.homeMetalAccent
         let count = coach.savedThisGame
         return Button {
             coach.practiceMistakes(store: store)
@@ -69,7 +70,7 @@ struct GameCoachRow: View {
     }
 
     private func momentView(_ moment: CoachMoment) -> some View {
-        let tint = moment.isPraise ? TrainingColor.green.color(on: theme) : TrainingColor.orange.color(on: theme)
+        let tint = moment.isPraise ? TrainingColor.green.boardColor(on: theme) : TrainingColor.orange.boardColor(on: theme)
         let lesson = coach.lesson(for: moment, in: store.library)
         return line(title: moment.title, detail: moment.detail, tint: tint) {
             if !moment.isPraise, match.canUndo {
@@ -133,7 +134,7 @@ struct GameCoachRow: View {
     }
 
     private func smallButton(_ title: String, symbol: String, action: @escaping () -> Void) -> some View {
-        let accent = theme.trainingAccent
+        let accent = theme.homeMetalAccent
         return Button(action: action) {
             Label(title, systemImage: symbol)
                 .font(.app(.caption, weight: .bold))
@@ -174,7 +175,7 @@ struct ThinkActionButton: View {
             showing = true
         } label: {
             VStack(spacing: 5) {
-                TrafficLightDots(theme: theme, size: 7)
+                TrafficLightDots(theme: theme, size: 7, bright: true)
                     .frame(width: 44, height: 44)
                     .background(Color.primary.opacity(theme.screenIsDark ? 0.07 : 0.05), in: Circle())
                     .overlay(Circle().strokeBorder(Color.primary.opacity(0.11), lineWidth: 1))
@@ -208,7 +209,7 @@ struct CoachOrbBadge: View {
     let theme: BoardTheme
 
     var body: some View {
-        let tint = moment.isPraise ? TrainingColor.green.color(on: theme) : TrainingColor.orange.color(on: theme)
+        let tint = moment.isPraise ? TrainingColor.green.boardColor(on: theme) : TrainingColor.orange.boardColor(on: theme)
         CoachAvatar(theme: theme, size: 26, tint: tint)
             .accessibilityElement()
             .accessibilityLabel(moment.isPraise ? "\(Coach.current.title) liked that move" : "\(Coach.current.title) has a tip")

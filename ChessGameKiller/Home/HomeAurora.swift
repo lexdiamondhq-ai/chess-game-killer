@@ -1443,9 +1443,9 @@ struct HomeAuroraJewel: View {
     var body: some View {
         GeometryReader { geo in
             let side = min(geo.size.width, geo.size.height)
-            // The corner follows the tile's size (16 pt at Home's 64), so the inner thread runs
-            // parallel to the edge all the way round at every size.
-            let tile = RoundedRectangle(cornerRadius: side * 0.25, style: .continuous)
+            // The corner is one cut at every size; the inner thread's corner is that less its own
+            // inset, so it runs parallel to the edge all the way round.
+            let tile = RoundedRectangle(cornerRadius: 16, style: .continuous)
             tile
                 .fill(LinearGradient(colors: stone.colors, startPoint: .topLeading, endPoint: .bottomTrailing))
                 .overlay {
@@ -1455,7 +1455,7 @@ struct HomeAuroraJewel: View {
                                              endRadius: side * 0.7))
                 }
                 .overlay {
-                    RoundedRectangle(cornerRadius: side * 0.195, style: .continuous)
+                    RoundedRectangle(cornerRadius: max(4, 16 - side * 0.055), style: .continuous)
                         .strokeBorder(AnyShapeStyle(Self.gold).opacity(0.9), lineWidth: 0.75)
                         .padding(side * 0.055)
                 }
