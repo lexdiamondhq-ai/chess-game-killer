@@ -110,6 +110,18 @@ final class CoachChoiceTests: XCTestCase {
         ["\(moment.rawValue) 1", "\(moment.rawValue) 2", "\(moment.rawValue) 3"]
     }
 
+    /// Tapping a coach in the picker is asking to hear them, so the hello plays out loud on silent
+    /// (Alex heard nothing, 2026-11-27); afterwards the game's sounds follow the switch again.
+    func testThePickerHelloPlaysOutLoudOnSilent() {
+        XCTAssertEqual(CoachReactions.previewAudio(on: true), .playback)
+        XCTAssertEqual(CoachReactions.previewAudio(on: false), .ambient)
+        let lines = ReactionLines.bundled
+        for coach in Coach.allCases {
+            let hello = lines?.lines(for: coach, .hello).first
+            XCTAssertNotNil(hello.flatMap { CoachVoice.recording(for: $0, coach: coach) }, "\(coach.name) has no hello to play")
+        }
+    }
+
     func testBigMomentsAlwaysGetAReactionAndOrdinaryOnesOnlySometimes() {
         let start = Date(timeIntervalSince1970: 1_000_000)
         // A roll of 0.8 is above every ordinary chance after the first solve of a sitting.

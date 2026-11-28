@@ -4,15 +4,16 @@ import Foundation
 /// Every sound the game can make. File names match ChessGameKiller/Sounds/*.mp3,
 /// which are generated with ElevenLabs by scripts/make_sounds.py.
 enum GameSound: String, CaseIterable {
-    /// A piece set down: the same soft wooden tock as a rival's move (move-soft.mp3, ...), in
+    /// A piece set down: the same wooden tock as a rival's move (move-soft.mp3, ...), in
     /// every piece set and on every screen, so no move ever squeaks or clanks (Alex, 2026-11-26).
     case move
     /// A timed game's move: the piece set down, then the chess clock pressed.
     case clockMove = "move-clock"
     /// A rival's move: a clean, soft wooden "tock" like other chess apps use, the same in every
     /// piece set and with no clock press, so the computer's moves never clank (Alex, 2026-11-23).
-    /// It has takes like a move (move-soft.mp3, move-soft-2.mp3, ...). The tocks are made in
-    /// code (a few fading wood tones under 3 kHz), not recorded.
+    /// It has takes like a move (move-soft.mp3, move-soft-2.mp3, ...). Since 2026-11-27 they are
+    /// real recordings of wooden pieces set down on a wooden board (Alex: the code-made tones
+    /// sounded like beeps). Source: "chess pieces" by simone_ds (Freesound), via Pixabay.
     case rivalMove = "move-soft"
     /// A rival's capture, as quiet and soft as its move.
     case rivalCapture = "capture-soft"
@@ -21,6 +22,8 @@ enum GameSound: String, CaseIterable {
     case select
     /// A capture: the soft tock of a rival's capture (capture-soft.mp3), for everyone.
     case capture
+    /// Check: two wooden knocks, the second lower ("tok-tok"), cut from the same real recording
+    /// as the moves. Alex picked it over clicks and bells, 2026-11-27.
     case check
     /// Castling: two soft tocks, king then rook (castle.mp3, made from the move-soft takes).
     case castle
@@ -35,7 +38,7 @@ enum GameSound: String, CaseIterable {
     case welcome
 
     /// Sets how the sounds sit against each other. The soft tocks of a move, capture or castle
-    /// sit well under full volume, and check (its file raised 3 dB) above them. The longer cues' files are all made the same loudness
+    /// sit well under full volume, and check's two knocks a little above them. The longer cues' files are all made the same loudness
     /// (-16 LUFS, scripts/make_sounds.py), so these alone place them: the endings only a
     /// little above the knocks, so the end of a game is never a jolt, and the welcome softest.
     var volume: Float {
@@ -43,7 +46,7 @@ enum GameSound: String, CaseIterable {
         case .clockMove: return 0.75
         case .move, .capture, .castle, .rivalMove, .rivalCapture: return 0.6
         case .select: return 0.3
-        case .check: return 1.0
+        case .check: return 0.7
         case .win: return 0.7
         case .gameOver: return 0.6
         case .defeat: return 0.6

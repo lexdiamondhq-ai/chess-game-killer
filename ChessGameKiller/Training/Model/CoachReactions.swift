@@ -135,6 +135,8 @@ final class CoachReactions: Reacting {
 
     private var policy = ReactionPolicy()
     private var player: AVAudioPlayer?
+    /// Hands the sound back to the game once a picker hello finishes.
+    private var previewEnd: Task<Void, Never>?
     private let lines: ReactionLines?
 
     init(lines: ReactionLines? = .bundled) {
@@ -150,10 +152,37 @@ final class CoachReactions: Reacting {
     }
 
     /// The coach says hello, so the player can hear the voice before picking it.
+    /// A tap asking to hear the voice, so it plays out loud even with the ring switch on silent,
+    /// like a video does (before, it played as a sound effect and silent mode hid it). The game's
+    /// quiet sound effects come back once the hello is over.
     func preview(_ coach: Coach) {
         guard let line = lines?.lines(for: coach, .hello).first else { return }
         CoachVoice.shared.stop()
-        play(line, coach: coach)
+        let lesson = CoachVoice.shared.lessonAudioActive
+        if !lesson { Self.setPreviewAudio(true) }
+        guard play(line, coach: coach), !lesson, let player else {
+            if !lesson { Self.setPreviewAudio(false) }
+            return
+        }
+        previewEnd?.cancel()
+        previewEnd = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(player.duration + 0.3))
+            guard !Task.isCancelled, let self, self.player === player || self.player == nil,
+                  !CoachVoice.shared.lessonAudioActive else { return }
+            Self.setPreviewAudio(false)
+        }
+    }
+
+    /// Out loud on silent while a hello plays (mixing with any music), then back to the game's
+    /// ambient sound, which follows the silent switch.
+    nonisolated static func previewAudio(on: Bool) -> AVAudioSession.Category {
+        on ? .playback : .ambient
+    }
+
+    private static func setPreviewAudio(_ on: Bool) {
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(previewAudio(on: on), options: [.mixWithOthers])
+        if on { try? session.setActive(true) }
     }
 
     func stop() {
@@ -161,13 +190,14 @@ final class CoachReactions: Reacting {
         player = nil
     }
 
-    private func play(_ line: String, coach: Coach) {
+    @discardableResult
+    private func play(_ line: String, coach: Coach) -> Bool {
         guard let url = CoachVoice.recording(for: line, coach: coach),
-              let player = try? AVAudioPlayer(contentsOf: url) else { return }
+              let player = try? AVAudioPlayer(contentsOf: url) else { return false }
         self.player?.stop()
         player.volume = 0.9
         player.prepareToPlay()
         self.player = player
-        player.play()
+        return player.play()
     }
 }
