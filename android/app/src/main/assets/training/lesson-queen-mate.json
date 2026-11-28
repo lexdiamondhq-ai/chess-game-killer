@@ -1,0 +1,164 @@
+{
+  "id": "queen-mate",
+  "title": "Queen Checkmate",
+  "subtitle": "Build a box, shrink it, finish it",
+  "skill": "queen-mate",
+  "steps": [
+    {
+      "fen": "8/8/4k3/8/3Q4/8/8/4K3 b - - 0 1",
+      "say": "King and queen against a lone king is always a win, once you know the method. First, your queen builds a box.",
+      "marks": [
+        {
+          "square": "e5",
+          "color": "teal"
+        },
+        {
+          "square": "e6",
+          "color": "teal"
+        },
+        {
+          "square": "e7",
+          "color": "teal"
+        },
+        {
+          "square": "e8",
+          "color": "teal"
+        },
+        {
+          "square": "f5",
+          "color": "teal"
+        },
+        {
+          "square": "f6",
+          "color": "teal"
+        },
+        {
+          "square": "f7",
+          "color": "teal"
+        },
+        {
+          "square": "f8",
+          "color": "teal"
+        },
+        {
+          "square": "g5",
+          "color": "teal"
+        },
+        {
+          "square": "g6",
+          "color": "teal"
+        },
+        {
+          "square": "g7",
+          "color": "teal"
+        },
+        {
+          "square": "g8",
+          "color": "teal"
+        },
+        {
+          "square": "h5",
+          "color": "teal"
+        },
+        {
+          "square": "h6",
+          "color": "teal"
+        },
+        {
+          "square": "h7",
+          "color": "teal"
+        },
+        {
+          "square": "h8",
+          "color": "teal"
+        }
+      ]
+    },
+    {
+      "say": "Keep your queen a knight's jump away from their king. Each time it moves, follow it, and the box gets smaller.",
+      "moves": [
+        "e6f5",
+        "d4e3",
+        "f5g4",
+        "e3f2"
+      ]
+    },
+    {
+      "say": "The box is two files wide now. Once the king is on the edge, stop chasing and bring your own king closer. The queen can't checkmate alone.",
+      "marks": [
+        {
+          "square": "g3",
+          "color": "teal"
+        },
+        {
+          "square": "g4",
+          "color": "teal"
+        },
+        {
+          "square": "g5",
+          "color": "teal"
+        },
+        {
+          "square": "g6",
+          "color": "teal"
+        },
+        {
+          "square": "g7",
+          "color": "teal"
+        },
+        {
+          "square": "g8",
+          "color": "teal"
+        },
+        {
+          "square": "h3",
+          "color": "teal"
+        },
+        {
+          "square": "h4",
+          "color": "teal"
+        },
+        {
+          "square": "h5",
+          "color": "teal"
+        },
+        {
+          "square": "h6",
+          "color": "teal"
+        },
+        {
+          "square": "h7",
+          "color": "teal"
+        },
+        {
+          "square": "h8",
+          "color": "teal"
+        }
+      ]
+    },
+    {
+      "fen": "7k/8/6K1/8/8/8/8/5Q2 w - - 0 1",
+      "say": "Careful here! Queen f7 takes every square, but the king isn't in check. That's stalemate, and it's only a draw.",
+      "moves": [
+        "f1f7"
+      ]
+    },
+    {
+      "fen": "7k/8/6K1/8/8/8/8/5Q2 w - - 0 1",
+      "say": "Always leave the king a square until you can give checkmate. Let's do it right.",
+      "task": {
+        "type": "move",
+        "prompt": "Checkmate in one.",
+        "solution": [
+          "f1f8"
+        ],
+        "mate": true,
+        "hint": "Check along the back row. Your king guards the squares in front.",
+        "success": "Checkmate! Box, shrink, bring the king, finish."
+      }
+    },
+    {
+      "say": "Practice it a few times and you'll never let a won game slip away again."
+    }
+  ]
+}

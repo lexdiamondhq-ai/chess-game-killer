@@ -22,7 +22,7 @@ android {
         targetSdk = 36
         // Each GitHub build gets a higher number, which Google Play needs for every upload.
         versionCode = (System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1)
-        versionName = "1.0.0"
+        versionName = "1.0.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -50,7 +50,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
 
     // Stockfish ships as a program named libstockfish.so, so Android unpacks it where programs may run.
     packaging { jniLibs { useLegacyPackaging = true } }

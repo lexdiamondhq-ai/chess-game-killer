@@ -1,0 +1,56 @@
+{
+  "id": "mate-in-one",
+  "title": "Checkmate in One",
+  "subtitle": "Look at every check",
+  "skill": "mate-in-1",
+  "steps": [
+    {
+      "fen": "6k1/Q7/5K2/8/8/8/8/8 w - - 0 1",
+      "say": "Checkmate means the king is attacked and has no way out: no escape square, no block, no capture."
+    },
+    {
+      "say": "This one is called the kiss of death. The queen goes right up to the king, and your own king protects her.",
+      "task": {
+        "type": "move",
+        "prompt": "Find the checkmate.",
+        "solution": [
+          "a7g7"
+        ],
+        "mate": true,
+        "hint": "Put the queen right in front of their king, on a square your king guards.",
+        "success": "Kiss of death! The king can't take the queen, because your king protects her."
+      }
+    },
+    {
+      "fen": "6k1/8/6K1/8/8/8/8/R7 w - - 0 1",
+      "say": "Rooks love edges. Your king takes away the squares in front, and the rook checks along the back row.",
+      "task": {
+        "type": "move",
+        "prompt": "Checkmate with the rook.",
+        "solution": [
+          "a1a8"
+        ],
+        "mate": true,
+        "hint": "Their king can't step forward. Check it along the back row.",
+        "success": "Back-row mate! Your king and rook make a perfect team."
+      }
+    },
+    {
+      "fen": "r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4",
+      "say": "Remember Scholar's Mate? Now you're White, and Black forgot the red light.",
+      "task": {
+        "type": "move",
+        "prompt": "Punish it. Checkmate in one!",
+        "solution": [
+          "h5f7"
+        ],
+        "mate": true,
+        "hint": "Your queen and bishop both aim at f7.",
+        "success": "Checkmate! Now you know it from both sides."
+      }
+    },
+    {
+      "say": "To find a mate, look at every check you have, one by one. For each one ask: can the king run, block, or capture? If not, it's mate."
+    }
+  ]
+}

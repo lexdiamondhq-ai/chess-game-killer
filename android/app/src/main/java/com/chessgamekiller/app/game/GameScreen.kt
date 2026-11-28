@@ -45,7 +45,13 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.chessgamekiller.app.Progress
 import com.chessgamekiller.app.Sounds
+import com.chessgamekiller.app.ui.KnightGlyph
+import com.chessgamekiller.app.ui.RivalFrame
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import com.chessgamekiller.app.engine.Engines
 import com.chessgamekiller.app.leo.LeoClient
 import com.chessgamekiller.app.leo.LeoPanel
@@ -82,6 +88,8 @@ fun GameScreen(rival: Rival, playWhite: Boolean, onExit: () -> Unit, onAnalyze: 
     var leoReply by remember { mutableStateOf<LeoReply?>(null) }
     var leoBusy by remember { mutableStateOf(false) }
     var rivalJob by remember { mutableStateOf<Job?>(null) }
+    /** The result is counted once per game, for your rating and the rivals you've beaten. */
+    var recorded by remember { mutableStateOf(false) }
 
     // Read version so the screen redraws after every move.
     @Suppress("UNUSED_VARIABLE") val tick = version
@@ -94,6 +102,13 @@ fun GameScreen(rival: Rival, playWhite: Boolean, onExit: () -> Unit, onAnalyze: 
             val won = game.whiteWon?.let { it == playWhite }
             sounds.playEnd(won)
             showEnd = true
+            if (!recorded) {
+                recorded = true
+                val score = when (won) { true -> 1.0; false -> 0.0; null -> 0.5 }
+                Progress.record(rival, score)
+                // Chess DNA: Leo reads the game's moves in the background.
+                com.chessgamekiller.app.learn.Dna.recordGame(context, rival.name, playWhite, game.moves.map { it.move.uci }, score)
+            }
         }
     }
 
@@ -140,7 +155,7 @@ fun GameScreen(rival: Rival, playWhite: Boolean, onExit: () -> Unit, onAnalyze: 
 
     fun newGame() {
         rivalJob?.cancel(); thinking = false
-        game = Game(); resigned = false; showEnd = false; leoReply = null
+        game = Game(); resigned = false; showEnd = false; leoReply = null; recorded = false
         version++
         if (!playWhite) rivalMove()
     }
@@ -164,15 +179,10 @@ fun GameScreen(rival: Rival, playWhite: Boolean, onExit: () -> Unit, onAnalyze: 
                 IconButton(onClick = { rivalJob?.cancel(); onExit() }, modifier = Modifier.testTag("game-back")) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Palette.ink)
                 }
-                Image(
-                    painterResource(rival.portrait),
-                    contentDescription = null,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.size(48.dp),
-                )
-                Spacer(Modifier.width(10.dp))
+                RivalFrame(rival, 50.dp)
+                Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(rival.title, style = Type.heading)
+                    Text(rival.title, style = Type.title.copy(fontSize = 22.sp, fontWeight = FontWeight.Normal))
                     Text(
                         when {
                             thinking -> "Thinking…"
@@ -196,6 +206,27 @@ fun GameScreen(rival: Rival, playWhite: Boolean, onExit: () -> Unit, onAnalyze: 
                 onMove = ::play,
                 modifier = Modifier.padding(horizontal = 6.dp),
             )
+
+            // You, across the board from the rival.
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    Modifier.size(36.dp).clip(CircleShape)
+                        .background(Brush.radialGradient(listOf(Palette.goldTop, Palette.goldFoot)))
+                        .border(1.dp, Color.White.copy(alpha = 0.35f), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) { KnightGlyph(Modifier.size(18.dp, 22.dp)) }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("You", style = Type.heading.copy(fontSize = 18.sp))
+                    Text(
+                        (if (playWhite) "White" else "Black") + " · " + (Progress.rating?.let { "Rating $it" } ?: "New"),
+                        style = Type.small.copy(fontSize = 12.sp),
+                    )
+                }
+            }
 
             // The moves so far.
             Text(
@@ -258,6 +289,11 @@ fun GameScreen(rival: Rival, playWhite: Boolean, onExit: () -> Unit, onAnalyze: 
                     rivalJob?.cancel(); thinking = false
                     resigned = true; showEnd = true
                     sounds.playEnd(false)
+                    if (!recorded) {
+                        recorded = true
+                        Progress.record(rival, 0.0)
+                        com.chessgamekiller.app.learn.Dna.recordGame(context, rival.name, playWhite, game.moves.map { it.move.uci }, 0.0)
+                    }
                 }
             },
             dismissButton = { QuietButton("Keep playing") { confirmResign = false } },

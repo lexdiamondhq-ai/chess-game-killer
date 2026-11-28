@@ -1,0 +1,161 @@
+{
+  "id": "piece-values",
+  "title": "What Pieces Are Worth",
+  "subtitle": "Count before you capture",
+  "skill": "counting",
+  "steps": [
+    {
+      "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      "say": "Every piece has a value. A pawn is worth 1. Knights and bishops are worth 3.",
+      "labels": [
+        {
+          "square": "a1",
+          "text": "5",
+          "color": "orange"
+        },
+        {
+          "square": "b1",
+          "text": "3",
+          "color": "blue"
+        },
+        {
+          "square": "c1",
+          "text": "3",
+          "color": "blue"
+        },
+        {
+          "square": "d1",
+          "text": "9",
+          "color": "pink"
+        },
+        {
+          "square": "d2",
+          "text": "1",
+          "color": "green"
+        }
+      ]
+    },
+    {
+      "say": "A rook is worth 5. The queen is worth 9, because she moves like a rook and a bishop together.",
+      "labels": [
+        {
+          "square": "a1",
+          "text": "5",
+          "color": "orange"
+        },
+        {
+          "square": "b1",
+          "text": "3",
+          "color": "blue"
+        },
+        {
+          "square": "c1",
+          "text": "3",
+          "color": "blue"
+        },
+        {
+          "square": "d1",
+          "text": "9",
+          "color": "pink"
+        },
+        {
+          "square": "d2",
+          "text": "1",
+          "color": "green"
+        }
+      ]
+    },
+    {
+      "say": "The king has no number. You can never trade it. If it's trapped, the game is over.",
+      "marks": [
+        {
+          "square": "e1",
+          "color": "yellow"
+        }
+      ]
+    },
+    {
+      "fen": "rnbqkbnr/ppp2ppp/3p4/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 3",
+      "say": "Before you capture, count. Here White's knight could take the pawn on e5.",
+      "arrows": [
+        {
+          "from": "f3",
+          "to": "e5",
+          "color": "yellow",
+          "dashed": true
+        }
+      ],
+      "task": {
+        "type": "choice",
+        "prompt": "Is Knight takes e5 a good capture?",
+        "options": [
+          {
+            "text": "Yes, I win a pawn",
+            "correct": false,
+            "move": "f3e5",
+            "why": "You'd win a pawn, but the d6 pawn takes your knight. That's 1 for 3."
+          },
+          {
+            "text": "No, I'd lose my knight",
+            "correct": true,
+            "move": "d6e5",
+            "why": "The d6 pawn guards e5, so you'd win 1 and lose 3."
+          }
+        ],
+        "success": "Good counting."
+      }
+    },
+    {
+      "say": "See? One pawn in, one knight out. Down 2 points.",
+      "moves": [
+        "f3e5",
+        "d6e5"
+      ]
+    },
+    {
+      "fen": "rnbqkb1r/pppp1ppp/4pn2/8/3PP3/2N5/PPP2PPP/R1BQKBNR b KQkq - 2 3",
+      "say": "Now Black puts a knight on d5. It's guarded by the e6 pawn, so it looks safe.",
+      "moves": [
+        "f6d5"
+      ]
+    },
+    {
+      "arrows": [
+        {
+          "from": "e4",
+          "to": "d5",
+          "color": "yellow",
+          "dashed": true
+        }
+      ],
+      "task": {
+        "type": "choice",
+        "prompt": "Is pawn takes d5 a good capture?",
+        "options": [
+          {
+            "text": "Yes, my pawn for their knight",
+            "correct": true,
+            "move": "e4d5",
+            "why": "Even if they take back, you gave 1 and won 3. You're 2 points up."
+          },
+          {
+            "text": "No, they can take back",
+            "correct": false,
+            "why": "They can take back, but count it: your pawn is worth 1 and their knight is worth 3."
+          }
+        ],
+        "success": "That's it."
+      }
+    },
+    {
+      "say": "Pawn takes knight, pawn takes pawn. You traded a 1 for a 3.",
+      "moves": [
+        "e4d5",
+        "e6d5"
+      ]
+    },
+    {
+      "say": "So here's the rule: count what you win and what you lose. Come out ahead or even, and the capture is fine. Come out behind, and it isn't."
+    }
+  ]
+}

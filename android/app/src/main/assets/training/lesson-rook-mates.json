@@ -1,0 +1,83 @@
+{
+  "id": "rook-mates",
+  "title": "Rook Checkmates",
+  "subtitle": "The ladder, and king and rook",
+  "skill": "ladder-mate",
+  "steps": [
+    {
+      "fen": "8/8/8/6k1/R7/8/8/1R2K3 w - - 0 1",
+      "say": "Two rooks can checkmate on their own. It's called the ladder: they take turns checking, and the king climbs to the edge.",
+      "arrows": [
+        {
+          "from": "a4",
+          "to": "h4",
+          "color": "teal",
+          "dashed": true
+        }
+      ]
+    },
+    {
+      "say": "One rook guards a row, the other checks on the next one. Then they swap.",
+      "moves": [
+        "b1b5",
+        "g5g6",
+        "a4a6",
+        "g6g7",
+        "b5b7",
+        "g7g8"
+      ]
+    },
+    {
+      "task": {
+        "type": "move",
+        "prompt": "Finish the ladder. Checkmate!",
+        "solution": [
+          "a6a8"
+        ],
+        "mate": true,
+        "hint": "One rook guards the 7th row. Use the other to check on the 8th.",
+        "success": "Up the ladder, and checkmate!"
+      }
+    },
+    {
+      "fen": "8/8/8/3k4/8/8/8/R3K3 w - - 0 1",
+      "say": "With one rook, your king has to help. First, use the rook to cut their king off.",
+      "moves": [
+        "a1a4"
+      ],
+      "arrows": [
+        {
+          "from": "a4",
+          "to": "h4",
+          "color": "teal",
+          "dashed": true
+        }
+      ]
+    },
+    {
+      "fen": "8/8/4k3/R7/4K3/8/8/8 w - - 0 1",
+      "say": "Then walk your king up. When the kings stand face to face, check from the side, and their king has to step back.",
+      "moves": [
+        "a5a6",
+        "e6e7"
+      ]
+    },
+    {
+      "fen": "4k3/8/4K3/8/8/8/8/R7 w - - 0 1",
+      "say": "Repeat until their king reaches the edge.",
+      "task": {
+        "type": "move",
+        "prompt": "Kings face to face. Checkmate!",
+        "solution": [
+          "a1a8"
+        ],
+        "mate": true,
+        "hint": "Check along the edge. Your king covers the squares in front.",
+        "success": "Checkmate with king and rook. That's a skill for life."
+      }
+    },
+    {
+      "say": "Ladder with two rooks, king and rook with one. Practice both until they feel easy."
+    }
+  ]
+}
