@@ -217,6 +217,8 @@ struct DeepReviewCard: View {
                         .frame(minHeight: 44)
                         .foregroundStyle(Polish.pillInk(gilded: theme.screenTone != nil))
                         .background { MainPillFill(gilded: theme.screenTone != nil, plain: Color.primary.opacity(0.92)) }
+                        // The metal takes no touches, so the whole capsule is named as the target.
+                        .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
             } else {
@@ -248,6 +250,8 @@ struct DeepReviewCard: View {
                     .frame(minHeight: 44)
                     .foregroundStyle(Polish.pillInk(gilded: theme.screenTone != nil))
                     .background { MainPillFill(gilded: theme.screenTone != nil, plain: Color.primary.opacity(0.92)) }
+                    // The metal takes no touches, so the whole capsule is named as the target.
+                    .contentShape(Capsule())
             }
             .buttonStyle(.plain)
         }

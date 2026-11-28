@@ -172,6 +172,8 @@ struct FriendInviteBanner: View {
                 shape.fill(Polish.cast(dark: theme.screenIsDark, strength: 1.75))
                     .blur(radius: 12)
                     .offset(y: 8)
+                    // A shadow takes no touches: the banner floats over the whole app.
+                    .allowsHitTesting(false)
                 shape.fill(.ultraThinMaterial)
             }
         }

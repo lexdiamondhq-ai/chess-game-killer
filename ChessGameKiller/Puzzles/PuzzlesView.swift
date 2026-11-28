@@ -215,6 +215,8 @@ struct PuzzlesView: View {
             .padding(.horizontal, 14)
             .frame(height: 44)
             .trainingCard(theme, cornerRadius: 14)
+            // The glass takes no touches, so the whole row is named as the target.
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Theme: \(store.theme.name). Change theme")
@@ -537,6 +539,8 @@ private struct ThemePicker: View {
                         .strokeBorder(accent, lineWidth: 1.5)
                 }
             }
+            // The glass takes no touches, so the whole tile is named as the target.
+            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(counts[option.id] == 0)

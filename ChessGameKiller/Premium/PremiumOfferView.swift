@@ -133,6 +133,8 @@ struct PremiumOfferView: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 54)
                 .background { mainFill }
+                // The metal takes no touches, so the whole button is named as the target.
+                .contentShape(Rectangle())
         }
         .buttonStyle(ChallengePressStyle())
     }
@@ -162,6 +164,8 @@ struct PremiumOfferView: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 54)
                 .background { mainFill }
+                // The metal takes no touches, so the whole button is named as the target.
+                .contentShape(Rectangle())
             }
             .buttonStyle(ChallengePressStyle())
             .disabled(busy)
@@ -468,6 +472,8 @@ struct PremiumLimitCard: View {
                                 RoundedRectangle(cornerRadius: 14, style: .continuous).fill(accent)
                             }
                         }
+                        // The metal takes no touches, so the whole button is named as the target.
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(ChallengePressStyle())
             }

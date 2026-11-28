@@ -1041,6 +1041,8 @@ private struct ExplorerCard: View {
                         .frame(minHeight: 44)
                         .foregroundStyle(Polish.pillInk(gilded: theme.screenTone != nil))
                         .background { MainPillFill(gilded: theme.screenTone != nil, plain: Color.primary.opacity(0.92)) }
+                        // The metal takes no touches, so the whole capsule is named as the target.
+                        .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
             } else {
@@ -1140,6 +1142,8 @@ private struct CardButton: View {
                 // The quiet button is a well with the page's fine gilded edge, not a grey slab.
                 if !prominent { PolishedEdge(shape: shape, edge: .well) }
             }
+            // The metal takes no touches, so the whole card is named as the target.
+            .contentShape(shape)
         }
         .buttonStyle(.plain)
     }
