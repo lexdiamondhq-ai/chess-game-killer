@@ -76,6 +76,28 @@ final class SculptedSnapshotTests: XCTestCase {
         }
     }
 
+    /// Settings > Pieces' big card for every set: the whole family of each side back to back on a
+    /// round of the gilded stone, as the card in the middle shows it before it starts turning.
+    func testPieceSetShowcase() throws {
+        let windowScene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        for set in PieceSet.allCases {
+            let showcase = PieceSetShowcaseScene(look: set.dress(.gilded), assets: SculptedAssets())
+            let window = UIWindow(windowScene: windowScene)
+            window.frame = CGRect(x: 0, y: 0, width: 300, height: 300)
+            let host = UIViewController()
+            host.view.backgroundColor = UIColor(red: 0.11, green: 0.115, blue: 0.125, alpha: 1)
+            showcase.view.frame = host.view.bounds
+            showcase.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            host.view.addSubview(showcase.view)
+            window.rootViewController = host
+            window.makeKeyAndVisible()
+            window.layoutIfNeeded()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.6))
+            try save(showcase.snapshot(), "showcase-\(set.rawValue)")
+            window.isHidden = true
+        }
+    }
+
     /// Hints on and the king picked up: brackets on the pieces the coach would move (the
     /// runner-up fainter), dots where the king can go, and a halo on its best square.
     func testHintMarks() throws {

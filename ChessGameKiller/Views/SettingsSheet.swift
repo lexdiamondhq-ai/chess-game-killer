@@ -68,7 +68,7 @@ struct SettingsSheet: View {
                     // never moves the boards under the finger.
                     section("Pieces") {
                         SettingsGroup(theme: theme) {
-                            PieceSetPicker(selection: $pieceSet, accent: accent)
+                            PieceSetPicker(selection: $pieceSet, board: theme.sculptedLook ?? .gilded, accent: accent)
                         }
                         .opacity(theme.sculptedLook == nil ? 0.4 : 1)
                         .disabled(theme.sculptedLook == nil)
