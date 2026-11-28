@@ -14,6 +14,9 @@ struct PieceSetPicker: View {
     /// The card in the middle, as the swipe settles.
     @State private var centered: PieceSet?
     @State private var width: CGFloat = 340
+    /// A set picked elsewhere that the carousel is scrolling to: the cards it passes on the way
+    /// are not picks.
+    @State private var scrollingTo: PieceSet?
 
     /// How much of the width the middle card takes; the rest is its neighbors peeking in.
     private static let share: CGFloat = 0.74
@@ -71,13 +74,19 @@ struct PieceSetPicker: View {
         .onAppear { centered = selection }
         // Swiping picks: the set that settles in the middle is the one the board wears.
         .onChange(of: centered) { _, set in
-            guard let set, set != selection else { return }
+            guard let set else { return }
+            guard scrollingTo == nil else { return }
+            guard set != selection else { return }
             withAnimation(.easeInOut(duration: 0.35)) { selection = set }
         }
         // A pick made anywhere else brings its card round.
         .onChange(of: selection) { _, set in
             guard centered != set else { return }
+            scrollingTo = set
             withAnimation(.snappy(duration: 0.4)) { centered = set }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+                if scrollingTo == set { scrollingTo = nil }
+            }
         }
         .sensoryFeedback(.selection, trigger: selection)
         .accessibilityElement(children: .ignore)
