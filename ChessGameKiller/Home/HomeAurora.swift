@@ -71,6 +71,15 @@ struct HomeAuroraPalette {
     /// The metal and the three jewels, run rich: a warm, full gold, a red ruby, a deep amethyst
     /// and a green jade.
     var gold: Color { dark ? Color(hex: 0xF0C76E) : Color(hex: 0xAE761C) }
+    /// The gold Home's words are written in. On the light page it is the deeper gold every
+    /// other page writes in (`Polish.goldInk`), so a small label reads (5.6 to 1 on a white
+    /// card, where Home's own gold gave 3.9) and Home's words match Learn's. Lines, dots and
+    /// rims keep `gold`: the deep ink goes olive in a small solid shape. Dark is unchanged.
+    var goldInk: Color { dark ? gold : Polish.goldInk(dark: false) }
+    /// The Chess DNA card's two chips, in the stones Learn's own chips wear: emerald for the
+    /// weapon and carnelian for the leak (they were teal and rose here, green and orange there).
+    var weapon: Color { StoneInk.emerald.color(dark: dark) }
+    var leak: Color { StoneInk.carnelian.color(dark: dark) }
     var rose: Color { dark ? Color(hex: 0xFF6688) : Color(hex: 0xD9335E) }
     var violet: Color { dark ? Color(hex: 0x9B7CFF) : Color(hex: 0x603CEA) }
     var teal: Color { dark ? Color(hex: 0x2FE2C2) : Color(hex: 0x089F84) }
@@ -361,7 +370,7 @@ struct HomeAuroraView: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            (Text("Beauty ") + Text("of").italic().foregroundColor(palette.gold) + Text(" Chess"))
+            (Text("Beauty ") + Text("of").italic().foregroundColor(palette.goldInk) + Text(" Chess"))
                 .font(.system(size: 22, weight: .medium, design: .serif))
                 .foregroundStyle(palette.ink)
                 .lineLimit(1)
@@ -607,7 +616,7 @@ struct HomeAuroraView: View {
                 Text(label.uppercased())
                     .font(.system(size: 7.5, weight: .bold))
                     .tracking(1.2)
-                    .foregroundStyle(palette.gold)
+                    .foregroundStyle(palette.goldInk)
             }
             .frame(minWidth: 40)
             .padding(.horizontal, 7)
@@ -691,7 +700,7 @@ struct HomeAuroraView: View {
             // card here. The game of the day, which the board up top plays, opens from its own.
             if let masterpiece = stage.masterpiece {
                 HomeAuroraRow(eyebrow: "Game of the day", title: masterpiece.title, detail: masterpiece.players,
-                              accent: palette.gold, palette: palette, tile: tile, action: openMasterpiece) {
+                              accent: palette.gold, eyebrowInk: palette.goldInk, palette: palette, tile: tile, action: openMasterpiece) {
                     HomeAuroraBoard(fen: masterpiece.frames.first, flipped: masterpiece.flipped, lit: false)
                 }
             }
@@ -879,7 +888,7 @@ struct HomeAuroraGameTile: View {
                 Button(action: change) {
                     Text("Change")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(palette.gold)
+                        .foregroundStyle(palette.goldInk)
                         .padding(.horizontal, 12)
                         .frame(height: 30)
                         .background(Capsule().strokeBorder(palette.gold.opacity(0.45), lineWidth: 1))
@@ -952,7 +961,7 @@ struct HomeAuroraNextRival: View {
                 Text((status ?? card.status).uppercased())
                     .font(.system(size: 10, weight: .bold))
                     .tracking(1.2)
-                    .foregroundStyle(palette.gold)
+                    .foregroundStyle(palette.goldInk)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
                 Text(rival.name)
@@ -1006,7 +1015,7 @@ struct HomeAuroraNextRival: View {
             Text(title)
                 .font(.system(size: 12, weight: .bold))
         }
-        .foregroundStyle(solid ? Color(hex: 0x2A1E0F) : palette.gold)
+        .foregroundStyle(solid ? Color(hex: 0x2A1E0F) : palette.goldInk)
         .padding(.horizontal, solid ? 13 : 11)
         .frame(height: 28)
         .background {
@@ -1093,6 +1102,9 @@ struct HomeAuroraRow<Picture: View>: View {
     let title: String
     let detail: String
     let accent: Color
+    /// The eyebrow's own ink, where it differs from the accent that tints the card's glow and
+    /// edge: a gold row writes in `goldInk`, which is deeper than its gold on the light page.
+    var eyebrowInk: Color? = nil
     let palette: HomeAuroraPalette
     var tile: Bool = false
     let action: () -> Void
@@ -1126,7 +1138,7 @@ struct HomeAuroraRow<Picture: View>: View {
                 Text(eyebrow.uppercased())
                     .font(.system(size: 10.5, weight: .bold))
                     .tracking(1.3)
-                    .foregroundStyle(accent)
+                    .foregroundStyle(eyebrowInk ?? accent)
                 Text(title)
                     .font(.system(size: 19, weight: .regular, design: .serif))
                     .foregroundStyle(palette.ink)
@@ -1156,7 +1168,7 @@ struct HomeAuroraRow<Picture: View>: View {
             Text(eyebrow.uppercased())
                 .font(.system(size: 9.5, weight: .bold))
                 .tracking(1.2)
-                .foregroundStyle(accent)
+                .foregroundStyle(eyebrowInk ?? accent)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
             Text(title)
@@ -1198,10 +1210,10 @@ struct HomeAuroraDNA: View {
                 if dna.weapon != nil || dna.leak != nil {
                     DNAChipPair {
                         if let weapon = dna.weapon {
-                            chip("Weapon", weapon.title, symbol: weapon.symbol, tint: palette.teal)
+                            chip("Weapon", weapon.title, symbol: weapon.symbol, tint: palette.weapon)
                         }
                         if let leak = dna.leak {
-                            chip("Leak", leak.headline, symbol: leak.area.symbol, tint: palette.rose)
+                            chip("Leak", leak.headline, symbol: leak.area.symbol, tint: palette.leak)
                         }
                     }
                 }
@@ -1228,7 +1240,7 @@ struct HomeAuroraDNA: View {
                 Text(dna.hasStyle ? "YOUR STYLE" : "STILL READING YOU")
                     .font(.system(size: 10.5, weight: .bold))
                     .tracking(1.3)
-                    .foregroundStyle(palette.gold)
+                    .foregroundStyle(palette.goldInk)
                 Text(dna.style?.title ?? "Your style, named")
                     .font(.system(size: 19, weight: .regular, design: .serif))
                     .foregroundStyle(palette.ink)
@@ -1265,7 +1277,7 @@ struct HomeAuroraDNA: View {
                         Spacer(minLength: 4)
                         Text(trait.word)
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(trait.value == nil ? palette.ink3 : palette.gold)
+                            .foregroundStyle(trait.value == nil ? palette.ink3 : palette.goldInk)
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
                     }
@@ -1732,7 +1744,7 @@ struct HomeAuroraSection: View {
                             .font(.system(size: 11, weight: .bold))
                     }
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(palette.gold)
+                    .foregroundStyle(palette.goldInk)
                     // A bigger target than it looks, without making the heading taller.
                     .contentShape(Rectangle().inset(by: -12))
                 }

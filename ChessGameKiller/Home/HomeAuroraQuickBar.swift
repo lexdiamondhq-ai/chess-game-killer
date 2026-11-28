@@ -103,7 +103,7 @@ struct HomeAuroraQuickBar: View {
             Text("YOUR MOVE")
                 .font(.system(size: 10, weight: .bold))
                 .tracking(1.4)
-                .foregroundStyle(palette.gold)
+                .foregroundStyle(palette.goldInk)
         }
     }
 

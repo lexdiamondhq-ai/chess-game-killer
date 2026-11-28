@@ -175,7 +175,7 @@ final class HomeSnapshotTests: XCTestCase {
                                 HomeAuroraJewel(glyph: Glyphs.fineLaurel, stone: .jade)
                             }
                             HomeAuroraRow(eyebrow: "Game of the day", title: "Réti – Tartakower", detail: "Réti v Tartakower · 1910",
-                                          accent: palette.gold, palette: palette, tile: true, action: {}) {
+                                          accent: palette.gold, eyebrowInk: palette.goldInk, palette: palette, tile: true, action: {}) {
                                 HomeAuroraBoard(fen: finest.fen, flipped: false, lit: false)
                             }
                         }

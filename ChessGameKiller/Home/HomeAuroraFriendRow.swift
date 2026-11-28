@@ -67,7 +67,7 @@ struct HomeAuroraFriendRow: View {
                         Image(systemName: "arrow.right")
                             .font(.system(size: 10, weight: .bold))
                     }
-                    .foregroundStyle(palette.gold)
+                    .foregroundStyle(palette.goldInk)
                     .padding(.horizontal, 12)
                     .frame(height: 32)
                     .overlay(Capsule().strokeBorder(palette.gold.opacity(0.8), lineWidth: 1.2))
