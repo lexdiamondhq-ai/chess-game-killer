@@ -84,17 +84,25 @@ struct TalkMic: View {
     var body: some View {
         let accent: Color = theme.accent ?? .accentColor
         let side: CGFloat = min(max(scaled, 30), 42)
+        // On the gold pages the disc is cut from the main button's metal, not a flat accent.
+        let gilded: Bool = theme.screenTone != nil
+        let glowing: Bool = theme.glows && !gilded
+        let shade: Color = gilded ? Polish.cast(dark: theme.screenIsDark) : accent.opacity(theme.glows ? 0.55 : 0.25)
         ZStack {
-            Circle()
-                .fill(LinearGradient(colors: [accent, accent.opacity(0.8)], startPoint: .top, endPoint: .bottom))
-            Circle()
-                .strokeBorder(Color.white.opacity(0.3), lineWidth: 0.75)
+            if gilded {
+                PolishedFill(shape: Circle(), quiet: true)
+            } else {
+                Circle()
+                    .fill(LinearGradient(colors: [accent, accent.opacity(0.8)], startPoint: .top, endPoint: .bottom))
+                Circle()
+                    .strokeBorder(Color.white.opacity(0.3), lineWidth: 0.75)
+            }
             Image(systemName: "mic.fill")
                 .font(.system(size: side * 0.42, weight: .semibold))
-                .foregroundStyle(Color.black.opacity(0.85))
+                .foregroundStyle(gilded ? Polish.onMetal : Color.black.opacity(0.85))
         }
         .frame(width: side, height: side)
-        .shadow(color: accent.opacity(theme.glows ? 0.55 : 0.25), radius: theme.glows ? 8 : 3, y: theme.glows ? 0 : 1)
+        .shadow(color: shade, radius: glowing ? 8 : 3, y: glowing ? 0 : 1)
         .accessibilityHidden(true)
     }
 }

@@ -121,7 +121,7 @@ struct TalkPanel: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
                 Text("Talk it through")
-                    .font(.display(size: 16, weight: .semibold))
+                    .font(.display(size: 17, weight: .semibold))
                     .lineLimit(1)
                 Text(status)
                     .font(theme.challengeFont(11, .medium))
@@ -164,9 +164,10 @@ struct TalkPanel: View {
     // MARK: - The dock
 
     private func foot(bottomInset: CGFloat) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 30, style: .continuous)
+        // 12 pt all round and a corner that runs with the capsule inside (26 + 12).
+        let shape = RoundedRectangle(cornerRadius: 38, style: .continuous)
         return footContent
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 12)
             .padding(.vertical, 12)
             .frame(maxWidth: Self.column)
             .glassPane(shape)
@@ -416,15 +417,24 @@ struct TalkPanel: View {
 
     private var sendButton: some View {
         let ready: Bool = canSend
+        let gilded: Bool = theme.screenTone != nil
         return Button {
             sendTyped()
         } label: {
             Image(systemName: "arrow.up")
                 .font(.system(size: 17, weight: .bold))
-                .foregroundStyle(theme.onChallengeAccent)
+                .foregroundStyle(gilded ? Polish.onMetal : theme.onChallengeAccent)
                 .frame(width: 44, height: 44)
-                .background(theme.challengeAccent, in: Circle())
-                .overlay { Circle().strokeBorder(Color.white.opacity(0.25), lineWidth: 0.75) }
+                .background {
+                    if gilded {
+                        // Cut from the main button's gold on the gold pages.
+                        PolishedFill(shape: Circle(), quiet: true)
+                    } else {
+                        Circle()
+                            .fill(theme.challengeAccent)
+                            .overlay { Circle().strokeBorder(Color.white.opacity(0.25), lineWidth: 0.75) }
+                    }
+                }
                 .contentShape(Circle())
         }
         .buttonStyle(ChallengePressStyle())
@@ -665,6 +675,7 @@ private struct TalkPanelTalkButton: View {
 
     var body: some View {
         let accent: Color = theme.challengeAccent
+        let gilded: Bool = theme.screenTone != nil
         let size: CGFloat = min(max(scaledSize, 60), 76)
         let glow: Double = listening ? 0.6 : 0.28
         let radius: CGFloat = listening ? 18 : 8
@@ -678,13 +689,20 @@ private struct TalkPanelTalkButton: View {
                 .strokeBorder(accent.opacity(0.8), lineWidth: 2)
                 .scaleEffect(ringScale)
                 .opacity(listening ? 1 : 0)
-            Circle()
-                .fill(LinearGradient(colors: [accent, accent.opacity(0.8)], startPoint: .top, endPoint: .bottom))
-                .overlay { Circle().strokeBorder(Color.white.opacity(0.3), lineWidth: 0.75) }
-                .shadow(color: accent.opacity(glow), radius: radius, y: lift)
+            Group {
+                if gilded {
+                    // The main button's gold; the glow below still grows while listening.
+                    PolishedFill(shape: Circle(), quiet: true)
+                } else {
+                    Circle()
+                        .fill(LinearGradient(colors: [accent, accent.opacity(0.8)], startPoint: .top, endPoint: .bottom))
+                        .overlay { Circle().strokeBorder(Color.white.opacity(0.3), lineWidth: 0.75) }
+                }
+            }
+            .shadow(color: accent.opacity(glow), radius: radius, y: lift)
             Image(systemName: "mic.fill")
                 .font(.system(size: size * 0.36, weight: .semibold))
-                .foregroundStyle(theme.onChallengeAccent)
+                .foregroundStyle(gilded ? Polish.onMetal : theme.onChallengeAccent)
         }
         .frame(width: size, height: size)
         .scaleEffect(buttonScale)

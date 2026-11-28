@@ -116,6 +116,8 @@ struct FriendGameRow: View {
     var design: Font.Design = .default
     let open: () -> Void
 
+    @Environment(\.colorScheme) private var scheme
+
     var body: some View {
         Button(action: open) {
             HStack(spacing: 12) {
@@ -134,7 +136,7 @@ struct FriendGameRow: View {
                 Spacer(minLength: 8)
                 Text(game.clock?.label ?? "No clock")
                     .font(.app(size: 13, weight: .medium).monospacedDigit())
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Color.faintInk)
                     .lineLimit(1)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 13, weight: .bold))
@@ -173,7 +175,11 @@ struct FriendGameRow: View {
                 Circle()
                     .fill(.tint)
                     .frame(width: 10, height: 10)
-                    .overlay { Circle().strokeBorder(Color.black.opacity(0.5), lineWidth: 1.5) }
+                    // The ring is cut from the page: dark on espresso, white on cream.
+                    .overlay {
+                        Circle().strokeBorder(scheme == .dark ? Color.black.opacity(0.5) : Color.white.opacity(0.92),
+                                              lineWidth: 1.5)
+                    }
                     .offset(x: 2, y: -2)
             }
         }
@@ -254,7 +260,8 @@ private struct FriendGameSwipeRow: View {
                 .opacity(-offset > 44 ? 1 : 0)
                 .frame(width: max(-offset, 0))
                 .frame(maxHeight: .infinity)
-                .background(ChallengeColors.urgent)
+                // The deep ruby on both pages, so the white bin reads.
+                .background(StoneInk.ruby.color(dark: false))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

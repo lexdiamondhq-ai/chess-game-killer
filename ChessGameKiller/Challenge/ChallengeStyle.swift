@@ -38,7 +38,7 @@ enum ChallengeColors {
     static let urgent = Color(hex: 0xFF4D6D)
     /// Words and icons that warn ("Cancel challenge", an error line): the ruby of the jewel
     /// tiles, deep on cream and lit on espresso. `urgent` stays for the clock's face.
-    static let danger = StoneInk.ruby.color
+    static let danger: Color = StoneInk.ruby.color
 }
 
 /// Sinks a touch while pressed.
@@ -105,7 +105,7 @@ private struct ChallengeButtonBody: View {
         switch kind {
         case .primary: return theme.screenTone == nil ? Color.black.opacity(0.88) : Polish.onMetal
         case .glass: return Color.primary
-        case .destructive: return ChallengeColors.urgent
+        case .destructive: return ChallengeColors.danger
         }
     }
 }
@@ -134,8 +134,9 @@ struct ChallengeBarIcon: View {
             .font(.system(size: 15, weight: .semibold))
             .foregroundStyle(.primary)
             .frame(width: 36, height: 36)
-            .background(Color.primary.opacity(0.08), in: Circle())
-            .overlay { Circle().strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5) }
+            // The screen's tint is the look's own metal (ChallengeHost sets it).
+            .background(AnyShapeStyle(.tint).opacity(0.12), in: Circle())
+            .overlay { Circle().strokeBorder(AnyShapeStyle(.tint).opacity(0.35), lineWidth: 0.75) }
             .contentShape(Circle())
     }
 }
@@ -152,7 +153,7 @@ struct ChallengeTopBar<Trailing: View>: View {
         ZStack {
             VStack(spacing: 1) {
                 Text(title)
-                    .font(.display(size: 16, weight: .semibold))
+                    .font(.display(size: 17, weight: .semibold))
                     .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -220,9 +221,13 @@ struct ChallengeAvatar: View {
             .overlay(alignment: .bottomTrailing) {
                 if let online {
                     Circle()
-                        .fill(online ? accent : Color(white: 0.5))
+                        .fill(online ? theme.trainingFill : Color(white: 0.5))
                         .frame(width: size * 0.27, height: size * 0.27)
-                        .overlay { Circle().strokeBorder(Color.black.opacity(0.55), lineWidth: 1.5) }
+                        // The ring is cut from the page: dark on espresso, white on cream.
+                        .overlay {
+                            Circle().strokeBorder(theme.screenIsDark ? Color.black.opacity(0.55) : Color.white.opacity(0.92),
+                                                  lineWidth: 1.5)
+                        }
                         .offset(x: 1, y: 1)
                         .animation(.snappy, value: online)
                 }
@@ -244,11 +249,7 @@ struct FairPlayCard: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "checkmark.shield.fill")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(theme.challengeAccent)
-                .frame(width: 34, height: 34)
-                .background(theme.challengeAccent.opacity(0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            TrainIcon(symbol: "checkmark.shield.fill", theme: theme, size: 34)
             VStack(alignment: .leading, spacing: 3) {
                 Text("Fair play")
                     .font(theme.challengeFont(15, .semibold))
@@ -280,31 +281,39 @@ struct ChallengeChip: View {
     let title: String
     let isOn: Bool
     let theme: BoardTheme
-    /// The title's size: larger for a lone symbol like ∞.
+    /// The title's size.
     var size: CGFloat = 15
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Text(title)
-                .font(theme.challengeFont(size, .semibold).monospacedDigit())
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .foregroundStyle(ink)
-                .padding(.horizontal, 6)
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .background {
-                    let shape = Capsule(style: .continuous)
-                    if isOn, theme.screenTone != nil {
-                        // The chosen one is cut from the main button's gold, without its glow.
-                        PolishedFill(shape: shape, quiet: true)
-                    } else if isOn {
-                        shape.fill(theme.challengeAccent)
-                    } else {
-                        Color.clear.challengeGlass(shape)
-                    }
+            Group {
+                if title == "∞" {
+                    // The symbol is centered and weighs what the digits beside it weigh.
+                    Image(systemName: "infinity")
+                        .font(.system(size: 17, weight: .semibold))
+                } else {
+                    Text(title)
+                        .font(theme.challengeFont(size, .semibold).monospacedDigit())
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                 }
-                .contentShape(Capsule(style: .continuous))
+            }
+            .foregroundStyle(ink)
+            .padding(.horizontal, 6)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background {
+                let shape = Capsule(style: .continuous)
+                if isOn, theme.screenTone != nil {
+                    // The chosen one is cut from the main button's gold, without its glow.
+                    PolishedFill(shape: shape, quiet: true)
+                } else if isOn {
+                    shape.fill(theme.challengeAccent)
+                } else {
+                    Color.clear.challengeGlass(shape)
+                }
+            }
+            .contentShape(Capsule(style: .continuous))
         }
         .buttonStyle(ChallengePressStyle())
         .animation(.snappy(duration: 0.2), value: isOn)
@@ -376,7 +385,7 @@ struct ChallengeSidePicker: View {
 
     private func card(_ choice: SideChoice) -> some View {
         let isOn = side == choice
-        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
         return Button {
             withAnimation(.snappy(duration: 0.22)) { side = choice }
         } label: {

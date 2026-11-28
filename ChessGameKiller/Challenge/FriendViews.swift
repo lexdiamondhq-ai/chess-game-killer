@@ -53,7 +53,7 @@ struct UsernamePicker: View {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 6) {
                 Text(center.friends.you == nil ? "Pick your username" : "Change your username")
-                    .font(.display(size: 26, weight: .semibold))
+                    .font(.display(size: 26, weight: .medium))
                 Text("Friends find you by it and send you challenges. Letters, numbers, _ and . only.")
                     .font(theme.challengeFont(15))
                     .foregroundStyle(.secondary)
@@ -84,7 +84,7 @@ struct UsernamePicker: View {
             if let problem {
                 Text(problem)
                     .font(theme.challengeFont(13))
-                    .foregroundStyle(ChallengeColors.urgent)
+                    .foregroundStyle(ChallengeColors.danger)
                     .transition(.opacity)
             }
             Spacer(minLength: 0)
@@ -147,7 +147,7 @@ struct FriendInviteBanner: View {
             }
             Spacer(minLength: 6)
             Button("Play", action: open)
-                .font(theme.challengeFont(14, .bold))
+                .font(theme.challengeFont(15, .semibold))
                 .foregroundStyle(theme.screenTone != nil ? Polish.onMetal : theme.onChallengeAccent)
                 .padding(.horizontal, 16)
                 .frame(height: 34)
@@ -165,10 +165,18 @@ struct FriendInviteBanner: View {
         .padding(.leading, 12)
         .padding(.trailing, 8)
         .padding(.vertical, 10)
-        .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(.ultraThinMaterial))
+        .background {
+            let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+            ZStack {
+                // The lift is drawn under the pane only, so nothing inside the glass casts its own.
+                shape.fill(Polish.cast(dark: theme.screenIsDark, strength: 1.75))
+                    .blur(radius: 12)
+                    .offset(y: 8)
+                shape.fill(.ultraThinMaterial)
+            }
+        }
         // A friend is asking: the bright edge.
         .overlay { PolishedEdge(shape: RoundedRectangle(cornerRadius: 22, style: .continuous), edge: .lit) }
-        .shadow(color: .black.opacity(0.35), radius: 18, y: 8)
         .padding(.horizontal, 14)
         .accessibilityElement(children: .contain)
     }

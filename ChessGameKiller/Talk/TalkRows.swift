@@ -15,24 +15,25 @@ extension BoardTheme {
     }
 }
 
-/// The verdict colors.
+/// The verdict colors, cut from the jewel stones: deep on a light page, lit on a dark one.
 enum TalkPanelPalette {
-    /// Right, and the good move: a clean green.
-    static let good = Color(hex: 0x34D399)
-    /// Wrong, and the danger: the app's clear red.
-    static let bad = ChallengeColors.urgent
-    /// Partly right.
-    static let partly = Color(hex: 0xF7D046)
-    /// What went unmentioned: amber.
-    static let missed = Color(hex: 0xFF9A3C)
-    /// Neither right nor wrong.
-    static let unclear = Color(white: 0.62)
+    /// Right, and the good move: emerald.
+    static let good: Color = StoneInk.emerald.color
+    /// Wrong, and the danger: ruby.
+    static let bad: Color = StoneInk.ruby.color
+    /// Partly right: citrine.
+    static let partly: Color = StoneInk.citrine.color
+    /// What went unmentioned: carnelian.
+    static let missed: Color = StoneInk.carnelian.color
+    /// Neither right nor wrong: a warm stone grey.
+    static let unclear: Color = StoneInk.stone.color
 
     /// A square's or an arrow's color on the board: green, red, or the look's accent.
+    /// These stay bright, since they are drawn on wood and stone and not on the page.
     static func tone(_ tone: TalkArrow.Tone, theme: BoardTheme) -> Color {
         switch tone {
-        case .good: return good
-        case .bad: return bad
+        case .good: return Color(hex: 0x34D399)
+        case .bad: return Color(hex: 0xFF4D6D)
         case .info: return theme.challengeAccent
         }
     }
@@ -387,7 +388,7 @@ private struct TalkPanelVerdicts: View {
             if lightable > 1 {
                 Text("Tap a line to see it on the board.")
                     .font(theme.talkFont(.caption))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Color.faintInk)
                     .frame(maxWidth: .infinity)
                     .modifier(TalkPanelArrival(index: rowCount + 1))
             }
@@ -536,7 +537,7 @@ private struct TalkPanelMoveRow: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("YOUR MOVE")
                 .font(.app(.caption2, weight: .semibold))
-                .tracking(1.1)
+                .tracking(1.2)
                 .foregroundStyle(.secondary)
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(title)
@@ -730,7 +731,7 @@ private struct TalkPanelGradeStyle {
         case .unknown: title = "Not graded"
         }
         if let review = MoveReview.Grade(rawValue: grade.rawValue) {
-            color = review.color
+            color = Self.ink(review)
             switch review.mark {
             case .symbol(let name): symbol = name
             case .text(let text): mark = text
@@ -741,6 +742,20 @@ private struct TalkPanelGradeStyle {
         } else {
             color = TalkPanelPalette.unclear
             symbol = "questionmark"
+        }
+    }
+
+    /// A grade's color as a word on the page: the raw grade colors are made for a dark board
+    /// and fade on cream, so each takes a stone's ink.
+    private static func ink(_ review: MoveReview.Grade) -> Color {
+        switch review {
+        case .checkmate: return Color.ink(light: 0xA87A2E, dark: 0xE2B577)
+        case .best: return TalkPanelPalette.good
+        case .excellent: return StoneInk.jade.color
+        case .good: return StoneInk.sapphire.color
+        case .inaccuracy: return Color.ink(light: 0x8A5F1E, dark: 0xEBCB5E)
+        case .mistake: return TalkPanelPalette.missed
+        case .blunder: return TalkPanelPalette.bad
         }
     }
 }
@@ -785,8 +800,8 @@ private struct TalkPanelTrafficLight: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("TRAFFIC LIGHT")
-                .font(.app(.caption, weight: .semibold))
-                .tracking(1.1)
+                .font(.app(.caption2, weight: .semibold))
+                .tracking(1.2)
                 .foregroundStyle(.secondary)
                 .accessibilityAddTraits(.isHeader)
             ViewThatFits(in: .horizontal) {
@@ -840,6 +855,7 @@ private struct TalkPanelLamp: View {
     let mark: TalkHabits.Mark
     let glows: Bool
 
+    @Environment(\.colorScheme) private var scheme
     @ScaledMetric(relativeTo: .subheadline) private var size: CGFloat = 18
 
     var body: some View {
@@ -863,13 +879,15 @@ private struct TalkPanelLamp: View {
     private func lit(_ color: Color, symbol: String) -> some View {
         let glow: Double = glows ? 0.9 : 0.55
         let radius: CGFloat = glows ? 8 : 5
+        // The lamp's stone is deep on a light page and lit on a dark one; the glyph follows.
+        let glyph: Color = scheme == .dark ? Color.black.opacity(0.78) : Color.white
         return ZStack {
             Circle()
                 .fill(color)
                 .shadow(color: color.opacity(glow), radius: radius)
             Image(systemName: symbol)
                 .font(.system(size: size * 0.5, weight: .heavy))
-                .foregroundStyle(Color.black.opacity(0.78))
+                .foregroundStyle(glyph)
         }
     }
 }
@@ -924,13 +942,8 @@ private struct TalkPanelProblemCard: View {
     let theme: BoardTheme
 
     var body: some View {
-        let accent: Color = theme.challengeAccent
         HStack(alignment: .center, spacing: 12) {
-            Image(systemName: "exclamationmark.bubble.fill")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(accent)
-                .frame(width: 34, height: 34)
-                .background(accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            TrainIcon(symbol: "exclamationmark.bubble.fill", theme: theme, size: 34)
             Text(text)
                 .font(theme.talkFont(.body, .medium))
                 .foregroundStyle(.primary)

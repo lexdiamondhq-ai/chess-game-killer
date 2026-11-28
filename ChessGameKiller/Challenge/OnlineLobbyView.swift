@@ -65,12 +65,12 @@ struct OnlineLobbyView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Play someone online")
-                .font(.display(size: 30, weight: .semibold))
+                .font(.display(size: 30, weight: .medium))
             Text(clock == nil && days == nil
                  ? "Games just for fun with players waiting now. Take one on, or find a game."
                  : "Rated games with players waiting now. Take one on, or find a game at your clock.")
                 .font(theme.challengeFont(15))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.quietInk)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.top, 8)
@@ -102,12 +102,17 @@ struct OnlineLobbyView: View {
                             Task { await lobby.challenge(player, name: name) }
                         }
                         if player.id != players.last?.id {
-                            Divider().overlay(Color.primary.opacity(0.06)).padding(.leading, 64)
+                            // A hairline that stops short of the card's edge.
+                            Rectangle()
+                                .fill(Color.primary.opacity(0.14))
+                                .frame(height: 0.5)
+                                .padding(.leading, 64)
+                                .padding(.trailing, 12)
                         }
                     }
                 }
                 .padding(.vertical, 4)
-                .challengeGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .challengeGlass(RoundedRectangle(cornerRadius: 22, style: .continuous))
             }
         }
     }
@@ -129,7 +134,7 @@ struct OnlineLobbyView: View {
             Spacer(minLength: 0)
         }
         .padding(14)
-        .challengeGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .challengeGlass(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
     private var bottomBar: some View {
@@ -137,7 +142,7 @@ struct OnlineLobbyView: View {
             if let problem = lobby.problem {
                 Text(problem)
                     .font(theme.challengeFont(13))
-                    .foregroundStyle(ChallengeColors.urgent)
+                    .foregroundStyle(ChallengeColors.danger)
                     .multilineTextAlignment(.center)
                     .transition(.opacity)
             }
@@ -347,7 +352,7 @@ struct OnlineDaysStepper: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 12)
-        .challengeGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .challengeGlass(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .opacity(isEnabled ? 1 : 0.5)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Time per move")
@@ -368,8 +373,8 @@ struct OnlineDaysStepper: View {
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(theme.challengeAccent)
                 .frame(width: 44, height: 44)
-                .background(Circle().fill(Color.primary.opacity(0.06)))
-                .overlay(Circle().strokeBorder(Color.primary.opacity(0.14), lineWidth: 1))
+                .background(Circle().fill(theme.challengeAccent.opacity(0.12)))
+                .overlay(Circle().strokeBorder(theme.challengeAccent.opacity(0.35), lineWidth: 0.75))
         }
         .buttonStyle(.plain)
         .opacity(possible ? 1 : 0.35)
@@ -394,7 +399,7 @@ struct OnlineLiveDot: View {
 
     var body: some View {
         Circle()
-            .fill(live ? theme.challengeAccent : Color.secondary)
+            .fill(live ? theme.trainingFill : Color.secondary)
             .frame(width: size, height: size)
             .background {
                 Circle()
@@ -433,11 +438,7 @@ struct OnlineFairPlayCard: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "checkmark.shield.fill")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(theme.challengeAccent)
-                .frame(width: 34, height: 34)
-                .background(theme.challengeAccent.opacity(0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            TrainIcon(symbol: "checkmark.shield.fill", theme: theme, size: 34)
             VStack(alignment: .leading, spacing: 3) {
                 Text("Fair play")
                     .font(theme.challengeFont(15, .semibold))
@@ -475,7 +476,7 @@ struct OnlineSeats: View {
             yourSeat
             Text("VS")
                 .font(theme.challengeFont(13, .bold))
-                .foregroundStyle(theme.challengeAccent.opacity(found ? 1 : 0.45))
+                .foregroundStyle(theme.challengeAccent.opacity(found ? 1 : 0.7))
                 .scaleEffect(found && !reduceMotion ? 1.25 : 1)
                 .frame(height: Self.seat)
             theirSeat
@@ -511,18 +512,24 @@ struct OnlineSeats: View {
                         .overlay { Circle().strokeBorder(theme.challengeAccent, lineWidth: 2) }
                         .transition(.scale(scale: 0.6).combined(with: .opacity))
                 } else if found {
-                    Circle()
-                        .fill(theme.challengeAccent)
-                        .overlay {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 20, weight: .bold))
-                                .foregroundStyle(theme.onChallengeAccent)
+                    // On the gold pages the filled seat is cut from the main button's metal.
+                    Group {
+                        if theme.screenTone != nil {
+                            PolishedFill(shape: Circle(), quiet: true)
+                        } else {
+                            Circle().fill(theme.challengeAccent)
                         }
-                        .transition(.scale(scale: 0.3).combined(with: .opacity))
+                    }
+                    .overlay {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundStyle(theme.screenTone != nil ? Polish.onMetal : theme.onChallengeAccent)
+                    }
+                    .transition(.scale(scale: 0.3).combined(with: .opacity))
                 } else {
                     Circle()
-                        .fill(Color.primary.opacity(0.06))
-                        .overlay { Circle().strokeBorder(Color.primary.opacity(0.14), lineWidth: 1) }
+                        .fill(theme.challengeAccent.opacity(0.1))
+                        .overlay { Circle().strokeBorder(theme.challengeAccent.opacity(0.3), lineWidth: 0.75) }
                     Text("?")
                         .font(theme.challengeFont(20, .semibold))
                         .foregroundStyle(.secondary)

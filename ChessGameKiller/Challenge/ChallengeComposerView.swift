@@ -275,10 +275,10 @@ struct ChallengeComposerView: View {
         VStack(alignment: .leading, spacing: 24) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Play a friend")
-                    .font(.display(size: 30, weight: .semibold))
+                    .font(.display(size: 30, weight: .medium))
                 Text("Pick a friend by username, or send a link. They play in the app, or right in the browser.")
                     .font(theme.challengeFont(15))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.quietInk)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.top, 8)
@@ -290,7 +290,7 @@ struct ChallengeComposerView: View {
                 ChallengeNameField(name: $name, theme: theme)
                 Text("Your friend sees this name.")
                     .font(theme.challengeFont(12))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Color.faintInk)
             }
 
             ChallengeClockPicker(clockID: $clockID, dailyDays: $dailyDays, theme: theme,
@@ -334,7 +334,7 @@ struct ChallengeComposerView: View {
                 if let codeProblem {
                     Text(codeProblem)
                         .font(theme.challengeFont(12))
-                        .foregroundStyle(ChallengeColors.urgent)
+                        .foregroundStyle(ChallengeColors.danger)
                         .transition(.opacity)
                 }
             }
@@ -372,7 +372,7 @@ struct ChallengeComposerView: View {
         VStack(spacing: 18) {
             ChallengeAvatar(name: person.name, theme: theme, size: 76)
             Text("Sending to \(person.name)…")
-                .font(.display(size: 24, weight: .semibold))
+                .font(.display(size: 24, weight: .medium))
                 .multilineTextAlignment(.center)
             KnightTraceMark()
                 .frame(width: 26, height: 32)
@@ -388,7 +388,7 @@ struct ChallengeComposerView: View {
         return VStack(spacing: 20) {
             VStack(spacing: 8) {
                 Text("Your challenge is ready")
-                    .font(.display(size: 26, weight: .semibold))
+                    .font(.display(size: 26, weight: .medium))
                     .multilineTextAlignment(.center)
                 Text(composer.recipient == nil
                      ? "Next to you? Let them scan. Far away? Send the link below."
@@ -411,7 +411,7 @@ struct ChallengeComposerView: View {
 
             Text("The challenge stays open for 7 days. Find it under Friend games.")
                 .font(theme.challengeFont(12))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(Color.faintInk)
                 .multilineTextAlignment(.center)
         }
         .animation(.snappy(duration: 0.3), value: composer.delivery)
@@ -423,8 +423,8 @@ struct ChallengeComposerView: View {
                 .frame(width: 210, height: 210)
                 .accessibilityLabel("QR code for the challenge. Your friend scans it with their camera.")
             Text("SCAN, OR TYPE THE CODE")
-                .font(.app(.caption, weight: .semibold))
-                .tracking(1.4)
+                .font(.app(.caption2, weight: .semibold))
+                .tracking(1.2)
                 .foregroundStyle(.secondary)
                 .padding(.top, 4)
             Text(ChallengeLink.spaced(created.code))
@@ -460,10 +460,10 @@ struct ChallengeComposerView: View {
     private func shareDock(_ created: FriendGame) -> some View {
         let invite = ChallengeInviteContent(game: created, name: name)
         return HStack(spacing: 0) {
-            SendDockButton(title: "Text", symbol: "message.fill", theme: theme) {
+            SendDockButton(title: "Text", symbol: "message", theme: theme) {
                 ChallengeSharing.shared.text(invite) { sent in sentInvite(sent) }
             }
-            SendDockButton(title: "Email", symbol: "envelope.fill", theme: theme) {
+            SendDockButton(title: "Email", symbol: "envelope", theme: theme) {
                 ChallengeSharing.shared.mail(invite) { sent in sentInvite(sent) }
             }
             SendDockButton(title: copied ? "Copied" : "Copy link", symbol: copied ? "checkmark" : "link",
@@ -498,7 +498,7 @@ struct ChallengeComposerView: View {
             if let problem = composer.problem, composer.created == nil {
                 Text(problem)
                     .font(theme.challengeFont(13))
-                    .foregroundStyle(ChallengeColors.urgent)
+                    .foregroundStyle(ChallengeColors.danger)
                     .multilineTextAlignment(.center)
                     .transition(.opacity)
             }
@@ -586,16 +586,22 @@ struct PersonAvatar: View {
     var body: some View {
         Text(person.initial)
             .font(.system(size: size * 0.38, weight: .bold, design: .serif))
-            .foregroundStyle(Color.black.opacity(0.82))
+            .foregroundStyle(Polish.onMetal)
             .frame(width: size, height: size)
+            // Home's own friend coin, with the main button's rim.
             .background(
-                Circle().fill(LinearGradient(colors: [Color(hex: 0xEBC57A), Color(hex: 0x8A6A33)],
+                Circle().fill(LinearGradient(colors: [Color(hex: 0xF3D99A), Color(hex: 0xB0763A)],
                                              startPoint: .topLeading, endPoint: .bottomTrailing))
             )
             .overlay {
+                Circle().strokeBorder(LinearGradient(colors: [Color.white.opacity(0.6), Color(hex: 0x9C6B2C).opacity(0.85)],
+                                                     startPoint: .top, endPoint: .bottom),
+                                      lineWidth: 1)
+            }
+            .overlay {
                 if person.online {
                     Circle()
-                        .strokeBorder(Color(hex: 0x7FCF8C), lineWidth: 2)
+                        .strokeBorder(StoneInk.emerald.color(dark: theme.screenIsDark), lineWidth: 2)
                         .padding(-4)
                 }
             }
@@ -731,10 +737,10 @@ private struct DeliveryRow: View {
                 ProgressView().controlSize(.small)
                 Text("Sending to \(person.name)…")
             case .sent(let person):
-                Image(systemName: "checkmark.circle.fill").foregroundStyle(Color(hex: 0x7FCF8C))
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(StoneInk.emerald.color(dark: theme.screenIsDark))
                 Text("Sent to \(person.name). They'll see it when they open the app.")
             case .failed(_, let problem):
-                Image(systemName: "exclamationmark.circle.fill").foregroundStyle(ChallengeColors.urgent)
+                Image(systemName: "exclamationmark.circle.fill").foregroundStyle(ChallengeColors.danger)
                 Text(problem)
                 Spacer(minLength: 4)
                 Button("Try again", action: retry)
