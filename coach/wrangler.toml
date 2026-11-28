@@ -24,9 +24,9 @@ DAILY_VOICE_CHARS = "40000"
 # Leo's voice on ElevenLabs: Frederick (a calm, velvety, well-spoken Englishman, from the voice library), with the lessons' model, so he sounds the same.
 VOICE_ID = "j9jfwdrw7BRfcR43Qohk"
 VOICE_MODEL = "eleven_v4"
-# Live Talk answers are read with ElevenLabs' Flash model, about half the cost per
-# character of the lessons' model, in the same voice. Remove to match the lessons exactly.
-TALK_VOICE_MODEL = "eleven_flash_v2_5"
+# Live Talk answers and the deep review are read with the lessons' model, so the coach sounds
+# the same everywhere (Flash, cheaper, sounded robotic: 2026-11-28). To save money, set
+# TALK_VOICE_MODEL = "eleven_flash_v2_5" here again.
 
 # The deep review (POST /review): after a game the coach talks through the whole of it.
 # One call to a stronger model than Talk's (to try Fable: "claude-fable-5-2", about twice

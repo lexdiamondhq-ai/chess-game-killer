@@ -1,15 +1,14 @@
 import AVFoundation
 import Foundation
 
-/// Plays Leo's recorded answer from the server, or has CoachVoice speak it with the device's voice
-/// when there is no recording. While Leo talks the audio is set up as in lessons (other audio
+/// Plays the coach's recorded answer from the server. With no recording the coach stays quiet
+/// and the answer is only on screen: the iPhone's own voice sounded robotic next to the coach's. While Leo talks the audio is set up as in lessons (other audio
 /// turned down, and the ring switch respected unless "Speak on silent" is on); afterwards the
 /// game's quiet sound effects come back.
 @MainActor
 final class LeoSpeaker: NSObject, TalkSpeaker {
     private var player: AVAudioPlayer?
     private var waiting: CheckedContinuation<Void, Never>?
-    private var isSaying = false
     /// This speaker switched the audio to the lesson setup and owes the switch back.
     private var holdsLessonAudio = false
     /// Counts lines, so a line that was stopped never tidies up after the one that replaced it.
@@ -50,18 +49,9 @@ final class LeoSpeaker: NSObject, TalkSpeaker {
         endTurn()
     }
 
+    /// No recording came: nothing is read aloud (the words are on screen), so this returns at once.
     func say(_ text: String) async {
         stop()
-        turn += 1
-        let mine = turn
-        let line = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !line.isEmpty, !Task.isCancelled, !CoachVoice.shared.isMuted else { return }
-        beginLessonAudio()
-        isSaying = true
-        await CoachVoice.shared.say(line)
-        guard turn == mine else { return }
-        isSaying = false
-        endTurn()
     }
 
     func stop() {
@@ -69,10 +59,6 @@ final class LeoSpeaker: NSObject, TalkSpeaker {
         if let player {
             player.stop()
             self.player = nil
-        }
-        if isSaying {
-            isSaying = false
-            CoachVoice.shared.stop()
         }
         resumeWaiting()
         endTurn()

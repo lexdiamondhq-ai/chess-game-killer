@@ -36,7 +36,7 @@ final class DeepReviewPlayer {
     @ObservationIgnored private var loading: Task<Void, Never>?
     @ObservationIgnored private var reading: Task<Void, Never>?
 
-    /// How long a part waits for its recording before the device's voice reads it instead.
+    /// How long a part waits for its recording before its words are shown without a voice.
     static let longestWaitForVoice: Duration = .seconds(6)
     /// A part's words are up but its recording is still on its way: the card says so, rather
     /// than showing Pause over silence.
@@ -159,7 +159,7 @@ final class DeepReviewPlayer {
     }
 
     /// The stream is over. Without a review that's a failure; with one, the parts still
-    /// missing a recording are read with the device's voice.
+    /// missing a recording are shown without a voice.
     private func streamFinished(with error: Error?) {
         streamEnded = true
         guard review == nil, phase == .loading else { return }
@@ -221,7 +221,7 @@ final class DeepReviewPlayer {
     }
 
     /// A part's recording: the one that arrived or was kept, waiting a little while the server
-    /// is still sending. Nil: read it with the device's voice.
+    /// is still sending. Nil: show its words without a voice.
     private func recording(for part: Int) async -> Data? {
         let began = ContinuousClock.now
         let deadline = began + Self.longestWaitForVoice

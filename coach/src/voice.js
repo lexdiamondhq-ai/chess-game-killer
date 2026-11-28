@@ -1,5 +1,5 @@
 // The coach's voice: Leo's answer read aloud by Frederick on ElevenLabs, Vera's by
-// Sarah, with the same model and settings as their recorded lessons
+// Karina, with the same model and settings as their recorded lessons
 // (scripts/training/make_narration.py), so the coach in a game sounds like the
 // coach in the lessons. When there's no
 // key, or ElevenLabs is slow or fails, the app reads the answer with the
@@ -8,12 +8,12 @@
 const API = "https://api.elevenlabs.io/v1/text-to-speech";
 /** Frederick ("Frederick Surrey" in ElevenLabs' voice library): a calm, velvety, well-spoken Englishman. */
 const DEFAULT_VOICE_ID = "j9jfwdrw7BRfcR43Qohk";
-/** Sarah: a confident, warm young American woman. Vera's voice. */
-const DEFAULT_VERA_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
+/** Karina ("Karina - Warm British Narrator" in the voice library): a smooth, natural Englishwoman. Vera's voice. */
+const DEFAULT_VERA_VOICE_ID = "BcIZ7kngidiArTkRyUAp";
 /** Leo's model, ElevenLabs' newest and most natural (LEO_MODEL in make_narration.py). */
 const DEFAULT_VOICE_MODEL = "eleven_v4";
-/** Vera's model, which her settings are made for (MODEL in make_narration.py). */
-const DEFAULT_VERA_VOICE_MODEL = "eleven_multilingual_v2";
+/** Vera's model: Leo's, the most natural (COACHES["vera"] in make_narration.py). */
+const DEFAULT_VERA_VOICE_MODEL = "eleven_v4";
 /** Leo's lessons are recorded at 128 kbps too (COACHES["leo"] in make_narration.py). */
 const OUTPUT_FORMAT = "mp3_44100_128";
 /**
@@ -21,14 +21,8 @@ const OUTPUT_FORMAT = "mp3_44100_128";
  * the voice's own, as in the samples Leo's voice was chosen from.
  */
 export const VOICE_SETTINGS = null;
-/** Vera's lesson settings (COACHES["vera"] in make_narration.py): steady and clean, at 128 kbps. */
-export const VERA_VOICE_SETTINGS = Object.freeze({
-  stability: 0.7,
-  similarity_boost: 0.85,
-  style: 0.0,
-  use_speaker_boost: true,
-  speed: 0.98,
-});
+/** Vera's lesson settings (COACHES["vera"] in make_narration.py): none, the voice's own, like Leo's. */
+export const VERA_VOICE_SETTINGS = null;
 const VERA_OUTPUT_FORMAT = "mp3_44100_128";
 /**
  * A spoken answer takes ElevenLabs a few seconds (the newest model a little longer); past this,
@@ -106,7 +100,7 @@ export async function speak(env, text, fetchImpl = fetch, coach = "leo", around 
 function voiceChoice(env, coach) {
   const vera = coach === "vera";
   const voice = String(vera ? env.VERA_VOICE_ID || DEFAULT_VERA_VOICE_ID : env.VOICE_ID || DEFAULT_VOICE_ID).trim();
-  // VOICE_MODEL is Leo's; Vera keeps the model her settings are made for. TALK_VOICE_MODEL, when
+  // VOICE_MODEL is Leo's; VERA_VOICE_MODEL Vera's. TALK_VOICE_MODEL, when
   // set, reads every live answer with a cheaper model instead: the lessons are recorded once,
   // but Talk pays per character on every answer.
   const lessonModel = vera ? env.VERA_VOICE_MODEL || DEFAULT_VERA_VOICE_MODEL : env.VOICE_MODEL || DEFAULT_VOICE_MODEL;

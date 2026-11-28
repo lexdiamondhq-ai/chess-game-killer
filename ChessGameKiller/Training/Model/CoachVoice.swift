@@ -4,7 +4,9 @@ import Foundation
 
 /// The coach's voice. Plays the line the picked coach recorded for a piece of text (made with
 /// ElevenLabs by scripts/training/make_narration.py, named by the coach and a hash of the
-/// text) and falls back to the device's own voice for anything not recorded.
+/// text). A line with no recording is not read by the iPhone's own voice, which sounds robotic
+/// next to the coach's: the coach stays quiet and the words on screen get about as long as reading
+/// them takes, as when muted.
 @MainActor
 final class CoachVoice: NSObject {
     static let shared = CoachVoice()
@@ -29,14 +31,12 @@ final class CoachVoice: NSObject {
     private(set) var lessonAudioActive = false
 
     private var player: AVAudioPlayer?
-    private let synthesizer = AVSpeechSynthesizer()
-    private var utterance: AVSpeechUtterance?
     private var waiting: CheckedContinuation<Void, Never>?
     private var interruptionObserver: NSObjectProtocol?
 
     override init() {
         super.init()
-        // A call, Siri or an alarm pauses the player and the synthesizer without a
+        // A call, Siri or an alarm pauses the player without a
         // finish callback. Stop instead, so a pending `say` returns and the lesson
         // carries on with captions rather than sitting on the same step.
         interruptionObserver = NotificationCenter.default.addObserver(
@@ -64,8 +64,8 @@ final class CoachVoice: NSObject {
         recording(for: text, coach: coach) != nil
     }
 
-    /// Talking right now: a recording or the device's voice.
-    var isSpeaking: Bool { player?.isPlaying == true || synthesizer.isSpeaking }
+    /// Playing a recording right now.
+    var isSpeaking: Bool { player?.isPlaying == true }
 
     /// Says a line and returns when it's finished, stopped or cancelled.
     /// Muted, it waits about as long as reading the line takes.
@@ -73,7 +73,7 @@ final class CoachVoice: NSObject {
         stop()
         let line = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !line.isEmpty, !Task.isCancelled else { return }
-        if isMuted {
+        if isMuted || !Self.hasRecording(for: line, coach: Coach.current) {
             try? await Task.sleep(for: Self.readingTime(line))
             return
         }
@@ -81,7 +81,7 @@ final class CoachVoice: NSObject {
             await withCheckedContinuation { continuation in
                 waiting = continuation
                 if !play(recordingFor: line) {
-                    speak(line)
+                    finish()
                 }
             }
         } onCancel: {
@@ -93,10 +93,6 @@ final class CoachVoice: NSObject {
     func stop() {
         player?.stop()
         player = nil
-        if synthesizer.isSpeaking {
-            synthesizer.stopSpeaking(at: .immediate)
-        }
-        utterance = nil
         finish()
     }
 
@@ -162,53 +158,15 @@ final class CoachVoice: NSObject {
         return player.play()
     }
 
-    private func speak(_ text: String) {
-        let utterance = AVSpeechUtterance(string: text)
-        let coach = Coach.current
-        utterance.voice = Self.deviceVoice(for: coach)
-        utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 1.02
-        utterance.pitchMultiplier = coach == .leo ? 0.95 : 1.02
-        utterance.postUtteranceDelay = 0.1
-        self.utterance = utterance
-        synthesizer.delegate = self
-        synthesizer.speak(utterance)
-    }
-
     private func finish() {
         let continuation = waiting
         waiting = nil
         continuation?.resume()
     }
 
-    /// The nicest English voice on the device for the coach: a man's for Leo (American first),
-    /// a woman's for Vera (American first).
-    private static func deviceVoice(for coach: Coach) -> AVSpeechSynthesisVoice? {
-        if let voice = deviceVoices[coach] { return voice }
-        let english = AVSpeechSynthesisVoice.speechVoices().filter { $0.language.hasPrefix("en") }
-        let gender: AVSpeechSynthesisVoiceGender = coach == .leo ? .male : .female
-        let first = "en-US"
-        let matching = english.filter { $0.gender == gender }
-        let ranked = matching.filter { $0.language == first } + matching.filter { $0.language != first }
-        let voice = ranked.first { $0.quality == .premium }
-            ?? ranked.first { $0.quality == .enhanced }
-            ?? ranked.first
-            ?? english.first { $0.quality == .enhanced }
-            ?? AVSpeechSynthesisVoice(language: first)
-        deviceVoices[coach] = voice
-        return voice
-    }
-
-    private static var deviceVoices: [Coach: AVSpeechSynthesisVoice] = [:]
-
     fileprivate func playerFinished(_ finished: ObjectIdentifier) {
         guard let player, ObjectIdentifier(player) == finished else { return }
         self.player = nil
-        finish()
-    }
-
-    fileprivate func speechFinished(_ finished: ObjectIdentifier) {
-        guard let utterance, ObjectIdentifier(utterance) == finished else { return }
-        self.utterance = nil
         finish()
     }
 }
@@ -222,17 +180,5 @@ extension CoachVoice: AVAudioPlayerDelegate {
     nonisolated func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
         let id = ObjectIdentifier(player)
         Task { @MainActor in self.playerFinished(id) }
-    }
-}
-
-extension CoachVoice: AVSpeechSynthesizerDelegate {
-    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
-        let id = ObjectIdentifier(utterance)
-        Task { @MainActor in self.speechFinished(id) }
-    }
-
-    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
-        let id = ObjectIdentifier(utterance)
-        Task { @MainActor in self.speechFinished(id) }
     }
 }
