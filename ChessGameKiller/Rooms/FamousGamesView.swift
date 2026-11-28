@@ -251,12 +251,15 @@ final class FamousGamePlayer {
 struct FamousGameTheater: View {
     let game: ClassicGame
     let theme: BoardTheme
+    /// Opens the position on the board in Analyze. Set from Home's game of the day.
+    var explore: ((String) -> Void)?
     @State private var player: FamousGamePlayer
     @Environment(\.dismiss) private var dismiss
 
-    init(game: ClassicGame, theme: BoardTheme) {
+    init(game: ClassicGame, theme: BoardTheme, explore: ((String) -> Void)? = nil) {
         self.game = game
         self.theme = theme
+        self.explore = explore
         _player = State(initialValue: FamousGamePlayer(game: game))
     }
 
@@ -273,6 +276,16 @@ struct FamousGameTheater: View {
                 Text(player.index == 0 ? "Start" : "Move \((player.index + 1) / 2) of \((game.moves.count + 1) / 2)")
                     .font(.app(.caption).monospacedDigit())
                     .foregroundStyle(.secondary)
+                if let explore {
+                    Button {
+                        player.pause()
+                        explore(player.board.fen)
+                    } label: {
+                        Label("Explore in Analyze", systemImage: "magnifyingglass").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false))
+                    .padding(.horizontal, 16)
+                }
                 Spacer(minLength: 0)
             }
             .frame(width: geo.size.width)

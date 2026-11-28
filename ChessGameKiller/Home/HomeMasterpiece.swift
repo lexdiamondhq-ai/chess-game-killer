@@ -3,8 +3,8 @@ import SwiftUI
 
 /// A different famous game each day, its finish playing itself out on a small board on
 /// Today: the Opera Game's queen sacrifice, the Immortal Game's mate, Fischer's Game of the
-/// Century. A tap opens it in Analyze at the start of the finish, to play through and test
-/// against Stockfish.
+/// Century. A tap opens the Famous Games player, which plays it from move 1 while Leo tells
+/// its story; from there it can go to Analyze.
 struct HomeMasterpiece: Equatable {
     let game: ClassicGame
     /// The position the finish starts from, then the one after each move of it.
