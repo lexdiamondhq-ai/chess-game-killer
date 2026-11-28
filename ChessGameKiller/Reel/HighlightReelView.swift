@@ -196,7 +196,7 @@ private struct ReelEvalBar: View {
             ZStack(alignment: .leading) {
                 Capsule().fill(Color.primary.opacity(0.15))
                 Capsule()
-                    .fill(theme.trainingAccent)
+                    .fill(theme.trainingFill)
                     .frame(width: max(4, geo.size.width * (chances + 1) / 2))
             }
         }

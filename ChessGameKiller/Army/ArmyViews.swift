@@ -32,13 +32,13 @@ extension ArmyRank {
     /// pale ivory would be lost, so it takes the page's ink and the gold the page's metal.
     func pageColor(for piece: Piece, theme: BoardTheme) -> Color {
         guard let tone = theme.screenTone, tone.scheme != .dark else { return color(for: piece, theme: theme) }
-        return self == .legend ? tone.metal : (piece.color == .white ? tone.ink2 : tone.ink)
+        return self == .legend ? theme.trainingAccent : (piece.color == .white ? tone.ink2 : tone.ink)
     }
 
     /// The gold of a page around the board: the home's metal on its light page.
     static func pageGold(_ theme: BoardTheme) -> Color {
         guard let tone = theme.screenTone, tone.scheme != .dark else { return gold }
-        return tone.metal
+        return theme.trainingAccent
     }
 }
 
@@ -135,8 +135,8 @@ struct ArmyNewsBanner: View {
                     .modifier(VeteranAura(rank: news.rank, piece: piece, theme: theme, size: 38, onBoard: false))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(news.label)
-                        .font(.app(size: 10, weight: .heavy))
-                        .tracking(0.8)
+                        .font(.app(.caption2, weight: .semibold))
+                        .tracking(1.2)
                         .foregroundStyle(tint)
                     Text(news.headline)
                         .font(.app(.subheadline, weight: .semibold))
@@ -180,8 +180,8 @@ struct PieceOfTheMatchCard: View {
                                       size: 40, onBoard: false))
             VStack(alignment: .leading, spacing: 2) {
                 Text("PIECE OF THE MATCH")
-                    .font(.app(size: 10, weight: .heavy))
-                    .tracking(0.8)
+                    .font(.app(.caption2, weight: .semibold))
+                    .tracking(1.2)
                     .foregroundStyle(tint)
                 Text(hero.line)
                     .font(.app(.subheadline, weight: .semibold))
@@ -304,7 +304,7 @@ struct ArmyView: View {
                 .font(.display(.title3, weight: .semibold))
             Text("Win with them and they earn a name, then a battle scar, then a gold name.")
                 .font(.app(.subheadline))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.quietInk)
                 .multilineTextAlignment(.center)
         }
         .padding(.top, 4)
@@ -405,7 +405,7 @@ struct ArmyView: View {
     private var honorRoll: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Most decorated")
-                .font(.app(.headline))
+                .font(.display(.title3, weight: .semibold))
             ForEach(decorated) { slot in
                 Button { selected = slot } label: { honorRow(slot) }
                     .buttonStyle(.plain)
@@ -425,7 +425,7 @@ struct ArmyView: View {
                 .modifier(VeteranAura(rank: record.rank, piece: piece, theme: theme, size: 34, onBoard: false))
             VStack(alignment: .leading, spacing: 1) {
                 Text(record.name ?? slot.title)
-                    .font(.app(.subheadline, weight: .semibold))
+                    .font(.display(.subheadline, weight: .semibold))
                 Text("\(record.rank.title) · \(slot.title)")
                     .font(.app(.caption))
                     .foregroundStyle(tint)
@@ -531,9 +531,17 @@ struct PieceDetailView: View {
                                 draftName = record.name ?? ""
                                 renaming = true
                             } label: {
-                                Image(systemName: "pencil.circle.fill")
-                                    .font(.app(.title3))
-                                    .foregroundStyle(.secondary)
+                                if theme.screenTone != nil {
+                                    // An espresso pencil on a gold coin, as ink sits on the gold buttons.
+                                    Image(systemName: "pencil.circle.fill")
+                                        .font(.app(.title3))
+                                        .symbolRenderingMode(.palette)
+                                        .foregroundStyle(Polish.onMetal, theme.trainingFill)
+                                } else {
+                                    Image(systemName: "pencil.circle.fill")
+                                        .font(.app(.title3))
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                             .accessibilityLabel("Rename")
                         }
@@ -588,13 +596,13 @@ struct PieceDetailView: View {
                         .foregroundStyle(.secondary)
                 }
                 ProgressView(value: min(1, max(0, fraction)))
-                    .tint(tint)
+                    .tint(theme.screenTone == nil ? tint : theme.trainingFill)
                 Text(next.reward)
                     .font(.app(.caption))
                     .foregroundStyle(.secondary)
             }
             .padding(14)
-            .trainingCard(theme, tint: tint, cornerRadius: 16)
+            .trainingCard(theme, tint: record.rank == .legend ? tint : nil, cornerRadius: 16)
         } else {
             Text("\(record.xp) XP. A Legend of your army.")
                 .font(.app(.subheadline, weight: .semibold))
@@ -653,16 +661,15 @@ struct PieceDetailView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .trainingCard(theme, tint: tint, cornerRadius: 16)
+        .trainingCard(theme, tint: record.rank == .legend ? tint : nil, cornerRadius: 16)
     }
 
     /// The Heirloom marks on the piece, and what each one is for.
     private func history(_ record: PieceRecord, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("ITS HISTORY, ON THE PIECE")
-                .font(.app(.caption2, weight: .semibold))
-                .tracking(1)
-                .foregroundStyle(.secondary)
+                .eyebrow()
+                .foregroundStyle(theme.trainingAccent)
             ForEach(store.heirloom(for: slot).story(for: record), id: \.self) { line in
                 Label {
                     Text(line)
@@ -671,13 +678,13 @@ struct PieceDetailView: View {
                 } icon: {
                     Image(systemName: "seal.fill")
                         .font(.system(size: 9))
-                        .foregroundStyle(HeirloomOverlay.gold)
+                        .foregroundStyle(theme.screenTone == nil ? HeirloomOverlay.gold : theme.trainingFill)
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .trainingCard(theme, tint: tint, cornerRadius: 16)
+        .trainingCard(theme, tint: record.rank == .legend ? tint : nil, cornerRadius: 16)
     }
 
     /// Which rival keeps taking this piece, and the rivals it has beaten back.
@@ -720,7 +727,7 @@ struct PieceDetailView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .trainingCard(theme, tint: tint, cornerRadius: 16)
+        .trainingCard(theme, tint: record.rank == .legend ? tint : nil, cornerRadius: 16)
     }
 
     private func stats(_ record: PieceRecord) -> some View {

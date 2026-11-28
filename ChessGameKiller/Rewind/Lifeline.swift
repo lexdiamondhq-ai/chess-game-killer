@@ -7,8 +7,10 @@ enum RewindPalette {
     static let amberHex: UInt32 = 0xF0AE5A
     static let coralHex: UInt32 = 0xEF7B6E
     static let gold = Color(hex: goldHex)
-    static let amber = Color(hex: amberHex)
-    static let coral = Color(hex: coralHex)
+    // On the page the two warnings are stone inks, deep on cream and lit on espresso, so a tag
+    // reads in both. The board's marks keep the bright hex values above.
+    static let amber = StoneInk.carnelian.color
+    static let coral = StoneInk.ruby.color
 
     /// Gold for words and small marks on the page around the board. The pale gold is made for
     /// a dark page; on a light one a WIN tag or the move in hand all but disappeared, so there
@@ -17,11 +19,18 @@ enum RewindPalette {
         theme.screenIsDark ? gold : theme.trainingAccent
     }
 
+    /// A moment's color on the page (its tag, its ring on the line): inks, not the board's light.
     static func color(for moment: SavedMoment, rewritten: Bool) -> Color {
-        Color(hex: hex(for: moment, rewritten: rewritten))
+        let fixed: Color = Color.ink(light: 0x8A5F1E, dark: goldHex)
+        if rewritten { return fixed }
+        switch moment.moveGrade {
+        case .blunder: return coral
+        case .mistake, .inaccuracy: return amber
+        default: return fixed
+        }
     }
 
-    /// The same color as 0xRRGGBB, for the 3D board's marks.
+    /// A moment's color as 0xRRGGBB, for the 3D board's marks.
     static func hex(for moment: SavedMoment, rewritten: Bool) -> UInt32 {
         if rewritten { return goldHex }
         switch moment.moveGrade {
@@ -127,8 +136,8 @@ struct Lifeline: View {
                     .position(x: playX, y: size.height / 2)
                     .allowsHitTesting(false)
             }
-            .font(.system(size: 10, weight: .semibold))
-            .tracking(1.8)
+            .font(.app(size: 10, weight: .semibold))
+            .tracking(1.2)
             .foregroundStyle(.secondary)
             .contentShape(Rectangle())
             .gesture(

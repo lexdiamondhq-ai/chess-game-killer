@@ -212,7 +212,7 @@ struct RewindView: View {
                 VStack(spacing: 2) {
                     Text("Rewind · vs \(game.opponentShown)")
                         .font(.app(.caption2, weight: .semibold))
-                        .tracking(2.5)
+                        .tracking(1.2)
                         .textCase(.uppercase)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -266,7 +266,7 @@ struct RewindView: View {
         } label: {
             VStack(spacing: 2) {
                 HStack(spacing: 4) {
-                    Text("\(level.title) review").tracking(2.5)
+                    Text("\(level.title) review").tracking(1.2)
                     Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
                 }
                 .font(.app(.caption2, weight: .semibold))
@@ -825,8 +825,8 @@ private struct SecondChanceSheet: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Second chance")
-                                    .font(.app(.caption, weight: .semibold))
-                                    .tracking(2)
+                                    .font(.app(.caption2, weight: .semibold))
+                                    .tracking(1.2)
                                     .textCase(.uppercase)
                                     .foregroundStyle(.secondary)
                                 Text(chance.moment.numbered)
@@ -981,8 +981,8 @@ private struct ExplorerCard: View {
     private var branches: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(explorer.playerToMove ? "Or you could play" : "If they try instead")
-                .font(.app(.caption, weight: .semibold))
-                .tracking(1.5)
+                .font(.app(.caption2, weight: .semibold))
+                .tracking(1.2)
                 .textCase(.uppercase)
                 .foregroundStyle(.secondary)
             ForEach(explorer.branches) { branch in
@@ -1035,7 +1035,7 @@ private struct ExplorerCard: View {
                 Button(action: onTryIt) {
                     Label("Try it myself", systemImage: "arrow.counterclockwise")
                         .font(.app(.subheadline, weight: .semibold))
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, 18)
                         .frame(minHeight: 44)
                         .foregroundStyle(Polish.pillInk(gilded: theme.screenTone != nil))
                         .background { MainPillFill(gilded: theme.screenTone != nil, plain: Color.primary.opacity(0.92)) }
@@ -1083,6 +1083,8 @@ private struct Tag: View {
     var symbol: String?
     let color: Color
 
+    @Environment(\.colorScheme) private var scheme
+
     var body: some View {
         HStack(spacing: 6) {
             if let symbol {
@@ -1095,7 +1097,8 @@ private struct Tag: View {
         .foregroundStyle(color)
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .background(Capsule().fill(color.opacity(0.14)))
+        .background(Capsule().fill(color.opacity(scheme == .dark ? 0.17 : 0.10)))
+        .overlay { Capsule().strokeBorder(color.opacity(0.35), lineWidth: 0.75) }
     }
 }
 

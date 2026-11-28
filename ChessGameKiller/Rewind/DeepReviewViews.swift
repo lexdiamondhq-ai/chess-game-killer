@@ -74,7 +74,7 @@ private struct DeepReviewWaiting: View {
                         .font(.app(.body))
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
-                            Capsule().fill(Color.primary.opacity(0.1))
+                            Capsule().fill(Polish.track(dark: theme.screenIsDark))
                             Capsule().fill(tint)
                                 .frame(width: geo.size.width * (filled ? 0.94 : 0.03))
                         }
@@ -106,6 +106,8 @@ struct DeepReviewCard: View {
     let onClose: () -> Void
 
     private var gold: Color { RewindPalette.goldInk(on: theme) }
+    /// Gold for the lit part of a bar: a step lighter than the ink on a light page.
+    private var goldFill: Color { theme.screenIsDark ? RewindPalette.gold : theme.trainingFill }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -133,7 +135,7 @@ struct DeepReviewCard: View {
                      ? "\(player.coach.name)'s voice is on its way"
                      : "\(player.coach.name)'s deep review")
                     .font(.app(.caption2, weight: .semibold))
-                    .tracking(2)
+                    .tracking(1.2)
                     .textCase(.uppercase)
                     .foregroundStyle(.secondary)
                 Text(chapter)
@@ -167,7 +169,7 @@ struct DeepReviewCard: View {
         HStack(spacing: 4) {
             ForEach(0..<max(player.partCount, 1), id: \.self) { part in
                 Capsule()
-                    .fill(part <= player.index ? AnyShapeStyle(gold) : AnyShapeStyle(Color.primary.opacity(0.12)))
+                    .fill(part <= player.index ? goldFill : Polish.track(dark: theme.screenIsDark))
                     .frame(height: 3)
             }
         }
@@ -222,7 +224,7 @@ struct DeepReviewCard: View {
     }
 
     private var waiting: some View {
-        DeepReviewWaiting(theme: theme, coach: player.coach, tint: gold)
+        DeepReviewWaiting(theme: theme, coach: player.coach, tint: goldFill)
             .padding(.top, 18)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }

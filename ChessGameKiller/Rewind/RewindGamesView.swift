@@ -92,7 +92,7 @@ struct RewindGamesView: View {
                 .font(.display(.title3, weight: .semibold))
             Text("Finish a game and it lands here. Rewind it to see the moments that mattered, then go back and fix them.")
                 .font(.app(.body))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.quietInk)
                 .multilineTextAlignment(.center)
         }
         .padding(.top, 120)
@@ -105,8 +105,7 @@ struct RewindGamesView: View {
         let next = vault.games.first { $0.leftToRewrite > 0 }
         return VStack(alignment: .leading, spacing: 8) {
             Text("This week")
-                .font(.carved(11))
-                .tracking(2)
+                .eyebrow()
                 .textCase(.uppercase)
                 .foregroundStyle(RewindPalette.goldInk(on: theme))
             HStack(alignment: .firstTextBaseline, spacing: 22) {
@@ -130,14 +129,14 @@ struct RewindGamesView: View {
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
-            GlassSurface(shape: RoundedRectangle(cornerRadius: 24, style: .continuous), tint: RewindPalette.gold)
+            GlassSurface(shape: RoundedRectangle(cornerRadius: 22, style: .continuous), tint: RewindPalette.gold)
         }
         .padding(.top, 8)
     }
 
     private func stat(_ value: Int, _ label: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 5) {
-            Text("\(value)").font(.app(.title, weight: .semibold).monospacedDigit())
+            Text("\(value)").font(.app(.title, weight: .semibold))
             Text(label).font(.app(.subheadline)).foregroundStyle(.secondary)
         }
     }
@@ -179,7 +178,8 @@ private struct GameCard: View {
                                 .foregroundStyle(resultColor)
                                 .padding(.horizontal, 7)
                                 .padding(.vertical, 3)
-                                .background(Capsule().fill(resultColor.opacity(0.14)))
+                                .background(Capsule().fill(resultColor.opacity(theme.screenIsDark ? 0.17 : 0.10)))
+                                .overlay { Capsule().strokeBorder(resultColor.opacity(0.35), lineWidth: 0.75) }
                                 .fixedSize()
                         }
                         Text("\(game.moveCount) moves · \(game.date.formatted(.relative(presentation: .named)))")
