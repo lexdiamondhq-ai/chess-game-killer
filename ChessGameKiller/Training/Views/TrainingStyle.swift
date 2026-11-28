@@ -70,6 +70,12 @@ extension TrainingColor {
         return stone.color(dark: theme.screenIsDark)
     }
 
+    /// The color of a mark drawn on a board (an arrow, a lit square, a numbered badge on a
+    /// square): the bright set, which stays clear on wood and stone and matches the 3D board.
+    func boardColor(on theme: BoardTheme) -> Color {
+        Color(hex: hex(on: theme))
+    }
+
     /// The stone each color is cut from.
     var stone: StoneInk {
         switch self {

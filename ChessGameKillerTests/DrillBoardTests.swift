@@ -168,10 +168,11 @@ final class DrillBoardTests: XCTestCase {
             XCTAssertEqual(marks, [SculptedCoachMark(square: .f7, color: TrainingColor.green.hex(on: theme)),
                                    SculptedCoachMark(square: .d4, color: TrainingColor.yellow.hex(on: theme))])
         }
-        // The hex is the flat board's color.
+        // The hex is the flat board's color. (A word or a bar on the page around it is cut from
+        // a jewel stone instead, see `StoneInk`; a mark on a board stays bright.)
         let theme = BoardTheme.named(.gilded)
         for color in TrainingColor.allCases {
-            XCTAssertEqual(Color(hex: color.hex(on: theme)), color.color(on: theme))
+            XCTAssertEqual(Color(hex: color.hex(on: theme)), color.boardColor(on: theme))
         }
     }
 
