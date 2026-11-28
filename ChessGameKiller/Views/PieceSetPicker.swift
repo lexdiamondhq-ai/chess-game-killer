@@ -5,6 +5,7 @@ import SwiftUI
 struct PieceSetPicker: View {
     @Binding var selection: PieceSet
     let accent: Color
+    @Environment(\.colorScheme) private var scheme
 
     private let columns = [GridItem(.adaptive(minimum: 92), spacing: 14)]
 
@@ -39,7 +40,7 @@ struct PieceSetPicker: View {
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .strokeBorder(accent, lineWidth: isOn ? 2 : 0)
                 }
-                .shadow(color: .black.opacity(0.35), radius: 6, y: 3)
+                .shadow(color: Polish.cast(dark: scheme == .dark, strength: 1.75), radius: 5, y: 3)
             Text(set.title)
                 .font(.app(.caption, weight: isOn ? .semibold : .regular))
                 .foregroundStyle(isOn ? .primary : .secondary)

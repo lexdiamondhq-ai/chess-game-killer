@@ -933,7 +933,6 @@ private struct CoachPanel: View {
 
     /// One quiet line, and a gold button that plays the next rival's film.
     private func nextRivalOffer(_ next: MatchController.Level) -> some View {
-        let gold = Color(hex: 0xE8C27A)
         let rival = next.rival
         return VStack(spacing: 8) {
             Text("\(rival.name) will see you now.")
@@ -953,18 +952,12 @@ private struct CoachPanel: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                 }
-                .foregroundStyle(Color(hex: 0x1B1408))
+                .foregroundStyle(Polish.onMetal)
                 .frame(maxWidth: .infinity)
                 .frame(minHeight: 52)
-                .background {
-                    Capsule()
-                        .fill(LinearGradient(colors: [Color(hex: 0xF3DDA8), gold, Color(hex: 0xC99A4B)],
-                                             startPoint: .top, endPoint: .bottom))
-                }
-                .overlay {
-                    Capsule().strokeBorder(Color.white.opacity(0.35), lineWidth: 1)
-                }
-                .shadow(color: gold.opacity(theme.glows ? 0.45 : 0.2), radius: 12, y: 3)
+                // The app's one gold button, cut from the same metal as Home's Play. The rivals
+                // are gold on every board, so it never takes a board's own metal.
+                .background { PolishedFill(shape: Capsule()).environment(\.polishMetal, nil) }
                 .contentShape(Capsule())
             }
             .buttonStyle(ChallengePressStyle())
@@ -1044,14 +1037,23 @@ private struct CoachPanel: View {
             collapse()
             withAnimation(.snappy) { match.rematch() }
         } label: {
+            // On the gold boards this is the app's gold button, as on every other screen; a
+            // board with its own metal or light (Sculpted, Neon, a rival's) keeps its own.
+            let gilded: Bool = theme.polishMetal == nil
             Label("Rematch", systemImage: "play.fill")
                 .font(.app(.headline))
-                .foregroundStyle(theme.isDark ? Color.black : Color.white)
+                .foregroundStyle(gilded ? Polish.onMetal : (theme.isDark ? Color.black : Color.white))
                 .frame(maxWidth: .infinity)
                 .frame(height: 52)
-                .background(Capsule().fill(accent.gradient))
-                .overlay(Capsule().strokeBorder(Color.white.opacity(0.3), lineWidth: 1))
-                .shadow(color: accent.opacity(theme.glows ? 0.5 : 0.22), radius: 12, y: 3)
+                .background {
+                    if gilded {
+                        PolishedFill(shape: Capsule())
+                    } else {
+                        Capsule().fill(accent.gradient)
+                            .overlay(Capsule().strokeBorder(Color.white.opacity(0.3), lineWidth: 1))
+                            .shadow(color: accent.opacity(theme.glows ? 0.5 : 0.22), radius: 12, y: 3)
+                    }
+                }
                 .contentShape(Capsule())
         }
         .buttonStyle(ChallengePressStyle())

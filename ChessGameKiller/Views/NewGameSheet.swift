@@ -241,14 +241,16 @@ struct NewGameSheet: View {
                 }
             }
         }
+        // The rows are clipped to the card; the card's own body is not, so on a light page it
+        // can cast the soft warm shadow that lifts it (a clip around both cut that shadow off).
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .background {
             let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
             shape
                 .fill(theme.screenIsDark ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)))
                 .overlay { PolishedEdge(shape: shape, edge: .card, dark: theme.screenIsDark) }
-                .shadow(color: .black.opacity(theme.screenIsDark ? 0.3 : 0.08), radius: 16, y: 6)
+                .shadow(color: theme.screenIsDark ? Color.clear : Polish.cast(dark: false), radius: 16, y: 6)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
     /// The king of the chosen side, for the Play as row.
@@ -270,10 +272,12 @@ struct NewGameSheet: View {
     }
 
     private var rowDivider: some View {
+        // A hairline that stops short of the gilded edge, as Home's rows do.
         Rectangle()
-            .fill(Color.primary.opacity(theme.screenIsDark ? 0.08 : 0.06))
-            .frame(height: 1)
+            .fill(Color.primary.opacity(0.14))
+            .frame(height: 0.5)
             .padding(.leading, 58)
+            .padding(.trailing, 14)
     }
 
     private var unfold: AnyTransition {
@@ -470,7 +474,7 @@ struct NewGameSheet: View {
             ForEach(Rival.all) { rival in
                 let isOn = rival.level == draftLevel
                 Capsule()
-                    .fill(isOn ? rival.ink(on: theme) : Color.secondary.opacity(0.3))
+                    .fill(isOn ? rival.ink(on: theme) : rival.ink(on: theme).opacity(0.25))
                     .frame(width: isOn ? 18 : 6, height: 6)
                     .shadow(color: isOn && theme.glows ? rival.hue.opacity(0.8) : .clear, radius: 6)
             }
@@ -543,7 +547,7 @@ struct NewGameSheet: View {
     }
 
     private func card(selected: Bool, color: Color, glow: Color?) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
         return shape
             .fill(selected ? color.opacity(0.1) : Color.primary.opacity(theme.screenIsDark ? 0.05 : 0.03))
             .overlay {
@@ -594,7 +598,7 @@ private struct RivalCard: View {
                 ForEach(0..<5, id: \.self) { index in
                     let lit = index < rival.strength
                     Capsule()
-                        .fill(lit ? rival.ink(on: theme) : Color.primary.opacity(0.14))
+                        .fill(lit ? rival.ink(on: theme) : rival.ink(on: theme).opacity(0.22))
                         .frame(width: 22, height: 5)
                         .shadow(color: lit && theme.glows ? rival.hue.opacity(0.8) : .clear, radius: 4)
                 }
@@ -654,12 +658,14 @@ private struct RivalCard: View {
                 .fill(theme.screenIsDark ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)))
                 .overlay {
                     if isSelected {
-                        shape.strokeBorder(rival.hue, lineWidth: 1.5)
+                        // The rival's pale hue is made for a dark page; on a light one the
+                        // chosen card takes the page's gold, so it never looks fainter than the rest.
+                        shape.strokeBorder(rival.ink(on: theme), lineWidth: 1.5)
                     } else {
                         PolishedEdge(shape: shape, edge: .card, dark: theme.screenIsDark)
                     }
                 }
-                .shadow(color: isSelected ? rival.hue.opacity(theme.glows ? 0.4 : 0.25) : .clear, radius: 16)
+                .shadow(color: isSelected ? rival.ink(on: theme).opacity(theme.glows ? 0.4 : 0.25) : .clear, radius: 16)
         }
         .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .animation(.snappy, value: isSelected)
@@ -689,7 +695,7 @@ private struct MatchRowButton<Icon: View>: View {
                     Text(label.uppercased())
                         .font(.app(.caption2, weight: .semibold))
                         .foregroundStyle(.secondary)
-                        .tracking(1)
+                        .tracking(1.2)
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(value)
                             .font(.app(.callout, weight: .bold))
@@ -738,7 +744,7 @@ private struct HintsRow: View {
                 Text("HINTS")
                     .font(.app(.caption2, weight: .semibold))
                     .foregroundStyle(.secondary)
-                    .tracking(1)
+                    .tracking(1.2)
                 Text(isOn ? "\(Coach.current.name) shows your best move" : "Off. No hints or picks from \(Coach.current.name).")
                     .font(.app(.callout, weight: .bold))
                     .foregroundStyle(.primary)
@@ -749,7 +755,7 @@ private struct HintsRow: View {
             Spacer(minLength: 0)
             Toggle("Hints", isOn: $isOn.animation(.snappy))
                 .labelsHidden()
-                .tint(accent)
+                .tint(theme.trainingFill)
         }
         .padding(.leading, 12)
         .padding(.trailing, 14)

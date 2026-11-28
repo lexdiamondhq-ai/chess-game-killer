@@ -70,18 +70,32 @@ enum Glyphs {
                       fineBuilder, fineAllRounder]
 }
 
-/// The small dark well a row's icon sits in (New Game's match card, Challenge a friend):
-/// a quiet recess with the icon in the text color, like the home dock, not an accent badge.
+/// The small plate a row's icon sits on (New Game's match card, Challenge a friend). On the
+/// home's gold pages it is the same gold enamel plate as a Settings row or a Learn row wears,
+/// so no cool grey sits among the gold; a look with its own color keeps the quiet dark well.
 struct GlyphTile<Content: View>: View {
     let theme: BoardTheme
     @ViewBuilder let content: () -> Content
 
     var body: some View {
-        let tile = RoundedRectangle(cornerRadius: 11, style: .continuous)
-        content()
-            .foregroundStyle(Color.primary.opacity(0.86))
-            .frame(width: 34, height: 34)
-            .background(theme.screenIsDark ? Color.black.opacity(0.3) : Color.primary.opacity(0.06), in: tile)
-            .overlay { tile.strokeBorder(Color.primary.opacity(theme.screenIsDark ? 0.09 : 0.08), lineWidth: 1) }
+        let tile = RoundedRectangle(cornerRadius: 10, style: .continuous)
+        if theme.screenTone != nil {
+            let accent: Color = theme.trainingAccent
+            content()
+                .foregroundStyle(accent)
+                .frame(width: 34, height: 34)
+                .background(LinearGradient(colors: [accent.opacity(0.24), accent.opacity(0.1)],
+                                           startPoint: .top, endPoint: .bottom), in: tile)
+                .overlay {
+                    tile.strokeBorder(LinearGradient(colors: [accent.opacity(0.5), accent.opacity(0.2)],
+                                                     startPoint: .top, endPoint: .bottom), lineWidth: 0.75)
+                }
+        } else {
+            content()
+                .foregroundStyle(Color.primary.opacity(0.86))
+                .frame(width: 34, height: 34)
+                .background(theme.screenIsDark ? Color.black.opacity(0.3) : Color.primary.opacity(0.06), in: tile)
+                .overlay { tile.strokeBorder(Color.primary.opacity(theme.screenIsDark ? 0.09 : 0.08), lineWidth: 0.75) }
+        }
     }
 }

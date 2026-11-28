@@ -270,7 +270,7 @@ struct RivalsHall: View {
                             .font(.custom(HomeCarvingFont.plain, size: 14, relativeTo: .footnote))
                             .foregroundStyle(isSelected ? Self.gold : .white.opacity(ladder.isOpen(film.level) ? 0.6 : 0.28))
                         Circle()
-                            .fill(ladder.beaten(film.rival) ? Self.gold : .white.opacity(isSelected ? 0.7 : 0.18))
+                            .fill(ladder.beaten(film.rival) ? Self.gold : (isSelected ? Color(hex: 0xF3DDA8) : Color.white.opacity(0.18)))
                             .frame(width: 5, height: 5)
                     }
                     .frame(minWidth: 30, minHeight: 36)
@@ -323,7 +323,7 @@ struct RivalHallCard: View {
         .overlay(alignment: .topTrailing) {
             if beaten {
                 Label("Beaten", systemImage: "checkmark.seal.fill")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.app(size: 12, weight: .semibold))
                     .foregroundStyle(Self.gold)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
@@ -373,7 +373,7 @@ struct RivalHallWords: View {
     private var words: some View {
         VStack(spacing: 10) {
             Text("RANK \(film.numeral)  ·  \(film.rival.elo)")
-                .font(.system(size: 11, weight: .bold).monospacedDigit())
+                .font(.app(size: 11, weight: .bold).monospacedDigit())
                 .tracking(2.2)
                 .foregroundStyle(Self.gold.opacity(open ? 1 : 0.6))
             Text(film.rival.name.uppercased())
@@ -398,11 +398,15 @@ struct RivalHallWords: View {
         if open {
             Button(action: face) {
                 Text("Face \(film.rival.name.lowercasedFirstWord)")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color(hex: 0x1C1813))
+                    .font(.app(size: 16, weight: .semibold))
+                    .foregroundStyle(Polish.onMetal)
                     .frame(maxWidth: .infinity, minHeight: 50)
-                    .background(HomeAuroraPalette.goldButton, in: Capsule())
-                    .shadow(color: Self.gold.opacity(0.35), radius: 14, y: 4)
+                    // The app's gold button, lit as in a dark room: the hall is always night.
+                    .background {
+                        PolishedFill(shape: Capsule())
+                            .environment(\.polishMetal, nil)
+                            .environment(\.colorScheme, .dark)
+                    }
             }
             .buttonStyle(HomeStagePress())
             .accessibilityHint("Plays \(film.rival.name)'s welcome, then starts the game")
@@ -411,7 +415,7 @@ struct RivalHallWords: View {
                 Image(systemName: "lock.fill")
                     .font(.system(size: 13, weight: .semibold))
                 Text("Beat \((film.previous?.name ?? "").lowercasedFirstWord) to face \(film.rival.name.lowercasedFirstWord)")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.app(size: 14, weight: .semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
             }
@@ -466,7 +470,7 @@ struct RivalFilmEnding: View {
             capsule
                 .padding(.top, 22)
             Button("Not today", action: notToday)
-                .font(.system(size: 15, weight: .semibold))
+                .font(.app(size: 15, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.42))
                 .frame(minHeight: 44)
                 .padding(.top, 4)
@@ -494,7 +498,7 @@ struct RivalFilmEnding: View {
                         .minimumScaleFactor(0.6)
                 } else {
                     Text("Beat \((film.previous?.name ?? "").lowercasedFirstWord) first")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.app(size: 15, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.6))
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)

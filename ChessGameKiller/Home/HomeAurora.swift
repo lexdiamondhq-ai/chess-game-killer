@@ -1174,10 +1174,10 @@ struct HomeAuroraDNA: View {
                 if dna.weapon != nil || dna.leak != nil {
                     DNAChipPair {
                         if let weapon = dna.weapon {
-                            chip("Weapon", weapon.title, symbol: weapon.symbol, tint: palette.teal)
+                            chip("Weapon", weapon.title, symbol: weapon.symbol, tint: StoneInk.jade.color(dark: palette.dark))
                         }
                         if let leak = dna.leak {
-                            chip("Leak", leak.headline, symbol: leak.area.symbol, tint: palette.rose)
+                            chip("Leak", leak.headline, symbol: leak.area.symbol, tint: StoneInk.rose.color(dark: palette.dark))
                         }
                     }
                 }
