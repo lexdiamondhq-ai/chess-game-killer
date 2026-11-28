@@ -45,6 +45,25 @@ enum ArrowOutline {
                         startInset: clearOfPiece, tipInset: analysisTip, bow: best ? 0.08 : 0.06, rise: best ? 0.22 : 0.16,
                         dotted: !best)
         }
+
+        /// Moves shorter than this many squares (one square, straight or diagonal) are short moves.
+        static let shortMove: CGFloat = 1.5
+
+        /// The proportions for a move `length` squares long. A one-square move has too little room
+        /// for the full gaps and head: only the head showed, and the shaft hid under the piece (Alex,
+        /// 2026-11-28). So it gets a smaller, straight arrow with tighter gaps, whole and in its
+        /// target square (Alex's pick A). Longer moves, and shapes with no head, keep these.
+        func fitted(toLength length: CGFloat) -> Proportions {
+            guard length < Self.shortMove, headLength > 0, startInset + tipInset > 0 else { return self }
+            var p = self
+            p.shaft = shaft * 0.88
+            p.headLength = headLength * 0.72
+            p.headWidth = headWidth * 0.8
+            p.startInset = min(startInset, 0.4)
+            p.tipInset = min(tipInset, 0.06)
+            p.bow = 0
+            return p
+        }
     }
 
     /// The path's three points: where the tail starts, the curve's pull to the side, and the tip.
@@ -53,6 +72,7 @@ enum ArrowOutline {
     static func path(from start: CGPoint, to end: CGPoint, unit: CGFloat, proportions p: Proportions,
                      side: CGFloat = 1) -> (tail: CGPoint, pull: CGPoint, tip: CGPoint) {
         let length = max(hypot(end.x - start.x, end.y - start.y), 0.001 * unit)
+        let p = p.fitted(toLength: length / unit)
         let u = CGPoint(x: (end.x - start.x) / length, y: (end.y - start.y) / length)
         // A short move (one square) has too little room for both gaps and a whole arrow: the gaps
         // shrink together, so the head and a stub of shaft always fit between the two pieces.
@@ -87,6 +107,7 @@ enum ArrowOutline {
     static func outlines(from start: CGPoint, to end: CGPoint, unit: CGFloat, dashed: Bool,
                          proportions p: Proportions, side: CGFloat = 1, seamless: Bool = false) -> [[CGPoint]] {
         let (tail, pull, tip) = path(from: start, to: end, unit: unit, proportions: p, side: side)
+        let p = p.fitted(toLength: hypot(end.x - start.x, end.y - start.y) / max(unit, 0.000001))
         // The head points along the curve as it lands.
         let lean = CGPoint(x: tip.x - pull.x, y: tip.y - pull.y)
         let leanLength = max(hypot(lean.x, lean.y), 0.000001)
