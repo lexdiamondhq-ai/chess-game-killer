@@ -129,7 +129,8 @@ struct ArmyNewsBanner: View {
 
     private func row(opens: Bool) -> some View {
         let piece = Piece(news.slot.kind, color: color, square: .a1)
-        let tint = news.rank.pageColor(for: piece, theme: theme)
+        // This banner is drawn only on the game screen, which is always dark: the board's colors.
+        let tint = news.rank.color(for: piece, theme: theme)
         return HStack(spacing: 12) {
                 PieceImage(piece: piece, theme: theme, size: 38)
                     .modifier(VeteranAura(rank: news.rank, piece: piece, theme: theme, size: 38, onBoard: false))
@@ -173,7 +174,8 @@ struct PieceOfTheMatchCard: View {
     var body: some View {
         let record = store.record(for: hero.slot)
         let piece = Piece(hero.slot.kind, color: color, square: .a1)
-        let tint = record.rank == .recruit ? ArmyRank.pageGold(theme) : record.rank.pageColor(for: piece, theme: theme)
+        // This card is drawn only on the game screen, which is always dark: the board's colors.
+        let tint = record.rank == .recruit ? ArmyRank.gold : record.rank.color(for: piece, theme: theme)
         HStack(spacing: 12) {
             PieceImage(piece: piece, theme: theme, size: 40, heirloom: store.heirloom(for: hero.slot))
                 .modifier(VeteranAura(rank: max(record.rank, .veteran), piece: piece, theme: theme,

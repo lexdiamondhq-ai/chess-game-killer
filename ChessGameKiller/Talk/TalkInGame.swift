@@ -80,6 +80,7 @@ struct TalkMic: View {
     let theme: BoardTheme
 
     @ScaledMetric(relativeTo: .subheadline) private var scaled: CGFloat = 34
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         let accent: Color = theme.accent ?? .accentColor
@@ -89,7 +90,7 @@ struct TalkMic: View {
         // also sits in the coach on the game screen.
         let gilded: Bool = theme.screenTone != nil && theme.polishMetal == nil
         let glowing: Bool = theme.glows && !gilded
-        let shade: Color = gilded ? Polish.cast(dark: theme.screenIsDark) : accent.opacity(theme.glows ? 0.55 : 0.25)
+        let shade: Color = gilded ? Polish.cast(dark: scheme == .dark) : accent.opacity(theme.glows ? 0.55 : 0.25)
         ZStack {
             if gilded {
                 PolishedFill(shape: Circle(), quiet: true)

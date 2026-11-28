@@ -601,7 +601,8 @@ struct PersonAvatar: View {
             .overlay {
                 if person.online {
                     Circle()
-                        .strokeBorder(StoneInk.emerald.color(dark: theme.screenIsDark), lineWidth: 2)
+                        // The ring follows the room it is drawn in: this coin also rides the banner over a game.
+                        .strokeBorder(StoneInk.emerald.color, lineWidth: 2)
                         .padding(-4)
                 }
             }

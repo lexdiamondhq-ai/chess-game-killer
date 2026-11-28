@@ -133,6 +133,9 @@ struct FriendInviteBanner: View {
     let open: () -> Void
     let close: () -> Void
 
+    /// The window it floats over: the game screen is dark whatever the home's tone.
+    @Environment(\.colorScheme) private var scheme
+
     var body: some View {
         HStack(spacing: 12) {
             PersonAvatar(person: note.from, size: 40, theme: theme)
@@ -174,7 +177,7 @@ struct FriendInviteBanner: View {
             let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
             ZStack {
                 // The lift is drawn under the pane only, so nothing inside the glass casts its own.
-                shape.fill(Polish.cast(dark: theme.screenIsDark, strength: 1.75))
+                shape.fill(Polish.cast(dark: scheme == .dark, strength: 1.75))
                     .blur(radius: 12)
                     .offset(y: 8)
                     // A shadow takes no touches: the banner floats over the whole app.

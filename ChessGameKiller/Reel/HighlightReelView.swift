@@ -18,6 +18,21 @@ struct ReelFrame: View {
     /// Rounded type on Neon, plain SF Pro on every other look, as in the game.
     private var design: Font.Design { theme.glows ? .rounded : .default }
 
+    /// A grade's color as words on the page: the grade colors are made for a dark board and
+    /// fade on cream, so each takes a stone's ink there.
+    private func gradeInk(_ grade: MoveReview.Grade) -> Color {
+        guard theme.screenTone != nil, !theme.screenIsDark, !theme.glows else { return grade.color(on: theme) }
+        switch grade {
+        case .checkmate: return theme.trainingAccent
+        case .best: return StoneInk.emerald.color(dark: false)
+        case .excellent: return StoneInk.jade.color(dark: false)
+        case .good: return StoneInk.sapphire.color(dark: false)
+        case .inaccuracy: return Color(hex: 0x8F6C00)
+        case .mistake: return StoneInk.carnelian.color(dark: false)
+        case .blunder: return StoneInk.ruby.color(dark: false)
+        }
+    }
+
     var body: some View {
         ZStack {
             TrainingBackdrop(theme: theme)
@@ -87,13 +102,13 @@ struct ReelFrame: View {
                     .padding(.trailing, -1.5)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                    .background(moment.grade.color(on: theme).opacity(0.22), in: Capsule())
-                    .foregroundStyle(moment.grade.color(on: theme))
+                    .background(gradeInk(moment.grade).opacity(0.22), in: Capsule())
+                    .foregroundStyle(gradeInk(moment.grade))
                 Spacer()
                 if let piece = highlight.piece {
                     Label(piece, systemImage: "shield.lefthalf.filled")
                         .font(.app(size: 15, weight: .bold))
-                        .foregroundStyle(theme.ink(for: reel.playerColor))
+                        .foregroundStyle(theme.screenIsDark ? theme.ink(for: reel.playerColor) : Color.primary.opacity(0.8))
                         .lineLimit(1)
                 }
                 Text("Move \((moment.ply + 1) / 2)")
@@ -107,7 +122,7 @@ struct ReelFrame: View {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(moment.san + glyph(moment.grade))
                     .font(.app(size: 40, weight: .heavy))
-                    .foregroundStyle(landed ? moment.grade.color(on: theme) : .primary)
+                    .foregroundStyle(landed ? gradeInk(moment.grade) : .primary)
                 Spacer()
                 ReelEvalBar(chances: landed ? moment.after : moment.before, theme: theme)
                     .frame(width: 120, height: 10)
