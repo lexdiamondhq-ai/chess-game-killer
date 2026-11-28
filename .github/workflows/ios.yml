@@ -301,6 +301,10 @@ jobs:
           awk '/Test Case .* started/ { last = $0 } /Restarting after/ { print "RUNNING AT THE CRASH: " last }' build.log | head -5 || true
           # How the shared engine started, when it was slow to (see StockfishEngine.startEngine).
           grep -E "Stockfish: " build.log | head -10 || true
+          # The last tests to start and finish: after a time-out, the one that started last and never
+          # finished is the one that hung.
+          echo "LAST TESTS:"
+          grep -E "Test Case '.*' (started|passed|failed)" build.log | tail -8 || true
       - name: Repeat the failures
         if: failure()
         # The pictures above can push the test results out of the log's tail, so they come again, last.
