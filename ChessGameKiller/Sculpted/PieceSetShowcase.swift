@@ -7,7 +7,7 @@ import ChessKit
 /// just see one at a time and you swipe through to select"; pick A, slowly turning, the whole
 /// family). The six pieces of each side stand back to back on a round of the board's own stone,
 /// which turns slowly so the light side and the dark side come round in turn.
-final class PieceSetShowcaseScene: NSObject, SCNSceneRendererDelegate {
+final class PieceSetShowcaseScene {
     /// The order along each row, seen from the front: the tall pair in the middle.
     static let family: [Piece.Kind] = [.rook, .knight, .queen, .king, .bishop, .pawn]
     /// One full turn, in seconds: slow enough to read as a display, not a spin.
@@ -24,11 +24,9 @@ final class PieceSetShowcaseScene: NSObject, SCNSceneRendererDelegate {
     init(look: SculptedLook, assets: SculptedAssets = .shared) {
         self.look = look
         view = ShowcaseSCNView(frame: CGRect(x: 0, y: 0, width: 300, height: 300), options: nil)
-        super.init()
-        view.delegate = self
-        // Back on screen: turn again if it should.
+        // Off screen it holds still; back on screen it turns again if it should.
         view.onWindow = { [weak self] in
-            guard let self, self.view.window != nil else { return }
+            guard let self else { return }
             self.setTurning(self.wantsTurning)
         }
         view.scene = scene
@@ -56,25 +54,17 @@ final class PieceSetShowcaseScene: NSObject, SCNSceneRendererDelegate {
         setTurning(false)
     }
 
+    /// Under tests the cards hold still: a turn that never ends would keep the snapshot tests'
+    /// pictures waiting on it.
+    static let mayTurn = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil
+
     /// Only the set in the middle turns; the ones peeking in at the sides hold still and draw nothing new.
-    /// With Reduce Motion on, every card holds still.
+    /// The turn is a SceneKit action, so the view draws while it runs and stops when the scene
+    /// is paused, as the game board does. With Reduce Motion on, and off screen, it holds still.
     func setTurning(_ turning: Bool) {
         wantsTurning = turning
-        let on = turning && !UIAccessibility.isReduceMotionEnabled
-        scene.isPaused = !on
-        view.isPlaying = on
-    }
-
-    /// A card whose screen has gone (its window closed or hidden) stops drawing at once, so a
-    /// sheet left behind never keeps the GPU busy.
-    func renderer(_ renderer: SCNSceneRenderer, updateAtTime time: TimeInterval) {
-        DispatchQueue.main.async { [weak self] in
-            guard let self, self.view.isPlaying else { return }
-            if self.view.window == nil || self.view.window?.isHidden == true {
-                self.scene.isPaused = true
-                self.view.isPlaying = false
-            }
-        }
+        let on = turning && Self.mayTurn && !UIAccessibility.isReduceMotionEnabled && view.window != nil
+        if scene.isPaused == on { scene.isPaused = !on }
     }
 
     /// The picture as it is now, for tests.
