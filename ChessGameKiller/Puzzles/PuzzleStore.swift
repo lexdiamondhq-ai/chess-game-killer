@@ -13,6 +13,8 @@ struct PuzzleProgress: Codable, Equatable {
     var bestStreak = 0
     var highestRating = 1000
     var rushBest = 0
+    /// The most safe picks in a row in Blunder Shield.
+    var shieldBest = 0
     /// The last few hundred puzzles played, so they don't come back soon.
     var recent: [String] = []
     /// The theme picked last time; empty for all.
@@ -23,7 +25,7 @@ struct PuzzleProgress: Codable, Equatable {
     var reviews = PuzzleReviewQueue()
 
     enum CodingKeys: String, CodingKey {
-        case rating, played, solved, streak, bestStreak, highestRating, rushBest, recent, themeID, themeStats, reviews
+        case rating, played, solved, streak, bestStreak, highestRating, rushBest, shieldBest, recent, themeID, themeStats, reviews
     }
 }
 
@@ -39,6 +41,7 @@ extension PuzzleProgress {
         bestStreak = try saved.decodeIfPresent(Int.self, forKey: .bestStreak) ?? bestStreak
         highestRating = try saved.decodeIfPresent(Int.self, forKey: .highestRating) ?? highestRating
         rushBest = try saved.decodeIfPresent(Int.self, forKey: .rushBest) ?? rushBest
+        shieldBest = try saved.decodeIfPresent(Int.self, forKey: .shieldBest) ?? shieldBest
         recent = try saved.decodeIfPresent([String].self, forKey: .recent) ?? recent
         themeID = try saved.decodeIfPresent(String.self, forKey: .themeID) ?? themeID
         themeStats = try saved.decodeIfPresent([String: ThemeRecord].self, forKey: .themeStats) ?? themeStats
@@ -210,6 +213,13 @@ final class PuzzleStore {
     /// Notes a Rush puzzle as seen, without touching the rating.
     func seen(_ puzzle: LichessPuzzle) {
         remember(puzzle.id)
+        save()
+    }
+
+    /// A Blunder Shield run: saved when it is the longest yet.
+    func recordShield(_ run: Int) {
+        guard run > progress.shieldBest else { return }
+        progress.shieldBest = run
         save()
     }
 
