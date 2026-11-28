@@ -742,7 +742,7 @@ struct HomeYouPanel: View {
                 HomeLinkRow(glyph: Glyphs.settings, stone: .slate, title: "Settings", detail: "Board look, sound, hints", tone: tone) { go(actions.settings) }
                 if let premium = actions.premium {
                     HomeHairline(tone: tone, inset: 54)
-                    HomeLinkRow(glyph: Glyphs.king, stone: .amber, title: "Premium", detail: Premium.shared.youLine, tone: tone) { go(premium) }
+                    HomeLinkRow(glyph: "crown.fill", stone: .amber, title: "Premium", detail: Premium.shared.youLine, tone: tone) { go(premium) }
                 }
             }
         }

@@ -211,7 +211,7 @@ struct TrainingBoardView: View {
         ZStack(alignment: .topLeading) {
             ForEach(uniqueMarks, id: \.self) { mark in
                 if let square = square(named: mark.square) {
-                    let color = (mark.color ?? .yellow).color(on: theme)
+                    let color = Color(hex: (mark.color ?? .yellow).hex(on: theme))
                     let cell = cell(of: square)
                     ZStack {
                         Rectangle().fill(color.opacity(theme.isDark ? 0.26 : 0.34))
@@ -278,7 +278,7 @@ struct TrainingBoardView: View {
                         to: center(of: to, size: size),
                         squareSize: size,
                         dashed: arrow.dashed ?? false,
-                        color: (arrow.color ?? .green).color(on: theme),
+                        color: Color(hex: (arrow.color ?? .green).hex(on: theme)),
                         glows: theme.glows
                     )
                     .transition(.opacity)
@@ -300,7 +300,7 @@ struct TrainingBoardView: View {
         ZStack(alignment: .topLeading) {
             ForEach(labels, id: \.self) { label in
                 if let square = square(named: label.square) {
-                    let color = (label.color ?? .blue).color(on: theme)
+                    let color = Color(hex: (label.color ?? .blue).hex(on: theme))
                     let cell = cell(of: square)
                     Text(label.text)
                         .font(.app(size: size * 0.24, weight: .heavy))

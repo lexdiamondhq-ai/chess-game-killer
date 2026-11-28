@@ -267,7 +267,7 @@ struct DNATraitBar: View {
                     Text(trait.kind.ends.high)
                 }
                 .font(.app(.caption2))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(Color.faintInk)
             }
         }
         .accessibilityElement(children: .ignore)
@@ -287,17 +287,17 @@ struct DNATraitBar: View {
             let x: CGFloat = (width - dot) * value
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(Color.primary.opacity(0.1))
+                    .fill(Polish.track(dark: theme.screenIsDark))
                     .frame(height: 4)
                 Capsule()
-                    .fill(theme.trainingAccent.opacity(0.55))
+                    .fill(theme.trainingFill.opacity(0.55))
                     .frame(width: x + dot / 2, height: 4)
                     .opacity(trait.value == nil ? 0 : 1)
                 // The typical player, in the middle.
                 DNATypicalMark()
                     .offset(x: width / 2 - 1)
                 Circle()
-                    .fill(theme.trainingAccent)
+                    .fill(theme.trainingFill)
                     .frame(width: dot, height: dot)
                     .offset(x: x)
                     .opacity(trait.value == nil ? 0.25 : 1)
@@ -326,8 +326,8 @@ struct DNAChip: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
                 Text(label)
-                    .font(.app(size: 10, weight: .heavy))
-                    .tracking(0.8)
+                    .font(.app(.caption2, weight: .semibold))
+                    .tracking(1.2)
                     .foregroundStyle(tint)
                 Text(title)
                     .font(.app(.footnote, weight: .semibold))
@@ -338,7 +338,11 @@ struct DNAChip: View {
         }
         .padding(10)
         .dnaChipFrame()
-        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(tint.opacity(0.12)))
+        // Set like Home's chips: a wash and a fine edge of the same stone.
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .fill(tint.opacity(theme.screenIsDark ? 0.17 : 0.10)))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .strokeBorder(tint.opacity(0.35), lineWidth: 1))
     }
 }
 
@@ -482,12 +486,13 @@ struct LearnedAboutYouRow: View {
         VStack(spacing: 0) {
             if let line {
                 HStack(alignment: .top, spacing: 12) {
-                    CoachAvatar(theme: theme, size: 34)
+                    // This row sits in the coach on the game screen, which is always dark.
+                    CoachAvatar(theme: theme, size: 34, boardRing: true)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("\(Coach.current.name.uppercased()) LEARNED")
-                            .font(.app(size: 10, weight: .heavy))
-                            .tracking(0.8)
-                            .foregroundStyle(theme.trainingAccent)
+                            .font(.app(.caption2, weight: .semibold))
+                            .tracking(1.2)
+                            .foregroundStyle(theme.homeMetalAccent)
                         Text(line)
                             .font(.app(.subheadline, weight: .medium))
                             .fixedSize(horizontal: false, vertical: true)

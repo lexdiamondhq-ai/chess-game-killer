@@ -5,6 +5,8 @@ import SwiftUI
 /// The challenge's link as a QR code, dark on ivory, for a friend next to you to scan with their camera.
 struct InviteQRCode: View {
     let url: URL
+    /// On a light page the ivory plate takes a fine gold rim, or it melts into the cream card.
+    var rimmed: Bool = false
 
     var body: some View {
         Group {
@@ -19,6 +21,12 @@ struct InviteQRCode: View {
         }
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color(hex: 0xF3EEE6)))
+        .overlay {
+            if rimmed {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(Polish.goldBase(dark: false).opacity(0.45), lineWidth: 0.75)
+            }
+        }
     }
 
     /// The QR code at one point a module; the view scales it up without smoothing.
@@ -53,7 +61,7 @@ struct UsernamePicker: View {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 6) {
                 Text(center.friends.you == nil ? "Pick your username" : "Change your username")
-                    .font(.display(size: 26, weight: .semibold))
+                    .font(.display(size: 26, weight: .medium))
                 Text("Friends find you by it and send you challenges. Letters, numbers, _ and . only.")
                     .font(theme.challengeFont(15))
                     .foregroundStyle(.secondary)
@@ -84,7 +92,7 @@ struct UsernamePicker: View {
             if let problem {
                 Text(problem)
                     .font(theme.challengeFont(13))
-                    .foregroundStyle(ChallengeColors.urgent)
+                    .foregroundStyle(ChallengeColors.danger)
                     .transition(.opacity)
             }
             Spacer(minLength: 0)
@@ -133,6 +141,9 @@ struct FriendInviteBanner: View {
     let open: () -> Void
     let close: () -> Void
 
+    /// The window it floats over: the game screen is dark whatever the home's tone.
+    @Environment(\.colorScheme) private var scheme
+
     var body: some View {
         HStack(spacing: 12) {
             PersonAvatar(person: note.from, size: 40, theme: theme)
@@ -146,13 +157,18 @@ struct FriendInviteBanner: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 6)
-            Button("Play", action: open)
-                .font(theme.challengeFont(14, .bold))
-                .foregroundStyle(theme.screenTone != nil ? Polish.onMetal : theme.onChallengeAccent)
-                .padding(.horizontal, 16)
-                .frame(height: 34)
-                .background { MainPillFill(gilded: theme.screenTone != nil, plain: theme.challengeAccent) }
-                .buttonStyle(ChallengePressStyle())
+            // The pill is the button's own label, so the whole gold shape takes the tap and not
+            // only the word.
+            Button(action: open) {
+                Text("Play")
+                    .font(theme.challengeFont(15, .semibold))
+                    .foregroundStyle(theme.screenTone != nil ? Polish.onMetal : theme.onChallengeAccent)
+                    .padding(.horizontal, 16)
+                    .frame(height: 34)
+                    .background { MainPillFill(gilded: theme.screenTone != nil, plain: theme.challengeAccent) }
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(ChallengePressStyle())
             Button(action: close) {
                 Image(systemName: "xmark")
                     .font(.system(size: 13, weight: .bold))
@@ -165,10 +181,20 @@ struct FriendInviteBanner: View {
         .padding(.leading, 12)
         .padding(.trailing, 8)
         .padding(.vertical, 10)
-        .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(.ultraThinMaterial))
+        .background {
+            let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+            ZStack {
+                // The lift is drawn under the pane only, so nothing inside the glass casts its own.
+                shape.fill(Polish.cast(dark: scheme == .dark, strength: 1.75))
+                    .blur(radius: 12)
+                    .offset(y: 8)
+                    // A shadow takes no touches: the banner floats over the whole app.
+                    .allowsHitTesting(false)
+                shape.fill(.ultraThinMaterial)
+            }
+        }
         // A friend is asking: the bright edge.
         .overlay { PolishedEdge(shape: RoundedRectangle(cornerRadius: 22, style: .continuous), edge: .lit) }
-        .shadow(color: .black.opacity(0.35), radius: 18, y: 8)
         .padding(.horizontal, 14)
         .accessibilityElement(children: .contain)
     }

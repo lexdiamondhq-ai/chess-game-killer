@@ -151,7 +151,7 @@ struct DrillView: View {
                     } label: {
                         Label("Hint", systemImage: "lightbulb.fill")
                     }
-                    .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false, tint: TrainingColor.yellow.color(on: theme)))
+                    .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false, tint: theme.hintTint, hint: true))
                     .frame(maxWidth: 130)
                     Button {
                         withAnimation(.snappy) { runner.reveal() }
@@ -183,7 +183,7 @@ struct DrillView: View {
                 } label: {
                     Label("Hint", systemImage: "lightbulb.fill")
                 }
-                .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false, tint: TrainingColor.yellow.color(on: theme)))
+                .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false, tint: theme.hintTint, hint: true))
                 .disabled(runner.usedHint)
                 Button {
                     withAnimation(.snappy) { runner.reveal() }

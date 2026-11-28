@@ -8,6 +8,7 @@ SF Symbol of the same size. Run it again after changing a shape:
 import json
 import math
 import os
+import re
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "ChessGameKiller", "Assets.xcassets", "Glyphs")
 
@@ -22,6 +23,19 @@ def circle(cx, cy, r, clockwise=True):
     sweep = 1 if clockwise else 0
     return (f"M{cx - r:.2f} {cy:.2f}A{r} {r} 0 1 {sweep} {cx + r:.2f} {cy:.2f}"
             f"A{r} {r} 0 1 {sweep} {cx - r:.2f} {cy:.2f}Z")
+
+
+def shifted(d, dx):
+    """An absolute path of M, L, H, V, C and Z moved sideways by dx."""
+    out = []
+    for cmd, body in re.findall(r"([MLHVCZ])([^MLHVCZ]*)", d):
+        nums = [float(n) for n in body.split()]
+        if cmd == "H":
+            nums = [n + dx for n in nums]
+        elif cmd in "MLC":
+            nums = [n + dx if i % 2 == 0 else n for i, n in enumerate(nums)]
+        out.append(cmd + " ".join(f"{n:g}" for n in nums))
+    return "".join(out)
 
 
 def transform(path_fn, dx=0.0, dy=0.0, s=1.0):
@@ -158,10 +172,11 @@ def gear(cx, cy, r_out, r_in, teeth, tooth_frac=0.5):
 
 def clock():
     """A chess clock: two faces, one button pressed down."""
-    body = rrect(2.4, 8.2, 19.2, 12.4, 3.0)
-    faces = circle(8.0, 14.4, 3.65, clockwise=False) + " " + circle(16.0, 14.4, 3.65, clockwise=False)
-    buttons = rrect(5.6, 5.4, 4.8, 1.9, 0.9) + " " + rrect(13.6, 6.5, 4.8, 1.1, 0.55)
-    hands = [("M8 14.4V12.0", 1.4), ("M8 14.4L9.5 15.3", 1.4), ("M16 14.4L17.6 13.0", 1.4)]
+    # Drawn one point higher than it first was, so its weight sits on the middle of the grid.
+    body = rrect(2.4, 7.2, 19.2, 12.4, 3.0)
+    faces = circle(8.0, 13.4, 3.65, clockwise=False) + " " + circle(16.0, 13.4, 3.65, clockwise=False)
+    buttons = rrect(5.6, 4.4, 4.8, 1.9, 0.9) + " " + rrect(13.6, 5.5, 4.8, 1.1, 0.55)
+    hands = [("M8 13.4V11.0", 1.4), ("M8 13.4L9.5 14.3", 1.4), ("M16 13.4L17.6 12.0", 1.4)]
     return svg([body + " " + faces, buttons], hands)
 
 
@@ -173,8 +188,10 @@ def puzzle():
          "C22.6 11 23.4 12.2 23.4 13.6C23.4 15.0 22.6 16.2 21.4 16.2C21 16.2 20.5 16.1 20 15.8V20.4"
          "C20 20.9 19.7 21.2 19.2 21.2H4.8C4.3 21.2 4 20.9 4 20.4V15.8C4.5 16.1 5 16.2 5.4 16.2"
          "C6.6 16.2 7.4 15.0 7.4 13.6C7.4 12.2 6.6 11 5.4 11C5 11 4.5 11.1 4 11.4V8C4 7.5 4.3 7.2 4.8 7.2Z")
-    hole = pawn(dx=12 - 12 * 0.5, dy=8.4, s=0.5)
-    return svg([d + " " + hole])
+    # The side knob pulls the piece's weight to the right, so the whole piece sits 0.9 left.
+    nudge = -0.9
+    hole = pawn(dx=12 - 12 * 0.5 + nudge, dy=8.4, s=0.5)
+    return svg([shifted(d, nudge) + " " + hole])
 
 
 def analyze():
@@ -187,7 +204,7 @@ def analyze():
 
 def rewind():
     """A pawn inside an arrow turning back: replay a game."""
-    r, cx, cy = 8.8, 12, 12.4
+    r, cx, cy = 8.8, 12, 11.8
     a0, a1 = math.radians(-58), math.radians(-122 + 360)
     x0, y0 = cx + r * math.cos(a0), cy + r * math.sin(a0)
     x1, y1 = cx + r * math.cos(a1), cy + r * math.sin(a1)
@@ -196,7 +213,7 @@ def rewind():
     # The head sits on the upper right end, pointing back the way of a rewind (up and left).
     d = (math.sin(a0), -math.cos(a0))
     head = arrowhead((x0 + d[0] * 3.2, y0 + d[1] * 3.2), d, length=4.2, half=2.9)
-    inner = pawn(dx=12 - 12 * 0.5, dy=12.4 - 11.6 * 0.5, s=0.5)
+    inner = pawn(dx=12 - 12 * 0.5, dy=11.8 - 11.6 * 0.5, s=0.5)
     return svg([inner, head], [(arc, 2.1)])
 
 

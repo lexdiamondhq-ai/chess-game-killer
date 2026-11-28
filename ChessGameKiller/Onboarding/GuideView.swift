@@ -38,23 +38,35 @@ struct GuideView: View {
                     TipBook.resetAll()
                     tipsReset = true
                 } label: {
-                    Label(tipsReset ? "Tips will show again" : "Show tips again",
-                          systemImage: tipsReset ? "checkmark" : "lightbulb")
-                        .font(.app(.body, weight: .semibold))
+                    // The icons share one width, so the three links' words start on one edge.
+                    Label {
+                        Text(tipsReset ? "Tips will show again" : "Show tips again")
+                    } icon: {
+                        Image(systemName: tipsReset ? "checkmark" : "lightbulb").frame(width: 26)
+                    }
+                    .font(.app(.body, weight: .semibold))
                 }
                 .disabled(tipsReset)
                 Button {
                     replayWelcome()
                 } label: {
-                    Label("Replay the welcome", systemImage: "sparkles")
-                        .font(.app(.body, weight: .semibold))
+                    Label {
+                        Text("Replay the welcome")
+                    } icon: {
+                        Image(systemName: "sparkles").frame(width: 26)
+                    }
+                    .font(.app(.body, weight: .semibold))
                 }
                 if IntroFilm.url != nil {
                     Button {
                         watchingIntro = true
                     } label: {
-                        Label("Watch the intro", systemImage: "film")
-                            .font(.app(.body, weight: .semibold))
+                        Label {
+                            Text("Watch the intro")
+                        } icon: {
+                            Image(systemName: "film").frame(width: 26)
+                        }
+                        .font(.app(.body, weight: .semibold))
                     }
                 }
             }
@@ -72,10 +84,7 @@ struct GuideView: View {
 
     private func group<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(title.uppercased())
-                .font(.app(.caption, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .tracking(1)
+            SectionLabel(text: title)
             content()
         }
         .padding(16)
@@ -98,7 +107,7 @@ private struct GuideRow: View {
                 .frame(width: 30)
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.app(.headline))
+                    .font(.display(.headline, weight: .semibold))
                 Text(text)
                     .font(.app(.subheadline))
                     .foregroundStyle(.secondary)

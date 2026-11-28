@@ -79,7 +79,7 @@ struct BoardScanView: View {
                     }
                     Text("Positions from real games on Lichess.")
                         .font(.app(.footnote))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(Color.faintInk)
                         .padding(.top, 4)
                 }
                 .padding(.horizontal, 16)
@@ -114,7 +114,7 @@ struct BoardScanView: View {
                 TrainIcon(symbol: option.symbol, theme: theme, size: 42)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(option.title)
-                        .font(.app(.headline))
+                        .font(.display(.headline, weight: .semibold))
                     Text(option.detail)
                         .font(.app(.subheadline))
                         .foregroundStyle(.secondary)
@@ -129,10 +129,16 @@ struct BoardScanView: View {
                 }
                 Image(systemName: selected ? "checkmark.circle.fill" : "circle")
                     .font(.app(.title3))
-                    .foregroundStyle(selected ? accent : Color.secondary.opacity(0.5))
+                    .foregroundStyle(selected ? accent : Polish.track(dark: theme.screenIsDark, strong: true))
             }
             .padding(14)
             .trainingCard(theme, tint: selected ? accent : nil, cornerRadius: 18)
+            .overlay {
+                if selected {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(accent, lineWidth: 1.5)
+                }
+            }
             .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -295,8 +301,7 @@ struct BoardScanView: View {
         let best = store.scanBest(runner.mode)
         return VStack(spacing: 10) {
             Text(runner.mode.title.uppercased())
-                .font(.app(.caption, weight: .bold))
-                .tracking(1)
+                .eyebrow()
                 .foregroundStyle(accent)
             Text("\(summary.percent)%")
                 .font(.app(size: 56, weight: .bold).monospacedDigit())

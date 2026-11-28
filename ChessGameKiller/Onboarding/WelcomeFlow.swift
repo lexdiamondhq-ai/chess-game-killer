@@ -30,7 +30,10 @@ struct WelcomeFlow: View {
     }
 
     private var theme: BoardTheme { .named(choice.look) }
-    private var accent: Color { tone?.metal ?? theme.accent ?? .accentColor }
+    /// Gold for words, glyphs and fine edges: the page's ink on the home's pages.
+    private var accent: Color { tone != nil ? theme.trainingAccent : (theme.accent ?? .accentColor) }
+    /// The same metal for a small solid shape, a step lighter than the ink on a light page.
+    private var accentFill: Color { tone != nil ? theme.trainingFill : (theme.accent ?? .accentColor) }
     /// The home's colors around the chosen board, as on every screen around a board.
     private var tone: HomeTone? { HomeTone.screen(for: theme, sheet: sheet, mode: toneMode) }
     private var rival: Rival { choice.experience.level.rival }
@@ -97,7 +100,7 @@ struct WelcomeFlow: View {
         HStack(spacing: 7) {
             ForEach(0..<Self.pages, id: \.self) { index in
                 Capsule()
-                    .fill(index == page ? accent : Color.primary.opacity(0.22))
+                    .fill(index == page ? accentFill : Color.primary.opacity(0.22))
                     .frame(width: index == page ? 18 : 6, height: 6)
             }
         }
@@ -164,12 +167,12 @@ struct WelcomeFlow: View {
     private func heading(_ title: String, _ subtitle: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(.display(.largeTitle, weight: .semibold))
+                .font(.display(.largeTitle, weight: .medium))
                 .fixedSize(horizontal: false, vertical: true)
             if let subtitle {
                 Text(subtitle)
                     .font(.app(.body))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.quietInk)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -178,8 +181,10 @@ struct WelcomeFlow: View {
 
     private var hello: some View {
         VStack(alignment: .leading, spacing: 28) {
+            // The king is drawn narrow in its box: pulled left so it hangs on the page's column.
             Glyph(name: Glyphs.king, size: 44)
                 .foregroundStyle(accent)
+                .padding(.leading, -10)
             heading("Chess, with a coach beside you")
             VStack(alignment: .leading, spacing: 18) {
                 // Each wears the stone its door wears inside the app: New game, Lessons, Your army.
@@ -327,7 +332,7 @@ private struct ExperienceCard: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .glassPane(shape, tint: isSelected ? accent.opacity(0.18) : nil)
-            .overlay { shape.strokeBorder(isSelected ? accent.opacity(0.7) : .clear, lineWidth: 1) }
+            .overlay { shape.strokeBorder(isSelected ? accent : .clear, lineWidth: 1.5) }
             .contentShape(shape)
         }
         .buttonStyle(.plain)

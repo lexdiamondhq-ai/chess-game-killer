@@ -10,6 +10,7 @@ struct PieceSetPicker: View {
     /// The board the sets are shown on: the one picked under Board.
     let board: SculptedLook
     let accent: Color
+    @Environment(\.colorScheme) private var scheme
 
     /// The card in the middle, as the swipe settles.
     @State private var centered: PieceSet?
@@ -128,10 +129,12 @@ struct PieceSetPicker: View {
         .overlay { shape.strokeBorder(.white.opacity(0.08), lineWidth: 0.5) }
         .padding(3)
         .overlay {
+            // On a light card the gap inside the ring reads as a second line: the ring sits on the picture there.
             RoundedRectangle(cornerRadius: 29, style: .continuous)
+                .inset(by: scheme == .dark ? 0 : 1)
                 .strokeBorder(accent, lineWidth: set == selection ? 2 : 0)
         }
-        .shadow(color: .black.opacity(0.35), radius: 10, y: 6)
+        .shadow(color: Polish.cast(dark: scheme == .dark, strength: 1.75), radius: 10, y: 6)
         .animation(.easeOut(duration: 0.2), value: set == selection)
     }
 

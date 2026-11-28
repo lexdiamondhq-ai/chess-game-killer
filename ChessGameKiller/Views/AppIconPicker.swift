@@ -38,6 +38,7 @@ enum AppIconChoice: String, CaseIterable, Identifiable {
 /// A row of icon tiles; tapping one changes the home screen icon (iOS confirms with its own alert).
 struct AppIconPicker: View {
     let accent: Color
+    @Environment(\.colorScheme) private var scheme
 
     @State private var selected = AppIconChoice.current
 
@@ -58,6 +59,8 @@ struct AppIconPicker: View {
     private func tile(_ choice: AppIconChoice) -> some View {
         let isOn = choice == selected
         let shape = RoundedRectangle(cornerRadius: 15, style: .continuous)
+        // On a light card the gap inside the ring reads as a second line: the ring sits on the picture there.
+        let ringInset: CGFloat = scheme == .dark ? 0 : 1
         return VStack(spacing: 8) {
             choice.preview
                 .resizable()
@@ -68,9 +71,10 @@ struct AppIconPicker: View {
                 .padding(3)
                 .overlay {
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .inset(by: ringInset)
                         .strokeBorder(accent, lineWidth: isOn ? 2 : 0)
                 }
-                .shadow(color: .black.opacity(0.35), radius: 6, y: 3)
+                .shadow(color: Polish.cast(dark: scheme == .dark, strength: 1.75), radius: 5, y: 3)
             Text(choice.title)
                 .font(.app(.caption, weight: isOn ? .semibold : .regular))
                 .foregroundStyle(isOn ? .primary : .secondary)

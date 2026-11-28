@@ -140,7 +140,7 @@ struct SessionView: View {
                 Image(systemName: "xmark")
                     .font(.system(size: 15, weight: .bold))
                     .frame(width: 36, height: 36)
-                    .background(.thinMaterial, in: Circle())
+                    .glassPane(Circle())
                     .frame(width: 44, height: 44)
                     .contentShape(Circle())
             }
@@ -217,7 +217,7 @@ struct ProgressDots: View {
             case .missed: return TrainingColor.red.color(on: theme)
             }
         }
-        return i == index ? theme.trainingAccent : Color.secondary.opacity(0.25)
+        return i == index ? theme.trainingFill : Polish.track(dark: theme.screenIsDark)
     }
 }
 
@@ -236,7 +236,7 @@ struct SessionIntro: View {
                     Image(systemName: "xmark")
                         .font(.system(size: 15, weight: .bold))
                         .frame(width: 36, height: 36)
-                        .background(.thinMaterial, in: Circle())
+                        .glassPane(Circle())
                     .frame(width: 44, height: 44)
                     .contentShape(Circle())
                 }
@@ -252,7 +252,7 @@ struct SessionIntro: View {
                 CoachAvatar(theme: theme, size: 84)
                 VStack(spacing: 6) {
                     Text(plan.title)
-                        .font(.display(.title, weight: .semibold))
+                        .font(.display(.title, weight: .medium))
                         .multilineTextAlignment(.center)
                     if let focus = plan.focus {
                         Label(focus.title, systemImage: focus.symbol)
@@ -330,7 +330,7 @@ struct SessionSummary: View {
     var body: some View {
         let accuracy = runner.accuracy
         let days = daily?.streak ?? max(runner.reward.streak, store.streak)
-        let green = theme.glows ? TrainingColor.green.color(on: theme) : theme.trainingAccent
+        let green = theme.glows ? TrainingColor.green.color(on: theme) : theme.trainingFill
         ScrollView {
             VStack(spacing: 20) {
                 ZStack {
@@ -354,7 +354,7 @@ struct SessionSummary: View {
                 HStack(spacing: 10) {
                     stat("+\(runner.reward.xp)", "XP", "sparkles", theme.trainingAccent)
                     stat("\(days)", days == 1 ? "day" : "days", "flame.fill",
-                         TrainingColor.orange.color(on: theme))
+                         theme.streakFlame)
                 }
 
                 if let promotion = runner.reward.promotion {
@@ -444,7 +444,7 @@ struct SessionSummary: View {
                         }
                     }
                     ProgressView(value: shown ? store.rankProgress : 0)
-                        .tint(theme.trainingAccent)
+                        .tint(theme.trainingFill)
                 }
             }
             .padding(16)
@@ -453,7 +453,7 @@ struct SessionSummary: View {
     }
 
     private func promotionCard(_ rank: Rank) -> some View {
-        let gold = TrainingColor.yellow.color(on: theme)
+        let gold = theme.festive(.yellow)
         return VStack(spacing: 10) {
             PieceImage(piece: Piece(rank.pieceKind, color: .white, square: .a1), theme: theme, size: 72)
                 .scaleEffect(shown ? 1 : 0.4)

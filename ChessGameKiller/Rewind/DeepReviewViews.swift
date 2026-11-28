@@ -37,7 +37,11 @@ struct DeepReviewRow: View {
                     .font(.app(.footnote, weight: .bold))
                     .foregroundStyle(gold)
                     .frame(width: 36, height: 36)
-                    .background(Circle().fill(gold.opacity(0.16)))
+                    // The same gold well as the step and play discs in the review itself.
+                    .background {
+                        Circle().fill(gold.opacity(0.12))
+                            .overlay { Circle().strokeBorder(gold.opacity(0.35), lineWidth: 0.75) }
+                    }
             }
             .padding(.horizontal, 12)
             .frame(minHeight: 56)
@@ -74,7 +78,7 @@ private struct DeepReviewWaiting: View {
                         .font(.app(.body))
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
-                            Capsule().fill(Color.primary.opacity(0.1))
+                            Capsule().fill(Polish.track(dark: theme.screenIsDark))
                             Capsule().fill(tint)
                                 .frame(width: geo.size.width * (filled ? 0.94 : 0.03))
                         }
@@ -106,6 +110,8 @@ struct DeepReviewCard: View {
     let onClose: () -> Void
 
     private var gold: Color { RewindPalette.goldInk(on: theme) }
+    /// Gold for the lit part of a bar: a step lighter than the ink on a light page.
+    private var goldFill: Color { theme.screenIsDark ? RewindPalette.gold : theme.trainingFill }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -133,7 +139,7 @@ struct DeepReviewCard: View {
                      ? "\(player.coach.name)'s voice is on its way"
                      : "\(player.coach.name)'s deep review")
                     .font(.app(.caption2, weight: .semibold))
-                    .tracking(2)
+                    .tracking(1.2)
                     .textCase(.uppercase)
                     .foregroundStyle(.secondary)
                 Text(chapter)
@@ -147,7 +153,11 @@ struct DeepReviewCard: View {
                 Image(systemName: "xmark")
                     .font(.app(.footnote, weight: .bold))
                     .frame(width: 44, height: 44)
-                    .background(Circle().fill(Color.primary.opacity(0.07)).padding(4))
+                    .background {
+                        Circle().fill(theme.trainingAccent.opacity(0.12))
+                            .overlay { Circle().strokeBorder(theme.trainingAccent.opacity(0.35), lineWidth: 0.75) }
+                            .padding(4)
+                    }
             }
             .tint(.primary)
             .accessibilityLabel("Close the review")
@@ -167,7 +177,7 @@ struct DeepReviewCard: View {
         HStack(spacing: 4) {
             ForEach(0..<max(player.partCount, 1), id: \.self) { part in
                 Capsule()
-                    .fill(part <= player.index ? AnyShapeStyle(gold) : AnyShapeStyle(Color.primary.opacity(0.12)))
+                    .fill(part <= player.index ? goldFill : Polish.track(dark: theme.screenIsDark))
                     .frame(height: 3)
             }
         }
@@ -211,6 +221,8 @@ struct DeepReviewCard: View {
                         .frame(minHeight: 44)
                         .foregroundStyle(Polish.pillInk(gilded: theme.screenTone != nil))
                         .background { MainPillFill(gilded: theme.screenTone != nil, plain: Color.primary.opacity(0.92)) }
+                        // The metal takes no touches, so the whole capsule is named as the target.
+                        .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
             } else {
@@ -222,7 +234,7 @@ struct DeepReviewCard: View {
     }
 
     private var waiting: some View {
-        DeepReviewWaiting(theme: theme, coach: player.coach, tint: gold)
+        DeepReviewWaiting(theme: theme, coach: player.coach, tint: goldFill)
             .padding(.top, 18)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -242,6 +254,8 @@ struct DeepReviewCard: View {
                     .frame(minHeight: 44)
                     .foregroundStyle(Polish.pillInk(gilded: theme.screenTone != nil))
                     .background { MainPillFill(gilded: theme.screenTone != nil, plain: Color.primary.opacity(0.92)) }
+                    // The metal takes no touches, so the whole capsule is named as the target.
+                    .contentShape(Capsule())
             }
             .buttonStyle(.plain)
         }
@@ -254,7 +268,8 @@ struct DeepReviewCard: View {
             Image(systemName: symbol)
                 .font(.app(.footnote, weight: .bold))
                 .frame(width: 44, height: 44)
-                .background(Circle().fill(Color.primary.opacity(0.07)))
+                .background(Circle().fill(theme.trainingAccent.opacity(0.12)))
+                .overlay { Circle().strokeBorder(theme.trainingAccent.opacity(0.35), lineWidth: 0.75) }
         }
         .tint(.primary)
         .disabled(disabled)

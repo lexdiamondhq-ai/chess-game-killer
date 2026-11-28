@@ -107,6 +107,12 @@ final class RivalLadderTests: XCTestCase {
             XCTAssertNotNil(film.filmURL, "\(film.rival.name) film")
             XCTAssertNotNil(film.themeURL, "\(film.rival.name) theme")
             XCTAssertNotNil(film.cardImage, "\(film.rival.name) card")
+            // Home's weather falls behind the rival, through a cut-out the shape of the still.
+            let cut = film.cutImage
+            XCTAssertNotNil(cut, "\(film.rival.name) cut-out")
+            if let cut, let card = film.cardImage {
+                XCTAssertEqual(cut.size.width / cut.size.height, card.size.width / card.size.height, accuracy: 0.001)
+            }
             XCTAssertLessThan(film.beat, 8)
         }
         XCTAssertNil(RivalFilm.of(.beginner).previous)

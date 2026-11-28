@@ -424,14 +424,15 @@ struct HomeAuroraView: View {
             }
             .padding(.horizontal, 16)
             // The page ends on For today: no carved sign-off under it (Alex, 2026-11-27: "Let's
-            // delete these"), only as much room as the bottom bar needs.
+            // delete these"), only as much room as the bottom bar and the fade above it need, so
+            // the last row of cards can be pulled clear of both.
         }
         // A part that arrives after the page (the first read of your games, a friend's move)
         // eases in and the rest makes room, instead of the page jumping.
         .animation(.snappy(duration: 0.3), value: info.dna != nil)
         .animation(.snappy(duration: 0.3), value: info.finest != nil)
         .animation(.snappy(duration: 0.3), value: HomeAuroraQuickBar.mode(games: info.games) != nil)
-        .padding(.bottom, 84)
+        .padding(.bottom, 120)
         .frame(maxWidth: .infinity)
         .background {
             shape.fill(palette.sheet)
@@ -500,7 +501,9 @@ struct HomeAuroraView: View {
                 ScrollView(.horizontal) {
                     HStack(alignment: .top, spacing: 16) {
                         ForEach(levels) { level in
-                            rivalCard(level, card: card, upNext: upNext, ladder: ladder)
+                            // The rival in front and the ones beside it, which show as you swipe.
+                            rivalCard(level, card: card, upNext: upNext, ladder: ladder,
+                                      weatherMoves: abs(level.rawValue - shown.rawValue) <= 1)
                                 .containerRelativeFrame(.horizontal)
                                 .id(level)
                         }
@@ -533,7 +536,7 @@ struct HomeAuroraView: View {
     }
 
     private func rivalCard(_ level: MatchController.Level, card: HomeAuroraGameCard, upNext: HomeUpNext,
-                           ladder: RivalLadder) -> some View {
+                           ladder: RivalLadder, weatherMoves: Bool) -> some View {
         let rival: Rival = level.rival
         let isOpen: Bool = ladder.isOpen(level)
         let lockedBy: Rival? = isOpen ? nil : MatchController.Level(rawValue: level.rawValue - 1)?.rival
@@ -544,6 +547,7 @@ struct HomeAuroraView: View {
             return ladder.beaten(rival) ? "\(place) · Beaten" : place
         }()
         return HomeAuroraNextRival(card: card, rival: rival, palette: palette, status: status, lockedBy: lockedBy,
+                                   weatherMoves: weatherMoves,
                                    play: { level == upNext.level ? open(card) : actions.playRival(level) },
                                    change: { level == upNext.level ? actions.stage.change() : actions.options(level) },
                                    meet: { actions.rivals(level) })
@@ -909,6 +913,8 @@ struct HomeAuroraNextRival: View {
     var status: String? = nil
     /// Set when this rival is still locked: the one to beat first.
     var lockedBy: Rival? = nil
+    /// False for a card swiped out of sight, whose weather then holds still.
+    var weatherMoves: Bool = true
     let play: () -> Void
     let change: () -> Void
     let meet: () -> Void
@@ -917,7 +923,7 @@ struct HomeAuroraNextRival: View {
         let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
         HStack(spacing: 14) {
             Button(action: meet) {
-                HomeRivalFrame(rival: rival, side: 112)
+                HomeRivalFrame(rival: rival, side: 112, weatherMoves: weatherMoves)
                     .saturation(lockedBy == nil ? 1 : 0.15)
                     .opacity(lockedBy == nil ? 1 : 0.75)
                     .overlay {
@@ -1010,6 +1016,10 @@ struct HomeAuroraNextRival: View {
 struct HomeRivalFrame: View {
     let rival: Rival
     let side: CGFloat
+    /// The weather behind the rival moves (HomeRivalWeather); a card out of sight holds still.
+    var weatherMoves: Bool = true
+    /// Tests stop the weather at a moment of their choosing.
+    var weatherTime: Double? = nil
 
     /// The stills, read once each.
     @MainActor private static var stills: [String: UIImage] = [:]
@@ -1038,6 +1048,10 @@ struct HomeRivalFrame: View {
                     .offset(y: -top * inner * 16 / 9)
                     .frame(width: inner, height: inner, alignment: .top)
                     .clipped()
+                    // Leaves, snow, rain, embers or lightning, behind the rival (Alex, 2026-11-28).
+                    .overlay {
+                        HomeRivalWeather(rival: rival, side: inner, top: top, moves: weatherMoves, at: weatherTime)
+                    }
             } else {
                 Image(rival.portraitName)
                     .resizable()
@@ -1403,13 +1417,15 @@ struct HomeAuroraJewel: View {
         var colors: [Color] {
             switch self {
             case .amethyst: return [Color(hex: 0x5B3FB8), Color(hex: 0x2E1F6E)]
-            case .jade: return [Color(hex: 0x1F8A7A), Color(hex: 0x0D4A45)]
+            // All eight sit at one depth, so the gold drawing stands as clearly on amber and
+            // jade as on amethyst and ruby.
+            case .jade: return [Color(hex: 0x1B7266), Color(hex: 0x043935)]
             case .ruby: return [Color(hex: 0xB3283B), Color(hex: 0x5E0F1C)]
             case .sapphire: return [Color(hex: 0x2B5FB8), Color(hex: 0x13306B)]
-            case .emerald: return [Color(hex: 0x2F8A57), Color(hex: 0x124A2C)]
-            case .amber: return [Color(hex: 0xB8782A), Color(hex: 0x6A3F10)]
-            case .slate: return [Color(hex: 0x4F5B6E), Color(hex: 0x232A36)]
-            case .violet: return [Color(hex: 0x8A3FA8), Color(hex: 0x45185A)]
+            case .emerald: return [Color(hex: 0x1B7546), Color(hex: 0x043B20)]
+            case .amber: return [Color(hex: 0xA25C0C), Color(hex: 0x4E2203)]
+            case .slate: return [Color(hex: 0x495C78), Color(hex: 0x1E293B)]
+            case .violet: return [Color(hex: 0x8F3A93), Color(hex: 0x47134C)]
             }
         }
     }
@@ -1439,9 +1455,11 @@ struct HomeAuroraJewel: View {
                                      startPoint: .topLeading, endPoint: .bottomTrailing)
 
     var body: some View {
-        let tile = RoundedRectangle(cornerRadius: 16, style: .continuous)
         GeometryReader { geo in
             let side = min(geo.size.width, geo.size.height)
+            // The corner is one cut at every size; the inner thread's corner is that less its own
+            // inset, so it runs parallel to the edge all the way round.
+            let tile = RoundedRectangle(cornerRadius: 16, style: .continuous)
             tile
                 .fill(LinearGradient(colors: stone.colors, startPoint: .topLeading, endPoint: .bottomTrailing))
                 .overlay {
@@ -1451,8 +1469,8 @@ struct HomeAuroraJewel: View {
                                              endRadius: side * 0.7))
                 }
                 .overlay {
-                    RoundedRectangle(cornerRadius: side * 0.22, style: .continuous)
-                        .strokeBorder(Color(hex: 0xE2C27E).opacity(0.7), lineWidth: 0.7)
+                    RoundedRectangle(cornerRadius: max(4, 16 - side * 0.055), style: .continuous)
+                        .strokeBorder(AnyShapeStyle(Self.gold).opacity(0.9), lineWidth: 0.75)
                         .padding(side * 0.055)
                 }
                 .overlay {

@@ -21,8 +21,10 @@ struct PremiumOfferView: View {
     private var premium: Premium { .shared }
 
     private var theme: BoardTheme { .named(themeID) }
-    /// The home's metal on its pages, or the board's own gold.
-    private var accent: Color { theme.screenTone?.metal ?? theme.accent ?? PremiumStyle.gold }
+    /// The page's gold ink on the home's pages, or the board's own gold.
+    private var accent: Color {
+        theme.screenTone != nil ? theme.trainingAccent : (theme.accent ?? PremiumStyle.gold)
+    }
     private var onAccent: Color { theme.screenIsDark ? .black : .white }
     /// On the home's pages the sheet is dressed as Home is: a gold medallion and the gold button.
     private var gilded: Bool { theme.screenTone != nil }
@@ -131,6 +133,8 @@ struct PremiumOfferView: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 54)
                 .background { mainFill }
+                // The metal takes no touches, so the whole button is named as the target.
+                .contentShape(Rectangle())
         }
         .buttonStyle(ChallengePressStyle())
     }
@@ -160,6 +164,8 @@ struct PremiumOfferView: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 54)
                 .background { mainFill }
+                // The metal takes no touches, so the whole button is named as the target.
+                .contentShape(Rectangle())
             }
             .buttonStyle(ChallengePressStyle())
             .disabled(busy)
@@ -220,10 +226,10 @@ private struct PremiumOfferHeader: View {
                     .glassPane(Circle(), tint: accent)
             }
             Text("Premium")
-                .font(.display(size: 38, weight: .semibold))
+                .font(.display(size: 38, weight: .medium))
             Text("Get better faster. Your coach learns how you play and builds every session around it.")
                 .font(.app(.body))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.quietInk)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -263,23 +269,23 @@ private struct PremiumBenefitList: View {
     }
 
     static let benefits: [Benefit] = [
-        Benefit(symbol: "person.text.rectangle", title: "A coach that learns you",
+        Benefit(symbol: "person.text.rectangle.fill", title: "A coach that learns you",
                 detail: "Your style, strengths and leaks from every game, and a plan rebuilt after each one."),
-        Benefit(symbol: "backward.circle", title: "Full Rewind on every game",
+        Benefit(symbol: "backward.circle.fill", title: "Full Rewind on every game",
                 detail: "Your coach talks you through the whole game. Ghost lines and second chances."),
-        Benefit(symbol: "puzzlepiece.extension", title: "Unlimited puzzles",
+        Benefit(symbol: "puzzlepiece.extension.fill", title: "Unlimited puzzles",
                 detail: "115,000 rated puzzles, Puzzle Rush, Cycles and your review queue."),
-        Benefit(symbol: "graduationcap", title: "Every lesson and drill",
+        Benefit(symbol: "graduationcap.fill", title: "Every lesson and drill",
                 detail: "All 15 lessons, 3,865 openings, 22 endgames, master games and unlimited See ahead."),
-        Benefit(symbol: "bubble.left.and.bubble.right", title: "Talk It Through every day",
+        Benefit(symbol: "bubble.left.and.bubble.right.fill", title: "Talk It Through every day",
                 detail: "Up to 50 talks and 30 photo scans a day."),
         // Premium opens every rival (RivalLadder.opensEverything); the page now says so
         // (Alex, 2026-11-11, audit pick R4).
-        Benefit(symbol: "shield.lefthalf.filled", title: "Every rival, from day one",
+        Benefit(symbol: "shield.fill", title: "Every rival, from day one",
                 detail: "Face any of the five without beating the ones before."),
         // Every set of pieces is free for everyone; the boards are what Premium opens
         // (four free, ten in all), so the line promises only that (inspection, 2026-11-14).
-        Benefit(symbol: "square.grid.3x3", title: "Every board look",
+        Benefit(symbol: "square.grid.3x3.fill", title: "Every board look",
                 detail: "All \(BoardTheme.all.count - BoardTheme.rivals.count) boards to play on."),
     ]
 
@@ -301,7 +307,7 @@ private struct PremiumBenefitRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
             Image(systemName: benefit.symbol)
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(accent)
                 .frame(width: 34, height: 34)
                 .background {
@@ -310,7 +316,7 @@ private struct PremiumBenefitRow: View {
                                              startPoint: .top, endPoint: .bottom))
                         .overlay {
                             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .strokeBorder(accent.opacity(0.4), lineWidth: 0.8)
+                                .strokeBorder(accent.opacity(0.4), lineWidth: 0.75)
                         }
                 }
             VStack(alignment: .leading, spacing: 2) {
@@ -466,6 +472,8 @@ struct PremiumLimitCard: View {
                                 RoundedRectangle(cornerRadius: 14, style: .continuous).fill(accent)
                             }
                         }
+                        // The metal takes no touches, so the whole button is named as the target.
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(ChallengePressStyle())
             }
@@ -507,7 +515,7 @@ struct PremiumSettingsCard: View {
             // cancel the plan (inspection, 2026-11-14: there was no way to it from the app).
             if active { managing = true } else { open() }
         } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
                 JewelIcon(symbol: "crown.fill", stone: .amber, size: 38)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(active ? "Premium is on" : "Premium")

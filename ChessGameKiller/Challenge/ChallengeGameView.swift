@@ -341,7 +341,7 @@ struct ChallengeGameView: View {
             HStack(spacing: 10) {
                 Image(systemName: symbol)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(urgent ? ChallengeColors.urgent : theme.challengeAccent)
+                    .foregroundStyle(urgent ? ChallengeColors.danger : theme.challengeAccent)
                 Text(text)
                     .font(theme.challengeFont(14, .medium))
                     .foregroundStyle(.primary)
@@ -351,6 +351,8 @@ struct ChallengeGameView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 11)
             .challengeGlass(Capsule(style: .continuous))
+            // The glass takes no touches, so the whole capsule is named as the target.
+            .contentShape(Capsule(style: .continuous))
         }
         .buttonStyle(ChallengePressStyle())
         .accessibilityHint("Dismisses this message")
@@ -835,8 +837,8 @@ struct PlayMoveBar: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background {
             Capsule(style: .continuous)
-                .fill(theme.challengeAccent.gradient)
-                .shadow(color: theme.challengeAccent.opacity(0.35), radius: 10, y: 2)
+                .fill(theme.trainingFill.gradient)
+                .shadow(color: theme.trainingFill.opacity(0.35), radius: 10, y: 2)
         }
         .padding(.vertical, 2)
     }
@@ -985,7 +987,7 @@ struct FriendPlate: View {
                         .disabled(game.sending != nil)
                     }
                 }
-                .foregroundStyle(ChallengeColors.urgent)
+                .foregroundStyle(ChallengeColors.danger)
                 .accessibilityLabel(left > 0 ? "Away. You can claim the win in \(left) seconds" : "Left the game. You can claim the win")
             }
         } else {
@@ -1163,7 +1165,7 @@ struct FriendDaysBox: View {
                 Text(DailyDays.left(left))
                     .font(.system(size: 17, weight: .medium).monospacedDigit())
             }
-            .foregroundStyle(urgent ? ChallengeColors.urgent : theme.challengeAccent)
+            .foregroundStyle(urgent ? ChallengeColors.danger : theme.challengeAccent)
             .lineLimit(1)
             .padding(.horizontal, 11)
             .padding(.vertical, 6)

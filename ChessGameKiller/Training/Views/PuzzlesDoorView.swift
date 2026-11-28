@@ -40,7 +40,7 @@ struct PuzzlesDoorView: View {
             .buttonStyle(.plain)
             Text("Puzzles come from the Lichess database, free for everyone.")
                 .font(.app(.footnote))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(Color.faintInk)
                 .frame(maxWidth: .infinity)
                 .padding(.top, 6)
         }
@@ -87,7 +87,8 @@ struct PuzzlesDoorView: View {
                 }
                 Spacer(minLength: 8)
                 if progress.streak > 1 {
-                    TrainingChip(text: "\(progress.streak) in a row", symbol: "flame.fill", color: theme.trainingAccent)
+                    TrainingChip(text: "\(progress.streak) in a row", symbol: "flame.fill", color: theme.trainingAccent,
+                                 symbolColor: theme.trainingFill)
                 }
             }
             HStack(spacing: 8) {

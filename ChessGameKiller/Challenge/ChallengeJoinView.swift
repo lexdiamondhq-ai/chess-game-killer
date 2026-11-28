@@ -70,7 +70,7 @@ struct ChallengeJoinView: View {
             VStack(spacing: 12) {
                 ChallengeAvatar(name: invite.host, theme: theme, size: 72, online: state[state.creator].online)
                 Text("\(invite.host) challenged you")
-                    .font(.display(size: 27, weight: .semibold))
+                    .font(.display(size: 27, weight: .medium))
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                 Text("\(ChallengeInviteText.clockWords(state.clock, days: state.days)) · You play \(mySeat.name)")
@@ -93,7 +93,7 @@ struct ChallengeJoinView: View {
                     ChallengeNameField(name: $name, theme: theme)
                     Text("\(invite.host) sees this name.")
                         .font(theme.challengeFont(12))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(Color.faintInk)
                 }
             }
 
@@ -131,7 +131,7 @@ struct ChallengeJoinView: View {
                 if let problem = invite.joinProblem {
                     Text(problem)
                         .font(theme.challengeFont(13))
-                        .foregroundStyle(ChallengeColors.urgent)
+                        .foregroundStyle(ChallengeColors.danger)
                         .multilineTextAlignment(.center)
                         .transition(.opacity)
                 }

@@ -31,13 +31,8 @@ struct ImportGamesView: View {
 
     private var form: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Picker("Site", selection: $site) {
-                ForEach(OnlineSite.allCases) { site in
-                    Text(site.title).tag(site)
-                }
-            }
-            .pickerStyle(.segmented)
-            .disabled(importer.phase.isWorking)
+            GildedSegments(title: "Site", selection: $site, options: siteOptions, theme: theme)
+                .disabled(importer.phase.isWorking)
 
             TextField("\(site.title) username", text: $username)
                 .font(.app(.body))
@@ -71,6 +66,10 @@ struct ImportGamesView: View {
         }
         .padding(18)
         .trainingCard(theme)
+    }
+
+    private var siteOptions: [(value: OnlineSite, label: String)] {
+        OnlineSite.allCases.map { (value: $0, label: $0.title) }
     }
 
     private var isSameAccount: Bool {
@@ -123,7 +122,7 @@ struct ImportGamesView: View {
                 .fixedSize(horizontal: false, vertical: true)
             if let progress {
                 ProgressView(value: progress)
-                    .tint(theme.trainingAccent)
+                    .tint(theme.trainingFill)
             }
         }
         .padding(18)

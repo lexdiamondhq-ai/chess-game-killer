@@ -33,6 +33,15 @@ struct RivalFilm {
         Self.stills.setObject(image, forKey: name as NSString)
         return image
     }
+    /// The rival's cut-out, the same size and place as the still: clear where the rival is and
+    /// solid everywhere else, so Home's weather can fall behind them (HomeRivalWeather).
+    var cutImage: UIImage? {
+        let name = "rival-\(rival.slug)-cut"
+        if let kept = Self.stills.object(forKey: name as NSString) { return kept }
+        guard let image = Bundle.main.path(forResource: name, ofType: "png").flatMap(UIImage.init(contentsOfFile:)) else { return nil }
+        Self.stills.setObject(image, forKey: name as NSString)
+        return image
+    }
     private static let stills = NSCache<NSString, UIImage>()
 
     /// The rival before this one on the ladder, nil for the Cub.

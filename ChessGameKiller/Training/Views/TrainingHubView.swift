@@ -27,11 +27,15 @@ struct TrainingHubView: View {
     @State private var greeting = ""
     @State private var confirmingReset = false
     @State private var showingLevelCheck = false
+    /// Learn's film over the page: once, the first time Learn opens, and again from the menu.
+    @State private var filmPlaying: Bool
 
     /// Opens straight on one door, Learn behind it (Home's Chess DNA card opens on Chess DNA).
     init(theme: BoardTheme, door: TrainDoor? = nil) {
         self.theme = theme
         _path = State(initialValue: NavigationPath(door.map { [$0] } ?? []))
+        // The film is for Learn's own page: a player sent straight to a door went there for the door.
+        _filmPlaying = State(initialValue: door == nil && LearnFilm.shouldShow())
     }
 
     var body: some View {
@@ -77,6 +81,17 @@ struct TrainingHubView: View {
         }
         .tint(theme.trainingAccent)
         .screenScheme(theme)
+        // Under the film, Learn is out of VoiceOver's way.
+        .accessibilityHidden(filmPlaying)
+        .overlay {
+            if filmPlaying {
+                LearnFilmView {
+                    LearnFilm.markSeen()
+                    withAnimation(.easeOut(duration: 0.5)) { filmPlaying = false }
+                }
+                .transition(.opacity)
+            }
+        }
         .environment(repertoire)
         .environment(endgames)
         .environment(think)
@@ -144,7 +159,7 @@ struct TrainingHubView: View {
             coachMenu
             Text(greeting)
                 .font(.app(.subheadline))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.quietInk)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
             StreakPill(streak: daily?.streak ?? store.streak, theme: theme)
@@ -245,6 +260,13 @@ struct TrainingHubView: View {
         ToolbarItem(placement: .topBarTrailing) {
             // The coach's voice switches live in Settings > Coach, once (Alex, 2026-11-08).
             Menu {
+                if LearnFilm.url != nil {
+                    Button {
+                        withAnimation(.easeIn(duration: 0.3)) { filmPlaying = true }
+                    } label: {
+                        Label("Watch the film", systemImage: "play.fill")
+                    }
+                }
                 Button {
                     showingLevelCheck = true
                 } label: {
@@ -275,7 +297,7 @@ struct TrainingHubView: View {
         VStack(spacing: 12) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.app(.largeTitle))
-                .foregroundStyle(.orange)
+                .foregroundStyle(theme.festive(.orange))
             Text("Training content is missing from this build.")
                 .font(.app(.headline))
                 .multilineTextAlignment(.center)
@@ -301,8 +323,7 @@ struct TodayCard: View {
             HStack(alignment: .top, spacing: 14) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(eyebrow(done: done))
-                        .font(.carved(11))
-                        .tracking(1.4)
+                        .eyebrow()
                         .foregroundStyle(theme.trainingAccent)
                     Text(title)
                         .font(.display(.title2, weight: .semibold))
