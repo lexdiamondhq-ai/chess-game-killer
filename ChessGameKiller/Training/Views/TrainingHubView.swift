@@ -27,11 +27,15 @@ struct TrainingHubView: View {
     @State private var greeting = ""
     @State private var confirmingReset = false
     @State private var showingLevelCheck = false
+    /// Learn's film over the page: once, the first time Learn opens, and again from the menu.
+    @State private var filmPlaying: Bool
 
     /// Opens straight on one door, Learn behind it (Home's Chess DNA card opens on Chess DNA).
     init(theme: BoardTheme, door: TrainDoor? = nil) {
         self.theme = theme
         _path = State(initialValue: NavigationPath(door.map { [$0] } ?? []))
+        // The film is for Learn's own page: a player sent straight to a door went there for the door.
+        _filmPlaying = State(initialValue: door == nil && LearnFilm.shouldShow())
     }
 
     var body: some View {
@@ -77,6 +81,17 @@ struct TrainingHubView: View {
         }
         .tint(theme.trainingAccent)
         .screenScheme(theme)
+        // Under the film, Learn is out of VoiceOver's way.
+        .accessibilityHidden(filmPlaying)
+        .overlay {
+            if filmPlaying {
+                LearnFilmView {
+                    LearnFilm.markSeen()
+                    withAnimation(.easeOut(duration: 0.5)) { filmPlaying = false }
+                }
+                .transition(.opacity)
+            }
+        }
         .environment(repertoire)
         .environment(endgames)
         .environment(think)
@@ -245,6 +260,13 @@ struct TrainingHubView: View {
         ToolbarItem(placement: .topBarTrailing) {
             // The coach's voice switches live in Settings > Coach, once (Alex, 2026-11-08).
             Menu {
+                if LearnFilm.url != nil {
+                    Button {
+                        withAnimation(.easeIn(duration: 0.3)) { filmPlaying = true }
+                    } label: {
+                        Label("Watch the film", systemImage: "play.fill")
+                    }
+                }
                 Button {
                     showingLevelCheck = true
                 } label: {
