@@ -26,17 +26,17 @@ protocol TalkListener: AnyObject {
     func cancel()
 }
 
-/// Plays Leo's voice, or speaks with the device's voice when there's no recording.
+/// Plays the coach's voice. With no recording the coach stays quiet: the words are on screen.
 @MainActor
 protocol TalkSpeaker: AnyObject {
     /// Plays an MP3 and returns when it ends or is stopped.
     func play(mp3: Data) async
-    /// Speaks with the device's voice and returns when done or stopped.
+    /// No recording came for these words. The live speaker stays quiet (the iPhone's voice sounded robotic).
     func say(_ text: String) async
     func stop()
 }
 
-/// What Leo says aloud: his recording, or the words for the device's voice.
+/// What Leo says aloud: his recording, or the words when none came.
 private enum TalkUtterance {
     case recording(Data)
     case words(String)
@@ -555,7 +555,7 @@ final class TalkSession: Identifiable {
         if let check {
             if answer == nil { answer = Self.fallbackAnswer(for: check) }
             phase = .answered
-            // No voice line came: the device's voice says it.
+            // No voice line came: the words are on screen.
             if let answer { speak(.words(answer)) }
             return
         }

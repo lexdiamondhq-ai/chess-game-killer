@@ -58,10 +58,11 @@ test("TALK_VOICE_MODEL reads live answers with the cheaper model, for Leo and Ve
   await speak(talk, "Hello.", fetchImpl, "vera");
   assert.match(calls[0].url, /\/j9jfwdrw7BRfcR43Qohk\?/);
   assert.equal(calls[0].body.model_id, "eleven_flash_v2_5");
-  assert.match(calls[1].url, /\/EXAVITQu4vr4xnSDxMaL\?/);
+  assert.match(calls[1].url, /\/BcIZ7kngidiArTkRyUAp\?/);
   assert.equal(calls[1].body.model_id, "eleven_flash_v2_5");
+  // Not set in wrangler.toml: live answers use the lessons' model, so they sound the same.
   const toml = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8");
-  assert.match(toml, /^TALK_VOICE_MODEL = "eleven_flash_v2_5"$/m);
+  assert.doesNotMatch(toml, /^TALK_VOICE_MODEL =/m);
 });
 
 test("no key, no text or an odd voice ID: nothing is sent", async () => {
@@ -109,7 +110,7 @@ test("base64 matches Node's, also for recordings bigger than one chunk", () => {
   assert.equal(toBase64(new Uint8Array(0)), "");
 });
 
-test("Vera's answer is read by Sarah, with her lessons' settings", async () => {
+test("Vera's answer is read by Karina, on the newest model with the voice's own settings", async () => {
   const sent = [];
   const fetchImpl = async (url, init) => {
     sent.push({ url, body: JSON.parse(init.body) });
@@ -117,14 +118,15 @@ test("Vera's answer is read by Sarah, with her lessons' settings", async () => {
   };
   const audio = await speak({ ELEVENLABS_API_KEY: "key" }, "Castling is safe.", fetchImpl, "vera");
   assert.deepEqual([...audio], [1, 2, 3]);
-  assert.match(sent[0].url, /\/EXAVITQu4vr4xnSDxMaL\?output_format=mp3_44100_128$/);
-  assert.deepEqual(sent[0].body.voice_settings, VERA_VOICE_SETTINGS);
-  assert.equal(sent[0].body.model_id, "eleven_multilingual_v2");
+  assert.match(sent[0].url, /\/BcIZ7kngidiArTkRyUAp\?output_format=mp3_44100_128$/);
+  assert.equal(VERA_VOICE_SETTINGS, null);
+  assert.equal(sent[0].body.voice_settings, undefined);
+  assert.equal(sent[0].body.model_id, "eleven_v4");
   // VERA_VOICE_ID swaps her voice; VOICE_ID and VOICE_MODEL stay Leo's.
   const both = { ELEVENLABS_API_KEY: "key", VOICE_ID: "leoVoice", VOICE_MODEL: "eleven_v4", VERA_VOICE_ID: "veraVoice" };
   await speak(both, "Hi.", fetchImpl, "vera");
   assert.match(sent[1].url, /\/veraVoice\?/);
-  assert.equal(sent[1].body.model_id, "eleven_multilingual_v2");
+  assert.equal(sent[1].body.model_id, "eleven_v4");
   await speak(both, "Hi.", fetchImpl);
   assert.match(sent[2].url, /\/leoVoice\?/);
   assert.equal(sent[2].body.model_id, "eleven_v4");
@@ -132,11 +134,8 @@ test("Vera's answer is read by Sarah, with her lessons' settings", async () => {
 
 test("the voices match the lesson recordings in make_narration.py", () => {
   const script = readFileSync(new URL("../../scripts/training/make_narration.py", import.meta.url), "utf8");
-  assert.match(script, /ELEVENLABS_VERA_VOICE_ID", "EXAVITQu4vr4xnSDxMaL"/);
-  assert.match(script, /^MODEL = "eleven_multilingual_v2"$/m);
-  assert.match(script, /"model": MODEL, "settings": \{"stability": 0\.7/);
-  assert.match(script, /"stability": 0\.7, "similarity_boost": 0\.85, "style": 0\.0, "use_speaker_boost": True, "speed": 0\.98/);
-  assert.match(script, /"format": "mp3_44100_128"/);
+  assert.match(script, /ELEVENLABS_VERA_VOICE_ID", "BcIZ7kngidiArTkRyUAp"/);
+  assert.match(script, /"vera":.*\n.*"model": LEO_MODEL, "settings": VOICE_SETTINGS, "format": "mp3_44100_128", "master": True/);
 });
 
 test("every lesson recording is in the voice its coach speaks with now", () => {
@@ -146,7 +145,7 @@ test("every lesson recording is in the voice its coach speaks with now", () => {
   const voices = JSON.parse(readFileSync(new URL("../../scripts/training/narration-voices.json", import.meta.url), "utf8"));
   const toml = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8");
   const leo = `${/^VOICE_ID = "(\w+)"$/m.exec(toml)[1]} ${/^VOICE_MODEL = "(\w+)"$/m.exec(toml)[1]}`;
-  const vera = "EXAVITQu4vr4xnSDxMaL eleven_multilingual_v2";
+  const vera = "BcIZ7kngidiArTkRyUAp eleven_v4";
   const files = readdirSync(new URL("../../ChessGameKiller/Training/Narration/", import.meta.url)).filter((name) => name.endsWith(".mp3"));
   assert.ok(files.length > 400, `only ${files.length} recordings`);
   for (const file of files) {

@@ -65,11 +65,12 @@ COACHES = {
     # Override with ELEVENLABS_VOICE_ID. Recorded at 128 kbps, then levelled (MASTER).
     "leo": {"name": "Leo", "prefix": "nar-", "voice": os.environ.get("ELEVENLABS_VOICE_ID", "j9jfwdrw7BRfcR43Qohk"),
             "model": LEO_MODEL, "settings": VOICE_SETTINGS, "format": "mp3_44100_128", "master": True},
-    # Sarah: a confident, warm young American woman. Override with ELEVENLABS_VERA_VOICE_ID.
-    # Steady and clean: high stability, no style exaggeration, recorded at 128 kbps.
-    "vera": {"name": "Vera", "prefix": "vera-", "voice": os.environ.get("ELEVENLABS_VERA_VOICE_ID", "EXAVITQu4vr4xnSDxMaL"),
-             "model": MODEL, "settings": {"stability": 0.7, "similarity_boost": 0.85, "style": 0.0, "use_speaker_boost": True, "speed": 0.98},
-             "format": "mp3_44100_128"},
+    # Karina ("Karina - Warm British Narrator"): a smooth, natural Englishwoman, a little low, from
+    # ElevenLabs' voice library, on Leo's model with the voice's own settings and Leo's polish. Picked
+    # 2026-11-28 because Sarah on the older model, held very steady, sounded robotic.
+    # Override with ELEVENLABS_VERA_VOICE_ID.
+    "vera": {"name": "Vera", "prefix": "vera-", "voice": os.environ.get("ELEVENLABS_VERA_VOICE_ID", "BcIZ7kngidiArTkRyUAp"),
+             "model": LEO_MODEL, "settings": VOICE_SETTINGS, "format": "mp3_44100_128", "master": True},
 }
 # What LessonPlayer says when a task has no wrong-answer line of its own.
 DEFAULT_WRONG = "Not quite. Have another look."
