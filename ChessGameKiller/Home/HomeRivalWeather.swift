@@ -150,7 +150,8 @@ struct HomeRivalWeatherPainter {
         }
     }
 
-    /// The light the weather throws on the rival: faint, and over the whole picture.
+    /// What is drawn over the rival: the faint light the weather throws on them, and the
+    /// Lionheart's few low sparks.
     func paintLight(_ context: inout GraphicsContext) {
         fit(&context)
         context.blendMode = .plusLighter
@@ -163,6 +164,20 @@ struct HomeRivalWeatherPainter {
                          with: .radialGradient(Gradient(colors: [Color(red: 1, green: 0.6, blue: 0.2).opacity(0.1 + 0.12 * flicker(0)),
                                                                  Color(red: 1, green: 0.6, blue: 0.2).opacity(0)]),
                                                center: center, startRadius: 0, endRadius: radius))
+            // He fills almost the whole picture, so a few sparks also drift up in front of
+            // his armor. They go out below his jaw and never cross his face.
+            var sparks = context
+            sparks.addFilter(.shadow(color: Color(red: 1, green: 0.55, blue: 0.16), radius: 1.6))
+            for i in 0..<9 {
+                let rise = 7 + noise(i, 21) * 8
+                let span = h * 0.42
+                let y = h + 2 - wrap(time * rise + noise(i, 22) * span, span)
+                let x = noise(i, 23) * w + sin(time * 1.1 + Double(i) * 2) * 4
+                let r = 0.45 + noise(i, 24) * 0.6
+                sparks.opacity = max(0, min(1, (y - h * 0.6) / (h * 0.2))) * (0.55 + 0.45 * flicker(Double(i + 40)))
+                sparks.fill(Path(ellipseIn: CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2)),
+                            with: .color(Color(red: 1, green: 0.84, blue: 0.49)))
+            }
         case .lightning:
             let lit = flash
             guard lit > 0 else { return }
@@ -184,13 +199,13 @@ struct HomeRivalWeatherPainter {
         shape.move(to: CGPoint(x: 0, y: -5))
         shape.addCurve(to: CGPoint(x: 0, y: 5), control1: CGPoint(x: 4, y: -2.5), control2: CGPoint(x: 4, y: 2.5))
         shape.addCurve(to: CGPoint(x: 0, y: -5), control1: CGPoint(x: -4, y: 2.5), control2: CGPoint(x: -4, y: -2.5))
-        for i in 0..<10 {
+        for i in 0..<16 {
             let fall = 9 + noise(i, 1) * 9
             let span = h + 16
             let y = wrap(time * fall + noise(i, 2) * span, span) - 8
             let x = wrap(noise(i, 3) * w + time * 5 + sin(time * 0.9 + Double(i)) * 10, w + 16) - 8
             let spin = Angle.degrees(time * (40 + noise(i, 4) * 80) + Double(i) * 47)
-            let scale = (0.75 + noise(i, 5) * 0.6) * 0.8
+            let scale = (0.75 + noise(i, 5) * 0.6) * 0.9
             var leaf = context
             leaf.translateBy(x: x, y: y)
             leaf.rotate(by: spin)
@@ -233,19 +248,20 @@ struct HomeRivalWeatherPainter {
         }
     }
 
-    // MARK: The Lionheart: embers rising from the fires behind him.
+    // MARK: The Lionheart: embers rising from the fires behind him (a few more in paintLight).
 
     private func embers(_ context: inout GraphicsContext) {
         var sparks = context
         sparks.addFilter(.shadow(color: Color(red: 1, green: 0.55, blue: 0.16), radius: 1.6))
-        for i in 0..<24 {
+        for i in 0..<40 {
             let rise = 9 + noise(i, 1) * 12
             let span = h + 6
             let y = h - wrap(time * rise + noise(i, 2) * span, span) + 3
             let x = noise(i, 3) * w + sin(time * 1.3 + Double(i) * 2) * 5
-            let r = 0.5 + noise(i, 4) * 0.9
-            // Brightest low down, gone by the top.
-            sparks.opacity = max(0, min(1, y / h * 1.4)) * (0.55 + 0.45 * flicker(Double(i)))
+            let r = 0.6 + noise(i, 4) * 1.0
+            // He fills his picture, and what sky there is lies at the top: they glow all the
+            // way up and go out only as they leave.
+            sparks.opacity = max(0, min(1, (y + 2) / 14)) * (0.6 + 0.4 * flicker(Double(i)))
             sparks.fill(Path(ellipseIn: CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2)),
                         with: .color(Color(red: 1, green: 0.84, blue: 0.49)))
         }
@@ -273,20 +289,25 @@ struct HomeRivalWeatherPainter {
             Gradient(colors: [Color(red: 0.8, green: 0.86, blue: 1).opacity(0.42 * lit),
                               Color(red: 0.8, green: 0.86, blue: 1).opacity(0.14 * lit)]),
             startPoint: .zero, endPoint: CGPoint(x: 0, y: h)))
-        // The bolt comes down in a new place each time, with one fork.
+        // The throne hides the middle of the sky, so the bolt comes down one side of it or
+        // the other, in a new place each time, with one fork.
         let strike = cycle
+        let left: Bool = noise(strike, 12) < 0.5
+        let band: ClosedRange<Double> = left ? 1.5...10.5 : 89.5...98.5
         var bolt = Path()
         var fork = Path()
-        var point = CGPoint(x: w * (0.12 + noise(strike, 8) * 0.76), y: -2)
+        var point = CGPoint(x: band.lowerBound + noise(strike, 8) * 9, y: -2)
         bolt.move(to: point)
         for step in 1...7 {
-            point = CGPoint(x: point.x + (noise(strike * 7 + step, 9) - 0.5) * 16, y: h * 0.62 * Double(step) / 7)
+            let x: Double = point.x + (noise(strike * 7 + step, 9) - 0.5) * 7
+            point = CGPoint(x: min(band.upperBound, max(band.lowerBound, x)), y: h * 0.74 * Double(step) / 7)
             bolt.addLine(to: point)
-            if step == 4 {
+            if step == 3 {
+                // The fork leans in behind the throne.
                 var tip = point
                 fork.move(to: tip)
                 for part in 1...3 {
-                    tip = CGPoint(x: tip.x + (noise(strike * 5 + part, 11) - 0.2) * 12, y: tip.y + 7)
+                    tip = CGPoint(x: tip.x + (left ? 1 : -1) * (2 + noise(strike * 5 + part, 11) * 5), y: tip.y + 7)
                     fork.addLine(to: tip)
                 }
             }
@@ -297,6 +318,6 @@ struct HomeRivalWeatherPainter {
         glow.stroke(fork, with: .color(Color(red: 0.92, green: 0.95, blue: 1).opacity(0.8)),
                     style: StrokeStyle(lineWidth: 0.6, lineCap: .round, lineJoin: .round))
         glow.stroke(bolt, with: .color(Color(red: 0.95, green: 0.97, blue: 1)),
-                    style: StrokeStyle(lineWidth: 1.1, lineCap: .round, lineJoin: .round))
+                    style: StrokeStyle(lineWidth: 1.3, lineCap: .round, lineJoin: .round))
     }
 }
