@@ -161,17 +161,15 @@ struct PuzzlesView: View {
                 Image(systemName: "xmark")
                     .font(.system(size: 15, weight: .bold))
                     .frame(width: 36, height: 36)
-                    .background(.thinMaterial, in: Circle())
+                    .glassPane(Circle())
                     .frame(width: 44, height: 44)
                     .contentShape(Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Close puzzles")
 
-            Picker("Mode", selection: $mode) {
-                ForEach(Mode.allCases) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
+            GildedSegments(title: "Mode", selection: $mode,
+                           options: Mode.allCases.map { (value: $0, label: $0.rawValue) }, theme: theme)
 
             VStack(alignment: .trailing, spacing: 0) {
                 Text("\(store.progress.rating)")
@@ -205,7 +203,7 @@ struct PuzzlesView: View {
                 if store.progress.streak > 1 {
                     Label("\(store.progress.streak) in a row", systemImage: "flame.fill")
                         .font(.app(.caption, weight: .bold).monospacedDigit())
-                        .foregroundStyle(TrainingColor.orange.color(on: theme))
+                        .foregroundStyle(theme.festive(.orange))
                 }
                 Text("Theme")
                     .font(.app(.caption))
@@ -434,13 +432,13 @@ private struct RushCard: View {
             }
             if let last, last.isOver {
                 Text(last.newBest ? "New best!" : last.strikes >= RushRound.lives ? "Three strikes" : "Time!")
-                    .font(.display(.title, weight: .semibold))
+                    .font(.display(.title, weight: .medium))
                 Text("\(last.score) solved")
                     .font(.app(.title3, weight: .semibold).monospacedDigit())
                     .foregroundStyle(theme.trainingAccent)
             } else {
                 Text("Puzzle Rush")
-                    .font(.display(.title, weight: .semibold))
+                    .font(.display(.title, weight: .medium))
                 Text("Three minutes. The puzzles start easy and get harder with every one you solve. Three mistakes and you're out.")
                     .font(.app(.subheadline))
                     .foregroundStyle(.secondary)
@@ -532,7 +530,13 @@ private struct ThemePicker: View {
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .trainingCard(theme, tint: isSelected ? accent : nil, cornerRadius: 14)
+            .trainingCard(theme, tint: isSelected ? accent : nil, cornerRadius: 18)
+            .overlay {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(accent, lineWidth: 1.5)
+                }
+            }
         }
         .buttonStyle(.plain)
         .disabled(counts[option.id] == 0)

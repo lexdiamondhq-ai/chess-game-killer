@@ -124,7 +124,7 @@ struct LessonPlayerView: View {
                 Image(systemName: "xmark")
                     .font(.system(size: 15, weight: .bold))
                     .frame(width: 36, height: 36)
-                    .background(.thinMaterial, in: Circle())
+                    .glassPane(Circle())
                     .frame(width: 44, height: 44)
                     .contentShape(Circle())
             }
@@ -152,7 +152,9 @@ struct LessonPlayerView: View {
                         .font(.app(.subheadline, weight: .semibold))
                         .padding(.horizontal, 14)
                         .frame(height: 36)
-                        .background(.thinMaterial, in: Capsule())
+                        .glassPane(Capsule())
+                        // The glass takes no touches, so the whole pill is named as the target.
+                        .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Skip the lesson")
@@ -169,7 +171,7 @@ struct LessonPlayerView: View {
                 Image(systemName: muted ? "speaker.slash.fill" : "speaker.wave.2.fill")
                     .font(.system(size: 15, weight: .semibold))
                     .frame(width: 36, height: 36)
-                    .background(.thinMaterial, in: Circle())
+                    .glassPane(Circle())
                     .contentTransition(.symbolEffect(.replace))
                     .frame(width: 44, height: 44)
                     .contentShape(Circle())
@@ -182,13 +184,15 @@ struct LessonPlayerView: View {
     }
 
     private func progress(_ player: LessonPlayer) -> some View {
-        let accent = theme.trainingAccent
+        // A solid bar: the fill's gold, a step lighter than the ink on cream.
+        let accent = theme.trainingFill
+        let track = Polish.track(dark: theme.screenIsDark)
         return HStack(spacing: 3) {
             ForEach(0..<player.steps.count, id: \.self) { index in
                 Capsule()
                     .fill(index < player.stepIndex || player.phase == .finished
                           ? accent
-                          : (index == player.stepIndex ? accent.opacity(0.55) : Color.secondary.opacity(0.22)))
+                          : (index == player.stepIndex ? accent.opacity(0.55) : track))
                     .frame(height: 4)
                     .shadow(color: theme.glows && index <= player.stepIndex ? accent.opacity(0.7) : .clear, radius: 3)
             }
@@ -280,7 +284,7 @@ struct LessonPlayerView: View {
                     } label: {
                         Label("Hint", systemImage: "lightbulb.fill")
                     }
-                    .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false, tint: TrainingColor.yellow.color(on: theme)))
+                    .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false, tint: theme.hintTint))
                 }
                 Button {
                     withAnimation(.snappy) { player.showAnswer() }
@@ -312,16 +316,31 @@ struct LessonPlayerView: View {
     private func roundButton(_ symbol: String, label: String, size: CGFloat, prominent: Bool = false,
                              action: @escaping () -> Void) -> some View {
         let accent = theme.trainingAccent
+        let onHome: Bool = theme.screenTone != nil
+        // The lesson's one main control is cut from the gold button's metal on the home's pages.
+        let gilded: Bool = prominent && onHome
+        let plainInk: Color = prominent ? (theme.screenIsDark ? Color.black : Color.white) : accent
         return Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: size * 0.36, weight: .bold))
-                .foregroundStyle(prominent ? (theme.screenIsDark ? Color.black : Color.white) : accent)
+                .foregroundStyle(gilded ? Polish.onMetal : plainInk)
                 .frame(width: size, height: size)
                 .background {
-                    Circle()
-                        .fill(prominent ? AnyShapeStyle(accent) : AnyShapeStyle(accent.opacity(theme.screenIsDark ? 0.16 : 0.12)))
-                        .shadow(color: prominent && theme.glows ? accent.opacity(0.6) : .clear, radius: 12)
+                    if gilded {
+                        PolishedFill(shape: Circle())
+                    } else {
+                        Circle()
+                            .fill(prominent ? AnyShapeStyle(accent) : AnyShapeStyle(accent.opacity(theme.screenIsDark ? 0.16 : 0.12)))
+                            .shadow(color: prominent && theme.glows ? accent.opacity(0.6) : .clear, radius: 12)
+                            .overlay {
+                                if !prominent, onHome {
+                                    Circle().strokeBorder(accent.opacity(0.35), lineWidth: 0.75)
+                                }
+                            }
+                    }
                 }
+                // The metal takes no touches, so the whole disc is named as the target.
+                .contentShape(Circle())
                 .contentTransition(.symbolEffect(.replace))
         }
         .buttonStyle(.plain)
@@ -386,7 +405,7 @@ struct LessonDoneCard: View {
                     TrainingChip(text: "+\(reward.xp) XP", symbol: "sparkles", color: theme.trainingAccent)
                     if streakDays > 0 {
                         TrainingChip(text: "\(streakDays)-day streak", symbol: "flame.fill",
-                                     color: TrainingColor.orange.color(on: theme))
+                                     color: theme.festive(.orange))
                     }
                 }
                 if let promotion = reward.promotion {
@@ -395,15 +414,15 @@ struct LessonDoneCard: View {
                     HStack(spacing: 10) {
                         PieceImage(piece: Piece(promotion.pieceKind, color: .white, square: .a1), theme: theme, size: 40)
                             .scaleEffect(appeared ? 1 : 0.4)
-                            .shadow(color: TrainingColor.yellow.color(on: theme).opacity(0.8), radius: 10)
+                            .shadow(color: theme.festive(.yellow).opacity(0.8), radius: 10)
                             .animation(.spring(response: 0.5, dampingFraction: 0.55).delay(0.35), value: appeared)
                         Text("Promoted to \(promotion.title)!")
                             .font(.app(.headline))
-                            .foregroundStyle(TrainingColor.yellow.color(on: theme))
+                            .foregroundStyle(theme.festive(.yellow))
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
-                    .trainingCard(theme, tint: TrainingColor.yellow.color(on: theme), cornerRadius: 16)
+                    .trainingCard(theme, tint: theme.festive(.yellow), cornerRadius: 16)
                 }
                 if let line {
                     HStack(alignment: .top, spacing: 10) {

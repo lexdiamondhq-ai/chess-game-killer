@@ -28,7 +28,7 @@ enum TrainDoor: String, CaseIterable, Identifiable, Hashable {
         case .lessons: return Glyphs.train
         case .openings: return "book.closed.fill"
         case .endgames: return "flag.checkered"
-        case .calculation: return "brain.head.profile"
+        case .calculation: return "brain.head.profile.fill"
         case .games: return Glyphs.games
         }
     }
@@ -67,7 +67,7 @@ struct TrainIcon: View {
             .overlay {
                 tile.strokeBorder(LinearGradient(colors: [color.opacity(0.5), color.opacity(0.2)],
                                                  startPoint: .top, endPoint: .bottom),
-                                  lineWidth: 0.8)
+                                  lineWidth: 0.75)
             }
             .accessibilityHidden(true)
     }
@@ -81,10 +81,10 @@ struct TrainBadge: View {
     var body: some View {
         Text(count > 99 ? "99+" : "\(count)")
             .font(.app(.caption, weight: .bold).monospacedDigit())
-            .foregroundStyle(Color.black)
+            .foregroundStyle(theme.screenTone != nil ? Polish.onMetal : Color.black)
             .padding(.horizontal, 7)
             .frame(minWidth: 22, minHeight: 22)
-            .background(theme.trainingAccent, in: Capsule())
+            .background { MainPillFill(gilded: theme.screenTone != nil, plain: theme.trainingAccent) }
             .accessibilityHidden(true)
     }
 }
@@ -200,7 +200,7 @@ struct TrainScreen<Content: View>: View {
                 if let intro {
                     Text(intro)
                         .font(.app(.subheadline))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.quietInk)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.horizontal, 4)
                         .padding(.bottom, 4)
@@ -224,7 +224,7 @@ struct StreakPill: View {
     let theme: BoardTheme
 
     var body: some View {
-        let color = TrainingColor.orange.color(on: theme)
+        let color = theme.festive(.orange)
         HStack(spacing: 5) {
             Image(systemName: "flame.fill")
                 .font(.system(size: 15, weight: .semibold))

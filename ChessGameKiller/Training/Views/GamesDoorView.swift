@@ -371,7 +371,8 @@ struct CoachReportCard: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
             }
-            DNAStandingBar(place: standing?.place, tint: tint)
+            // In between, the bar is the page's gold as a fill, a step lighter than its ink.
+            DNAStandingBar(place: standing?.place, tint: stands ? tint : theme.trainingFill)
                 .opacity(standing == nil ? 0.35 : 1)
         }
         .accessibilityElement(children: .ignore)

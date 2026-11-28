@@ -80,11 +80,9 @@ struct OpeningStatsPanel: View {
                     bandMenu
                 }
             }
-            Picker("Whose games", selection: $bookCode) {
-                Text("Masters").tag("m")
-                Text("Your level").tag("level")
-            }
-            .pickerStyle(.segmented)
+            GildedSegments(title: "Whose games", selection: $bookCode,
+                           options: [(value: "m", label: "Masters"), (value: "level", label: "Your level")],
+                           theme: theme)
         }
     }
 

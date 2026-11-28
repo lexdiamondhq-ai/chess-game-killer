@@ -35,7 +35,7 @@ struct LessonsDoorView: View {
                 }
                 Text("Every drill was checked by Stockfish.")
                     .font(.app(.footnote))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Color.faintInk)
                     .frame(maxWidth: .infinity)
                     .padding(.top, 6)
             }

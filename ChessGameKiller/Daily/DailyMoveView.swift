@@ -124,7 +124,7 @@ struct DailyMoveView: View {
                 Image(systemName: "xmark")
                     .font(.system(size: 15, weight: .bold))
                     .frame(width: 36, height: 36)
-                    .background(.thinMaterial, in: Circle())
+                    .glassPane(Circle())
                     .frame(width: 44, height: 44)
                     .contentShape(Circle())
             }
@@ -244,7 +244,7 @@ struct DailyMoveView: View {
                     .foregroundStyle(theme.trainingAccent)
             }
             if daily.streak > 0 {
-                StreakCoins(streak: daily.streak, accent: theme.trainingAccent)
+                StreakCoins(streak: daily.streak, accent: theme.trainingAccent, gilded: theme.screenTone != nil)
                     .padding(.vertical, 4)
             }
             if let mark = daily.markToday {
@@ -333,6 +333,8 @@ struct DailyMoveView: View {
 struct StreakCoins: View {
     let streak: Int
     let accent: Color
+    /// On the home's pages a kept day is cut from the gold button's metal.
+    var gilded = false
 
     @State private var flipped = false
     @AppStorage("haptics") private var hapticsOn = true
@@ -368,11 +370,15 @@ struct StreakCoins: View {
         let number: Int = streak - today + day
         return VStack(spacing: 4) {
             ZStack {
-                Circle()
-                    .fill(lit ? accent : Color.primary.opacity(0.08))
-                    .overlay {
-                        Circle().strokeBorder(Color.white.opacity(lit ? 0.35 : 0.12), lineWidth: 0.75)
-                    }
+                if lit && gilded {
+                    PolishedFill(shape: Circle(), quiet: true)
+                } else {
+                    Circle()
+                        .fill(lit ? accent : Color.primary.opacity(0.08))
+                        .overlay {
+                            Circle().strokeBorder(Color.white.opacity(lit ? 0.35 : 0.12), lineWidth: 0.75)
+                        }
+                }
                 face(day, lit: lit)
             }
             .frame(width: Self.size, height: Self.size)
@@ -386,14 +392,15 @@ struct StreakCoins: View {
 
     @ViewBuilder
     private func face(_ day: Int, lit: Bool) -> some View {
+        let ink: Color = gilded ? Polish.onMetal : Color.black.opacity(0.8)
         if day == 7 {
             Image(systemName: "crown.fill")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(lit ? Color.black.opacity(0.8) : Color.secondary)
+                .foregroundStyle(lit ? ink : Color.secondary)
         } else if lit {
             Image(systemName: "checkmark")
                 .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(Color.black.opacity(0.8))
+                .foregroundStyle(ink)
         }
     }
 }

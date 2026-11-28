@@ -133,10 +133,9 @@ struct GuessTheMoveList: View {
         TrainScreen(theme: theme, title: "Guess the Move",
                     intro: "Pick a game. Guess each of the winner's moves; the closer your guess, the more points.") {
             if !content.masterGames.isEmpty {
-                Picker("Games", selection: $shelf) {
-                    ForEach(Shelf.allCases) { Text($0.rawValue).tag($0) }
-                }
-                .pickerStyle(.segmented)
+                GildedSegments(title: "Games", selection: $shelf,
+                               options: Shelf.allCases.map { (value: $0, label: $0.rawValue) },
+                               theme: theme)
                 if shelf == .masters {
                     Text("\(content.masterGames.count) recent classical games between players rated 2500 and up, from top tournaments.")
                         .font(.app(.footnote))

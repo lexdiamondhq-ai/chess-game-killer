@@ -31,7 +31,7 @@ struct EndgamesDoorView: View {
             }
             Text("Online, every move is judged by the Lichess tablebase, which knows the perfect result. Offline, Stockfish judges.")
                 .font(.app(.footnote))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(Color.faintInk)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
                 .padding(.top, 6)
@@ -98,7 +98,7 @@ struct EndgamesDoorView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             ProgressView(value: Double(progress.doneCount), total: Double(max(progress.total, 1)))
-                .tint(theme.trainingAccent)
+                .tint(theme.trainingFill)
                 .accessibilityHidden(true)
             if let next {
                 Button {
@@ -124,13 +124,13 @@ struct EndgamesDoorView: View {
                         .font(.system(size: 24))
                         .foregroundStyle(theme.trainingAccent)
                 } else {
-                    EndgameLevelBars(level: study.level, color: theme.trainingAccent)
+                    EndgameLevelBars(level: study.level, color: theme.trainingFill)
                 }
             }
             .frame(width: 30)
             VStack(alignment: .leading, spacing: 2) {
                 Text(study.title)
-                    .font(.app(.subheadline, weight: .semibold))
+                    .font(.display(.callout, weight: .semibold))
                     .foregroundStyle(.primary)
                 Text(study.goalText)
                     .font(.app(.caption))
@@ -162,12 +162,13 @@ struct EndgamesDoorView: View {
 struct EndgameLevelBars: View {
     let level: Int
     let color: Color
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 2.5) {
             ForEach(1...3, id: \.self) { bar in
                 Capsule()
-                    .fill(bar <= level ? color : Color.primary.opacity(0.16))
+                    .fill(bar <= level ? color : Polish.track(dark: scheme == .dark))
                     .frame(width: 4, height: 6 + CGFloat(bar) * 4)
             }
         }

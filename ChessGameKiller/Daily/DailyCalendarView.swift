@@ -129,7 +129,7 @@ struct DailyCalendarView: View {
                 }
                 Text("Past Moves never count toward the streak.")
                     .font(.app(.caption))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Color.faintInk)
                     .padding(.top, 14)
             }
             .padding(.horizontal, 22)
@@ -224,7 +224,7 @@ struct DailyCalendarView: View {
                 .font(.app(.footnote, weight: .semibold).monospacedDigit())
             Text(label.uppercased())
                 .font(.app(.caption2))
-                .tracking(1.4)
+                .tracking(1.2)
                 .foregroundStyle(.secondary)
         }
         .lineLimit(1)
@@ -238,9 +238,9 @@ struct DailyCalendarView: View {
         return HStack(spacing: 0) {
             ForEach(ordered, id: \.self) { name in
                 Text(name.uppercased())
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.app(size: 10, weight: .semibold))
                     .tracking(1.2)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Color.faintInk)
                     .frame(maxWidth: .infinity)
             }
         }
@@ -319,11 +319,10 @@ struct DailyCalendarView: View {
         return HStack(spacing: 14) {
             HomeAuroraBoard(fen: puzzle?.shownFEN, flipped: puzzle?.solverIsWhite == false, lit: false)
                 .frame(width: 74, height: 74)
-                .shadow(color: .black.opacity(0.35), radius: 6, y: 4)
+                .shadow(color: Polish.cast(dark: theme.screenIsDark, strength: 1.75), radius: 5, y: 3)
             VStack(alignment: .leading, spacing: 3) {
                 Text(eyebrow(day, puzzle).uppercased())
-                    .font(.custom(HomeCarvingFont.plain, size: 10))
-                    .tracking(1.8)
+                    .eyebrow()
                     .foregroundStyle(accent)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -340,7 +339,8 @@ struct DailyCalendarView: View {
                 dismiss()
                 play(day.date)
             }
-            .buttonStyle(TrainingButtonStyle(theme: theme))
+            // A small action inside a card: the quiet gold pill, not the page's main button.
+            .buttonStyle(ChallengeButtonStyle(kind: .primary, theme: theme, height: 40))
             .fixedSize()
         }
         .padding(12)

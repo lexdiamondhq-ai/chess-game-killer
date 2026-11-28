@@ -37,7 +37,7 @@ private struct CoachCard: View {
     let theme: BoardTheme
     let action: () -> Void
 
-    private var accent: Color { theme.accent ?? theme.trainingAccent }
+    private var accent: Color { theme.trainingAccent }
 
     private var voiceNote: String {
         coach == .leo ? "Warm, British" : "Bright, American"

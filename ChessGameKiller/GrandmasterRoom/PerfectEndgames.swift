@@ -54,6 +54,7 @@ struct EndgameView: View {
             .frame(width: geo.size.width)
         }
         .background { TrainingBackdrop(theme: theme) }
+        .screenScheme(theme)
         .animation(.snappy, value: runner?.phase)
         .onAppear {
             guard runner == nil else { return }
@@ -126,7 +127,7 @@ struct EndgameView: View {
                 } label: {
                     Label("Hint", systemImage: "lightbulb.fill")
                 }
-                .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false, tint: TrainingColor.yellow.color(on: theme)))
+                .buttonStyle(TrainingButtonStyle(theme: theme, prominent: false, tint: theme.hintTint))
                 .disabled(runner.phase != .playing)
                 // Dimmed only before the study starts, so the buttons don't flicker with every move.
                 .opacity(runner.phase == .loading ? 0.5 : 1)

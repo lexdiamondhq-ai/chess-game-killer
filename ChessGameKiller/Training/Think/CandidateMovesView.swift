@@ -187,9 +187,8 @@ private struct CandidatePositionView: View {
             } label: {
                 Text("Check my candidates")
             }
-            .buttonStyle(TrainingButtonStyle(theme: theme))
+            .buttonStyle(TrainingButtonStyle(theme: theme, dimmed: !ready))
             .disabled(!ready)
-            .opacity(ready ? 1 : 0.45)
         case .checking:
             HStack(spacing: 10) {
                 KnightWait(size: 18)
@@ -484,7 +483,7 @@ private struct CandidateRoundSummary: View {
                                             in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                         }
                         Text("\(round.points)")
-                            .font(.app(.largeTitle, weight: .bold).monospacedDigit())
+                            .font(.app(.largeTitle, weight: .bold))
                             .foregroundStyle(theme.trainingAccent)
                         Text("points out of \(CandidateRound.maxPoints)")
                             .font(.app(.subheadline))

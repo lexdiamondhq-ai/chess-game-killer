@@ -40,7 +40,7 @@ struct PuzzlesDoorView: View {
             .buttonStyle(.plain)
             Text("Puzzles come from the Lichess database, free for everyone.")
                 .font(.app(.footnote))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(Color.faintInk)
                 .frame(maxWidth: .infinity)
                 .padding(.top, 6)
         }
@@ -79,7 +79,7 @@ struct PuzzlesDoorView: View {
                         .eyebrow()
                         .foregroundStyle(theme.trainingAccent)
                     Text("\(progress.rating)")
-                        .font(.app(size: 44, weight: .bold).monospacedDigit())
+                        .font(.app(size: 44, weight: .semibold))
                     Text(progress.played == 0 ? "Your puzzle rating moves with every puzzle."
                          : "Best \(progress.highestRating) · \(progress.solved) of \(progress.played) solved")
                         .font(.app(.footnote))
