@@ -700,7 +700,7 @@ struct HomeAuroraView: View {
             // card here. The game of the day, which the board up top plays, opens from its own.
             if let masterpiece = stage.masterpiece {
                 HomeAuroraRow(eyebrow: "Game of the day", title: masterpiece.title, detail: masterpiece.players,
-                              accent: palette.gold, palette: palette, tile: tile, action: openMasterpiece) {
+                              accent: palette.gold, eyebrowInk: palette.goldInk, palette: palette, tile: tile, action: openMasterpiece) {
                     HomeAuroraBoard(fen: masterpiece.frames.first, flipped: masterpiece.flipped, lit: false)
                 }
             }
@@ -1102,6 +1102,9 @@ struct HomeAuroraRow<Picture: View>: View {
     let title: String
     let detail: String
     let accent: Color
+    /// The eyebrow's own ink, where it differs from the accent that tints the card's glow and
+    /// edge: a gold row writes in `goldInk`, which is deeper than its gold on the light page.
+    var eyebrowInk: Color? = nil
     let palette: HomeAuroraPalette
     var tile: Bool = false
     let action: () -> Void
@@ -1135,7 +1138,7 @@ struct HomeAuroraRow<Picture: View>: View {
                 Text(eyebrow.uppercased())
                     .font(.system(size: 10.5, weight: .bold))
                     .tracking(1.3)
-                    .foregroundStyle(accent)
+                    .foregroundStyle(eyebrowInk ?? accent)
                 Text(title)
                     .font(.system(size: 19, weight: .regular, design: .serif))
                     .foregroundStyle(palette.ink)
@@ -1165,7 +1168,7 @@ struct HomeAuroraRow<Picture: View>: View {
             Text(eyebrow.uppercased())
                 .font(.system(size: 9.5, weight: .bold))
                 .tracking(1.2)
-                .foregroundStyle(accent)
+                .foregroundStyle(eyebrowInk ?? accent)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
             Text(title)

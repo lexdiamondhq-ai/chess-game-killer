@@ -109,7 +109,7 @@ struct HomeAuroraFinestRow: View {
 
     var body: some View {
         HomeAuroraRow(eyebrow: "Your finest move", title: finest.move, detail: who,
-                      accent: palette.gold, palette: palette, tile: tile, action: replay) {
+                      accent: palette.gold, eyebrowInk: palette.goldInk, palette: palette, tile: tile, action: replay) {
             HomeFinestMoveFrame(finest: finest, side: tile ? 56 : 64)
         }
         .accessibilityHint("Replays the game at this move")
