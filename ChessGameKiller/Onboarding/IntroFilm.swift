@@ -44,14 +44,9 @@ struct IntroFilmView: View {
             .ignoresSafeArea()
             .overlay(alignment: .topTrailing) {
                 if !showsBegin {
-                    Button("Skip", action: finish)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.85))
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Capsule().fill(.black.opacity(0.35)))
-                        .overlay(Capsule().strokeBorder(.white.opacity(0.2), lineWidth: 0.5))
-                        .padding(.top, 8)
+                    // The pill sits where it always did: its touch frame adds 5 points above it.
+                    FilmSkipButton(action: finish)
+                        .padding(.top, 3)
                         .padding(.trailing, 20)
                         .transition(.opacity)
                         .accessibilityHint("Skips the intro film")
