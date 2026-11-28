@@ -31,7 +31,6 @@ final class HomeMusic {
     private init() {
         on = UserDefaults.standard.object(forKey: Self.key) as? Bool ?? true
         available = Bundle.main.url(forResource: Self.track, withExtension: "mp3") != nil
-        watchTheSound()
         if Self.probes { probe() }
     }
 
@@ -56,15 +55,8 @@ final class HomeMusic {
 
     /// The sound was handed back after Leo spoke or listened, which can stop the music while
     /// Home is showing: it picks up again.
-    ///
-    /// Handing the sound back silences the strings, but the player can go on saying it plays,
-    /// so it is started again rather than asked. That was the quiet Home after Today's training
-    /// (Alex, 2026-11-28): the lesson gave the sound back just after Home had come back and
-    /// started its music, and the old check believed the player.
     func pickUp() {
-        guard playing else { return }
-        player?.pause()
-        start()
+        if playing, player?.isPlaying != true { start() }
     }
 
     func toggle() {
@@ -81,10 +73,8 @@ final class HomeMusic {
             player?.prepareToPlay()
         }
         guard let player else { return }
-        // Ambient: mixes with other audio and stays quiet on silent. The sound may have been
-        // handed back by Leo or a film, so it is taken again.
+        // Ambient: mixes with other audio and stays quiet on silent.
         try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
-        try? AVAudioSession.sharedInstance().setActive(true)
         if !player.isPlaying {
             player.volume = 0
             player.play()
@@ -100,26 +90,6 @@ final class HomeMusic {
             guard let self, !self.playing else { return }
             self.player?.pause()
         }
-    }
-
-    /// A call, Siri or an alarm stops the music without a word: it comes back when they end.
-    /// Should the phone's sound restart under the app, the player is made again.
-    private func watchTheSound() {
-        let center = NotificationCenter.default
-        let session = AVAudioSession.sharedInstance()
-        observers.append(center.addObserver(forName: AVAudioSession.interruptionNotification, object: session,
-                                            queue: .main) { note in
-            let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
-            guard raw == AVAudioSession.InterruptionType.ended.rawValue else { return }
-            MainActor.assumeIsolated { HomeMusic.shared.pickUp() }
-        })
-        observers.append(center.addObserver(forName: AVAudioSession.mediaServicesWereResetNotification, object: session,
-                                            queue: .main) { _ in
-            MainActor.assumeIsolated {
-                HomeMusic.shared.player = nil
-                HomeMusic.shared.pickUp()
-            }
-        })
     }
 
     /// Twice a second, whether the track has moved on since the last look.

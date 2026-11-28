@@ -124,9 +124,6 @@ final class CoachVoice: NSObject {
     /// Back to the game's quiet sound effects.
     func endLesson() {
         stop()
-        // Closing a lesson can call this twice (its Close, then the screen going away): only the
-        // first hands the sound back, so the second can't silence the music Home has just started.
-        guard lessonAudioActive else { return }
         lessonAudioActive = false
         let session = AVAudioSession.sharedInstance()
         try? session.setActive(false, options: .notifyOthersOnDeactivation)
