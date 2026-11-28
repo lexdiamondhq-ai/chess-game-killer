@@ -36,6 +36,9 @@ extension BoardTheme {
 /// The red of a clock in its last seconds, used for what is urgent and nothing else.
 enum ChallengeColors {
     static let urgent = Color(hex: 0xFF4D6D)
+    /// Words and icons that warn ("Cancel challenge", an error line): the ruby of the jewel
+    /// tiles, deep on cream and lit on espresso. `urgent` stays for the clock's face.
+    static let danger = StoneInk.ruby.color
 }
 
 /// Sinks a touch while pressed.

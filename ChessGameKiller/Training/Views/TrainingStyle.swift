@@ -46,7 +46,7 @@ private struct ScreenScheme: ViewModifier {
         if let tone = HomeTone.screen(for: theme, sheet: sheet, mode: mode) {
             content
                 .preferredColorScheme(tone.scheme)
-                .tint(tone.metal)
+                .tint(theme.trainingAccent)
                 .environment(\.polishMetal, theme.screenPolishMetal)
         } else {
             content.preferredColorScheme(theme.isDark ? .dark : nil)
@@ -62,11 +62,30 @@ extension View {
 }
 
 extension TrainingColor {
+    /// The color for words, bars, dots and edges on a page: cut from the jewel stones on the
+    /// home's pages (see `StoneInk`), so a right answer is emerald and not neon, and reads as
+    /// text on cream. A look with its own light (Neon) and the older home keep the bright set.
     func color(on theme: BoardTheme) -> Color {
-        Color(hex: hex(on: theme))
+        guard theme.screenTone != nil, !theme.glows else { return Color(hex: hex(on: theme)) }
+        return stone.color(dark: theme.screenIsDark)
     }
 
-    /// The color as 0xRRGGBB: brighter on a dark screen. The 3D board takes it this way.
+    /// The stone each color is cut from.
+    var stone: StoneInk {
+        switch self {
+        case .red: return .ruby
+        case .yellow: return .citrine
+        case .green: return .emerald
+        case .blue: return .sapphire
+        case .violet: return .amethyst
+        case .teal: return .jade
+        case .orange: return .carnelian
+        case .pink: return .rose
+        }
+    }
+
+    /// The color as 0xRRGGBB: brighter on a dark screen. The 3D board takes it this way, and
+    /// so do arrows and marks drawn on a flat board, which must stay bright on wood and stone.
     func hex(on theme: BoardTheme) -> UInt32 {
         if theme.screenIsDark {
             switch self {
@@ -94,8 +113,41 @@ extension TrainingColor {
 }
 
 extension BoardTheme {
-    /// The training screens' main color: the home's metal, or the board's own accent.
-    var trainingAccent: Color { screenTone?.metal ?? accent ?? .accentColor }
+    /// The training screens' main color, for words, icons and fine edges: the app's gold ink
+    /// on the home's pages (the gold of a carved label, so every gold word on a page is one
+    /// metal), Sculpted's silver and Noir's champagne on theirs, or the board's own accent.
+    var trainingAccent: Color {
+        guard let tone = screenTone else { return accent ?? .accentColor }
+        if wearsOwnMetal(tone) { return tone.metal }
+        return Polish.goldInk(dark: tone.scheme == .dark)
+    }
+
+    /// The same metal for a small solid shape (the lit part of a bar, a switch that is on):
+    /// a step lighter than the ink on a light page, where the ink would read as bronze.
+    var trainingFill: Color {
+        guard let tone = screenTone else { return accent ?? .accentColor }
+        if wearsOwnMetal(tone) { return tone.metal }
+        return Polish.goldFill(dark: tone.scheme == .dark)
+    }
+
+    /// The home's metal as it was before the gold ink: Analyze keeps it, as Alex likes that
+    /// screen exactly as it is.
+    var homeMetalAccent: Color { screenTone?.metal ?? accent ?? .accentColor }
+
+    /// Sculpted's pages are silver in every light; Noir's are champagne in the dark.
+    private func wearsOwnMetal(_ tone: HomeTone) -> Bool {
+        id == .sculpted || (id == .noir && tone.scheme == .dark)
+    }
+
+    /// A hint's tint: the page's gold, since yellow glass turns olive on espresso and lemon
+    /// on cream. Neon keeps its yellow.
+    var hintTint: Color { glows || screenTone == nil ? TrainingColor.yellow.color(on: self) : trainingAccent }
+
+    /// The streak's flame and a promotion's shine: gold on the home's pages, as Home's own
+    /// streak is; the bright set elsewhere.
+    func festive(_ color: TrainingColor) -> Color {
+        glows || screenTone == nil ? color.color(on: self) : trainingAccent
+    }
 
     func trainingTone(_ tone: LessonPlayer.Tone) -> Color {
         switch tone {
@@ -151,7 +203,10 @@ struct TrainingCard: ViewModifier {
                 .homePane(shape, tone: tone)
                 .overlay {
                     if let tint {
-                        shape.strokeBorder(tint.opacity(0.55), lineWidth: 1).allowsHitTesting(false)
+                        // Laid right on the gilded line, and nearly solid, so the two never
+                        // mix into a muddy third color.
+                        shape.strokeBorder(tint.opacity(tone.scheme == .dark ? 0.8 : 0.9), lineWidth: 1)
+                            .allowsHitTesting(false)
                     }
                 }
         } else if theme.isDark, !theme.glows {
@@ -197,9 +252,25 @@ struct TrainingButtonStyle: ButtonStyle {
     let theme: BoardTheme
     var prominent = true
     var tint: Color?
+    /// The gold button while it can't be pressed yet: a quiet gold glass with a readable
+    /// label. Fading the whole button instead turns its gold to mud on espresso.
+    var dimmed = false
 
     func makeBody(configuration: Configuration) -> some View {
-        TrainingButton(theme: theme, prominent: prominent, tint: tint, configuration: configuration)
+        TrainingButton(theme: theme, prominent: prominent, tint: tint, dimmed: dimmed, configuration: configuration)
+    }
+}
+
+/// The gold button's body while it waits: the metal worn thin, with a fine gold rim.
+private struct WaitingFill: View {
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.polishMetal) private var ownMetal
+
+    var body: some View {
+        let dark: Bool = scheme == .dark
+        Capsule()
+            .fill(Polish.buttonMetal(ownMetal).foot.opacity(dark ? 0.18 : 0.22))
+            .overlay { Capsule().strokeBorder(Polish.metal(ownMetal, dark: dark).base.opacity(0.45), lineWidth: 1) }
     }
 }
 
@@ -207,6 +278,7 @@ private struct TrainingButton: View {
     let theme: BoardTheme
     let prominent: Bool
     let tint: Color?
+    var dimmed = false
     let configuration: ButtonStyleConfiguration
     @AppStorage(HomeLayout.key) private var sheet = HomeLayout.defaultOn
     @AppStorage(HomeToneMode.key) private var mode = HomeToneMode.defaultMode
@@ -215,24 +287,29 @@ private struct TrainingButton: View {
         if let tone = HomeTone.screen(for: theme, sheet: sheet, mode: mode) {
             homeButton(tone)
         } else {
-            boardButton
+            boardButton.opacity(dimmed ? 0.45 : 1)
         }
     }
 
     private func homeButton(_ tone: HomeTone) -> some View {
-        configuration.label
+        let waiting: Bool = dimmed && prominent && tint == nil
+        let solidInk: Color = tint == nil ? Polish.onMetal : (tone.scheme == .dark ? Color.black : Color.white)
+        return configuration.label
             .font(.app(.headline))
             .lineLimit(1)
             .minimumScaleFactor(0.8)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
             .padding(.horizontal, 12)
+            // One height for the main button on every screen (Home's and Challenge's 52).
+            .frame(minHeight: 52)
             // A quiet button keeps the page's ink: a tint (a hint's yellow) only colors its edge
             // and fill, since a pale tint would be lost as text on a light page.
-            .foregroundStyle(prominent ? (tint == nil ? Polish.onMetal : (tone.scheme == .dark ? Color.black : Color.white))
-                             : tone.ink)
+            .foregroundStyle(waiting ? tone.ink.opacity(0.5) : (prominent ? solidInk : tone.ink))
             .background {
-                if prominent, let tint {
+                if waiting {
+                    WaitingFill()
+                } else if prominent, let tint {
                     Capsule().fill(tint)
                 } else if prominent {
                     HomeIvoryFill(tone: tone)
@@ -298,6 +375,12 @@ struct CoachAvatar: View {
     private var restingRing: [Color] {
         if theme.id == .neon {
             return [Color(hex: 0x19C6CF), Color(hex: 0x9B4BEA), Color(hex: 0xE04BC4), Color(hex: 0x19C6CF)]
+        }
+        if theme.screenTone != nil {
+            // Solid stops from the edge's gold: a see-through stop lets the dark face show
+            // and turns the ring to bronze on a light page.
+            let metal = Polish.metal(theme.screenPolishMetal, dark: colorScheme == .dark)
+            return [metal.catchLight, metal.deep, metal.catchLight]
         }
         let accent = colorScheme == .dark ? (theme.accent ?? theme.trainingAccent) : theme.trainingAccent
         return [accent, accent.opacity(0.55), accent]
@@ -377,7 +460,10 @@ struct TurnBadge: View {
         HStack(spacing: 6) {
             Circle()
                 .fill(theme.sideColor(side))
-                .overlay(Circle().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
+                // A pale rim in the dark; on cream the ivory dot needs a deeper one to be seen.
+                .overlay(Circle().strokeBorder(theme.screenIsDark ? Color.white.opacity(0.35)
+                                                                  : theme.trainingAccent.opacity(0.6),
+                                               lineWidth: 1))
                 .frame(width: 10, height: 10)
             Text(text ?? "\(side.displayName) to move")
                 .font(.app(.caption, weight: .semibold))

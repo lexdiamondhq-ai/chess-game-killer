@@ -93,7 +93,8 @@ struct GlassSurface<S: InsettableShape>: View {
             if weight == .regular {
                 // A soft shadow under the pane lifts it off the backdrop. It is drawn beside the
                 // frost, not around it, so the frost still sees the backdrop's light.
-                shape.fill(Color.black.opacity(0.2))
+                // Black in a dark room; a warm umber on cream, where black leaves a grey smudge.
+                shape.fill(Polish.cast(dark: scheme != .light))
                     .blur(radius: 9)
                     .offset(y: 4)
             }
