@@ -149,7 +149,11 @@ struct DeepReviewCard: View {
                 Image(systemName: "xmark")
                     .font(.app(.footnote, weight: .bold))
                     .frame(width: 44, height: 44)
-                    .background(Circle().fill(Color.primary.opacity(0.07)).padding(4))
+                    .background {
+                        Circle().fill(theme.trainingAccent.opacity(0.12))
+                            .overlay { Circle().strokeBorder(theme.trainingAccent.opacity(0.35), lineWidth: 0.75) }
+                            .padding(4)
+                    }
             }
             .tint(.primary)
             .accessibilityLabel("Close the review")
@@ -256,7 +260,8 @@ struct DeepReviewCard: View {
             Image(systemName: symbol)
                 .font(.app(.footnote, weight: .bold))
                 .frame(width: 44, height: 44)
-                .background(Circle().fill(Color.primary.opacity(0.07)))
+                .background(Circle().fill(theme.trainingAccent.opacity(0.12)))
+                .overlay { Circle().strokeBorder(theme.trainingAccent.opacity(0.35), lineWidth: 0.75) }
         }
         .tint(.primary)
         .disabled(disabled)

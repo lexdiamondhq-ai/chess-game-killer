@@ -25,6 +25,7 @@ struct ReelFrame: View {
                 Text("BEAUTY OF CHESS")
                     .font(.app(size: 13, weight: .heavy))
                     .tracking(3)
+                    .padding(.trailing, -3)
                     .foregroundStyle(accent)
                     .opacity(showsWordmark ? 1 : 0)
                     .padding(.top, wordmarkTop)
@@ -83,6 +84,7 @@ struct ReelFrame: View {
                 Text(highlight.kind.title.uppercased())
                     .font(.app(size: 14, weight: .heavy))
                     .tracking(1.5)
+                    .padding(.trailing, -1.5)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
                     .background(moment.grade.color(on: theme).opacity(0.22), in: Capsule())
@@ -150,7 +152,9 @@ struct ReelFrame: View {
         }
         return Text(text)
             .font(.app(size: 22, weight: .black))
+            // Letter spacing also follows the last letter: taken back, so the word is centred.
             .tracking(4)
+            .padding(.trailing, -4)
             .padding(.horizontal, 22)
             .padding(.vertical, 8)
             .background(color.opacity(0.2), in: Capsule())
@@ -249,6 +253,7 @@ struct HighlightReelView: View {
                 Text("BEAUTY OF CHESS")
                     .font(.app(size: 13, weight: .heavy))
                     .tracking(3)
+                    .padding(.trailing, -3)
                     .foregroundStyle(theme.trainingAccent)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)

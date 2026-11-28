@@ -129,7 +129,9 @@ struct RewindGamesView: View {
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
-            GlassSurface(shape: RoundedRectangle(cornerRadius: 22, style: .continuous), tint: RewindPalette.gold)
+            // Pale gold over dark glass turns khaki: in the dark the gold stays in the edge and the label.
+            GlassSurface(shape: RoundedRectangle(cornerRadius: 22, style: .continuous),
+                         tint: theme.screenIsDark ? nil : RewindPalette.gold)
         }
         .padding(.top, 8)
     }
@@ -175,6 +177,7 @@ private struct GameCard: View {
                             Text(game.result.title.uppercased())
                                 .font(.app(.caption2, weight: .bold))
                                 .tracking(1.2)
+                                .padding(.trailing, -1.2)
                                 .foregroundStyle(resultColor)
                                 .padding(.horizontal, 7)
                                 .padding(.vertical, 3)

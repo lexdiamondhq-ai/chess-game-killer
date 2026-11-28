@@ -503,6 +503,8 @@ struct TrainingChip: View {
     var symbol: String?
     let color: Color
 
+    @Environment(\.colorScheme) private var scheme
+
     var body: some View {
         HStack(spacing: 4) {
             if let symbol {
@@ -513,7 +515,9 @@ struct TrainingChip: View {
         .padding(.horizontal, 9)
         .padding(.vertical, 4)
         .foregroundStyle(color)
-        .background(color.opacity(0.14), in: Capsule())
+        // One recipe with every other tag: a light wash and a fine rim in the chip's own color.
+        .background(Capsule().fill(color.opacity(scheme == .dark ? 0.17 : 0.10)))
+        .overlay { Capsule().strokeBorder(color.opacity(0.35), lineWidth: 0.75) }
     }
 }
 

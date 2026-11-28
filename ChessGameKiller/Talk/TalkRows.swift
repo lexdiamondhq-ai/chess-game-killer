@@ -21,8 +21,8 @@ enum TalkPanelPalette {
     static let good: Color = StoneInk.emerald.color
     /// Wrong, and the danger: ruby.
     static let bad: Color = StoneInk.ruby.color
-    /// Partly right: citrine.
-    static let partly: Color = StoneInk.citrine.color
+    /// Partly right: citrine, taken deep enough on a light page to read as a small mark.
+    static let partly: Color = Color.ink(light: 0x8F6C00, dark: 0xE6D04A)
     /// What went unmentioned: carnelian.
     static let missed: Color = StoneInk.carnelian.color
     /// Neither right nor wrong: a warm stone grey.
@@ -749,11 +749,11 @@ private struct TalkPanelGradeStyle {
     /// and fade on cream, so each takes a stone's ink.
     private static func ink(_ review: MoveReview.Grade) -> Color {
         switch review {
-        case .checkmate: return Color.ink(light: 0xA87A2E, dark: 0xE2B577)
+        case .checkmate: return Color.ink(light: 0x8A5F1E, dark: 0xE8C27A)
         case .best: return TalkPanelPalette.good
         case .excellent: return StoneInk.jade.color
         case .good: return StoneInk.sapphire.color
-        case .inaccuracy: return Color.ink(light: 0x8A5F1E, dark: 0xEBCB5E)
+        case .inaccuracy: return TalkPanelPalette.partly
         case .mistake: return TalkPanelPalette.missed
         case .blunder: return TalkPanelPalette.bad
         }

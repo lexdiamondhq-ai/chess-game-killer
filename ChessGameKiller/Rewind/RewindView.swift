@@ -689,7 +689,9 @@ struct RewindView: View {
             Image(systemName: symbol)
                 .font(.app(.caption, weight: .bold))
                 .frame(width: 34, height: 34)
-                .background(Circle().fill(Color.primary.opacity(0.07)))
+                // A gold well with a fine rim, as the round buttons of the Challenge bar wear.
+                .background(Circle().fill(theme.trainingAccent.opacity(0.12)))
+                .overlay { Circle().strokeBorder(theme.trainingAccent.opacity(0.35), lineWidth: 0.75) }
                 .frame(width: 44, height: 38)
                 .contentShape(Rectangle())
         }
@@ -1057,7 +1059,8 @@ private struct ExplorerCard: View {
             Image(systemName: symbol)
                 .font(.app(.footnote, weight: .bold))
                 .frame(width: 44, height: 44)
-                .background(Circle().fill(Color.primary.opacity(0.07)))
+                .background(Circle().fill(theme.trainingAccent.opacity(0.12)))
+                .overlay { Circle().strokeBorder(theme.trainingAccent.opacity(0.35), lineWidth: 0.75) }
         }
         .tint(.primary)
         .disabled(disabled)
@@ -1111,6 +1114,8 @@ private struct CardButton: View {
     var accent: Color = .primary
     let action: () -> Void
 
+    @Environment(\.colorScheme) private var scheme
+
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
         let golden: Bool = prominent && gilded
@@ -1127,14 +1132,13 @@ private struct CardButton: View {
                 if golden {
                     PolishedFill(shape: shape, quiet: true)
                 } else {
-                    shape.fill(prominent ? AnyShapeStyle(Color.primary.opacity(0.92)) : AnyShapeStyle(Color.primary.opacity(0.06)))
+                    shape.fill(prominent ? AnyShapeStyle(Color.primary.opacity(0.92))
+                                         : AnyShapeStyle(Color.primary.opacity(scheme == .dark ? 0.05 : 0.03)))
                 }
             }
             .overlay {
-                if !prominent {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-                }
+                // The quiet button is a well with the page's fine gilded edge, not a grey slab.
+                if !prominent { PolishedEdge(shape: shape, edge: .well) }
             }
         }
         .buttonStyle(.plain)

@@ -167,6 +167,8 @@ struct DailyCalendarView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .fixedSize(horizontal: true, vertical: false)
+                // Letter spacing also follows the last letter: taken back, so the name is centred.
+                .padding(.trailing, -5)
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityLabel(month.start.formatted(.dateTime.month(.wide).year()))
             hairline(leading: false)
@@ -271,8 +273,8 @@ struct DailyCalendarView: View {
             .frame(width: 40, height: 46)
             .background {
                 if chosen {
-                    shape.fill(Color.primary.opacity(0.09))
-                        .overlay { shape.strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.75) }
+                    shape.fill(Polish.track(dark: theme.screenIsDark))
+                        .overlay { shape.strokeBorder(Polish.track(dark: theme.screenIsDark, strong: true), lineWidth: 0.75) }
                 }
             }
             .overlay {
@@ -299,8 +301,9 @@ struct DailyCalendarView: View {
     private func mark(_ mark: DailyCalendarMark) -> some View {
         switch mark {
         case .found:
-            Circle().fill(accent).frame(width: 7, height: 7)
-                .shadow(color: accent.opacity(0.55), radius: 4)
+            // A small solid gold; its halo is light, so it is kept for the dark page.
+            Circle().fill(theme.trainingFill).frame(width: 7, height: 7)
+                .shadow(color: theme.screenIsDark ? accent.opacity(0.55) : .clear, radius: 4)
         case .helped:
             Circle().strokeBorder(accent, lineWidth: 1.5).frame(width: 7, height: 7)
         case .missed:

@@ -114,7 +114,7 @@ struct BoardScanView: View {
                 TrainIcon(symbol: option.symbol, theme: theme, size: 42)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(option.title)
-                        .font(.app(.headline))
+                        .font(.display(.headline, weight: .semibold))
                     Text(option.detail)
                         .font(.app(.subheadline))
                         .foregroundStyle(.secondary)
