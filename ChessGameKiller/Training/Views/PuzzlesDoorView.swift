@@ -10,7 +10,7 @@ struct PuzzlesDoorView: View {
     @State private var offer: PremiumFeature?
 
     enum Cover: String, Identifiable {
-        case rated, rush, cycles, review
+        case rated, rush, shield, cycles, review
         var id: String { rawValue }
     }
 
@@ -23,6 +23,12 @@ struct PuzzlesDoorView: View {
                 TrainRow(symbol: "timer", title: "Puzzle Rush",
                          detail: "Three minutes, three strikes. They get harder as you go.",
                          value: puzzles.progress.rushBest > 0 ? "Best \(puzzles.progress.rushBest)" : nil, theme: theme)
+            }
+            .buttonStyle(.plain)
+            Button { cover = .shield } label: {
+                TrainRow(symbol: "shield.lefthalf.filled", title: "Blunder Shield",
+                         detail: "Two moves, and one is a trap. Pick the safe one before the ring runs out. Your own game mistakes come first.",
+                         value: puzzles.progress.shieldBest > 0 ? "Best \(puzzles.progress.shieldBest)" : nil, theme: theme)
             }
             .buttonStyle(.plain)
             Button { open(.cycles, needs: .puzzleCycles) } label: {
@@ -51,6 +57,8 @@ struct PuzzlesDoorView: View {
                 PuzzlesView(theme: theme).environment(puzzles).environment(training)
             case .rush:
                 PuzzlesView(theme: theme, startMode: .rush).environment(puzzles).environment(training)
+            case .shield:
+                BlunderShieldView(theme: theme).environment(puzzles).environment(training)
             case .cycles:
                 PuzzleCyclesView(theme: theme).environment(puzzles)
             case .review:
