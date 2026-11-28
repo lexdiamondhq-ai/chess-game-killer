@@ -68,6 +68,10 @@ struct HomeView: View {
     @State private var hall: HallVisit?
     /// The castle room open from Rooms: Trophy Hall, Famous Games or the Dungeon.
     @State private var castleRoom: CastleRoom?
+    /// The game of the day, playing in the Famous Games player with Leo's story.
+    @State private var famous: ClassicGame?
+    /// The position "Explore in Analyze" carries out of that player.
+    @State private var famousExplore: String?
     @AppStorage("setup.clock") private var timeControl: TimeControl = .unlimited
     @AppStorage("haptics") private var hapticsOn = true
     /// The name friends see, from the last challenge: the home says hello with it.
@@ -773,7 +777,8 @@ extension HomeView {
             analyze: actions.analyze,
             analyzePosition: actions.analyzePosition,
             you: { openYou(.bottom) },
-            rooms: openShortcuts)
+            rooms: openShortcuts,
+            famousGame: { game in famous = game })
         let auroraInfo = HomeAuroraInfo(stage: info, games: currentGameList(upNext), look: look,
                                         pieces: match.game.pieces.map(\.piece), finest: finestMove, dna: dna,
                                         people: challenges?.friends.people ?? [])
@@ -807,11 +812,23 @@ extension HomeView {
             .onReceive(NotificationCenter.default.publisher(for: ScreenCovers.closeAll)) { _ in
                 hall = nil
                 castleRoom = nil
+                famous = nil
             }
             // The army screen's quest button: the same game Home's Your army strip starts.
             .onReceive(NotificationCenter.default.publisher(for: ArmyQuestLink.play)) { note in
                 guard let raw = note.object as? Int, let level = MatchController.Level(rawValue: raw) else { return }
                 playOtherRival(level)
+            }
+            // Game of the day (Alex, 2026-11-28): the whole game plays with Leo's story, as in
+            // Rooms > Famous Games, rather than a bare Analyze board he couldn't follow.
+            .fullScreenCover(item: $famous, onDismiss: {
+                // Analyze opens once the player has gone, so the two screens don't collide.
+                if let fen = famousExplore { famousExplore = nil; actions.analyzePosition(fen) }
+            }) { game in
+                FamousGameTheater(game: game, theme: pieceTheme, explore: { fen in
+                    famousExplore = fen
+                    famous = nil
+                })
             }
             .fullScreenCover(item: $castleRoom) { room in
                 CastleRoomScreen(room: room, theme: pieceTheme)

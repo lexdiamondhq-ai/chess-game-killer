@@ -752,7 +752,6 @@ struct HomeAuroraView: View {
         }
     }
 
-    /// The game of the day, in Analyze from its first position, ready to play through.
     private func openKnightMenu() {
         // The vines grow from the full-size knight, so a folded bar opens out first.
         if barFolded > 0 { withAnimation(Self.barSettle) { barFolded = 0 } }
@@ -774,8 +773,10 @@ struct HomeAuroraView: View {
         }
     }
 
+    /// The game of the day, played from move 1 while Leo tells its story (Alex, 2026-11-28: the
+    /// bare Analyze board it used to open didn't say what was going on).
     private func openMasterpiece() {
-        if let fen = stage.masterpiece?.frames.first { actions.stage.analyzePosition(fen) }
+        if let game = stage.masterpiece?.game { actions.stage.famousGame(game) }
     }
 
     private var todayTitle: String {

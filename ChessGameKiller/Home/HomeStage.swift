@@ -44,6 +44,8 @@ struct HomeStageActions {
     var analyzePosition: (String) -> Void
     var you: () -> Void
     var rooms: () -> Void
+    /// The game of the day, told as a story: the Famous Games player (Alex, 2026-11-28).
+    var famousGame: (ClassicGame) -> Void = { _ in }
 }
 
 /// One card in the deck.
