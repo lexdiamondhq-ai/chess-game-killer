@@ -115,7 +115,8 @@ struct VisionBoard: View {
     private func flashLayer(_ layout: VisionBoardLayout) -> some View {
         ZStack(alignment: .topLeading) {
             ForEach(flashes) { flash in
-                let color = flash.right ? theme.trainingAccent : TrainingColor.red.color(on: theme)
+                // On the board: the bright set and the fill's gold, which read on wood and stone.
+                let color: Color = flash.right ? theme.trainingFill : Color(hex: TrainingColor.red.hex(on: theme))
                 let center = layout.center(of: flash.square)
                 Rectangle()
                     .fill(color.opacity(flash.right ? 0.5 : 0.6))
@@ -175,7 +176,8 @@ struct ScanMarks: View {
     }
 
     private func foundRing(size: CGFloat) -> some View {
-        let accent = theme.trainingAccent
+        // A ring on the board, not on the page: the fill's gold, lighter than the ink on a light page.
+        let accent = theme.trainingFill
         let shape = RoundedRectangle(cornerRadius: size * 0.14, style: .continuous)
         return ZStack {
             shape.fill(accent.opacity(0.16))
@@ -188,14 +190,14 @@ struct ScanMarks: View {
 
     private func missedRing(size: CGFloat) -> some View {
         RoundedRectangle(cornerRadius: size * 0.14, style: .continuous)
-            .strokeBorder(TrainingColor.orange.color(on: theme),
+            .strokeBorder(Color(hex: TrainingColor.orange.hex(on: theme)),
                           style: StrokeStyle(lineWidth: size * 0.06, dash: [size * 0.16, size * 0.1]))
             .padding(size * 0.04)
             .frame(width: size, height: size)
     }
 
     private func slipCross(size: CGFloat) -> some View {
-        let red = TrainingColor.red.color(on: theme)
+        let red = Color(hex: TrainingColor.red.hex(on: theme))
         return Image(systemName: "xmark")
             .font(.system(size: size * 0.17, weight: .heavy))
             .foregroundStyle(.white)

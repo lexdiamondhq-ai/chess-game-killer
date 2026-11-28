@@ -8,13 +8,14 @@ struct DNAStandingBar: View {
     /// 0 to 1. Nil until there is enough to judge.
     let place: Double?
     let tint: Color
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         GeometryReader { geo in
             let width: CGFloat = geo.size.width
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(Color.primary.opacity(0.1))
+                    .fill(Polish.track(dark: scheme == .dark))
                     .frame(height: 4)
                 if let place {
                     Capsule()
@@ -74,7 +75,7 @@ struct DNAListTitle: View {
         HStack(alignment: .firstTextBaseline) {
             Text(text.uppercased())
                 .font(.carved(12))
-                .tracking(1.4)
+                .tracking(1.6)
                 .foregroundStyle(tint)
                 .accessibilityAddTraits(.isHeader)
             Spacer(minLength: 8)
@@ -96,15 +97,24 @@ struct DNAListRow<Trailing: View>: View {
     let title: String
     let detail: String
     let tint: Color
+    /// The plate's own fill on a light page, where a deep tint's wash would read as grey.
+    var lightPlate: Color? = nil
     @ViewBuilder let trailing: () -> Trailing
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
+        let plate: Color = scheme == .dark ? tint.opacity(0.17) : (lightPlate ?? tint.opacity(0.10))
         HStack(spacing: 12) {
             Image(systemName: symbol)
                 .font(.system(size: 12, weight: .heavy))
                 .foregroundStyle(tint)
                 .frame(width: 28, height: 28)
-                .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                // Set like Home's chips: a wash and a fine edge of the same stone.
+                .background(plate, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .strokeBorder(tint.opacity(0.35), lineWidth: 0.75)
+                }
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
@@ -131,16 +141,19 @@ struct DNAPillStyle: ButtonStyle {
     var prominent = true
 
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
+        // On a gold look the pill is the small gold capsule every other screen uses.
+        let gilded: Bool = theme.screenTone != nil
+        let solidInk: Color = gilded ? Polish.onMetal : Color.black.opacity(0.85)
+        return configuration.label
             .font(.app(.footnote, weight: .bold).monospacedDigit())
             .lineLimit(1)
             .fixedSize()
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
-            .foregroundStyle(prominent ? AnyShapeStyle(Color.black.opacity(0.85)) : AnyShapeStyle(theme.trainingAccent))
+            .foregroundStyle(prominent ? solidInk : theme.trainingAccent)
             .background {
                 if prominent {
-                    Capsule().fill(theme.trainingAccent)
+                    MainPillFill(gilded: gilded, plain: theme.trainingAccent)
                 } else {
                     Capsule().strokeBorder(theme.trainingAccent.opacity(0.6), lineWidth: 1)
                 }
@@ -228,10 +241,17 @@ struct DNAWeakSpotList: View {
 
     private var tint: Color { TrainingColor.orange.color(on: theme) }
 
+    /// The plate behind the mark on a light gold page: a peach enamel, since the carnelian's
+    /// own wash is a grey pink on cream. The mark and the rim stay carnelian.
+    private var lightPlate: Color? {
+        theme.screenTone != nil && !theme.glows ? Color(hex: 0xEE7A12).opacity(0.16) : nil
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(spots.enumerated()), id: \.element.id) { offset, spot in
-                DNAListRow(symbol: "exclamationmark", title: spot.headline, detail: spot.proof, tint: tint) {
+                DNAListRow(symbol: "exclamationmark", title: spot.headline, detail: spot.proof, tint: tint,
+                           lightPlate: lightPlate) {
                     action(spot)
                 }
                 .accessibilityElement(children: .contain)

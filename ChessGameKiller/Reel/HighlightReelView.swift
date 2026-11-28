@@ -18,6 +18,21 @@ struct ReelFrame: View {
     /// Rounded type on Neon, plain SF Pro on every other look, as in the game.
     private var design: Font.Design { theme.glows ? .rounded : .default }
 
+    /// A grade's color as words on the page: the grade colors are made for a dark board and
+    /// fade on cream, so each takes a stone's ink there.
+    private func gradeInk(_ grade: MoveReview.Grade) -> Color {
+        guard theme.screenTone != nil, !theme.screenIsDark, !theme.glows else { return grade.color(on: theme) }
+        switch grade {
+        case .checkmate: return theme.trainingAccent
+        case .best: return StoneInk.emerald.color(dark: false)
+        case .excellent: return StoneInk.jade.color(dark: false)
+        case .good: return StoneInk.sapphire.color(dark: false)
+        case .inaccuracy: return Color(hex: 0x8F6C00)
+        case .mistake: return StoneInk.carnelian.color(dark: false)
+        case .blunder: return StoneInk.ruby.color(dark: false)
+        }
+    }
+
     var body: some View {
         ZStack {
             TrainingBackdrop(theme: theme)
@@ -25,6 +40,7 @@ struct ReelFrame: View {
                 Text("BEAUTY OF CHESS")
                     .font(.app(size: 13, weight: .heavy))
                     .tracking(3)
+                    .padding(.trailing, -3)
                     .foregroundStyle(accent)
                     .opacity(showsWordmark ? 1 : 0)
                     .padding(.top, wordmarkTop)
@@ -83,15 +99,16 @@ struct ReelFrame: View {
                 Text(highlight.kind.title.uppercased())
                     .font(.app(size: 14, weight: .heavy))
                     .tracking(1.5)
+                    .padding(.trailing, -1.5)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                    .background(moment.grade.color(on: theme).opacity(0.22), in: Capsule())
-                    .foregroundStyle(moment.grade.color(on: theme))
+                    .background(gradeInk(moment.grade).opacity(0.22), in: Capsule())
+                    .foregroundStyle(gradeInk(moment.grade))
                 Spacer()
                 if let piece = highlight.piece {
                     Label(piece, systemImage: "shield.lefthalf.filled")
                         .font(.app(size: 15, weight: .bold))
-                        .foregroundStyle(theme.ink(for: reel.playerColor))
+                        .foregroundStyle(theme.screenIsDark ? theme.ink(for: reel.playerColor) : Color.primary.opacity(0.8))
                         .lineLimit(1)
                 }
                 Text("Move \((moment.ply + 1) / 2)")
@@ -105,7 +122,7 @@ struct ReelFrame: View {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(moment.san + glyph(moment.grade))
                     .font(.app(size: 40, weight: .heavy))
-                    .foregroundStyle(landed ? moment.grade.color(on: theme) : .primary)
+                    .foregroundStyle(landed ? gradeInk(moment.grade) : .primary)
                 Spacer()
                 ReelEvalBar(chances: landed ? moment.after : moment.before, theme: theme)
                     .frame(width: 120, height: 10)
@@ -150,7 +167,9 @@ struct ReelFrame: View {
         }
         return Text(text)
             .font(.app(size: 22, weight: .black))
+            // Letter spacing also follows the last letter: taken back, so the word is centred.
             .tracking(4)
+            .padding(.trailing, -4)
             .padding(.horizontal, 22)
             .padding(.vertical, 8)
             .background(color.opacity(0.2), in: Capsule())
@@ -196,7 +215,7 @@ private struct ReelEvalBar: View {
             ZStack(alignment: .leading) {
                 Capsule().fill(Color.primary.opacity(0.15))
                 Capsule()
-                    .fill(theme.trainingAccent)
+                    .fill(theme.trainingFill)
                     .frame(width: max(4, geo.size.width * (chances + 1) / 2))
             }
         }
@@ -249,6 +268,7 @@ struct HighlightReelView: View {
                 Text("BEAUTY OF CHESS")
                     .font(.app(size: 13, weight: .heavy))
                     .tracking(3)
+                    .padding(.trailing, -3)
                     .foregroundStyle(theme.trainingAccent)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)

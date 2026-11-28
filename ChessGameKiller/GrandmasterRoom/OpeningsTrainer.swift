@@ -401,11 +401,10 @@ struct OpeningLineView: View {
             let boardSide: CGFloat = max(200, min(geo.size.width - TrainingBoardView.sideRoom, geo.size.height * 0.56))
             ScrollView {
             VStack(spacing: 12) {
-                Picker("Play as", selection: $side) {
-                    Text("Play as White").tag(Piece.Color.white)
-                    Text("Play as Black").tag(Piece.Color.black)
-                }
-                .pickerStyle(.segmented)
+                GildedSegments(title: "Play as", selection: $side,
+                               options: [(value: Piece.Color.white, label: "Play as White"),
+                                         (value: Piece.Color.black, label: "Play as Black")],
+                               theme: theme)
                 .padding(.horizontal, 16)
                 if let runner {
                     TrainerBoard(game: runner.board, theme: theme, side: boardSide, flipped: side == .black,
@@ -546,6 +545,7 @@ private struct RepertoireReview: View {
             .frame(width: geo.size.width)
         }
         .background { TrainingBackdrop(theme: theme) }
+        .screenScheme(theme)
         .onAppear { if runner == nil { load() } }
         .onChange(of: runner?.isDone) { _, done in
             guard done == true, !recorded, let runner, !entries.isEmpty else { return }

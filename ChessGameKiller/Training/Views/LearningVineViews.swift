@@ -13,7 +13,25 @@ enum VineGold {
     static let metal = LinearGradient(colors: [light, deep, bright], startPoint: .top, endPoint: .bottom)
 
     /// Gold words: warm on dark rooms, a deeper gold on light ones so they still read.
-    static func text(_ theme: BoardTheme) -> Color { theme.screenIsDark ? Color(hex: 0xE6C06A) : Color(hex: 0x8C6620) }
+    static func text(_ theme: BoardTheme) -> Color { Polish.goldInk(dark: theme.screenIsDark) }
+
+    /// The line under the stem: the vine's dark ink on espresso, a warm gold cast on cream,
+    /// where the dark ink leaves a grey contour.
+    static func shade(dark: Bool, strength: Double = 0.55) -> Color {
+        dark ? ink.opacity(strength) : Color(hex: 0x8A5F1E).opacity(0.4)
+    }
+
+    /// A closed bud: a quiet dark seed on espresso, pale parchment on cream.
+    static func bud(dark: Bool) -> Color { dark ? Color(hex: 0x3A3220) : Color(hex: 0xF3E6C8) }
+
+    /// The bud's outline: bright on espresso, the deep gold on cream so the line holds.
+    static func budEdge(dark: Bool, strength: Double) -> Color {
+        dark ? bright.opacity(strength) : deep.opacity(0.9)
+    }
+
+    static func leafShadow(dark: Bool) -> Color {
+        dark ? Color.black.opacity(0.35) : Color(hex: 0x8A5F1E).opacity(0.22)
+    }
 
     /// The carved title: the vine's own metal on dark rooms, a deeper cut on light ones.
     static func title(_ theme: BoardTheme) -> LinearGradient {
@@ -38,8 +56,7 @@ struct VineCard: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .firstTextBaseline) {
                     Text("YOUR VINE")
-                        .font(VineGold.carved(13))
-                        .tracking(2)
+                        .eyebrow()
                         .foregroundStyle(VineGold.text(theme))
                     Spacer(minLength: 8)
                     Text(countLine)
@@ -49,7 +66,8 @@ struct VineCard: View {
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.tertiary)
                 }
-                VineSprig(leaves: min(vine.leaves.count, 5), hasBloom: vine.bloom != nil, hasBud: !vine.buds.isEmpty)
+                VineSprig(leaves: min(vine.leaves.count, 5), hasBloom: vine.bloom != nil, hasBud: !vine.buds.isEmpty,
+                          dark: theme.screenIsDark)
                     .frame(height: 44)
                     .accessibilityHidden(true)
                 if let bloom = vine.bloom {
@@ -66,7 +84,7 @@ struct VineCard: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .trainingCard(theme, cornerRadius: 20)
+            .trainingCard(theme, cornerRadius: 22)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -87,6 +105,8 @@ struct VineSprig: View {
     let leaves: Int
     let hasBloom: Bool
     let hasBud: Bool
+    /// Whether the page is dark: the vine's darks follow it.
+    var dark = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var breathe = false
 
@@ -102,7 +122,7 @@ struct VineSprig: View {
                                   control1: CGPoint(x: bloomX * 0.18, y: h * 0.25), control2: CGPoint(x: bloomX * 0.32, y: h * 0.8))
                     stem.addCurve(to: CGPoint(x: bloomX, y: h * 0.42),
                                   control1: CGPoint(x: bloomX * 0.68, y: h * 0.25), control2: CGPoint(x: bloomX * 0.84, y: h * 0.62))
-                    gc.stroke(stem, with: .color(VineGold.ink.opacity(0.5)), style: StrokeStyle(lineWidth: 4.5, lineCap: .round))
+                    gc.stroke(stem, with: .color(VineGold.shade(dark: dark, strength: 0.5)), style: StrokeStyle(lineWidth: 4.5, lineCap: .round))
                     gc.stroke(stem, with: .linearGradient(Gradient(colors: [VineGold.deep, VineGold.light, VineGold.bright]),
                                                           startPoint: .zero, endPoint: CGPoint(x: w, y: 0)),
                               style: StrokeStyle(lineWidth: 2.6, lineCap: .round))
@@ -124,8 +144,8 @@ struct VineSprig: View {
                     if hasBud {
                         let p = CGPoint(x: w - 34, y: h * 0.52)
                         let bud = VineBudShape.path(at: p, size: 9)
-                        gc.fill(bud, with: .color(Color(hex: 0x3A3220)))
-                        gc.stroke(bud, with: .color(VineGold.bright.opacity(0.75)), lineWidth: 1)
+                        gc.fill(bud, with: .color(VineGold.bud(dark: dark)))
+                        gc.stroke(bud, with: .color(VineGold.budEdge(dark: dark, strength: 0.75)), lineWidth: 1)
                     }
                 }
                 if hasBloom {
@@ -168,7 +188,7 @@ struct LearningVinePage: View {
                 if vine.earlierDays > 0 {
                     Text(vine.earlierDays == 1 ? "1 earlier day below the root" : "\(vine.earlierDays) earlier days below the root")
                         .font(.app(.caption))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(Color.faintInk)
                         .frame(maxWidth: .infinity)
                 }
                 PremiumGate(theme: theme, isOn: premium.opens(.lessons)) { offer = .lessons }
@@ -245,13 +265,13 @@ struct VineStem: View {
                 let pastPoints = bloomIndex < points.count ? Array(points[bloomIndex...].reversed()) : Array(points.reversed())
                 VineCurve(points: pastPoints, root: root)
                     .trim(from: 0, to: grown)
-                    .stroke(VineGold.ink.opacity(0.55), style: StrokeStyle(lineWidth: 7, lineCap: .round))
+                    .stroke(VineGold.shade(dark: theme.screenIsDark), style: StrokeStyle(lineWidth: 7, lineCap: .round))
                     .offset(y: 2)
                 VineCurve(points: pastPoints, root: root)
                     .trim(from: 0, to: grown)
                     .stroke(LinearGradient(colors: [VineGold.bright, VineGold.light, VineGold.deep], startPoint: .top, endPoint: .bottom),
                             style: StrokeStyle(lineWidth: 4.2, lineCap: .round))
-                VineTendrils(points: pastPoints)
+                VineTendrils(points: pastPoints, dark: theme.screenIsDark)
                     .opacity(grown)
                 ForEach(Array(nodes.enumerated()), id: \.element.id) { index, node in
                     let p = points[index]
@@ -308,7 +328,7 @@ struct VineStem: View {
                 .fill(LinearGradient(colors: [VineGold.light, VineGold.deep], startPoint: .top, endPoint: .bottom))
                 .overlay(VineLeafShape(angle: right ? -.pi / 7 : -.pi + .pi / 7, length: 32, veinOnly: true)
                     .stroke(VineGold.ink.opacity(0.55), lineWidth: 0.8))
-                .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
+                .shadow(color: VineGold.leafShadow(dark: theme.screenIsDark), radius: 2, y: 1)
                 .frame(width: 80, height: 80)
                 .position(p)
         case .bloom:
@@ -320,15 +340,17 @@ struct VineStem: View {
             .position(p)
         case .bud, .premiumBud:
             let premium = node.kind == .premiumBud
+            let dark: Bool = theme.screenIsDark
+            let edge: Color = VineGold.budEdge(dark: dark, strength: premium ? 0.9 : 0.7)
             ZStack {
                 VineBudShape(size: 11)
-                    .fill(premium ? AnyShapeStyle(VineGold.metal) : AnyShapeStyle(Color(hex: 0x3A3220)))
+                    .fill(premium ? AnyShapeStyle(VineGold.metal) : AnyShapeStyle(VineGold.bud(dark: dark)))
                 VineBudShape(size: 11)
-                    .stroke(VineGold.bright.opacity(premium ? 0.9 : 0.7), lineWidth: 1.1)
+                    .stroke(edge, lineWidth: 1.1)
                 if premium {
                     Image(systemName: "crown.fill")
                         .font(.system(size: 10))
-                        .foregroundStyle(VineGold.bright)
+                        .foregroundStyle(dark ? VineGold.bright : VineGold.deep)
                         .offset(y: -24)
                 }
             }
@@ -380,6 +402,8 @@ struct VineCurve: Shape {
 /// Small curling tendrils off the stem, between the leaves, like the knight's branches.
 struct VineTendrils: View {
     let points: [CGPoint]
+    /// Whether the page is dark.
+    var dark = true
 
     var body: some View {
         Canvas { gc, _ in
@@ -392,7 +416,7 @@ struct VineTendrils: View {
                               control1: CGPoint(x: p.x + side * 8, y: p.y + 2), control2: CGPoint(x: p.x + side * 22, y: p.y - 4))
                 curl.addCurve(to: CGPoint(x: p.x + side * 12, y: p.y - 12),
                               control1: CGPoint(x: p.x + side * 18, y: p.y - 22), control2: CGPoint(x: p.x + side * 10, y: p.y - 18))
-                gc.stroke(curl, with: .color(VineGold.ink.opacity(0.5)), style: StrokeStyle(lineWidth: 2.6, lineCap: .round))
+                gc.stroke(curl, with: .color(VineGold.shade(dark: dark, strength: 0.5)), style: StrokeStyle(lineWidth: 2.6, lineCap: .round))
                 gc.stroke(curl, with: .color(VineGold.deep), style: StrokeStyle(lineWidth: 1.3, lineCap: .round))
             }
         }
@@ -457,12 +481,23 @@ struct VineBudShape: Shape {
 struct VineFlower: View {
     let size: CGFloat
     var glow: CGFloat = 1
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
+        // On espresso a strong halo turns into a khaki disc, so it is softer there, and it
+        // falls away on a curve so no rim shows.
+        let peak: Double = (scheme == .dark ? 0.42 : 0.75) * Double(glow)
+        let light: Color = Color(hex: 0xF6DEA3)
+        let halo: [Gradient.Stop] = [
+            Gradient.Stop(color: light.opacity(peak), location: 0),
+            Gradient.Stop(color: light.opacity(peak * 0.58), location: 0.3),
+            Gradient.Stop(color: light.opacity(peak * 0.22), location: 0.6),
+            Gradient.Stop(color: light.opacity(peak * 0.05), location: 0.85),
+            Gradient.Stop(color: light.opacity(0), location: 1),
+        ]
         ZStack {
             Circle()
-                .fill(RadialGradient(colors: [Color(hex: 0xFFE6A8).opacity(0.75 * glow), Color(hex: 0xFFE6A8).opacity(0)],
-                                     center: .center, startRadius: 0, endRadius: size * 2.4))
+                .fill(RadialGradient(stops: halo, center: .center, startRadius: 0, endRadius: size * 2.4))
                 .frame(width: size * 4.8, height: size * 4.8)
                 .scaleEffect(0.85 + 0.15 * glow)
             ForEach(0..<6, id: \.self) { k in
@@ -519,14 +554,14 @@ struct PremiumGate: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .trainingCard(theme, tint: VineGold.deep, cornerRadius: 20)
+        .trainingCard(theme, tint: VineGold.deep, cornerRadius: 22)
     }
 
     private func column(_ title: String, lines: [String], gold: Bool) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.app(.caption2, weight: .bold))
-                .tracking(1)
+                .font(.app(.caption2, weight: .semibold))
+                .tracking(1.2)
                 .foregroundStyle(gold ? AnyShapeStyle(VineGold.text(theme)) : AnyShapeStyle(.secondary))
             ForEach(lines, id: \.self) { line in
                 Text(line)

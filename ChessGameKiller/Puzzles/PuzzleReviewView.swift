@@ -217,13 +217,18 @@ private struct ReviewCaughtUpView: View {
             VStack(spacing: 18) {
                 Image(systemName: "checkmark.seal.fill")
                     .font(.system(size: 52, weight: .semibold))
-                    .foregroundStyle(theme.trainingAccent)
+                    // A large solid gold is lit from above, like the edges; the ink gold is for words.
+                    .foregroundStyle(theme.screenTone != nil && !theme.glows
+                        ? AnyShapeStyle(LinearGradient(colors: [Polish.goldBase(dark: theme.screenIsDark),
+                                                                Polish.goldDeep(dark: theme.screenIsDark)],
+                                                       startPoint: .top, endPoint: .bottom))
+                        : AnyShapeStyle(theme.trainingAccent))
                     .shadow(color: theme.glows ? theme.trainingAccent.opacity(0.7) : .clear, radius: 14)
                     .padding(.top, 28)
                     .accessibilityHidden(true)
                 VStack(spacing: 6) {
                     Text("All caught up")
-                        .font(.display(.title, weight: .semibold))
+                        .font(.display(.title, weight: .medium))
                     if reviewed > 0 {
                         Text("\(reviewed) reviewed · \(clean) clean")
                             .font(.app(.subheadline).monospacedDigit())

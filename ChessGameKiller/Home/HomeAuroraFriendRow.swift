@@ -97,7 +97,7 @@ struct HomeAuroraFriendRow: View {
             .overlay(Circle().strokeBorder(palette.card, lineWidth: 2))
             .overlay(alignment: .bottomTrailing) {
                 if person.online {
-                    Circle().fill(Color(hex: 0x7FCF8C))
+                    Circle().fill(palette.dark ? StoneInk.emerald.color(dark: true) : HomeTone.liveOnLight)
                         .frame(width: 8, height: 8)
                         .overlay(Circle().strokeBorder(palette.card, lineWidth: 1.5))
                 }

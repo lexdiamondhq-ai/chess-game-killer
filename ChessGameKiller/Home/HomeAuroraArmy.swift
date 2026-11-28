@@ -88,7 +88,9 @@ struct HomeAuroraArmy: View {
     private func figure(_ slot: ArmySlot) -> some View {
         let rank: ArmyRank = army.record(for: slot).rank
         let piece = Piece(slot.kind, color: color, square: slot.square(for: color))
-        let stone = LinearGradient(colors: [Color(hex: 0x6A5D51), Color(hex: 0x2E2621)],
+        // The same warm stone, lifted on a light card, where the dark one read as a puddle.
+        let stone = LinearGradient(colors: palette.dark ? [Color(hex: 0x6A5D51), Color(hex: 0x2E2621)]
+                                                        : [Color(hex: 0xD9CFC0), Color(hex: 0xA99C8B)],
                                    startPoint: .top, endPoint: .bottom)
         let base = Ellipse()
             .fill(stone)

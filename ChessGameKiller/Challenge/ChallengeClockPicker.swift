@@ -67,8 +67,8 @@ struct ChallengeClockPicker: View {
             ForEach(OnlineLobby.moreClocks) { group in
                 VStack(alignment: .leading, spacing: 6) {
                     Text(group.name.uppercased())
-                        .font(theme.challengeFont(11.5, .semibold))
-                        .tracking(0.8)
+                        .font(theme.challengeFont(11, .semibold))
+                        .tracking(1.2)
                         .foregroundStyle(.secondary)
                         .accessibilityAddTraits(.isHeader)
                     HStack(spacing: 6) {
@@ -80,12 +80,12 @@ struct ChallengeClockPicker: View {
             }
         }
         .padding(14)
-        .challengeGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .challengeGlass(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
     private func clockChip(_ option: FriendClock?, size: CGFloat = 15) -> some View {
         ChallengeChip(title: option?.label ?? "∞", isOn: clock == option, theme: theme,
-                      size: option == nil ? 24 : size) {
+                      size: size) {
             withAnimation(.snappy(duration: 0.3)) { clockID = OnlineLobby.clockID(option) }
         }
         .accessibilityLabel(detail(option, nil))

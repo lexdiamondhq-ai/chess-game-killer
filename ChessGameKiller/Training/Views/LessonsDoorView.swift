@@ -35,7 +35,7 @@ struct LessonsDoorView: View {
                 }
                 Text("Every drill was checked by Stockfish.")
                     .font(.app(.footnote))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Color.faintInk)
                     .frame(maxWidth: .infinity)
                     .padding(.top, 6)
             }
@@ -206,10 +206,12 @@ struct UnitCard: View {
         let isDone = store.isDone(lesson.id)
         let locked: Bool = !Premium.shared.opens(.lessons) && !library.isFreeLesson(lesson.id)
         let symbol: String = isDone ? "checkmark.circle.fill" : locked ? "crown.fill" : "play.circle.fill"
+        // On the light gold page a washed done disc reads as tan: one gold for the card's marks.
+        let washedDone: Bool = isDone && (theme.screenIsDark || theme.screenTone == nil)
         return HStack(spacing: 12) {
             Image(systemName: symbol)
                 .font(.system(size: 26))
-                .foregroundStyle(isDone ? color.opacity(0.7) : color)
+                .foregroundStyle(washedDone ? color.opacity(0.7) : color)
                 .frame(width: 34)
             VStack(alignment: .leading, spacing: 1) {
                 Text(lesson.title)

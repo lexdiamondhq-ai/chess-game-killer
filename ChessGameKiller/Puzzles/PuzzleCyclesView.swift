@@ -34,7 +34,8 @@ struct PuzzleCyclesView: View {
             TrainingBackdrop(theme: theme)
             VStack(spacing: 0) {
                 RoomHeader(title: "Cycles", subtitle: "The Woodpecker Method") { close() }
-                    .overlay(alignment: .topTrailing) { optionsMenu }
+                    // Centred on the header's row, so its disc sits on the close disc's centre line.
+                    .overlay(alignment: .trailing) { optionsMenu }
                 screen
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -170,7 +171,8 @@ struct PuzzleCyclesView: View {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 15, weight: .bold))
                     .frame(width: 36, height: 36)
-                    .background(.thinMaterial, in: Circle())
+                    .glassPane(Circle())
+                    .contentShape(Circle())
             }
             .accessibilityLabel("Cycles options")
             .padding(.trailing, 16)
@@ -370,7 +372,7 @@ struct PuzzleRunTrack: View {
         if index < results.count {
             return results[index] ? TrainingColor.green.color(on: theme) : TrainingColor.red.color(on: theme)
         }
-        return index == results.count ? theme.trainingAccent : Color.primary.opacity(0.14)
+        return index == results.count ? theme.trainingFill : Polish.track(dark: theme.screenIsDark)
     }
 }
 
@@ -450,14 +452,14 @@ private struct CycleSetupView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
             .padding(.horizontal, 6)
-            .trainingCard(theme, tint: selected ? accent : nil, cornerRadius: 16)
+            .trainingCard(theme, tint: selected ? accent : nil, cornerRadius: 18)
             .overlay {
                 if selected {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .strokeBorder(accent, lineWidth: 1.5)
                 }
             }
-            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(option.name): \(option.count) puzzles, \(option.firstCycle) the first time through")
@@ -515,7 +517,7 @@ private struct CycleIllustration: View {
     let theme: BoardTheme
 
     var body: some View {
-        let accent = theme.trainingAccent
+        let accent = theme.trainingFill
         HStack(alignment: .bottom, spacing: 14) {
             ForEach(0..<4, id: \.self) { index in
                 VStack(spacing: 6) {
@@ -548,7 +550,7 @@ private struct CycleSummaryView: View {
             VStack(spacing: 18) {
                 VStack(spacing: 6) {
                     Text(title)
-                        .font(.display(.title, weight: .semibold))
+                        .font(.display(.title, weight: .medium))
                     Text(subtitle)
                         .font(.app(.subheadline).monospacedDigit())
                         .foregroundStyle(.secondary)
@@ -661,7 +663,7 @@ private struct CycleBars: View {
             Label {
                 Text("Time")
             } icon: {
-                Circle().fill(theme.trainingAccent).frame(width: 8, height: 8)
+                Circle().fill(theme.trainingFill).frame(width: 8, height: 8)
             }
             Label {
                 Text("Solved cleanly")
@@ -683,7 +685,7 @@ private struct CycleBars: View {
                 .foregroundStyle(.secondary)
                 .frame(minWidth: 16)
             VStack(spacing: 5) {
-                bar(run.elapsed / longest, color: theme.trainingAccent, height: 10,
+                bar(run.elapsed / longest, color: theme.trainingFill, height: 10,
                     tick: run.target.map { $0 / longest })
                 bar(run.accuracy, color: green, height: 4)
             }
@@ -731,7 +733,7 @@ private struct CycleBars: View {
         GeometryReader { geo in
             let width = geo.size.width
             ZStack(alignment: .leading) {
-                Capsule().fill(Color.primary.opacity(0.08))
+                Capsule().fill(Polish.track(dark: theme.screenIsDark))
                 Capsule()
                     .fill(color)
                     .frame(width: max(height, width * CGFloat(min(1, max(0, fraction)))))

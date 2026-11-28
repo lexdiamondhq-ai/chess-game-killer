@@ -159,7 +159,7 @@ struct TrainingHubView: View {
             coachMenu
             Text(greeting)
                 .font(.app(.subheadline))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.quietInk)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
             StreakPill(streak: daily?.streak ?? store.streak, theme: theme)
@@ -297,7 +297,7 @@ struct TrainingHubView: View {
         VStack(spacing: 12) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.app(.largeTitle))
-                .foregroundStyle(.orange)
+                .foregroundStyle(theme.festive(.orange))
             Text("Training content is missing from this build.")
                 .font(.app(.headline))
                 .multilineTextAlignment(.center)
@@ -323,8 +323,7 @@ struct TodayCard: View {
             HStack(alignment: .top, spacing: 14) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(eyebrow(done: done))
-                        .font(.carved(11))
-                        .tracking(1.4)
+                        .eyebrow()
                         .foregroundStyle(theme.trainingAccent)
                     Text(title)
                         .font(.display(.title2, weight: .semibold))

@@ -18,20 +18,24 @@ struct ChallengeEntryRow: View {
             row(glyph: Glyphs.challenge, stone: .sapphire, title: "Play a friend", detail: "by username or link",
                 label: "Play a friend, by username or link", action: action)
             if let online {
-                Divider()
-                    .overlay(Color.primary.opacity(0.06))
+                // A hairline that stops short of the gilded edge, as the match card's do.
+                Rectangle()
+                    .fill(Color.primary.opacity(0.14))
+                    .frame(height: 0.5)
                     .padding(.leading, 58)
+                    .padding(.trailing, 14)
                 row(glyph: Glyphs.online, stone: .jade, title: "Play online", detail: onlineDetail,
                     label: "Play online, \(onlineDetail)", action: online)
             }
         }
+        // The rows are clipped to the card; the card's body is not, so its shadow can show.
+        .clipShape(shape)
         .background {
             shape
                 .fill(theme.screenIsDark ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)))
                 .overlay { PolishedEdge(shape: shape, edge: .card, dark: theme.screenIsDark) }
-                .shadow(color: .black.opacity(theme.screenIsDark ? 0.3 : 0.08), radius: 16, y: 6)
+                .shadow(color: theme.screenIsDark ? Color.clear : Polish.cast(dark: false), radius: 16, y: 6)
         }
-        .clipShape(shape)
     }
 
     private var onlineDetail: String {

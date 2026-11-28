@@ -68,7 +68,7 @@ struct SettingsSheet: View {
                     // never moves the boards under the finger.
                     section("Pieces") {
                         SettingsGroup(theme: theme) {
-                            PieceSetPicker(selection: $pieceSet, accent: accent)
+                            PieceSetPicker(selection: $pieceSet, accent: theme.trainingFill)
                         }
                         .opacity(theme.sculptedLook == nil ? 0.4 : 1)
                         .disabled(theme.sculptedLook == nil)
@@ -89,7 +89,7 @@ struct SettingsSheet: View {
                             // board). A look with a 3D board always plays on it, Tilted or Flat;
                             // SculptedSetting.settle() puts anyone who turned it off back.
                             if theme.sculptedLook != nil {
-                                PickerRow(title: "Board view", subtitle: tilt.blurb, symbol: "perspective", theme: theme) {
+                                PickerRow(title: "Board view", subtitle: tilt.blurb, symbol: "cube.fill", theme: theme) {
                                     Picker("Board view", selection: $tilt) {
                                         ForEach(BoardTilt.allCases) { choice in
                                             Text(choice.title).tag(choice)
@@ -102,10 +102,10 @@ struct SettingsSheet: View {
                                       symbol: "textformat.abc", isOn: $coordinatesOn, theme: theme)
                             rule
                             ToggleRow(title: "Piece history", subtitle: "Your pieces wear what they've been through: gold seams, a promoted pawn's collar, notches, patina.",
-                                      symbol: "seal", isOn: $heirloomOn, theme: theme)
+                                      symbol: "seal.fill", isOn: $heirloomOn, theme: theme)
                             rule
                             ToggleRow(title: "Confirm moves", subtitle: "In online, friend and daily games your move waits on the board with a gold Play bar: tap ✓ to play it, ✕ to take it back. Off plays it the moment you tap.",
-                                      symbol: "checkmark.circle", isOn: $confirmMovesOn, theme: theme)
+                                      symbol: "checkmark.circle.fill", isOn: $confirmMovesOn, theme: theme)
                             // The switches for the earlier homes are gone (Alex, 2026-11-08): the
                             // app has one home. HomeLayouts.settle() puts anyone who turned them off back.
                         }
@@ -119,14 +119,14 @@ struct SettingsSheet: View {
                                       symbol: "sparkles", isOn: $showBestMoves, theme: theme)
                             rule
                             ToggleRow(title: "Runner-up in the coach", subtitle: "The coach panel lists a second choice too. The board only ever lights the best.",
-                                      symbol: "lightbulb", isOn: $showSecondBest, theme: theme)
+                                      symbol: "lightbulb.fill", isOn: $showSecondBest, theme: theme)
                                 .disabled(!showBestMoves)
                             rule
                             ToggleRow(title: "Move grades", subtitle: "Rates each move you play, from Best to Blunder.",
                                       symbol: "star.fill", isOn: $showVerdicts, theme: theme)
                             rule
                             PickerRow(title: "Game review", subtitle: (ReviewLevel(rawValue: reviewLevel) ?? .club).blurb,
-                                      symbol: "backward.circle", theme: theme) {
+                                      symbol: "backward.circle.fill", theme: theme) {
                                 Picker("Game review", selection: $reviewLevel) {
                                     ForEach(ReviewLevel.allCases) { level in
                                         Text(level.title).tag(level.rawValue)
@@ -151,7 +151,7 @@ struct SettingsSheet: View {
                     // Moved down from Appearance, under Voice reactions (Alex, 2026-11-09).
                     section("App icon") {
                         SettingsGroup(theme: theme) {
-                            AppIconPicker(accent: accent)
+                            AppIconPicker(accent: theme.trainingFill)
                         }
                     }
 
@@ -195,12 +195,12 @@ struct SettingsSheet: View {
                                     dismiss()
                                 }
                             } label: {
-                                LinkRowLabel(title: "How it works", symbol: "questionmark.circle", theme: theme)
+                                LinkRowLabel(title: "How it works", symbol: "questionmark.circle.fill", theme: theme)
                             }
                             .buttonStyle(.plain)
                             rule
                             Link(destination: PremiumStyle.privacy) {
-                                LinkRowLabel(title: "Privacy policy", symbol: "hand.raised", theme: theme)
+                                LinkRowLabel(title: "Privacy policy", symbol: "hand.raised.fill", theme: theme)
                             }
                             .buttonStyle(.plain)
                             rule
@@ -217,7 +217,7 @@ struct SettingsSheet: View {
                                 LicensesView(theme: theme)
                             } label: {
                                 HStack(spacing: 12) {
-                                    IconTile(symbol: "info.circle", theme: theme)
+                                    IconTile(symbol: "info.circle.fill", theme: theme)
                                     Text("Version")
                                         .font(.app(.body, weight: .semibold))
                                         .foregroundStyle(Color.primary)
@@ -275,10 +275,9 @@ struct SettingsSheet: View {
                          threeD: theme.sculptedLook != nil && sculpted3D, pieceSet: pieceSet)
                 .padding(.top, 6)
             Text("Live preview")
-                .font(.carved(11))
-                .tracking(1.5)
+                .eyebrow()
                 .textCase(.uppercase)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.trainingAccent)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 18)
@@ -290,7 +289,12 @@ struct SettingsSheet: View {
     }
 
     private var rule: some View {
-        Divider().padding(.leading, 60)
+        // A hairline that stops short of the gilded edge, as Home's rows do.
+        Rectangle()
+            .fill(Color.primary.opacity(0.14))
+            .frame(height: 0.5)
+            .padding(.leading, 60)
+            .padding(.trailing, 14)
     }
 
     /// Every look that is not a rival's own board, in the menu's order.
@@ -499,8 +503,9 @@ private struct ThemeCard: View {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 17, weight: .semibold))
                                 .symbolRenderingMode(.palette)
-                                .foregroundStyle(Color.black, theme.trainingAccent)
-                                .background(Circle().fill(Color.black).padding(-1.5))
+                                // Espresso on gold, as on the gold buttons, and a ring cut from the card.
+                                .foregroundStyle(Polish.onMetal, theme.trainingFill)
+                                .background(Circle().fill(theme.screenIsDark ? Color.black : Color.white).padding(-1.5))
                                 .offset(x: 7, y: -7)
                                 .transition(.scale.combined(with: .opacity))
                         }
@@ -548,7 +553,9 @@ private struct ThemeCard: View {
     private var swatch: some View {
         ZStack {
             if let art = option.boardArt {
-                Image(art).resizable().interpolation(.high).scaledToFill()
+                // The four centre squares, close enough to show the stone: the art is the whole
+                // board with a frame 1/18 wide, so a square is 1/9 of it.
+                Image(art).resizable().interpolation(.high).scaledToFill().scaleEffect(4.5)
             } else {
                 if let surface = option.surface {
                     LinearGradient(colors: surface, startPoint: .topLeading, endPoint: .bottomTrailing)
@@ -560,10 +567,13 @@ private struct ThemeCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(option.boardEdge ?? Color.black.opacity(0.08), lineWidth: 1)
+                .strokeBorder(option.boardEdge ?? (theme.screenIsDark ? Polish.goldBase(dark: true).opacity(0.38)
+                                                                      : Color.black.opacity(0.1)),
+                              lineWidth: theme.screenIsDark ? 0.75 : 1)
         }
-        .shadow(color: option.backdrop != nil ? .black.opacity(0.35)
-                    : option.isDark ? Color(hex: 0x3CDCE6).opacity(0.35) : .black.opacity(0.1), radius: 6)
+        .shadow(color: option.backdrop != nil ? Polish.cast(dark: theme.screenIsDark, strength: 1.75)
+                    : option.isDark ? Color(hex: 0x3CDCE6).opacity(0.35) : .black.opacity(0.1),
+                radius: 5, y: option.backdrop != nil ? 2 : 0)
         .accessibilityHidden(true)
     }
 
@@ -607,7 +617,7 @@ private struct ToggleRow: View {
             }
             .opacity(isEnabled ? 1 : 0.4)
         }
-        .tint(theme.trainingAccent)
+        .tint(theme.trainingFill)
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
     }
@@ -677,15 +687,20 @@ private struct IconTile: View {
         let accent = theme.trainingAccent
         let tile = RoundedRectangle(cornerRadius: 10, style: .continuous)
         Image(systemName: symbol)
+            // One strength for the whole glyph: the Haptics phone's waves are drawn faint otherwise.
+            .symbolRenderingMode(.monochrome)
             .font(.system(size: 15, weight: .semibold))
             .foregroundStyle(accent)
             .frame(width: 34, height: 34)
             .background {
                 // Lit from above with a fine rim, as the Learn rows' plates are.
-                tile.fill(LinearGradient(colors: [accent.opacity(0.26), accent.opacity(0.1)],
+                tile.fill(LinearGradient(colors: [accent.opacity(0.24), accent.opacity(0.1)],
                                          startPoint: .top, endPoint: .bottom))
             }
-            .overlay { tile.strokeBorder(accent.opacity(0.4), lineWidth: 0.8) }
+            .overlay {
+                tile.strokeBorder(LinearGradient(colors: [accent.opacity(0.5), accent.opacity(0.2)],
+                                                 startPoint: .top, endPoint: .bottom), lineWidth: 0.75)
+            }
             .accessibilityHidden(true)
     }
 }

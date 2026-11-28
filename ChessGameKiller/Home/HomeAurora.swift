@@ -424,14 +424,15 @@ struct HomeAuroraView: View {
             }
             .padding(.horizontal, 16)
             // The page ends on For today: no carved sign-off under it (Alex, 2026-11-27: "Let's
-            // delete these"), only as much room as the bottom bar needs.
+            // delete these"), only as much room as the bottom bar and the fade above it need, so
+            // the last row of cards can be pulled clear of both.
         }
         // A part that arrives after the page (the first read of your games, a friend's move)
         // eases in and the rest makes room, instead of the page jumping.
         .animation(.snappy(duration: 0.3), value: info.dna != nil)
         .animation(.snappy(duration: 0.3), value: info.finest != nil)
         .animation(.snappy(duration: 0.3), value: HomeAuroraQuickBar.mode(games: info.games) != nil)
-        .padding(.bottom, 84)
+        .padding(.bottom, 120)
         .frame(maxWidth: .infinity)
         .background {
             shape.fill(palette.sheet)
@@ -1416,13 +1417,15 @@ struct HomeAuroraJewel: View {
         var colors: [Color] {
             switch self {
             case .amethyst: return [Color(hex: 0x5B3FB8), Color(hex: 0x2E1F6E)]
-            case .jade: return [Color(hex: 0x1F8A7A), Color(hex: 0x0D4A45)]
+            // All eight sit at one depth, so the gold drawing stands as clearly on amber and
+            // jade as on amethyst and ruby.
+            case .jade: return [Color(hex: 0x1B7266), Color(hex: 0x043935)]
             case .ruby: return [Color(hex: 0xB3283B), Color(hex: 0x5E0F1C)]
             case .sapphire: return [Color(hex: 0x2B5FB8), Color(hex: 0x13306B)]
-            case .emerald: return [Color(hex: 0x2F8A57), Color(hex: 0x124A2C)]
-            case .amber: return [Color(hex: 0xB8782A), Color(hex: 0x6A3F10)]
-            case .slate: return [Color(hex: 0x4F5B6E), Color(hex: 0x232A36)]
-            case .violet: return [Color(hex: 0x8A3FA8), Color(hex: 0x45185A)]
+            case .emerald: return [Color(hex: 0x1B7546), Color(hex: 0x043B20)]
+            case .amber: return [Color(hex: 0xA25C0C), Color(hex: 0x4E2203)]
+            case .slate: return [Color(hex: 0x495C78), Color(hex: 0x1E293B)]
+            case .violet: return [Color(hex: 0x8F3A93), Color(hex: 0x47134C)]
             }
         }
     }
@@ -1452,9 +1455,11 @@ struct HomeAuroraJewel: View {
                                      startPoint: .topLeading, endPoint: .bottomTrailing)
 
     var body: some View {
-        let tile = RoundedRectangle(cornerRadius: 16, style: .continuous)
         GeometryReader { geo in
             let side = min(geo.size.width, geo.size.height)
+            // The corner is one cut at every size; the inner thread's corner is that less its own
+            // inset, so it runs parallel to the edge all the way round.
+            let tile = RoundedRectangle(cornerRadius: 16, style: .continuous)
             tile
                 .fill(LinearGradient(colors: stone.colors, startPoint: .topLeading, endPoint: .bottomTrailing))
                 .overlay {
@@ -1464,8 +1469,8 @@ struct HomeAuroraJewel: View {
                                              endRadius: side * 0.7))
                 }
                 .overlay {
-                    RoundedRectangle(cornerRadius: side * 0.22, style: .continuous)
-                        .strokeBorder(Color(hex: 0xE2C27E).opacity(0.7), lineWidth: 0.7)
+                    RoundedRectangle(cornerRadius: max(4, 16 - side * 0.055), style: .continuous)
+                        .strokeBorder(AnyShapeStyle(Self.gold).opacity(0.9), lineWidth: 0.75)
                         .padding(side * 0.055)
                 }
                 .overlay {

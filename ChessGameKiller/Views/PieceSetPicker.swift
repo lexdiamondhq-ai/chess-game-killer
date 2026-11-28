@@ -5,6 +5,7 @@ import SwiftUI
 struct PieceSetPicker: View {
     @Binding var selection: PieceSet
     let accent: Color
+    @Environment(\.colorScheme) private var scheme
 
     private let columns = [GridItem(.adaptive(minimum: 92), spacing: 14)]
 
@@ -27,6 +28,8 @@ struct PieceSetPicker: View {
     private func tile(_ set: PieceSet) -> some View {
         let isOn = set == selection
         let shape = RoundedRectangle(cornerRadius: 15, style: .continuous)
+        // On a light card the gap inside the ring reads as a second line: the ring sits on the picture there.
+        let ringInset: CGFloat = scheme == .dark ? 0 : 1
         return VStack(spacing: 8) {
             set.preview
                 .resizable()
@@ -37,9 +40,10 @@ struct PieceSetPicker: View {
                 .padding(3)
                 .overlay {
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .inset(by: ringInset)
                         .strokeBorder(accent, lineWidth: isOn ? 2 : 0)
                 }
-                .shadow(color: .black.opacity(0.35), radius: 6, y: 3)
+                .shadow(color: Polish.cast(dark: scheme == .dark, strength: 1.75), radius: 5, y: 3)
             Text(set.title)
                 .font(.app(.caption, weight: isOn ? .semibold : .regular))
                 .foregroundStyle(isOn ? .primary : .secondary)

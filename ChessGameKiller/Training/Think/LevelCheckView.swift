@@ -122,9 +122,8 @@ struct LevelCheckView: View {
                 } label: {
                     Text("Start")
                 }
-                .buttonStyle(TrainingButtonStyle(theme: theme))
+                .buttonStyle(TrainingButtonStyle(theme: theme, dimmed: runner == nil))
                 .disabled(runner == nil)
-                .opacity(runner == nil ? 0.45 : 1)
                 Button {
                     onFinish(nil)
                 } label: {
@@ -274,7 +273,8 @@ private struct LevelProgressBar: View {
         HStack(spacing: 4) {
             ForEach(0..<LevelEstimator.questions, id: \.self) { index in
                 Capsule()
-                    .fill(index < answered ? theme.trainingAccent : Color.secondary.opacity(index == answered ? 0.45 : 0.2))
+                    .fill(index < answered ? theme.trainingFill
+                          : Polish.track(dark: theme.screenIsDark, strong: index == answered))
                     .frame(height: 4)
             }
         }
@@ -294,8 +294,8 @@ private struct LevelBandScale: View {
             HStack(spacing: 4) {
                 ForEach(LevelBand.allCases) { item in
                     Capsule()
-                        .fill(item == band ? theme.trainingAccent
-                              : Color.secondary.opacity(item.rawValue < band.rawValue ? 0.45 : 0.2))
+                        .fill(item == band ? theme.trainingFill
+                              : Polish.track(dark: theme.screenIsDark, strong: item.rawValue < band.rawValue))
                         .frame(height: 6)
                 }
             }

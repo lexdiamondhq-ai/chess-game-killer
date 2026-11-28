@@ -187,9 +187,8 @@ private struct CandidatePositionView: View {
             } label: {
                 Text("Check my candidates")
             }
-            .buttonStyle(TrainingButtonStyle(theme: theme))
+            .buttonStyle(TrainingButtonStyle(theme: theme, dimmed: !ready))
             .disabled(!ready)
-            .opacity(ready ? 1 : 0.45)
         case .checking:
             HStack(spacing: 10) {
                 KnightWait(size: 18)

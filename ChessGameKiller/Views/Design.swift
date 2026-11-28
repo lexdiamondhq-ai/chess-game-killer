@@ -77,7 +77,12 @@ struct PolishedFill<S: InsettableShape>: View {
 
     var body: some View {
         let metal = Polish.buttonMetal(ownMetal)
-        let glow: Double = quiet ? 0 : (scheme == .dark ? 0.3 : 0.34)
+        let lightRoom: Bool = scheme != .dark
+        // In a dark room the upper lip is a line of light. On cream, light on light is no line
+        // at all, so the lip is the edge's own gold there: one clean edge, lit by the sheen.
+        let lip: Color = lightRoom ? Polish.metal(ownMetal, dark: false).catchLight.opacity(0.9)
+                                   : Color.white.opacity(0.6)
+        let glow: Double = quiet ? 0 : (lightRoom ? 0.26 : 0.3)
         shape
             .fill(LinearGradient(colors: [metal.top, metal.foot], startPoint: .top, endPoint: .bottom))
             .overlay {
@@ -85,11 +90,12 @@ struct PolishedFill<S: InsettableShape>: View {
                                           startPoint: .top, endPoint: .center))
             }
             .overlay {
-                shape.strokeBorder(LinearGradient(colors: [Color.white.opacity(0.6), metal.rim.opacity(0.85)],
+                shape.strokeBorder(LinearGradient(colors: [lip, metal.rim.opacity(0.85)],
                                                   startPoint: .top, endPoint: .bottom),
                                    lineWidth: 1)
             }
-            .shadow(color: metal.foot.opacity(glow), radius: 10, y: 4)
+            // On cream the glow falls under the button, not around it.
+            .shadow(color: metal.foot.opacity(glow), radius: lightRoom ? 8 : 10, y: lightRoom ? 5 : 4)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
     }
@@ -114,6 +120,67 @@ extension Polish {
     /// Ink on a small main capsule: espresso on the gold, the page's own color on a plain fill.
     static func pillInk(gilded: Bool) -> AnyShapeStyle {
         gilded ? AnyShapeStyle(onMetal) : AnyShapeStyle(.background)
+    }
+}
+
+// MARK: - A choice of two or three
+
+/// Two or three choices side by side ("Rated / Puzzle Rush"): a glass capsule with the chosen
+/// one cut from the small gold capsule, the same family as the Tilted / Flat switch. It stands
+/// in for the system's grey segmented control on the gold pages.
+struct GildedSegments<Value: Hashable>: View {
+    /// What the choice is, for VoiceOver ("Mode").
+    let title: String
+    @Binding var selection: Value
+    let options: [(value: Value, label: String)]
+    let theme: BoardTheme
+
+    @Namespace private var marker
+
+    var body: some View {
+        let gilded: Bool = theme.screenTone != nil
+        let accent: Color = theme.trainingAccent
+        HStack(spacing: 0) {
+            ForEach(options.indices, id: \.self) { index in
+                let option = options[index]
+                let isOn: Bool = option.value == selection
+                Button {
+                    withAnimation(.snappy(duration: 0.2)) { selection = option.value }
+                } label: {
+                    Text(option.label)
+                        .font(.app(.subheadline, weight: .semibold))
+                        .foregroundStyle(isOn ? (gilded ? AnyShapeStyle(Polish.onMetal) : AnyShapeStyle(Color.primary))
+                                              : AnyShapeStyle(Color.quietInk))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .padding(.horizontal, 10)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background {
+                            if isOn {
+                                Group {
+                                    if gilded {
+                                        PolishedFill(shape: Capsule(), quiet: true)
+                                    } else {
+                                        Capsule()
+                                            .fill(accent.opacity(0.22))
+                                            .overlay { Capsule().strokeBorder(accent.opacity(0.5), lineWidth: 0.75) }
+                                    }
+                                }
+                                .matchedGeometryEffect(id: "on", in: marker)
+                            }
+                        }
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(isOn ? .isSelected : [])
+            }
+        }
+        // As tall as the system's own two-way switch, so swapping one for the other moves nothing.
+        .padding(2)
+        .frame(height: 32)
+        .glassPane(Capsule())
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(title)
     }
 }
 
@@ -157,6 +224,52 @@ struct SectionLabel: View {
     }
 }
 
+extension Color {
+    /// Quiet running text that sits on the page itself, not on a card: the page's ink at 62%.
+    /// The system's secondary is a cool grey there, and too pale on cream.
+    static let quietInk = Color.primary.opacity(0.62)
+    /// A footnote: one step quieter, and still easy to read (the system's tertiary is not).
+    static let faintInk = Color.primary.opacity(0.55)
+
+    /// A color with a value for a light room and one for a dark room, for a palette that has
+    /// no theme in hand. It follows the screen it is drawn on.
+    static func ink(light: UInt32, dark: UInt32) -> Color {
+        Color(UIColor { traits in
+            let hex: UInt32 = traits.userInterfaceStyle == .dark ? dark : light
+            return UIColor(red: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255,
+                           blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
+        })
+    }
+}
+
+/// The colors that mean something (right, wrong, careful, a hint), cut from the same stones as
+/// the jewel tiles: deep on cream so they read as words, lit but never neon on espresso, so
+/// gold stays the brightest thing on a page.
+enum StoneInk {
+    case emerald, ruby, carnelian, citrine, sapphire, amethyst, jade, rose, stone
+
+    /// On a light page, and on a dark one.
+    var hex: (light: UInt32, dark: UInt32) {
+        switch self {
+        case .emerald: return (0x1F7A4D, 0x6FCF97)
+        case .ruby: return (0xB3283B, 0xEC6A78)
+        // A touch redder than the gold ink, so small capitals in it never read as gold.
+        case .carnelian: return (0xB84A14, 0xF09460)
+        case .citrine: return (0xD49B00, 0xE6D04A)
+        case .sapphire: return (0x2B5FB8, 0x8AAEF0)
+        case .amethyst: return (0x5B3FB8, 0xB5A2F5)
+        case .jade: return (0x17786A, 0x6CCFC0)
+        case .rose: return (0xB03468, 0xF08CB8)
+        case .stone: return (0x7A7164, 0xA69E92)
+        }
+    }
+
+    func color(dark: Bool) -> Color { Color(hex: dark ? hex.dark : hex.light) }
+
+    /// The same, following the screen it is drawn on.
+    var color: Color { Color.ink(light: hex.light, dark: hex.dark) }
+}
+
 extension Text {
     /// A card's eyebrow: a few carved capitals over its headline ("NEXT UP", "RATED"), in the
     /// same hand as a group's label, so a card and the group above it read as one family.
@@ -184,8 +297,9 @@ struct JewelIcon: View {
                                          center: UnitPoint(x: 0.3, y: 0.2), startRadius: 0, endRadius: size * 0.7))
             }
             .overlay {
+                // The fine inner thread, in the drawing's own gold: one metal on every stone.
                 RoundedRectangle(cornerRadius: size * 0.24, style: .continuous)
-                    .strokeBorder(Color(hex: 0xE2C27E).opacity(0.7), lineWidth: 0.7)
+                    .strokeBorder(AnyShapeStyle(HomeAuroraJewel.gold).opacity(0.9), lineWidth: 0.75)
                     .padding(size * 0.06)
             }
             .overlay {

@@ -195,6 +195,7 @@ struct CalculationView: View {
             .frame(width: geo.size.width)
         }
         .background { TrainingBackdrop(theme: theme) }
+        .screenScheme(theme)
         .animation(.snappy, value: runner?.phase)
         .task {
             await puzzles.load()
@@ -212,12 +213,9 @@ struct CalculationView: View {
 
     private var settingsRow: some View {
         HStack(spacing: 12) {
-            Picker("Moves ahead", selection: $depth) {
-                Text("Short").tag(1)
-                Text("Medium").tag(2)
-                Text("Long").tag(3)
-            }
-            .pickerStyle(.segmented)
+            GildedSegments(title: "Moves ahead", selection: $depth,
+                           options: [(value: 1, label: "Short"), (value: 2, label: "Medium"), (value: 3, label: "Long")],
+                           theme: theme)
             Toggle(isOn: $blindfold) {
                 Label("Blindfold", systemImage: "eye.slash.fill")
                     .font(.app(.subheadline, weight: .semibold))

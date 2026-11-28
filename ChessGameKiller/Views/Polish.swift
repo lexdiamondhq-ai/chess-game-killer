@@ -12,6 +12,27 @@ enum Polish {
     static func goldBase(dark: Bool) -> Color { dark ? Color(hex: 0xE8C27A) : Color(hex: 0xB7832E) }
     static func goldDeep(dark: Bool) -> Color { dark ? Color(hex: 0xA8793A) : Color(hex: 0x8A5F1E) }
 
+    /// Gold for words and fine drawings: the gold a group's carved label wears, so a link, an
+    /// eyebrow and a label on one page are one metal. Deep enough to read on cream (5.2:1).
+    static func goldInk(dark: Bool) -> Color { dark ? goldBase(dark: true) : goldDeep(dark: false) }
+
+    /// Gold for a small solid shape that isn't a button: the lit part of a bar, a switch that
+    /// is on. The body of the edge's gold, a step lighter than the ink on a light page.
+    static func goldFill(dark: Bool) -> Color { goldBase(dark: dark) }
+
+    /// The empty part of a bar or a scale, and a ring nobody chose: the page's own warm ink
+    /// worn thin, never a neutral grey.
+    static func track(dark: Bool, strong: Bool = false) -> Color {
+        dark ? Color(hex: 0xF4EDDF).opacity(strong ? 0.30 : 0.14)
+             : Color(hex: 0x3A2A12).opacity(strong ? 0.28 : 0.12)
+    }
+
+    /// What a card, a chip or a thumbnail casts on the page: black in a dark room, a warm
+    /// umber on cream, where black leaves a grey smudge.
+    static func cast(dark: Bool, strength: Double = 1) -> Color {
+        dark ? Color.black.opacity(0.2 * strength) : Color(hex: 0x5A3E1B).opacity(0.13 * strength)
+    }
+
     /// An edge's three tones: where the light catches it, its body, and its shade.
     struct Metal {
         let catchLight: Color

@@ -250,6 +250,7 @@ struct GuessTheMoveView: View {
             .frame(width: geo.size.width)
         }
         .background { TrainingBackdrop(theme: theme) }
+        .screenScheme(theme)
         .animation(.snappy, value: runner?.phase)
         .onAppear {
             guard runner == nil else { return }
@@ -286,7 +287,7 @@ struct RoomHeader: View {
                 Image(systemName: "xmark")
                     .font(.system(size: 15, weight: .bold))
                     .frame(width: 36, height: 36)
-                    .background(.thinMaterial, in: Circle())
+                    .glassPane(Circle())
                     .frame(width: 44, height: 44)
                     .contentShape(Circle())
             }

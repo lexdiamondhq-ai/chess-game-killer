@@ -129,7 +129,7 @@ struct DailyCalendarView: View {
                 }
                 Text("Past Moves never count toward the streak.")
                     .font(.app(.caption))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Color.faintInk)
                     .padding(.top, 14)
             }
             .padding(.horizontal, 22)
@@ -167,6 +167,8 @@ struct DailyCalendarView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .fixedSize(horizontal: true, vertical: false)
+                // Letter spacing also follows the last letter: taken back, so the name is centred.
+                .padding(.trailing, -5)
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityLabel(month.start.formatted(.dateTime.month(.wide).year()))
             hairline(leading: false)
@@ -224,7 +226,7 @@ struct DailyCalendarView: View {
                 .font(.app(.footnote, weight: .semibold).monospacedDigit())
             Text(label.uppercased())
                 .font(.app(.caption2))
-                .tracking(1.4)
+                .tracking(1.2)
                 .foregroundStyle(.secondary)
         }
         .lineLimit(1)
@@ -238,9 +240,10 @@ struct DailyCalendarView: View {
         return HStack(spacing: 0) {
             ForEach(ordered, id: \.self) { name in
                 Text(name.uppercased())
-                    .font(.system(size: 10, weight: .semibold))
+                    // Quiet capitals, the weight of the tally's labels one row up.
+                    .font(.app(size: 10, weight: .regular))
                     .tracking(1.2)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Color.quietInk)
                     .frame(maxWidth: .infinity)
             }
         }
@@ -271,8 +274,8 @@ struct DailyCalendarView: View {
             .frame(width: 40, height: 46)
             .background {
                 if chosen {
-                    shape.fill(Color.primary.opacity(0.09))
-                        .overlay { shape.strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.75) }
+                    shape.fill(Polish.track(dark: theme.screenIsDark))
+                        .overlay { shape.strokeBorder(Polish.track(dark: theme.screenIsDark, strong: true), lineWidth: 0.75) }
                 }
             }
             .overlay {
@@ -299,8 +302,9 @@ struct DailyCalendarView: View {
     private func mark(_ mark: DailyCalendarMark) -> some View {
         switch mark {
         case .found:
-            Circle().fill(accent).frame(width: 7, height: 7)
-                .shadow(color: accent.opacity(0.55), radius: 4)
+            // A small solid gold; its halo is light, so it is kept for the dark page.
+            Circle().fill(theme.trainingFill).frame(width: 7, height: 7)
+                .shadow(color: theme.screenIsDark ? accent.opacity(0.55) : .clear, radius: 4)
         case .helped:
             Circle().strokeBorder(accent, lineWidth: 1.5).frame(width: 7, height: 7)
         case .missed:
@@ -319,11 +323,10 @@ struct DailyCalendarView: View {
         return HStack(spacing: 14) {
             HomeAuroraBoard(fen: puzzle?.shownFEN, flipped: puzzle?.solverIsWhite == false, lit: false)
                 .frame(width: 74, height: 74)
-                .shadow(color: .black.opacity(0.35), radius: 6, y: 4)
+                .shadow(color: Polish.cast(dark: theme.screenIsDark, strength: 1.75), radius: 5, y: 3)
             VStack(alignment: .leading, spacing: 3) {
                 Text(eyebrow(day, puzzle).uppercased())
-                    .font(.custom(HomeCarvingFont.plain, size: 10))
-                    .tracking(1.8)
+                    .eyebrow()
                     .foregroundStyle(accent)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -340,7 +343,8 @@ struct DailyCalendarView: View {
                 dismiss()
                 play(day.date)
             }
-            .buttonStyle(TrainingButtonStyle(theme: theme))
+            // A small action inside a card: the quiet gold pill, not the page's main button.
+            .buttonStyle(ChallengeButtonStyle(kind: .primary, theme: theme, height: 40))
             .fixedSize()
         }
         .padding(12)

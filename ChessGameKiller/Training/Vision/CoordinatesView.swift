@@ -211,13 +211,19 @@ struct CoordinatesView: View {
                 }
                 Spacer(minLength: 0)
                 Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(selected ? accent : Color.secondary.opacity(0.5))
+                    .foregroundStyle(selected ? accent : Polish.track(dark: theme.screenIsDark, strong: true))
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
             .frame(maxWidth: .infinity)
-            .trainingCard(theme, tint: selected ? accent : nil, cornerRadius: 16)
-            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .trainingCard(theme, tint: selected ? accent : nil, cornerRadius: 18)
+            .overlay {
+                if selected {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(accent, lineWidth: 1.5)
+                }
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Play as \(side.displayName). \(record)")

@@ -49,7 +49,7 @@ struct AnalyzeSheet: View {
         self.session = session
     }
 
-    private var accent: Color { theme.trainingAccent }
+    private var accent: Color { theme.homeMetalAccent }
     private var hasCamera: Bool { UIImagePickerController.isSourceTypeAvailable(.camera) }
     /// The game on the board when it has moves to look at (opened from Home there may be none).
     private var gameFEN: String? {
@@ -349,9 +349,9 @@ private struct StartCard: View {
     var body: some View {
         HStack(spacing: 14) {
             Glyph(name: symbol, size: 28)
-                .foregroundStyle(theme.trainingAccent)
+                .foregroundStyle(theme.homeMetalAccent)
                 .frame(width: 44, height: 44)
-                .background(theme.trainingAccent.opacity(0.15), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(theme.homeMetalAccent.opacity(0.15), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.app(.headline))
                 Text(detail).font(.app(.subheadline)).foregroundStyle(.secondary)
@@ -405,7 +405,7 @@ struct BoardEditorView: View {
     @AppStorage("sculpted3D") private var sculpted3D = true
     @AppStorage(BoardTilt.storageKey) private var tilt = BoardTilt.tilted
 
-    private var accent: Color { theme.trainingAccent }
+    private var accent: Color { theme.homeMetalAccent }
     private var problem: String? {
         session.draft.problems.first?.message(white: "White", black: "Black")
     }
@@ -689,7 +689,7 @@ struct AnalysisView: View {
     private var sideName: String { model.draft.sideToMove == .white ? "White" : "Black" }
     private var otherSideName: String { model.draft.sideToMove == .white ? "Black" : "White" }
 
-    private var accent: Color { theme.trainingAccent }
+    private var accent: Color { theme.homeMetalAccent }
 
     /// The last move's squares and the piece picked up, tinted.
     private var tints: [Square: Color] {
