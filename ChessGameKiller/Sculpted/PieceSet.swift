@@ -34,6 +34,18 @@ enum PieceSet: String, CaseIterable, Identifiable {
         }
     }
 
+    /// The line under its name in Settings: what it is made of.
+    var blurb: String {
+        switch self {
+        case .stone: return "The board's own carved stone"
+        case .blackPearl: return "Mother of pearl and black pearl, in platinum"
+        case .jade: return "Pale jade and onyx, with gold and rubies"
+        case .crystal: return "Clear and smoked crystal, in gold"
+        case .sovereign: return "Polished gold against blackened silver"
+        case .porcelain: return "White porcelain painted in cobalt"
+        }
+    }
+
     /// The tile in Settings: the set itself on the gilded stone.
     var preview: Image { Image("PieceSets/\(rawValue)") }
 
