@@ -29,6 +29,8 @@ struct TrainingHubView: View {
     @State private var showingLevelCheck = false
     /// Learn's film over the page: once, the first time Learn opens, and again from the menu.
     @State private var filmPlaying: Bool
+    /// Chess DNA's film over the page: once, the first time Chess DNA opens, and again from its page.
+    @State private var dnaFilmPlaying = false
 
     /// Opens straight on one door, Learn behind it (Home's Chess DNA card opens on Chess DNA).
     init(theme: BoardTheme, door: TrainDoor? = nil) {
@@ -82,12 +84,18 @@ struct TrainingHubView: View {
         .tint(theme.trainingAccent)
         .screenScheme(theme)
         // Under the film, Learn is out of VoiceOver's way.
-        .accessibilityHidden(filmPlaying)
+        .accessibilityHidden(filmPlaying || dnaFilmPlaying)
         .overlay {
             if filmPlaying {
                 LearnFilmView {
                     LearnFilm.markSeen()
                     withAnimation(.easeOut(duration: 0.5)) { filmPlaying = false }
+                }
+                .transition(.opacity)
+            } else if dnaFilmPlaying {
+                LearnFilmView(url: DNAFilm.url) {
+                    DNAFilm.markSeen()
+                    withAnimation(.easeOut(duration: 0.5)) { dnaFilmPlaying = false }
                 }
                 .transition(.opacity)
             }
@@ -249,7 +257,25 @@ struct TrainingHubView: View {
         case .openings: OpeningsView(theme: theme)
         case .endgames: EndgamesDoorView(theme: theme)
         case .calculation: CalculationDoorView(theme: theme)
-        case .games: GamesDoorView(theme: theme)
+        case .games:
+            GamesDoorView(theme: theme)
+                // The first time Chess DNA opens, from Learn's door or Home's card, its film fades in.
+                .onAppear {
+                    if !dnaFilmPlaying, DNAFilm.shouldShow() {
+                        withAnimation(.easeIn(duration: 0.6)) { dnaFilmPlaying = true }
+                    }
+                }
+                .toolbar {
+                    if DNAFilm.url != nil {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button {
+                                withAnimation(.easeIn(duration: 0.3)) { dnaFilmPlaying = true }
+                            } label: {
+                                Label("Watch the film", systemImage: "play.circle")
+                            }
+                        }
+                    }
+                }
         }
     }
 

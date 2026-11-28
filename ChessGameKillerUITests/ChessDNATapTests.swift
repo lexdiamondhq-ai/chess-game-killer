@@ -13,6 +13,32 @@ final class ChessDNATapTests: TapTestCase {
         expectPage("Chess DNA", after: "Opening Chess DNA")
     }
 
+    /// Skip in the corner of Chess DNA's film.
+    private var skipFilm: XCUIElementQuery { buttons("Skip the film") }
+
+    /// The first time Chess DNA opens, its film fades in over it, and Skip gives way to the page.
+    func testTheFilmPlaysTheFirstTimeChessDNAOpens() {
+        launch(["-dnaFilmSeen", "NO"])
+        tap(buttons("Learn"), "The Learn tab on Home", scrolls: false)
+        expectPage("Learn", after: "Tapping the Learn tab on Home")
+        tap(buttons(startingWith: "Chess DNA."), "The Chess DNA door")
+        expectTouchable(skipFilm, "Chess DNA's film did not play the first time Chess DNA opened")
+        tap(skipFilm, "Skip on Chess DNA's film", scrolls: false)
+        expectPage("Chess DNA", after: "Skipping Chess DNA's film")
+        if !leaves(skipFilm.firstMatch) { fail("Chess DNA's film stayed after Skip") }
+    }
+
+    /// A player who has seen the film opens Chess DNA without it; Watch the film plays it again,
+    /// and Skip comes back to the page.
+    func testWatchTheFilmPlaysItAgain() {
+        openChessDNA()
+        if skipFilm.firstMatch.exists { fail("Chess DNA's film played for a player who has seen it") }
+        tap(buttons("Watch the film"), "Watch the film on Chess DNA", scrolls: false)
+        expectTouchable(skipFilm, "Watch the film on Chess DNA did not play the film")
+        tap(skipFilm, "Skip on Chess DNA's film", scrolls: false)
+        expectPage("Chess DNA", after: "Skipping Chess DNA's film")
+    }
+
     /// Back from Chess DNA is Learn, and the vine opens from there as well.
     func testBackFromChessDNAIsLearn() {
         openChessDNA()

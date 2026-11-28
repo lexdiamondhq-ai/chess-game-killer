@@ -22,9 +22,32 @@ enum LearnFilm {
     }
 }
 
-/// Learn's film, full screen and with sound, over Learn. Skip sits small in the corner; at its
-/// end the film gives way to Learn.
+/// "The Forge": Chess DNA's 31-second film (Alex, 2026-11-28). Leo tells it: the Wolf Knight
+/// walks into a forge whose walls are carved with chess pieces; his armor, made of every game
+/// he played, shines gold on one side (his weapon) and has a glowing crack on the other (his
+/// leak); he seals the crack in gold, and every carved piece lights him up. It fades in once,
+/// the first time Chess DNA opens, and the Chess DNA page plays it again (Watch the film).
+enum DNAFilm {
+    static let key = "dnaFilmSeen"
+
+    static var url: URL? { Bundle.main.url(forResource: "dna-film", withExtension: "mp4") }
+
+    /// Once, the first time Chess DNA opens. Never in tests or CI's pictures, and not without the file.
+    static func shouldShow(_ defaults: UserDefaults = .standard, underTest: Bool = Welcome.isUnderTest) -> Bool {
+        guard !underTest, defaults.string(forKey: "showcase") == nil,
+              defaults.string(forKey: "showcaseOpen") == nil else { return false }
+        return !defaults.bool(forKey: key) && url != nil
+    }
+
+    static func markSeen(_ defaults: UserDefaults = .standard) {
+        defaults.set(true, forKey: key)
+    }
+}
+
+/// A Learn film (Learn's own or Chess DNA's), full screen and with sound, over Learn. Skip sits
+/// small in the corner; at its end the film gives way to the page under it.
 struct LearnFilmView: View {
+    var url: URL? = LearnFilm.url
     let done: () -> Void
     @State private var player: AVPlayer?
     @State private var finished = false
@@ -55,7 +78,7 @@ struct LearnFilmView: View {
     }
 
     private func start() {
-        guard let url = LearnFilm.url else {
+        guard let url else {
             finish()
             return
         }
